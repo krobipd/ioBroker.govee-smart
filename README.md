@@ -9,7 +9,7 @@
 [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd)
 [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
-<img src="https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart-smart/main/admin/govee-smart.svg" width="100" />
+<img src="https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg" width="100" />
 
 Control [Govee](https://www.govee.com/) smart lights (H6xxx/H7xxx series) via three seamless channels: **LAN** (fastest, primary), **AWS IoT MQTT** (real-time status push), and **Cloud API v2** (scenes, segments, capabilities).
 
@@ -32,7 +32,7 @@ Control [Govee](https://www.govee.com/) smart lights (H6xxx/H7xxx series) via th
 - **Node.js >= 20**
 - **ioBroker js-controller >= 7.0.0**
 - **ioBroker Admin >= 7.6.20**
-- **Govee lights with LAN API support** (H6xxx/H7xxx series with Wi-Fi)
+- **Govee lights with LAN API support** (H6xxx/H7xxx series with Wi-Fi) — [Supported devices list](https://app-h5.govee.com/user-manual/wlan-guide)
 
 ---
 
@@ -129,6 +129,14 @@ govee-smart.0.
 ---
 
 ## Changelog
+
+### 0.1.2 (2026-04-06)
+- Fix LAN discovery race condition: listen socket ready before first scan
+
+### 0.1.1 (2026-04-05)
+- Fix LAN-only devices missing control states (power, brightness, color, colorTemperature)
+- Fix LAN status matching by source IP instead of broadcasting to all devices
+- Request device status immediately after LAN discovery
 
 ### 0.1.0 (2026-04-05)
 - Initial release
