@@ -34,10 +34,12 @@ module.exports = __toCommonJS(govee_mqtt_client_exports);
 var https = __toESM(require("node:https"));
 var forge = __toESM(require("node-forge"));
 var mqtt = __toESM(require("mqtt"));
-const LOGIN_URL = "https://app2.govee.com/account/rest/account/v1/login";
+const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
 const IOT_KEY_URL = "https://app2.govee.com/app/v1/account/iot/key";
-const APP_VERSION = "6.5.02";
+const APP_VERSION = "7.3.30";
 const CLIENT_TYPE = "1";
+const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
+const USER_AGENT = "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
 const AMAZON_ROOT_CA1 = `-----BEGIN CERTIFICATE-----
 MIIDQTCCAimgAwIBAgITBmyfz5m/jAo54vB4ikPmljZbyjANBgkqhkiG9w0BAQsF
 ADA5MQswCQYDVQQGEwJVUzEPMA0GA1UEChMGQW1hem9uMRkwFwYDVQQDExBBbWF6
@@ -93,14 +95,23 @@ class GoveeMqttClient {
    * @param onConnection Called on connection state changes
    */
   async connect(onStatus, onConnection) {
+    var _a, _b, _c;
     this.onStatus = onStatus;
     this.onConnection = onConnection;
     try {
       const loginResp = await this.login();
+      if (!loginResp.client) {
+        throw new Error(
+          `Login failed: ${(_a = loginResp.message) != null ? _a : "unknown error"} (status ${(_b = loginResp.status) != null ? _b : "?"})`
+        );
+      }
       this.bearerToken = loginResp.client.token;
-      this.accountId = loginResp.client.accountId;
+      this.accountId = String(loginResp.client.accountId);
       this.accountTopic = loginResp.client.topic;
       const iotResp = await this.getIotKey();
+      if (!((_c = iotResp.data) == null ? void 0 : _c.endpoint)) {
+        throw new Error("IoT key response missing endpoint/certificate data");
+      }
       const { endpoint, p12, p12Pass } = iotResp.data;
       const { key, cert, ca } = this.extractCertsFromP12(p12, p12Pass);
       const clientId = `AP/${this.accountId}/${this.generateUuid()}`;
@@ -116,16 +127,16 @@ class GoveeMqttClient {
         rejectUnauthorized: true
       });
       this.client.on("connect", () => {
-        var _a;
+        var _a2;
         this.reconnectAttempts = 0;
         this.log.debug("MQTT connected to AWS IoT");
-        (_a = this.client) == null ? void 0 : _a.subscribe(this.accountTopic, { qos: 0 }, (err) => {
-          var _a2;
+        (_a2 = this.client) == null ? void 0 : _a2.subscribe(this.accountTopic, { qos: 0 }, (err) => {
+          var _a3;
           if (err) {
             this.log.warn(`MQTT subscribe failed: ${err.message}`);
           } else {
             this.log.debug(`MQTT subscribed to account topic`);
-            (_a2 = this.onConnection) == null ? void 0 : _a2.call(this, true);
+            (_a3 = this.onConnection) == null ? void 0 : _a3.call(this, true);
           }
         });
       });
@@ -136,8 +147,8 @@ class GoveeMqttClient {
         this.log.debug(`MQTT error: ${err.message}`);
       });
       this.client.on("close", () => {
-        var _a;
-        (_a = this.onConnection) == null ? void 0 : _a.call(this, false);
+        var _a2;
+        (_a2 = this.onConnection) == null ? void 0 : _a2.call(this, false);
         this.scheduleReconnect();
       });
     } catch (err) {
@@ -313,18 +324,22 @@ class GoveeMqttClient {
   }
   /** Login to Govee account */
   login() {
-    const clientId = this.generateUuid();
     return this.httpsPost(
       LOGIN_URL,
       {
         email: this.email,
         password: this.password,
-        client: clientId
+        client: CLIENT_ID
       },
       {
         appVersion: APP_VERSION,
-        clientId,
-        clientType: CLIENT_TYPE
+        clientId: CLIENT_ID,
+        clientType: CLIENT_TYPE,
+        "User-Agent": USER_AGENT,
+        timezone: "Europe/Berlin",
+        country: "DE",
+        envid: "0",
+        iotversion: "0"
       }
     );
   }
@@ -333,7 +348,9 @@ class GoveeMqttClient {
     return this.httpsGet(IOT_KEY_URL, {
       Authorization: `Bearer ${this.bearerToken}`,
       appVersion: APP_VERSION,
-      clientType: CLIENT_TYPE
+      clientId: CLIENT_ID,
+      clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT
     });
   }
   /**

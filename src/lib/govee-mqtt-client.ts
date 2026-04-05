@@ -8,10 +8,13 @@ import type {
   TimerAdapter,
 } from "./types.js";
 
-const LOGIN_URL = "https://app2.govee.com/account/rest/account/v1/login";
+const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
 const IOT_KEY_URL = "https://app2.govee.com/app/v1/account/iot/key";
-const APP_VERSION = "6.5.02";
+const APP_VERSION = "7.3.30";
 const CLIENT_TYPE = "1";
+const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
+const USER_AGENT =
+  "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
 
 /** Amazon Root CA 1 — required for AWS IoT Core TLS */
 const AMAZON_ROOT_CA1 = `-----BEGIN CERTIFICATE-----
@@ -96,12 +99,20 @@ export class GoveeMqttClient {
     try {
       // Step 1: Login
       const loginResp = await this.login();
+      if (!loginResp.client) {
+        throw new Error(
+          `Login failed: ${loginResp.message ?? "unknown error"} (status ${loginResp.status ?? "?"})`,
+        );
+      }
       this.bearerToken = loginResp.client.token;
-      this.accountId = loginResp.client.accountId;
+      this.accountId = String(loginResp.client.accountId);
       this.accountTopic = loginResp.client.topic;
 
       // Step 2: Get IoT credentials
       const iotResp = await this.getIotKey();
+      if (!iotResp.data?.endpoint) {
+        throw new Error("IoT key response missing endpoint/certificate data");
+      }
       const { endpoint, p12, p12Pass } = iotResp.data;
 
       // Step 3: Extract key + cert from P12
@@ -342,18 +353,22 @@ export class GoveeMqttClient {
 
   /** Login to Govee account */
   private login(): Promise<GoveeLoginResponse> {
-    const clientId = this.generateUuid();
     return this.httpsPost<GoveeLoginResponse>(
       LOGIN_URL,
       {
         email: this.email,
         password: this.password,
-        client: clientId,
+        client: CLIENT_ID,
       },
       {
         appVersion: APP_VERSION,
-        clientId,
+        clientId: CLIENT_ID,
         clientType: CLIENT_TYPE,
+        "User-Agent": USER_AGENT,
+        timezone: "Europe/Berlin",
+        country: "DE",
+        envid: "0",
+        iotversion: "0",
       },
     );
   }
@@ -363,7 +378,9 @@ export class GoveeMqttClient {
     return this.httpsGet<GoveeIotKeyResponse>(IOT_KEY_URL, {
       Authorization: `Bearer ${this.bearerToken}`,
       appVersion: APP_VERSION,
+      clientId: CLIENT_ID,
       clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT,
     });
   }
 

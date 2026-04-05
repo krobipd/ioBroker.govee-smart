@@ -133,12 +133,16 @@ export interface CloudScene {
 
 /** Login response from app2.govee.com */
 export interface GoveeLoginResponse {
-  /** Client authentication data */
-  client: {
+  /** API status code (200 = success) */
+  status?: number;
+  /** API status message */
+  message?: string;
+  /** Client authentication data (missing on auth failure) */
+  client?: {
     /** Bearer token for API calls */
     token: string;
-    /** Account identifier */
-    accountId: string;
+    /** Account identifier (numeric) */
+    accountId: number | string;
     /** MQTT topic for status updates */
     topic: string;
   };
@@ -147,7 +151,7 @@ export interface GoveeLoginResponse {
 /** IoT key response from app2.govee.com */
 export interface GoveeIotKeyResponse {
   /** IoT credential data */
-  data: {
+  data?: {
     /** AWS IoT endpoint hostname */
     endpoint: string;
     /** Base64-encoded PKCS12 certificate */
