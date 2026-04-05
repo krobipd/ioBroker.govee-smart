@@ -46,10 +46,11 @@
     },
     "main": "build/main.js",
     "files": [
-        "admin/",
-        "build/",
+        "admin",
+        "build",
         "io-package.json",
-        "LICENSE"
+        "LICENSE",
+        "README.md"
     ],
     "scripts": {
         "prebuild": "rimraf build",
@@ -61,6 +62,7 @@
         "test:integration": "npm run build:test && mocha --exit \"build/test/**/*.js\"",
         "test": "npm run build:test && mocha --exit \"build/test/**/*.js\"",
         "lint": "eslint",
+        "lint:fix": "eslint --fix",
         "translate": "translate-adapter",
         "release": "release-script"
     },
