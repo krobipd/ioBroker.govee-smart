@@ -2,6 +2,7 @@ import * as utils from "@iobroker/adapter-core";
 import {
   getDefaultLanStates,
   mapCapabilities,
+  type StateDefinition,
 } from "./lib/capability-mapper.js";
 import { DeviceManager } from "./lib/device-manager.js";
 import { GoveeCloudClient } from "./lib/govee-cloud-client.js";
@@ -124,8 +125,9 @@ class GoveeAdapter extends utils.Adapter {
       );
     }
 
-    // Subscribe to all writable device states
+    // Subscribe to all writable device and group states
     await this.subscribeStatesAsync("devices.*");
+    await this.subscribeStatesAsync("groups.*");
 
     // Cleanup stale devices after initial discovery (30s delay for LAN scan)
     this.setTimeout(() => {
@@ -183,7 +185,7 @@ class GoveeAdapter extends utils.Adapter {
 
     // Find which device this state belongs to
     const localId = id.replace(`${this.namespace}.`, "");
-    if (!localId.startsWith("devices.")) {
+    if (!localId.startsWith("devices.") && !localId.startsWith("groups.")) {
       return;
     }
 
@@ -240,11 +242,25 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     for (const device of devices) {
-      let stateDefs = mapCapabilities(device.capabilities);
-      // LAN-only devices have no Cloud capabilities — use default LAN states
-      if (stateDefs.length === 0 && device.lanIp) {
+      let stateDefs: StateDefinition[];
+
+      if (device.lanIp) {
+        // LAN-capable: use LAN defaults for basic states, add Cloud extras
         stateDefs = getDefaultLanStates();
+        if (device.capabilities.length > 0) {
+          const lanIds = new Set(stateDefs.map((d) => d.id));
+          const cloudDefs = mapCapabilities(device.capabilities);
+          for (const cd of cloudDefs) {
+            if (!lanIds.has(cd.id)) {
+              stateDefs.push(cd);
+            }
+          }
+        }
+      } else {
+        // Cloud-only: use Cloud capabilities
+        stateDefs = mapCapabilities(device.capabilities);
       }
+
       void this.stateManager.createDeviceStates(device, stateDefs);
     }
 

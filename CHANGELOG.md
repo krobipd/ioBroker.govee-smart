@@ -1,4 +1,12 @@
 # Changelog
+## 0.3.0 (2026-04-06)
+- Stable device folder naming: always `sku_shortId` (e.g. `h61be_1d6f`), Cloud name in `common.name` only
+- LAN-first: basic control states (power, brightness, color, colorTemperature) always from LAN defaults
+- Fix MQTT login: use v2 API endpoint with required headers
+- Groups (BaseGroup) separated into `groups/` folder
+- Fix Cloud API unit normalization (`unit.percent` → `%`)
+- Fix `info.online` race condition on startup
+
 ## 0.2.1 (2026-04-05)
 - Fix duplicate SKU collision: LAN-only devices now use SKU with short device ID suffix for unique folder names
 - Fix deploy workflow: add build step before npm publish

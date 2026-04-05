@@ -203,7 +203,7 @@ function mapRange(cap: CloudCapability): StateDefinition[] {
       write: true,
       min: range?.min ?? 0,
       max: range?.max ?? 100,
-      unit: cap.parameters.unit,
+      unit: normalizeUnit(cap.parameters.unit),
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
     },
@@ -318,11 +318,31 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
       type: "number",
       role,
       write: false,
-      unit: cap.parameters.unit ?? unit,
+      unit: normalizeUnit(cap.parameters.unit) ?? unit,
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
     },
   ];
+}
+
+/** Known Govee API unit strings → ioBroker units */
+const UNIT_MAP: Record<string, string> = {
+  "unit.percent": "%",
+  "unit.kelvin": "K",
+  "unit.celsius": "°C",
+  "unit.fahrenheit": "°F",
+};
+
+/**
+ * Normalize Govee API unit string to ioBroker standard
+ *
+ * @param unit Raw unit string from API
+ */
+function normalizeUnit(unit?: string): string | undefined {
+  if (!unit) {
+    return undefined;
+  }
+  return UNIT_MAP[unit] ?? unit;
 }
 
 /**

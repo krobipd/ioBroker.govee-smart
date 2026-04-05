@@ -159,7 +159,7 @@ function mapRange(cap) {
       write: true,
       min: (_a = range == null ? void 0 : range.min) != null ? _a : 0,
       max: (_b = range == null ? void 0 : range.max) != null ? _b : 100,
-      unit: cap.parameters.unit,
+      unit: normalizeUnit(cap.parameters.unit),
       capabilityType: cap.type,
       capabilityInstance: cap.instance
     }
@@ -246,11 +246,24 @@ function mapProperty(cap) {
       type: "number",
       role,
       write: false,
-      unit: (_a = cap.parameters.unit) != null ? _a : unit,
+      unit: (_a = normalizeUnit(cap.parameters.unit)) != null ? _a : unit,
       capabilityType: cap.type,
       capabilityInstance: cap.instance
     }
   ];
+}
+const UNIT_MAP = {
+  "unit.percent": "%",
+  "unit.kelvin": "K",
+  "unit.celsius": "\xB0C",
+  "unit.fahrenheit": "\xB0F"
+};
+function normalizeUnit(unit) {
+  var _a;
+  if (!unit) {
+    return void 0;
+  }
+  return (_a = UNIT_MAP[unit]) != null ? _a : unit;
 }
 function sanitizeId(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();

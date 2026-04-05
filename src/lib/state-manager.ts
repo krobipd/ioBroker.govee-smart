@@ -11,6 +11,15 @@ function sanitize(str: string): string {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
 
+/**
+ * Normalize device ID — remove colons, lowercase
+ *
+ * @param id Raw device identifier
+ */
+function normalizeDeviceId(id: string): string {
+  return id.replace(/:/g, "").toLowerCase();
+}
+
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
@@ -36,10 +45,10 @@ export class StateManager {
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
 
-    // Migrate if prefix changed (e.g., SKU → Cloud name)
+    // Migrate if prefix changed (e.g., old naming scheme)
     if (oldPrefix && oldPrefix !== newPrefix) {
       this.adapter.log.debug(
-        `Migrating ${device.name}: ${oldPrefix} → ${newPrefix}`,
+        `Migrating device ${device.sku}: ${oldPrefix} → ${newPrefix}`,
       );
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
     }
@@ -244,10 +253,7 @@ export class StateManager {
     const prefix = this.devicePrefix(device);
 
     if (state.online !== undefined) {
-      await this.adapter.setStateAsync(`${prefix}.info.online`, {
-        val: state.online,
-        ack: true,
-      });
+      await this.setStateIfExists(`${prefix}.info.online`, state.online);
     }
     if (state.power !== undefined) {
       await this.setStateIfExists(`${prefix}.control.power`, state.power);
@@ -292,35 +298,43 @@ export class StateManager {
     const currentPrefixes = new Set(
       currentDevices.map((d) => this.devicePrefix(d)),
     );
-    const existingObjects = await this.adapter.getObjectViewAsync(
-      "system",
-      "device",
-      {
-        startkey: `${this.adapter.namespace}.devices.`,
-        endkey: `${this.adapter.namespace}.devices.\u9999`,
-      },
-    );
 
-    if (!existingObjects?.rows) {
-      return;
-    }
+    // Cleanup both devices/ and groups/ folders
+    for (const folder of ["devices", "groups"]) {
+      const existingObjects = await this.adapter.getObjectViewAsync(
+        "system",
+        "device",
+        {
+          startkey: `${this.adapter.namespace}.${folder}.`,
+          endkey: `${this.adapter.namespace}.${folder}.\u9999`,
+        },
+      );
 
-    for (const row of existingObjects.rows) {
-      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-      if (!currentPrefixes.has(localId)) {
-        this.adapter.log.debug(`Removing stale device: ${localId}`);
-        await this.adapter.delObjectAsync(localId, { recursive: true });
+      if (!existingObjects?.rows) {
+        continue;
+      }
+
+      for (const row of existingObjects.rows) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        if (!currentPrefixes.has(localId)) {
+          this.adapter.log.debug(`Removing stale device: ${localId}`);
+          await this.adapter.delObjectAsync(localId, { recursive: true });
+        }
       }
     }
   }
 
   /**
-   * Get device object ID prefix — uses device name for readable folders.
+   * Get device object ID prefix — stable SKU + short device ID.
+   * Groups (BaseGroup) go under groups/, devices under devices/.
+   * Human-readable name is in common.name, not in the object ID.
    *
    * @param device Govee device
    */
   devicePrefix(device: GoveeDevice): string {
-    return `devices.${sanitize(device.name)}`;
+    const shortId = normalizeDeviceId(device.deviceId).slice(-4);
+    const folder = device.sku === "BaseGroup" ? "groups" : "devices";
+    return `${folder}.${sanitize(`${device.sku}_${shortId}`)}`;
   }
 
   /**

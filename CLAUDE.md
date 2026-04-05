@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.2.1 (April 2026)
+- **Version:** 0.3.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** (noch nicht published)
 - **Runtime-Deps:** `@iobroker/adapter-core`, `mqtt`, `node-forge`
@@ -53,16 +53,18 @@ src/lib/state-manager.ts      → State CRUD + Cleanup
 
 ## State Tree
 
-Ordnername = Cloud-Gerätename (z.B. `wohnzimmer_led_strip`), ohne Cloud = SKU + Short-ID (z.B. `h6160_5a07`).
+Ordnername = immer `sku_shortid` (z.B. `h61be_1d6f`). Cloud-Name nur in `common.name`. Gruppen unter `groups/`.
 
 ```
 govee-smart.0.
 ├── info.connection
-└── devices.
-    └── wohnzimmer_led_strip.        (oder h6160_5a07. ohne Cloud)
-        ├── info.name / .model / .serial / .online
-        ├── control.power / .brightness / .colorRgb / .colorTemperature / .scene
-        └── segments.count / .0.color / .0.brightness
+├── devices.
+│   └── h61be_1d6f.                  (SKU + letzte 4 Hex der Device-ID)
+│       ├── info.name / .model / .serial / .online
+│       ├── control.power / .brightness / .colorRgb / .colorTemperature / .scene
+│       └── segments.count / .0.color / .0.brightness
+└── groups.
+    └── basegroup_1280.              (Govee-Gruppen)
 ```
 
 ## Szenen-Steuerung
@@ -141,8 +143,11 @@ Single Page, drei Sektionen:
 3. **Cloud nur wo nötig** — Definitionen, Szenen, Segmente
 4. **Graceful degradation** — ohne Credentials: LAN-only funktioniert
 5. **Capability-driven** — States aus API generiert, nichts hardcodiert
-6. **Nahtlos** — User merkt nicht welcher Kanal
-7. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
+6. **LAN-first States** — Basis-States immer aus LAN-Defaults, Cloud nur Extras
+7. **Stabile Ordner** — `sku_shortid`, Cloud-Name nur in `common.name`
+8. **Gruppen-Ordner** — BaseGroup unter `groups/`, Devices unter `devices/`
+9. **Nahtlos** — User merkt nicht welcher Kanal
+10. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
 
 ## Tests (78)
 
@@ -159,11 +164,10 @@ Nicht getestet (bewusst): main.ts Lifecycle, MQTT/LAN-Clients (Netzwerk), Cloud-
 
 | Version | Highlights |
 |---------|------------|
+| 0.3.0 | Stabile sku_shortid Ordner, LAN-first States, MQTT Login v2 Fix, Gruppen-Ordner, Unit-Normalisierung |
 | 0.2.1 | Fix SKU collision (short-ID suffix), deploy workflow build step |
-| 0.2.0 | Name-based folders, control/ channel, info.serial, stale cleanup |
-| 0.1.2 | Fix LAN discovery race condition |
-| 0.1.1 | Fix LAN-only devices: default control states, status matching by source IP |
-| 0.1.0 | Initial: LAN UDP, AWS IoT MQTT, Cloud API v2, Szenen, Segmente |
+| 0.2.0 | control/ channel, info.serial, stale cleanup |
+| 0.1.x | Initial: LAN UDP, AWS IoT MQTT, Cloud API v2, Szenen, Segmente |
 
 ## Befehle
 

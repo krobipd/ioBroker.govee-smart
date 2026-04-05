@@ -122,6 +122,7 @@ class GoveeAdapter extends utils.Adapter {
       );
     }
     await this.subscribeStatesAsync("devices.*");
+    await this.subscribeStatesAsync("groups.*");
     this.setTimeout(() => {
       if (this.stateManager && this.deviceManager) {
         void this.stateManager.cleanupDevices(this.deviceManager.getDevices());
@@ -168,7 +169,7 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
     const localId = id.replace(`${this.namespace}.`, "");
-    if (!localId.startsWith("devices.")) {
+    if (!localId.startsWith("devices.") && !localId.startsWith("groups.")) {
       return;
     }
     const device = this.findDeviceForState(localId);
@@ -213,9 +214,20 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
     for (const device of devices) {
-      let stateDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
-      if (stateDefs.length === 0 && device.lanIp) {
+      let stateDefs;
+      if (device.lanIp) {
         stateDefs = (0, import_capability_mapper.getDefaultLanStates)();
+        if (device.capabilities.length > 0) {
+          const lanIds = new Set(stateDefs.map((d) => d.id));
+          const cloudDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
+          for (const cd of cloudDefs) {
+            if (!lanIds.has(cd.id)) {
+              stateDefs.push(cd);
+            }
+          }
+        }
+      } else {
+        stateDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
       }
       void this.stateManager.createDeviceStates(device, stateDefs);
     }

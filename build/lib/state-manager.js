@@ -24,6 +24,9 @@ module.exports = __toCommonJS(state_manager_exports);
 function sanitize(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
+function normalizeDeviceId(id) {
+  return id.replace(/:/g, "").toLowerCase();
+}
 class StateManager {
   adapter;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
@@ -44,7 +47,7 @@ class StateManager {
     const oldPrefix = this.prefixMap.get(key);
     if (oldPrefix && oldPrefix !== newPrefix) {
       this.adapter.log.debug(
-        `Migrating ${device.name}: ${oldPrefix} \u2192 ${newPrefix}`
+        `Migrating device ${device.sku}: ${oldPrefix} \u2192 ${newPrefix}`
       );
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
     }
@@ -222,10 +225,7 @@ class StateManager {
   async updateDeviceState(device, state) {
     const prefix = this.devicePrefix(device);
     if (state.online !== void 0) {
-      await this.adapter.setStateAsync(`${prefix}.info.online`, {
-        val: state.online,
-        ack: true
-      });
+      await this.setStateIfExists(`${prefix}.info.online`, state.online);
     }
     if (state.power !== void 0) {
       await this.setStateIfExists(`${prefix}.control.power`, state.power);
@@ -268,32 +268,38 @@ class StateManager {
     const currentPrefixes = new Set(
       currentDevices.map((d) => this.devicePrefix(d))
     );
-    const existingObjects = await this.adapter.getObjectViewAsync(
-      "system",
-      "device",
-      {
-        startkey: `${this.adapter.namespace}.devices.`,
-        endkey: `${this.adapter.namespace}.devices.\u9999`
+    for (const folder of ["devices", "groups"]) {
+      const existingObjects = await this.adapter.getObjectViewAsync(
+        "system",
+        "device",
+        {
+          startkey: `${this.adapter.namespace}.${folder}.`,
+          endkey: `${this.adapter.namespace}.${folder}.\u9999`
+        }
+      );
+      if (!(existingObjects == null ? void 0 : existingObjects.rows)) {
+        continue;
       }
-    );
-    if (!(existingObjects == null ? void 0 : existingObjects.rows)) {
-      return;
-    }
-    for (const row of existingObjects.rows) {
-      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-      if (!currentPrefixes.has(localId)) {
-        this.adapter.log.debug(`Removing stale device: ${localId}`);
-        await this.adapter.delObjectAsync(localId, { recursive: true });
+      for (const row of existingObjects.rows) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        if (!currentPrefixes.has(localId)) {
+          this.adapter.log.debug(`Removing stale device: ${localId}`);
+          await this.adapter.delObjectAsync(localId, { recursive: true });
+        }
       }
     }
   }
   /**
-   * Get device object ID prefix — uses device name for readable folders.
+   * Get device object ID prefix — stable SKU + short device ID.
+   * Groups (BaseGroup) go under groups/, devices under devices/.
+   * Human-readable name is in common.name, not in the object ID.
    *
    * @param device Govee device
    */
   devicePrefix(device) {
-    return `devices.${sanitize(device.name)}`;
+    const shortId = normalizeDeviceId(device.deviceId).slice(-4);
+    const folder = device.sku === "BaseGroup" ? "groups" : "devices";
+    return `${folder}.${sanitize(`${device.sku}_${shortId}`)}`;
   }
   /**
    * Unique key for internal tracking (not used as object ID).

@@ -77,30 +77,34 @@ The adapter works with different levels of configuration. Each level unlocks add
 
 ## State Tree
 
-Device folders are named after the device name from the Govee Cloud API (e.g., `wohnzimmer_led_strip`). Without an API key, the SKU with a short device ID suffix is used (e.g., `h6160_5a07`).
+Device folders use a stable `sku_shortId` naming (e.g., `h61be_1d6f`). The human-readable Cloud device name is stored in `common.name` and `info.name`. Groups (BaseGroup) are separated into a `groups/` folder.
 
 ```
 govee-smart.0.
 ├── info/
 │   └── connection              — Overall connection status (boolean)
-└── devices/
-    └── {device_name}/
-        ├── info/
-        │   ├── name            — Device display name (string)
-        │   ├── model           — Product SKU (string)
-        │   ├── serial          — Device ID (string)
-        │   └── online          — Device reachable (boolean)
-        ├── control/
-        │   ├── power           — On/Off (boolean, writable)
-        │   ├── brightness      — Brightness 0-100% (number, writable)
-        │   ├── colorRgb        — Color as "#RRGGBB" (string, writable)
-        │   ├── colorTemperature — Color temperature in Kelvin (number, writable)
-        │   └── scene           — Active scene (string, dropdown, writable)
-        └── segments/
-            ├── count           — Number of segments (number)
-            └── {0..n}/
-                ├── color       — Segment color "#RRGGBB" (string, writable)
-                └── brightness  — Segment brightness 0-100% (number, writable)
+├── devices/
+│   └── h61be_1d6f/             — Stable SKU + short device ID
+│       ├── info/
+│       │   ├── name            — Cloud device name (string)
+│       │   ├── model           — Product SKU (string)
+│       │   ├── serial          — Device ID (string)
+│       │   └── online          — Device reachable (boolean)
+│       ├── control/
+│       │   ├── power           — On/Off (boolean, writable)
+│       │   ├── brightness      — Brightness 0-100% (number, writable)
+│       │   ├── colorRgb        — Color as "#RRGGBB" (string, writable)
+│       │   ├── colorTemperature — Color temperature in Kelvin (number, writable)
+│       │   └── scene           — Active scene (string, dropdown, writable)
+│       └── segments/
+│           ├── count           — Number of segments (number)
+│           └── {0..n}/
+│               ├── color       — Segment color "#RRGGBB" (string, writable)
+│               └── brightness  — Segment brightness 0-100% (number, writable)
+└── groups/
+    └── basegroup_1280/         — Govee device groups
+        ├── info/ ...
+        └── control/ ...
 ```
 
 ---
@@ -134,29 +138,27 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.3.0 (2026-04-06)
+- Stable device folder naming: always `sku_shortId`, Cloud name in `common.name` only
+- LAN-first: basic control states always from LAN defaults
+- Fix MQTT login: use v2 API endpoint with required headers
+- Groups separated into `groups/` folder
+- Fix Cloud API unit normalization
+
 ### 0.2.1 (2026-04-06)
-- Fix duplicate SKU collision: LAN-only devices now use SKU with short device ID suffix for unique folder names
-- Fix deploy workflow: add build step before npm publish
+- Fix duplicate SKU collision, fix deploy workflow
 
 ### 0.2.0 (2026-04-06)
-- Device folders use Cloud device name (falls back to SKU without API key)
-- Control states moved to `control/` channel for cleaner structure
-- Added `info.serial` state for device ID
+- Control states in `control/` channel, `info.serial` state
 
 ### 0.1.2 (2026-04-06)
-- Fix LAN discovery race condition: listen socket ready before first scan
+- Fix LAN discovery race condition
 
 ### 0.1.1 (2026-04-05)
-- Fix LAN-only devices missing control states (power, brightness, color, colorTemperature)
-- Fix LAN status matching by source IP instead of broadcasting to all devices
-- Request device status immediately after LAN discovery
+- Fix LAN-only devices missing control states
 
 ### 0.1.0 (2026-04-05)
-- Initial release
-- LAN UDP discovery and control
-- AWS IoT MQTT real-time status and control
-- Cloud API v2 for capabilities, scenes, segments
-- Automatic channel routing (LAN > MQTT > Cloud)
+- Initial release: LAN UDP, AWS IoT MQTT, Cloud API v2
 
 ---
 
