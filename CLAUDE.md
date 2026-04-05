@@ -25,7 +25,7 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 | Szenen | — | — | **einzige Quelle** |
 | Segmente | — | — | **einzige Quelle** |
 
-**Nur Geräte mit lokaler API.** Primär Lights (H6xxx/H7xxx).
+**Nur Geräte mit lokaler API.** Siehe [Supported devices](https://app-h5.govee.com/user-manual/wlan-guide).
 
 ## Credential-Stufen (graceful degradation)
 
