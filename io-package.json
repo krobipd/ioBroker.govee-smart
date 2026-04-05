@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "0.1.0",
+        "version": "0.1.1",
         "news": {
+            "0.1.1": {
+                "en": "Fix LAN-only devices missing control states, fix status matching by source IP",
+                "de": "Fix LAN-only Geräte ohne Steuer-States, Fix Status-Zuordnung per Source-IP",
+                "ru": "Исправление отсутствия состояний управления для устройств только LAN",
+                "pt": "Correção de estados de controle ausentes para dispositivos somente LAN",
+                "nl": "Fix ontbrekende besturingsstaten voor LAN-only apparaten",
+                "fr": "Correction des états de contrôle manquants pour les appareils LAN uniquement",
+                "it": "Correzione stati di controllo mancanti per dispositivi solo LAN",
+                "es": "Corrección de estados de control faltantes para dispositivos solo LAN",
+                "pl": "Naprawiono brakujące stany sterowania dla urządzeń tylko LAN",
+                "uk": "Виправлення відсутніх станів керування для пристроїв лише LAN",
+                "zh-cn": "修复仅LAN设备缺少控制状态的问题"
+            },
             "0.1.0": {
                 "en": "Initial release",
                 "de": "Erstveröffentlichung",

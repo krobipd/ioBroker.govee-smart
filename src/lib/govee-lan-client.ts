@@ -57,8 +57,8 @@ export class GoveeLanClient {
 
     // Listen socket for responses (port 4002)
     this.listenSocket = dgram.createSocket({ type: "udp4", reuseAddr: true });
-    this.listenSocket.on("message", (msg) => {
-      this.handleMessage(msg);
+    this.listenSocket.on("message", (msg, rinfo) => {
+      this.handleMessage(msg, rinfo.address);
     });
     this.listenSocket.on("error", (err) => {
       this.log.debug(`LAN listen socket error: ${err.message}`);
@@ -225,8 +225,9 @@ export class GoveeLanClient {
    * Parse incoming UDP message
    *
    * @param msg Raw UDP message buffer
+   * @param sourceIp Source IP address from UDP rinfo
    */
-  private handleMessage(msg: Buffer): void {
+  private handleMessage(msg: Buffer, sourceIp: string): void {
     try {
       const data = JSON.parse(msg.toString()) as {
         msg?: { cmd?: string; data?: Record<string, unknown> };
@@ -241,7 +242,7 @@ export class GoveeLanClient {
       if (cmd === "scan") {
         this.handleScanResponse(payload);
       } else if (cmd === "devStatus") {
-        this.handleStatusResponse(payload);
+        this.handleStatusResponse(payload, sourceIp);
       }
     } catch {
       this.log.debug(
@@ -284,13 +285,15 @@ export class GoveeLanClient {
   }
 
   /**
-   * Handle status response
+   * Handle status response — matched to device by source IP
    *
    * @param data Parsed status response payload
+   * @param sourceIp Source IP address from UDP message
    */
-  private handleStatusResponse(data: Record<string, unknown>): void {
-    // Find device by looking at response — LAN responses don't always include device ID
-    // We match by source IP from the knownDevices map
+  private handleStatusResponse(
+    data: Record<string, unknown>,
+    sourceIp: string,
+  ): void {
     const status: LanStatus = {
       onOff: (data.onOff as number) ?? 0,
       brightness: (data.brightness as number) ?? 0,
@@ -302,7 +305,6 @@ export class GoveeLanClient {
       colorTemInKelvin: (data.colorTemInKelvin as number) ?? 0,
     };
 
-    // Notify for all known devices — caller matches by context
-    this.onStatus?.("", status);
+    this.onStatus?.(sourceIp, status);
   }
 }

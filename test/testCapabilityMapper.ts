@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { mapCapabilities } from "../src/lib/capability-mapper";
+import { getDefaultLanStates, mapCapabilities } from "../src/lib/capability-mapper";
 import type { CloudCapability } from "../src/lib/types";
 
 describe("CapabilityMapper", () => {
@@ -150,6 +150,38 @@ describe("CapabilityMapper", () => {
             const result = mapCapabilities(caps);
             expect(result).to.have.lengthOf(4);
             expect(result.map((r) => r.id)).to.deep.equal(["power", "brightness", "colorRgb", "colorTemperature"]);
+        });
+    });
+
+    describe("getDefaultLanStates", () => {
+        it("should return power, brightness, colorRgb, colorTemperature", () => {
+            const defs = getDefaultLanStates();
+            expect(defs).to.have.lengthOf(4);
+            expect(defs.map((d) => d.id)).to.deep.equal(["power", "brightness", "colorRgb", "colorTemperature"]);
+        });
+
+        it("should have correct types and roles", () => {
+            const defs = getDefaultLanStates();
+            const power = defs.find((d) => d.id === "power")!;
+            expect(power.type).to.equal("boolean");
+            expect(power.role).to.equal("switch");
+            expect(power.write).to.be.true;
+
+            const brightness = defs.find((d) => d.id === "brightness")!;
+            expect(brightness.type).to.equal("number");
+            expect(brightness.role).to.equal("level.brightness");
+            expect(brightness.min).to.equal(0);
+            expect(brightness.max).to.equal(100);
+
+            const color = defs.find((d) => d.id === "colorRgb")!;
+            expect(color.type).to.equal("string");
+            expect(color.role).to.equal("level.color.rgb");
+
+            const temp = defs.find((d) => d.id === "colorTemperature")!;
+            expect(temp.type).to.equal("number");
+            expect(temp.min).to.equal(2000);
+            expect(temp.max).to.equal(9000);
+            expect(temp.unit).to.equal("K");
         });
     });
 });

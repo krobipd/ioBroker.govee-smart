@@ -48,6 +48,57 @@ export function mapCapabilities(
 }
 
 /**
+ * Default state definitions for LAN-only devices (no Cloud capabilities).
+ * All LAN-capable Govee lights support: power, brightness, color, color temperature.
+ */
+export function getDefaultLanStates(): StateDefinition[] {
+  return [
+    {
+      id: "power",
+      name: "Power",
+      type: "boolean",
+      role: "switch",
+      write: true,
+      capabilityType: "lan",
+      capabilityInstance: "powerSwitch",
+    },
+    {
+      id: "brightness",
+      name: "Brightness",
+      type: "number",
+      role: "level.brightness",
+      write: true,
+      min: 0,
+      max: 100,
+      unit: "%",
+      capabilityType: "lan",
+      capabilityInstance: "brightness",
+    },
+    {
+      id: "colorRgb",
+      name: "Color RGB",
+      type: "string",
+      role: "level.color.rgb",
+      write: true,
+      capabilityType: "lan",
+      capabilityInstance: "colorRgb",
+    },
+    {
+      id: "colorTemperature",
+      name: "Color Temperature",
+      type: "number",
+      role: "level.color.temperature",
+      write: true,
+      min: 2000,
+      max: 9000,
+      unit: "K",
+      capabilityType: "lan",
+      capabilityInstance: "colorTemperatureK",
+    },
+  ];
+}
+
+/**
  * Map a single capability to state definition(s)
  *
  * @param cap Cloud capability to map

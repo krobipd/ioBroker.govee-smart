@@ -1,5 +1,8 @@
 import * as utils from "@iobroker/adapter-core";
-import { mapCapabilities } from "./lib/capability-mapper.js";
+import {
+  getDefaultLanStates,
+  mapCapabilities,
+} from "./lib/capability-mapper.js";
 import { DeviceManager } from "./lib/device-manager.js";
 import { GoveeCloudClient } from "./lib/govee-cloud-client.js";
 import { GoveeLanClient } from "./lib/govee-lan-client.js";
@@ -62,14 +65,13 @@ class GoveeAdapter extends utils.Adapter {
     this.deviceManager.setLanClient(this.lanClient);
 
     this.lanClient.start(
-      (lanDevice) => this.deviceManager!.handleLanDiscovery(lanDevice),
-      (_deviceId, status) => {
-        // Match by IP — LAN responses don't always include device ID
-        for (const dev of this.deviceManager!.getDevices()) {
-          if (dev.lanIp) {
-            this.deviceManager!.handleLanStatus(dev.lanIp, status);
-          }
-        }
+      (lanDevice) => {
+        this.deviceManager!.handleLanDiscovery(lanDevice);
+        // Request status after discovery
+        this.lanClient!.requestStatus(lanDevice.ip);
+      },
+      (sourceIp, status) => {
+        this.deviceManager!.handleLanStatus(sourceIp, status);
       },
     );
 
@@ -239,7 +241,11 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     for (const device of devices) {
-      const stateDefs = mapCapabilities(device.capabilities);
+      let stateDefs = mapCapabilities(device.capabilities);
+      // LAN-only devices have no Cloud capabilities — use default LAN states
+      if (stateDefs.length === 0 && device.lanIp) {
+        stateDefs = getDefaultLanStates();
+      }
       void this.stateManager.createDeviceStates(device, stateDefs);
     }
 

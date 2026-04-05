@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.1.0 (April 2026)
+- **Version:** 0.1.1 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** (noch nicht published)
 - **Runtime-Deps:** `@iobroker/adapter-core`, `mqtt`, `node-forge`
@@ -155,13 +155,13 @@ Single Page, drei Sektionen:
 6. **Nahtlos** — User merkt nicht welcher Kanal
 7. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
 
-## Tests (66)
+## Tests (77)
 
 ```
-test/testCapabilityMapper.ts → Capability Mapping (on_off, range, color, scenes, property, toggle) (9 Tests)
+test/testCapabilityMapper.ts → Capability Mapping (on_off, range, color, scenes, property, toggle, LAN defaults) (11 Tests)
 test/testDeviceManager.ts    → Device Manager (LAN discovery, IP update, MQTT status, filtering) (5 Tests)
 test/testRateLimiter.ts      → Rate Limiter (per-minute, per-day, queueing) (4 Tests)
-test/testPackageFiles.ts     → @iobroker/testing (48 Tests)
+test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 ```
 
 Nicht getestet (bewusst): main.ts Lifecycle, MQTT/LAN-Clients (Netzwerk), Cloud-Client (HTTP).
@@ -170,7 +170,8 @@ Nicht getestet (bewusst): main.ts Lifecycle, MQTT/LAN-Clients (Netzwerk), Cloud-
 
 | Version | Highlights |
 |---------|------------|
-| 0.1.0 | Initial: LAN UDP, AWS IoT MQTT, Cloud API v2, Szenen, Segmente, 66 Tests |
+| 0.1.1 | Fix LAN-only devices: default control states, status matching by source IP |
+| 0.1.0 | Initial: LAN UDP, AWS IoT MQTT, Cloud API v2, Szenen, Segmente |
 
 ## Befehle
 
