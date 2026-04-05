@@ -190,10 +190,12 @@ export class DeviceManager {
       }
     } else {
       // LAN-only device (no Cloud data yet)
+      // Include short device ID suffix for uniqueness (multiple devices can share same SKU)
+      const shortId = this.normalizeDeviceId(lanDevice.device).slice(-4);
       const device: GoveeDevice = {
         sku: lanDevice.sku,
         deviceId: lanDevice.device,
-        name: lanDevice.sku,
+        name: `${lanDevice.sku}_${shortId}`,
         type: "light",
         lanIp: lanDevice.ip,
         capabilities: [],

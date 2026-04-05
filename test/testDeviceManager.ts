@@ -35,8 +35,39 @@ describe("DeviceManager", () => {
             const devices = dm.getDevices();
             expect(devices).to.have.lengthOf(1);
             expect(devices[0].sku).to.equal("H6160");
+            expect(devices[0].name).to.equal("H6160_0011");
             expect(devices[0].lanIp).to.equal("192.168.1.100");
             expect(devices[0].channels.lan).to.be.true;
+        });
+
+        it("should create unique names for devices with same SKU", () => {
+            const lanDevice1: LanDevice = {
+                ip: "192.168.1.100",
+                device: "AA:BB:CC:DD:EE:FF:00:11",
+                sku: "H61BE",
+                bleVersionHard: "",
+                bleVersionSoft: "",
+                wifiVersionHard: "",
+                wifiVersionSoft: "",
+            };
+            const lanDevice2: LanDevice = {
+                ip: "192.168.1.101",
+                device: "11:22:33:44:55:66:77:88",
+                sku: "H61BE",
+                bleVersionHard: "",
+                bleVersionSoft: "",
+                wifiVersionHard: "",
+                wifiVersionSoft: "",
+            };
+
+            dm.handleLanDiscovery(lanDevice1);
+            dm.handleLanDiscovery(lanDevice2);
+
+            const devices = dm.getDevices();
+            expect(devices).to.have.lengthOf(2);
+            expect(devices[0].name).to.not.equal(devices[1].name);
+            expect(devices[0].name).to.equal("H61BE_0011");
+            expect(devices[1].name).to.equal("H61BE_7788");
         });
 
         it("should update LAN IP for existing device", () => {
