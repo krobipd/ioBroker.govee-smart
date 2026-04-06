@@ -170,6 +170,15 @@ export class DeviceManager {
               await loadScenes();
             }
 
+            // Log dynamic_scene capabilities for debugging
+            for (const c of cd.capabilities) {
+              if (c.type.includes("dynamic_scene")) {
+                this.log.info(
+                  `Cap ${cd.sku}: ${c.instance} hasOptions=${!!c.parameters.options} optLen=${c.parameters.options?.length ?? 0} keys=${Object.keys(c.parameters).join(",")}`,
+                );
+              }
+            }
+
             // DIY scenes from device capabilities (not in scenes endpoint)
             if (device.diyScenes.length === 0) {
               const diyCap = cd.capabilities.find(

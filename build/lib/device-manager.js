@@ -96,7 +96,7 @@ class DeviceManager {
    * Called on startup and periodically.
    */
   async loadFromCloud() {
-    var _a;
+    var _a, _b, _c;
     if (!this.cloudClient) {
       return false;
     }
@@ -142,6 +142,13 @@ class DeviceManager {
             } else {
               await loadScenes();
             }
+            for (const c of cd.capabilities) {
+              if (c.type.includes("dynamic_scene")) {
+                this.log.info(
+                  `Cap ${cd.sku}: ${c.instance} hasOptions=${!!c.parameters.options} optLen=${(_b = (_a = c.parameters.options) == null ? void 0 : _a.length) != null ? _b : 0} keys=${Object.keys(c.parameters).join(",")}`
+                );
+              }
+            }
             if (device.diyScenes.length === 0) {
               const diyCap = cd.capabilities.find(
                 (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "diyScene" && c.parameters.options
@@ -175,7 +182,7 @@ class DeviceManager {
         }
       }
       if (changed) {
-        (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
+        (_c = this.onDeviceListChanged) == null ? void 0 : _c.call(this, this.getDevices());
       }
       this.lastErrorCategory = null;
       return true;
