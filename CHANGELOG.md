@@ -1,4 +1,10 @@
 # Changelog
+## 0.6.1 (2026-04-06)
+- Fix snapshots not appearing: values are integers from device capabilities, not objects from scenes endpoint
+- Snapshot dropdowns now show on all devices with saved snapshots (e.g. "Snap1", "Snap2")
+- DIY scene support prepared (API currently returns no options — app-only feature)
+- Scene dropdown reset now also clears diy_scene and snapshot on color/colorTemp change
+
 ## 0.6.0 (2026-04-06)
 - Batch segment control: new `segments.command` state (e.g. "1-5:#ff0000:20", "all:#00ff00:50")
 - Generic capability routing for toggle/dynamic_scene states (gradient_toggle, diy_scene, music_mode)

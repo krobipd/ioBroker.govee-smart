@@ -142,6 +142,11 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.6.1 (2026-04-06)
+- Fix snapshots not appearing (integer values from capabilities were filtered out)
+- DIY scene dropdown support prepared (API currently provides no data)
+- Scene reset now also clears diy_scene and snapshot dropdowns
+
 ### 0.6.0 (2026-04-06)
 - Batch segment control: `segments.command` state (e.g. "1-5:#ff0000:20")
 - Generic capability routing (gradient_toggle, diy_scene, music_mode)
@@ -168,9 +173,6 @@ govee-smart.0.
 ### 0.3.0 (2026-04-06)
 - Stable device folder naming (`sku_shortId`), LAN-first controls
 - Fix MQTT login v2, groups folder, Cloud unit normalization
-
-### 0.2.1 (2026-04-06)
-- Fix duplicate SKU collision, fix deploy workflow
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

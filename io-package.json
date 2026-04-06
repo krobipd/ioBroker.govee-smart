@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.6.0",
+    "version": "0.6.1",
     "news": {
+      "0.6.1": {
+        "en": "Fix snapshots not appearing, DIY scene dropdown support prepared, scene reset clears all dropdowns",
+        "de": "Fix Snapshots nicht sichtbar, DIY-Szenen-Dropdown vorbereitet, Szenen-Reset löscht alle Dropdowns",
+        "ru": "Исправление отображения снимков, подготовка DIY-сцен, сброс сцен очищает все списки",
+        "pt": "Correção de snapshots não aparecendo, suporte a cenas DIY preparado, reset limpa todos os dropdowns",
+        "nl": "Fix snapshots niet zichtbaar, DIY-scène dropdown voorbereid, scène-reset wist alle dropdowns",
+        "fr": "Correction snapshots invisibles, dropdown scènes DIY préparé, reset scènes efface tous les dropdowns",
+        "it": "Correzione snapshot non visibili, dropdown scene DIY preparato, reset scene cancella tutti i dropdown",
+        "es": "Corrección de snapshots no visibles, soporte de escenas DIY preparado, reset limpia todos los dropdowns",
+        "pl": "Naprawa niewidocznych snapshotów, przygotowanie dropdown scen DIY, reset scen czyści wszystkie dropdowny",
+        "uk": "Виправлення невидимих знімків, підготовка DIY-сцен, скидання сцен очищає всі списки",
+        "zh-cn": "修复快照不显示，DIY场景下拉准备，场景重置清除所有下拉"
+      },
       "0.6.0": {
         "en": "Batch segment control, generic capability routing, scene dropdown auto-reset",
         "de": "Batch-Segmentsteuerung, generisches Capability-Routing, Szenen-Dropdown Auto-Reset",
@@ -80,19 +93,6 @@
         "pl": "Fix duplikat SKU kolizji: tylko LAN urządzenia teraz używać SKU z krótkim ID urządzenia przyrostek dla unikalnych nazw folderów\nNapraw przepływ pracy: dodaj krok budowy przed publikacją npm",
         "uk": "Фіксувати дублікати зіткнення кодів: локально-тільки пристрої тепер використовують коди з коротким пристроєм ID suffix для унікальних назв папок\nВиправлення розгортання робочого процесу: додати крок до npm публікувати",
         "zh-cn": "修复重复的 SKU 碰撞: 现在仅使用 LAN 设备的 SKU , 并带有短设备 ID 后缀, 用于独有的文件夹名称\n固定部署工作流程: 在 npm 发布前添加构建步骤"
-      },
-      "0.2.0": {
-        "en": "Device folders use Cloud name (SKU fallback), control states in control/ channel",
-        "de": "Geräte-Ordner mit Cloud-Name (SKU-Fallback), Steuer-States in control/ Channel",
-        "ru": "Папки устройств используют имя из облака, состояния управления в канале control/",
-        "pt": "Pastas de dispositivos usam nome da nuvem, estados de controle no canal control/",
-        "nl": "Apparaatmappen gebruiken cloudnaam, besturingsstaten in control/ kanaal",
-        "fr": "Dossiers d'appareils avec nom cloud, états de contrôle dans le canal control/",
-        "it": "Cartelle dispositivi con nome cloud, stati di controllo nel canale control/",
-        "es": "Carpetas de dispositivos con nombre de nube, estados de control en canal control/",
-        "pl": "Foldery urządzeń z nazwą z chmury, stany sterowania w kanale control/",
-        "uk": "Теки пристроїв з іменем з хмари, стани керування в каналі control/",
-        "zh-cn": "设备文件夹使用云端名称，控制状态移至control/通道"
       }
     },
     "titleLang": {
