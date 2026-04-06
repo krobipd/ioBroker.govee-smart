@@ -170,7 +170,28 @@ export class DeviceManager {
               await loadScenes();
             }
 
-            // Snapshots also available from device capabilities as fallback
+            // DIY scenes from device capabilities (not in scenes endpoint)
+            if (device.diyScenes.length === 0) {
+              const diyCap = cd.capabilities.find(
+                (c) =>
+                  c.type === "devices.capabilities.dynamic_scene" &&
+                  c.instance === "diyScene" &&
+                  c.parameters.options,
+              );
+              if (diyCap?.parameters.options) {
+                device.diyScenes = diyCap.parameters.options
+                  .filter(
+                    (o) =>
+                      typeof o.name === "string" && typeof o.value === "object",
+                  )
+                  .map((o) => ({
+                    name: o.name,
+                    value: o.value as Record<string, unknown>,
+                  }));
+              }
+            }
+
+            // Snapshots from device capabilities (not in scenes endpoint)
             if (device.snapshots.length === 0) {
               const snapCap = cd.capabilities.find(
                 (c) =>
@@ -191,7 +212,11 @@ export class DeviceManager {
               }
             }
 
-            if (device.scenes.length > 0 || device.snapshots.length > 0) {
+            if (
+              device.scenes.length > 0 ||
+              device.diyScenes.length > 0 ||
+              device.snapshots.length > 0
+            ) {
               changed = true;
             }
           }

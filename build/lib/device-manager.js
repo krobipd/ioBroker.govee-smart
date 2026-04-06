@@ -142,6 +142,19 @@ class DeviceManager {
             } else {
               await loadScenes();
             }
+            if (device.diyScenes.length === 0) {
+              const diyCap = cd.capabilities.find(
+                (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "diyScene" && c.parameters.options
+              );
+              if (diyCap == null ? void 0 : diyCap.parameters.options) {
+                device.diyScenes = diyCap.parameters.options.filter(
+                  (o) => typeof o.name === "string" && typeof o.value === "object"
+                ).map((o) => ({
+                  name: o.name,
+                  value: o.value
+                }));
+              }
+            }
             if (device.snapshots.length === 0) {
               const snapCap = cd.capabilities.find(
                 (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "snapshot" && c.parameters.options
@@ -155,7 +168,7 @@ class DeviceManager {
                 }));
               }
             }
-            if (device.scenes.length > 0 || device.snapshots.length > 0) {
+            if (device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0) {
               changed = true;
             }
           }
