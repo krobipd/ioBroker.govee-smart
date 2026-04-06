@@ -1,4 +1,10 @@
 # Changelog
+## **WORK IN PROGRESS**
+- Batch segment control: new `segments.command` state (e.g. "1-5:#ff0000:20", "all:#00ff00:50")
+- Generic capability routing for toggle/dynamic_scene states (gradient_toggle, diy_scene, music_mode)
+- Scene dropdown auto-reset when switching to solid color or color temperature
+- Fix writable states without command routing (writes were silently ignored)
+
 ## 0.5.0 (2026-04-06)
 - Fix segment control commands (were silently failing, now routed via Cloud API)
 - Rate-limited Cloud startup to prevent API throttling

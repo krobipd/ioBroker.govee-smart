@@ -397,10 +397,10 @@ export class DeviceManager {
    * Send a generic capability command via Cloud API.
    * Used for capability types not explicitly handled (toggle, dynamic_scene, etc.)
    *
-   * @param device
-   * @param capabilityType
-   * @param capabilityInstance
-   * @param value
+   * @param device Target device
+   * @param capabilityType Full capability type (e.g. "devices.capabilities.toggle")
+   * @param capabilityInstance Capability instance name (e.g. "gradientToggle")
+   * @param value Command value
    */
   async sendCapabilityCommand(
     device: GoveeDevice,

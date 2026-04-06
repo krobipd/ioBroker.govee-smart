@@ -101,6 +101,7 @@ govee-smart.0.
 │       │   └── snapshot        — Saved snapshot (string, dropdown, writable)
 │       └── segments/
 │           ├── count           — Number of segments (number)
+│           ├── command         — Batch control "1-5:#ff0000:20" (string, writable)
 │           └── {0..n}/
 │               ├── color       — Segment color "#RRGGBB" (string, writable)
 │               └── brightness  — Segment brightness 0-100% (number, writable)
@@ -141,6 +142,11 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.6.0 (2026-04-06)
+- Batch segment control: `segments.command` state (e.g. "1-5:#ff0000:20")
+- Generic capability routing (gradient_toggle, diy_scene, music_mode)
+- Scene dropdown auto-reset on color/colorTemp change
+
 ### 0.5.0 (2026-04-06)
 - Fix segment control commands (now routed via Cloud API)
 - Rate-limited Cloud startup, error dedup logging
@@ -165,9 +171,6 @@ govee-smart.0.
 
 ### 0.2.1 (2026-04-06)
 - Fix duplicate SKU collision, fix deploy workflow
-
-### 0.2.0 (2026-04-06)
-- Control states in `control/` channel, `info.serial` state
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

@@ -1,5 +1,12 @@
 # Older Changes
 
+## 0.2.0 (2026-04-06)
+
+- Device folders use Cloud device name (falls back to SKU without API key)
+- Control states moved to `control/` channel for cleaner structure
+- Added `info.serial` state for device ID
+- Removed misleading device count from startup log
+
 ## 0.1.2 (2026-04-05)
 
 - Fix LAN discovery race condition: listen socket ready before first scan

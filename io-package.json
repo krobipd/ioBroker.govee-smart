@@ -3,6 +3,19 @@
         "name": "govee-smart",
         "version": "0.5.0",
         "news": {
+            "0.6.0": {
+                "en": "Batch segment control, generic capability routing, scene dropdown auto-reset",
+                "de": "Batch-Segmentsteuerung, generisches Capability-Routing, Szenen-Dropdown Auto-Reset",
+                "ru": "Пакетное управление сегментами, маршрутизация возможностей, автосброс выбора сцены",
+                "pt": "Controle de segmentos em lote, roteamento de capacidades, reset automático de cenas",
+                "nl": "Batch segmentbesturing, generieke capability-routing, scène-dropdown auto-reset",
+                "fr": "Contrôle segments par lot, routage générique des capacités, reset auto scènes",
+                "it": "Controllo segmenti batch, routing capacità generico, reset automatico scene",
+                "es": "Control de segmentos por lotes, enrutamiento de capacidades, reset automático de escenas",
+                "pl": "Sterowanie segmentami wsadowe, routing możliwości, auto-reset scen",
+                "uk": "Пакетне керування сегментами, маршрутизація можливостей, автоскидання сцен",
+                "zh-cn": "批量段控制，通用能力路由，场景下拉自动重置"
+            },
             "0.5.0": {
                 "en": "Fix segment control, rate-limited startup, error dedup logging, scene refresh on poll, startup ready message",
                 "de": "Fix Segment-Steuerung, Rate-limitierter Start, Error-Dedup Logging, Szenen-Refresh bei Poll, Startup-Meldung",
@@ -80,19 +93,6 @@
                 "pl": "Foldery urządzeń z nazwą z chmury, stany sterowania w kanale control/",
                 "uk": "Теки пристроїв з іменем з хмари, стани керування в каналі control/",
                 "zh-cn": "设备文件夹使用云端名称，控制状态移至control/通道"
-            },
-            "0.1.2": {
-                "en": "Fix LAN discovery race condition: listen socket ready before first scan",
-                "de": "Fix LAN-Discovery Race Condition: Listen-Socket bereit vor erstem Scan",
-                "ru": "Исправление гонки при обнаружении LAN: сокет прослушивания готов перед сканированием",
-                "pt": "Correção de condição de corrida na descoberta LAN",
-                "nl": "Fix LAN-ontdekking race-conditie",
-                "fr": "Correction de la condition de course dans la découverte LAN",
-                "it": "Correzione race condition nella scoperta LAN",
-                "es": "Corrección de condición de carrera en descubrimiento LAN",
-                "pl": "Naprawa wyścigu w wykrywaniu LAN",
-                "uk": "Виправлення перегонів при LAN-виявленні",
-                "zh-cn": "修复LAN发现竞争条件"
             }
         },
         "titleLang": {
