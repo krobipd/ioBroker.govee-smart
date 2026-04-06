@@ -270,12 +270,14 @@ class GoveeAdapter extends utils.Adapter {
       } else {
         stateDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
       }
+      stateDefs = stateDefs.filter(
+        (d) => d.id !== "light_scene" && d.id !== "snapshot"
+      );
       if (device.scenes.length > 0) {
         const sceneStates = { 0: "---" };
         device.scenes.forEach((s, i) => {
           sceneStates[i + 1] = s.name;
         });
-        stateDefs = stateDefs.filter((d) => d.id !== "light_scene");
         stateDefs.push({
           id: "light_scene",
           name: "Light Scene",
@@ -283,6 +285,7 @@ class GoveeAdapter extends utils.Adapter {
           role: "text",
           write: true,
           states: sceneStates,
+          def: "0",
           capabilityType: "devices.capabilities.dynamic_scene",
           capabilityInstance: "lightScene"
         });
@@ -292,7 +295,6 @@ class GoveeAdapter extends utils.Adapter {
         device.snapshots.forEach((s, i) => {
           snapStates[i + 1] = s.name;
         });
-        stateDefs = stateDefs.filter((d) => d.id !== "snapshot");
         stateDefs.push({
           id: "snapshot",
           name: "Snapshot",
@@ -300,11 +302,16 @@ class GoveeAdapter extends utils.Adapter {
           role: "text",
           write: true,
           states: snapStates,
+          def: "0",
           capabilityType: "devices.capabilities.dynamic_scene",
           capabilityInstance: "snapshot"
         });
       }
-      void this.stateManager.createDeviceStates(device, stateDefs);
+      this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
+        this.log.error(
+          `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`
+        );
+      });
     }
     this.updateConnectionState();
   }

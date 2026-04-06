@@ -20,6 +20,8 @@ export interface StateDefinition {
   max?: number;
   /** Predefined states for select (value → label) */
   states?: Record<string, string>;
+  /** Default value for new states */
+  def?: ioBroker.StateValue;
   /** Original capability type */
   capabilityType: string;
   /** Original capability instance */
@@ -59,6 +61,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       type: "boolean",
       role: "switch",
       write: true,
+      def: false,
       capabilityType: "lan",
       capabilityInstance: "powerSwitch",
     },
@@ -71,6 +74,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       min: 0,
       max: 100,
       unit: "%",
+      def: 0,
       capabilityType: "lan",
       capabilityInstance: "brightness",
     },
@@ -80,6 +84,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       type: "string",
       role: "level.color.rgb",
       write: true,
+      def: "#000000",
       capabilityType: "lan",
       capabilityInstance: "colorRgb",
     },
@@ -92,6 +97,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       min: 2000,
       max: 9000,
       unit: "K",
+      def: 2000,
       capabilityType: "lan",
       capabilityInstance: "colorTemperatureK",
     },
@@ -115,6 +121,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           type: "boolean",
           role: "switch",
           write: true,
+          def: false,
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
         },
@@ -134,6 +141,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           type: "boolean",
           role: "switch",
           write: true,
+          def: false,
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
         },
@@ -175,6 +183,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           type: "string",
           role: "json",
           write: true,
+          def: "",
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
         },
@@ -204,6 +213,7 @@ function mapRange(cap: CloudCapability): StateDefinition[] {
       min: range?.min ?? 0,
       max: range?.max ?? 100,
       unit: normalizeUnit(cap.parameters.unit),
+      def: range?.min ?? 0,
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
     },
@@ -224,6 +234,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
         type: "string",
         role: "level.color.rgb",
         write: true,
+        def: "#000000",
         capabilityType: cap.type,
         capabilityInstance: cap.instance,
       },
@@ -245,6 +256,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
         min: range?.min ?? 2000,
         max: range?.max ?? 9000,
         unit: "K",
+        def: range?.min ?? 2000,
         capabilityType: cap.type,
         capabilityInstance: cap.instance,
       },
@@ -281,6 +293,7 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
       role: "text",
       write: true,
       states,
+      def: "",
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
     },

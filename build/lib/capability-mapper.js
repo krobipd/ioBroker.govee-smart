@@ -41,6 +41,7 @@ function getDefaultLanStates() {
       type: "boolean",
       role: "switch",
       write: true,
+      def: false,
       capabilityType: "lan",
       capabilityInstance: "powerSwitch"
     },
@@ -53,6 +54,7 @@ function getDefaultLanStates() {
       min: 0,
       max: 100,
       unit: "%",
+      def: 0,
       capabilityType: "lan",
       capabilityInstance: "brightness"
     },
@@ -62,6 +64,7 @@ function getDefaultLanStates() {
       type: "string",
       role: "level.color.rgb",
       write: true,
+      def: "#000000",
       capabilityType: "lan",
       capabilityInstance: "colorRgb"
     },
@@ -74,6 +77,7 @@ function getDefaultLanStates() {
       min: 2e3,
       max: 9e3,
       unit: "K",
+      def: 2e3,
       capabilityType: "lan",
       capabilityInstance: "colorTemperatureK"
     }
@@ -90,6 +94,7 @@ function mapSingleCapability(cap) {
           type: "boolean",
           role: "switch",
           write: true,
+          def: false,
           capabilityType: cap.type,
           capabilityInstance: cap.instance
         }
@@ -106,6 +111,7 @@ function mapSingleCapability(cap) {
           type: "boolean",
           role: "switch",
           write: true,
+          def: false,
           capabilityType: cap.type,
           capabilityInstance: cap.instance
         }
@@ -139,6 +145,7 @@ function mapSingleCapability(cap) {
           type: "string",
           role: "json",
           write: true,
+          def: "",
           capabilityType: cap.type,
           capabilityInstance: cap.instance
         }
@@ -148,7 +155,7 @@ function mapSingleCapability(cap) {
   }
 }
 function mapRange(cap) {
-  var _a, _b;
+  var _a, _b, _c;
   const range = cap.parameters.range;
   const isBrightness = cap.instance.toLowerCase().includes("brightness");
   return [
@@ -161,13 +168,14 @@ function mapRange(cap) {
       min: (_a = range == null ? void 0 : range.min) != null ? _a : 0,
       max: (_b = range == null ? void 0 : range.max) != null ? _b : 100,
       unit: normalizeUnit(cap.parameters.unit),
+      def: (_c = range == null ? void 0 : range.min) != null ? _c : 0,
       capabilityType: cap.type,
       capabilityInstance: cap.instance
     }
   ];
 }
 function mapColorSetting(cap) {
-  var _a, _b;
+  var _a, _b, _c;
   if (cap.instance === "colorRgb") {
     return [
       {
@@ -176,6 +184,7 @@ function mapColorSetting(cap) {
         type: "string",
         role: "level.color.rgb",
         write: true,
+        def: "#000000",
         capabilityType: cap.type,
         capabilityInstance: cap.instance
       }
@@ -193,6 +202,7 @@ function mapColorSetting(cap) {
         min: (_a = range == null ? void 0 : range.min) != null ? _a : 2e3,
         max: (_b = range == null ? void 0 : range.max) != null ? _b : 9e3,
         unit: "K",
+        def: (_c = range == null ? void 0 : range.min) != null ? _c : 2e3,
         capabilityType: cap.type,
         capabilityInstance: cap.instance
       }
@@ -217,6 +227,7 @@ function mapMode(cap) {
       role: "text",
       write: true,
       states,
+      def: "",
       capabilityType: cap.type,
       capabilityInstance: cap.instance
     }

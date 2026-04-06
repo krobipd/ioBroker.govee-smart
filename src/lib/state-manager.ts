@@ -119,9 +119,16 @@ export class StateManager {
       val: device.deviceId,
       ack: true,
     });
+    await this.adapter.setStateAsync(`${prefix}.info.online`, {
+      val: device.state.online ?? false,
+      ack: true,
+    });
 
     // Control channel
     const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
+    this.adapter.log.info(
+      `[DBG] createDeviceStates ${device.sku}: ${controlDefs.length} states [${controlDefs.map((d) => d.id).join(", ")}]`,
+    );
     if (controlDefs.length > 0) {
       await this.adapter.extendObjectAsync(`${prefix}.control`, {
         type: "channel",
@@ -150,6 +157,9 @@ export class StateManager {
         if (def.states) {
           common.states = def.states;
         }
+        if (def.def !== undefined) {
+          common.def = def.def;
+        }
 
         await this.adapter.extendObjectAsync(`${prefix}.control.${def.id}`, {
           type: "state",
@@ -159,6 +169,22 @@ export class StateManager {
             capabilityInstance: def.capabilityInstance,
           },
         });
+
+        // Set default value if state has no value yet
+        if (def.def !== undefined) {
+          const current = await this.adapter.getStateAsync(
+            `${prefix}.control.${def.id}`,
+          );
+          this.adapter.log.info(
+            `[DBG] Default ${prefix}.${def.id}: current=${current ? JSON.stringify(current.val) : "null"}, def=${JSON.stringify(def.def)}`,
+          );
+          if (!current || current.val === null || current.val === undefined) {
+            await this.adapter.setStateAsync(`${prefix}.control.${def.id}`, {
+              val: def.def,
+              ack: true,
+            });
+          }
+        }
       }
     }
 

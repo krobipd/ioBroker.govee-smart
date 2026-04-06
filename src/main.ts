@@ -307,15 +307,17 @@ class GoveeAdapter extends utils.Adapter {
         stateDefs = mapCapabilities(device.capabilities);
       }
 
-      // Replace generic dynamic_scene JSON states with real dropdowns
-      // if we have actual scene/snapshot data from the scenes endpoint
+      // Always remove generic light_scene/snapshot JSON states from capability mapper —
+      // only add back as real dropdowns if we have actual scene/snapshot data
+      stateDefs = stateDefs.filter(
+        (d) => d.id !== "light_scene" && d.id !== "snapshot",
+      );
+
       if (device.scenes.length > 0) {
         const sceneStates: Record<string, string> = { 0: "---" };
         device.scenes.forEach((s, i) => {
           sceneStates[i + 1] = s.name;
         });
-        // Remove generic light_scene JSON state if present
-        stateDefs = stateDefs.filter((d) => d.id !== "light_scene");
         stateDefs.push({
           id: "light_scene",
           name: "Light Scene",
@@ -323,6 +325,7 @@ class GoveeAdapter extends utils.Adapter {
           role: "text",
           write: true,
           states: sceneStates,
+          def: "0",
           capabilityType: "devices.capabilities.dynamic_scene",
           capabilityInstance: "lightScene",
         });
@@ -333,7 +336,6 @@ class GoveeAdapter extends utils.Adapter {
         device.snapshots.forEach((s, i) => {
           snapStates[i + 1] = s.name;
         });
-        stateDefs = stateDefs.filter((d) => d.id !== "snapshot");
         stateDefs.push({
           id: "snapshot",
           name: "Snapshot",
@@ -341,12 +343,17 @@ class GoveeAdapter extends utils.Adapter {
           role: "text",
           write: true,
           states: snapStates,
+          def: "0",
           capabilityType: "devices.capabilities.dynamic_scene",
           capabilityInstance: "snapshot",
         });
       }
 
-      void this.stateManager.createDeviceStates(device, stateDefs);
+      this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
+        this.log.error(
+          `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
     }
 
     this.updateConnectionState();

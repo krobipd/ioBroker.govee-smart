@@ -42,6 +42,7 @@ class StateManager {
    * @param stateDefs State definitions from capability mapper
    */
   async createDeviceStates(device, stateDefs) {
+    var _a;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -111,7 +112,14 @@ class StateManager {
       val: device.deviceId,
       ack: true
     });
+    await this.adapter.setStateAsync(`${prefix}.info.online`, {
+      val: (_a = device.state.online) != null ? _a : false,
+      ack: true
+    });
     const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
+    this.adapter.log.info(
+      `[DBG] createDeviceStates ${device.sku}: ${controlDefs.length} states [${controlDefs.map((d) => d.id).join(", ")}]`
+    );
     if (controlDefs.length > 0) {
       await this.adapter.extendObjectAsync(`${prefix}.control`, {
         type: "channel",
@@ -138,6 +146,9 @@ class StateManager {
         if (def.states) {
           common.states = def.states;
         }
+        if (def.def !== void 0) {
+          common.def = def.def;
+        }
         await this.adapter.extendObjectAsync(`${prefix}.control.${def.id}`, {
           type: "state",
           common,
@@ -146,6 +157,20 @@ class StateManager {
             capabilityInstance: def.capabilityInstance
           }
         });
+        if (def.def !== void 0) {
+          const current = await this.adapter.getStateAsync(
+            `${prefix}.control.${def.id}`
+          );
+          this.adapter.log.info(
+            `[DBG] Default ${prefix}.${def.id}: current=${current ? JSON.stringify(current.val) : "null"}, def=${JSON.stringify(def.def)}`
+          );
+          if (!current || current.val === null || current.val === void 0) {
+            await this.adapter.setStateAsync(`${prefix}.control.${def.id}`, {
+              val: def.def,
+              ack: true
+            });
+          }
+        }
       }
     }
     const segmentDefs = stateDefs.filter((d) => d.id.startsWith("_segment_"));
