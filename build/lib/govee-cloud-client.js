@@ -129,7 +129,7 @@ class GoveeCloudClient {
     const diyScenes = [];
     const snapshots = [];
     for (const cap of (_b = (_a = resp.payload) == null ? void 0 : _a.capabilities) != null ? _b : []) {
-      this.log.debug(
+      this.log.info(
         `Scenes endpoint: instance=${cap.instance}, type=${cap.type}, options=${(_d = (_c = cap.parameters.options) == null ? void 0 : _c.length) != null ? _d : 0}`
       );
       const opts = (_e = cap.parameters.options) != null ? _e : [];
