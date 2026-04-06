@@ -193,6 +193,7 @@ class StateManager {
       (c) => c.type.includes("segment_color_setting")
     );
     const segmentCount = this.getSegmentCount(segCap);
+    device.segmentCount = segmentCount;
     await this.ensureState(
       `${prefix}.segments.count`,
       "Segment Count",
@@ -239,6 +240,18 @@ class StateManager {
         }
       );
     }
+    await this.adapter.extendObjectAsync(`${prefix}.segments.command`, {
+      type: "state",
+      common: {
+        name: "Batch Segment Command",
+        type: "string",
+        role: "text",
+        read: false,
+        write: true,
+        desc: "Format: segments:color:brightness \u2014 e.g. 1-5:#ff0000:20, all:#00ff00, 0,3,7::50"
+      },
+      native: {}
+    });
   }
   /**
    * Update device state from any source (LAN, MQTT, Cloud).

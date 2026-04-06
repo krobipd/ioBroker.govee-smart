@@ -212,6 +212,7 @@ export class StateManager {
       c.type.includes("segment_color_setting"),
     );
     const segmentCount = this.getSegmentCount(segCap);
+    device.segmentCount = segmentCount;
 
     await this.ensureState(
       `${prefix}.segments.count`,
@@ -262,6 +263,20 @@ export class StateManager {
         },
       );
     }
+
+    // Comfort command state for batch segment control
+    await this.adapter.extendObjectAsync(`${prefix}.segments.command`, {
+      type: "state",
+      common: {
+        name: "Batch Segment Command",
+        type: "string",
+        role: "text",
+        read: false,
+        write: true,
+        desc: "Format: segments:color:brightness — e.g. 1-5:#ff0000:20, all:#00ff00, 0,3,7::50",
+      } as ioBroker.StateCommon,
+      native: {},
+    });
   }
 
   /**

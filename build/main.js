@@ -98,6 +98,26 @@ class GoveeAdapter extends utils.Adapter {
       (device, state) => this.onDeviceStateUpdate(device, state),
       (devices) => this.onDeviceListChanged(devices)
     );
+    this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
+      const prefix = this.stateManager.devicePrefix(device);
+      for (const idx of batch.segments) {
+        if (batch.color !== void 0) {
+          const hex = `#${batch.color.toString(16).padStart(6, "0")}`;
+          this.setStateAsync(`${prefix}.segments.${idx}.color`, {
+            val: hex,
+            ack: true
+          }).catch(() => {
+          });
+        }
+        if (batch.brightness !== void 0) {
+          this.setStateAsync(`${prefix}.segments.${idx}.brightness`, {
+            val: batch.brightness,
+            ack: true
+          }).catch(() => {
+          });
+        }
+      }
+    };
     if (config.apiKey || config.goveeEmail && config.goveePassword) {
       this.log.info(
         "Starting Govee adapter \u2014 initializing channels, this may take a moment..."
@@ -490,6 +510,9 @@ class GoveeAdapter extends utils.Adapter {
     const segBrightMatch = /^segments\.(\d+)\.brightness$/.exec(suffix);
     if (segBrightMatch) {
       return `segmentBrightness:${segBrightMatch[1]}`;
+    }
+    if (suffix === "segments.command") {
+      return "segmentBatch";
     }
     return null;
   }

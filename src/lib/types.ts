@@ -271,6 +271,9 @@ export interface GoveeDevice {
   /** Last known state */
   state: DeviceState;
   /** Which channels are available */
+  /** Number of LED segments (from capability) */
+  segmentCount?: number;
+  /** Which channels are available */
   channels: {
     /** LAN UDP reachable */
     lan: boolean;

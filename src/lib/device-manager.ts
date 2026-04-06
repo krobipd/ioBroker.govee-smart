@@ -356,10 +356,15 @@ export class DeviceManager {
     // Segment commands only work via Cloud API
     if (
       command.startsWith("segmentColor:") ||
-      command.startsWith("segmentBrightness:")
+      command.startsWith("segmentBrightness:") ||
+      command === "segmentBatch"
     ) {
       if (device.channels.cloud && this.cloudClient) {
-        await this.sendCloudCommand(device, command, value);
+        if (command === "segmentBatch") {
+          await this.sendSegmentBatch(device, value as string);
+        } else {
+          await this.sendCloudCommand(device, command, value);
+        }
         return;
       }
       this.log.debug(`Segment control requires Cloud API for ${device.name}`);
@@ -433,6 +438,158 @@ export class DeviceManager {
       await execute();
     }
   }
+
+  /**
+   * Send a batch segment command.
+   * Format: "segments:color:brightness" — e.g. "1-5:#ff0000:20", "all:#00ff00", "0,3,7::50"
+   *
+   * @param device Target device
+   * @param commandStr Batch command string
+   */
+  async sendSegmentBatch(
+    device: GoveeDevice,
+    commandStr: string,
+  ): Promise<void> {
+    if (!this.cloudClient) {
+      return;
+    }
+
+    const parsed = this.parseSegmentBatch(device, commandStr);
+    if (!parsed) {
+      this.log.warn(
+        `Invalid segment command "${commandStr}" for ${device.name}`,
+      );
+      return;
+    }
+
+    const cap = this.findCapabilityForCommand(device, "segmentColor:0");
+    if (!cap) {
+      this.log.debug(`No segment capability for ${device.name}`);
+      return;
+    }
+
+    if (parsed.color !== undefined) {
+      const execute = async (): Promise<void> => {
+        await this.cloudClient!.controlDevice(
+          device.sku,
+          device.deviceId,
+          cap.type,
+          cap.instance,
+          { segment: parsed.segments, rgb: parsed.color },
+        );
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(execute, 0);
+      } else {
+        await execute();
+      }
+    }
+
+    if (parsed.brightness !== undefined) {
+      const brightCap = device.capabilities.find(
+        (c) =>
+          c.type.includes("segment_color_setting") &&
+          c.instance.toLowerCase().includes("brightness"),
+      );
+      const execute = async (): Promise<void> => {
+        await this.cloudClient!.controlDevice(
+          device.sku,
+          device.deviceId,
+          (brightCap ?? cap).type,
+          (brightCap ?? cap).instance,
+          { segment: parsed.segments, brightness: parsed.brightness },
+        );
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(execute, 0);
+      } else {
+        await execute();
+      }
+    }
+
+    // Update individual segment states to stay in sync
+    this.onSegmentBatchUpdate?.(device, parsed);
+  }
+
+  /**
+   * Parse batch segment command string.
+   *
+   * @param device Target device (for segment count)
+   * @param cmd Command string (e.g. "1-5:#ff0000:20")
+   */
+  private parseSegmentBatch(
+    device: GoveeDevice,
+    cmd: string,
+  ): {
+    segments: number[];
+    color?: number;
+    brightness?: number;
+  } | null {
+    const parts = cmd.split(":");
+    if (parts.length < 1 || !parts[0]) {
+      return null;
+    }
+
+    // Parse segment indices
+    const segStr = parts[0].trim();
+    const segCount = device.segmentCount ?? 15;
+    let segments: number[];
+
+    if (segStr === "all") {
+      segments = Array.from({ length: segCount }, (_, i) => i);
+    } else {
+      segments = [];
+      for (const part of segStr.split(",")) {
+        const rangeMatch = /^(\d+)-(\d+)$/.exec(part.trim());
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end && i < segCount; i++) {
+            segments.push(i);
+          }
+        } else {
+          const idx = parseInt(part.trim(), 10);
+          if (!isNaN(idx) && idx < segCount) {
+            segments.push(idx);
+          }
+        }
+      }
+    }
+
+    if (segments.length === 0) {
+      return null;
+    }
+
+    // Parse color (#RRGGBB → packed int)
+    let color: number | undefined;
+    if (parts.length >= 2 && parts[1]) {
+      const colorStr = parts[1].trim();
+      if (/^#?[0-9a-fA-F]{6}$/.test(colorStr)) {
+        color = parseInt(colorStr.replace("#", ""), 16);
+      }
+    }
+
+    // Parse brightness (0-100)
+    let brightness: number | undefined;
+    if (parts.length >= 3 && parts[2]) {
+      const bri = parseInt(parts[2].trim(), 10);
+      if (!isNaN(bri) && bri >= 0 && bri <= 100) {
+        brightness = bri;
+      }
+    }
+
+    if (color === undefined && brightness === undefined) {
+      return null;
+    }
+
+    return { segments, color, brightness };
+  }
+
+  /** Callback for batch segment state sync */
+  onSegmentBatchUpdate?: (
+    device: GoveeDevice,
+    batch: { segments: number[]; color?: number; brightness?: number },
+  ) => void;
 
   /**
    * Send command via LAN UDP

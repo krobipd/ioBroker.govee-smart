@@ -88,6 +88,26 @@ class GoveeAdapter extends utils.Adapter {
       (devices) => this.onDeviceListChanged(devices),
     );
 
+    // Sync individual segment states after batch command
+    this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
+      const prefix = this.stateManager!.devicePrefix(device);
+      for (const idx of batch.segments) {
+        if (batch.color !== undefined) {
+          const hex = `#${batch.color.toString(16).padStart(6, "0")}`;
+          this.setStateAsync(`${prefix}.segments.${idx}.color`, {
+            val: hex,
+            ack: true,
+          }).catch(() => {});
+        }
+        if (batch.brightness !== undefined) {
+          this.setStateAsync(`${prefix}.segments.${idx}.brightness`, {
+            val: batch.brightness,
+            ack: true,
+          }).catch(() => {});
+        }
+      }
+    };
+
     // Log startup hint — initialization may take a while with Cloud/MQTT
     if (config.apiKey || (config.goveeEmail && config.goveePassword)) {
       this.log.info(
@@ -548,6 +568,10 @@ class GoveeAdapter extends utils.Adapter {
     const segBrightMatch = /^segments\.(\d+)\.brightness$/.exec(suffix);
     if (segBrightMatch) {
       return `segmentBrightness:${segBrightMatch[1]}`;
+    }
+    // Batch segment command
+    if (suffix === "segments.command") {
+      return "segmentBatch";
     }
     return null;
   }

@@ -295,9 +295,13 @@ class DeviceManager {
    */
   async sendCommand(device, command, value) {
     var _a;
-    if (command.startsWith("segmentColor:") || command.startsWith("segmentBrightness:")) {
+    if (command.startsWith("segmentColor:") || command.startsWith("segmentBrightness:") || command === "segmentBatch") {
       if (device.channels.cloud && this.cloudClient) {
-        await this.sendCloudCommand(device, command, value);
+        if (command === "segmentBatch") {
+          await this.sendSegmentBatch(device, value);
+        } else {
+          await this.sendCloudCommand(device, command, value);
+        }
         return;
       }
       this.log.debug(`Segment control requires Cloud API for ${device.name}`);
@@ -354,6 +358,126 @@ class DeviceManager {
       await execute();
     }
   }
+  /**
+   * Send a batch segment command.
+   * Format: "segments:color:brightness" — e.g. "1-5:#ff0000:20", "all:#00ff00", "0,3,7::50"
+   *
+   * @param device Target device
+   * @param commandStr Batch command string
+   */
+  async sendSegmentBatch(device, commandStr) {
+    var _a;
+    if (!this.cloudClient) {
+      return;
+    }
+    const parsed = this.parseSegmentBatch(device, commandStr);
+    if (!parsed) {
+      this.log.warn(
+        `Invalid segment command "${commandStr}" for ${device.name}`
+      );
+      return;
+    }
+    const cap = this.findCapabilityForCommand(device, "segmentColor:0");
+    if (!cap) {
+      this.log.debug(`No segment capability for ${device.name}`);
+      return;
+    }
+    if (parsed.color !== void 0) {
+      const execute = async () => {
+        await this.cloudClient.controlDevice(
+          device.sku,
+          device.deviceId,
+          cap.type,
+          cap.instance,
+          { segment: parsed.segments, rgb: parsed.color }
+        );
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(execute, 0);
+      } else {
+        await execute();
+      }
+    }
+    if (parsed.brightness !== void 0) {
+      const brightCap = device.capabilities.find(
+        (c) => c.type.includes("segment_color_setting") && c.instance.toLowerCase().includes("brightness")
+      );
+      const execute = async () => {
+        await this.cloudClient.controlDevice(
+          device.sku,
+          device.deviceId,
+          (brightCap != null ? brightCap : cap).type,
+          (brightCap != null ? brightCap : cap).instance,
+          { segment: parsed.segments, brightness: parsed.brightness }
+        );
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(execute, 0);
+      } else {
+        await execute();
+      }
+    }
+    (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
+  }
+  /**
+   * Parse batch segment command string.
+   *
+   * @param device Target device (for segment count)
+   * @param cmd Command string (e.g. "1-5:#ff0000:20")
+   */
+  parseSegmentBatch(device, cmd) {
+    var _a;
+    const parts = cmd.split(":");
+    if (parts.length < 1 || !parts[0]) {
+      return null;
+    }
+    const segStr = parts[0].trim();
+    const segCount = (_a = device.segmentCount) != null ? _a : 15;
+    let segments;
+    if (segStr === "all") {
+      segments = Array.from({ length: segCount }, (_, i) => i);
+    } else {
+      segments = [];
+      for (const part of segStr.split(",")) {
+        const rangeMatch = /^(\d+)-(\d+)$/.exec(part.trim());
+        if (rangeMatch) {
+          const start = parseInt(rangeMatch[1], 10);
+          const end = parseInt(rangeMatch[2], 10);
+          for (let i = start; i <= end && i < segCount; i++) {
+            segments.push(i);
+          }
+        } else {
+          const idx = parseInt(part.trim(), 10);
+          if (!isNaN(idx) && idx < segCount) {
+            segments.push(idx);
+          }
+        }
+      }
+    }
+    if (segments.length === 0) {
+      return null;
+    }
+    let color;
+    if (parts.length >= 2 && parts[1]) {
+      const colorStr = parts[1].trim();
+      if (/^#?[0-9a-fA-F]{6}$/.test(colorStr)) {
+        color = parseInt(colorStr.replace("#", ""), 16);
+      }
+    }
+    let brightness;
+    if (parts.length >= 3 && parts[2]) {
+      const bri = parseInt(parts[2].trim(), 10);
+      if (!isNaN(bri) && bri >= 0 && bri <= 100) {
+        brightness = bri;
+      }
+    }
+    if (color === void 0 && brightness === void 0) {
+      return null;
+    }
+    return { segments, color, brightness };
+  }
+  /** Callback for batch segment state sync */
+  onSegmentBatchUpdate;
   /**
    * Send command via LAN UDP
    *
