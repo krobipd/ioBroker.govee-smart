@@ -13,5 +13,7 @@
     "supportHeader": "Support",
     "aboutInfo": "This adapter is free and open source. If you find it useful, consider supporting the development.",
     "donateKofi": "Support on Ko-fi",
-    "donatePaypal": "Donate via PayPal"
+    "donatePaypal": "Donate via PayPal",
+    "networkInterfaceLabel": "Network Interface",
+    "networkInterfaceTooltip": "Select the network interface for LAN device discovery. Leave empty to use all interfaces (recommended for most setups)."
 }

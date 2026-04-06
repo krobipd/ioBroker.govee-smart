@@ -10,6 +10,8 @@
     "lanInfo": "Urządzenia z włączonym trybem LAN w aplikacji Govee Home są wykrywane automatycznie. Zapewnia to najszybszą kontrolę (~100 ms).",
     "mqttHeader": "Konto Govee (opcjonalnie)",
     "mqttInfo": "Wprowadź dane logowania do konta Govee, aby włączyć aktualizację statusu w czasie rzeczywistym poprzez MQTT. Bez tego status jest aktualizowany tylko na żądanie.",
+    "networkInterfaceLabel": "Interfejs sieciowy",
+    "networkInterfaceTooltip": "Wybierz interfejs sieciowy do wykrywania urządzeń LAN. Pozostaw puste, aby używać wszystkich interfejsów (zalecane dla większości konfiguracji).",
     "passwordLabel": "Hasło",
     "pollIntervalLabel": "Interwał odświeżania chmury (sekundy)",
     "settingsHeader": "Ustawienia",

@@ -38,11 +38,11 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 
 ## Ports
 
-| Port | Protocol | Direction | Purpose |
-|------|----------|-----------|---------|
-| 4001 | UDP | Outbound (multicast 239.255.255.250) | LAN device discovery |
-| 4002 | UDP | Inbound | LAN device responses |
-| 4003 | UDP | Outbound | LAN device commands |
+| Port | Protocol | Direction | Purpose | Configurable |
+|------|----------|-----------|---------|--------------|
+| 4001 | UDP | Outbound (multicast 239.255.255.250) | LAN device discovery | No — fixed by Govee LAN protocol |
+| 4002 | UDP | Inbound | LAN device responses | No — fixed by Govee LAN protocol |
+| 4003 | UDP | Outbound | LAN device commands | No — fixed by Govee LAN protocol |
 
 ---
 
@@ -68,6 +68,7 @@ The adapter works with different levels of configuration. Each level unlocks add
 
 | Option | Description | Default |
 |--------|-------------|---------|
+| **Network Interface** | IP address of the network interface for LAN discovery (leave empty for all interfaces) | All |
 | **API Key** | Govee Cloud API key (optional) | — |
 | **Email** | Govee account email (optional) | — |
 | **Password** | Govee account password (optional) | — |
@@ -191,6 +192,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ## Changelog
 
+### 0.8.0 (2026-04-06)
+- Network interface selection for LAN discovery (multi-NIC/VLAN support)
+
 ### 0.7.0 (2026-04-06)
 - Add IP address to device info (`info.ip`), auto-updated on LAN discovery
 - Batch segment control documentation (format, examples, notes)
@@ -216,12 +220,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Batch segment control: `segments.command` state (e.g. "1-5:#ff0000:20")
 - Generic capability routing (gradient_toggle, diy_scene, music_mode)
 - Scene dropdown auto-reset on color/colorTemp change
-
-### 0.5.0 (2026-04-06)
-- Fix segment control commands (now routed via Cloud API)
-- Rate-limited Cloud startup, error dedup logging
-- Scene/snapshot refresh on each Cloud poll
-- Startup "ready" message only after all channels initialized
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

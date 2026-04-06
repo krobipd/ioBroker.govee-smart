@@ -10,6 +10,8 @@
     "lanInfo": "会自动发现在 Govee Home 应用程序中启用 LAN 模式的设备。这提供了最快的控制（~100ms）。",
     "mqttHeader": "Govee 帐户（可选）",
     "mqttInfo": "输入您的 Govee 帐户凭据以通过 MQTT 启用实时状态更新。如果没有这个，状态只会根据请求更新。",
+    "networkInterfaceLabel": "网络接口",
+    "networkInterfaceTooltip": "选择用于 LAN 设备发现的网络接口。留空以使用所有接口（推荐用于大多数设置）。",
     "passwordLabel": "密码",
     "pollIntervalLabel": "云刷新间隔（秒）",
     "settingsHeader": "设置",

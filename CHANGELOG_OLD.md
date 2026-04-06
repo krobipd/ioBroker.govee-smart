@@ -1,5 +1,11 @@
 # Older Changes
 
+## 0.5.0 (2026-04-06)
+- Fix segment control commands (now routed via Cloud API)
+- Rate-limited Cloud startup, error dedup logging
+- Scene/snapshot refresh on each Cloud poll
+- Startup "ready" message only after all channels initialized
+
 ## 0.4.1 (2026-04-06)
 - Fix null state values: sensible defaults for all control states
 - Remove stale control states on startup

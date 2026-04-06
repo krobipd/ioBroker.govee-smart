@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.7.0",
+    "version": "0.8.0",
     "news": {
+      "0.8.0": {
+        "en": "Network interface selection for LAN discovery (multi-NIC/VLAN support)",
+        "de": "Netzwerk-Interface Auswahl für LAN-Erkennung (Multi-NIC/VLAN Unterstützung)",
+        "ru": "Выбор сетевого интерфейса для обнаружения LAN (поддержка нескольких сетевых адаптеров/VLAN)",
+        "pt": "Seleção de interface de rede para descoberta LAN (suporte multi-NIC/VLAN)",
+        "nl": "Netwerkinterface selectie voor LAN-detectie (multi-NIC/VLAN ondersteuning)",
+        "fr": "Sélection de l'interface réseau pour la découverte LAN (support multi-NIC/VLAN)",
+        "it": "Selezione interfaccia di rete per rilevamento LAN (supporto multi-NIC/VLAN)",
+        "es": "Selección de interfaz de red para detección LAN (soporte multi-NIC/VLAN)",
+        "pl": "Wybór interfejsu sieciowego do wykrywania LAN (obsługa wielu kart sieciowych/VLAN)",
+        "uk": "Вибір мережевого інтерфейсу для виявлення LAN (підтримка кількох мережевих адаптерів/VLAN)",
+        "zh-cn": "LAN发现网络接口选择（多网卡/VLAN支持）"
+      },
       "0.7.0": {
         "en": "Add IP address to device info (auto-updated via LAN), batch segment control documentation",
         "de": "IP-Adresse in Geräte-Info (automatisch via LAN aktualisiert), Batch-Segment-Steuerung Dokumentation",
@@ -80,19 +93,6 @@
         "pl": "Sterowanie segmentami wsadowe, routing możliwości, auto-reset scen",
         "uk": "Пакетне керування сегментами, маршрутизація можливостей, автоскидання сцен",
         "zh-cn": "批量段控制，通用能力路由，场景下拉自动重置"
-      },
-      "0.5.0": {
-        "en": "Fix segment control, rate-limited startup, error dedup logging, scene refresh on poll, startup ready message",
-        "de": "Fix Segment-Steuerung, Rate-limitierter Start, Error-Dedup Logging, Szenen-Refresh bei Poll, Startup-Meldung",
-        "ru": "Исправление управления сегментами, ограничение запросов при запуске, дедупликация ошибок, обновление сцен",
-        "pt": "Correção do controle de segmentos, início limitado por taxa, dedup de erros, atualização de cenas no poll",
-        "nl": "Fix segmentbesturing, rate-limited opstarten, fout-dedup logging, scène-verversing bij poll",
-        "fr": "Correction contrôle segments, démarrage limité, dédup erreurs, rafraîchissement scènes, message prêt",
-        "it": "Correzione controllo segmenti, avvio rate-limited, dedup errori, aggiornamento scene nel poll",
-        "es": "Corrección control de segmentos, inicio con límite de tasa, dedup de errores, actualización de escenas",
-        "pl": "Naprawa sterowania segmentami, start z limitem, dedup błędów, odświeżanie scen przy poll",
-        "uk": "Виправлення керування сегментами, обмежений старт, дедуплікація помилок, оновлення сцен",
-        "zh-cn": "修复分段控制，启动速率限制，错误去重日志，轮询时刷新场景，启动就绪消息"
       }
     },
     "titleLang": {
@@ -169,6 +169,7 @@
     "apiKey": "",
     "goveeEmail": "",
     "goveePassword": "",
-    "pollInterval": 60
+    "pollInterval": 60,
+    "networkInterface": ""
   }
 }

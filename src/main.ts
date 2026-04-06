@@ -137,6 +137,8 @@ class GoveeAdapter extends utils.Adapter {
       (sourceIp, status) => {
         this.deviceManager!.handleLanStatus(sourceIp, status);
       },
+      30_000,
+      config.networkInterface || "",
     );
 
     // --- Cloud (if API key provided) ---

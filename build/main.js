@@ -140,7 +140,9 @@ class GoveeAdapter extends utils.Adapter {
       },
       (sourceIp, status) => {
         this.deviceManager.handleLanStatus(sourceIp, status);
-      }
+      },
+      3e4,
+      config.networkInterface || ""
     );
     if (config.apiKey) {
       this.cloudClient = new import_govee_cloud_client.GoveeCloudClient(config.apiKey, this.log);

@@ -10,6 +10,8 @@
     "lanInfo": "Apparaten waarvoor de LAN-modus is ingeschakeld in de Govee Home-app worden automatisch gedetecteerd. Dit biedt de snelste controle (~100 ms).",
     "mqttHeader": "Govee-account (optioneel)",
     "mqttInfo": "Voer de inloggegevens van uw Govee-account in om realtime statusupdates via MQTT in te schakelen. Zonder dit wordt de status alleen op verzoek bijgewerkt.",
+    "networkInterfaceLabel": "Netwerkinterface",
+    "networkInterfaceTooltip": "Selecteer de netwerkinterface voor LAN-apparaatdetectie. Laat leeg om alle interfaces te gebruiken (aanbevolen voor de meeste configuraties).",
     "passwordLabel": "Wachtwoord",
     "pollIntervalLabel": "Cloudvernieuwingsinterval (seconden)",
     "settingsHeader": "Instellingen",

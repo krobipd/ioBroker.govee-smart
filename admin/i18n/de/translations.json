@@ -13,5 +13,7 @@
     "passwordLabel": "Passwort",
     "pollIntervalLabel": "Cloud-Aktualisierungsintervall (Sekunden)",
     "settingsHeader": "Einstellungen",
-    "supportHeader": "Unterstützung"
+    "supportHeader": "Unterstützung",
+    "networkInterfaceLabel": "Netzwerk-Interface",
+    "networkInterfaceTooltip": "Netzwerk-Interface für die LAN-Geräteerkennung auswählen. Leer lassen um alle Interfaces zu verwenden (empfohlen für die meisten Setups)."
 }

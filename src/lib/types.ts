@@ -8,6 +8,8 @@ export interface AdapterConfig {
   goveePassword: string;
   /** Cloud device list refresh interval in seconds */
   pollInterval: number;
+  /** Network interface IP for LAN multicast (empty = all interfaces) */
+  networkInterface: string;
 }
 
 // --- Cloud API v2 Types ---

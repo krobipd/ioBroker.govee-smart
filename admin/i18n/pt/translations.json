@@ -10,6 +10,8 @@
     "lanInfo": "Dispositivos com modo LAN habilitado no aplicativo Govee Home são descobertos automaticamente. Isso fornece o controle mais rápido (~100ms).",
     "mqttHeader": "Conta Govee (opcional)",
     "mqttInfo": "Insira as credenciais da sua conta Govee para ativar atualizações de status em tempo real via MQTT. Sem isso, o status só é atualizado mediante solicitação.",
+    "networkInterfaceLabel": "Interface de rede",
+    "networkInterfaceTooltip": "Selecione a interface de rede para descoberta de dispositivos LAN. Deixe vazio para usar todas as interfaces (recomendado para a maioria das configurações).",
     "passwordLabel": "Senha",
     "pollIntervalLabel": "Intervalo de atualização da nuvem (segundos)",
     "settingsHeader": "Configurações",

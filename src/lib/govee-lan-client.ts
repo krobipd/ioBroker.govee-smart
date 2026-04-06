@@ -46,14 +46,21 @@ export class GoveeLanClient {
    * @param onDiscovery Called when a new device is found
    * @param onStatus Called when a status response arrives
    * @param scanIntervalMs How often to send multicast scan (default 30s)
+   * @param networkInterface IP of network interface to bind to (empty = all)
    */
   start(
     onDiscovery: LanDiscoveryCallback,
     onStatus: LanStatusCallback,
     scanIntervalMs = 30_000,
+    networkInterface = "",
   ): void {
     this.onDiscovery = onDiscovery;
     this.onStatus = onStatus;
+
+    const bindAddr = networkInterface || undefined;
+    if (bindAddr) {
+      this.log.info(`LAN binding to network interface ${bindAddr}`);
+    }
 
     // Listen socket for responses (port 4002) — must be ready before first scan
     this.listenSocket = dgram.createSocket({ type: "udp4", reuseAddr: true });
@@ -63,7 +70,7 @@ export class GoveeLanClient {
     this.listenSocket.on("error", (err) => {
       this.log.debug(`LAN listen socket error: ${err.message}`);
     });
-    this.listenSocket.bind(LISTEN_PORT, () => {
+    this.listenSocket.bind(LISTEN_PORT, bindAddr, () => {
       this.log.debug(`LAN listening on port ${LISTEN_PORT}`);
 
       // Scan socket for multicast discovery (port 4001) — started after listen is ready
@@ -74,7 +81,7 @@ export class GoveeLanClient {
       this.scanSocket.bind(() => {
         this.scanSocket?.setBroadcast(true);
         try {
-          this.scanSocket?.addMembership(MULTICAST_ADDR);
+          this.scanSocket?.addMembership(MULTICAST_ADDR, bindAddr);
         } catch {
           this.log.debug(
             "Could not join multicast group — using broadcast fallback",
