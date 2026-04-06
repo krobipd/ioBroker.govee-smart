@@ -126,8 +126,8 @@ export class StateManager {
 
     // Control channel
     const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
-    this.adapter.log.info(
-      `[DBG] createDeviceStates ${device.sku}: ${controlDefs.length} states [${controlDefs.map((d) => d.id).join(", ")}]`,
+    this.adapter.log.debug(
+      `createDeviceStates ${device.sku}: ${controlDefs.length} control states`,
     );
     if (controlDefs.length > 0) {
       await this.adapter.extendObjectAsync(`${prefix}.control`, {
@@ -175,8 +175,8 @@ export class StateManager {
           const current = await this.adapter.getStateAsync(
             `${prefix}.control.${def.id}`,
           );
-          this.adapter.log.info(
-            `[DBG] Default ${prefix}.${def.id}: current=${current ? JSON.stringify(current.val) : "null"}, def=${JSON.stringify(def.def)}`,
+          this.adapter.log.debug(
+            `Default ${def.id}: current=${current ? JSON.stringify(current.val) : "null"}, def=${JSON.stringify(def.def)}`,
           );
           if (!current || current.val === null || current.val === undefined) {
             await this.adapter.setStateAsync(`${prefix}.control.${def.id}`, {
@@ -187,6 +187,9 @@ export class StateManager {
         }
       }
     }
+
+    // Remove stale control states that are no longer in the current definitions
+    await this.cleanupControlStates(prefix, controlDefs);
 
     // Check if device has segment capabilities
     const segmentDefs = stateDefs.filter((d) => d.id.startsWith("_segment_"));
@@ -346,6 +349,40 @@ export class StateManager {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           await this.adapter.delObjectAsync(localId, { recursive: true });
         }
+      }
+    }
+  }
+
+  /**
+   * Remove control states that are no longer in the current definitions.
+   *
+   * @param prefix Device prefix
+   * @param controlDefs Current control state definitions
+   */
+  private async cleanupControlStates(
+    prefix: string,
+    controlDefs: StateDefinition[],
+  ): Promise<void> {
+    const validIds = new Set(controlDefs.map((d) => d.id));
+    const controlPrefix = `${this.adapter.namespace}.${prefix}.control.`;
+    const existing = await this.adapter.getObjectViewAsync("system", "state", {
+      startkey: controlPrefix,
+      endkey: `${controlPrefix}\u9999`,
+    });
+
+    if (!existing?.rows) {
+      return;
+    }
+
+    for (const row of existing.rows) {
+      const stateId = row.id.replace(controlPrefix, "");
+      if (!validIds.has(stateId)) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        this.adapter.log.debug(`Removing stale control state: ${localId}`);
+        await this.adapter.delObjectAsync(localId);
+        await this.adapter.delStateAsync(localId).catch(() => {
+          // State may not exist
+        });
       }
     }
   }
