@@ -96,7 +96,7 @@ class DeviceManager {
    * Called on startup and periodically.
    */
   async loadFromCloud() {
-    var _a, _b, _c;
+    var _a;
     if (!this.cloudClient) {
       return false;
     }
@@ -142,13 +142,6 @@ class DeviceManager {
             } else {
               await loadScenes();
             }
-            for (const c of cd.capabilities) {
-              if (c.type.includes("dynamic_scene")) {
-                this.log.info(
-                  `Cap ${cd.sku}: ${c.instance} hasOptions=${!!c.parameters.options} optLen=${(_b = (_a = c.parameters.options) == null ? void 0 : _a.length) != null ? _b : 0} keys=${Object.keys(c.parameters).join(",")}`
-                );
-              }
-            }
             if (device.diyScenes.length === 0) {
               const diyCap = cd.capabilities.find(
                 (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "diyScene" && c.parameters.options
@@ -167,11 +160,14 @@ class DeviceManager {
                 (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "snapshot" && c.parameters.options
               );
               if (snapCap == null ? void 0 : snapCap.parameters.options) {
+                this.log.info(
+                  `Snapshot options for ${cd.sku}: ${JSON.stringify(snapCap.parameters.options.slice(0, 2))}`
+                );
                 device.snapshots = snapCap.parameters.options.filter(
-                  (o) => typeof o.name === "string" && typeof o.value === "object"
+                  (o) => typeof o.name === "string" && o.value !== void 0 && o.value !== null
                 ).map((o) => ({
                   name: o.name,
-                  value: o.value
+                  value: typeof o.value === "object" ? o.value : { value: o.value }
                 }));
               }
             }
@@ -182,7 +178,7 @@ class DeviceManager {
         }
       }
       if (changed) {
-        (_c = this.onDeviceListChanged) == null ? void 0 : _c.call(this, this.getDevices());
+        (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
       }
       this.lastErrorCategory = null;
       return true;
