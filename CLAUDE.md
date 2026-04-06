@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.3.0 (April 2026)
+- **Version:** 0.4.1 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `mqtt`, `node-forge`
@@ -140,11 +140,13 @@ Single Page, drei Sektionen:
 3. **Cloud nur wo nötig** — Definitionen, Szenen, Snapshots, Segmente
 4. **Graceful degradation** — ohne Credentials: LAN-only funktioniert
 5. **Capability-driven** — States aus API generiert, nichts hardcodiert
-6. **Szenen als echte Dropdowns** — Index-basiert, value-Payload aus Cloud
+6. **Szenen als echte Dropdowns** — Index-basiert, value-Payload aus Cloud; nur wenn Daten vorhanden
 7. **Stabile Ordner** — `sku_shortid`, Cloud-Name nur in `common.name`
 8. **Gruppen-Ordner** — BaseGroup unter `groups/`, Devices unter `devices/`
 9. **Nahtlos** — User merkt nicht welcher Kanal
 10. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
+11. **Keine null-Werte** — Alle States haben `def` in StateDefinition + werden beim Erstellen initialisiert
+12. **Stale State Cleanup** — `cleanupControlStates()` entfernt alte Control-States die nicht mehr in Defs sind
 
 ## Tests (78)
 
