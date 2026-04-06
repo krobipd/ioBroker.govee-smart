@@ -82,7 +82,9 @@ Device folders use a stable `sku_shortId` naming (e.g., `h61be_1d6f`). The human
 ```
 govee-smart.0.
 ├── info/
-│   └── connection              — Overall connection status (boolean)
+│   ├── connection              — Overall connection status (boolean)
+│   ├── mqttConnected           — MQTT connection status (boolean)
+│   └── cloudConnected          — Cloud API connection status (boolean)
 ├── devices/
 │   └── h61be_1d6f/             — Stable SKU + short device ID
 │       ├── info/
@@ -95,7 +97,8 @@ govee-smart.0.
 │       │   ├── brightness      — Brightness 0-100% (number, writable)
 │       │   ├── colorRgb        — Color as "#RRGGBB" (string, writable)
 │       │   ├── colorTemperature — Color temperature in Kelvin (number, writable)
-│       │   └── scene           — Active scene (string, dropdown, writable)
+│       │   ├── light_scene     — Light scene (string, dropdown, writable)
+│       │   └── snapshot        — Saved snapshot (string, dropdown, writable)
 │       └── segments/
 │           ├── count           — Number of segments (number)
 │           └── {0..n}/
@@ -138,27 +141,27 @@ govee-smart.0.
 
 ## Changelog
 
-### 0.3.0 (2026-04-06)
-- Stable device folder naming: always `sku_shortId`, Cloud name in `common.name` only
-- LAN-first: basic control states always from LAN defaults
-- Fix MQTT login: use v2 API endpoint with required headers
-- Groups separated into `groups/` folder
-- Fix Cloud API unit normalization
+### 0.4.0 (2026-04-06)
+- Scenes and snapshots as real dropdowns (78-237 scenes per device)
+- Cloud state loading for Cloud-only states
+- Cloud never overwrites LAN states
+- Added `info.mqttConnected` and `info.cloudConnected`
+- Cleaner logging with device/group summary
 
-### 0.2.1 (2026-04-06)
+### 0.3.0 (2026-04-06)
+- Stable device folder naming (`sku_shortId`), LAN-first controls
+- Fix MQTT login v2, groups folder, Cloud unit normalization
+
+### 0.2.1 (2026-04-05)
 - Fix duplicate SKU collision, fix deploy workflow
 
 ### 0.2.0 (2026-04-06)
 - Control states in `control/` channel, `info.serial` state
 
-### 0.1.2 (2026-04-06)
-- Fix LAN discovery race condition
-
-### 0.1.1 (2026-04-05)
-- Fix LAN-only devices missing control states
-
-### 0.1.0 (2026-04-05)
+### 0.1.x (2026-04-05)
 - Initial release: LAN UDP, AWS IoT MQTT, Cloud API v2
+
+[Older changelog entries](CHANGELOG_OLD.md)
 
 ---
 

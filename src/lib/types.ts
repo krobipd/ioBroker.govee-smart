@@ -109,24 +109,25 @@ export interface CloudStateCapability {
   state: { value: unknown };
 }
 
-/** Cloud API scenes response */
+/** Cloud API scenes response — payload contains capabilities with options */
 export interface CloudScenesResponse {
   /** Response status code */
   code: number;
   /** Response message */
   message: string;
-  /** List of available scenes */
-  data: CloudScene[];
+  /** Payload with capabilities (scenes endpoint format) */
+  payload?: {
+    /** Scene capabilities with options */
+    capabilities: CloudCapability[];
+  };
 }
 
-/** A scene from the Cloud API */
+/** A scene/snapshot option from the Cloud API */
 export interface CloudScene {
-  /** Display name of the scene */
-  sceneName: string;
-  /** Numeric scene identifier */
-  sceneId: number;
-  /** Optional scene parameter ID */
-  sceneParamId?: string;
+  /** Display name */
+  name: string;
+  /** Activation value (passed directly to control endpoint) */
+  value: Record<string, unknown>;
 }
 
 // --- AWS IoT MQTT Types ---
@@ -263,8 +264,10 @@ export interface GoveeDevice {
   mqttTopic?: string;
   /** Capabilities from Cloud API */
   capabilities: CloudCapability[];
-  /** Available scenes (from Cloud) */
+  /** Available light scenes (from Cloud scenes endpoint) */
   scenes: CloudScene[];
+  /** Available snapshots (from Cloud scenes endpoint) */
+  snapshots: CloudScene[];
   /** Last known state */
   state: DeviceState;
   /** Which channels are available */

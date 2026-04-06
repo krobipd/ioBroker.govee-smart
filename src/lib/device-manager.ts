@@ -126,21 +126,51 @@ export class DeviceManager {
         }
       }
 
-      // Load scenes for light devices
+      // Load scenes and snapshots for light devices
       for (const cd of cloudDevices) {
         if (
           cd.type === "light" ||
-          cd.capabilities.some((c) => c.type.includes("mode"))
+          cd.capabilities.some((c) => c.type.includes("dynamic_scene"))
         ) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
-          if (device && device.scenes.length === 0) {
+          if (
+            device &&
+            device.scenes.length === 0 &&
+            device.snapshots.length === 0
+          ) {
+            // Scenes come from the dedicated scenes endpoint
             try {
-              device.scenes = await this.cloudClient.getScenes(
-                cd.sku,
-                cd.device,
-              );
+              const { lightScenes, snapshots } =
+                await this.cloudClient.getScenes(cd.sku, cd.device);
+              device.scenes = lightScenes;
+              device.snapshots = snapshots;
             } catch {
               this.log.debug(`Could not load scenes for ${cd.sku}`);
+            }
+
+            // Snapshots also available from device capabilities as fallback
+            if (device.snapshots.length === 0) {
+              const snapCap = cd.capabilities.find(
+                (c) =>
+                  c.type === "devices.capabilities.dynamic_scene" &&
+                  c.instance === "snapshot" &&
+                  c.parameters.options,
+              );
+              if (snapCap?.parameters.options) {
+                device.snapshots = snapCap.parameters.options
+                  .filter(
+                    (o) =>
+                      typeof o.name === "string" && typeof o.value === "object",
+                  )
+                  .map((o) => ({
+                    name: o.name,
+                    value: o.value as Record<string, unknown>,
+                  }));
+              }
+            }
+
+            if (device.scenes.length > 0 || device.snapshots.length > 0) {
+              changed = true;
             }
           }
         }
@@ -202,6 +232,7 @@ export class DeviceManager {
         lanIp: lanDevice.ip,
         capabilities: [],
         scenes: [],
+        snapshots: [],
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false },
       };
@@ -433,7 +464,7 @@ export class DeviceManager {
       return;
     }
 
-    const cloudValue = this.toCloudValue(command, value);
+    const cloudValue = this.toCloudValue(device, command, value);
 
     const execute = async (): Promise<void> => {
       await this.cloudClient!.controlDevice(
@@ -495,6 +526,20 @@ export class DeviceManager {
       ) {
         return cap;
       }
+      if (
+        command === "lightScene" &&
+        shortType === "dynamic_scene" &&
+        cap.instance === "lightScene"
+      ) {
+        return cap;
+      }
+      if (
+        command === "snapshot" &&
+        shortType === "dynamic_scene" &&
+        cap.instance === "snapshot"
+      ) {
+        return cap;
+      }
     }
     return undefined;
   }
@@ -502,10 +547,15 @@ export class DeviceManager {
   /**
    * Convert adapter value to Cloud API value
    *
+   * @param device Target device (for scene/snapshot lookup)
    * @param command Command type
    * @param value Adapter-side value to convert
    */
-  private toCloudValue(command: string, value: unknown): unknown {
+  private toCloudValue(
+    device: GoveeDevice,
+    command: string,
+    value: unknown,
+  ): unknown {
     switch (command) {
       case "power":
         return value ? 1 : 0;
@@ -519,6 +569,17 @@ export class DeviceManager {
         return value;
       case "scene":
         return value;
+      case "lightScene": {
+        // Value is the dropdown index (string) — resolve to scene activation payload
+        const idx = parseInt(String(value), 10);
+        const scene = device.scenes[idx - 1];
+        return scene?.value ?? value;
+      }
+      case "snapshot": {
+        const idx = parseInt(String(value), 10);
+        const snap = device.snapshots[idx - 1];
+        return snap?.value ?? value;
+      }
       default:
         return value;
     }
@@ -552,6 +613,7 @@ export class DeviceManager {
       type: cd.type || "unknown",
       capabilities: cd.capabilities,
       scenes: [],
+      snapshots: [],
       state: { online: true },
       channels: { lan: false, mqtt: false, cloud: true },
     };

@@ -115,11 +115,16 @@ class GoveeAdapter extends utils.Adapter {
       this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this);
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
+      this.log.info("Loading devices from Cloud API, please wait...");
       const cloudOk = await this.deviceManager.loadFromCloud();
       void this.setStateAsync("info.cloudConnected", {
         val: cloudOk,
         ack: true
       });
+      if (cloudOk) {
+        await this.loadCloudStates();
+      }
+      this.logDeviceSummary();
       const intervalMs = Math.max(30, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
       this.cloudPollTimer = this.setInterval(() => {
         void this.deviceManager.loadFromCloud().then((ok) => {
@@ -168,14 +173,11 @@ class GoveeAdapter extends utils.Adapter {
       }
     }, 3e4);
     this.updateConnectionState();
-    const channels = ["LAN"];
-    if (config.apiKey) {
-      channels.push("Cloud");
+    if (!config.apiKey) {
+      this.log.info(
+        "Govee adapter ready (LAN only) \u2014 configure Cloud API key for scenes, device names and more"
+      );
     }
-    if (config.goveeEmail) {
-      channels.push("MQTT");
-    }
-    this.log.info(`Govee adapter started \u2014 channels: ${channels.join(", ")}`);
   }
   /**
    * Adapter stopping — MUST be synchronous.
@@ -268,6 +270,40 @@ class GoveeAdapter extends utils.Adapter {
       } else {
         stateDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
       }
+      if (device.scenes.length > 0) {
+        const sceneStates = { 0: "---" };
+        device.scenes.forEach((s, i) => {
+          sceneStates[i + 1] = s.name;
+        });
+        stateDefs = stateDefs.filter((d) => d.id !== "light_scene");
+        stateDefs.push({
+          id: "light_scene",
+          name: "Light Scene",
+          type: "string",
+          role: "text",
+          write: true,
+          states: sceneStates,
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene"
+        });
+      }
+      if (device.snapshots.length > 0) {
+        const snapStates = { 0: "---" };
+        device.snapshots.forEach((s, i) => {
+          snapStates[i + 1] = s.name;
+        });
+        stateDefs = stateDefs.filter((d) => d.id !== "snapshot");
+        stateDefs.push({
+          id: "snapshot",
+          name: "Snapshot",
+          type: "string",
+          role: "text",
+          write: true,
+          states: snapStates,
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "snapshot"
+        });
+      }
       void this.stateManager.createDeviceStates(device, stateDefs);
     }
     this.updateConnectionState();
@@ -280,6 +316,77 @@ class GoveeAdapter extends utils.Adapter {
     const lanRunning = this.lanClient !== null;
     const connected = hasDevices ? anyOnline : lanRunning;
     void this.setStateAsync("info.connection", { val: connected, ack: true });
+  }
+  /** Log device/group summary after Cloud load */
+  logDeviceSummary() {
+    if (!this.deviceManager) {
+      return;
+    }
+    const all = this.deviceManager.getDevices();
+    const devices = all.filter((d) => d.sku !== "BaseGroup");
+    const groups = all.filter((d) => d.sku === "BaseGroup");
+    const parts = [];
+    if (devices.length > 0) {
+      parts.push(`${devices.length} device${devices.length > 1 ? "s" : ""}`);
+    }
+    if (groups.length > 0) {
+      parts.push(`${groups.length} group${groups.length > 1 ? "s" : ""}`);
+    }
+    if (parts.length > 0) {
+      this.log.info(`Govee adapter ready (${parts.join(", ")})`);
+    } else {
+      this.log.info("Govee adapter ready (no devices found)");
+    }
+  }
+  /**
+   * Load current state for all Cloud devices and populate state values.
+   * Called once after initial Cloud device list load.
+   */
+  async loadCloudStates() {
+    if (!this.cloudClient || !this.deviceManager || !this.stateManager) {
+      return;
+    }
+    const devices = this.deviceManager.getDevices();
+    const lanStateIds = new Set((0, import_capability_mapper.getDefaultLanStates)().map((s) => s.id));
+    let loaded = 0;
+    for (const device of devices) {
+      if (!device.channels.cloud || device.capabilities.length === 0) {
+        continue;
+      }
+      try {
+        const caps = await this.cloudClient.getDeviceState(
+          device.sku,
+          device.deviceId
+        );
+        const prefix = this.stateManager.devicePrefix(device);
+        for (const cap of caps) {
+          const mapped = (0, import_capability_mapper.mapCloudStateValue)(cap);
+          if (!mapped) {
+            continue;
+          }
+          if (device.lanIp && lanStateIds.has(mapped.stateId)) {
+            continue;
+          }
+          const obj = await this.getObjectAsync(
+            `${prefix}.control.${mapped.stateId}`
+          );
+          if (obj) {
+            await this.setStateAsync(`${prefix}.control.${mapped.stateId}`, {
+              val: mapped.value,
+              ack: true
+            });
+          }
+        }
+        loaded++;
+      } catch {
+        this.log.debug(
+          `Could not load Cloud state for ${device.name} (${device.sku})`
+        );
+      }
+    }
+    if (loaded > 0) {
+      this.log.debug(`Cloud states loaded for ${loaded} devices`);
+    }
   }
   /**
    * Find device for a state ID
@@ -318,6 +425,12 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.scene") {
       return "scene";
+    }
+    if (suffix === "control.light_scene") {
+      return "lightScene";
+    }
+    if (suffix === "control.snapshot") {
+      return "snapshot";
     }
     if (suffix.startsWith("segments.") && suffix.endsWith(".color")) {
       return "segmentColor";

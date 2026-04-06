@@ -19,7 +19,8 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var capability_mapper_exports = {};
 __export(capability_mapper_exports, {
   getDefaultLanStates: () => getDefaultLanStates,
-  mapCapabilities: () => mapCapabilities
+  mapCapabilities: () => mapCapabilities,
+  mapCloudStateValue: () => mapCloudStateValue
 });
 module.exports = __toCommonJS(capability_mapper_exports);
 function mapCapabilities(capabilities) {
@@ -271,9 +272,61 @@ function sanitizeId(str) {
 function humanize(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 }
+function mapCloudStateValue(cap) {
+  var _a;
+  const shortType = cap.type.replace("devices.capabilities.", "");
+  const raw = (_a = cap.state) == null ? void 0 : _a.value;
+  if (raw === void 0 || raw === null) {
+    return null;
+  }
+  switch (shortType) {
+    case "on_off":
+      return { stateId: "power", value: raw === 1 };
+    case "range":
+      return { stateId: sanitizeId(cap.instance), value: raw };
+    case "color_setting":
+      if (cap.instance === "colorRgb") {
+        const num = typeof raw === "number" ? raw : 0;
+        const r = num >> 16 & 255;
+        const g = num >> 8 & 255;
+        const b = num & 255;
+        return {
+          stateId: "colorRgb",
+          value: `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
+        };
+      }
+      if (cap.instance.includes("colorTem")) {
+        return { stateId: "colorTemperature", value: raw };
+      }
+      return null;
+    case "toggle":
+      return { stateId: sanitizeId(cap.instance), value: raw === 1 };
+    case "mode":
+      if (cap.instance === "presetScene") {
+        return {
+          stateId: "scene",
+          value: typeof raw === "object" || typeof raw === "function" ? JSON.stringify(raw) : String(raw)
+        };
+      }
+      return null;
+    case "dynamic_scene":
+    case "music_setting":
+    case "work_mode":
+    case "temperature_setting":
+      return {
+        stateId: sanitizeId(cap.instance),
+        value: typeof raw === "object" || typeof raw === "function" ? JSON.stringify(raw) : String(raw)
+      };
+    case "property":
+      return { stateId: sanitizeId(cap.instance), value: raw };
+    default:
+      return null;
+  }
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   getDefaultLanStates,
-  mapCapabilities
+  mapCapabilities,
+  mapCloudStateValue
 });
 //# sourceMappingURL=capability-mapper.js.map

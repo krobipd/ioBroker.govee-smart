@@ -9,8 +9,15 @@
 
 - **Version:** 0.3.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
-- **npm:** (noch nicht published)
+- **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `mqtt`, `node-forge`
+
+## KRITISCH: LAN-first ist unantastbar!
+
+- **LAN-States (power, brightness, colorRgb, colorTemperature) dürfen NIE von Cloud überschrieben werden**
+- State-Definitionen: LAN-fähige Geräte → immer `getDefaultLanStates()` als Basis
+- State-Werte: `loadCloudStates()` filtert LAN-State-IDs für LAN-fähige Geräte
+- Cloud ist NUR für: Szenen, Snapshots, Toggles, Segmente, Sensoren
 
 ## Kanal-Priorität: LAN → MQTT → Cloud
 
@@ -22,7 +29,7 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 | Status anfragen | **primär** | Fallback | letzter Ausweg |
 | Status Push (echtzeit) | — | **einzige Quelle** | — |
 | Geräteliste + Capabilities | — | — | **einzige Quelle** |
-| Szenen | — | — | **einzige Quelle** |
+| Szenen + Snapshots | — | — | **einzige Quelle** |
 | Segmente | — | — | **einzige Quelle** |
 
 **Nur Geräte mit lokaler API.** Siehe [Supported devices](https://app-h5.govee.com/user-manual/wlan-guide).
@@ -32,22 +39,20 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 | Eingabe | Funktionsumfang |
 |---------|----------------|
 | Nichts | LAN-only: Discovery, Power, Brightness, Color, Status |
-| + API Key | + Geräteliste mit Namen, Capabilities, Szenen, Segmente |
+| + API Key | + Geräteliste mit Namen, Capabilities, Szenen, Snapshots, Segmente |
 | + Email/Passwort | + Echtzeit Status-Push via MQTT |
-
-Admin UI: Drei Sektionen mit Hinweis was man bekommt. Klar dokumentiert.
 
 ## Architektur
 
 ```
-src/main.ts                   → Lifecycle, StateChange
-src/lib/types.ts              → Interfaces (API, Config, Capabilities, Devices)
-src/lib/govee-cloud-client.ts → Cloud REST API v2 (Devices, Capabilities, Szenen, Segmente)
+src/main.ts                   → Lifecycle, StateChange, Cloud State Loading
+src/lib/types.ts              → Interfaces (API, Config, Capabilities, Devices, Scenes)
+src/lib/govee-cloud-client.ts → Cloud REST API v2 (Devices, Capabilities, Szenen+Snapshots, Control)
 src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Status-Push + Control Fallback)
 src/lib/govee-lan-client.ts   → LAN UDP (Discovery + Control + Status)
-src/lib/device-manager.ts     → LAN → MQTT → Cloud Routing, unsichtbar für User
+src/lib/device-manager.ts     → LAN → MQTT → Cloud Routing, Scene/Snapshot Loading
 src/lib/rate-limiter.ts       → Rate-Limits für Cloud REST Calls
-src/lib/capability-mapper.ts  → Capability → ioBroker State Definition
+src/lib/capability-mapper.ts  → Capability → ioBroker State Definition + Cloud State Value Mapping
 src/lib/state-manager.ts      → State CRUD + Cleanup
 ```
 
@@ -58,30 +63,30 @@ Ordnername = immer `sku_shortid` (z.B. `h61be_1d6f`). Cloud-Name nur in `common.
 ```
 govee-smart.0.
 ├── info.connection
+├── info.mqttConnected
+├── info.cloudConnected
 ├── devices.
 │   └── h61be_1d6f.                  (SKU + letzte 4 Hex der Device-ID)
 │       ├── info.name / .model / .serial / .online
-│       ├── control.power / .brightness / .colorRgb / .colorTemperature / .scene
+│       ├── control.power / .brightness / .colorRgb / .colorTemperature
+│       ├── control.light_scene       (Dropdown: 78-237 Szenen aus Cloud)
+│       ├── control.snapshot          (Dropdown: User-gespeicherte Zustände)
+│       ├── control.gradient_toggle / .diy_scene / .music_mode
 │       └── segments.count / .0.color / .0.brightness
 └── groups.
     └── basegroup_1280.              (Govee-Gruppen)
 ```
 
-## Szenen-Steuerung
+## Szenen-Architektur (WICHTIG!)
 
-State mit `states`-Property (Dropdown):
-```
-device.scene → type: string, write: true
-               states: { "id1": "Sunset", "id2": "Rainbow", ... }
-```
-Szenen-Liste von Cloud, als states-Objekt. User wählt aus — kein ID-Tippen.
+Szenen kommen vom **separaten Scenes-Endpoint** (`POST /device/scenes`), NICHT aus den Device-Capabilities!
 
-## Segment-Steuerung
+**Response-Format:** `{payload: {capabilities: [{type, instance, parameters: {options: [{name, value}]}}]}}`
 
-Pro Segment eigene States, dynamisch aus Capabilities:
-- Jedes Segment wie ein Mini-Licht (color + brightness)
-- Anzahl aus Capability-Definition
-- Steuerung über Cloud REST (einziger Kanal für Segmente)
+- `lightScene` Options → Szenen-Dropdown mit Index-basierter Auswahl
+- `snapshot` Options → Snapshot-Dropdown (User-gespeicherte Zustände)
+- Snapshots auch als Fallback aus Device-Capabilities `dynamic_scene`/`snapshot`/`parameters.options`
+- **Aktivierung:** User wählt Index → `device.scenes[idx-1].value` → direkt als `capability.value` an Control-Endpoint
 
 ## Cloud REST API v2
 
@@ -93,10 +98,14 @@ Pro Segment eigene States, dynamisch aus Capabilities:
 - Appliances: **100/Tag** (!)
 - Rate-Limiter schützt, Cloud nur als letzter Ausweg
 
+### Unit-Normalisierung
+Cloud API liefert nicht-standard Units: `unit.percent` → `%`, `unit.kelvin` → `K`, `unit.celsius` → `°C`
+
 ## AWS IoT MQTT
 
-### Auth-Flow
-1. Login: `POST app2.govee.com/.../login` → token + accountId + topic
+### Auth-Flow (v2 Headers erforderlich!)
+1. Login: `POST app2.govee.com/.../v1/login` → token + accountId + topic
+   - Headers: User-Agent, clientId, appVersion, timezone, country, envId, iotVersion
 2. IoT Key: `GET app2.govee.com/.../iot/key` → endpoint + P12 cert
 3. Connect: Mutual TLS, Client-ID `AP/<accountId>/<uuid>`
 
@@ -118,32 +127,20 @@ Nur Lights mit aktivierter LAN-Funktion in Govee Home App.
 
 Single Page, drei Sektionen:
 
-**1. LAN (immer aktiv)**
-- Hinweis: "Geräte mit aktivierter LAN-Funktion werden automatisch gefunden"
-
-**2. Cloud API (optional)**
-- API Key (password, encrypted)
-- Hinweis: "Ermöglicht Szenen, Segmente und Gerätenamen"
-
-**3. Govee Account (optional)**
-- Email (text)
-- Passwort (password, encrypted)
-- Hinweis: "Ermöglicht Echtzeit Status-Updates"
-
-**4. Einstellungen**
-- Poll Interval (number, default 60s — nur Cloud-Geräteliste-Refresh)
-- Connection Check Button
-
+**1. LAN (immer aktiv)** — "Geräte mit aktivierter LAN-Funktion werden automatisch gefunden"
+**2. Cloud API (optional)** — API Key → "Ermöglicht Szenen, Segmente und Gerätenamen"
+**3. Govee Account (optional)** — Email + Passwort → "Ermöglicht Echtzeit Status-Updates"
+**4. Einstellungen** — Poll Interval + Connection Check
 **5. Donation**
 
 ## Design-Prinzipien
 
-1. **LAN first** — schnellster Kanal, Kern des Adapters
+1. **LAN first** — schnellster Kanal, Kern des Adapters, Cloud darf NIE LAN-States überschreiben
 2. **MQTT für Echtzeit** — Status-Push, Steuer-Fallback
-3. **Cloud nur wo nötig** — Definitionen, Szenen, Segmente
+3. **Cloud nur wo nötig** — Definitionen, Szenen, Snapshots, Segmente
 4. **Graceful degradation** — ohne Credentials: LAN-only funktioniert
 5. **Capability-driven** — States aus API generiert, nichts hardcodiert
-6. **LAN-first States** — Basis-States immer aus LAN-Defaults, Cloud nur Extras
+6. **Szenen als echte Dropdowns** — Index-basiert, value-Payload aus Cloud
 7. **Stabile Ordner** — `sku_shortid`, Cloud-Name nur in `common.name`
 8. **Gruppen-Ordner** — BaseGroup unter `groups/`, Devices unter `devices/`
 9. **Nahtlos** — User merkt nicht welcher Kanal
@@ -157,17 +154,6 @@ test/testDeviceManager.ts    → Device Manager (LAN discovery, IP update, MQTT 
 test/testRateLimiter.ts      → Rate Limiter (per-minute, per-day, queueing) (4 Tests)
 test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 ```
-
-Nicht getestet (bewusst): main.ts Lifecycle, MQTT/LAN-Clients (Netzwerk), Cloud-Client (HTTP).
-
-## Versionshistorie
-
-| Version | Highlights |
-|---------|------------|
-| 0.3.0 | Stabile sku_shortid Ordner, LAN-first States, MQTT Login v2 Fix, Gruppen-Ordner, Unit-Normalisierung |
-| 0.2.1 | Fix SKU collision (short-ID suffix), deploy workflow build step |
-| 0.2.0 | control/ channel, info.serial, stale cleanup |
-| 0.1.x | Initial: LAN UDP, AWS IoT MQTT, Cloud API v2, Szenen, Segmente |
 
 ## Befehle
 

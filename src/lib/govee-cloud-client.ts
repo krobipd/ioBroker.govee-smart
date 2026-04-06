@@ -102,12 +102,16 @@ export class GoveeCloudClient {
   }
 
   /**
-   * Fetch dynamic scenes for a device
+   * Fetch dynamic scenes and snapshots for a device.
+   * The scenes endpoint returns capabilities with options.
    *
    * @param sku Product model
    * @param device Device identifier
    */
-  async getScenes(sku: string, device: string): Promise<CloudScene[]> {
+  async getScenes(
+    sku: string,
+    device: string,
+  ): Promise<{ lightScenes: CloudScene[]; snapshots: CloudScene[] }> {
     const resp = await this.request<CloudScenesResponse>(
       "POST",
       "/router/api/v1/device/scenes",
@@ -116,7 +120,30 @@ export class GoveeCloudClient {
         payload: { sku, device },
       },
     );
-    return resp.data ?? [];
+
+    const lightScenes: CloudScene[] = [];
+    const snapshots: CloudScene[] = [];
+
+    for (const cap of resp.payload?.capabilities ?? []) {
+      const opts = cap.parameters.options ?? [];
+      const mapped: CloudScene[] = opts
+        .filter(
+          (o): o is { name: string; value: Record<string, unknown> } =>
+            typeof o.name === "string" && typeof o.value === "object",
+        )
+        .map((o) => ({
+          name: o.name,
+          value: o.value,
+        }));
+
+      if (cap.instance === "lightScene") {
+        lightScenes.push(...mapped);
+      } else if (cap.instance === "snapshot") {
+        snapshots.push(...mapped);
+      }
+    }
+
+    return { lightScenes, snapshots };
   }
 
   /** Check if the API key is valid */

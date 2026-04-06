@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "news": {
+      "0.4.0": {
+        "en": "Scenes and snapshots as dropdowns, Cloud state loading, info.mqttConnected/cloudConnected, cleaner logging",
+        "de": "Szenen und Snapshots als Dropdowns, Cloud-Status-Laden, info.mqttConnected/cloudConnected, saubereres Logging",
+        "ru": "Сцены и снимки как выпадающие списки, загрузка состояний из облака, info.mqttConnected/cloudConnected",
+        "pt": "Cenas e snapshots como dropdowns, carregamento de estados da nuvem, info.mqttConnected/cloudConnected",
+        "nl": "Scènes en snapshots als dropdowns, Cloud-statusladen, info.mqttConnected/cloudConnected",
+        "fr": "Scènes et snapshots en dropdowns, chargement d'états Cloud, info.mqttConnected/cloudConnected",
+        "it": "Scene e snapshot come dropdown, caricamento stati Cloud, info.mqttConnected/cloudConnected",
+        "es": "Escenas y snapshots como dropdowns, carga de estados Cloud, info.mqttConnected/cloudConnected",
+        "pl": "Sceny i snapshoty jako dropdown, ładowanie stanów Cloud, info.mqttConnected/cloudConnected",
+        "uk": "Сцени та знімки як dropdown, завантаження станів Cloud, info.mqttConnected/cloudConnected",
+        "zh-cn": "场景和快照作为下拉菜单，Cloud状态加载，info.mqttConnected/cloudConnected"
+      },
       "0.3.0": {
         "en": "Stable device folders (SKU+ID), LAN-first controls, fix MQTT login v2, groups folder, fix Cloud unit strings",
         "de": "Stabile Geräteordner (SKU+ID), LAN-first Steuerung, Fix MQTT Login v2, Gruppen-Ordner, Fix Cloud-Einheiten",
@@ -67,19 +80,6 @@
         "pl": "Naprawiono brakujące stany sterowania dla urządzeń tylko LAN",
         "uk": "Виправлення відсутніх станів керування для пристроїв лише LAN",
         "zh-cn": "修复仅LAN设备缺少控制状态的问题"
-      },
-      "0.1.0": {
-        "en": "Initial release",
-        "de": "Erstveröffentlichung",
-        "ru": "Первоначальный выпуск",
-        "pt": "Lançamento inicial",
-        "nl": "Eerste uitgave",
-        "fr": "Version initiale",
-        "it": "Rilascio iniziale",
-        "es": "Lanzamiento inicial",
-        "pl": "Pierwsze wydanie",
-        "uk": "Початковий випуск",
-        "zh-cn": "初始版本"
       }
     },
     "titleLang": {

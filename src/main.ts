@@ -2,6 +2,7 @@ import * as utils from "@iobroker/adapter-core";
 import {
   getDefaultLanStates,
   mapCapabilities,
+  mapCloudStateValue,
   type StateDefinition,
 } from "./lib/capability-mapper.js";
 import { DeviceManager } from "./lib/device-manager.js";
@@ -112,11 +113,20 @@ class GoveeAdapter extends utils.Adapter {
       this.deviceManager.setRateLimiter(this.rateLimiter);
 
       // Initial cloud load
+      this.log.info("Loading devices from Cloud API, please wait...");
       const cloudOk = await this.deviceManager.loadFromCloud();
       void this.setStateAsync("info.cloudConnected", {
         val: cloudOk,
         ack: true,
       });
+
+      // Load current device states from Cloud
+      if (cloudOk) {
+        await this.loadCloudStates();
+      }
+
+      // Log device summary
+      this.logDeviceSummary();
 
       // Periodic cloud refresh
       const intervalMs = Math.max(30, config.pollInterval ?? 60) * 1000;
@@ -176,14 +186,12 @@ class GoveeAdapter extends utils.Adapter {
 
     this.updateConnectionState();
 
-    const channels: string[] = ["LAN"];
-    if (config.apiKey) {
-      channels.push("Cloud");
+    // LAN-only mode hint (no Cloud config)
+    if (!config.apiKey) {
+      this.log.info(
+        "Govee adapter ready (LAN only) — configure Cloud API key for scenes, device names and more",
+      );
     }
-    if (config.goveeEmail) {
-      channels.push("MQTT");
-    }
-    this.log.info(`Govee adapter started — channels: ${channels.join(", ")}`);
   }
 
   /**
@@ -299,6 +307,45 @@ class GoveeAdapter extends utils.Adapter {
         stateDefs = mapCapabilities(device.capabilities);
       }
 
+      // Replace generic dynamic_scene JSON states with real dropdowns
+      // if we have actual scene/snapshot data from the scenes endpoint
+      if (device.scenes.length > 0) {
+        const sceneStates: Record<string, string> = { 0: "---" };
+        device.scenes.forEach((s, i) => {
+          sceneStates[i + 1] = s.name;
+        });
+        // Remove generic light_scene JSON state if present
+        stateDefs = stateDefs.filter((d) => d.id !== "light_scene");
+        stateDefs.push({
+          id: "light_scene",
+          name: "Light Scene",
+          type: "string",
+          role: "text",
+          write: true,
+          states: sceneStates,
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+        });
+      }
+
+      if (device.snapshots.length > 0) {
+        const snapStates: Record<string, string> = { 0: "---" };
+        device.snapshots.forEach((s, i) => {
+          snapStates[i + 1] = s.name;
+        });
+        stateDefs = stateDefs.filter((d) => d.id !== "snapshot");
+        stateDefs.push({
+          id: "snapshot",
+          name: "Snapshot",
+          type: "string",
+          role: "text",
+          write: true,
+          states: snapStates,
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "snapshot",
+        });
+      }
+
       void this.stateManager.createDeviceStates(device, stateDefs);
     }
 
@@ -313,6 +360,88 @@ class GoveeAdapter extends utils.Adapter {
     const lanRunning = this.lanClient !== null;
     const connected = hasDevices ? anyOnline : lanRunning;
     void this.setStateAsync("info.connection", { val: connected, ack: true });
+  }
+
+  /** Log device/group summary after Cloud load */
+  private logDeviceSummary(): void {
+    if (!this.deviceManager) {
+      return;
+    }
+    const all = this.deviceManager.getDevices();
+    const devices = all.filter((d) => d.sku !== "BaseGroup");
+    const groups = all.filter((d) => d.sku === "BaseGroup");
+
+    const parts: string[] = [];
+    if (devices.length > 0) {
+      parts.push(`${devices.length} device${devices.length > 1 ? "s" : ""}`);
+    }
+    if (groups.length > 0) {
+      parts.push(`${groups.length} group${groups.length > 1 ? "s" : ""}`);
+    }
+
+    if (parts.length > 0) {
+      this.log.info(`Govee adapter ready (${parts.join(", ")})`);
+    } else {
+      this.log.info("Govee adapter ready (no devices found)");
+    }
+  }
+
+  /**
+   * Load current state for all Cloud devices and populate state values.
+   * Called once after initial Cloud device list load.
+   */
+  private async loadCloudStates(): Promise<void> {
+    if (!this.cloudClient || !this.deviceManager || !this.stateManager) {
+      return;
+    }
+
+    const devices = this.deviceManager.getDevices();
+    // LAN-first: never overwrite LAN states with Cloud values
+    const lanStateIds = new Set(getDefaultLanStates().map((s) => s.id));
+    let loaded = 0;
+
+    for (const device of devices) {
+      if (!device.channels.cloud || device.capabilities.length === 0) {
+        continue;
+      }
+
+      try {
+        const caps = await this.cloudClient.getDeviceState(
+          device.sku,
+          device.deviceId,
+        );
+        const prefix = this.stateManager.devicePrefix(device);
+
+        for (const cap of caps) {
+          const mapped = mapCloudStateValue(cap);
+          if (!mapped) {
+            continue;
+          }
+          // Skip LAN-covered states for LAN-capable devices
+          if (device.lanIp && lanStateIds.has(mapped.stateId)) {
+            continue;
+          }
+          const obj = await this.getObjectAsync(
+            `${prefix}.control.${mapped.stateId}`,
+          );
+          if (obj) {
+            await this.setStateAsync(`${prefix}.control.${mapped.stateId}`, {
+              val: mapped.value,
+              ack: true,
+            });
+          }
+        }
+        loaded++;
+      } catch {
+        this.log.debug(
+          `Could not load Cloud state for ${device.name} (${device.sku})`,
+        );
+      }
+    }
+
+    if (loaded > 0) {
+      this.log.debug(`Cloud states loaded for ${loaded} devices`);
+    }
   }
 
   /**
@@ -354,6 +483,12 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.scene") {
       return "scene";
+    }
+    if (suffix === "control.light_scene") {
+      return "lightScene";
+    }
+    if (suffix === "control.snapshot") {
+      return "snapshot";
     }
     // Segment commands
     if (suffix.startsWith("segments.") && suffix.endsWith(".color")) {

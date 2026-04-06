@@ -1,4 +1,4 @@
-import type { CloudCapability } from "./types.js";
+import type { CloudCapability, CloudStateCapability } from "./types.js";
 
 /** ioBroker state definition derived from a Govee capability */
 export interface StateDefinition {
@@ -367,4 +367,85 @@ function humanize(str: string): string {
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
     .replace(/^\w/, (c) => c.toUpperCase());
+}
+
+/** Mapped Cloud state value: state ID + converted value */
+export interface CloudStateValue {
+  /** State ID in control/ channel (e.g. "power", "brightness", "gradient_toggle") */
+  stateId: string;
+  /** Converted value ready for ioBroker setStateAsync */
+  value: ioBroker.StateValue;
+}
+
+/**
+ * Map a Cloud device state capability to a state ID + converted value.
+ * Uses the same ID logic as mapCapabilities so IDs always match.
+ *
+ * @param cap Cloud state capability with current value
+ */
+export function mapCloudStateValue(
+  cap: CloudStateCapability,
+): CloudStateValue | null {
+  const shortType = cap.type.replace("devices.capabilities.", "");
+  const raw = cap.state?.value;
+  if (raw === undefined || raw === null) {
+    return null;
+  }
+
+  switch (shortType) {
+    case "on_off":
+      return { stateId: "power", value: raw === 1 };
+
+    case "range":
+      return { stateId: sanitizeId(cap.instance), value: raw as number };
+
+    case "color_setting":
+      if (cap.instance === "colorRgb") {
+        const num = typeof raw === "number" ? raw : 0;
+        const r = (num >> 16) & 0xff;
+        const g = (num >> 8) & 0xff;
+        const b = num & 0xff;
+        return {
+          stateId: "colorRgb",
+          value: `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`,
+        };
+      }
+      if (cap.instance.includes("colorTem")) {
+        return { stateId: "colorTemperature", value: raw as number };
+      }
+      return null;
+
+    case "toggle":
+      return { stateId: sanitizeId(cap.instance), value: raw === 1 };
+
+    case "mode":
+      if (cap.instance === "presetScene") {
+        return {
+          stateId: "scene",
+          value:
+            typeof raw === "object" || typeof raw === "function"
+              ? JSON.stringify(raw)
+              : String(raw as string | number | boolean | bigint),
+        };
+      }
+      return null;
+
+    case "dynamic_scene":
+    case "music_setting":
+    case "work_mode":
+    case "temperature_setting":
+      return {
+        stateId: sanitizeId(cap.instance),
+        value:
+          typeof raw === "object" || typeof raw === "function"
+            ? JSON.stringify(raw)
+            : String(raw as string | number | boolean | bigint),
+      };
+
+    case "property":
+      return { stateId: sanitizeId(cap.instance), value: raw as number };
+
+    default:
+      return null;
+  }
 }

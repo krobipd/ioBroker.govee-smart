@@ -107,13 +107,14 @@ class GoveeCloudClient {
     });
   }
   /**
-   * Fetch dynamic scenes for a device
+   * Fetch dynamic scenes and snapshots for a device.
+   * The scenes endpoint returns capabilities with options.
    *
    * @param sku Product model
    * @param device Device identifier
    */
   async getScenes(sku, device) {
-    var _a;
+    var _a, _b, _c;
     const resp = await this.request(
       "POST",
       "/router/api/v1/device/scenes",
@@ -122,7 +123,23 @@ class GoveeCloudClient {
         payload: { sku, device }
       }
     );
-    return (_a = resp.data) != null ? _a : [];
+    const lightScenes = [];
+    const snapshots = [];
+    for (const cap of (_b = (_a = resp.payload) == null ? void 0 : _a.capabilities) != null ? _b : []) {
+      const opts = (_c = cap.parameters.options) != null ? _c : [];
+      const mapped = opts.filter(
+        (o) => typeof o.name === "string" && typeof o.value === "object"
+      ).map((o) => ({
+        name: o.name,
+        value: o.value
+      }));
+      if (cap.instance === "lightScene") {
+        lightScenes.push(...mapped);
+      } else if (cap.instance === "snapshot") {
+        snapshots.push(...mapped);
+      }
+    }
+    return { lightScenes, snapshots };
   }
   /** Check if the API key is valid */
   async checkConnection() {

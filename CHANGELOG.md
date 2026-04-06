@@ -1,4 +1,13 @@
 # Changelog
+## 0.4.0 (2026-04-06)
+- Scenes as real dropdowns — loaded from Cloud scenes endpoint (78-237 scenes per device)
+- Snapshots as dropdowns — from scenes endpoint with device capability fallback
+- Scene/snapshot activation via Cloud control endpoint
+- Cloud state loading for Cloud-only states (toggles, modes)
+- Cloud never overwrites LAN states (power, brightness, color, colorTemperature)
+- Added `info.mqttConnected` and `info.cloudConnected` global connection states
+- Cleaner logging: device/group summary on startup
+
 ## 0.3.0 (2026-04-06)
 - Stable device folder naming: always `sku_shortId` (e.g. `h61be_1d6f`), Cloud name in `common.name` only
 - LAN-first: basic control states (power, brightness, color, colorTemperature) always from LAN defaults
