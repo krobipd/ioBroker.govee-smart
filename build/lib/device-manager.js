@@ -21,6 +21,7 @@ __export(device_manager_exports, {
   DeviceManager: () => DeviceManager
 });
 module.exports = __toCommonJS(device_manager_exports);
+var import_types = require("./types.js");
 class DeviceManager {
   log;
   devices = /* @__PURE__ */ new Map();
@@ -30,6 +31,7 @@ class DeviceManager {
   rateLimiter = null;
   onDeviceUpdate = null;
   onDeviceListChanged = null;
+  lastErrorCategory = null;
   /** @param log ioBroker logger */
   constructor(log) {
     this.log = log;
@@ -118,13 +120,26 @@ class DeviceManager {
       for (const cd of cloudDevices) {
         if (cd.type === "light" || cd.capabilities.some((c) => c.type.includes("dynamic_scene"))) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
-          if (device && device.scenes.length === 0 && device.snapshots.length === 0) {
-            try {
-              const { lightScenes, snapshots } = await this.cloudClient.getScenes(cd.sku, cd.device);
-              device.scenes = lightScenes;
-              device.snapshots = snapshots;
-            } catch {
-              this.log.debug(`Could not load scenes for ${cd.sku}`);
+          if (device) {
+            const loadScenes = async () => {
+              try {
+                const { lightScenes, snapshots } = await this.cloudClient.getScenes(cd.sku, cd.device);
+                if (lightScenes.length > 0 || snapshots.length > 0) {
+                  const scenesChanged = lightScenes.length !== device.scenes.length || snapshots.length !== device.snapshots.length;
+                  device.scenes = lightScenes;
+                  device.snapshots = snapshots;
+                  if (scenesChanged) {
+                    changed = true;
+                  }
+                }
+              } catch {
+                this.log.debug(`Could not load scenes for ${cd.sku}`);
+              }
+            };
+            if (this.rateLimiter) {
+              await this.rateLimiter.tryExecute(loadScenes, 2);
+            } else {
+              await loadScenes();
             }
             if (device.snapshots.length === 0) {
               const snapCap = cd.capabilities.find(
@@ -148,11 +163,10 @@ class DeviceManager {
       if (changed) {
         (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
       }
+      this.lastErrorCategory = null;
       return true;
     } catch (err) {
-      this.log.warn(
-        `Cloud device list failed: ${err instanceof Error ? err.message : String(err)}`
-      );
+      this.logDedup("Cloud device list failed", err);
       return false;
     }
   }
@@ -165,7 +179,7 @@ class DeviceManager {
     var _a;
     let matched;
     for (const dev of this.devices.values()) {
-      if (this.normalizeDeviceId(dev.deviceId) === this.normalizeDeviceId(lanDevice.device)) {
+      if ((0, import_types.normalizeDeviceId)(dev.deviceId) === (0, import_types.normalizeDeviceId)(lanDevice.device)) {
         matched = dev;
         break;
       }
@@ -184,7 +198,7 @@ class DeviceManager {
         );
       }
     } else {
-      const shortId = this.normalizeDeviceId(lanDevice.device).slice(-4);
+      const shortId = (0, import_types.normalizeDeviceId)(lanDevice.device).slice(-4);
       const device = {
         sku: lanDevice.sku,
         deviceId: lanDevice.device,
@@ -281,6 +295,14 @@ class DeviceManager {
    */
   async sendCommand(device, command, value) {
     var _a;
+    if (command.startsWith("segmentColor:") || command.startsWith("segmentBrightness:")) {
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
+      this.log.debug(`Segment control requires Cloud API for ${device.name}`);
+      return;
+    }
     if (device.lanIp && this.lanClient) {
       this.sendLanCommand(device, command, value);
       return;
@@ -327,7 +349,8 @@ class DeviceManager {
         if (((_a = this.mqttClient) == null ? void 0 : _a.connected) && this.sendMqttCommand(device, command, value)) {
           return;
         }
-        void this.sendCloudCommand(device, command, value);
+        this.sendCloudCommand(device, command, value).catch(() => {
+        });
     }
   }
   /**
@@ -423,6 +446,12 @@ class DeviceManager {
       if (command === "snapshot" && shortType === "dynamic_scene" && cap.instance === "snapshot") {
         return cap;
       }
+      if (command.startsWith("segmentColor:") && shortType === "segment_color_setting") {
+        return cap;
+      }
+      if (command.startsWith("segmentBrightness:") && shortType === "segment_color_setting") {
+        return cap;
+      }
     }
     return void 0;
   }
@@ -459,6 +488,15 @@ class DeviceManager {
         return (_b = snap == null ? void 0 : snap.value) != null ? _b : value;
       }
       default:
+        if (command.startsWith("segmentColor:")) {
+          const segIdx = parseInt(command.split(":")[1], 10);
+          const { r, g, b } = this.parseColor(value);
+          return { segment: [segIdx], rgb: r << 16 | g << 8 | b };
+        }
+        if (command.startsWith("segmentBrightness:")) {
+          const segIdx = parseInt(command.split(":")[1], 10);
+          return { segment: [segIdx], brightness: value };
+        }
         return value;
     }
   }
@@ -505,9 +543,9 @@ class DeviceManager {
     if (direct) {
       return direct;
     }
-    const normalizedId = this.normalizeDeviceId(deviceId);
+    const normalizedId = (0, import_types.normalizeDeviceId)(deviceId);
     for (const dev of this.devices.values()) {
-      if (dev.sku === sku && this.normalizeDeviceId(dev.deviceId) === normalizedId) {
+      if (dev.sku === sku && (0, import_types.normalizeDeviceId)(dev.deviceId) === normalizedId) {
         return dev;
       }
     }
@@ -520,15 +558,23 @@ class DeviceManager {
    * @param deviceId Device identifier
    */
   deviceKey(sku, deviceId) {
-    return `${sku}_${this.normalizeDeviceId(deviceId)}`;
+    return `${sku}_${(0, import_types.normalizeDeviceId)(deviceId)}`;
   }
   /**
-   * Normalize device ID — remove colons, lowercase
+   * Log error with dedup — only warn on category change, debug on repeat.
    *
-   * @param id Raw device identifier
+   * @param context Error context description
+   * @param err Error to log
    */
-  normalizeDeviceId(id) {
-    return id.replace(/:/g, "").toLowerCase();
+  logDedup(context, err) {
+    const category = (0, import_types.classifyError)(err);
+    const msg = `${context}: ${err instanceof Error ? err.message : String(err)}`;
+    if (category !== this.lastErrorCategory) {
+      this.lastErrorCategory = category;
+      this.log.warn(msg);
+    } else {
+      this.log.debug(`${msg} (repeated)`);
+    }
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

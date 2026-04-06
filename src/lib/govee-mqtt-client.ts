@@ -347,7 +347,9 @@ export class GoveeMqttClient {
 
     this.reconnectTimer = this.timers.setTimeout(() => {
       this.reconnectTimer = undefined;
-      void this.connect(this.onStatus!, this.onConnection!);
+      if (this.onStatus && this.onConnection) {
+        void this.connect(this.onStatus, this.onConnection);
+      }
     }, delay);
   }
 

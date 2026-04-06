@@ -299,6 +299,56 @@ export interface DeviceState {
   [key: string]: unknown;
 }
 
+/**
+ * Normalize device ID — remove colons, lowercase
+ *
+ * @param id Raw device identifier
+ */
+export function normalizeDeviceId(id: string): string {
+  return id.replace(/:/g, "").toLowerCase();
+}
+
+/** Error categories for dedup logging */
+export type ErrorCategory =
+  | "NETWORK"
+  | "TIMEOUT"
+  | "AUTH"
+  | "RATE_LIMIT"
+  | "UNKNOWN";
+
+/**
+ * Classify an error into a category for dedup logging.
+ * Only the category is used as key — not context or full message.
+ *
+ * @param err Error to classify
+ */
+export function classifyError(err: unknown): ErrorCategory {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (
+    msg.includes("ECONNREFUSED") ||
+    msg.includes("ENOTFOUND") ||
+    msg.includes("ENETUNREACH") ||
+    msg.includes("ECONNRESET")
+  ) {
+    return "NETWORK";
+  }
+  if (msg.includes("timed out") || msg.includes("Timeout")) {
+    return "TIMEOUT";
+  }
+  if (
+    msg.includes("401") ||
+    msg.includes("403") ||
+    msg.includes("Login failed") ||
+    msg.includes("auth")
+  ) {
+    return "AUTH";
+  }
+  if (msg.includes("429") || msg.includes("Rate limit")) {
+    return "RATE_LIMIT";
+  }
+  return "UNKNOWN";
+}
+
 /** Timer/callback interfaces for helper classes */
 export interface TimerAdapter {
   /** Create a repeating interval timer */

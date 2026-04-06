@@ -49,12 +49,14 @@ class CloudApiError extends Error {
 }
 class GoveeCloudClient {
   apiKey;
+  log;
   /**
    * @param apiKey Govee API key
-   * @param _log ioBroker logger (reserved for future use)
+   * @param log ioBroker logger
    */
-  constructor(apiKey, _log) {
+  constructor(apiKey, log) {
     this.apiKey = apiKey;
+    this.log = log;
   }
   /** Fetch all devices with their capabilities */
   async getDevices() {
@@ -77,7 +79,7 @@ class GoveeCloudClient {
       "POST",
       "/router/api/v1/device/state",
       {
-        requestId: "uuid",
+        requestId: `state_${Date.now()}`,
         payload: { sku, device }
       }
     );
@@ -165,6 +167,7 @@ class GoveeCloudClient {
    * @param body Optional request body
    */
   request(method, path, body) {
+    this.log.debug(`Cloud API: ${method} ${path}`);
     return new Promise((resolve, reject) => {
       const url = new URL(path, BASE_URL);
       const postData = body ? JSON.stringify(body) : void 0;

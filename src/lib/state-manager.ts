@@ -1,6 +1,10 @@
 import type * as utils from "@iobroker/adapter-core";
 import type { StateDefinition } from "./capability-mapper.js";
-import type { DeviceState, GoveeDevice } from "./types.js";
+import {
+  normalizeDeviceId,
+  type DeviceState,
+  type GoveeDevice,
+} from "./types.js";
 
 /**
  * Sanitize a string for ioBroker object ID
@@ -9,15 +13,6 @@ import type { DeviceState, GoveeDevice } from "./types.js";
  */
 function sanitize(str: string): string {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
-}
-
-/**
- * Normalize device ID — remove colons, lowercase
- *
- * @param id Raw device identifier
- */
-function normalizeDeviceId(id: string): string {
-  return id.replace(/:/g, "").toLowerCase();
 }
 
 /** Manages ioBroker state creation and updates for Govee devices */
@@ -374,6 +369,7 @@ export class StateManager {
       return;
     }
 
+    let deleted = 0;
     for (const row of existing.rows) {
       const stateId = row.id.replace(controlPrefix, "");
       if (!validIds.has(stateId)) {
@@ -383,7 +379,19 @@ export class StateManager {
         await this.adapter.delStateAsync(localId).catch(() => {
           // State may not exist
         });
+        deleted++;
       }
+    }
+
+    // If all control states were deleted, remove empty control/ channel
+    if (deleted > 0 && deleted === existing.rows.length) {
+      const controlChannelId = `${prefix}.control`;
+      this.adapter.log.debug(
+        `Removing empty control channel: ${controlChannelId}`,
+      );
+      await this.adapter.delObjectAsync(controlChannelId).catch(() => {
+        // Channel may not exist
+      });
     }
   }
 

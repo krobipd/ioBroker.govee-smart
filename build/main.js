@@ -98,6 +98,11 @@ class GoveeAdapter extends utils.Adapter {
       (device, state) => this.onDeviceStateUpdate(device, state),
       (devices) => this.onDeviceListChanged(devices)
     );
+    if (config.apiKey || config.goveeEmail && config.goveePassword) {
+      this.log.info(
+        "Starting Govee adapter \u2014 initializing channels, this may take a moment..."
+      );
+    }
     this.lanClient = new import_govee_lan_client.GoveeLanClient(this.log, this);
     this.deviceManager.setLanClient(this.lanClient);
     this.lanClient.start(
@@ -115,23 +120,24 @@ class GoveeAdapter extends utils.Adapter {
       this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this);
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
-      this.log.info("Loading devices from Cloud API, please wait...");
       const cloudOk = await this.deviceManager.loadFromCloud();
-      void this.setStateAsync("info.cloudConnected", {
+      this.setStateAsync("info.cloudConnected", {
         val: cloudOk,
         ack: true
+      }).catch(() => {
       });
       if (cloudOk) {
         await this.loadCloudStates();
       }
-      this.logDeviceSummary();
       const intervalMs = Math.max(30, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
       this.cloudPollTimer = this.setInterval(() => {
-        void this.deviceManager.loadFromCloud().then((ok) => {
-          void this.setStateAsync("info.cloudConnected", {
+        this.deviceManager.loadFromCloud().then((ok) => {
+          this.setStateAsync("info.cloudConnected", {
             val: ok,
             ack: true
+          }).catch(() => {
           });
+        }).catch(() => {
         });
       }, intervalMs);
     }
@@ -146,9 +152,10 @@ class GoveeAdapter extends utils.Adapter {
       await this.mqttClient.connect(
         (update) => this.deviceManager.handleMqttStatus(update),
         (connected) => {
-          void this.setStateAsync("info.mqttConnected", {
+          this.setStateAsync("info.mqttConnected", {
             val: connected,
             ack: true
+          }).catch(() => {
           });
           if (connected) {
             this.log.debug("MQTT connected \u2014 real-time status active");
@@ -169,15 +176,12 @@ class GoveeAdapter extends utils.Adapter {
     await this.subscribeStatesAsync("groups.*");
     this.setTimeout(() => {
       if (this.stateManager && this.deviceManager) {
-        void this.stateManager.cleanupDevices(this.deviceManager.getDevices());
+        this.stateManager.cleanupDevices(this.deviceManager.getDevices()).catch(() => {
+        });
       }
     }, 3e4);
     this.updateConnectionState();
-    if (!config.apiKey) {
-      this.log.info(
-        "Govee adapter ready (LAN only) \u2014 configure Cloud API key for scenes, device names and more"
-      );
-    }
+    this.logDeviceSummary(config);
   }
   /**
    * Adapter stopping — MUST be synchronous.
@@ -241,7 +245,8 @@ class GoveeAdapter extends utils.Adapter {
    */
   onDeviceStateUpdate(device, state) {
     if (this.stateManager) {
-      void this.stateManager.updateDeviceState(device, state);
+      this.stateManager.updateDeviceState(device, state).catch(() => {
+      });
     }
     this.updateConnectionState();
   }
@@ -322,10 +327,18 @@ class GoveeAdapter extends utils.Adapter {
     const anyOnline = (_d = (_c = this.deviceManager) == null ? void 0 : _c.getDevices().some((d) => d.state.online)) != null ? _d : false;
     const lanRunning = this.lanClient !== null;
     const connected = hasDevices ? anyOnline : lanRunning;
-    void this.setStateAsync("info.connection", { val: connected, ack: true });
+    this.setStateAsync("info.connection", { val: connected, ack: true }).catch(
+      () => {
+      }
+    );
   }
-  /** Log device/group summary after Cloud load */
-  logDeviceSummary() {
+  /**
+   * Log final ready message with device/group/channel summary.
+   * Called once at the end of onReady after all channels are initialized.
+   *
+   * @param config Adapter configuration
+   */
+  logDeviceSummary(config) {
     if (!this.deviceManager) {
       return;
     }
@@ -339,11 +352,17 @@ class GoveeAdapter extends utils.Adapter {
     if (groups.length > 0) {
       parts.push(`${groups.length} group${groups.length > 1 ? "s" : ""}`);
     }
-    if (parts.length > 0) {
-      this.log.info(`Govee adapter ready (${parts.join(", ")})`);
-    } else {
-      this.log.info("Govee adapter ready (no devices found)");
+    const channels = ["LAN"];
+    if (config.apiKey) {
+      channels.push("Cloud");
     }
+    if (config.goveeEmail && config.goveePassword) {
+      channels.push("MQTT");
+    }
+    const deviceInfo = parts.length > 0 ? parts.join(", ") : "no devices found";
+    this.log.info(
+      `Govee adapter ready (${deviceInfo}, channels: ${channels.join("+")})`
+    );
   }
   /**
    * Load current state for all Cloud devices and populate state values.
@@ -439,11 +458,13 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "control.snapshot") {
       return "snapshot";
     }
-    if (suffix.startsWith("segments.") && suffix.endsWith(".color")) {
-      return "segmentColor";
+    const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);
+    if (segColorMatch) {
+      return `segmentColor:${segColorMatch[1]}`;
     }
-    if (suffix.startsWith("segments.") && suffix.endsWith(".brightness")) {
-      return "segmentBrightness";
+    const segBrightMatch = /^segments\.(\d+)\.brightness$/.exec(suffix);
+    if (segBrightMatch) {
+      return `segmentBrightness:${segBrightMatch[1]}`;
     }
     return null;
   }

@@ -1,4 +1,15 @@
 # Changelog
+## 0.5.0 (2026-04-06)
+- Fix segment control commands (were silently failing, now routed via Cloud API)
+- Rate-limited Cloud startup to prevent API throttling
+- Error dedup logging — only warn on category change, debug on repeat
+- Scene/snapshot refresh on each Cloud poll (not only on first load)
+- Startup logging: "ready" message only after all channels initialized
+- Shared utilities (normalizeDeviceId, classifyError), removed code duplication
+- Add .catch() to all fire-and-forget async calls
+- Fix MQTT reconnect null safety, Cloud API requestId, LanStatusCallback type
+- Remove stale files (javscript.txt, CHANGELOG_OLD.md)
+
 ## 0.4.1 (2026-04-06)
 - Fix null state values: sensible defaults for all control states
 - Remove stale control states on startup (e.g. leftover snapshot JSON state)

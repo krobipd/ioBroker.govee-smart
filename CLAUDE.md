@@ -130,7 +130,7 @@ Single Page, drei Sektionen:
 **1. LAN (immer aktiv)** — "Geräte mit aktivierter LAN-Funktion werden automatisch gefunden"
 **2. Cloud API (optional)** — API Key → "Ermöglicht Szenen, Segmente und Gerätenamen"
 **3. Govee Account (optional)** — Email + Passwort → "Ermöglicht Echtzeit Status-Updates"
-**4. Einstellungen** — Poll Interval + Connection Check
+**4. Einstellungen** — Poll Interval
 **5. Donation**
 
 ## Design-Prinzipien
@@ -146,7 +146,12 @@ Single Page, drei Sektionen:
 9. **Nahtlos** — User merkt nicht welcher Kanal
 10. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
 11. **Keine null-Werte** — Alle States haben `def` in StateDefinition + werden beim Erstellen initialisiert
-12. **Stale State Cleanup** — `cleanupControlStates()` entfernt alte Control-States die nicht mehr in Defs sind
+12. **Stale State Cleanup** — `cleanupControlStates()` entfernt alte Control-States + leere Channels
+13. **Error-Dedup** — `classifyError()` + `lastErrorCategory` in DeviceManager; warn nur bei Kategorie-Wechsel
+14. **Rate-Limited Startup** — Scene-Loading über `rateLimiter.tryExecute()` auch beim Cloud-Init
+15. **Segment-Routing** — `segmentColor:N`/`segmentBrightness:N` Commands → Cloud `segment_color_setting`
+16. **Shared Utilities** — `normalizeDeviceId()` + `classifyError()` in types.ts, nicht dupliziert
+17. **Kein Fire-and-forget** — Alle async void-Calls haben `.catch()` Handler
 
 ## Tests (78)
 

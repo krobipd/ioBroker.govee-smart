@@ -14,8 +14,8 @@ const COMMAND_PORT = 4003;
 /** Callback for discovered LAN devices */
 export type LanDiscoveryCallback = (device: LanDevice) => void;
 
-/** Callback for status updates */
-export type LanStatusCallback = (deviceId: string, status: LanStatus) => void;
+/** Callback for status updates (matched by source IP, not device ID) */
+export type LanStatusCallback = (sourceIp: string, status: LanStatus) => void;
 
 /**
  * Govee LAN UDP client for device discovery and control.

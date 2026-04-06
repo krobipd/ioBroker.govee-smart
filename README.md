@@ -141,6 +141,12 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.5.0 (2026-04-06)
+- Fix segment control commands (now routed via Cloud API)
+- Rate-limited Cloud startup, error dedup logging
+- Scene/snapshot refresh on each Cloud poll
+- Startup "ready" message only after all channels initialized
+
 ### 0.4.1 (2026-04-06)
 - Fix null state values: sensible defaults for all control states
 - Remove stale control states on startup
@@ -162,9 +168,6 @@ govee-smart.0.
 
 ### 0.2.0 (2026-04-06)
 - Control states in `control/` channel, `info.serial` state
-
-### 0.1.x (2026-04-05)
-- Initial release: LAN UDP, AWS IoT MQTT, Cloud API v2
 
 [Older changelog entries](CHANGELOG_OLD.md)
 

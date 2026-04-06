@@ -21,11 +21,9 @@ __export(state_manager_exports, {
   StateManager: () => StateManager
 });
 module.exports = __toCommonJS(state_manager_exports);
+var import_types = require("./types.js");
 function sanitize(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
-}
-function normalizeDeviceId(id) {
-  return id.replace(/:/g, "").toLowerCase();
 }
 class StateManager {
   adapter;
@@ -331,6 +329,7 @@ class StateManager {
     if (!(existing == null ? void 0 : existing.rows)) {
       return;
     }
+    let deleted = 0;
     for (const row of existing.rows) {
       const stateId = row.id.replace(controlPrefix, "");
       if (!validIds.has(stateId)) {
@@ -339,7 +338,16 @@ class StateManager {
         await this.adapter.delObjectAsync(localId);
         await this.adapter.delStateAsync(localId).catch(() => {
         });
+        deleted++;
       }
+    }
+    if (deleted > 0 && deleted === existing.rows.length) {
+      const controlChannelId = `${prefix}.control`;
+      this.adapter.log.debug(
+        `Removing empty control channel: ${controlChannelId}`
+      );
+      await this.adapter.delObjectAsync(controlChannelId).catch(() => {
+      });
     }
   }
   /**
@@ -350,7 +358,7 @@ class StateManager {
    * @param device Govee device
    */
   devicePrefix(device) {
-    const shortId = normalizeDeviceId(device.deviceId).slice(-4);
+    const shortId = (0, import_types.normalizeDeviceId)(device.deviceId).slice(-4);
     const folder = device.sku === "BaseGroup" ? "groups" : "devices";
     return `${folder}.${sanitize(`${device.sku}_${shortId}`)}`;
   }

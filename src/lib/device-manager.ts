@@ -2,12 +2,15 @@ import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
 import type { GoveeMqttClient } from "./govee-mqtt-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
-import type {
-  CloudDevice,
-  DeviceState,
-  GoveeDevice,
-  LanDevice,
-  MqttStatusUpdate,
+import {
+  classifyError,
+  normalizeDeviceId,
+  type CloudDevice,
+  type DeviceState,
+  type ErrorCategory,
+  type GoveeDevice,
+  type LanDevice,
+  type MqttStatusUpdate,
 } from "./types.js";
 
 /**
@@ -25,6 +28,7 @@ export class DeviceManager {
     | ((device: GoveeDevice, state: Partial<DeviceState>) => void)
     | null = null;
   private onDeviceListChanged: ((devices: GoveeDevice[]) => void) | null = null;
+  private lastErrorCategory: ErrorCategory | null = null;
 
   /** @param log ioBroker logger */
   constructor(log: ioBroker.Logger) {
@@ -133,19 +137,31 @@ export class DeviceManager {
           cd.capabilities.some((c) => c.type.includes("dynamic_scene"))
         ) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
-          if (
-            device &&
-            device.scenes.length === 0 &&
-            device.snapshots.length === 0
-          ) {
-            // Scenes come from the dedicated scenes endpoint
-            try {
-              const { lightScenes, snapshots } =
-                await this.cloudClient.getScenes(cd.sku, cd.device);
-              device.scenes = lightScenes;
-              device.snapshots = snapshots;
-            } catch {
-              this.log.debug(`Could not load scenes for ${cd.sku}`);
+          if (device) {
+            // Scenes come from the dedicated scenes endpoint (refresh each poll)
+            // Rate-limited to avoid hitting API limits during startup
+            const loadScenes = async (): Promise<void> => {
+              try {
+                const { lightScenes, snapshots } =
+                  await this.cloudClient!.getScenes(cd.sku, cd.device);
+                if (lightScenes.length > 0 || snapshots.length > 0) {
+                  const scenesChanged =
+                    lightScenes.length !== device.scenes.length ||
+                    snapshots.length !== device.snapshots.length;
+                  device.scenes = lightScenes;
+                  device.snapshots = snapshots;
+                  if (scenesChanged) {
+                    changed = true;
+                  }
+                }
+              } catch {
+                this.log.debug(`Could not load scenes for ${cd.sku}`);
+              }
+            };
+            if (this.rateLimiter) {
+              await this.rateLimiter.tryExecute(loadScenes, 2);
+            } else {
+              await loadScenes();
             }
 
             // Snapshots also available from device capabilities as fallback
@@ -179,11 +195,10 @@ export class DeviceManager {
       if (changed) {
         this.onDeviceListChanged?.(this.getDevices());
       }
+      this.lastErrorCategory = null;
       return true;
     } catch (err) {
-      this.log.warn(
-        `Cloud device list failed: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      this.logDedup("Cloud device list failed", err);
       return false;
     }
   }
@@ -198,8 +213,7 @@ export class DeviceManager {
     let matched: GoveeDevice | undefined;
     for (const dev of this.devices.values()) {
       if (
-        this.normalizeDeviceId(dev.deviceId) ===
-        this.normalizeDeviceId(lanDevice.device)
+        normalizeDeviceId(dev.deviceId) === normalizeDeviceId(lanDevice.device)
       ) {
         matched = dev;
         break;
@@ -223,7 +237,7 @@ export class DeviceManager {
     } else {
       // LAN-only device (no Cloud data yet)
       // Include short device ID suffix for uniqueness (multiple devices can share same SKU)
-      const shortId = this.normalizeDeviceId(lanDevice.device).slice(-4);
+      const shortId = normalizeDeviceId(lanDevice.device).slice(-4);
       const device: GoveeDevice = {
         sku: lanDevice.sku,
         deviceId: lanDevice.device,
@@ -339,6 +353,19 @@ export class DeviceManager {
     command: string,
     value: unknown,
   ): Promise<void> {
+    // Segment commands only work via Cloud API
+    if (
+      command.startsWith("segmentColor:") ||
+      command.startsWith("segmentBrightness:")
+    ) {
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
+      this.log.debug(`Segment control requires Cloud API for ${device.name}`);
+      return;
+    }
+
     // Priority 1: LAN
     if (device.lanIp && this.lanClient) {
       this.sendLanCommand(device, command, value);
@@ -400,7 +427,7 @@ export class DeviceManager {
         ) {
           return;
         }
-        void this.sendCloudCommand(device, command, value);
+        this.sendCloudCommand(device, command, value).catch(() => {});
     }
   }
 
@@ -540,6 +567,18 @@ export class DeviceManager {
       ) {
         return cap;
       }
+      if (
+        command.startsWith("segmentColor:") &&
+        shortType === "segment_color_setting"
+      ) {
+        return cap;
+      }
+      if (
+        command.startsWith("segmentBrightness:") &&
+        shortType === "segment_color_setting"
+      ) {
+        return cap;
+      }
     }
     return undefined;
   }
@@ -581,6 +620,15 @@ export class DeviceManager {
         return snap?.value ?? value;
       }
       default:
+        if (command.startsWith("segmentColor:")) {
+          const segIdx = parseInt(command.split(":")[1], 10);
+          const { r, g, b } = this.parseColor(value as string);
+          return { segment: [segIdx], rgb: (r << 16) | (g << 8) | b };
+        }
+        if (command.startsWith("segmentBrightness:")) {
+          const segIdx = parseInt(command.split(":")[1], 10);
+          return { segment: [segIdx], brightness: value };
+        }
         return value;
     }
   }
@@ -636,12 +684,9 @@ export class DeviceManager {
     }
 
     // Normalized search
-    const normalizedId = this.normalizeDeviceId(deviceId);
+    const normalizedId = normalizeDeviceId(deviceId);
     for (const dev of this.devices.values()) {
-      if (
-        dev.sku === sku &&
-        this.normalizeDeviceId(dev.deviceId) === normalizedId
-      ) {
+      if (dev.sku === sku && normalizeDeviceId(dev.deviceId) === normalizedId) {
         return dev;
       }
     }
@@ -655,15 +700,23 @@ export class DeviceManager {
    * @param deviceId Device identifier
    */
   private deviceKey(sku: string, deviceId: string): string {
-    return `${sku}_${this.normalizeDeviceId(deviceId)}`;
+    return `${sku}_${normalizeDeviceId(deviceId)}`;
   }
 
   /**
-   * Normalize device ID — remove colons, lowercase
+   * Log error with dedup — only warn on category change, debug on repeat.
    *
-   * @param id Raw device identifier
+   * @param context Error context description
+   * @param err Error to log
    */
-  private normalizeDeviceId(id: string): string {
-    return id.replace(/:/g, "").toLowerCase();
+  private logDedup(context: string, err: unknown): void {
+    const category = classifyError(err);
+    const msg = `${context}: ${err instanceof Error ? err.message : String(err)}`;
+    if (category !== this.lastErrorCategory) {
+      this.lastErrorCategory = category;
+      this.log.warn(msg);
+    } else {
+      this.log.debug(`${msg} (repeated)`);
+    }
   }
 }
