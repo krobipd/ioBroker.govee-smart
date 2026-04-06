@@ -1,5 +1,5 @@
 # Changelog
-## **WORK IN PROGRESS**
+## 0.6.0 (2026-04-06)
 - Batch segment control: new `segments.command` state (e.g. "1-5:#ff0000:20", "all:#00ff00:50")
 - Generic capability routing for toggle/dynamic_scene states (gradient_toggle, diy_scene, music_mode)
 - Scene dropdown auto-reset when switching to solid color or color temperature

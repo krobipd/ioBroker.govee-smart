@@ -1,174 +1,174 @@
 {
-    "common": {
-        "name": "govee-smart",
-        "version": "0.5.0",
-        "news": {
-            "0.6.0": {
-                "en": "Batch segment control, generic capability routing, scene dropdown auto-reset",
-                "de": "Batch-Segmentsteuerung, generisches Capability-Routing, Szenen-Dropdown Auto-Reset",
-                "ru": "Пакетное управление сегментами, маршрутизация возможностей, автосброс выбора сцены",
-                "pt": "Controle de segmentos em lote, roteamento de capacidades, reset automático de cenas",
-                "nl": "Batch segmentbesturing, generieke capability-routing, scène-dropdown auto-reset",
-                "fr": "Contrôle segments par lot, routage générique des capacités, reset auto scènes",
-                "it": "Controllo segmenti batch, routing capacità generico, reset automatico scene",
-                "es": "Control de segmentos por lotes, enrutamiento de capacidades, reset automático de escenas",
-                "pl": "Sterowanie segmentami wsadowe, routing możliwości, auto-reset scen",
-                "uk": "Пакетне керування сегментами, маршрутизація можливостей, автоскидання сцен",
-                "zh-cn": "批量段控制，通用能力路由，场景下拉自动重置"
-            },
-            "0.5.0": {
-                "en": "Fix segment control, rate-limited startup, error dedup logging, scene refresh on poll, startup ready message",
-                "de": "Fix Segment-Steuerung, Rate-limitierter Start, Error-Dedup Logging, Szenen-Refresh bei Poll, Startup-Meldung",
-                "ru": "Исправление управления сегментами, ограничение запросов при запуске, дедупликация ошибок, обновление сцен",
-                "pt": "Correção do controle de segmentos, início limitado por taxa, dedup de erros, atualização de cenas no poll",
-                "nl": "Fix segmentbesturing, rate-limited opstarten, fout-dedup logging, scène-verversing bij poll",
-                "fr": "Correction contrôle segments, démarrage limité, dédup erreurs, rafraîchissement scènes, message prêt",
-                "it": "Correzione controllo segmenti, avvio rate-limited, dedup errori, aggiornamento scene nel poll",
-                "es": "Corrección control de segmentos, inicio con límite de tasa, dedup de errores, actualización de escenas",
-                "pl": "Naprawa sterowania segmentami, start z limitem, dedup błędów, odświeżanie scen przy poll",
-                "uk": "Виправлення керування сегментами, обмежений старт, дедуплікація помилок, оновлення сцен",
-                "zh-cn": "修复分段控制，启动速率限制，错误去重日志，轮询时刷新场景，启动就绪消息"
-            },
-            "0.4.1": {
-                "en": "Fix null state values: sensible defaults for all states, remove stale control states on startup",
-                "de": "Fix Null-Werte: sinnvolle Standardwerte für alle States, veraltete Control-States beim Start entfernen",
-                "ru": "Исправление null значений: разумные значения по умолчанию, удаление устаревших состояний",
-                "pt": "Correção de valores nulos: padrões sensatos para todos os estados, remoção de estados obsoletos",
-                "nl": "Fix null-waarden: standaardwaarden voor alle staten, verouderde control-staten verwijderen",
-                "fr": "Correction des valeurs nulles: valeurs par défaut pour tous les états, suppression des états obsolètes",
-                "it": "Correzione valori null: valori predefiniti per tutti gli stati, rimozione stati obsoleti",
-                "es": "Corrección valores nulos: valores predeterminados para todos los estados, eliminar estados obsoletos",
-                "pl": "Naprawa wartości null: domyślne wartości dla wszystkich stanów, usuwanie nieaktualnych stanów",
-                "uk": "Виправлення null значень: розумні значення за замовчуванням, видалення застарілих станів",
-                "zh-cn": "修复空值：为所有状态设置合理的默认值，启动时删除过期的控制状态"
-            },
-            "0.4.0": {
-                "en": "Scenes and snapshots as dropdowns, Cloud state loading, info.mqttConnected/cloudConnected, cleaner logging",
-                "de": "Szenen und Snapshots als Dropdowns, Cloud-Status-Laden, info.mqttConnected/cloudConnected, saubereres Logging",
-                "ru": "Сцены и снимки как выпадающие списки, загрузка состояний из облака, info.mqttConnected/cloudConnected",
-                "pt": "Cenas e snapshots como dropdowns, carregamento de estados da nuvem, info.mqttConnected/cloudConnected",
-                "nl": "Scènes en snapshots als dropdowns, Cloud-statusladen, info.mqttConnected/cloudConnected",
-                "fr": "Scènes et snapshots en dropdowns, chargement d'états Cloud, info.mqttConnected/cloudConnected",
-                "it": "Scene e snapshot come dropdown, caricamento stati Cloud, info.mqttConnected/cloudConnected",
-                "es": "Escenas y snapshots como dropdowns, carga de estados Cloud, info.mqttConnected/cloudConnected",
-                "pl": "Sceny i snapshoty jako dropdown, ładowanie stanów Cloud, info.mqttConnected/cloudConnected",
-                "uk": "Сцени та знімки як dropdown, завантаження станів Cloud, info.mqttConnected/cloudConnected",
-                "zh-cn": "场景和快照作为下拉菜单，Cloud状态加载，info.mqttConnected/cloudConnected"
-            },
-            "0.3.0": {
-                "en": "Stable device folders (SKU+ID), LAN-first controls, fix MQTT login v2, groups folder, fix Cloud unit strings",
-                "de": "Stabile Geräteordner (SKU+ID), LAN-first Steuerung, Fix MQTT Login v2, Gruppen-Ordner, Fix Cloud-Einheiten",
-                "ru": "Стабильные папки устройств (SKU+ID), LAN-приоритет, исправление MQTT входа v2, папка групп, исправление единиц Cloud",
-                "pt": "Pastas estáveis (SKU+ID), controle LAN-first, correção MQTT login v2, pasta de grupos, correção unidades Cloud",
-                "nl": "Stabiele apparaatmappen (SKU+ID), LAN-first bediening, fix MQTT login v2, groepmap, fix Cloud eenheden",
-                "fr": "Dossiers stables (SKU+ID), contrôle LAN-first, correction MQTT login v2, dossier groupes, correction unités Cloud",
-                "it": "Cartelle stabili (SKU+ID), controllo LAN-first, fix login MQTT v2, cartella gruppi, fix unità Cloud",
-                "es": "Carpetas estables (SKU+ID), control LAN-first, fix MQTT login v2, carpeta grupos, fix unidades Cloud",
-                "pl": "Stabilne foldery (SKU+ID), LAN-first sterowanie, fix MQTT login v2, folder grup, fix jednostek Cloud",
-                "uk": "Стабільні теки (SKU+ID), LAN-first керування, виправлення MQTT логін v2, тека груп, виправлення одиниць Cloud",
-                "zh-cn": "稳定设备文件夹(SKU+ID)，LAN优先控制，修复MQTT登录v2，分组文件夹，修复Cloud单位"
-            },
-            "0.2.1": {
-                "en": "Fix duplicate SKU collision: LAN-only devices now use SKU with short device ID suffix for unique folder names\nFix deploy workflow: add build step before npm publish",
-                "de": "Fix duplicate SKU Kollision: LAN-only-Geräte verwenden jetzt SKU mit Short Device ID Suffix für eindeutige Ordnernamen\nWorkflow einstellen: Erstellen Sie einen Schritt vor npm veröffentlichen",
-                "ru": "Исправьте двойное столкновение SKU: устройства только для LAN теперь используют SKU с коротким идентификатором устройства для уникальных имен папок\nИсправьте рабочий процесс развертывания: добавьте шаг сборки до публикации npm",
-                "pt": "Corrigir colisão SKU duplicada: dispositivos somente LAN agora usam SKU com sufixo de ID de dispositivo curto para nomes de pastas exclusivos\nCorrigir o fluxo de trabalho de implantação: adicionar o passo de compilação antes da publicação do npm",
-                "nl": "Fix dubbele SKU botsing: LAN-alleen apparaten gebruiken nu SKU met korte apparaat ID achtervoegsel voor unieke mapnamen\nFix implementatie workflow: voeg bouw stap voor npm publiceren",
-                "fr": "Correction de la collision SKU dupliquée : les périphériques LAN seulement utilisent désormais SKU avec un suffixe d'ID de périphérique court pour les noms de dossiers uniques\nCorrection du workflow de déploiement : ajouter l'étape de construction avant npm publier",
-                "it": "Risolvere la collisione di SKU duplicato: i dispositivi LAN-only ora utilizzano SKU con il suffisso di ID di dispositivo corto per i nomi di cartella unici\nFissare il flusso di lavoro di distribuzione: aggiungere passo di build prima npm pubblicare",
-                "es": "Fijar la colisión SKU duplicada: Los dispositivos LAN solo utilizan ahora SKU con sufijo de identificación de dispositivo corto para nombres de carpeta únicos\nFijar flujo de trabajo de despliegue: añadir paso de construcción antes de que npm publique",
-                "pl": "Fix duplikat SKU kolizji: tylko LAN urządzenia teraz używać SKU z krótkim ID urządzenia przyrostek dla unikalnych nazw folderów\nNapraw przepływ pracy: dodaj krok budowy przed publikacją npm",
-                "uk": "Фіксувати дублікати зіткнення кодів: локально-тільки пристрої тепер використовують коди з коротким пристроєм ID suffix для унікальних назв папок\nВиправлення розгортання робочого процесу: додати крок до npm публікувати",
-                "zh-cn": "修复重复的 SKU 碰撞: 现在仅使用 LAN 设备的 SKU , 并带有短设备 ID 后缀, 用于独有的文件夹名称\n固定部署工作流程: 在 npm 发布前添加构建步骤"
-            },
-            "0.2.0": {
-                "en": "Device folders use Cloud name (SKU fallback), control states in control/ channel",
-                "de": "Geräte-Ordner mit Cloud-Name (SKU-Fallback), Steuer-States in control/ Channel",
-                "ru": "Папки устройств используют имя из облака, состояния управления в канале control/",
-                "pt": "Pastas de dispositivos usam nome da nuvem, estados de controle no canal control/",
-                "nl": "Apparaatmappen gebruiken cloudnaam, besturingsstaten in control/ kanaal",
-                "fr": "Dossiers d'appareils avec nom cloud, états de contrôle dans le canal control/",
-                "it": "Cartelle dispositivi con nome cloud, stati di controllo nel canale control/",
-                "es": "Carpetas de dispositivos con nombre de nube, estados de control en canal control/",
-                "pl": "Foldery urządzeń z nazwą z chmury, stany sterowania w kanale control/",
-                "uk": "Теки пристроїв з іменем з хмари, стани керування в каналі control/",
-                "zh-cn": "设备文件夹使用云端名称，控制状态移至control/通道"
-            }
-        },
-        "titleLang": {
-            "en": "Govee Smart Lights",
-            "de": "Govee Smart Lights",
-            "ru": "Govee Smart Lights",
-            "pt": "Govee Smart Lights",
-            "nl": "Govee Smart Lights",
-            "fr": "Govee Smart Lights",
-            "it": "Govee Smart Lights",
-            "es": "Govee Smart Lights",
-            "pl": "Govee Smart Lights",
-            "uk": "Govee Smart Lights",
-            "zh-cn": "Govee Smart Lights"
-        },
-        "desc": {
-            "en": "Control Govee smart lights via LAN, MQTT and Cloud API",
-            "de": "Govee Smart Lights über LAN, MQTT und Cloud API steuern",
-            "ru": "Управление умными светильниками Govee через LAN, MQTT и Cloud API",
-            "pt": "Controle luzes inteligentes Govee via LAN, MQTT e Cloud API",
-            "nl": "Bedien Govee slimme verlichting via LAN, MQTT en Cloud API",
-            "fr": "Contrôlez les lumières intelligentes Govee via LAN, MQTT et Cloud API",
-            "it": "Controlla le luci intelligenti Govee tramite LAN, MQTT e Cloud API",
-            "es": "Controla las luces inteligentes Govee a través de LAN, MQTT y Cloud API",
-            "pl": "Steruj inteligentnymi lampami Govee przez LAN, MQTT i Cloud API",
-            "uk": "Керуйте розумними світильниками Govee через LAN, MQTT та Cloud API",
-            "zh-cn": "通过LAN、MQTT和Cloud API控制Govee智能灯"
-        },
-        "authors": [
-            "krobi <krobi@power-dreams.com>"
-        ],
-        "licenseInformation": {
-            "license": "MIT",
-            "type": "free"
-        },
-        "platform": "Javascript/Node.js",
-        "icon": "govee-smart.svg",
-        "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg",
-        "readme": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/README.md",
-        "enabled": true,
-        "tier": 3,
-        "loglevel": "info",
-        "mode": "daemon",
-        "type": "lighting",
-        "compact": true,
-        "connectionType": "local",
-        "dataSource": "push",
-        "adminUI": {
-            "config": "json"
-        },
-        "supportedMessages": {
-            "stopInstance": true
-        },
-        "dependencies": [
-            {
-                "js-controller": ">=7.0.0"
-            }
-        ],
-        "globalDependencies": [
-            {
-                "admin": ">=7.6.20"
-            }
-        ]
+  "common": {
+    "name": "govee-smart",
+    "version": "0.6.0",
+    "news": {
+      "0.6.0": {
+        "en": "Batch segment control, generic capability routing, scene dropdown auto-reset",
+        "de": "Batch-Segmentsteuerung, generisches Capability-Routing, Szenen-Dropdown Auto-Reset",
+        "ru": "Пакетное управление сегментами, маршрутизация возможностей, автосброс выбора сцены",
+        "pt": "Controle de segmentos em lote, roteamento de capacidades, reset automático de cenas",
+        "nl": "Batch segmentbesturing, generieke capability-routing, scène-dropdown auto-reset",
+        "fr": "Contrôle segments par lot, routage générique des capacités, reset auto scènes",
+        "it": "Controllo segmenti batch, routing capacità generico, reset automatico scene",
+        "es": "Control de segmentos por lotes, enrutamiento de capacidades, reset automático de escenas",
+        "pl": "Sterowanie segmentami wsadowe, routing możliwości, auto-reset scen",
+        "uk": "Пакетне керування сегментами, маршрутизація можливостей, автоскидання сцен",
+        "zh-cn": "批量段控制，通用能力路由，场景下拉自动重置"
+      },
+      "0.5.0": {
+        "en": "Fix segment control, rate-limited startup, error dedup logging, scene refresh on poll, startup ready message",
+        "de": "Fix Segment-Steuerung, Rate-limitierter Start, Error-Dedup Logging, Szenen-Refresh bei Poll, Startup-Meldung",
+        "ru": "Исправление управления сегментами, ограничение запросов при запуске, дедупликация ошибок, обновление сцен",
+        "pt": "Correção do controle de segmentos, início limitado por taxa, dedup de erros, atualização de cenas no poll",
+        "nl": "Fix segmentbesturing, rate-limited opstarten, fout-dedup logging, scène-verversing bij poll",
+        "fr": "Correction contrôle segments, démarrage limité, dédup erreurs, rafraîchissement scènes, message prêt",
+        "it": "Correzione controllo segmenti, avvio rate-limited, dedup errori, aggiornamento scene nel poll",
+        "es": "Corrección control de segmentos, inicio con límite de tasa, dedup de errores, actualización de escenas",
+        "pl": "Naprawa sterowania segmentami, start z limitem, dedup błędów, odświeżanie scen przy poll",
+        "uk": "Виправлення керування сегментами, обмежений старт, дедуплікація помилок, оновлення сцен",
+        "zh-cn": "修复分段控制，启动速率限制，错误去重日志，轮询时刷新场景，启动就绪消息"
+      },
+      "0.4.1": {
+        "en": "Fix null state values: sensible defaults for all states, remove stale control states on startup",
+        "de": "Fix Null-Werte: sinnvolle Standardwerte für alle States, veraltete Control-States beim Start entfernen",
+        "ru": "Исправление null значений: разумные значения по умолчанию, удаление устаревших состояний",
+        "pt": "Correção de valores nulos: padrões sensatos para todos os estados, remoção de estados obsoletos",
+        "nl": "Fix null-waarden: standaardwaarden voor alle staten, verouderde control-staten verwijderen",
+        "fr": "Correction des valeurs nulles: valeurs par défaut pour tous les états, suppression des états obsolètes",
+        "it": "Correzione valori null: valori predefiniti per tutti gli stati, rimozione stati obsoleti",
+        "es": "Corrección valores nulos: valores predeterminados para todos los estados, eliminar estados obsoletos",
+        "pl": "Naprawa wartości null: domyślne wartości dla wszystkich stanów, usuwanie nieaktualnych stanów",
+        "uk": "Виправлення null значень: розумні значення за замовчуванням, видалення застарілих станів",
+        "zh-cn": "修复空值：为所有状态设置合理的默认值，启动时删除过期的控制状态"
+      },
+      "0.4.0": {
+        "en": "Scenes and snapshots as dropdowns, Cloud state loading, info.mqttConnected/cloudConnected, cleaner logging",
+        "de": "Szenen und Snapshots als Dropdowns, Cloud-Status-Laden, info.mqttConnected/cloudConnected, saubereres Logging",
+        "ru": "Сцены и снимки как выпадающие списки, загрузка состояний из облака, info.mqttConnected/cloudConnected",
+        "pt": "Cenas e snapshots como dropdowns, carregamento de estados da nuvem, info.mqttConnected/cloudConnected",
+        "nl": "Scènes en snapshots als dropdowns, Cloud-statusladen, info.mqttConnected/cloudConnected",
+        "fr": "Scènes et snapshots en dropdowns, chargement d'états Cloud, info.mqttConnected/cloudConnected",
+        "it": "Scene e snapshot come dropdown, caricamento stati Cloud, info.mqttConnected/cloudConnected",
+        "es": "Escenas y snapshots como dropdowns, carga de estados Cloud, info.mqttConnected/cloudConnected",
+        "pl": "Sceny i snapshoty jako dropdown, ładowanie stanów Cloud, info.mqttConnected/cloudConnected",
+        "uk": "Сцени та знімки як dropdown, завантаження станів Cloud, info.mqttConnected/cloudConnected",
+        "zh-cn": "场景和快照作为下拉菜单，Cloud状态加载，info.mqttConnected/cloudConnected"
+      },
+      "0.3.0": {
+        "en": "Stable device folders (SKU+ID), LAN-first controls, fix MQTT login v2, groups folder, fix Cloud unit strings",
+        "de": "Stabile Geräteordner (SKU+ID), LAN-first Steuerung, Fix MQTT Login v2, Gruppen-Ordner, Fix Cloud-Einheiten",
+        "ru": "Стабильные папки устройств (SKU+ID), LAN-приоритет, исправление MQTT входа v2, папка групп, исправление единиц Cloud",
+        "pt": "Pastas estáveis (SKU+ID), controle LAN-first, correção MQTT login v2, pasta de grupos, correção unidades Cloud",
+        "nl": "Stabiele apparaatmappen (SKU+ID), LAN-first bediening, fix MQTT login v2, groepmap, fix Cloud eenheden",
+        "fr": "Dossiers stables (SKU+ID), contrôle LAN-first, correction MQTT login v2, dossier groupes, correction unités Cloud",
+        "it": "Cartelle stabili (SKU+ID), controllo LAN-first, fix login MQTT v2, cartella gruppi, fix unità Cloud",
+        "es": "Carpetas estables (SKU+ID), control LAN-first, fix MQTT login v2, carpeta grupos, fix unidades Cloud",
+        "pl": "Stabilne foldery (SKU+ID), LAN-first sterowanie, fix MQTT login v2, folder grup, fix jednostek Cloud",
+        "uk": "Стабільні теки (SKU+ID), LAN-first керування, виправлення MQTT логін v2, тека груп, виправлення одиниць Cloud",
+        "zh-cn": "稳定设备文件夹(SKU+ID)，LAN优先控制，修复MQTT登录v2，分组文件夹，修复Cloud单位"
+      },
+      "0.2.1": {
+        "en": "Fix duplicate SKU collision: LAN-only devices now use SKU with short device ID suffix for unique folder names\nFix deploy workflow: add build step before npm publish",
+        "de": "Fix duplicate SKU Kollision: LAN-only-Geräte verwenden jetzt SKU mit Short Device ID Suffix für eindeutige Ordnernamen\nWorkflow einstellen: Erstellen Sie einen Schritt vor npm veröffentlichen",
+        "ru": "Исправьте двойное столкновение SKU: устройства только для LAN теперь используют SKU с коротким идентификатором устройства для уникальных имен папок\nИсправьте рабочий процесс развертывания: добавьте шаг сборки до публикации npm",
+        "pt": "Corrigir colisão SKU duplicada: dispositivos somente LAN agora usam SKU com sufixo de ID de dispositivo curto para nomes de pastas exclusivos\nCorrigir o fluxo de trabalho de implantação: adicionar o passo de compilação antes da publicação do npm",
+        "nl": "Fix dubbele SKU botsing: LAN-alleen apparaten gebruiken nu SKU met korte apparaat ID achtervoegsel voor unieke mapnamen\nFix implementatie workflow: voeg bouw stap voor npm publiceren",
+        "fr": "Correction de la collision SKU dupliquée : les périphériques LAN seulement utilisent désormais SKU avec un suffixe d'ID de périphérique court pour les noms de dossiers uniques\nCorrection du workflow de déploiement : ajouter l'étape de construction avant npm publier",
+        "it": "Risolvere la collisione di SKU duplicato: i dispositivi LAN-only ora utilizzano SKU con il suffisso di ID di dispositivo corto per i nomi di cartella unici\nFissare il flusso di lavoro di distribuzione: aggiungere passo di build prima npm pubblicare",
+        "es": "Fijar la colisión SKU duplicada: Los dispositivos LAN solo utilizan ahora SKU con sufijo de identificación de dispositivo corto para nombres de carpeta únicos\nFijar flujo de trabajo de despliegue: añadir paso de construcción antes de que npm publique",
+        "pl": "Fix duplikat SKU kolizji: tylko LAN urządzenia teraz używać SKU z krótkim ID urządzenia przyrostek dla unikalnych nazw folderów\nNapraw przepływ pracy: dodaj krok budowy przed publikacją npm",
+        "uk": "Фіксувати дублікати зіткнення кодів: локально-тільки пристрої тепер використовують коди з коротким пристроєм ID suffix для унікальних назв папок\nВиправлення розгортання робочого процесу: додати крок до npm публікувати",
+        "zh-cn": "修复重复的 SKU 碰撞: 现在仅使用 LAN 设备的 SKU , 并带有短设备 ID 后缀, 用于独有的文件夹名称\n固定部署工作流程: 在 npm 发布前添加构建步骤"
+      },
+      "0.2.0": {
+        "en": "Device folders use Cloud name (SKU fallback), control states in control/ channel",
+        "de": "Geräte-Ordner mit Cloud-Name (SKU-Fallback), Steuer-States in control/ Channel",
+        "ru": "Папки устройств используют имя из облака, состояния управления в канале control/",
+        "pt": "Pastas de dispositivos usam nome da nuvem, estados de controle no canal control/",
+        "nl": "Apparaatmappen gebruiken cloudnaam, besturingsstaten in control/ kanaal",
+        "fr": "Dossiers d'appareils avec nom cloud, états de contrôle dans le canal control/",
+        "it": "Cartelle dispositivi con nome cloud, stati di controllo nel canale control/",
+        "es": "Carpetas de dispositivos con nombre de nube, estados de control en canal control/",
+        "pl": "Foldery urządzeń z nazwą z chmury, stany sterowania w kanale control/",
+        "uk": "Теки пристроїв з іменем з хмари, стани керування в каналі control/",
+        "zh-cn": "设备文件夹使用云端名称，控制状态移至control/通道"
+      }
     },
-    "encryptedNative": [
-        "apiKey",
-        "goveePassword"
+    "titleLang": {
+      "en": "Govee Smart Lights",
+      "de": "Govee Smart Lights",
+      "ru": "Govee Smart Lights",
+      "pt": "Govee Smart Lights",
+      "nl": "Govee Smart Lights",
+      "fr": "Govee Smart Lights",
+      "it": "Govee Smart Lights",
+      "es": "Govee Smart Lights",
+      "pl": "Govee Smart Lights",
+      "uk": "Govee Smart Lights",
+      "zh-cn": "Govee Smart Lights"
+    },
+    "desc": {
+      "en": "Control Govee smart lights via LAN, MQTT and Cloud API",
+      "de": "Govee Smart Lights über LAN, MQTT und Cloud API steuern",
+      "ru": "Управление умными светильниками Govee через LAN, MQTT и Cloud API",
+      "pt": "Controle luzes inteligentes Govee via LAN, MQTT e Cloud API",
+      "nl": "Bedien Govee slimme verlichting via LAN, MQTT en Cloud API",
+      "fr": "Contrôlez les lumières intelligentes Govee via LAN, MQTT et Cloud API",
+      "it": "Controlla le luci intelligenti Govee tramite LAN, MQTT e Cloud API",
+      "es": "Controla las luces inteligentes Govee a través de LAN, MQTT y Cloud API",
+      "pl": "Steruj inteligentnymi lampami Govee przez LAN, MQTT i Cloud API",
+      "uk": "Керуйте розумними світильниками Govee через LAN, MQTT та Cloud API",
+      "zh-cn": "通过LAN、MQTT和Cloud API控制Govee智能灯"
+    },
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
     ],
-    "protectedNative": [
-        "apiKey",
-        "goveePassword"
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "govee-smart.svg",
+    "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg",
+    "readme": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/README.md",
+    "enabled": true,
+    "tier": 3,
+    "loglevel": "info",
+    "mode": "daemon",
+    "type": "lighting",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "push",
+    "adminUI": {
+      "config": "json"
+    },
+    "supportedMessages": {
+      "stopInstance": true
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=7.0.0"
+      }
     ],
-    "native": {
-        "apiKey": "",
-        "goveeEmail": "",
-        "goveePassword": "",
-        "pollInterval": 60
-    }
+    "globalDependencies": [
+      {
+        "admin": ">=7.6.20"
+      }
+    ]
+  },
+  "encryptedNative": [
+    "apiKey",
+    "goveePassword"
+  ],
+  "protectedNative": [
+    "apiKey",
+    "goveePassword"
+  ],
+  "native": {
+    "apiKey": "",
+    "goveeEmail": "",
+    "goveePassword": "",
+    "pollInterval": 60
+  }
 }
