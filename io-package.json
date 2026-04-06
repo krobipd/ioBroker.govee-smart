@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.8.0",
+    "version": "0.8.1",
     "news": {
+      "0.8.1": {
+        "en": "Fix ready message showing disconnected channels, fix network interface default selection",
+        "de": "Fix Ready-Meldung zeigt getrennte Kanäle, Fix Netzwerk-Interface Standardauswahl",
+        "ru": "Исправление сообщения о готовности с отключенными каналами, исправление выбора сетевого интерфейса",
+        "pt": "Correção da mensagem ready mostrando canais desconectados, correção da seleção padrão de interface",
+        "nl": "Fix ready-melding toont niet-verbonden kanalen, fix standaard netwerkinterface selectie",
+        "fr": "Correction message ready affichant canaux déconnectés, correction sélection interface réseau par défaut",
+        "it": "Correzione messaggio ready con canali disconnessi, correzione selezione predefinita interfaccia di rete",
+        "es": "Corrección mensaje ready mostrando canales desconectados, corrección selección predeterminada de interfaz",
+        "pl": "Naprawa wiadomości ready pokazującej rozłączone kanały, naprawa domyślnego wyboru interfejsu sieciowego",
+        "uk": "Виправлення повідомлення ready з відключеними каналами, виправлення вибору мережевого інтерфейсу",
+        "zh-cn": "修复就绪消息显示已断开通道，修复网络接口默认选择"
+      },
       "0.8.0": {
         "en": "Network interface selection for LAN discovery (multi-NIC/VLAN support)",
         "de": "Netzwerk-Interface Auswahl für LAN-Erkennung (Multi-NIC/VLAN Unterstützung)",
@@ -80,19 +93,6 @@
         "pl": "Naprawa niewidocznych snapshotów, przygotowanie dropdown scen DIY, reset scen czyści wszystkie dropdowny",
         "uk": "Виправлення невидимих знімків, підготовка DIY-сцен, скидання сцен очищає всі списки",
         "zh-cn": "修复快照不显示，DIY场景下拉准备，场景重置清除所有下拉"
-      },
-      "0.6.0": {
-        "en": "Batch segment control, generic capability routing, scene dropdown auto-reset",
-        "de": "Batch-Segmentsteuerung, generisches Capability-Routing, Szenen-Dropdown Auto-Reset",
-        "ru": "Пакетное управление сегментами, маршрутизация возможностей, автосброс выбора сцены",
-        "pt": "Controle de segmentos em lote, roteamento de capacidades, reset automático de cenas",
-        "nl": "Batch segmentbesturing, generieke capability-routing, scène-dropdown auto-reset",
-        "fr": "Contrôle segments par lot, routage générique des capacités, reset auto scènes",
-        "it": "Controllo segmenti batch, routing capacità generico, reset automatico scene",
-        "es": "Control de segmentos por lotes, enrutamiento de capacidades, reset automático de escenas",
-        "pl": "Sterowanie segmentami wsadowe, routing możliwości, auto-reset scen",
-        "uk": "Пакетне керування сегментами, маршрутизація можливостей, автоскидання сцен",
-        "zh-cn": "批量段控制，通用能力路由，场景下拉自动重置"
       }
     },
     "titleLang": {
@@ -170,6 +170,6 @@
     "goveeEmail": "",
     "goveePassword": "",
     "pollInterval": 60,
-    "networkInterface": ""
+    "networkInterface": "0.0.0.0"
   }
 }

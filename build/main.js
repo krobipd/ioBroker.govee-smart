@@ -216,7 +216,7 @@ class GoveeAdapter extends utils.Adapter {
       }
     }, 3e4);
     this.updateConnectionState();
-    this.logDeviceSummary(config);
+    this.logDeviceSummary();
   }
   /**
    * Adapter stopping — MUST be synchronous.
@@ -415,9 +415,9 @@ class GoveeAdapter extends utils.Adapter {
    * Log final ready message with device/group/channel summary.
    * Called once at the end of onReady after all channels are initialized.
    *
-   * @param config Adapter configuration
    */
-  logDeviceSummary(config) {
+  logDeviceSummary() {
+    var _a;
     if (!this.deviceManager) {
       return;
     }
@@ -432,10 +432,10 @@ class GoveeAdapter extends utils.Adapter {
       parts.push(`${groups.length} group${groups.length > 1 ? "s" : ""}`);
     }
     const channels = ["LAN"];
-    if (config.apiKey) {
+    if (this.cloudWasConnected) {
       channels.push("Cloud");
     }
-    if (config.goveeEmail && config.goveePassword) {
+    if ((_a = this.mqttClient) == null ? void 0 : _a.connected) {
       channels.push("MQTT");
     }
     const deviceInfo = parts.length > 0 ? parts.join(", ") : "no devices found";

@@ -64,7 +64,7 @@ class GoveeLanClient {
   start(onDiscovery, onStatus, scanIntervalMs = 3e4, networkInterface = "") {
     this.onDiscovery = onDiscovery;
     this.onStatus = onStatus;
-    const bindAddr = networkInterface || void 0;
+    const bindAddr = networkInterface && networkInterface !== "0.0.0.0" ? networkInterface : void 0;
     if (bindAddr) {
       this.log.info(`LAN binding to network interface ${bindAddr}`);
     }

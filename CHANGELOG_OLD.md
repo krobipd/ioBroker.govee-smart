@@ -1,5 +1,10 @@
 # Older Changes
 
+## 0.6.0 (2026-04-06)
+- Batch segment control: `segments.command` state (e.g. "1-5:#ff0000:20")
+- Generic capability routing (gradient_toggle, diy_scene, music_mode)
+- Scene dropdown auto-reset on color/colorTemp change
+
 ## 0.5.0 (2026-04-06)
 - Fix segment control commands (now routed via Cloud API)
 - Rate-limited Cloud startup, error dedup logging

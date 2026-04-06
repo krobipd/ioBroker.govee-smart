@@ -192,6 +192,10 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ## Changelog
 
+### 0.8.1 (2026-04-06)
+- Fix ready message showing disconnected channels as active
+- Fix network interface default selection in admin UI
+
 ### 0.8.0 (2026-04-06)
 - Network interface selection for LAN discovery (multi-NIC/VLAN support)
 
@@ -215,11 +219,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Fix snapshots not appearing (integer values from capabilities were filtered out)
 - DIY scene dropdown support prepared (API currently provides no data)
 - Scene reset now also clears diy_scene and snapshot dropdowns
-
-### 0.6.0 (2026-04-06)
-- Batch segment control: `segments.command` state (e.g. "1-5:#ff0000:20")
-- Generic capability routing (gradient_toggle, diy_scene, music_mode)
-- Scene dropdown auto-reset on color/colorTemp change
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

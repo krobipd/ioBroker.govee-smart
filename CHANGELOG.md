@@ -1,4 +1,8 @@
 # Changelog
+## 0.8.1 (2026-04-06)
+- Fix ready message showing disconnected channels as active (now uses actual connection state)
+- Fix network interface default selection in admin UI (pre-selects "all interfaces")
+
 ## 0.8.0 (2026-04-06)
 - Network interface selection for LAN discovery (multi-NIC/VLAN support)
 - Ports documented as non-configurable (fixed by Govee LAN protocol)

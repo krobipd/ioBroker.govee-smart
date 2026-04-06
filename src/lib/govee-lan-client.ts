@@ -57,7 +57,10 @@ export class GoveeLanClient {
     this.onDiscovery = onDiscovery;
     this.onStatus = onStatus;
 
-    const bindAddr = networkInterface || undefined;
+    const bindAddr =
+      networkInterface && networkInterface !== "0.0.0.0"
+        ? networkInterface
+        : undefined;
     if (bindAddr) {
       this.log.info(`LAN binding to network interface ${bindAddr}`);
     }

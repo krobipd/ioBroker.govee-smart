@@ -230,7 +230,7 @@ class GoveeAdapter extends utils.Adapter {
     this.updateConnectionState();
 
     // Log final ready message — all channels initialized
-    this.logDeviceSummary(config);
+    this.logDeviceSummary();
   }
 
   /**
@@ -461,9 +461,8 @@ class GoveeAdapter extends utils.Adapter {
    * Log final ready message with device/group/channel summary.
    * Called once at the end of onReady after all channels are initialized.
    *
-   * @param config Adapter configuration
    */
-  private logDeviceSummary(config: AdapterConfig): void {
+  private logDeviceSummary(): void {
     if (!this.deviceManager) {
       return;
     }
@@ -480,10 +479,10 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     const channels: string[] = ["LAN"];
-    if (config.apiKey) {
+    if (this.cloudWasConnected) {
       channels.push("Cloud");
     }
-    if (config.goveeEmail && config.goveePassword) {
+    if (this.mqttClient?.connected) {
       channels.push("MQTT");
     }
 
