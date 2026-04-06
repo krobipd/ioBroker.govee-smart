@@ -91,7 +91,8 @@ govee-smart.0.
 │       │   ├── name            — Cloud device name (string)
 │       │   ├── model           — Product SKU (string)
 │       │   ├── serial          — Device ID (string)
-│       │   └── online          — Device reachable (boolean)
+│       │   ├── online          — Device reachable (boolean)
+│       │   └── ip              — LAN IP address (string, auto-updated)
 │       ├── control/
 │       │   ├── power           — On/Off (boolean, writable)
 │       │   ├── brightness      — Brightness 0-100% (number, writable)
@@ -110,6 +111,54 @@ govee-smart.0.
         ├── info/ ...
         └── control/ ...
 ```
+
+---
+
+## Batch Segment Control
+
+LED strips with multiple segments can be controlled in bulk via the `segments.command` state. This sends a single string command instead of setting each segment individually.
+
+### Format
+
+```
+segments:color:brightness
+```
+
+| Part | Description | Required |
+|------|-------------|----------|
+| **segments** | Which segments to target | Yes |
+| **color** | Hex color (`#RRGGBB` or `RRGGBB`) | No (omit with `::`) |
+| **brightness** | Brightness 0–100% | No |
+
+At least **color** or **brightness** must be provided.
+
+### Segment Selection
+
+| Syntax | Meaning | Example |
+|--------|---------|---------|
+| `all` | All segments | `all:#ff0000:50` |
+| `3` | Single segment | `3:#00ff00` |
+| `1-5` | Range (inclusive) | `1-5:#0000ff:80` |
+| `0,3,7` | Specific segments | `0,3,7:#ffffff` |
+| `0,3-5,10` | Mixed | `0,3-5,10:#ff00ff:60` |
+
+Segment indices start at 0. Values beyond the device's segment count are automatically clamped.
+
+### Examples
+
+| Command | Effect |
+|---------|--------|
+| `all:#ff0000:50` | All segments red at 50% brightness |
+| `1-5:#00ff00` | Segments 1–5 green (brightness unchanged) |
+| `0,3,7:#0000ff:80` | Segments 0, 3 and 7 blue at 80% |
+| `all::30` | All segments brightness to 30% (color unchanged) |
+| `2-4:ff8800` | Segments 2–4 orange (# prefix optional) |
+
+### Notes
+
+- Requires a **Cloud API key** (segments are controlled via Cloud API)
+- Each command sends at most 2 API calls (one for color, one for brightness) regardless of how many segments are selected
+- Individual segment states (`segments.0.color`, `segments.0.brightness`, etc.) are automatically updated after a batch command
 
 ---
 
@@ -142,6 +191,10 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.7.0 (2026-04-06)
+- Add IP address to device info (`info.ip`), auto-updated on LAN discovery
+- Batch segment control documentation (format, examples, notes)
+
 ### 0.6.4 (2026-04-06)
 - Fix misleading "check email/password" for non-credential Govee login errors
 - MQTT login errors classified by actual Govee response (rate-limit, credential, account issue)
@@ -169,11 +222,6 @@ govee-smart.0.
 - Rate-limited Cloud startup, error dedup logging
 - Scene/snapshot refresh on each Cloud poll
 - Startup "ready" message only after all channels initialized
-
-### 0.4.1 (2026-04-06)
-- Fix null state values: sensible defaults for all control states
-- Remove stale control states on startup
-- Only create light_scene/snapshot states when data available
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

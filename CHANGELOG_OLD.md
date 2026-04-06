@@ -1,5 +1,10 @@
 # Older Changes
 
+## 0.4.1 (2026-04-06)
+- Fix null state values: sensible defaults for all control states
+- Remove stale control states on startup
+- Only create light_scene/snapshot states when data available
+
 ## 0.4.0 (2026-04-06)
 - Scenes and snapshots as real dropdowns (78-237 scenes per device)
 - Cloud state loading for Cloud-only states

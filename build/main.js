@@ -99,6 +99,13 @@ class GoveeAdapter extends utils.Adapter {
       (device, state) => this.onDeviceStateUpdate(device, state),
       (devices) => this.onDeviceListChanged(devices)
     );
+    this.deviceManager.onLanIpChanged = (device, ip) => {
+      const prefix = this.stateManager.devicePrefix(device);
+      this.setStateAsync(`${prefix}.info.ip`, { val: ip, ack: true }).catch(
+        () => {
+        }
+      );
+    };
     this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
       const prefix = this.stateManager.devicePrefix(device);
       for (const idx of batch.segments) {

@@ -272,6 +272,7 @@ export class DeviceManager {
         this.log.debug(
           `LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`,
         );
+        this.onLanIpChanged?.(matched, lanDevice.ip);
       }
     } else {
       // LAN-only device (no Cloud data yet)
@@ -630,6 +631,9 @@ export class DeviceManager {
     device: GoveeDevice,
     batch: { segments: number[]; color?: number; brightness?: number },
   ) => void;
+
+  /** Callback when device LAN IP changes */
+  onLanIpChanged?: (device: GoveeDevice, ip: string) => void;
 
   /**
    * Send command via LAN UDP

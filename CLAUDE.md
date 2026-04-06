@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.6.4 (April 2026)
+- **Version:** 0.7.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -67,7 +67,7 @@ govee-smart.0.
 ├── info.cloudConnected
 ├── devices.
 │   └── h61be_1d6f.                  (SKU + letzte 4 Hex der Device-ID)
-│       ├── info.name / .model / .serial / .online
+│       ├── info.name / .model / .serial / .online / .ip
 │       ├── control.power / .brightness / .colorRgb / .colorTemperature
 │       ├── control.light_scene       (Dropdown: 78-237 Szenen aus Cloud)
 │       ├── control.snapshot          (Dropdown: User-gespeicherte Zustände)

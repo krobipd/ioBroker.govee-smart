@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.6.4",
+    "version": "0.7.0",
     "news": {
+      "0.7.0": {
+        "en": "Add IP address to device info (auto-updated via LAN), batch segment control documentation",
+        "de": "IP-Adresse in Geräte-Info (automatisch via LAN aktualisiert), Batch-Segment-Steuerung Dokumentation",
+        "ru": "IP-адрес в информации об устройстве (автообновление через LAN), документация пакетного управления сегментами",
+        "pt": "Endereço IP nas informações do dispositivo (atualizado via LAN), documentação do controle de segmentos em lote",
+        "nl": "IP-adres in apparaatinfo (automatisch bijgewerkt via LAN), documentatie batch-segmentbesturing",
+        "fr": "Adresse IP dans les infos appareil (mise à jour auto via LAN), documentation contrôle segments par lot",
+        "it": "Indirizzo IP nelle info dispositivo (aggiornato automaticamente via LAN), documentazione controllo segmenti batch",
+        "es": "Dirección IP en la información del dispositivo (actualizada automáticamente vía LAN), documentación del control de segmentos por lotes",
+        "pl": "Adres IP w informacjach o urządzeniu (automatycznie aktualizowany przez LAN), dokumentacja sterowania segmentami wsadowego",
+        "uk": "IP-адреса в інформації пристрою (автооновлення через LAN), документація пакетного керування сегментами",
+        "zh-cn": "设备信息中添加IP地址（通过LAN自动更新），批量段控制文档"
+      },
       "0.6.4": {
         "en": "Fix misleading MQTT error: distinguish credential, rate-limit and account issues in Govee login",
         "de": "Fix irreführende MQTT-Fehlermeldung: Credential-, Rate-Limit- und Account-Probleme beim Govee-Login unterscheiden",
@@ -80,19 +93,6 @@
         "pl": "Naprawa sterowania segmentami, start z limitem, dedup błędów, odświeżanie scen przy poll",
         "uk": "Виправлення керування сегментами, обмежений старт, дедуплікація помилок, оновлення сцен",
         "zh-cn": "修复分段控制，启动速率限制，错误去重日志，轮询时刷新场景，启动就绪消息"
-      },
-      "0.4.1": {
-        "en": "Fix null state values: sensible defaults for all states, remove stale control states on startup",
-        "de": "Fix Null-Werte: sinnvolle Standardwerte für alle States, veraltete Control-States beim Start entfernen",
-        "ru": "Исправление null значений: разумные значения по умолчанию, удаление устаревших состояний",
-        "pt": "Correção de valores nulos: padrões sensatos para todos os estados, remoção de estados obsoletos",
-        "nl": "Fix null-waarden: standaardwaarden voor alle staten, verouderde control-staten verwijderen",
-        "fr": "Correction des valeurs nulles: valeurs par défaut pour tous les états, suppression des états obsolètes",
-        "it": "Correzione valori null: valori predefiniti per tutti gli stati, rimozione stati obsoleti",
-        "es": "Corrección valores nulos: valores predeterminados para todos los estados, eliminar estados obsoletos",
-        "pl": "Naprawa wartości null: domyślne wartości dla wszystkich stanów, usuwanie nieaktualnych stanów",
-        "uk": "Виправлення null значень: розумні значення за замовчуванням, видалення застарілих станів",
-        "zh-cn": "修复空值：为所有状态设置合理的默认值，启动时删除过期的控制状态"
       }
     },
     "titleLang": {

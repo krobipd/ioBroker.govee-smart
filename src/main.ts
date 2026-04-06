@@ -89,6 +89,14 @@ class GoveeAdapter extends utils.Adapter {
       (devices) => this.onDeviceListChanged(devices),
     );
 
+    // Update info.ip when LAN IP changes
+    this.deviceManager.onLanIpChanged = (device, ip) => {
+      const prefix = this.stateManager!.devicePrefix(device);
+      this.setStateAsync(`${prefix}.info.ip`, { val: ip, ack: true }).catch(
+        () => {},
+      );
+    };
+
     // Sync individual segment states after batch command
     this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
       const prefix = this.stateManager!.devicePrefix(device);

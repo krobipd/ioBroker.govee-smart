@@ -1,4 +1,8 @@
 # Changelog
+## 0.7.0 (2026-04-06)
+- Add IP address to device info (`info.ip`), auto-updated on LAN discovery
+- Batch segment control documentation in README (format, examples, notes)
+
 ## 0.6.4 (2026-04-06)
 - Fix misleading "check email/password" error when Govee rejects login for non-credential reasons (e.g. "account abnormal")
 - MQTT login errors now classified by actual Govee response: rate-limit, credential, or account issue

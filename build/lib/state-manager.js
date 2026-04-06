@@ -40,7 +40,7 @@ class StateManager {
    * @param stateDefs State definitions from capability mapper
    */
   async createDeviceStates(device, stateDefs) {
-    var _a;
+    var _a, _b;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -98,6 +98,13 @@ class StateManager {
       "indicator.reachable",
       false
     );
+    await this.ensureState(
+      `${prefix}.info.ip`,
+      "IP Address",
+      "string",
+      "info.ip",
+      false
+    );
     await this.adapter.setStateAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true
@@ -112,6 +119,10 @@ class StateManager {
     });
     await this.adapter.setStateAsync(`${prefix}.info.online`, {
       val: (_a = device.state.online) != null ? _a : false,
+      ack: true
+    });
+    await this.adapter.setStateAsync(`${prefix}.info.ip`, {
+      val: (_b = device.lanIp) != null ? _b : "",
       ack: true
     });
     const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));

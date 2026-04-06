@@ -193,7 +193,7 @@ class DeviceManager {
    * @param lanDevice Discovered LAN device
    */
   handleLanDiscovery(lanDevice) {
-    var _a;
+    var _a, _b;
     let matched;
     for (const dev of this.devices.values()) {
       if ((0, import_types.normalizeDeviceId)(dev.deviceId) === (0, import_types.normalizeDeviceId)(lanDevice.device)) {
@@ -213,6 +213,7 @@ class DeviceManager {
         this.log.debug(
           `LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`
         );
+        (_a = this.onLanIpChanged) == null ? void 0 : _a.call(this, matched, lanDevice.ip);
       }
     } else {
       const shortId = (0, import_types.normalizeDeviceId)(lanDevice.device).slice(-4);
@@ -233,7 +234,7 @@ class DeviceManager {
       this.log.debug(
         `LAN: New device ${lanDevice.sku} at ${lanDevice.ip} (no Cloud data)`
       );
-      (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
+      (_b = this.onDeviceListChanged) == null ? void 0 : _b.call(this, this.getDevices());
     }
   }
   /**
@@ -496,6 +497,8 @@ class DeviceManager {
   }
   /** Callback for batch segment state sync */
   onSegmentBatchUpdate;
+  /** Callback when device LAN IP changes */
+  onLanIpChanged;
   /**
    * Send command via LAN UDP
    *

@@ -101,6 +101,13 @@ export class StateManager {
       "indicator.reachable",
       false,
     );
+    await this.ensureState(
+      `${prefix}.info.ip`,
+      "IP Address",
+      "string",
+      "info.ip",
+      false,
+    );
 
     await this.adapter.setStateAsync(`${prefix}.info.name`, {
       val: device.name,
@@ -116,6 +123,10 @@ export class StateManager {
     });
     await this.adapter.setStateAsync(`${prefix}.info.online`, {
       val: device.state.online ?? false,
+      ack: true,
+    });
+    await this.adapter.setStateAsync(`${prefix}.info.ip`, {
+      val: device.lanIp ?? "",
       ack: true,
     });
 
