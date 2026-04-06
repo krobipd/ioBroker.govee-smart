@@ -1,4 +1,9 @@
 # Changelog
+## 0.6.4 (2026-04-06)
+- Fix misleading "check email/password" error when Govee rejects login for non-credential reasons (e.g. "account abnormal")
+- MQTT login errors now classified by actual Govee response: rate-limit, credential, or account issue
+- Only credential errors trigger auth-backoff; account issues and rate-limits keep reconnecting
+
 ## 0.6.3 (2026-04-06)
 - MQTT auth backoff: stop reconnecting after 3 consecutive login failures with actionable warning
 - MQTT error dedup: first error warns, repeated same category silent (debug)

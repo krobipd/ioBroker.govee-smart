@@ -142,6 +142,10 @@ govee-smart.0.
 
 ## Changelog
 
+### 0.6.4 (2026-04-06)
+- Fix misleading "check email/password" for non-credential Govee login errors
+- MQTT login errors classified by actual Govee response (rate-limit, credential, account issue)
+
 ### 0.6.3 (2026-04-06)
 - MQTT auth backoff (stop after 3 failures), error dedup, recovery logging
 - Cloud connection recovery detection
@@ -170,17 +174,6 @@ govee-smart.0.
 - Fix null state values: sensible defaults for all control states
 - Remove stale control states on startup
 - Only create light_scene/snapshot states when data available
-
-### 0.4.0 (2026-04-06)
-- Scenes and snapshots as real dropdowns (78-237 scenes per device)
-- Cloud state loading for Cloud-only states
-- Cloud never overwrites LAN states
-- Added `info.mqttConnected` and `info.cloudConnected`
-- Cleaner logging with device/group summary
-
-### 0.3.0 (2026-04-06)
-- Stable device folder naming (`sku_shortId`), LAN-first controls
-- Fix MQTT login v2, groups folder, Cloud unit normalization
 
 Older changelog: [CHANGELOG.md](CHANGELOG.md)
 

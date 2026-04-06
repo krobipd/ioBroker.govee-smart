@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.6.3 (April 2026)
+- **Version:** 0.6.4 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -154,11 +154,12 @@ Single Page, drei Sektionen:
 17. **Kein Fire-and-forget** — Alle async void-Calls haben `.catch()` Handler
 21. **MQTT Auth-Backoff** — Nach 3 konsekutiven Login-Fehlern Reconnect stoppen, actionable Warning
 22. **Error-Dedup überall** — MQTT + Cloud: first warn, repeat debug; Recovery-Meldung bei Wiederherstellung
+23. **MQTT Login-Klassifizierung** — Govee-Response wird differenziert: Credential-Fehler → Auth-Backoff, Rate-Limit/Account-Issues → weiter reconnecten
 18. **Scene-State Sync** — `light_scene` wird auf "0" zurückgesetzt wenn colorRgb/colorTemperature gesetzt wird
 19. **Generic Capability Routing** — States mit `native.capabilityType/Instance` werden automatisch via Cloud API geroutet (toggle, dynamic_scene, etc.)
 20. **Batch Segment Command** — `segments.command` State: `1-5:#ff0000:20`, `all:#00ff00`, `0,3,7::50` — max 2 API-Calls statt N×2
 
-## Tests (177)
+## Tests (178)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping (37 Tests)
@@ -175,7 +176,7 @@ test/testDeviceManager.ts    → Device Manager (55 Tests)
   - logDedup: category tracking, warn vs debug (1+assertions)
 test/testRateLimiter.ts      → Rate Limiter (9 Tests)
   - Limits, daily usage, queueing, priority sorting, stop/clear, counter tracking
-test/testTypes.ts            → Shared Utilities (18 Tests)
+test/testTypes.ts            → Shared Utilities (19 Tests)
   - normalizeDeviceId: colons, lowercase, empty string
   - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property
 test/testPackageFiles.ts     → @iobroker/testing (57 Tests)

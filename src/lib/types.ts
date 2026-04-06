@@ -357,15 +357,19 @@ export function classifyError(err: unknown): ErrorCategory {
     return "TIMEOUT";
   }
   if (
+    msg.includes("429") ||
+    msg.includes("Rate limit") ||
+    msg.includes("Rate limited")
+  ) {
+    return "RATE_LIMIT";
+  }
+  if (
     msg.includes("401") ||
     msg.includes("403") ||
     msg.includes("Login failed") ||
     msg.includes("auth")
   ) {
     return "AUTH";
-  }
-  if (msg.includes("429") || msg.includes("Rate limit")) {
-    return "RATE_LIMIT";
   }
   return "UNKNOWN";
 }

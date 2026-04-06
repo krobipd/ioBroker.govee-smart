@@ -75,6 +75,10 @@ describe("Types utilities", () => {
             expect(classifyError(new Error("Rate limit exceeded"))).to.equal("RATE_LIMIT");
         });
 
+        it("should classify Rate limited by Govee as RATE_LIMIT", () => {
+            expect(classifyError(new Error("Rate limited by Govee: too many requests (status 429)"))).to.equal("RATE_LIMIT");
+        });
+
         it("should classify unknown errors as UNKNOWN", () => {
             expect(classifyError(new Error("Something unexpected happened"))).to.equal("UNKNOWN");
         });

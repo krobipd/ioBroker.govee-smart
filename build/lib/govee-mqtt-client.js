@@ -105,9 +105,16 @@ class GoveeMqttClient {
     try {
       const loginResp = await this.login();
       if (!loginResp.client) {
-        throw new Error(
-          `Login failed: ${(_a = loginResp.message) != null ? _a : "unknown error"} (status ${(_b = loginResp.status) != null ? _b : "?"})`
-        );
+        const apiStatus = (_a = loginResp.status) != null ? _a : 0;
+        const apiMsg = (_b = loginResp.message) != null ? _b : "unknown error";
+        const statusStr = `(status ${apiStatus || "?"})`;
+        if (apiStatus === 429 || /too many|rate.?limit|frequent|throttl/i.test(apiMsg)) {
+          throw new Error(`Rate limited by Govee: ${apiMsg} ${statusStr}`);
+        }
+        if (apiStatus === 401 || /password|credential|unauthorized/i.test(apiMsg)) {
+          throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
+        }
+        throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
       }
       this.bearerToken = loginResp.client.token;
       this.accountId = String(loginResp.client.accountId);

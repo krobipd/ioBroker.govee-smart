@@ -1,5 +1,16 @@
 # Older Changes
 
+## 0.4.0 (2026-04-06)
+- Scenes and snapshots as real dropdowns (78-237 scenes per device)
+- Cloud state loading for Cloud-only states
+- Cloud never overwrites LAN states
+- Added `info.mqttConnected` and `info.cloudConnected`
+- Cleaner logging with device/group summary
+
+## 0.3.0 (2026-04-06)
+- Stable device folder naming (`sku_shortId`), LAN-first controls
+- Fix MQTT login v2, groups folder, Cloud unit normalization
+
 ## 0.2.1 (2026-04-06)
 - Fix duplicate SKU collision: LAN-only devices now use SKU with short device ID suffix for unique folder names
 - Fix deploy workflow: add build step before npm publish

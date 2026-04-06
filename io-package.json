@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.6.3",
+    "version": "0.6.4",
     "news": {
+      "0.6.4": {
+        "en": "Fix misleading MQTT error: distinguish credential, rate-limit and account issues in Govee login",
+        "de": "Fix irreführende MQTT-Fehlermeldung: Credential-, Rate-Limit- und Account-Probleme beim Govee-Login unterscheiden",
+        "ru": "Исправление ошибки MQTT: различение проблем с учетными данными, ограничением скорости и аккаунтом",
+        "pt": "Correção de erro MQTT enganoso: distinguir problemas de credenciais, limite de taxa e conta no login Govee",
+        "nl": "Fix misleidende MQTT-fout: onderscheid credential-, rate-limit- en accountproblemen bij Govee-login",
+        "fr": "Correction erreur MQTT trompeuse: distinction des problèmes de credentials, rate-limit et compte Govee",
+        "it": "Correzione errore MQTT fuorviante: distinzione problemi credenziali, rate-limit e account nel login Govee",
+        "es": "Corrección error MQTT engañoso: distinguir problemas de credenciales, límite de tasa y cuenta en login Govee",
+        "pl": "Naprawa mylącego błędu MQTT: rozróżnienie problemów z danymi logowania, limitem i kontem Govee",
+        "uk": "Виправлення помилки MQTT: розрізнення проблем з обліковими даними, обмеженням і акаунтом Govee",
+        "zh-cn": "修复误导性MQTT错误：区分Govee登录中的凭证、速率限制和账户问题"
+      },
       "0.6.3": {
         "en": "MQTT auth backoff, error dedup, Cloud/MQTT recovery logging, improved error classification",
         "de": "MQTT Auth-Backoff, Error-Dedup, Cloud/MQTT Recovery-Logging, verbesserte Fehlerklassifizierung",
@@ -80,19 +93,6 @@
         "pl": "Naprawa wartości null: domyślne wartości dla wszystkich stanów, usuwanie nieaktualnych stanów",
         "uk": "Виправлення null значень: розумні значення за замовчуванням, видалення застарілих станів",
         "zh-cn": "修复空值：为所有状态设置合理的默认值，启动时删除过期的控制状态"
-      },
-      "0.4.0": {
-        "en": "Scenes and snapshots as dropdowns, Cloud state loading, info.mqttConnected/cloudConnected, cleaner logging",
-        "de": "Szenen und Snapshots als Dropdowns, Cloud-Status-Laden, info.mqttConnected/cloudConnected, saubereres Logging",
-        "ru": "Сцены и снимки как выпадающие списки, загрузка состояний из облака, info.mqttConnected/cloudConnected",
-        "pt": "Cenas e snapshots como dropdowns, carregamento de estados da nuvem, info.mqttConnected/cloudConnected",
-        "nl": "Scènes en snapshots als dropdowns, Cloud-statusladen, info.mqttConnected/cloudConnected",
-        "fr": "Scènes et snapshots en dropdowns, chargement d'états Cloud, info.mqttConnected/cloudConnected",
-        "it": "Scene e snapshot come dropdown, caricamento stati Cloud, info.mqttConnected/cloudConnected",
-        "es": "Escenas y snapshots como dropdowns, carga de estados Cloud, info.mqttConnected/cloudConnected",
-        "pl": "Sceny i snapshoty jako dropdown, ładowanie stanów Cloud, info.mqttConnected/cloudConnected",
-        "uk": "Сцени та знімки як dropdown, завантаження станів Cloud, info.mqttConnected/cloudConnected",
-        "zh-cn": "场景和快照作为下拉菜单，Cloud状态加载，info.mqttConnected/cloudConnected"
       }
     },
     "titleLang": {
