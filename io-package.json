@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.8.1",
+    "version": "0.8.2",
     "news": {
+      "0.8.2": {
+        "en": "Remove build/ from git tracking, fix .gitignore, remove redundant CHANGELOG.md",
+        "de": "build/ aus Git-Tracking entfernt, .gitignore korrigiert, redundante CHANGELOG.md entfernt",
+        "ru": "Удален build/ из отслеживания git, исправлен .gitignore, удален избыточный CHANGELOG.md",
+        "pt": "Removido build/ do rastreamento git, corrigido .gitignore, removido CHANGELOG.md redundante",
+        "nl": "build/ verwijderd uit git-tracking, .gitignore gecorrigeerd, overbodige CHANGELOG.md verwijderd",
+        "fr": "Suppression de build/ du suivi git, correction de .gitignore, suppression du CHANGELOG.md redondant",
+        "it": "Rimosso build/ dal tracciamento git, corretto .gitignore, rimosso CHANGELOG.md ridondante",
+        "es": "Eliminado build/ del seguimiento git, corregido .gitignore, eliminado CHANGELOG.md redundante",
+        "pl": "Usunięto build/ ze śledzenia git, poprawiono .gitignore, usunięto zbędny CHANGELOG.md",
+        "uk": "Видалено build/ з відстеження git, виправлено .gitignore, видалено зайвий CHANGELOG.md",
+        "zh-cn": "从git跟踪中删除build/，修复.gitignore，删除多余的CHANGELOG.md"
+      },
       "0.8.1": {
         "en": "Fix ready message showing disconnected channels, fix network interface default selection",
         "de": "Fix Ready-Meldung zeigt getrennte Kanäle, Fix Netzwerk-Interface Standardauswahl",
@@ -80,19 +93,6 @@
         "pl": "Kompleksowe testy: 78 do 175 testów dla routingu komend, konwersji wartości, parsowania segmentów",
         "uk": "Комплексне тестування: з 78 до 175 тестів для маршрутизації команд, конвертації значень",
         "zh-cn": "全面测试套件：78增至175个测试，覆盖命令路由、值转换、段解析"
-      },
-      "0.6.1": {
-        "en": "Fix snapshots not appearing, DIY scene dropdown support prepared, scene reset clears all dropdowns",
-        "de": "Fix Snapshots nicht sichtbar, DIY-Szenen-Dropdown vorbereitet, Szenen-Reset löscht alle Dropdowns",
-        "ru": "Исправление отображения снимков, подготовка DIY-сцен, сброс сцен очищает все списки",
-        "pt": "Correção de snapshots não aparecendo, suporte a cenas DIY preparado, reset limpa todos os dropdowns",
-        "nl": "Fix snapshots niet zichtbaar, DIY-scène dropdown voorbereid, scène-reset wist alle dropdowns",
-        "fr": "Correction snapshots invisibles, dropdown scènes DIY préparé, reset scènes efface tous les dropdowns",
-        "it": "Correzione snapshot non visibili, dropdown scene DIY preparato, reset scene cancella tutti i dropdown",
-        "es": "Corrección de snapshots no visibles, soporte de escenas DIY preparado, reset limpia todos los dropdowns",
-        "pl": "Naprawa niewidocznych snapshotów, przygotowanie dropdown scen DIY, reset scen czyści wszystkie dropdowny",
-        "uk": "Виправлення невидимих знімків, підготовка DIY-сцен, скидання сцен очищає всі списки",
-        "zh-cn": "修复快照不显示，DIY场景下拉准备，场景重置清除所有下拉"
       }
     },
     "titleLang": {

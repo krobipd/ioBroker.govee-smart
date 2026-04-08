@@ -192,6 +192,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ## Changelog
 
+### 0.8.2 (2026-04-08)
+- Remove build/ from git tracking, fix .gitignore, remove redundant CHANGELOG.md
+
 ### 0.8.1 (2026-04-06)
 - Fix ready message showing disconnected channels as active
 - Fix network interface default selection in admin UI
@@ -212,15 +215,7 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Cloud connection recovery detection
 - Improved error classification (OS-level error codes)
 
-### 0.6.2 (2026-04-06)
-- Comprehensive test suite: 78 → 175 tests (command routing, value conversions, segment parsing, capability matching)
-
-### 0.6.1 (2026-04-06)
-- Fix snapshots not appearing (integer values from capabilities were filtered out)
-- DIY scene dropdown support prepared (API currently provides no data)
-- Scene reset now also clears diy_scene and snapshot dropdowns
-
-Older changelog: [CHANGELOG.md](CHANGELOG.md)
+Older changelog: [CHANGELOG_OLD.md](CHANGELOG_OLD.md)
 
 ---
 

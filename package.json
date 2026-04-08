@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Control Govee smart home devices via LAN, MQTT and Cloud",
   "author": {
     "name": "krobi",
@@ -20,7 +20,8 @@
     "url": "https://github.com/krobipd/ioBroker.govee-smart"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20",
+    "npm": ">=10"
   },
   "dependencies": {
     "@iobroker/adapter-core": "^3.3.2",

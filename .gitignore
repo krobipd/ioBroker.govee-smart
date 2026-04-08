@@ -1,8 +1,34 @@
-node_modules/
-build/test/
-build/src/
-.dev-server/
+# macOS
 .DS_Store
-*.tgz
+
+# Node.js
+node_modules/
+npm-debug.log*
+
+# IDE
 .idea/
-javscript.txt
+.vscode/*
+!.vscode/settings.json
+*.swp
+*.swo
+
+# ioBroker repochecker
+.commitinfo
+
+# ioBroker
+admin/i18n/flat.txt
+
+# Build & Test
+build/
+coverage/
+.nyc_output/
+
+# Packages
+*.tgz
+
+# Dev server
+.dev-server/
+
+# Environment
+.env
+.env.local
