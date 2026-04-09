@@ -135,7 +135,6 @@ function mapSingleCapability(cap) {
         }
       ];
     case "dynamic_scene":
-    case "music_setting":
     case "work_mode":
     case "temperature_setting":
       return [
@@ -150,6 +149,8 @@ function mapSingleCapability(cap) {
           capabilityInstance: cap.instance
         }
       ];
+    case "music_setting":
+      return mapMusicSetting(cap);
     default:
       return null;
   }
@@ -264,6 +265,61 @@ function mapProperty(cap) {
     }
   ];
 }
+function mapMusicSetting(cap) {
+  const fields = cap.parameters.fields;
+  if (!fields || fields.length === 0) {
+    return [];
+  }
+  const states = [];
+  const modeField = fields.find((f) => f.fieldName === "musicMode");
+  if ((modeField == null ? void 0 : modeField.options) && modeField.options.length > 0) {
+    const modeStates = { 0: "---" };
+    for (const opt of modeField.options) {
+      modeStates[typeof opt.value === "object" ? JSON.stringify(opt.value) : String(opt.value)] = opt.name;
+    }
+    states.push({
+      id: "music_mode",
+      name: "Music Mode",
+      type: "string",
+      role: "text",
+      write: true,
+      states: modeStates,
+      def: "0",
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance
+    });
+  }
+  const sensField = fields.find((f) => f.fieldName === "sensitivity");
+  if (sensField == null ? void 0 : sensField.range) {
+    states.push({
+      id: "music_sensitivity",
+      name: "Music Sensitivity",
+      type: "number",
+      role: "level",
+      write: true,
+      min: sensField.range.min,
+      max: sensField.range.max,
+      unit: "%",
+      def: sensField.range.max,
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance
+    });
+  }
+  const autoColorField = fields.find((f) => f.fieldName === "autoColor");
+  if (autoColorField) {
+    states.push({
+      id: "music_auto_color",
+      name: "Music Auto Color",
+      type: "boolean",
+      role: "switch",
+      write: true,
+      def: true,
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance
+    });
+  }
+  return states;
+}
 const UNIT_MAP = {
   "unit.percent": "%",
   "unit.kelvin": "K",
@@ -321,13 +377,22 @@ function mapCloudStateValue(cap) {
       }
       return null;
     case "dynamic_scene":
-    case "music_setting":
     case "work_mode":
     case "temperature_setting":
       return {
         stateId: sanitizeId(cap.instance),
         value: typeof raw === "object" || typeof raw === "function" ? JSON.stringify(raw) : String(raw)
       };
+    case "music_setting":
+      if (typeof raw === "object" && raw !== null) {
+        const struct = raw;
+        const mode = struct.musicMode;
+        return {
+          stateId: "music_mode",
+          value: typeof mode === "number" ? String(mode) : "0"
+        };
+      }
+      return null;
     case "property":
       return { stateId: sanitizeId(cap.instance), value: raw };
     default:

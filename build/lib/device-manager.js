@@ -96,7 +96,7 @@ class DeviceManager {
    * Called on startup and periodically.
    */
   async loadFromCloud() {
-    var _a;
+    var _a, _b;
     if (!this.cloudClient) {
       return false;
     }
@@ -143,16 +143,24 @@ class DeviceManager {
               await loadScenes();
             }
             if (device.diyScenes.length === 0) {
-              const diyCap = cd.capabilities.find(
-                (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "diyScene" && c.parameters.options
-              );
-              if (diyCap == null ? void 0 : diyCap.parameters.options) {
-                device.diyScenes = diyCap.parameters.options.filter(
-                  (o) => typeof o.name === "string" && typeof o.value === "object"
-                ).map((o) => ({
-                  name: o.name,
-                  value: o.value
-                }));
+              const loadDiy = async () => {
+                try {
+                  const diy = await this.cloudClient.getDiyScenes(
+                    cd.sku,
+                    cd.device
+                  );
+                  if (diy.length > 0) {
+                    device.diyScenes = diy;
+                    changed = true;
+                  }
+                } catch {
+                  this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
+                }
+              };
+              if (this.rateLimiter) {
+                await this.rateLimiter.tryExecute(loadDiy, 2);
+              } else {
+                await loadDiy();
               }
             }
             if (device.snapshots.length === 0) {
@@ -171,6 +179,20 @@ class DeviceManager {
                 }));
               }
             }
+            if (device.sceneLibrary.length === 0 && ((_a = this.mqttClient) == null ? void 0 : _a.token)) {
+              try {
+                const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
+                if (lib.length > 0) {
+                  device.sceneLibrary = lib;
+                  changed = true;
+                  this.log.debug(
+                    `Scene library for ${cd.sku}: ${lib.length} scenes`
+                  );
+                }
+              } catch {
+                this.log.debug(`Could not load scene library for ${cd.sku}`);
+              }
+            }
             if (device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0) {
               changed = true;
             }
@@ -178,7 +200,7 @@ class DeviceManager {
         }
       }
       if (changed) {
-        (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
+        (_b = this.onDeviceListChanged) == null ? void 0 : _b.call(this, this.getDevices());
       }
       this.lastErrorCategory = null;
       return true;
@@ -227,6 +249,7 @@ class DeviceManager {
         scenes: [],
         diyScenes: [],
         snapshots: [],
+        sceneLibrary: [],
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false }
       };
@@ -718,6 +741,7 @@ class DeviceManager {
       scenes: [],
       diyScenes: [],
       snapshots: [],
+      sceneLibrary: [],
       state: { online: true },
       channels: { lan: false, mqtt: false, cloud: true }
     };

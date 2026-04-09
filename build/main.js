@@ -38,6 +38,7 @@ class GoveeAdapter extends utils.Adapter {
   rateLimiter = null;
   cloudPollTimer = void 0;
   cloudWasConnected = false;
+  readyLogged = false;
   /** @param options Adapter options */
   constructor(options = {}) {
     super({ ...options, name: "govee-smart" });
@@ -202,6 +203,10 @@ class GoveeAdapter extends utils.Adapter {
                 );
               }
             }
+            if (!this.readyLogged) {
+              this.readyLogged = true;
+              this.logDeviceSummary();
+            }
           }
           this.updateConnectionState();
         }
@@ -216,7 +221,17 @@ class GoveeAdapter extends utils.Adapter {
       }
     }, 3e4);
     this.updateConnectionState();
-    this.logDeviceSummary();
+    if (!this.mqttClient) {
+      this.readyLogged = true;
+      this.logDeviceSummary();
+    } else {
+      this.setTimeout(() => {
+        if (!this.readyLogged) {
+          this.readyLogged = true;
+          this.logDeviceSummary();
+        }
+      }, 15e3);
+    }
   }
   /**
    * Adapter stopping — MUST be synchronous.
@@ -282,6 +297,11 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
     try {
+      if (command === "music") {
+        await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
+        await this.setStateAsync(id, { val: state.val, ack: true });
+        return;
+      }
       await this.deviceManager.sendCommand(device, command, state.val);
       await this.setStateAsync(id, { val: state.val, ack: true });
       if (command === "colorRgb" || command === "colorTemperature") {
@@ -298,6 +318,40 @@ class GoveeAdapter extends utils.Adapter {
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+  }
+  /**
+   * Build and send a music_setting STRUCT command.
+   * Reads sibling music state values and combines them into one API call.
+   *
+   * @param device Target device
+   * @param prefix Device state prefix
+   * @param changedSuffix Which music state was changed
+   * @param newValue New value for the changed state
+   */
+  async sendMusicCommand(device, prefix, changedSuffix, newValue) {
+    var _a, _b;
+    const base = `${this.namespace}.${prefix}.control`;
+    const modeState = await this.getStateAsync(`${base}.music_mode`);
+    const sensState = await this.getStateAsync(`${base}.music_sensitivity`);
+    const autoState = await this.getStateAsync(`${base}.music_auto_color`);
+    const musicMode = changedSuffix === "control.music_mode" ? parseInt(String(newValue), 10) : parseInt(String((_a = modeState == null ? void 0 : modeState.val) != null ? _a : 0), 10);
+    const sensitivity = changedSuffix === "control.music_sensitivity" ? newValue : (_b = sensState == null ? void 0 : sensState.val) != null ? _b : 100;
+    const autoColor = changedSuffix === "control.music_auto_color" ? newValue ? 1 : 0 : (autoState == null ? void 0 : autoState.val) ? 1 : 0;
+    if (!musicMode || musicMode === 0) {
+      this.log.debug("Music mode not selected, skipping command");
+      return;
+    }
+    const structValue = {
+      musicMode,
+      sensitivity,
+      autoColor
+    };
+    await this.deviceManager.sendCapabilityCommand(
+      device,
+      "devices.capabilities.music_setting",
+      "musicMode",
+      structValue
+    );
   }
   /**
    * Called by device-manager when a device state changes
@@ -539,6 +593,9 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.snapshot") {
       return "snapshot";
+    }
+    if (suffix === "control.music_mode" || suffix === "control.music_sensitivity" || suffix === "control.music_auto_color") {
+      return "music";
     }
     const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);
     if (segColorMatch) {

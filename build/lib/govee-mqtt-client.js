@@ -69,7 +69,7 @@ class GoveeMqttClient {
   timers;
   client = null;
   accountTopic = "";
-  bearerToken = "";
+  _bearerToken = "";
   accountId = "";
   reconnectTimer = void 0;
   reconnectAttempts = 0;
@@ -90,6 +90,10 @@ class GoveeMqttClient {
     this.password = password;
     this.log = log;
     this.timers = timers;
+  }
+  /** Bearer token from login — available after connect, used for undocumented API */
+  get token() {
+    return this._bearerToken;
   }
   /**
    * Connect to Govee MQTT.
@@ -116,7 +120,7 @@ class GoveeMqttClient {
         }
         throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
       }
-      this.bearerToken = loginResp.client.token;
+      this._bearerToken = loginResp.client.token;
       this.accountId = String(loginResp.client.accountId);
       this.accountTopic = loginResp.client.topic;
       const iotResp = await this.getIotKey();
@@ -388,12 +392,45 @@ class GoveeMqttClient {
   /** Get IoT key (P12 certificate) */
   getIotKey() {
     return this.httpsGet(IOT_KEY_URL, {
-      Authorization: `Bearer ${this.bearerToken}`,
+      Authorization: `Bearer ${this._bearerToken}`,
       appVersion: APP_VERSION,
       clientId: CLIENT_ID,
       clientType: CLIENT_TYPE,
       "User-Agent": USER_AGENT
     });
+  }
+  /**
+   * Fetch scene library for a specific SKU from undocumented API.
+   * Requires active bearer token (connect must have succeeded).
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchSceneLibrary(sku) {
+    var _a, _b, _c;
+    if (!this._bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/bff-app/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet(url, {
+      Authorization: `Bearer ${this._bearerToken}`,
+      appVersion: APP_VERSION,
+      clientId: CLIENT_ID,
+      clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT
+    });
+    const scenes = [];
+    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
+      for (const s of (_c = cat.scenes) != null ? _c : []) {
+        if (s.sceneName) {
+          scenes.push({
+            name: s.sceneName,
+            sceneCode: s.sceneCode,
+            value: s.sceneId !== void 0 ? { id: s.sceneId, paramId: s.sceneParamId } : void 0
+          });
+        }
+      }
+    }
+    return scenes;
   }
   /**
    * Extract PEM key + cert from PKCS12

@@ -222,30 +222,19 @@ export class DeviceManager {
               }
             }
 
-            // Scene library from undocumented API (needs MQTT token)
-            const hasToken = !!this.mqttClient?.token;
-            this.log.debug(
-              `Scene library check for ${cd.sku}: cached=${device.sceneLibrary.length}, token=${hasToken}`,
-            );
-            if (device.sceneLibrary.length === 0 && hasToken) {
-              const loadLibrary = async (): Promise<void> => {
-                try {
-                  const lib = await this.mqttClient!.fetchSceneLibrary(cd.sku);
-                  if (lib.length > 0) {
-                    device.sceneLibrary = lib;
-                    changed = true;
-                    this.log.debug(
-                      `Scene library for ${cd.sku}: ${lib.length} scenes`,
-                    );
-                  }
-                } catch {
-                  this.log.debug(`Could not load scene library for ${cd.sku}`);
+            // Scene library from undocumented API (separate host, no rate limit needed)
+            if (device.sceneLibrary.length === 0 && this.mqttClient?.token) {
+              try {
+                const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
+                if (lib.length > 0) {
+                  device.sceneLibrary = lib;
+                  changed = true;
+                  this.log.debug(
+                    `Scene library for ${cd.sku}: ${lib.length} scenes`,
+                  );
                 }
-              };
-              if (this.rateLimiter) {
-                await this.rateLimiter.tryExecute(loadLibrary, 3);
-              } else {
-                await loadLibrary();
+              } catch {
+                this.log.debug(`Could not load scene library for ${cd.sku}`);
               }
             }
 

@@ -22,6 +22,7 @@ class GoveeAdapter extends utils.Adapter {
   private rateLimiter: RateLimiter | null = null;
   private cloudPollTimer: ioBroker.Interval | undefined = undefined;
   private cloudWasConnected = false;
+  private readyLogged = false;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -208,6 +209,11 @@ class GoveeAdapter extends utils.Adapter {
                 );
               }
             }
+            // Log ready message now that MQTT is also connected
+            if (!this.readyLogged) {
+              this.readyLogged = true;
+              this.logDeviceSummary();
+            }
           }
           this.updateConnectionState();
         },
@@ -229,8 +235,19 @@ class GoveeAdapter extends utils.Adapter {
 
     this.updateConnectionState();
 
-    // Log final ready message — all channels initialized
-    this.logDeviceSummary();
+    // Log final ready message — wait for MQTT if configured, otherwise log now
+    if (!this.mqttClient) {
+      this.readyLogged = true;
+      this.logDeviceSummary();
+    } else {
+      // Safety timeout: log ready even if MQTT takes too long
+      this.setTimeout(() => {
+        if (!this.readyLogged) {
+          this.readyLogged = true;
+          this.logDeviceSummary();
+        }
+      }, 15_000);
+    }
   }
 
   /**
