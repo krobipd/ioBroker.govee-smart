@@ -809,4 +809,283 @@ describe("DeviceManager", () => {
             expect(warnings).to.have.lengthOf(2);
         });
     });
+
+    describe("handleMqttStatus — edge cases", () => {
+        function setupDevice(): void {
+            const lanDevice: LanDevice = {
+                ip: "192.168.1.100",
+                device: "AABBCCDDEEFF0011",
+                sku: "H6160",
+                bleVersionHard: "",
+                bleVersionSoft: "",
+                wifiVersionHard: "",
+                wifiVersionSoft: "",
+            };
+            dm.handleLanDiscovery(lanDevice);
+        }
+
+        it("should handle partial state update (power only)", () => {
+            setupDevice();
+            let updatedState: Partial<import("../src/lib/types").DeviceState> | null = null;
+            dm.setCallbacks((_dev, state) => { updatedState = state; }, () => {});
+
+            dm.handleMqttStatus({
+                sku: "H6160",
+                device: "AABBCCDDEEFF0011",
+                state: { onOff: 0 },
+            });
+            expect(updatedState).to.not.be.null;
+            expect(updatedState!.power).to.be.false;
+            expect(updatedState!.brightness).to.be.undefined;
+            expect(updatedState!.colorRgb).to.be.undefined;
+        });
+
+        it("should handle color temperature from MQTT", () => {
+            setupDevice();
+            let updatedState: Partial<import("../src/lib/types").DeviceState> | null = null;
+            dm.setCallbacks((_dev, state) => { updatedState = state; }, () => {});
+
+            dm.handleMqttStatus({
+                sku: "H6160",
+                device: "AABBCCDDEEFF0011",
+                state: { colorTemInKelvin: 5000 },
+            });
+            expect(updatedState!.colorTemperature).to.equal(5000);
+        });
+
+        it("should set mqtt channel to true on status update", () => {
+            setupDevice();
+            dm.setCallbacks(() => {}, () => {});
+
+            dm.handleMqttStatus({
+                sku: "H6160",
+                device: "AABBCCDDEEFF0011",
+                state: { onOff: 1 },
+            });
+
+            const device = dm.getDevices()[0];
+            expect(device.channels.mqtt).to.be.true;
+        });
+
+        it("should handle empty state object", () => {
+            setupDevice();
+            let updatedState: Partial<import("../src/lib/types").DeviceState> | null = null;
+            dm.setCallbacks((_dev, state) => { updatedState = state; }, () => {});
+
+            dm.handleMqttStatus({
+                sku: "H6160",
+                device: "AABBCCDDEEFF0011",
+            });
+            // Should still get online: true
+            expect(updatedState).to.not.be.null;
+            expect(updatedState!.online).to.be.true;
+        });
+    });
+
+    describe("handleLanStatus — edge cases", () => {
+        function setupDevice(): void {
+            const lanDevice: LanDevice = {
+                ip: "192.168.1.100",
+                device: "AABBCCDDEEFF0011",
+                sku: "H6160",
+                bleVersionHard: "",
+                bleVersionSoft: "",
+                wifiVersionHard: "",
+                wifiVersionSoft: "",
+            };
+            dm.handleLanDiscovery(lanDevice);
+        }
+
+        it("should handle zero brightness", () => {
+            setupDevice();
+            let updatedState: Partial<import("../src/lib/types").DeviceState> | null = null;
+            dm.setCallbacks((_dev, state) => { updatedState = state; }, () => {});
+
+            dm.handleLanStatus("192.168.1.100", {
+                onOff: 1,
+                brightness: 0,
+                color: { r: 0, g: 0, b: 0 },
+                colorTemInKelvin: 0,
+            });
+            expect(updatedState!.brightness).to.equal(0);
+        });
+
+        it("should handle colorTemInKelvin 0 as no color temp", () => {
+            setupDevice();
+            let updatedState: Partial<import("../src/lib/types").DeviceState> | null = null;
+            dm.setCallbacks((_dev, state) => { updatedState = state; }, () => {});
+
+            dm.handleLanStatus("192.168.1.100", {
+                onOff: 1,
+                brightness: 50,
+                color: { r: 255, g: 0, b: 0 },
+                colorTemInKelvin: 0,
+            });
+            // colorTemInKelvin 0 means RGB mode, not color temp
+            expect(updatedState!.colorTemperature).to.be.undefined;
+        });
+    });
+
+    describe("sendCommand — noMqtt quirk", () => {
+        it("should skip MQTT for noMqtt device (H6121) and fall to Cloud", async () => {
+            const mqttTracker = createCallTracker();
+            const mockMqtt = {
+                connected: true,
+                setPower: mqttTracker.track("setPower"),
+            };
+            dm.setMqttClient(mockMqtt as any);
+
+            const cloudTracker = createCallTracker();
+            const mockCloud = {
+                controlDevice: (...args: unknown[]) => {
+                    cloudTracker.calls.push({ method: "controlDevice", args });
+                    return Promise.resolve();
+                },
+            };
+            dm.setCloudClient(mockCloud as any);
+
+            // H6121 has noMqtt quirk
+            const device = createTestDevice({
+                sku: "H6121",
+                lanIp: undefined,
+                channels: { lan: false, mqtt: true, cloud: true },
+            });
+            (dm as any).devices.set("H6121_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "power", true);
+            // MQTT should NOT be called
+            expect(mqttTracker.calls).to.have.lengthOf(0);
+            // Cloud should be called instead
+            expect(cloudTracker.calls).to.have.lengthOf(1);
+        });
+
+        it("should still use MQTT for non-quirk devices", async () => {
+            const mqttTracker = createCallTracker();
+            const mockMqtt = {
+                connected: true,
+                setPower: mqttTracker.track("setPower"),
+                setBrightness: mqttTracker.track("setBrightness"),
+                setColor: mqttTracker.track("setColor"),
+                setColorTemperature: mqttTracker.track("setColorTemperature"),
+            };
+            dm.setMqttClient(mockMqtt as any);
+
+            const device = createTestDevice({
+                lanIp: undefined,
+                channels: { lan: false, mqtt: true, cloud: true },
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "power", true);
+            expect(mqttTracker.calls).to.have.lengthOf(1);
+            expect(mqttTracker.calls[0].method).to.equal("setPower");
+        });
+    });
+
+    describe("sendCommand — DIY scene via LAN", () => {
+        it("should route DIY scene via ptReal when library match found", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                setBrightness: lanTracker.track("setBrightness"),
+                setColor: lanTracker.track("setColor"),
+                setColorTemperature: lanTracker.track("setColorTemperature"),
+                setScene: lanTracker.track("setScene"),
+                setGradient: lanTracker.track("setGradient"),
+                setDiyScene: lanTracker.track("setDiyScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice({
+                diyScenes: [{ name: "MyDIY", value: { id: 100, paramId: "xyz" } }],
+                diyLibrary: [{ name: "MyDIY", diyCode: 50, scenceParam: "ABCD" }],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "diyScene", "1");
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("setDiyScene");
+            expect(lanTracker.calls[0].args[1]).to.equal("ABCD");
+        });
+
+        it("should fall back to Cloud for DIY scene not in library", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                setBrightness: lanTracker.track("setBrightness"),
+                setColor: lanTracker.track("setColor"),
+                setColorTemperature: lanTracker.track("setColorTemperature"),
+                setScene: lanTracker.track("setScene"),
+                setGradient: lanTracker.track("setGradient"),
+                setDiyScene: lanTracker.track("setDiyScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const cloudTracker = createCallTracker();
+            const mockCloud = {
+                controlDevice: (...args: unknown[]) => {
+                    cloudTracker.calls.push({ method: "controlDevice", args });
+                    return Promise.resolve();
+                },
+            };
+            dm.setCloudClient(mockCloud as any);
+
+            const device = createTestDevice({
+                diyScenes: [{ name: "MyDIY", value: { id: 100, paramId: "xyz" } }],
+                diyLibrary: [{ name: "OtherDIY", diyCode: 50, scenceParam: "ABCD" }],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "diyScene", "1");
+            // LAN setDiyScene should NOT be called
+            expect(lanTracker.calls.filter(c => c.method === "setDiyScene")).to.have.lengthOf(0);
+            // Cloud should be called
+            expect(cloudTracker.calls).to.have.lengthOf(1);
+        });
+    });
+
+    describe("sendCommand — colorTemperature via LAN", () => {
+        it("should route colorTemperature to LAN", async () => {
+            const tracker = createCallTracker();
+            const mockLan = {
+                setPower: tracker.track("setPower"),
+                setBrightness: tracker.track("setBrightness"),
+                setColor: tracker.track("setColor"),
+                setColorTemperature: tracker.track("setColorTemperature"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice();
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "colorTemperature", 4500);
+            expect(tracker.calls).to.have.lengthOf(1);
+            expect(tracker.calls[0].method).to.equal("setColorTemperature");
+            expect(tracker.calls[0].args).to.deep.equal(["192.168.1.100", 4500]);
+        });
+    });
+
+    describe("sendCommand — no channel available", () => {
+        it("should warn when no channel is available", async () => {
+            const warnings: string[] = [];
+            const warnLog: ioBroker.Logger = {
+                debug: () => {},
+                info: () => {},
+                warn: (msg: string) => { warnings.push(msg); },
+                error: () => {},
+                silly: () => {},
+                level: "debug",
+            };
+            const noDm = new DeviceManager(warnLog);
+
+            const device = createTestDevice({
+                lanIp: undefined,
+                channels: { lan: false, mqtt: false, cloud: false },
+            });
+            (noDm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await noDm.sendCommand(device, "power", true);
+            expect(warnings.some(w => w.includes("No channel available"))).to.be.true;
+        });
+    });
 });
