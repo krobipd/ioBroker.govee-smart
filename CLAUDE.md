@@ -88,6 +88,13 @@ Szenen kommen vom **separaten Scenes-Endpoint** (`POST /device/scenes`), NICHT a
 - Snapshots auch als Fallback aus Device-Capabilities `dynamic_scene`/`snapshot`/`parameters.options`
 - **Aktivierung:** User wählt Index → `device.scenes[idx-1].value` → direkt als `capability.value` an Control-Endpoint
 
+### Scene Library (undokumentierte API)
+- **Endpoint:** `GET https://app2.govee.com/appsku/v1/light-effect-libraries?sku=<SKU>`
+- **Auth:** KEINE! Nur AppVersion + User-Agent Header nötig (public endpoint)
+- Liefert erweiterte Szenen-Daten inkl. `sceneCode` für ptReal BLE-over-LAN
+- Geladen im Poll-Zyklus (MQTT-Client muss initialisiert sein wegen httpsGet-Helper)
+- Response: `{data: {categories: [{scenes: [{sceneName, sceneCode, sceneId, sceneParamId}]}]}}`
+
 ## Cloud REST API v2
 
 **Base URL:** `https://openapi.api.govee.com`
