@@ -170,24 +170,26 @@ export class DeviceManager {
               await loadScenes();
             }
 
-            // DIY scenes from device capabilities (not in scenes endpoint)
+            // DIY scenes from dedicated diy-scenes endpoint
             if (device.diyScenes.length === 0) {
-              const diyCap = cd.capabilities.find(
-                (c) =>
-                  c.type === "devices.capabilities.dynamic_scene" &&
-                  c.instance === "diyScene" &&
-                  c.parameters.options,
-              );
-              if (diyCap?.parameters.options) {
-                device.diyScenes = diyCap.parameters.options
-                  .filter(
-                    (o) =>
-                      typeof o.name === "string" && typeof o.value === "object",
-                  )
-                  .map((o) => ({
-                    name: o.name,
-                    value: o.value as Record<string, unknown>,
-                  }));
+              const loadDiy = async (): Promise<void> => {
+                try {
+                  const diy = await this.cloudClient!.getDiyScenes(
+                    cd.sku,
+                    cd.device,
+                  );
+                  if (diy.length > 0) {
+                    device.diyScenes = diy;
+                    changed = true;
+                  }
+                } catch {
+                  this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
+                }
+              };
+              if (this.rateLimiter) {
+                await this.rateLimiter.tryExecute(loadDiy, 2);
+              } else {
+                await loadDiy();
               }
             }
 

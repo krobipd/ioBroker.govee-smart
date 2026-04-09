@@ -158,6 +158,41 @@ export class GoveeCloudClient {
     return { lightScenes, diyScenes, snapshots };
   }
 
+  /**
+   * Fetch DIY scenes for a device from the dedicated diy-scenes endpoint.
+   *
+   * @param sku Product model
+   * @param device Device identifier
+   */
+  async getDiyScenes(sku: string, device: string): Promise<CloudScene[]> {
+    const resp = await this.request<CloudScenesResponse>(
+      "POST",
+      "/router/api/v1/device/diy-scenes",
+      {
+        requestId: "diy-scenes",
+        payload: { sku, device },
+      },
+    );
+
+    const scenes: CloudScene[] = [];
+    for (const cap of resp.payload?.capabilities ?? []) {
+      this.log.debug(
+        `DIY-Scenes endpoint: instance=${cap.instance}, options=${cap.parameters.options?.length ?? 0}`,
+      );
+      const opts = cap.parameters.options ?? [];
+      scenes.push(
+        ...opts
+          .filter(
+            (o): o is { name: string; value: Record<string, unknown> } =>
+              typeof o.name === "string" && typeof o.value === "object",
+          )
+          .map((o) => ({ name: o.name, value: o.value })),
+      );
+    }
+
+    return scenes;
+  }
+
   /** Check if the API key is valid */
   async checkConnection(): Promise<{
     success: boolean;
