@@ -16,6 +16,11 @@ export interface CachedDeviceData {
     name: string;
     sceneCode: number;
     scenceParam?: string;
+    speedInfo?: {
+      supSpeed: boolean;
+      speedIndex: number;
+      config: string;
+    };
   }>;
   musicLibrary: Array<{
     name: string;

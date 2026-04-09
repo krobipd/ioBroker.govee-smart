@@ -436,6 +436,32 @@ class GoveeAdapter extends utils.Adapter {
           capabilityInstance: "lightScene"
         });
       }
+      const maxSpeedLevels = device.sceneLibrary.reduce((max, s) => {
+        var _a2;
+        if (!((_a2 = s.speedInfo) == null ? void 0 : _a2.supSpeed) || !s.speedInfo.config) {
+          return max;
+        }
+        try {
+          const levels = JSON.parse(s.speedInfo.config);
+          return Math.max(max, levels.length);
+        } catch {
+          return max;
+        }
+      }, 0);
+      if (maxSpeedLevels > 1) {
+        stateDefs.push({
+          id: "scene_speed",
+          name: "Scene Speed",
+          type: "number",
+          role: "level",
+          write: true,
+          min: 0,
+          max: maxSpeedLevels - 1,
+          def: 0,
+          capabilityType: "local",
+          capabilityInstance: "sceneSpeed"
+        });
+      }
       if (device.diyScenes.length > 0) {
         const diyStates = { 0: "---" };
         device.diyScenes.forEach((s, i) => {
@@ -677,6 +703,9 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.gradient_toggle") {
       return "gradientToggle";
+    }
+    if (suffix === "control.scene_speed") {
+      return "sceneSpeed";
     }
     if (suffix === "control.music_mode" || suffix === "control.music_sensitivity" || suffix === "control.music_auto_color") {
       return "music";

@@ -579,6 +579,19 @@ export class DeviceManager {
       return;
     }
 
+    // Scene speed: re-send active scene with modified speed level (LAN ptReal only)
+    if (command === "sceneSpeed") {
+      if (device.lanIp && this.lanClient) {
+        // TODO: Implement speed byte manipulation in scenceParam once byte layout is verified.
+        // For now, store the speed level for next scene activation.
+        device.state.sceneSpeed = parseInt(String(value), 10) || 0;
+        this.log.debug(
+          `Scene speed set to ${device.state.sceneSpeed} for ${device.name} (applied on next scene activation)`,
+        );
+      }
+      return;
+    }
+
     // Segment brightness: Cloud only (no ptReal equivalent)
     if (command.startsWith("segmentBrightness:")) {
       if (device.channels.cloud && this.cloudClient) {

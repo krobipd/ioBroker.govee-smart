@@ -409,7 +409,7 @@ class GoveeMqttClient {
    * @param sku Product model (e.g. "H61BE")
    */
   async fetchSceneLibrary(sku) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
     const resp = await this.httpsGet(url, {
       appVersion: APP_VERSION,
@@ -424,10 +424,16 @@ class GoveeMqttClient {
         const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
         const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
         if (code > 0) {
+          const si = effect == null ? void 0 : effect.speedInfo;
           scenes.push({
             name: s.sceneName,
             sceneCode: code,
-            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0
+            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0,
+            speedInfo: (si == null ? void 0 : si.supSpeed) ? {
+              supSpeed: true,
+              speedIndex: (_g = si.speedIndex) != null ? _g : 0,
+              config: (_h = si.config) != null ? _h : ""
+            } : void 0
           });
         }
       }

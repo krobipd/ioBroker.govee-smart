@@ -279,6 +279,15 @@ export interface GoveeDevice {
     sceneCode: number;
     /** Base64-encoded BLE scene parameter data */
     scenceParam?: string;
+    /** Speed control info (from scene library API) */
+    speedInfo?: {
+      /** Whether this scene supports speed adjustment */
+      supSpeed: boolean;
+      /** Default speed level index */
+      speedIndex: number;
+      /** JSON config with per-level moveIn/color/bright overrides */
+      config: string;
+    };
   }>;
   /** Music effect library entries for ptReal local music mode (authenticated API) */
   musicLibrary: Array<{
@@ -330,6 +339,8 @@ export interface DeviceState {
   colorTemperature?: number;
   /** Active scene name */
   scene?: string;
+  /** Current scene speed level index */
+  sceneSpeed?: number;
   /** Additional dynamic state values */
   [key: string]: unknown;
 }

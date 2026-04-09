@@ -458,9 +458,18 @@ export class GoveeMqttClient {
    *
    * @param sku Product model (e.g. "H61BE")
    */
-  async fetchSceneLibrary(
-    sku: string,
-  ): Promise<{ name: string; sceneCode: number; scenceParam?: string }[]> {
+  async fetchSceneLibrary(sku: string): Promise<
+    {
+      name: string;
+      sceneCode: number;
+      scenceParam?: string;
+      speedInfo?: {
+        supSpeed: boolean;
+        speedIndex: number;
+        config: string;
+      };
+    }[]
+  > {
     const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
     const resp = await this.httpsGet<{
       data?: {
@@ -471,6 +480,11 @@ export class GoveeMqttClient {
             lightEffects?: Array<{
               sceneCode?: number;
               scenceParam?: string;
+              speedInfo?: {
+                supSpeed?: boolean;
+                speedIndex?: number;
+                config?: string;
+              };
             }>;
           }>;
         }>;
@@ -480,8 +494,12 @@ export class GoveeMqttClient {
       "User-Agent": USER_AGENT,
     });
 
-    const scenes: { name: string; sceneCode: number; scenceParam?: string }[] =
-      [];
+    const scenes: {
+      name: string;
+      sceneCode: number;
+      scenceParam?: string;
+      speedInfo?: { supSpeed: boolean; speedIndex: number; config: string };
+    }[] = [];
     for (const cat of resp.data?.categories ?? []) {
       for (const s of cat.scenes ?? []) {
         if (!s.sceneName) {
@@ -491,10 +509,18 @@ export class GoveeMqttClient {
         const effect = s.lightEffects?.[0];
         const code = effect?.sceneCode ?? s.sceneCode ?? 0;
         if (code > 0) {
+          const si = effect?.speedInfo;
           scenes.push({
             name: s.sceneName,
             sceneCode: code,
             scenceParam: effect?.scenceParam || undefined,
+            speedInfo: si?.supSpeed
+              ? {
+                  supSpeed: true,
+                  speedIndex: si.speedIndex ?? 0,
+                  config: si.config ?? "",
+                }
+              : undefined,
           });
         }
       }

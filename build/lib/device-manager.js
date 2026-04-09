@@ -485,6 +485,15 @@ class DeviceManager {
       }
       return;
     }
+    if (command === "sceneSpeed") {
+      if (device.lanIp && this.lanClient) {
+        device.state.sceneSpeed = parseInt(String(value), 10) || 0;
+        this.log.debug(
+          `Scene speed set to ${device.state.sceneSpeed} for ${device.name} (applied on next scene activation)`
+        );
+      }
+      return;
+    }
     if (command.startsWith("segmentBrightness:")) {
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);

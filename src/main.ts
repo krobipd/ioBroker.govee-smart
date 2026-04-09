@@ -530,6 +530,33 @@ class GoveeAdapter extends utils.Adapter {
         });
       }
 
+      // Scene speed slider — only if any scene supports speed adjustment
+      const maxSpeedLevels = device.sceneLibrary.reduce((max, s) => {
+        if (!s.speedInfo?.supSpeed || !s.speedInfo.config) {
+          return max;
+        }
+        try {
+          const levels = JSON.parse(s.speedInfo.config) as unknown[];
+          return Math.max(max, levels.length);
+        } catch {
+          return max;
+        }
+      }, 0);
+      if (maxSpeedLevels > 1) {
+        stateDefs.push({
+          id: "scene_speed",
+          name: "Scene Speed",
+          type: "number",
+          role: "level",
+          write: true,
+          min: 0,
+          max: maxSpeedLevels - 1,
+          def: 0,
+          capabilityType: "local",
+          capabilityInstance: "sceneSpeed",
+        });
+      }
+
       if (device.diyScenes.length > 0) {
         const diyStates: Record<string, string> = { 0: "---" };
         device.diyScenes.forEach((s, i) => {
@@ -793,6 +820,9 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.gradient_toggle") {
       return "gradientToggle";
+    }
+    if (suffix === "control.scene_speed") {
+      return "sceneSpeed";
     }
     // Music mode states — routed via buildMusicCommand
     if (
