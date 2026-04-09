@@ -401,21 +401,15 @@ class GoveeMqttClient {
   }
   /**
    * Fetch scene library for a specific SKU from undocumented API.
-   * Requires active bearer token (connect must have succeeded).
+   * Public endpoint — no authentication required, only AppVersion header.
    *
    * @param sku Product model (e.g. "H61BE")
    */
   async fetchSceneLibrary(sku) {
     var _a, _b, _c;
-    if (!this._bearerToken) {
-      return [];
-    }
-    const url = `https://app2.govee.com/bff-app/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
     const resp = await this.httpsGet(url, {
-      Authorization: `Bearer ${this._bearerToken}`,
       appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
       "User-Agent": USER_AGENT
     });
     const scenes = [];
@@ -528,7 +522,7 @@ class GoveeMqttClient {
         {
           method: "GET",
           hostname: u.hostname,
-          path: u.pathname,
+          path: u.pathname + u.search,
           headers,
           timeout: 15e3
         },

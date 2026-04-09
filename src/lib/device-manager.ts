@@ -222,8 +222,8 @@ export class DeviceManager {
               }
             }
 
-            // Scene library from undocumented API (separate host, no rate limit needed)
-            if (device.sceneLibrary.length === 0 && this.mqttClient?.token) {
+            // Scene library from undocumented API (public, no auth needed)
+            if (device.sceneLibrary.length === 0 && this.mqttClient) {
               try {
                 const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
                 if (lib.length > 0) {

@@ -96,7 +96,7 @@ class DeviceManager {
    * Called on startup and periodically.
    */
   async loadFromCloud() {
-    var _a, _b;
+    var _a;
     if (!this.cloudClient) {
       return false;
     }
@@ -179,7 +179,7 @@ class DeviceManager {
                 }));
               }
             }
-            if (device.sceneLibrary.length === 0 && ((_a = this.mqttClient) == null ? void 0 : _a.token)) {
+            if (device.sceneLibrary.length === 0 && this.mqttClient) {
               try {
                 const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
                 if (lib.length > 0) {
@@ -200,7 +200,7 @@ class DeviceManager {
         }
       }
       if (changed) {
-        (_b = this.onDeviceListChanged) == null ? void 0 : _b.call(this, this.getDevices());
+        (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
       }
       this.lastErrorCategory = null;
       return true;
