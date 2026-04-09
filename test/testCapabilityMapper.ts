@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { getDefaultLanStates, mapCapabilities, mapCloudStateValue } from "../src/lib/capability-mapper";
+import { applyQuirksToStates, getDefaultLanStates, mapCapabilities, mapCloudStateValue } from "../src/lib/capability-mapper";
 import type { CloudCapability, CloudStateCapability } from "../src/lib/types";
 
 describe("CapabilityMapper", () => {
@@ -538,6 +538,34 @@ describe("CapabilityMapper", () => {
             };
             const result = mapCloudStateValue(cap);
             expect(result).to.be.null;
+        });
+    });
+
+    describe("applyQuirksToStates", () => {
+        it("should correct colorTemperature range for known SKU", () => {
+            const states = getDefaultLanStates();
+            applyQuirksToStates("H60A1", states);
+            const ct = states.find((s) => s.id === "colorTemperature");
+            expect(ct).to.not.be.undefined;
+            expect(ct!.min).to.equal(2200);
+            expect(ct!.max).to.equal(6500);
+            expect(ct!.def).to.equal(2200);
+        });
+
+        it("should not change colorTemperature range for unknown SKU", () => {
+            const states = getDefaultLanStates();
+            applyQuirksToStates("H9999", states);
+            const ct = states.find((s) => s.id === "colorTemperature");
+            expect(ct!.min).to.equal(2000);
+            expect(ct!.max).to.equal(9000);
+        });
+
+        it("should not affect non-colorTemperature states", () => {
+            const states = getDefaultLanStates();
+            applyQuirksToStates("H60A1", states);
+            const brightness = states.find((s) => s.id === "brightness");
+            expect(brightness!.min).to.equal(0);
+            expect(brightness!.max).to.equal(100);
         });
     });
 });

@@ -1,5 +1,6 @@
 import * as utils from "@iobroker/adapter-core";
 import {
+  applyQuirksToStates,
   getDefaultLanStates,
   mapCapabilities,
   mapCloudStateValue,
@@ -467,6 +468,9 @@ class GoveeAdapter extends utils.Adapter {
         // Cloud-only: use Cloud capabilities
         stateDefs = mapCapabilities(device.capabilities);
       }
+
+      // Apply device quirks (e.g. correct color temp range for specific SKUs)
+      applyQuirksToStates(device.sku, stateDefs);
 
       // Remove generic JSON states from capability mapper —
       // only add back as real dropdowns if we have actual scene/snapshot/diy data

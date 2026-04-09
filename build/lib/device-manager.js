@@ -21,6 +21,7 @@ __export(device_manager_exports, {
   DeviceManager: () => DeviceManager
 });
 module.exports = __toCommonJS(device_manager_exports);
+var import_device_quirks = require("./device-quirks.js");
 var import_types = require("./types.js");
 class DeviceManager {
   log;
@@ -151,6 +152,12 @@ class DeviceManager {
           this.devices.set(this.deviceKey(cd.sku, cd.device), device);
           changed = true;
           this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
+        }
+        const quirks = (0, import_device_quirks.getDeviceQuirks)(cd.sku);
+        if (quirks == null ? void 0 : quirks.brokenPlatformApi) {
+          this.log.debug(
+            `${cd.sku} has known broken platform API metadata \u2014 capabilities may be incomplete`
+          );
         }
       }
       for (const cd of cloudDevices) {
@@ -489,7 +496,8 @@ class DeviceManager {
       this.sendLanCommand(device, command, value);
       return;
     }
-    if (device.channels.mqtt && ((_b = this.mqttClient) == null ? void 0 : _b.connected)) {
+    const quirks = (0, import_device_quirks.getDeviceQuirks)(device.sku);
+    if (!(quirks == null ? void 0 : quirks.noMqtt) && device.channels.mqtt && ((_b = this.mqttClient) == null ? void 0 : _b.connected)) {
       if (this.sendMqttCommand(device, command, value)) {
         return;
       }

@@ -1,4 +1,5 @@
 import type { CloudCapability, CloudStateCapability } from "./types.js";
+import { applyColorTempQuirk } from "./device-quirks.js";
 
 /** ioBroker state definition derived from a Govee capability */
 export interface StateDefinition {
@@ -412,6 +413,32 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     });
   }
 
+  return states;
+}
+
+/**
+ * Apply device quirks to mapped state definitions.
+ * Corrects wrong API data (e.g. color temperature range) for specific SKUs.
+ *
+ * @param sku Device model (e.g. "H60A1")
+ * @param states State definitions to adjust
+ */
+export function applyQuirksToStates(
+  sku: string,
+  states: StateDefinition[],
+): StateDefinition[] {
+  for (const state of states) {
+    if (
+      state.id === "colorTemperature" &&
+      state.min != null &&
+      state.max != null
+    ) {
+      const corrected = applyColorTempQuirk(sku, state.min, state.max);
+      state.min = corrected.min;
+      state.max = corrected.max;
+      state.def = corrected.min;
+    }
+  }
   return states;
 }
 

@@ -1,3 +1,4 @@
+import { getDeviceQuirks } from "./device-quirks.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
 import type { GoveeMqttClient } from "./govee-mqtt-client.js";
@@ -168,6 +169,14 @@ export class DeviceManager {
           this.devices.set(this.deviceKey(cd.sku, cd.device), device);
           changed = true;
           this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
+        }
+
+        // Warn about devices with known broken platform API metadata
+        const quirks = getDeviceQuirks(cd.sku);
+        if (quirks?.brokenPlatformApi) {
+          this.log.debug(
+            `${cd.sku} has known broken platform API metadata — capabilities may be incomplete`,
+          );
         }
       }
 
@@ -585,8 +594,9 @@ export class DeviceManager {
       return;
     }
 
-    // Priority 2: MQTT
-    if (device.channels.mqtt && this.mqttClient?.connected) {
+    // Priority 2: MQTT (skip for devices with noMqtt quirk)
+    const quirks = getDeviceQuirks(device.sku);
+    if (!quirks?.noMqtt && device.channels.mqtt && this.mqttClient?.connected) {
       if (this.sendMqttCommand(device, command, value)) {
         return;
       }

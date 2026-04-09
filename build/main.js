@@ -398,6 +398,7 @@ class GoveeAdapter extends utils.Adapter {
       } else {
         stateDefs = (0, import_capability_mapper.mapCapabilities)(device.capabilities);
       }
+      (0, import_capability_mapper.applyQuirksToStates)(device.sku, stateDefs);
       stateDefs = stateDefs.filter(
         (d) => d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot"
       );
