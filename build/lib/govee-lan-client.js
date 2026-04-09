@@ -28,7 +28,8 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var govee_lan_client_exports = {};
 __export(govee_lan_client_exports, {
-  GoveeLanClient: () => GoveeLanClient
+  GoveeLanClient: () => GoveeLanClient,
+  buildScenePackets: () => buildScenePackets
 });
 module.exports = __toCommonJS(govee_lan_client_exports);
 var dgram = __toESM(require("node:dgram"));
@@ -186,6 +187,40 @@ class GoveeLanClient {
     });
   }
   /**
+   * Send a scene via ptReal BLE-passthrough.
+   * Builds multi-packet BLE data from scenceParam + final scene-code packet.
+   *
+   * @param ip Device IP address
+   * @param sceneCode Scene code from scene library (must be > 0)
+   * @param scenceParam Base64-encoded scene parameter data (may be empty for simple presets)
+   */
+  setScene(ip, sceneCode, scenceParam) {
+    if (sceneCode <= 0) {
+      return;
+    }
+    const packets = buildScenePackets(sceneCode, scenceParam);
+    this.sendPtReal(ip, packets);
+  }
+  /**
+   * Send raw ptReal BLE-passthrough packets to a device.
+   *
+   * @param ip Device IP address
+   * @param base64Packets Array of Base64-encoded 20-byte BLE packets
+   */
+  sendPtReal(ip, base64Packets) {
+    const message = {
+      msg: { cmd: "ptReal", data: { command: base64Packets } }
+    };
+    const buf = Buffer.from(JSON.stringify(message));
+    const socket = dgram.createSocket("udp4");
+    socket.send(buf, 0, buf.length, COMMAND_PORT, ip, (err) => {
+      if (err) {
+        this.log.debug(`LAN ptReal error to ${ip}: ${err.message}`);
+      }
+      socket.close();
+    });
+  }
+  /**
    * Request device status
    *
    * @param ip Device IP address
@@ -295,8 +330,53 @@ class GoveeLanClient {
     (_e = this.onStatus) == null ? void 0 : _e.call(this, sourceIp, status);
   }
 }
+function xorChecksum(data) {
+  let checksum = 0;
+  for (const b of data) {
+    checksum ^= b;
+  }
+  return checksum;
+}
+function finishPacket(data) {
+  while (data.length < 19) {
+    data.push(0);
+  }
+  data.push(xorChecksum(data));
+  return data;
+}
+function buildScenePackets(sceneCode, scenceParam) {
+  const packets = [];
+  if (scenceParam) {
+    const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
+    const rawData = [163, 0, 1, 0, 2];
+    let numLines = 0;
+    let lastLineMarker = 1;
+    for (const b of paramBytes) {
+      if (rawData.length % 19 === 0) {
+        numLines++;
+        rawData.push(163);
+        lastLineMarker = rawData.length;
+        rawData.push(numLines);
+      }
+      rawData.push(b);
+    }
+    rawData[lastLineMarker] = 255;
+    rawData[3] = numLines + 1;
+    for (let i = 0; i < rawData.length; i += 19) {
+      const chunk = rawData.slice(i, i + 19);
+      const pkt = finishPacket([...chunk]);
+      packets.push(Buffer.from(pkt).toString("base64"));
+    }
+  }
+  const lo = sceneCode & 255;
+  const hi = sceneCode >> 8 & 255;
+  const activatePacket = finishPacket([51, 5, 4, lo, hi]);
+  packets.push(Buffer.from(activatePacket).toString("base64"));
+  return packets;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  GoveeLanClient
+  GoveeLanClient,
+  buildScenePackets
 });
 //# sourceMappingURL=govee-lan-client.js.map

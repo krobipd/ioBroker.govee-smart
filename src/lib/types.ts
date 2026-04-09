@@ -272,11 +272,13 @@ export interface GoveeDevice {
   diyScenes: CloudScene[];
   /** Available snapshots (from Cloud scenes endpoint) */
   snapshots: CloudScene[];
-  /** Scene library entries with scene codes (from undocumented API) */
+  /** Scene library entries with scene codes for ptReal (from undocumented API) */
   sceneLibrary: Array<{
     name: string;
-    sceneCode?: string;
-    value?: unknown;
+    /** BLE scene code (> 0 = usable via ptReal) */
+    sceneCode: number;
+    /** Base64-encoded BLE scene parameter data */
+    scenceParam?: string;
   }>;
   /** Last known state */
   state: DeviceState;

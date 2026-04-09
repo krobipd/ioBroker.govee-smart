@@ -530,7 +530,7 @@ class DeviceManager {
    * @param value Command value
    */
   sendLanCommand(device, command, value) {
-    var _a;
+    var _a, _b, _c, _d;
     if (!device.lanIp || !this.lanClient) {
       return;
     }
@@ -549,8 +549,33 @@ class DeviceManager {
       case "colorTemperature":
         this.lanClient.setColorTemperature(device.lanIp, value);
         break;
+      case "lightScene": {
+        const idx = parseInt(String(value), 10);
+        const scene = device.scenes[idx - 1];
+        if (scene) {
+          const baseName = scene.name.replace(/-[A-Z]$/, "");
+          const libEntry = (_a = device.sceneLibrary.find((s) => s.name === scene.name)) != null ? _a : device.sceneLibrary.find((s) => s.name === baseName);
+          if (libEntry) {
+            this.log.debug(
+              `ptReal: ${scene.name} \u2192 code=${libEntry.sceneCode}`
+            );
+            this.lanClient.setScene(
+              device.lanIp,
+              libEntry.sceneCode,
+              (_b = libEntry.scenceParam) != null ? _b : ""
+            );
+            return;
+          }
+        }
+        if (((_c = this.mqttClient) == null ? void 0 : _c.connected) && this.sendMqttCommand(device, command, value)) {
+          return;
+        }
+        this.sendCloudCommand(device, command, value).catch(() => {
+        });
+        break;
+      }
       default:
-        if (((_a = this.mqttClient) == null ? void 0 : _a.connected) && this.sendMqttCommand(device, command, value)) {
+        if (((_d = this.mqttClient) == null ? void 0 : _d.connected) && this.sendMqttCommand(device, command, value)) {
           return;
         }
         this.sendCloudCommand(device, command, value).catch(() => {

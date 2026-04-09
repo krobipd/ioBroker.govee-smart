@@ -362,6 +362,96 @@ describe("DeviceManager", () => {
             expect(tracker.calls[0].args[4]).to.equal(1); // power on = 1
         });
 
+        it("should route lightScene via ptReal when scene is in library", async () => {
+            const tracker = createCallTracker();
+            const mockLan = {
+                setPower: tracker.track("setPower"),
+                setBrightness: tracker.track("setBrightness"),
+                setColor: tracker.track("setColor"),
+                setColorTemperature: tracker.track("setColorTemperature"),
+                setScene: tracker.track("setScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice({
+                sceneLibrary: [
+                    { name: "Sunset", sceneCode: 42, scenceParam: "AQID" },
+                    { name: "Aurora", sceneCode: 99 },
+                ],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            // Select scene index 1 = "Sunset" → matches library entry
+            await dm.sendCommand(device, "lightScene", "1");
+            expect(tracker.calls).to.have.lengthOf(1);
+            expect(tracker.calls[0].method).to.equal("setScene");
+            expect(tracker.calls[0].args).to.deep.equal(["192.168.1.100", 42, "AQID"]);
+        });
+
+        it("should match ptReal by base name (strip -A/-B suffix)", async () => {
+            const tracker = createCallTracker();
+            const mockLan = {
+                setPower: tracker.track("setPower"),
+                setBrightness: tracker.track("setBrightness"),
+                setColor: tracker.track("setColor"),
+                setColorTemperature: tracker.track("setColorTemperature"),
+                setScene: tracker.track("setScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice({
+                scenes: [
+                    { name: "Aurora-B", value: { id: 1 } },
+                ],
+                sceneLibrary: [
+                    { name: "Aurora", sceneCode: 215 },
+                ],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            // "Aurora-B" → base name "Aurora" → matches library
+            await dm.sendCommand(device, "lightScene", "1");
+            expect(tracker.calls).to.have.lengthOf(1);
+            expect(tracker.calls[0].method).to.equal("setScene");
+            expect(tracker.calls[0].args).to.deep.equal(["192.168.1.100", 215, ""]);
+        });
+
+        it("should fall back to Cloud for lightScene not in library", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                setBrightness: lanTracker.track("setBrightness"),
+                setColor: lanTracker.track("setColor"),
+                setColorTemperature: lanTracker.track("setColorTemperature"),
+                setScene: lanTracker.track("setScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const cloudTracker = createCallTracker();
+            const mockCloud = {
+                controlDevice: (...args: unknown[]) => {
+                    cloudTracker.calls.push({ method: "controlDevice", args });
+                    return Promise.resolve();
+                },
+            };
+            dm.setCloudClient(mockCloud as any);
+
+            const device = createTestDevice({
+                sceneLibrary: [
+                    { name: "Aurora", sceneCode: 99 },
+                ],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            // Select scene index 1 = "Sunset" → NOT in library (library only has "Aurora")
+            await dm.sendCommand(device, "lightScene", "1");
+            // LAN setScene should NOT be called
+            expect(lanTracker.calls).to.have.lengthOf(0);
+            // Cloud should be called
+            expect(cloudTracker.calls).to.have.lengthOf(1);
+            expect(cloudTracker.calls[0].method).to.equal("controlDevice");
+        });
+
         it("should always route segment commands via Cloud", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {

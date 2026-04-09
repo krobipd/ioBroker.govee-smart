@@ -151,7 +151,7 @@ Single Page, drei Sektionen:
 7. **Stabile Ordner** — `sku_shortid`, Cloud-Name nur in `common.name`
 8. **Gruppen-Ordner** — BaseGroup unter `groups/`, Devices unter `devices/`
 9. **Nahtlos** — User merkt nicht welcher Kanal
-10. **Kein BLE** — ptReal/BLE-Passthrough nicht nutzen
+10. **ptReal Scene Activation** — Szenen mit sceneCode aus Scene Library werden via BLE-over-LAN (ptReal) aktiviert statt Cloud; Name-Matching mit Suffix-Stripping (-A/-B)
 11. **Keine null-Werte** — Alle States haben `def` in StateDefinition + werden beim Erstellen initialisiert
 12. **Stale State Cleanup** — `cleanupControlStates()` entfernt alte Control-States + leere Channels
 13. **Error-Dedup** — `classifyError()` + `lastErrorCategory` in DeviceManager; warn nur bei Kategorie-Wechsel
@@ -167,22 +167,26 @@ Single Page, drei Sektionen:
 23. **MQTT Login-Klassifizierung** — Govee-Response wird differenziert: Credential-Fehler → Auth-Backoff, Rate-Limit/Account-Issues → weiter reconnecten
 24. **info.ip State** — LAN IP-Adresse pro Gerät unter `info.ip`, auto-aktualisiert bei LAN-Discovery via `onLanIpChanged` Callback
 25. **Network Interface Selection** — `networkInterface` Config (IP-Selector im Admin), bindet Multicast + Listen auf gewähltes Interface; Ports fix (Govee-Protokoll)
+26. **MQTT before Cloud** — MQTT wird vor Cloud initialisiert, damit Scene Library beim ersten loadFromCloud verfügbar ist
+27. **Ready-Message Ordering** — `checkAllReady()` prüft MQTT+Cloud bevor Ready geloggt wird; Safety-Timeout 30s
 
-## Tests (178)
+## Tests (187)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping (37 Tests)
   - mapCapabilities: on_off, range, color, scenes, property, toggle, LAN defaults (11)
   - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases (10)
   - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases (16)
-test/testDeviceManager.ts    → Device Manager (55 Tests)
+test/testDeviceManager.ts    → Device Manager (58 Tests)
   - LAN discovery, IP update, MQTT status, unknown device/IP handling (7)
-  - sendCommand channel routing: LAN→MQTT→Cloud fallback, segment→Cloud only (6)
+  - sendCommand channel routing: LAN→MQTT→Cloud fallback, ptReal scene, segment→Cloud only (9)
   - toCloudValue: power, brightness, color hex→int, scene/snapshot/diy index lookup, segments (14)
   - parseSegmentBatch: range, all, comma, brightness-only, clamp, invalid, mixed (10)
   - findCapabilityForCommand: all command types, unknown, empty capabilities (11)
   - parseColor: hex with/without #, black, white, invalid (5)
   - logDedup: category tracking, warn vs debug (1+assertions)
+test/testLanClient.ts        → LAN Client BLE Packet Builder (5 Tests)
+  - buildScenePackets: activation packet, little-endian, A3 data, XOR checksum, empty param
 test/testRateLimiter.ts      → Rate Limiter (9 Tests)
   - Limits, daily usage, queueing, priority sorting, stop/clear, counter tracking
 test/testTypes.ts            → Shared Utilities (19 Tests)

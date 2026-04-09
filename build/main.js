@@ -39,6 +39,7 @@ class GoveeAdapter extends utils.Adapter {
   cloudPollTimer = void 0;
   cloudWasConnected = false;
   readyLogged = false;
+  cloudInitDone = false;
   /** @param options Adapter options */
   constructor(options = {}) {
     super({ ...options, name: "govee-smart" });
@@ -145,38 +146,6 @@ class GoveeAdapter extends utils.Adapter {
       3e4,
       config.networkInterface || ""
     );
-    if (config.apiKey) {
-      this.cloudClient = new import_govee_cloud_client.GoveeCloudClient(config.apiKey, this.log);
-      this.deviceManager.setCloudClient(this.cloudClient);
-      this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this);
-      this.rateLimiter.start();
-      this.deviceManager.setRateLimiter(this.rateLimiter);
-      const cloudOk = await this.deviceManager.loadFromCloud();
-      this.cloudWasConnected = cloudOk;
-      this.setStateAsync("info.cloudConnected", {
-        val: cloudOk,
-        ack: true
-      }).catch(() => {
-      });
-      if (cloudOk) {
-        await this.loadCloudStates();
-      }
-      const intervalMs = Math.max(30, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
-      this.cloudPollTimer = this.setInterval(() => {
-        this.deviceManager.loadFromCloud().then((ok) => {
-          if (ok && !this.cloudWasConnected) {
-            this.log.info("Cloud API connection restored");
-          }
-          this.cloudWasConnected = ok;
-          this.setStateAsync("info.cloudConnected", {
-            val: ok,
-            ack: true
-          }).catch(() => {
-          });
-        }).catch(() => {
-        });
-      }, intervalMs);
-    }
     if (config.goveeEmail && config.goveePassword) {
       this.mqttClient = new import_govee_mqtt_client.GoveeMqttClient(
         config.goveeEmail,
@@ -203,14 +172,44 @@ class GoveeAdapter extends utils.Adapter {
                 );
               }
             }
-            if (!this.readyLogged) {
-              this.readyLogged = true;
-              this.logDeviceSummary();
-            }
+            this.checkAllReady();
           }
           this.updateConnectionState();
         }
       );
+    }
+    if (config.apiKey) {
+      this.cloudClient = new import_govee_cloud_client.GoveeCloudClient(config.apiKey, this.log);
+      this.deviceManager.setCloudClient(this.cloudClient);
+      this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this);
+      this.rateLimiter.start();
+      this.deviceManager.setRateLimiter(this.rateLimiter);
+      const cloudOk = await this.deviceManager.loadFromCloud();
+      this.cloudWasConnected = cloudOk;
+      this.cloudInitDone = true;
+      this.setStateAsync("info.cloudConnected", {
+        val: cloudOk,
+        ack: true
+      }).catch(() => {
+      });
+      if (cloudOk) {
+        await this.loadCloudStates();
+      }
+      const intervalMs = Math.max(30, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
+      this.cloudPollTimer = this.setInterval(() => {
+        this.deviceManager.loadFromCloud().then((ok) => {
+          if (ok && !this.cloudWasConnected) {
+            this.log.info("Cloud API connection restored");
+          }
+          this.cloudWasConnected = ok;
+          this.setStateAsync("info.cloudConnected", {
+            val: ok,
+            ack: true
+          }).catch(() => {
+          });
+        }).catch(() => {
+        });
+      }, intervalMs);
     }
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
@@ -221,17 +220,13 @@ class GoveeAdapter extends utils.Adapter {
       }
     }, 3e4);
     this.updateConnectionState();
-    if (!this.mqttClient) {
-      this.readyLogged = true;
-      this.logDeviceSummary();
-    } else {
-      this.setTimeout(() => {
-        if (!this.readyLogged) {
-          this.readyLogged = true;
-          this.logDeviceSummary();
-        }
-      }, 15e3);
-    }
+    this.checkAllReady();
+    this.setTimeout(() => {
+      if (!this.readyLogged) {
+        this.readyLogged = true;
+        this.logDeviceSummary();
+      }
+    }, 3e4);
   }
   /**
    * Adapter stopping — MUST be synchronous.
@@ -466,9 +461,24 @@ class GoveeAdapter extends utils.Adapter {
     );
   }
   /**
+   * Check if all configured channels are initialized and log ready message.
+   * Called from MQTT onConnection callback and end of onReady.
+   */
+  checkAllReady() {
+    if (this.readyLogged) {
+      return;
+    }
+    if (this.cloudClient && !this.cloudInitDone) {
+      return;
+    }
+    if (this.mqttClient && !this.mqttClient.connected) {
+      return;
+    }
+    this.readyLogged = true;
+    this.logDeviceSummary();
+  }
+  /**
    * Log final ready message with device/group/channel summary.
-   * Called once at the end of onReady after all channels are initialized.
-   *
    */
   logDeviceSummary() {
     var _a;

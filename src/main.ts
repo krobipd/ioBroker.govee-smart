@@ -23,6 +23,7 @@ class GoveeAdapter extends utils.Adapter {
   private cloudPollTimer: ioBroker.Interval | undefined = undefined;
   private cloudWasConnected = false;
   private readyLogged = false;
+  private cloudInitDone = false;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -142,6 +143,41 @@ class GoveeAdapter extends utils.Adapter {
       config.networkInterface || "",
     );
 
+    // --- MQTT (if account credentials provided) ---
+    // Initialize MQTT before Cloud so scene library can load on first cycle
+    if (config.goveeEmail && config.goveePassword) {
+      this.mqttClient = new GoveeMqttClient(
+        config.goveeEmail,
+        config.goveePassword,
+        this.log,
+        this,
+      );
+      this.deviceManager.setMqttClient(this.mqttClient);
+
+      await this.mqttClient.connect(
+        (update) => this.deviceManager!.handleMqttStatus(update),
+        (connected) => {
+          this.setStateAsync("info.mqttConnected", {
+            val: connected,
+            ack: true,
+          }).catch(() => {});
+          if (connected) {
+            this.log.debug("MQTT connected — real-time status active");
+            for (const dev of this.deviceManager!.getDevices()) {
+              if (dev.mqttTopic) {
+                this.mqttClient!.registerDeviceTopic(
+                  dev.deviceId,
+                  dev.mqttTopic,
+                );
+              }
+            }
+            this.checkAllReady();
+          }
+          this.updateConnectionState();
+        },
+      );
+    }
+
     // --- Cloud (if API key provided) ---
     if (config.apiKey) {
       this.cloudClient = new GoveeCloudClient(config.apiKey, this.log);
@@ -151,9 +187,10 @@ class GoveeAdapter extends utils.Adapter {
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
 
-      // Initial cloud load
+      // Initial cloud load (MQTT client available for scene library)
       const cloudOk = await this.deviceManager.loadFromCloud();
       this.cloudWasConnected = cloudOk;
+      this.cloudInitDone = true;
       this.setStateAsync("info.cloudConnected", {
         val: cloudOk,
         ack: true,
@@ -182,44 +219,6 @@ class GoveeAdapter extends utils.Adapter {
       }, intervalMs);
     }
 
-    // --- MQTT (if account credentials provided) ---
-    if (config.goveeEmail && config.goveePassword) {
-      this.mqttClient = new GoveeMqttClient(
-        config.goveeEmail,
-        config.goveePassword,
-        this.log,
-        this,
-      );
-      this.deviceManager.setMqttClient(this.mqttClient);
-
-      await this.mqttClient.connect(
-        (update) => this.deviceManager!.handleMqttStatus(update),
-        (connected) => {
-          this.setStateAsync("info.mqttConnected", {
-            val: connected,
-            ack: true,
-          }).catch(() => {});
-          if (connected) {
-            this.log.debug("MQTT connected — real-time status active");
-            for (const dev of this.deviceManager!.getDevices()) {
-              if (dev.mqttTopic) {
-                this.mqttClient!.registerDeviceTopic(
-                  dev.deviceId,
-                  dev.mqttTopic,
-                );
-              }
-            }
-            // Log ready message now that MQTT is also connected
-            if (!this.readyLogged) {
-              this.readyLogged = true;
-              this.logDeviceSummary();
-            }
-          }
-          this.updateConnectionState();
-        },
-      );
-    }
-
     // Subscribe to all writable device and group states
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
@@ -235,19 +234,15 @@ class GoveeAdapter extends utils.Adapter {
 
     this.updateConnectionState();
 
-    // Log final ready message — wait for MQTT if configured, otherwise log now
-    if (!this.mqttClient) {
-      this.readyLogged = true;
-      this.logDeviceSummary();
-    } else {
-      // Safety timeout: log ready even if MQTT takes too long
-      this.setTimeout(() => {
-        if (!this.readyLogged) {
-          this.readyLogged = true;
-          this.logDeviceSummary();
-        }
-      }, 15_000);
-    }
+    // Check if all channels are ready — may already be true if MQTT connected fast
+    this.checkAllReady();
+    // Safety timeout: log ready even if a channel takes too long
+    this.setTimeout(() => {
+      if (!this.readyLogged) {
+        this.readyLogged = true;
+        this.logDeviceSummary();
+      }
+    }, 30_000);
   }
 
   /**
@@ -541,9 +536,27 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
+   * Check if all configured channels are initialized and log ready message.
+   * Called from MQTT onConnection callback and end of onReady.
+   */
+  private checkAllReady(): void {
+    if (this.readyLogged) {
+      return;
+    }
+    // Wait for Cloud init if configured
+    if (this.cloudClient && !this.cloudInitDone) {
+      return;
+    }
+    // Wait for MQTT connection if configured
+    if (this.mqttClient && !this.mqttClient.connected) {
+      return;
+    }
+    this.readyLogged = true;
+    this.logDeviceSummary();
+  }
+
+  /**
    * Log final ready message with device/group/channel summary.
-   * Called once at the end of onReady after all channels are initialized.
-   *
    */
   private logDeviceSummary(): void {
     if (!this.deviceManager) {

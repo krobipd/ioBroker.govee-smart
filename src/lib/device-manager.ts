@@ -685,6 +685,38 @@ export class DeviceManager {
       case "colorTemperature":
         this.lanClient.setColorTemperature(device.lanIp, value as number);
         break;
+      case "lightScene": {
+        // Try ptReal BLE-over-LAN if scene is in scene library
+        const idx = parseInt(String(value), 10);
+        const scene = device.scenes[idx - 1];
+        if (scene) {
+          // Match by exact name first, then by base name (strip -A/-B suffix)
+          const baseName = scene.name.replace(/-[A-Z]$/, "");
+          const libEntry =
+            device.sceneLibrary.find((s) => s.name === scene.name) ??
+            device.sceneLibrary.find((s) => s.name === baseName);
+          if (libEntry) {
+            this.log.debug(
+              `ptReal: ${scene.name} → code=${libEntry.sceneCode}`,
+            );
+            this.lanClient.setScene(
+              device.lanIp,
+              libEntry.sceneCode,
+              libEntry.scenceParam ?? "",
+            );
+            return;
+          }
+        }
+        // Scene not in library — fall through to MQTT/Cloud
+        if (
+          this.mqttClient?.connected &&
+          this.sendMqttCommand(device, command, value)
+        ) {
+          return;
+        }
+        this.sendCloudCommand(device, command, value).catch(() => {});
+        break;
+      }
       default:
         // LAN doesn't support this command — fall through to MQTT/Cloud
         if (

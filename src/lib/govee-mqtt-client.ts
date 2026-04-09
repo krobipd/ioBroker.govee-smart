@@ -456,16 +456,18 @@ export class GoveeMqttClient {
    */
   async fetchSceneLibrary(
     sku: string,
-  ): Promise<{ name: string; sceneCode?: string; value?: unknown }[]> {
+  ): Promise<{ name: string; sceneCode: number; scenceParam?: string }[]> {
     const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
     const resp = await this.httpsGet<{
       data?: {
         categories?: Array<{
           scenes?: Array<{
             sceneName?: string;
-            sceneCode?: string;
-            sceneParamId?: number;
-            sceneId?: number;
+            sceneCode?: number;
+            lightEffects?: Array<{
+              sceneCode?: number;
+              scenceParam?: string;
+            }>;
           }>;
         }>;
       };
@@ -474,17 +476,21 @@ export class GoveeMqttClient {
       "User-Agent": USER_AGENT,
     });
 
-    const scenes: { name: string; sceneCode?: string; value?: unknown }[] = [];
+    const scenes: { name: string; sceneCode: number; scenceParam?: string }[] =
+      [];
     for (const cat of resp.data?.categories ?? []) {
       for (const s of cat.scenes ?? []) {
-        if (s.sceneName) {
+        if (!s.sceneName) {
+          continue;
+        }
+        // Use effect-level sceneCode (more reliable than scene-level)
+        const effect = s.lightEffects?.[0];
+        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
+        if (code > 0) {
           scenes.push({
             name: s.sceneName,
-            sceneCode: s.sceneCode,
-            value:
-              s.sceneId !== undefined
-                ? { id: s.sceneId, paramId: s.sceneParamId }
-                : undefined,
+            sceneCode: code,
+            scenceParam: effect?.scenceParam || undefined,
           });
         }
       }
