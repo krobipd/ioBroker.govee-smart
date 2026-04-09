@@ -28,6 +28,7 @@ var import_govee_cloud_client = require("./lib/govee-cloud-client.js");
 var import_govee_lan_client = require("./lib/govee-lan-client.js");
 var import_govee_mqtt_client = require("./lib/govee-mqtt-client.js");
 var import_rate_limiter = require("./lib/rate-limiter.js");
+var import_sku_cache = require("./lib/sku-cache.js");
 var import_state_manager = require("./lib/state-manager.js");
 class GoveeAdapter extends utils.Adapter {
   deviceManager = null;
@@ -36,7 +37,7 @@ class GoveeAdapter extends utils.Adapter {
   mqttClient = null;
   cloudClient = null;
   rateLimiter = null;
-  cloudPollTimer = void 0;
+  skuCache = null;
   cloudWasConnected = false;
   readyLogged = false;
   cloudInitDone = false;
@@ -49,7 +50,6 @@ class GoveeAdapter extends utils.Adapter {
   }
   /** Adapter started — initialize all channels */
   async onReady() {
-    var _a;
     const config = this.config;
     await this.setObjectNotExistsAsync("info", {
       type: "channel",
@@ -97,6 +97,11 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
     this.stateManager = new import_state_manager.StateManager(this);
     this.deviceManager = new import_device_manager.DeviceManager(this.log);
+    this.skuCache = new import_sku_cache.SkuCache(
+      utils.getAbsoluteInstanceDataDir(this),
+      this.log
+    );
+    this.deviceManager.setSkuCache(this.skuCache);
     this.deviceManager.setCallbacks(
       (device, state) => this.onDeviceStateUpdate(device, state),
       (devices) => this.onDeviceListChanged(devices)
@@ -178,38 +183,34 @@ class GoveeAdapter extends utils.Adapter {
         }
       );
     }
+    const cachedOk = this.deviceManager.loadFromCache();
     if (config.apiKey) {
       this.cloudClient = new import_govee_cloud_client.GoveeCloudClient(config.apiKey, this.log);
       this.deviceManager.setCloudClient(this.cloudClient);
       this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this);
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
-      const cloudOk = await this.deviceManager.loadFromCloud();
-      this.cloudWasConnected = cloudOk;
-      this.cloudInitDone = true;
-      this.setStateAsync("info.cloudConnected", {
-        val: cloudOk,
-        ack: true
-      }).catch(() => {
-      });
-      if (cloudOk) {
-        await this.loadCloudStates();
-      }
-      const intervalMs = Math.max(30, (_a = config.pollInterval) != null ? _a : 60) * 1e3;
-      this.cloudPollTimer = this.setInterval(() => {
-        this.deviceManager.loadFromCloud().then((ok) => {
-          if (ok && !this.cloudWasConnected) {
-            this.log.info("Cloud API connection restored");
-          }
-          this.cloudWasConnected = ok;
-          this.setStateAsync("info.cloudConnected", {
-            val: ok,
-            ack: true
-          }).catch(() => {
-          });
+      if (!cachedOk) {
+        const cloudOk = await this.deviceManager.loadFromCloud();
+        this.cloudWasConnected = cloudOk;
+        this.setStateAsync("info.cloudConnected", {
+          val: cloudOk,
+          ack: true
         }).catch(() => {
         });
-      }, intervalMs);
+        if (cloudOk) {
+          await this.loadCloudStates();
+        }
+      } else {
+        this.log.info("Using cached device data \u2014 no Cloud calls needed");
+        this.cloudWasConnected = true;
+        this.setStateAsync("info.cloudConnected", {
+          val: true,
+          ack: true
+        }).catch(() => {
+        });
+      }
+      this.cloudInitDone = true;
     }
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
@@ -236,10 +237,6 @@ class GoveeAdapter extends utils.Adapter {
   onUnload(callback) {
     var _a, _b, _c;
     try {
-      if (this.cloudPollTimer) {
-        this.clearInterval(this.cloudPollTimer);
-        this.cloudPollTimer = void 0;
-      }
       (_a = this.lanClient) == null ? void 0 : _a.stop();
       (_b = this.mqttClient) == null ? void 0 : _b.disconnect();
       (_c = this.rateLimiter) == null ? void 0 : _c.stop();

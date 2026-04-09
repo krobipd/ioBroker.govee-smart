@@ -118,6 +118,9 @@ class GoveeMqttClient {
         if (apiStatus === 401 || /password|credential|unauthorized/i.test(apiMsg)) {
           throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
         }
+        if (/abnormal|blocked|suspended|disabled/i.test(apiMsg)) {
+          throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
+        }
         throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
       }
       this._bearerToken = loginResp.client.token;
@@ -430,6 +433,98 @@ class GoveeMqttClient {
       }
     }
     return scenes;
+  }
+  /** Headers for authenticated undocumented API endpoints */
+  authHeaders() {
+    return {
+      Authorization: `Bearer ${this._bearerToken}`,
+      appVersion: APP_VERSION,
+      clientId: CLIENT_ID,
+      clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT
+    };
+  }
+  /**
+   * Fetch music effect library for a specific SKU (requires auth).
+   * Returns music modes with BLE data for ptReal local control.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchMusicLibrary(sku) {
+    var _a, _b, _c, _d, _e, _f;
+    if (!this._bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/appsku/v1/music-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet(url, this.authHeaders());
+    const modes = [];
+    let modeIdx = 0;
+    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
+      for (const s of (_c = cat.scenes) != null ? _c : []) {
+        if (!s.sceneName) {
+          continue;
+        }
+        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
+        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
+        if (code > 0) {
+          modes.push({
+            name: s.sceneName,
+            musicCode: code,
+            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0,
+            mode: modeIdx
+          });
+        }
+        modeIdx++;
+      }
+    }
+    return modes;
+  }
+  /**
+   * Fetch DIY light effect library for a specific SKU (requires auth).
+   * Returns DIY scene definitions with BLE data for ptReal local control.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchDiyLibrary(sku) {
+    var _a, _b, _c, _d, _e, _f;
+    if (!this._bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/appsku/v1/diy-light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet(url, this.authHeaders());
+    const diys = [];
+    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
+      for (const s of (_c = cat.scenes) != null ? _c : []) {
+        if (!s.sceneName) {
+          continue;
+        }
+        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
+        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
+        if (code > 0) {
+          diys.push({
+            name: s.sceneName,
+            diyCode: code,
+            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0
+          });
+        }
+      }
+    }
+    return diys;
+  }
+  /**
+   * Fetch supported features for a specific SKU (requires auth).
+   * Returns feature flags indicating what the device supports.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchSkuFeatures(sku) {
+    var _a;
+    if (!this._bearerToken) {
+      return null;
+    }
+    const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet(url, this.authHeaders());
+    return (_a = resp.data) != null ? _a : null;
   }
   /**
    * Extract PEM key + cert from PKCS12

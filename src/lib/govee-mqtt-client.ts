@@ -128,7 +128,11 @@ export class GoveeMqttClient {
         ) {
           throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
         }
-        // Account issues, maintenance, etc. — not a credential problem
+        // Account blocked/abnormal — treat as auth failure to stop reconnect
+        if (/abnormal|blocked|suspended|disabled/i.test(apiMsg)) {
+          throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
+        }
+        // Other account issues, maintenance, etc.
         throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
       }
       this._bearerToken = loginResp.client.token;
@@ -497,6 +501,141 @@ export class GoveeMqttClient {
     }
 
     return scenes;
+  }
+
+  /** Headers for authenticated undocumented API endpoints */
+  private authHeaders(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this._bearerToken}`,
+      appVersion: APP_VERSION,
+      clientId: CLIENT_ID,
+      clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT,
+    };
+  }
+
+  /**
+   * Fetch music effect library for a specific SKU (requires auth).
+   * Returns music modes with BLE data for ptReal local control.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchMusicLibrary(
+    sku: string,
+  ): Promise<
+    { name: string; musicCode: number; scenceParam?: string; mode?: number }[]
+  > {
+    if (!this._bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/appsku/v1/music-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet<{
+      data?: {
+        categories?: Array<{
+          categoryName?: string;
+          scenes?: Array<{
+            sceneName?: string;
+            sceneCode?: number;
+            lightEffects?: Array<{
+              sceneCode?: number;
+              scenceParam?: string;
+            }>;
+          }>;
+        }>;
+      };
+    }>(url, this.authHeaders());
+
+    const modes: {
+      name: string;
+      musicCode: number;
+      scenceParam?: string;
+      mode?: number;
+    }[] = [];
+    let modeIdx = 0;
+    for (const cat of resp.data?.categories ?? []) {
+      for (const s of cat.scenes ?? []) {
+        if (!s.sceneName) {
+          continue;
+        }
+        const effect = s.lightEffects?.[0];
+        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
+        if (code > 0) {
+          modes.push({
+            name: s.sceneName,
+            musicCode: code,
+            scenceParam: effect?.scenceParam || undefined,
+            mode: modeIdx,
+          });
+        }
+        modeIdx++;
+      }
+    }
+    return modes;
+  }
+
+  /**
+   * Fetch DIY light effect library for a specific SKU (requires auth).
+   * Returns DIY scene definitions with BLE data for ptReal local control.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchDiyLibrary(
+    sku: string,
+  ): Promise<{ name: string; diyCode: number; scenceParam?: string }[]> {
+    if (!this._bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/appsku/v1/diy-light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet<{
+      data?: {
+        categories?: Array<{
+          scenes?: Array<{
+            sceneName?: string;
+            sceneCode?: number;
+            lightEffects?: Array<{
+              sceneCode?: number;
+              scenceParam?: string;
+            }>;
+          }>;
+        }>;
+      };
+    }>(url, this.authHeaders());
+
+    const diys: { name: string; diyCode: number; scenceParam?: string }[] = [];
+    for (const cat of resp.data?.categories ?? []) {
+      for (const s of cat.scenes ?? []) {
+        if (!s.sceneName) {
+          continue;
+        }
+        const effect = s.lightEffects?.[0];
+        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
+        if (code > 0) {
+          diys.push({
+            name: s.sceneName,
+            diyCode: code,
+            scenceParam: effect?.scenceParam || undefined,
+          });
+        }
+      }
+    }
+    return diys;
+  }
+
+  /**
+   * Fetch supported features for a specific SKU (requires auth).
+   * Returns feature flags indicating what the device supports.
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchSkuFeatures(sku: string): Promise<Record<string, unknown> | null> {
+    if (!this._bearerToken) {
+      return null;
+    }
+    const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet<{
+      data?: Record<string, unknown>;
+    }>(url, this.authHeaders());
+    return resp.data ?? null;
   }
 
   /**

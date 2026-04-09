@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.9.1",
+    "version": "0.9.2",
     "news": {
+      "0.9.2": {
+        "en": "Add SKU cache: device data persisted locally, zero Cloud calls after first start\nRemove periodic Cloud polling (was every 60s)\nAdd authenticated endpoint support for music/DIY libraries and SKU feature flags\nFix MQTT login classification for account-blocked scenarios",
+        "de": "SKU-Cache hinzugefügt: Gerätedaten lokal gespeichert, keine Cloud-Aufrufe nach dem ersten Start\nPeriodisches Cloud-Polling entfernt (war alle 60s)\nAuthentifizierte Endpoints für Music-/DIY-Libraries und SKU-Feature-Flags\nFix MQTT-Login-Klassifizierung bei gesperrten Accounts",
+        "ru": "Добавлен SKU-кэш: данные устройств хранятся локально, ноль Cloud-вызовов после первого запуска\nУдален периодический опрос Cloud (был каждые 60с)\nПоддержка аутентифицированных эндпоинтов для музыкальных/DIY библиотек и флагов функций SKU\nИсправлена классификация MQTT-логина при блокировке аккаунта",
+        "pt": "Cache SKU adicionado: dados do dispositivo armazenados localmente, zero chamadas Cloud após o primeiro início\nPolling periódico da Cloud removido (era a cada 60s)\nSuporte a endpoints autenticados para bibliotecas de música/DIY e flags de recursos SKU\nCorreção da classificação de login MQTT para cenários de conta bloqueada",
+        "nl": "SKU-cache toegevoegd: apparaatgegevens lokaal opgeslagen, nul Cloud-aanroepen na eerste start\nPeriodieke Cloud-polling verwijderd (was elke 60s)\nGeauthenticeerde endpoint-ondersteuning voor muziek-/DIY-bibliotheken en SKU-functievlaggen\nFix MQTT-login classificatie bij geblokkeerde accounts",
+        "fr": "Cache SKU ajouté : données appareil stockées localement, zéro appels Cloud après le premier démarrage\nSuppression du polling Cloud périodique (était toutes les 60s)\nSupport des endpoints authentifiés pour les bibliothèques musique/DIY et les flags de fonctionnalités SKU\nCorrection de la classification du login MQTT pour les comptes bloqués",
+        "it": "Aggiunta cache SKU: dati dispositivo salvati localmente, zero chiamate Cloud dopo il primo avvio\nRimosso il polling periodico Cloud (era ogni 60s)\nSupporto endpoint autenticati per librerie musica/DIY e flag funzionalità SKU\nCorrezione classificazione login MQTT per account bloccati",
+        "es": "Caché SKU añadido: datos del dispositivo almacenados localmente, cero llamadas Cloud después del primer inicio\nEliminado el polling periódico de Cloud (era cada 60s)\nSoporte de endpoints autenticados para bibliotecas de música/DIY y flags de características SKU\nCorrección de clasificación de login MQTT para cuentas bloqueadas",
+        "pl": "Dodano pamięć podręczną SKU: dane urządzenia zapisane lokalnie, zero wywołań Cloud po pierwszym uruchomieniu\nUsunięto okresowe odpytywanie Cloud (było co 60s)\nObsługa uwierzytelnionych punktów końcowych dla bibliotek muzycznych/DIY i flag funkcji SKU\nNaprawa klasyfikacji logowania MQTT dla zablokowanych kont",
+        "uk": "Додано SKU-кеш: дані пристроїв зберігаються локально, нуль Cloud-викликів після першого запуску\nВидалено періодичне опитування Cloud (було кожні 60с)\nПідтримка автентифікованих ендпоінтів для музичних/DIY бібліотек та прапорців функцій SKU\nВиправлено класифікацію MQTT-логіну при блокуванні акаунту",
+        "zh-cn": "添加SKU缓存：设备数据本地持久化，首次启动后零Cloud调用\n移除周期性Cloud轮询（之前每60秒）\n添加认证端点支持音乐/DIY库和SKU功能标志\n修复MQTT登录分类以处理账户被锁定的情况"
+      },
       "0.9.1": {
         "en": "Add ptReal BLE-over-LAN scene activation (local scenes without Cloud API)\nFix initialization order: MQTT before Cloud for scene library on first cycle\nFix ready message only appears after all channels are fully initialized",
         "de": "Fügen Sie ptReal BLE-over-LAN Szenenaktivierung (lokale Szenen ohne Cloud API) hinzu\nFix Initialisierungsauftrag: MQTT vor Cloud für Szenenbibliothek im ersten Zyklus\nFix bereite Nachricht erscheint nur, nachdem alle Kanäle vollständig initialisiert werden",
@@ -80,19 +93,6 @@
         "pl": "Wybór interfejsu sieciowego do wykrywania LAN (obsługa wielu kart sieciowych/VLAN)",
         "uk": "Вибір мережевого інтерфейсу для виявлення LAN (підтримка кількох мережевих адаптерів/VLAN)",
         "zh-cn": "LAN发现网络接口选择（多网卡/VLAN支持）"
-      },
-      "0.7.0": {
-        "en": "Add IP address to device info (auto-updated via LAN), batch segment control documentation",
-        "de": "IP-Adresse in Geräte-Info (automatisch via LAN aktualisiert), Batch-Segment-Steuerung Dokumentation",
-        "ru": "IP-адрес в информации об устройстве (автообновление через LAN), документация пакетного управления сегментами",
-        "pt": "Endereço IP nas informações do dispositivo (atualizado via LAN), documentação do controle de segmentos em lote",
-        "nl": "IP-adres in apparaatinfo (automatisch bijgewerkt via LAN), documentatie batch-segmentbesturing",
-        "fr": "Adresse IP dans les infos appareil (mise à jour auto via LAN), documentation contrôle segments par lot",
-        "it": "Indirizzo IP nelle info dispositivo (aggiornato automaticamente via LAN), documentazione controllo segmenti batch",
-        "es": "Dirección IP en la información del dispositivo (actualizada automáticamente vía LAN), documentación del control de segmentos por lotes",
-        "pl": "Adres IP w informacjach o urządzeniu (automatycznie aktualizowany przez LAN), dokumentacja sterowania segmentami wsadowego",
-        "uk": "IP-адреса в інформації пристрою (автооновлення через LAN), документація пакетного керування сегментами",
-        "zh-cn": "设备信息中添加IP地址（通过LAN自动更新），批量段控制文档"
       }
     },
     "titleLang": {

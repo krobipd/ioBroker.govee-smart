@@ -280,6 +280,26 @@ export interface GoveeDevice {
     /** Base64-encoded BLE scene parameter data */
     scenceParam?: string;
   }>;
+  /** Music effect library entries for ptReal local music mode (authenticated API) */
+  musicLibrary: Array<{
+    name: string;
+    /** BLE music effect code */
+    musicCode: number;
+    /** Base64-encoded BLE parameter data */
+    scenceParam?: string;
+    /** Music sub-mode index */
+    mode?: number;
+  }>;
+  /** DIY light effect library entries for ptReal local DIY activation (authenticated API) */
+  diyLibrary: Array<{
+    name: string;
+    /** BLE DIY effect code */
+    diyCode: number;
+    /** Base64-encoded BLE parameter data */
+    scenceParam?: string;
+  }>;
+  /** Supported feature flags per SKU (from authenticated API) */
+  skuFeatures: Record<string, unknown> | null;
   /** Last known state */
   state: DeviceState;
   /** Which channels are available */

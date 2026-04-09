@@ -10,6 +10,7 @@ import { GoveeCloudClient } from "./lib/govee-cloud-client.js";
 import { GoveeLanClient } from "./lib/govee-lan-client.js";
 import { GoveeMqttClient } from "./lib/govee-mqtt-client.js";
 import { RateLimiter } from "./lib/rate-limiter.js";
+import { SkuCache } from "./lib/sku-cache.js";
 import { StateManager } from "./lib/state-manager.js";
 import type { AdapterConfig, DeviceState, GoveeDevice } from "./lib/types.js";
 
@@ -20,7 +21,7 @@ class GoveeAdapter extends utils.Adapter {
   private mqttClient: GoveeMqttClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
-  private cloudPollTimer: ioBroker.Interval | undefined = undefined;
+  private skuCache: SkuCache | null = null;
   private cloudWasConnected = false;
   private readyLogged = false;
   private cloudInitDone = false;
@@ -85,6 +86,11 @@ class GoveeAdapter extends utils.Adapter {
 
     this.stateManager = new StateManager(this);
     this.deviceManager = new DeviceManager(this.log);
+    this.skuCache = new SkuCache(
+      utils.getAbsoluteInstanceDataDir(this),
+      this.log,
+    );
+    this.deviceManager.setSkuCache(this.skuCache);
 
     this.deviceManager.setCallbacks(
       (device, state) => this.onDeviceStateUpdate(device, state),
@@ -178,7 +184,9 @@ class GoveeAdapter extends utils.Adapter {
       );
     }
 
-    // --- Cloud (if API key provided) ---
+    // --- Device data: Cache first, Cloud only on cache miss ---
+    const cachedOk = this.deviceManager.loadFromCache();
+
     if (config.apiKey) {
       this.cloudClient = new GoveeCloudClient(config.apiKey, this.log);
       this.deviceManager.setCloudClient(this.cloudClient);
@@ -187,36 +195,27 @@ class GoveeAdapter extends utils.Adapter {
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
 
-      // Initial cloud load (MQTT client available for scene library)
-      const cloudOk = await this.deviceManager.loadFromCloud();
-      this.cloudWasConnected = cloudOk;
-      this.cloudInitDone = true;
-      this.setStateAsync("info.cloudConnected", {
-        val: cloudOk,
-        ack: true,
-      }).catch(() => {});
+      if (!cachedOk) {
+        // No cache — first start, fetch from Cloud once
+        const cloudOk = await this.deviceManager.loadFromCloud();
+        this.cloudWasConnected = cloudOk;
+        this.setStateAsync("info.cloudConnected", {
+          val: cloudOk,
+          ack: true,
+        }).catch(() => {});
 
-      // Load current device states from Cloud
-      if (cloudOk) {
-        await this.loadCloudStates();
+        if (cloudOk) {
+          await this.loadCloudStates();
+        }
+      } else {
+        this.log.info("Using cached device data — no Cloud calls needed");
+        this.cloudWasConnected = true;
+        this.setStateAsync("info.cloudConnected", {
+          val: true,
+          ack: true,
+        }).catch(() => {});
       }
-
-      // Periodic cloud refresh
-      const intervalMs = Math.max(30, config.pollInterval ?? 60) * 1000;
-      this.cloudPollTimer = this.setInterval(() => {
-        this.deviceManager!.loadFromCloud()
-          .then((ok) => {
-            if (ok && !this.cloudWasConnected) {
-              this.log.info("Cloud API connection restored");
-            }
-            this.cloudWasConnected = ok;
-            this.setStateAsync("info.cloudConnected", {
-              val: ok,
-              ack: true,
-            }).catch(() => {});
-          })
-          .catch(() => {});
-      }, intervalMs);
+      this.cloudInitDone = true;
     }
 
     // Subscribe to all writable device and group states
@@ -252,10 +251,6 @@ class GoveeAdapter extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     try {
-      if (this.cloudPollTimer) {
-        this.clearInterval(this.cloudPollTimer);
-        this.cloudPollTimer = undefined;
-      }
       this.lanClient?.stop();
       this.mqttClient?.disconnect();
       this.rateLimiter?.stop();

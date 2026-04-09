@@ -29,6 +29,7 @@ class DeviceManager {
   mqttClient = null;
   cloudClient = null;
   rateLimiter = null;
+  skuCache = null;
   onDeviceUpdate = null;
   onDeviceListChanged = null;
   lastErrorCategory = null;
@@ -69,6 +70,14 @@ class DeviceManager {
     this.rateLimiter = limiter;
   }
   /**
+   * Register the SKU cache for persistent device data
+   *
+   * @param cache SKU cache instance
+   */
+  setSkuCache(cache) {
+    this.skuCache = cache;
+  }
+  /**
    * Set callbacks for device state changes and list changes.
    *
    * @param onUpdate Called when a device state changes (from any channel)
@@ -92,8 +101,35 @@ class DeviceManager {
     return this.devices.get(this.deviceKey(sku, deviceId));
   }
   /**
-   * Load devices from Cloud API and merge with LAN discovery.
-   * Called on startup and periodically.
+   * Load devices from local SKU cache.
+   * Returns true if any devices were loaded (= Cloud not needed).
+   */
+  loadFromCache() {
+    var _a;
+    if (!this.skuCache) {
+      return false;
+    }
+    const cached = this.skuCache.loadAll();
+    if (cached.length === 0) {
+      return false;
+    }
+    let changed = false;
+    for (const entry of cached) {
+      const key = this.deviceKey(entry.sku, entry.deviceId);
+      if (!this.devices.has(key)) {
+        this.devices.set(key, this.cachedToGoveeDevice(entry));
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.log.info(`Loaded ${cached.length} device(s) from cache`);
+      (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
+    }
+    return cached.length > 0;
+  }
+  /**
+   * Load devices from Cloud API and save to cache.
+   * Only called when cache is empty (first start) or manual refresh.
    */
   async loadFromCloud() {
     var _a;
@@ -179,18 +215,70 @@ class DeviceManager {
                 }));
               }
             }
-            if (device.sceneLibrary.length === 0 && this.mqttClient) {
-              try {
-                const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
-                if (lib.length > 0) {
-                  device.sceneLibrary = lib;
-                  changed = true;
+            if (this.mqttClient) {
+              if (device.sceneLibrary.length === 0) {
+                try {
+                  const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
+                  if (lib.length > 0) {
+                    device.sceneLibrary = lib;
+                    changed = true;
+                    this.log.debug(
+                      `Scene library for ${cd.sku}: ${lib.length} scenes`
+                    );
+                  }
+                } catch {
+                  this.log.debug(`Could not load scene library for ${cd.sku}`);
+                }
+              }
+              if (device.musicLibrary.length === 0) {
+                try {
+                  const lib = await this.mqttClient.fetchMusicLibrary(cd.sku);
+                  if (lib.length > 0) {
+                    device.musicLibrary = lib;
+                    changed = true;
+                    this.log.debug(
+                      `Music library for ${cd.sku}: ${lib.length} modes`
+                    );
+                  }
+                } catch (e) {
                   this.log.debug(
-                    `Scene library for ${cd.sku}: ${lib.length} scenes`
+                    `Could not load music library for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`
                   );
                 }
-              } catch {
-                this.log.debug(`Could not load scene library for ${cd.sku}`);
+              }
+              if (device.diyLibrary.length === 0) {
+                try {
+                  const lib = await this.mqttClient.fetchDiyLibrary(cd.sku);
+                  if (lib.length > 0) {
+                    device.diyLibrary = lib;
+                    changed = true;
+                    this.log.debug(
+                      `DIY library for ${cd.sku}: ${lib.length} effects`
+                    );
+                  }
+                } catch (e) {
+                  this.log.debug(
+                    `Could not load DIY library for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`
+                  );
+                }
+              }
+              if (!device.skuFeatures) {
+                try {
+                  const features = await this.mqttClient.fetchSkuFeatures(
+                    cd.sku
+                  );
+                  if (features) {
+                    device.skuFeatures = features;
+                    changed = true;
+                    this.log.debug(
+                      `SKU features for ${cd.sku}: ${JSON.stringify(features).slice(0, 200)}`
+                    );
+                  }
+                } catch (e) {
+                  this.log.debug(
+                    `Could not load SKU features for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`
+                  );
+                }
               }
             }
             if (device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0) {
@@ -198,6 +286,14 @@ class DeviceManager {
             }
           }
         }
+      }
+      if (this.skuCache) {
+        for (const device of this.devices.values()) {
+          this.skuCache.save(this.goveeDeviceToCached(device));
+        }
+        this.log.info(
+          `Cached ${this.devices.size} device(s) \u2014 next start uses cache, no Cloud needed`
+        );
       }
       if (changed) {
         (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
@@ -250,6 +346,9 @@ class DeviceManager {
         diyScenes: [],
         snapshots: [],
         sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false }
       };
@@ -767,6 +866,9 @@ class DeviceManager {
       diyScenes: [],
       snapshots: [],
       sceneLibrary: [],
+      musicLibrary: [],
+      diyLibrary: [],
+      skuFeatures: null,
       state: { online: true },
       channels: { lan: false, mqtt: false, cloud: true }
     };
@@ -814,6 +916,51 @@ class DeviceManager {
     } else {
       this.log.debug(`${msg} (repeated)`);
     }
+  }
+  /**
+   * Convert cached data to a GoveeDevice (runtime fields set to defaults)
+   *
+   * @param cached Cached device data
+   */
+  cachedToGoveeDevice(cached) {
+    return {
+      sku: cached.sku,
+      deviceId: cached.deviceId,
+      name: cached.name,
+      type: cached.type,
+      capabilities: cached.capabilities,
+      scenes: cached.scenes,
+      diyScenes: cached.diyScenes,
+      snapshots: cached.snapshots,
+      sceneLibrary: cached.sceneLibrary,
+      musicLibrary: cached.musicLibrary,
+      diyLibrary: cached.diyLibrary,
+      skuFeatures: cached.skuFeatures,
+      state: { online: false },
+      channels: { lan: false, mqtt: false, cloud: false }
+    };
+  }
+  /**
+   * Extract cacheable data from a GoveeDevice
+   *
+   * @param device Runtime device
+   */
+  goveeDeviceToCached(device) {
+    return {
+      sku: device.sku,
+      deviceId: device.deviceId,
+      name: device.name,
+      type: device.type,
+      capabilities: device.capabilities,
+      scenes: device.scenes,
+      diyScenes: device.diyScenes,
+      snapshots: device.snapshots,
+      sceneLibrary: device.sceneLibrary,
+      musicLibrary: device.musicLibrary,
+      diyLibrary: device.diyLibrary,
+      skuFeatures: device.skuFeatures,
+      cachedAt: Date.now()
+    };
   }
 }
 // Annotate the CommonJS export names for ESM import in node:
