@@ -29,7 +29,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var govee_lan_client_exports = {};
 __export(govee_lan_client_exports, {
   GoveeLanClient: () => GoveeLanClient,
-  buildScenePackets: () => buildScenePackets
+  buildGradientPacket: () => buildGradientPacket,
+  buildScenePackets: () => buildScenePackets,
+  buildSegmentColorPacket: () => buildSegmentColorPacket
 });
 module.exports = __toCommonJS(govee_lan_client_exports);
 var dgram = __toESM(require("node:dgram"));
@@ -221,6 +223,28 @@ class GoveeLanClient {
     });
   }
   /**
+   * Set gradient toggle via ptReal BLE-passthrough.
+   *
+   * @param ip Device IP address
+   * @param on Gradient on/off
+   */
+  setGradient(ip, on) {
+    this.sendPtReal(ip, [buildGradientPacket(on)]);
+  }
+  /**
+   * Set segment color via ptReal BLE-passthrough.
+   * Encodes segments as two bitmask bytes (segments 0-7 → left, 8-15 → right).
+   *
+   * @param ip Device IP address
+   * @param segments Array of segment indices to color
+   * @param r Red channel 0-255
+   * @param g Green channel 0-255
+   * @param b Blue channel 0-255
+   */
+  setSegmentColor(ip, segments, r, g, b) {
+    this.sendPtReal(ip, [buildSegmentColorPacket(segments, r, g, b)]);
+  }
+  /**
    * Request device status
    *
    * @param ip Device IP address
@@ -374,9 +398,30 @@ function buildScenePackets(sceneCode, scenceParam) {
   packets.push(Buffer.from(activatePacket).toString("base64"));
   return packets;
 }
+function buildGradientPacket(on) {
+  return Buffer.from(finishPacket([51, 20, on ? 1 : 0])).toString(
+    "base64"
+  );
+}
+function buildSegmentColorPacket(segments, r, g, b) {
+  let leftMask = 0;
+  let rightMask = 0;
+  for (const seg of segments) {
+    if (seg < 8) {
+      leftMask |= 1 << seg;
+    } else if (seg < 16) {
+      rightMask |= 1 << seg - 8;
+    }
+  }
+  return Buffer.from(
+    finishPacket([51, 5, 11, r, g, b, leftMask, rightMask])
+  ).toString("base64");
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   GoveeLanClient,
-  buildScenePackets
+  buildGradientPacket,
+  buildScenePackets,
+  buildSegmentColorPacket
 });
 //# sourceMappingURL=govee-lan-client.js.map

@@ -601,6 +601,9 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "control.snapshot") {
       return "snapshot";
     }
+    if (suffix === "control.gradient_toggle") {
+      return "gradientToggle";
+    }
     if (suffix === "control.music_mode" || suffix === "control.music_sensitivity" || suffix === "control.music_auto_color") {
       return "music";
     }

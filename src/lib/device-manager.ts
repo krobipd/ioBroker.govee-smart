@@ -523,21 +523,59 @@ export class DeviceManager {
     command: string,
     value: unknown,
   ): Promise<void> {
-    // Segment commands only work via Cloud API
-    if (
-      command.startsWith("segmentColor:") ||
-      command.startsWith("segmentBrightness:") ||
-      command === "segmentBatch"
-    ) {
+    // Segment color: try LAN ptReal first, fall back to Cloud
+    if (command.startsWith("segmentColor:")) {
+      if (device.lanIp && this.lanClient) {
+        const segIdx = parseInt(command.split(":")[1], 10);
+        const { r, g, b } = this.parseColor(value as string);
+        this.lanClient.setSegmentColor(device.lanIp, [segIdx], r, g, b);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
-        if (command === "segmentBatch") {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
+      return;
+    }
+
+    // Segment batch: try LAN ptReal first, fall back to Cloud
+    if (command === "segmentBatch") {
+      if (device.lanIp && this.lanClient) {
+        const parsed = this.parseSegmentBatch(device, value as string);
+        if (parsed?.color !== undefined) {
+          const r = (parsed.color >> 16) & 0xff;
+          const g = (parsed.color >> 8) & 0xff;
+          const b = parsed.color & 0xff;
+          this.lanClient.setSegmentColor(
+            device.lanIp,
+            parsed.segments,
+            r,
+            g,
+            b,
+          );
+        }
+        if (parsed) {
+          this.onSegmentBatchUpdate?.(device, parsed);
+        }
+        // Brightness via ptReal not supported — fall through to Cloud if needed
+        if (parsed?.brightness !== undefined && this.cloudClient) {
           await this.sendSegmentBatch(device, value as string);
-        } else {
-          await this.sendCloudCommand(device, command, value);
         }
         return;
       }
-      this.log.debug(`Segment control requires Cloud API for ${device.name}`);
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendSegmentBatch(device, value as string);
+        return;
+      }
+      return;
+    }
+
+    // Segment brightness: Cloud only (no ptReal equivalent)
+    if (command.startsWith("segmentBrightness:")) {
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
       return;
     }
 
@@ -794,6 +832,9 @@ export class DeviceManager {
       }
       case "colorTemperature":
         this.lanClient.setColorTemperature(device.lanIp, value as number);
+        break;
+      case "gradientToggle":
+        this.lanClient.setGradient(device.lanIp, value as boolean);
         break;
       case "lightScene": {
         // Try ptReal BLE-over-LAN if scene is in scene library

@@ -435,24 +435,61 @@ class DeviceManager {
    * @param value Command value
    */
   async sendCommand(device, command, value) {
-    var _a;
-    if (command.startsWith("segmentColor:") || command.startsWith("segmentBrightness:") || command === "segmentBatch") {
+    var _a, _b;
+    if (command.startsWith("segmentColor:")) {
+      if (device.lanIp && this.lanClient) {
+        const segIdx = parseInt(command.split(":")[1], 10);
+        const { r, g, b } = this.parseColor(value);
+        this.lanClient.setSegmentColor(device.lanIp, [segIdx], r, g, b);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
-        if (command === "segmentBatch") {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
+      return;
+    }
+    if (command === "segmentBatch") {
+      if (device.lanIp && this.lanClient) {
+        const parsed = this.parseSegmentBatch(device, value);
+        if ((parsed == null ? void 0 : parsed.color) !== void 0) {
+          const r = parsed.color >> 16 & 255;
+          const g = parsed.color >> 8 & 255;
+          const b = parsed.color & 255;
+          this.lanClient.setSegmentColor(
+            device.lanIp,
+            parsed.segments,
+            r,
+            g,
+            b
+          );
+        }
+        if (parsed) {
+          (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
+        }
+        if ((parsed == null ? void 0 : parsed.brightness) !== void 0 && this.cloudClient) {
           await this.sendSegmentBatch(device, value);
-        } else {
-          await this.sendCloudCommand(device, command, value);
         }
         return;
       }
-      this.log.debug(`Segment control requires Cloud API for ${device.name}`);
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendSegmentBatch(device, value);
+        return;
+      }
+      return;
+    }
+    if (command.startsWith("segmentBrightness:")) {
+      if (device.channels.cloud && this.cloudClient) {
+        await this.sendCloudCommand(device, command, value);
+        return;
+      }
       return;
     }
     if (device.lanIp && this.lanClient) {
       this.sendLanCommand(device, command, value);
       return;
     }
-    if (device.channels.mqtt && ((_a = this.mqttClient) == null ? void 0 : _a.connected)) {
+    if (device.channels.mqtt && ((_b = this.mqttClient) == null ? void 0 : _b.connected)) {
       if (this.sendMqttCommand(device, command, value)) {
         return;
       }
@@ -647,6 +684,9 @@ class DeviceManager {
       }
       case "colorTemperature":
         this.lanClient.setColorTemperature(device.lanIp, value);
+        break;
+      case "gradientToggle":
+        this.lanClient.setGradient(device.lanIp, value);
         break;
       case "lightScene": {
         const idx = parseInt(String(value), 10);

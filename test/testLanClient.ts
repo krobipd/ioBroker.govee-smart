@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { buildScenePackets } from "../src/lib/govee-lan-client";
+import { buildScenePackets, buildGradientPacket, buildSegmentColorPacket } from "../src/lib/govee-lan-client";
 
 describe("buildScenePackets", () => {
     it("should build a single activation packet for scene code only", () => {
@@ -68,5 +68,77 @@ describe("buildScenePackets", () => {
     it("should handle empty scenceParam (scene code only)", () => {
         const packets = buildScenePackets(1, "");
         expect(packets).to.have.lengthOf(1);
+    });
+});
+
+describe("buildGradientPacket", () => {
+    it("should build gradient ON packet", () => {
+        const buf = Buffer.from(buildGradientPacket(true), "base64");
+        expect(buf).to.have.lengthOf(20);
+        expect(buf[0]).to.equal(0x33);
+        expect(buf[1]).to.equal(0x14);
+        expect(buf[2]).to.equal(0x01);
+        for (let i = 3; i < 19; i++) {
+            expect(buf[i]).to.equal(0);
+        }
+    });
+
+    it("should build gradient OFF packet", () => {
+        const buf = Buffer.from(buildGradientPacket(false), "base64");
+        expect(buf[0]).to.equal(0x33);
+        expect(buf[1]).to.equal(0x14);
+        expect(buf[2]).to.equal(0x00);
+    });
+
+    it("should have valid XOR checksum", () => {
+        const buf = Buffer.from(buildGradientPacket(true), "base64");
+        let xor = 0;
+        for (let i = 0; i < 19; i++) {
+            xor ^= buf[i];
+        }
+        expect(buf[19]).to.equal(xor);
+    });
+});
+
+describe("buildSegmentColorPacket", () => {
+    it("should encode RGB and single segment in left bitmask", () => {
+        const buf = Buffer.from(buildSegmentColorPacket([3], 0xff, 0x00, 0x80), "base64");
+        expect(buf).to.have.lengthOf(20);
+        expect(buf[0]).to.equal(0x33);
+        expect(buf[1]).to.equal(0x05);
+        expect(buf[2]).to.equal(0x0b);
+        expect(buf[3]).to.equal(0xff); // R
+        expect(buf[4]).to.equal(0x00); // G
+        expect(buf[5]).to.equal(0x80); // B
+        expect(buf[6]).to.equal(1 << 3); // left mask: segment 3
+        expect(buf[7]).to.equal(0x00); // right mask: empty
+    });
+
+    it("should encode multiple segments across both bitmasks", () => {
+        const buf = Buffer.from(buildSegmentColorPacket([0, 7, 8, 14], 0x10, 0x20, 0x30), "base64");
+        expect(buf[6]).to.equal((1 << 0) | (1 << 7)); // left: segments 0 + 7
+        expect(buf[7]).to.equal((1 << 0) | (1 << 6)); // right: segments 8 + 14
+    });
+
+    it("should encode all segments 0-15", () => {
+        const allSegs = Array.from({ length: 16 }, (_, i) => i);
+        const buf = Buffer.from(buildSegmentColorPacket(allSegs, 0, 0, 0), "base64");
+        expect(buf[6]).to.equal(0xff); // left: all 8 bits
+        expect(buf[7]).to.equal(0xff); // right: all 8 bits
+    });
+
+    it("should ignore segments >= 16", () => {
+        const buf = Buffer.from(buildSegmentColorPacket([16, 20], 0, 0, 0), "base64");
+        expect(buf[6]).to.equal(0x00);
+        expect(buf[7]).to.equal(0x00);
+    });
+
+    it("should have valid XOR checksum", () => {
+        const buf = Buffer.from(buildSegmentColorPacket([1, 5, 10], 0xaa, 0xbb, 0xcc), "base64");
+        let xor = 0;
+        for (let i = 0; i < 19; i++) {
+            xor ^= buf[i];
+        }
+        expect(buf[19]).to.equal(xor);
     });
 });

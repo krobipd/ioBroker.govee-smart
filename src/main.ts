@@ -690,6 +690,9 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "control.snapshot") {
       return "snapshot";
     }
+    if (suffix === "control.gradient_toggle") {
+      return "gradientToggle";
+    }
     // Music mode states — routed via buildMusicCommand
     if (
       suffix === "control.music_mode" ||

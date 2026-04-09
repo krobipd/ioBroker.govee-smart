@@ -232,6 +232,36 @@ export class GoveeLanClient {
   }
 
   /**
+   * Set gradient toggle via ptReal BLE-passthrough.
+   *
+   * @param ip Device IP address
+   * @param on Gradient on/off
+   */
+  setGradient(ip: string, on: boolean): void {
+    this.sendPtReal(ip, [buildGradientPacket(on)]);
+  }
+
+  /**
+   * Set segment color via ptReal BLE-passthrough.
+   * Encodes segments as two bitmask bytes (segments 0-7 → left, 8-15 → right).
+   *
+   * @param ip Device IP address
+   * @param segments Array of segment indices to color
+   * @param r Red channel 0-255
+   * @param g Green channel 0-255
+   * @param b Blue channel 0-255
+   */
+  setSegmentColor(
+    ip: string,
+    segments: number[],
+    r: number,
+    g: number,
+    b: number,
+  ): void {
+    this.sendPtReal(ip, [buildSegmentColorPacket(segments, r, g, b)]);
+  }
+
+  /**
    * Request device status
    *
    * @param ip Device IP address
@@ -430,4 +460,44 @@ export function buildScenePackets(
   packets.push(Buffer.from(activatePacket).toString("base64"));
 
   return packets;
+}
+
+/**
+ * Build a Base64-encoded BLE packet for gradient toggle via ptReal.
+ *
+ * @param on Gradient on/off
+ */
+export function buildGradientPacket(on: boolean): string {
+  return Buffer.from(finishPacket([0x33, 0x14, on ? 0x01 : 0x00])).toString(
+    "base64",
+  );
+}
+
+/**
+ * Build a Base64-encoded BLE packet for segment color via ptReal.
+ * Segments 0-7 → left bitmask, segments 8-15 → right bitmask.
+ *
+ * @param segments Array of segment indices
+ * @param r Red channel 0-255
+ * @param g Green channel 0-255
+ * @param b Blue channel 0-255
+ */
+export function buildSegmentColorPacket(
+  segments: number[],
+  r: number,
+  g: number,
+  b: number,
+): string {
+  let leftMask = 0;
+  let rightMask = 0;
+  for (const seg of segments) {
+    if (seg < 8) {
+      leftMask |= 1 << seg;
+    } else if (seg < 16) {
+      rightMask |= 1 << (seg - 8);
+    }
+  }
+  return Buffer.from(
+    finishPacket([0x33, 0x05, 0x0b, r, g, b, leftMask, rightMask]),
+  ).toString("base64");
 }

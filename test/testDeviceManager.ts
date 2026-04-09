@@ -455,13 +455,11 @@ describe("DeviceManager", () => {
             expect(cloudTracker.calls[0].method).to.equal("controlDevice");
         });
 
-        it("should always route segment commands via Cloud", async () => {
+        it("should route segment color via LAN ptReal when available", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
-                setBrightness: lanTracker.track("setBrightness"),
-                setColor: lanTracker.track("setColor"),
-                setColorTemperature: lanTracker.track("setColorTemperature"),
+                setSegmentColor: lanTracker.track("setSegmentColor"),
             };
             dm.setLanClient(mockLan as any);
 
@@ -477,12 +475,54 @@ describe("DeviceManager", () => {
             const device = createTestDevice();
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
-            await dm.sendCommand(device, "segmentColor:0", "#ff0000");
-            // LAN should NOT be called
-            expect(lanTracker.calls).to.have.lengthOf(0);
-            // Cloud should be called
+            await dm.sendCommand(device, "segmentColor:3", "#ff0000");
+            // LAN should be called with ptReal
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("setSegmentColor");
+            expect(lanTracker.calls[0].args[1]).to.deep.equal([3]); // segments
+            expect(lanTracker.calls[0].args[2]).to.equal(255); // R
+            expect(lanTracker.calls[0].args[3]).to.equal(0);   // G
+            expect(lanTracker.calls[0].args[4]).to.equal(0);   // B
+            // Cloud should NOT be called
+            expect(cloudTracker.calls).to.have.lengthOf(0);
+        });
+
+        it("should fall back to Cloud for segment color without LAN", async () => {
+            const cloudTracker = createCallTracker();
+            const mockCloud = {
+                controlDevice: (...args: unknown[]) => {
+                    cloudTracker.calls.push({ method: "controlDevice", args });
+                    return Promise.resolve();
+                },
+            };
+            dm.setCloudClient(mockCloud as any);
+
+            const device = createTestDevice({ lanIp: undefined });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "segmentColor:0", "#00ff00");
             expect(cloudTracker.calls).to.have.lengthOf(1);
-            expect(cloudTracker.calls[0].method).to.equal("controlDevice");
+        });
+
+        it("should route gradient toggle via LAN ptReal", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                setBrightness: lanTracker.track("setBrightness"),
+                setColor: lanTracker.track("setColor"),
+                setColorTemperature: lanTracker.track("setColorTemperature"),
+                setGradient: lanTracker.track("setGradient"),
+                setScene: lanTracker.track("setScene"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice();
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "gradientToggle", true);
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("setGradient");
+            expect(lanTracker.calls[0].args[1]).to.equal(true);
         });
     });
 
