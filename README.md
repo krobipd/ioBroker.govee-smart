@@ -191,6 +191,11 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### **WORK IN PROGRESS**
+- Add ptReal BLE-over-LAN scene activation (local scenes without Cloud API)
+- Fix initialization order: MQTT before Cloud for scene library on first cycle
+- Fix ready message only appears after all channels are fully initialized
+
 ### 0.9.0 (2026-04-09)
 - Add dedicated DIY-scenes endpoint for user-created scenes
 - Add music mode controls: dropdown, sensitivity slider, auto-color toggle
