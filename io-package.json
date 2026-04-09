@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.9.2",
+    "version": "0.9.3",
     "news": {
+      "0.9.3": {
+        "en": "Add local snapshots: save/restore device state via LAN without Cloud\nAdd device quirks system: correct wrong API data for specific SKUs\nAdd scene speed control infrastructure (speed adjustment pending live testing)\nExtend test coverage to 254 tests",
+        "de": "Lokale Snapshots: Gerätezustand per LAN speichern/wiederherstellen ohne Cloud\nDevice-Quirks-System: falsche API-Daten für bestimmte SKUs korrigieren\nScene-Speed-Control Infrastruktur vorbereitet (Speed-Anpassung nach Live-Test)\nTestabdeckung auf 254 Tests erweitert",
+        "ru": "Локальные снимки: сохранение/восстановление состояния устройства через LAN без Cloud\nСистема квирков устройств: исправление неверных данных API для определённых SKU\nИнфраструктура управления скоростью сцен (настройка скорости после живого тестирования)\nРасширено покрытие тестами до 254",
+        "pt": "Snapshots locais: salvar/restaurar estado do dispositivo via LAN sem Cloud\nSistema de quirks: corrigir dados API incorretos para SKUs específicos\nInfraestrutura de controle de velocidade de cenas (ajuste pendente de teste ao vivo)\nCobertura de testes ampliada para 254",
+        "nl": "Lokale snapshots: apparaatstatus opslaan/herstellen via LAN zonder Cloud\nDevice quirks systeem: onjuiste API-gegevens corrigeren voor specifieke SKU's\nScene speed control infrastructuur (snelheidsaanpassing na live testen)\nTestdekking uitgebreid naar 254 tests",
+        "fr": "Snapshots locaux : sauvegarder/restaurer l'état de l'appareil via LAN sans Cloud\nSystème de quirks : corriger les données API incorrectes pour certains SKU\nInfrastructure de contrôle de vitesse des scènes (ajustement après test en direct)\nCouverture de tests étendue à 254",
+        "it": "Snapshot locali: salva/ripristina stato dispositivo via LAN senza Cloud\nSistema quirks dispositivi: correzione dati API errati per SKU specifici\nInfrastruttura controllo velocità scene (regolazione dopo test dal vivo)\nCopertura test estesa a 254",
+        "es": "Snapshots locales: guardar/restaurar estado del dispositivo vía LAN sin Cloud\nSistema de quirks: corregir datos API incorrectos para SKUs específicos\nInfraestructura de control de velocidad de escenas (ajuste pendiente de prueba en vivo)\nCobertura de pruebas ampliada a 254",
+        "pl": "Lokalne snapshoty: zapisywanie/przywracanie stanu urządzenia przez LAN bez Cloud\nSystem quirków urządzeń: korekcja błędnych danych API dla określonych SKU\nInfrastruktura sterowania prędkością scen (dostosowanie po testach na żywo)\nPokrycie testami rozszerzone do 254",
+        "uk": "Локальні снапшоти: збереження/відновлення стану пристрою через LAN без Cloud\nСистема квірків пристроїв: виправлення неправильних даних API для певних SKU\nІнфраструктура керування швидкістю сцен (налаштування після живого тестування)\nПокриття тестами розширено до 254",
+        "zh-cn": "本地快照：通过LAN保存/恢复设备状态，无需Cloud\n设备怪癖系统：修正特定SKU的错误API数据\n场景速度控制基础设施（速度调整待实际测试）\n测试覆盖扩展至254个"
+      },
       "0.9.2": {
         "en": "Add SKU cache: device data persisted locally, zero Cloud calls after first start\nRemove periodic Cloud polling (was every 60s)\nAdd authenticated endpoint support for music/DIY libraries and SKU feature flags\nFix MQTT login classification for account-blocked scenarios",
         "de": "SKU-Cache hinzugefügt: Gerätedaten lokal gespeichert, keine Cloud-Aufrufe nach dem ersten Start\nPeriodisches Cloud-Polling entfernt (war alle 60s)\nAuthentifizierte Endpoints für Music-/DIY-Libraries und SKU-Feature-Flags\nFix MQTT-Login-Klassifizierung bei gesperrten Accounts",
@@ -80,19 +93,6 @@
         "pl": "Naprawa wiadomości ready pokazującej rozłączone kanały, naprawa domyślnego wyboru interfejsu sieciowego",
         "uk": "Виправлення повідомлення ready з відключеними каналами, виправлення вибору мережевого інтерфейсу",
         "zh-cn": "修复就绪消息显示已断开通道，修复网络接口默认选择"
-      },
-      "0.8.0": {
-        "en": "Network interface selection for LAN discovery (multi-NIC/VLAN support)",
-        "de": "Netzwerk-Interface Auswahl für LAN-Erkennung (Multi-NIC/VLAN Unterstützung)",
-        "ru": "Выбор сетевого интерфейса для обнаружения LAN (поддержка нескольких сетевых адаптеров/VLAN)",
-        "pt": "Seleção de interface de rede para descoberta LAN (suporte multi-NIC/VLAN)",
-        "nl": "Netwerkinterface selectie voor LAN-detectie (multi-NIC/VLAN ondersteuning)",
-        "fr": "Sélection de l'interface réseau pour la découverte LAN (support multi-NIC/VLAN)",
-        "it": "Selezione interfaccia di rete per rilevamento LAN (supporto multi-NIC/VLAN)",
-        "es": "Selección de interfaz de red para detección LAN (soporte multi-NIC/VLAN)",
-        "pl": "Wybór interfejsu sieciowego do wykrywania LAN (obsługa wielu kart sieciowych/VLAN)",
-        "uk": "Вибір мережевого інтерфейсу для виявлення LAN (підтримка кількох мережевих адаптерів/VLAN)",
-        "zh-cn": "LAN发现网络接口选择（多网卡/VLAN支持）"
       }
     },
     "titleLang": {
