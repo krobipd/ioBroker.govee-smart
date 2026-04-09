@@ -172,7 +172,6 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       ];
 
     case "dynamic_scene":
-    case "music_setting":
     case "work_mode":
     case "temperature_setting":
       // Complex types — expose as JSON for now
@@ -188,6 +187,9 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           capabilityInstance: cap.instance,
         },
       ];
+
+    case "music_setting":
+      return mapMusicSetting(cap);
 
     default:
       return null;
@@ -338,6 +340,89 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
   ];
 }
 
+/**
+ * Map music_setting capability to user-friendly states.
+ * Parses STRUCT fields into: mode dropdown, sensitivity slider, auto-color toggle.
+ *
+ * @param cap Cloud music_setting capability
+ */
+function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
+  const fields = cap.parameters.fields;
+  if (!fields || fields.length === 0) {
+    // Fallback: expose as JSON if no fields defined
+    return [
+      {
+        id: "music_mode",
+        name: "Music Mode",
+        type: "string",
+        role: "json",
+        write: true,
+        def: "",
+        capabilityType: cap.type,
+        capabilityInstance: cap.instance,
+      },
+    ];
+  }
+
+  const states: StateDefinition[] = [];
+
+  const modeField = fields.find((f) => f.fieldName === "musicMode");
+  if (modeField?.options) {
+    const modeStates: Record<string, string> = { 0: "---" };
+    for (const opt of modeField.options) {
+      modeStates[
+        typeof opt.value === "object"
+          ? JSON.stringify(opt.value)
+          : String(opt.value as string | number | boolean)
+      ] = opt.name;
+    }
+    states.push({
+      id: "music_mode",
+      name: "Music Mode",
+      type: "string",
+      role: "text",
+      write: true,
+      states: modeStates,
+      def: "0",
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance,
+    });
+  }
+
+  const sensField = fields.find((f) => f.fieldName === "sensitivity");
+  if (sensField?.range) {
+    states.push({
+      id: "music_sensitivity",
+      name: "Music Sensitivity",
+      type: "number",
+      role: "level",
+      write: true,
+      min: sensField.range.min,
+      max: sensField.range.max,
+      unit: "%",
+      def: sensField.range.max,
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance,
+    });
+  }
+
+  const autoColorField = fields.find((f) => f.fieldName === "autoColor");
+  if (autoColorField) {
+    states.push({
+      id: "music_auto_color",
+      name: "Music Auto Color",
+      type: "boolean",
+      role: "switch",
+      write: true,
+      def: true,
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance,
+    });
+  }
+
+  return states;
+}
+
 /** Known Govee API unit strings → ioBroker units */
 const UNIT_MAP: Record<string, string> = {
   "unit.percent": "%",
@@ -444,7 +529,6 @@ export function mapCloudStateValue(
       return null;
 
     case "dynamic_scene":
-    case "music_setting":
     case "work_mode":
     case "temperature_setting":
       return {
@@ -454,6 +538,18 @@ export function mapCloudStateValue(
             ? JSON.stringify(raw)
             : String(raw as string | number | boolean | bigint),
       };
+
+    case "music_setting":
+      // Extract mode value from STRUCT state
+      if (typeof raw === "object" && raw !== null) {
+        const struct = raw as Record<string, unknown>;
+        const mode = struct.musicMode;
+        return {
+          stateId: "music_mode",
+          value: typeof mode === "number" ? String(mode) : "0",
+        };
+      }
+      return null;
 
     case "property":
       return { stateId: sanitizeId(cap.instance), value: raw as number };

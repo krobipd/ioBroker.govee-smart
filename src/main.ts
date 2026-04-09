@@ -308,6 +308,13 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     try {
+      // Music mode: combine all music states into one STRUCT command
+      if (command === "music") {
+        await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
+        await this.setStateAsync(id, { val: state.val, ack: true });
+        return;
+      }
+
       await this.deviceManager.sendCommand(device, command, state.val);
       // Optimistic ack
       await this.setStateAsync(id, { val: state.val, ack: true });
@@ -326,6 +333,65 @@ class GoveeAdapter extends utils.Adapter {
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * Build and send a music_setting STRUCT command.
+   * Reads sibling music state values and combines them into one API call.
+   *
+   * @param device Target device
+   * @param prefix Device state prefix
+   * @param changedSuffix Which music state was changed
+   * @param newValue New value for the changed state
+   */
+  private async sendMusicCommand(
+    device: GoveeDevice,
+    prefix: string,
+    changedSuffix: string,
+    newValue: ioBroker.StateValue,
+  ): Promise<void> {
+    const base = `${this.namespace}.${prefix}.control`;
+
+    // Read current sibling values
+    const modeState = await this.getStateAsync(`${base}.music_mode`);
+    const sensState = await this.getStateAsync(`${base}.music_sensitivity`);
+    const autoState = await this.getStateAsync(`${base}.music_auto_color`);
+
+    // Apply the changed value, use siblings for the rest
+    const musicMode =
+      changedSuffix === "control.music_mode"
+        ? parseInt(String(newValue), 10)
+        : parseInt(String(modeState?.val ?? 0), 10);
+    const sensitivity =
+      changedSuffix === "control.music_sensitivity"
+        ? (newValue as number)
+        : ((sensState?.val as number) ?? 100);
+    const autoColor =
+      changedSuffix === "control.music_auto_color"
+        ? newValue
+          ? 1
+          : 0
+        : autoState?.val
+          ? 1
+          : 0;
+
+    if (!musicMode || musicMode === 0) {
+      this.log.debug("Music mode not selected, skipping command");
+      return;
+    }
+
+    const structValue: Record<string, unknown> = {
+      musicMode,
+      sensitivity,
+      autoColor,
+    };
+
+    await this.deviceManager!.sendCapabilityCommand(
+      device,
+      "devices.capabilities.music_setting",
+      "musicMode",
+      structValue,
+    );
   }
 
   /**
@@ -598,6 +664,14 @@ class GoveeAdapter extends utils.Adapter {
     }
     if (suffix === "control.snapshot") {
       return "snapshot";
+    }
+    // Music mode states — routed via buildMusicCommand
+    if (
+      suffix === "control.music_mode" ||
+      suffix === "control.music_sensitivity" ||
+      suffix === "control.music_auto_color"
+    ) {
+      return "music";
     }
     // Segment commands — encode segment index in command name
     const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);

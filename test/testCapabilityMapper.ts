@@ -215,7 +215,7 @@ describe("CapabilityMapper", () => {
             expect(result[0].write).to.be.true;
         });
 
-        it("should map music_setting to JSON state", () => {
+        it("should map music_setting without fields to JSON fallback", () => {
             const caps: CloudCapability[] = [
                 {
                     type: "devices.capabilities.music_setting",
@@ -226,6 +226,60 @@ describe("CapabilityMapper", () => {
             const result = mapCapabilities(caps);
             expect(result).to.have.lengthOf(1);
             expect(result[0].id).to.equal("music_mode");
+            expect(result[0].role).to.equal("json");
+        });
+
+        it("should map music_setting with fields to dropdown + slider + toggle", () => {
+            const caps: CloudCapability[] = [
+                {
+                    type: "devices.capabilities.music_setting",
+                    instance: "musicMode",
+                    parameters: {
+                        dataType: "STRUCT",
+                        fields: [
+                            {
+                                fieldName: "musicMode",
+                                dataType: "ENUM",
+                                options: [
+                                    { name: "Energic", value: 5 },
+                                    { name: "Rhythm", value: 3 },
+                                    { name: "Spectrum", value: 6 },
+                                ],
+                            },
+                            {
+                                fieldName: "sensitivity",
+                                dataType: "INTEGER",
+                                range: { min: 0, max: 100, precision: 1 },
+                            },
+                            {
+                                fieldName: "autoColor",
+                                dataType: "ENUM",
+                                options: [
+                                    { name: "on", value: 1 },
+                                    { name: "off", value: 0 },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            ];
+            const result = mapCapabilities(caps);
+            expect(result).to.have.lengthOf(3);
+
+            // Mode dropdown
+            expect(result[0].id).to.equal("music_mode");
+            expect(result[0].role).to.equal("text");
+            expect(result[0].states).to.deep.include({ 5: "Energic", 3: "Rhythm", 6: "Spectrum" });
+
+            // Sensitivity slider
+            expect(result[1].id).to.equal("music_sensitivity");
+            expect(result[1].type).to.equal("number");
+            expect(result[1].min).to.equal(0);
+            expect(result[1].max).to.equal(100);
+
+            // Auto color toggle
+            expect(result[2].id).to.equal("music_auto_color");
+            expect(result[2].type).to.equal("boolean");
         });
 
         it("should map work_mode to JSON state", () => {
