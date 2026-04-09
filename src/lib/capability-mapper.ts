@@ -349,25 +349,15 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
 function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
   const fields = cap.parameters.fields;
   if (!fields || fields.length === 0) {
-    // Fallback: expose as JSON if no fields defined
-    return [
-      {
-        id: "music_mode",
-        name: "Music Mode",
-        type: "string",
-        role: "json",
-        write: true,
-        def: "",
-        capabilityType: cap.type,
-        capabilityInstance: cap.instance,
-      },
-    ];
+    // No field details from API — can't create usable states
+    return [];
   }
 
   const states: StateDefinition[] = [];
 
+  // Mode dropdown — only if API provides actual mode options
   const modeField = fields.find((f) => f.fieldName === "musicMode");
-  if (modeField?.options) {
+  if (modeField?.options && modeField.options.length > 0) {
     const modeStates: Record<string, string> = { 0: "---" };
     for (const opt of modeField.options) {
       modeStates[
@@ -389,6 +379,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     });
   }
 
+  // Sensitivity slider
   const sensField = fields.find((f) => f.fieldName === "sensitivity");
   if (sensField?.range) {
     states.push({
@@ -406,6 +397,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     });
   }
 
+  // Auto color toggle
   const autoColorField = fields.find((f) => f.fieldName === "autoColor");
   if (autoColorField) {
     states.push({

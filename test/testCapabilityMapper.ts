@@ -215,7 +215,7 @@ describe("CapabilityMapper", () => {
             expect(result[0].write).to.be.true;
         });
 
-        it("should map music_setting without fields to JSON fallback", () => {
+        it("should skip music_setting without fields", () => {
             const caps: CloudCapability[] = [
                 {
                     type: "devices.capabilities.music_setting",
@@ -224,9 +224,7 @@ describe("CapabilityMapper", () => {
                 },
             ];
             const result = mapCapabilities(caps);
-            expect(result).to.have.lengthOf(1);
-            expect(result[0].id).to.equal("music_mode");
-            expect(result[0].role).to.equal("json");
+            expect(result).to.have.lengthOf(0);
         });
 
         it("should map music_setting with fields to dropdown + slider + toggle", () => {
