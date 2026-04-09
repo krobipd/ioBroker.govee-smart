@@ -191,7 +191,7 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
-### **WORK IN PROGRESS**
+### 0.9.0 (2026-04-09)
 - Add dedicated DIY-scenes endpoint for user-created scenes
 - Add music mode controls: dropdown, sensitivity slider, auto-color toggle
 - Add scene library per SKU from undocumented API (78-159 scenes per device)
@@ -210,10 +210,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ### 0.8.0 (2026-04-06)
 - Network interface selection for LAN discovery (multi-NIC/VLAN support)
-
-### 0.7.0 (2026-04-06)
-- Add IP address to device info (`info.ip`), auto-updated on LAN discovery
-- Batch segment control documentation (format, examples, notes)
 
 ## Support
 

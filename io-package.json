@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.8.3",
+    "version": "0.9.0",
     "news": {
+      "0.9.0": {
+        "en": "Add dedicated DIY-scenes endpoint for user-created scenes\nAdd music mode controls: dropdown, sensitivity slider, auto-color toggle\nAdd scene library per SKU from undocumented API (78-159 scenes per device)\nFix ready message now waits for MQTT before logging channel summary\nFix scene library: correct endpoint path, remove unnecessary auth, preserve query parameters",
+        "de": "Fügen Sie dedizierte DIY-Scenes Endpoint für benutzerdefinierte Szenen hinzu\nMusikmodussteuerungen hinzufügen: Dropdown, Sensitivität Slider, Auto-Farb-Toggle\nSzenenbibliothek pro SKU von unocumented API (78-159 Szenen pro Gerät)\nFix bereite Nachricht wartet jetzt auf MQTT vor Protokollierung Kanal Zusammenfassung\nSzenenbibliothek reparieren: korrekter Endpunktpfad, unnötige Auth entfernen, Abfrageparameter speichern",
+        "ru": "Добавьте выделенную конечную точку DIY-сцен для пользовательских сцен\nДобавьте элементы управления музыкальным режимом: выпадающий, слайдер чувствительности, автоматическое переключение цветов\nДобавить библиотеку сцен на SKU из незарегистрированного API (78-159 сцен на устройство)\nГотовое сообщение Fix теперь ждет MQTT перед входом в систему\nИсправьте библиотеку сцен: исправьте путь конечной точки, удалите ненужный аут, сохраните параметры запроса",
+        "pt": "Adicionar o endpoint dedicado das cenas DIY para as cenas criadas pelo usuário\nAdiciona controles de modo de música: dropdown, controle deslizante de sensibilidade, botão de cor automática\nAdicionar biblioteca de cenas por SKU de API não documentada (78-159 cenas por dispositivo)\nCorrigir a mensagem pronta agora espera pelo MQTT antes de registrar o resumo do canal\nCorrigir a biblioteca de cenas: caminho correto do endpoint, remover a autenticação desnecessária, preservar os parâmetros da consulta",
+        "nl": "Voeg speciale DIY-scenes eindpunt voor door de gebruiker gemaakte scènes\nMuziekmodusbedieningen toevoegen: dropdown, gevoeligheidsschuifregelaar, automatisch kleuren schakelen\nVoeg scene library per SKU toe van ongedocumenteerde API (78-159 scènes per apparaat)\nRepareer nu klaar bericht wacht op MQTT voordat het loggen kanaal samenvatting\nFix scene library: correct eindpunt pad, verwijder onnodige auth, behoud query parameters",
+        "fr": "Ajouter un paramètre dédié aux scènes de bricolage pour les scènes créées par l'utilisateur\nAjouter les commandes de mode musique: déroulant, slider de sensibilité, auto-color toggle\nAjouter une scene library par SKU de l'API sans papiers (78-159 scènes par appareil)\nCorrection du message prêt attend maintenant MQTT avant l'enregistrement du résumé du canal\nCorrection scene library: corriger le chemin du paramètre, supprimer auth inutile, préserver les paramètres de la requête",
+        "it": "Aggiungi endpoint dedicato DIY-scenes per scene create dall'utente\nAggiungi controlli della modalità musicale: dropdown, cursore della sensibilità, auto-color toggle\nAggiungi libreria di scena per SKU da API non documentata (78-159 scene per dispositivo)\nFissare il messaggio pronto ora aspetta MQTT prima di registrare il riepilogo del canale\nFissare la libreria della scena: corretto percorso endpoint, rimuovere auth non necessario, preservare i parametri di query",
+        "es": "Añadir DIY dedicado punto final para escenas creadas por el usuario\nAgregar los controles del modo de música: desplegable, deslizador de sensibilidad, cambio automático de color\nAñadir biblioteca de escena por SKU de API indocumentada (78-159 escenas por dispositivo)\nCorregir mensaje listo ahora espera para MQTT antes de iniciar sesión canal resumen\nFijar la biblioteca de escena: camino de punta correcta, eliminar la austeridad innecesaria, conservar los parámetros de consulta",
+        "pl": "Dodaj dedykowany punkt końcowy dla scen stworzonych przez użytkownika\nDodaj sterowniki trybu muzycznego: zrzut, suwak wrażliwości, przełączanie autokolorów\nDodaj bibliotekę sceny na SKU z nieudokumentowanego API (78- 159 scen na urządzenie)\nNapraw gotowy komunikat teraz czeka na MQTT przed logowaniem podsumowania kanału\nNapraw bibliotekę sceny: poprawna ścieżka punktowa, usuń niepotrzebne auth, zachowaj parametry zapytania",
+        "uk": "Додайте виділену кінцеву точку DIY-scens для створення користувацьких сцен\nДодати керування музичним режимом: випадання, чутливість слайдера, авто-колірний перемикач\nРусский EnglishРусскийУкраїнськаPolskiItalianoEspañol汉语Bahasa Indonesiaहिन्दीPortuguês日本語DeutschFrançaisภาษาไทยελληνικά اللغة العربية\nВиправлення готового повідомлення тепер чекає на MQTT перед залоговим каналом\nРусский EnglishРусскийУкраїнськаPolskiItalianoEspañol汉语Bahasa Indonesiaहिन्दीPortuguês日本語DeutschFrançaisภาษาไทยελληνικά اللغة العربية",
+        "zh-cn": "为用户创建的场景添加专用的 DIY 场景端点\n添加音乐模式控件: 下拉、 灵敏度滑动、 自动色彩切换\n从无记录的 API (每个设备78-159个场景) 添加场景库\n在登录频道摘要之前, 修复已准备好的消息等待 MQTT\n修复场景库:正确的端点路径,删除不必要的认证,保存查询参数"
+      },
       "0.8.3": {
         "en": "Fix release-script blocking on manual-review plugin",
         "de": "Fix Release-script Sperrung auf manuelle Vorschau-Plugin",
@@ -80,19 +93,6 @@
         "pl": "Naprawa mylącego błędu MQTT: rozróżnienie problemów z danymi logowania, limitem i kontem Govee",
         "uk": "Виправлення помилки MQTT: розрізнення проблем з обліковими даними, обмеженням і акаунтом Govee",
         "zh-cn": "修复误导性MQTT错误：区分Govee登录中的凭证、速率限制和账户问题"
-      },
-      "0.6.3": {
-        "en": "MQTT auth backoff, error dedup, Cloud/MQTT recovery logging, improved error classification",
-        "de": "MQTT Auth-Backoff, Error-Dedup, Cloud/MQTT Recovery-Logging, verbesserte Fehlerklassifizierung",
-        "ru": "MQTT откат авторизации, дедупликация ошибок, логирование восстановления Cloud/MQTT, улучшенная классификация",
-        "pt": "MQTT auth backoff, dedup de erros, logging de recuperação Cloud/MQTT, classificação melhorada",
-        "nl": "MQTT auth-backoff, fout-dedup, Cloud/MQTT herstel-logging, verbeterde foutclassificatie",
-        "fr": "MQTT auth backoff, dédup erreurs, logging restauration Cloud/MQTT, classification améliorée",
-        "it": "MQTT auth backoff, dedup errori, logging recupero Cloud/MQTT, classificazione errori migliorata",
-        "es": "MQTT auth backoff, dedup de errores, logging de recuperación Cloud/MQTT, clasificación mejorada",
-        "pl": "MQTT auth backoff, dedup błędów, logowanie odzyskiwania Cloud/MQTT, ulepszona klasyfikacja",
-        "uk": "MQTT auth backoff, дедуплікація помилок, логування відновлення Cloud/MQTT, покращена класифікація",
-        "zh-cn": "MQTT认证回退，错误去重，Cloud/MQTT恢复日志，改进的错误分类"
       }
     },
     "titleLang": {
