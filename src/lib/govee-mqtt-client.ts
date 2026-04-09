@@ -60,7 +60,7 @@ export class GoveeMqttClient {
   private readonly timers: TimerAdapter;
   private client: mqtt.MqttClient | null = null;
   private accountTopic = "";
-  private bearerToken = "";
+  private _bearerToken = "";
   private accountId = "";
   private reconnectTimer: ioBroker.Timeout | undefined = undefined;
   private reconnectAttempts = 0;
@@ -87,6 +87,11 @@ export class GoveeMqttClient {
     this.password = password;
     this.log = log;
     this.timers = timers;
+  }
+
+  /** Bearer token from login — available after connect, used for undocumented API */
+  get token(): string {
+    return this._bearerToken;
   }
 
   /**
@@ -126,7 +131,7 @@ export class GoveeMqttClient {
         // Account issues, maintenance, etc. — not a credential problem
         throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
       }
-      this.bearerToken = loginResp.client.token;
+      this._bearerToken = loginResp.client.token;
       this.accountId = String(loginResp.client.accountId);
       this.accountTopic = loginResp.client.topic;
 
@@ -435,12 +440,64 @@ export class GoveeMqttClient {
   /** Get IoT key (P12 certificate) */
   private getIotKey(): Promise<GoveeIotKeyResponse> {
     return this.httpsGet<GoveeIotKeyResponse>(IOT_KEY_URL, {
-      Authorization: `Bearer ${this.bearerToken}`,
+      Authorization: `Bearer ${this._bearerToken}`,
       appVersion: APP_VERSION,
       clientId: CLIENT_ID,
       clientType: CLIENT_TYPE,
       "User-Agent": USER_AGENT,
     });
+  }
+
+  /**
+   * Fetch scene library for a specific SKU from undocumented API.
+   * Requires active bearer token (connect must have succeeded).
+   *
+   * @param sku Product model (e.g. "H61BE")
+   */
+  async fetchSceneLibrary(
+    sku: string,
+  ): Promise<{ name: string; sceneCode?: string; value?: unknown }[]> {
+    if (!this._bearerToken) {
+      return [];
+    }
+
+    const url = `https://app2.govee.com/bff-app/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    const resp = await this.httpsGet<{
+      data?: {
+        categories?: Array<{
+          scenes?: Array<{
+            sceneName?: string;
+            sceneCode?: string;
+            sceneParamId?: number;
+            sceneId?: number;
+          }>;
+        }>;
+      };
+    }>(url, {
+      Authorization: `Bearer ${this._bearerToken}`,
+      appVersion: APP_VERSION,
+      clientId: CLIENT_ID,
+      clientType: CLIENT_TYPE,
+      "User-Agent": USER_AGENT,
+    });
+
+    const scenes: { name: string; sceneCode?: string; value?: unknown }[] = [];
+    for (const cat of resp.data?.categories ?? []) {
+      for (const s of cat.scenes ?? []) {
+        if (s.sceneName) {
+          scenes.push({
+            name: s.sceneName,
+            sceneCode: s.sceneCode,
+            value:
+              s.sceneId !== undefined
+                ? { id: s.sceneId, paramId: s.sceneParamId }
+                : undefined,
+          });
+        }
+      }
+    }
+
+    return scenes;
   }
 
   /**

@@ -46,6 +46,7 @@ function createTestDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
             { name: "Snap1", value: 3782580 },
             { name: "Snap2", value: 3782581 },
         ],
+        sceneLibrary: [],
         segmentCount: 15,
         state: { online: true },
         channels: { lan: true, mqtt: true, cloud: true },

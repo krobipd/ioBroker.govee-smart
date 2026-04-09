@@ -272,6 +272,12 @@ export interface GoveeDevice {
   diyScenes: CloudScene[];
   /** Available snapshots (from Cloud scenes endpoint) */
   snapshots: CloudScene[];
+  /** Scene library entries with scene codes (from undocumented API) */
+  sceneLibrary: Array<{
+    name: string;
+    sceneCode?: string;
+    value?: unknown;
+  }>;
   /** Last known state */
   state: DeviceState;
   /** Which channels are available */

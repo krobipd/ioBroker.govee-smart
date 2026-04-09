@@ -222,6 +222,29 @@ export class DeviceManager {
               }
             }
 
+            // Scene library from undocumented API (needs MQTT token)
+            if (device.sceneLibrary.length === 0 && this.mqttClient?.token) {
+              const loadLibrary = async (): Promise<void> => {
+                try {
+                  const lib = await this.mqttClient!.fetchSceneLibrary(cd.sku);
+                  if (lib.length > 0) {
+                    device.sceneLibrary = lib;
+                    changed = true;
+                    this.log.debug(
+                      `Scene library for ${cd.sku}: ${lib.length} scenes`,
+                    );
+                  }
+                } catch {
+                  this.log.debug(`Could not load scene library for ${cd.sku}`);
+                }
+              };
+              if (this.rateLimiter) {
+                await this.rateLimiter.tryExecute(loadLibrary, 3);
+              } else {
+                await loadLibrary();
+              }
+            }
+
             if (
               device.scenes.length > 0 ||
               device.diyScenes.length > 0 ||
@@ -290,6 +313,7 @@ export class DeviceManager {
         scenes: [],
         diyScenes: [],
         snapshots: [],
+        sceneLibrary: [],
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false },
       };
@@ -924,6 +948,7 @@ export class DeviceManager {
       scenes: [],
       diyScenes: [],
       snapshots: [],
+      sceneLibrary: [],
       state: { online: true },
       channels: { lan: false, mqtt: false, cloud: true },
     };
