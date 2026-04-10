@@ -206,6 +206,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 0.9.5 (2026-04-11)
+- Fix device names not updating from cache when LAN discovery runs first
+
 ### 0.9.4 (2026-04-11)
 - Improve startup and ready logging: clear channel summary, per-device details with LAN IPs and scene counts
 - Remove excessive debug noise: default value checks, periodic LAN scan messages
@@ -237,9 +240,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ### 0.8.3 (2026-04-09)
 - Fix release-script blocking on manual-review plugin
-
-### 0.8.2 (2026-04-08)
-- Remove build/ from git tracking, fix .gitignore, remove redundant CHANGELOG.md
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

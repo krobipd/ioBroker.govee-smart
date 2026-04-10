@@ -129,7 +129,22 @@ export class DeviceManager {
     let changed = false;
     for (const entry of cached) {
       const key = this.deviceKey(entry.sku, entry.deviceId);
-      if (!this.devices.has(key)) {
+      const existing = this.devices.get(key);
+      if (existing) {
+        // Merge cached data into LAN-discovered device
+        existing.name = entry.name || existing.name;
+        existing.type = entry.type || existing.type;
+        existing.capabilities = entry.capabilities;
+        existing.scenes = entry.scenes;
+        existing.diyScenes = entry.diyScenes;
+        existing.snapshots = entry.snapshots;
+        existing.sceneLibrary = entry.sceneLibrary;
+        existing.musicLibrary = entry.musicLibrary;
+        existing.diyLibrary = entry.diyLibrary;
+        existing.skuFeatures = entry.skuFeatures;
+        existing.channels.cloud = entry.capabilities.length > 0;
+        changed = true;
+      } else {
         this.devices.set(key, this.cachedToGoveeDevice(entry));
         changed = true;
       }

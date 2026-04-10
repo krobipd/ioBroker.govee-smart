@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.9.4",
+    "version": "0.9.5",
     "news": {
+      "0.9.5": {
+        "en": "Fix device names not updating from cache when LAN discovery runs first",
+        "de": "Fix Gerätenamen werden nicht aus Cache aktualisiert wenn LAN-Discovery zuerst läuft",
+        "ru": "Исправлено: имена устройств не обновляются из кэша при первом запуске LAN",
+        "pt": "Corrigido: nomes dos dispositivos não atualizados do cache quando LAN roda primeiro",
+        "nl": "Fix apparaatnamen worden niet bijgewerkt uit cache wanneer LAN-discovery eerst draait",
+        "fr": "Correction: noms des appareils non mis à jour depuis le cache quand LAN démarre en premier",
+        "it": "Fix nomi dispositivi non aggiornati dalla cache quando LAN discovery parte prima",
+        "es": "Fix nombres de dispositivos no actualizados desde caché cuando LAN se ejecuta primero",
+        "pl": "Naprawiono: nazwy urządzeń nie aktualizowane z cache gdy LAN discovery startuje pierwszy",
+        "uk": "Виправлено: імена пристроїв не оновлюються з кешу коли LAN discovery запускається першим",
+        "zh-cn": "修复LAN发现先运行时设备名称未从缓存更新"
+      },
       "0.9.4": {
         "en": "Improve startup and ready logging with channel summary and per-device details\nRemove excessive debug noise (default checks, scan messages)\nPromote MQTT first-connect to info level",
         "de": "Startup- und Ready-Logging verbessert mit Kanal-Übersicht und Gerätedetails\nÜbermäßiges Debug-Logging entfernt (Default-Checks, Scan-Meldungen)\nMQTT-Erstverbindung auf Info-Level hochgestuft",
@@ -80,19 +93,6 @@
         "pl": "Usunięto build/ ze śledzenia git, poprawiono .gitignore, usunięto zbędny CHANGELOG.md",
         "uk": "Видалено build/ з відстеження git, виправлено .gitignore, видалено зайвий CHANGELOG.md",
         "zh-cn": "从git跟踪中删除build/，修复.gitignore，删除多余的CHANGELOG.md"
-      },
-      "0.8.1": {
-        "en": "Fix ready message showing disconnected channels, fix network interface default selection",
-        "de": "Fix Ready-Meldung zeigt getrennte Kanäle, Fix Netzwerk-Interface Standardauswahl",
-        "ru": "Исправление сообщения о готовности с отключенными каналами, исправление выбора сетевого интерфейса",
-        "pt": "Correção da mensagem ready mostrando canais desconectados, correção da seleção padrão de interface",
-        "nl": "Fix ready-melding toont niet-verbonden kanalen, fix standaard netwerkinterface selectie",
-        "fr": "Correction message ready affichant canaux déconnectés, correction sélection interface réseau par défaut",
-        "it": "Correzione messaggio ready con canali disconnessi, correzione selezione predefinita interfaccia di rete",
-        "es": "Corrección mensaje ready mostrando canales desconectados, corrección selección predeterminada de interfaz",
-        "pl": "Naprawa wiadomości ready pokazującej rozłączone kanały, naprawa domyślnego wyboru interfejsu sieciowego",
-        "uk": "Виправлення повідомлення ready з відключеними каналами, виправлення вибору мережевого інтерфейсу",
-        "zh-cn": "修复就绪消息显示已断开通道，修复网络接口默认选择"
       }
     },
     "titleLang": {
