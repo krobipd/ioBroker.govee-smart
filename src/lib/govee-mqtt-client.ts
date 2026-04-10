@@ -128,9 +128,11 @@ export class GoveeMqttClient {
         ) {
           throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
         }
-        // Account blocked/abnormal — treat as auth failure to stop reconnect
+        // Account temporarily locked — NOT a credential error, keep reconnecting
         if (/abnormal|blocked|suspended|disabled/i.test(apiMsg)) {
-          throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
+          throw new Error(
+            `Account temporarily locked by Govee: ${apiMsg} ${statusStr}`,
+          );
         }
         // Other account issues, maintenance, etc.
         throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);

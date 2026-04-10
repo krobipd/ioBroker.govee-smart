@@ -43,6 +43,9 @@ class GoveeAdapter extends utils.Adapter {
   cloudWasConnected = false;
   readyLogged = false;
   cloudInitDone = false;
+  lanScanDone = false;
+  statesReady = false;
+  stateCreationQueue = [];
   /** @param options Adapter options */
   constructor(options = {}) {
     super({ ...options, name: "govee-smart" });
@@ -157,6 +160,10 @@ class GoveeAdapter extends utils.Adapter {
       3e4,
       config.networkInterface || ""
     );
+    this.setTimeout(() => {
+      this.lanScanDone = true;
+      this.checkAllReady();
+    }, 3e3);
     if (config.goveeEmail && config.goveePassword) {
       this.mqttClient = new import_govee_mqtt_client.GoveeMqttClient(
         config.goveeEmail,
@@ -217,6 +224,9 @@ class GoveeAdapter extends utils.Adapter {
       }
       this.cloudInitDone = true;
     }
+    await Promise.all(this.stateCreationQueue);
+    this.stateCreationQueue = [];
+    this.statesReady = true;
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
     this.setTimeout(() => {
@@ -541,11 +551,12 @@ class GoveeAdapter extends utils.Adapter {
         capabilityType: "local",
         capabilityInstance: "snapshotDelete"
       });
-      this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
+      const p = this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
         this.log.error(
           `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`
         );
       });
+      this.stateCreationQueue.push(p);
     }
     this.updateConnectionState();
   }
@@ -567,6 +578,12 @@ class GoveeAdapter extends utils.Adapter {
    */
   checkAllReady() {
     if (this.readyLogged) {
+      return;
+    }
+    if (!this.lanScanDone) {
+      return;
+    }
+    if (!this.statesReady) {
       return;
     }
     if (this.cloudClient && !this.cloudInitDone) {
@@ -612,29 +629,6 @@ class GoveeAdapter extends utils.Adapter {
     this.log.info(
       `Govee adapter ready \u2014 ${parts.join(", ")} (channels: ${channels.join("+")})`
     );
-    for (const dev of devices) {
-      const chParts = [];
-      if (dev.lanIp) {
-        chParts.push(`LAN ${dev.lanIp}`);
-      }
-      if (dev.channels.mqtt) {
-        chParts.push("MQTT");
-      }
-      if (dev.channels.cloud) {
-        chParts.push("Cloud");
-      }
-      const sceneParts = [];
-      if (dev.scenes.length > 0) {
-        sceneParts.push(`${dev.scenes.length} scenes`);
-      }
-      if (dev.diyScenes.length > 0) {
-        sceneParts.push(`${dev.diyScenes.length} DIY`);
-      }
-      const sceneInfo = sceneParts.length > 0 ? `, ${sceneParts.join(", ")}` : "";
-      this.log.info(
-        `  ${dev.name} (${dev.sku}) \u2014 ${chParts.join(", ")}${sceneInfo}`
-      );
-    }
   }
   /**
    * Load current state for all Cloud devices and populate state values.

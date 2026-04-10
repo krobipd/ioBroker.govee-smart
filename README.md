@@ -206,6 +206,13 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 0.9.6 (2026-04-11)
+- Fix scenes missing for most devices due to incomplete cache from rate-limited Cloud fetch
+- Fix MQTT "account abnormal" incorrectly treated as wrong credentials (keeps reconnecting instead of stopping)
+- Ready message now waits for LAN scan and state creation before logging
+- Remove per-device detail lines from ready summary (redundant with state tree)
+- Fill scenes from scene library when Cloud scenes are missing (ptReal fallback)
+
 ### 0.9.5 (2026-04-11)
 - Fix device names not updating from cache when LAN discovery runs first
 
@@ -237,9 +244,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Add scene library per SKU from undocumented API (78-159 scenes per device)
 - Fix ready message now waits for MQTT before logging channel summary
 - Fix scene library: correct endpoint path, remove unnecessary auth, preserve query parameters
-
-### 0.8.3 (2026-04-09)
-- Fix release-script blocking on manual-review plugin
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.9.5",
+    "version": "0.9.6",
     "news": {
+      "0.9.6": {
+        "en": "Fix scenes missing for most devices due to incomplete cache from rate-limited Cloud fetch\nFix MQTT 'account abnormal' incorrectly treated as wrong credentials\nReady message now waits for LAN scan and state creation before logging\nRemove per-device detail lines from ready summary (redundant with state tree)",
+        "de": "Fix fehlende Szenen bei den meisten Geräten durch unvollständigen Cache nach Rate-Limit\nFix MQTT 'Account abnormal' fälschlich als falsche Zugangsdaten behandelt\nReady-Meldung wartet jetzt auf LAN-Scan und State-Erstellung\nPer-Device Details aus Ready-Summary entfernt (redundant mit State-Tree)",
+        "ru": "Исправлены отсутствующие сцены из-за неполного кэша после ограничения частоты запросов\nИсправлено: MQTT 'аккаунт аномальный' ошибочно обрабатывался как неверные учётные данные\nСообщение готовности теперь ждёт LAN-сканирование и создание состояний\nУдалены детали устройств из сводки готовности",
+        "pt": "Corrigido cenas ausentes devido a cache incompleto por limite de taxa Cloud\nCorrigido MQTT 'conta anormal' tratado incorretamente como credenciais erradas\nMensagem de pronto agora espera scan LAN e criação de estados\nRemovidos detalhes por dispositivo do resumo de pronto",
+        "nl": "Fix ontbrekende scènes door onvolledige cache na rate-limited Cloud fetch\nFix MQTT 'account abnormaal' onterecht behandeld als verkeerde inloggegevens\nReady-bericht wacht nu op LAN-scan en state-creatie\nPer-apparaat details verwijderd uit ready-samenvatting",
+        "fr": "Correction scènes manquantes à cause d'un cache incomplet après limitation de débit Cloud\nCorrection MQTT 'compte anormal' traité comme identifiants incorrects\nMessage prêt attend maintenant le scan LAN et la création des états\nDétails par appareil supprimés du résumé de démarrage",
+        "it": "Fix scene mancanti per cache incompleta da fetch Cloud con rate limit\nFix MQTT 'account anomalo' trattato erroneamente come credenziali errate\nMessaggio pronto ora attende scansione LAN e creazione stati\nDettagli per dispositivo rimossi dal riepilogo di pronto",
+        "es": "Fix escenas faltantes por caché incompleto de fetch Cloud con límite de tasa\nFix MQTT 'cuenta anormal' tratado incorrectamente como credenciales erróneas\nMensaje de listo ahora espera escaneo LAN y creación de estados\nDetalles por dispositivo eliminados del resumen de listo",
+        "pl": "Naprawiono brakujące sceny z powodu niekompletnego cache po limicie zapytań Cloud\nNaprawiono MQTT 'konto nietypowe' błędnie traktowane jako złe dane logowania\nKomunikat gotowości czeka teraz na skan LAN i utworzenie stanów\nUsunięto szczegóły urządzeń z podsumowania gotowości",
+        "uk": "Виправлено відсутні сцени через неповний кеш після обмеження запитів Cloud\nВиправлено MQTT 'аккаунт аномальний' помилково оброблявся як невірні облікові дані\nПовідомлення готовності тепер чекає LAN-сканування та створення станів\nВидалено деталі пристроїв з підсумку готовності",
+        "zh-cn": "修复因Cloud请求限制导致缓存不完整而缺少场景的问题\n修复MQTT'账户异常'被错误地视为凭证错误\n就绪消息现在等待LAN扫描和状态创建完成\n从就绪摘要中移除逐设备详情"
+      },
       "0.9.5": {
         "en": "Fix device names not updating from cache when LAN discovery runs first",
         "de": "Fix Gerätenamen werden nicht aus Cache aktualisiert wenn LAN-Discovery zuerst läuft",
@@ -80,19 +93,6 @@
         "pl": "Fix release- script blocking na wtyczce manual- review",
         "uk": "Виправлення блокування записів на ручний плагін",
         "zh-cn": "在手动审查插件上修复发布标记屏蔽"
-      },
-      "0.8.2": {
-        "en": "Remove build/ from git tracking, fix .gitignore, remove redundant CHANGELOG.md",
-        "de": "build/ aus Git-Tracking entfernt, .gitignore korrigiert, redundante CHANGELOG.md entfernt",
-        "ru": "Удален build/ из отслеживания git, исправлен .gitignore, удален избыточный CHANGELOG.md",
-        "pt": "Removido build/ do rastreamento git, corrigido .gitignore, removido CHANGELOG.md redundante",
-        "nl": "build/ verwijderd uit git-tracking, .gitignore gecorrigeerd, overbodige CHANGELOG.md verwijderd",
-        "fr": "Suppression de build/ du suivi git, correction de .gitignore, suppression du CHANGELOG.md redondant",
-        "it": "Rimosso build/ dal tracciamento git, corretto .gitignore, rimosso CHANGELOG.md ridondante",
-        "es": "Eliminado build/ del seguimiento git, corregido .gitignore, eliminado CHANGELOG.md redundante",
-        "pl": "Usunięto build/ ze śledzenia git, poprawiono .gitignore, usunięto zbędny CHANGELOG.md",
-        "uk": "Видалено build/ з відстеження git, виправлено .gitignore, видалено зайвий CHANGELOG.md",
-        "zh-cn": "从git跟踪中删除build/，修复.gitignore，删除多余的CHANGELOG.md"
       }
     },
     "titleLang": {

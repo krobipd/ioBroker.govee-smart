@@ -152,6 +152,28 @@ export class DeviceManager {
 
     if (changed) {
       this.log.info(`Loaded ${cached.length} device(s) from cache`);
+    }
+
+    // Check if cache has incomplete scene data (e.g. from previous rate limit)
+    const incomplete = Array.from(this.devices.values()).some(
+      (d) =>
+        d.scenes.length === 0 &&
+        d.sceneLibrary.length > 0 &&
+        d.type === "devices.types.light",
+    );
+    if (incomplete) {
+      this.log.info(
+        "Cache has incomplete scene data — will re-fetch from Cloud",
+      );
+      return false;
+    }
+
+    // Fill scenes from sceneLibrary for devices where Cloud scenes are missing
+    for (const device of this.devices.values()) {
+      this.populateScenesFromLibrary(device);
+    }
+
+    if (changed) {
       this.onDeviceListChanged?.(this.getDevices());
     }
     return cached.length > 0;
@@ -370,14 +392,40 @@ export class DeviceManager {
         }
       }
 
-      // Save all devices to cache
+      // Save devices to cache — skip devices with incomplete scene data
       if (this.skuCache) {
+        let cachedCount = 0;
+        let skippedCount = 0;
         for (const device of this.devices.values()) {
-          this.skuCache.save(this.goveeDeviceToCached(device));
+          const isLight = device.type === "devices.types.light";
+          const scenesIncomplete =
+            isLight &&
+            device.scenes.length === 0 &&
+            device.capabilities.length > 0;
+          if (scenesIncomplete) {
+            skippedCount++;
+            this.log.debug(
+              `Not caching ${device.name} (${device.sku}) — scene data incomplete`,
+            );
+          } else {
+            this.skuCache.save(this.goveeDeviceToCached(device));
+            cachedCount++;
+          }
         }
-        this.log.info(
-          `Cached ${this.devices.size} device(s) — next start uses cache, no Cloud needed`,
-        );
+        if (skippedCount > 0) {
+          this.log.info(
+            `Cached ${cachedCount} device(s), skipped ${skippedCount} with incomplete data — will retry next start`,
+          );
+        } else {
+          this.log.info(
+            `Cached ${cachedCount} device(s) — next start uses cache, no Cloud needed`,
+          );
+        }
+      }
+
+      // Fill scenes from sceneLibrary as fallback for devices still missing scenes
+      for (const device of this.devices.values()) {
+        this.populateScenesFromLibrary(device);
       }
 
       if (changed) {
@@ -1245,6 +1293,22 @@ export class DeviceManager {
       this.log.warn(msg);
     } else {
       this.log.debug(`${msg} (repeated)`);
+    }
+  }
+
+  /**
+   * Fill device.scenes from sceneLibrary when Cloud scenes are missing.
+   * ptReal activation matches by name, so sceneLibrary names are sufficient.
+   */
+  private populateScenesFromLibrary(device: GoveeDevice): void {
+    if (device.scenes.length === 0 && device.sceneLibrary.length > 0) {
+      device.scenes = device.sceneLibrary.map((entry) => ({
+        name: entry.name,
+        value: {}, // ptReal uses sceneLibrary directly, Cloud payload not needed
+      }));
+      this.log.debug(
+        `${device.sku}: ${device.scenes.length} scenes from library (Cloud scenes missing)`,
+      );
     }
   }
 

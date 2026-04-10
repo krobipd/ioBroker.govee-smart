@@ -31,6 +31,9 @@ class GoveeAdapter extends utils.Adapter {
   private cloudWasConnected = false;
   private readyLogged = false;
   private cloudInitDone = false;
+  private lanScanDone = false;
+  private statesReady = false;
+  private stateCreationQueue: Promise<void>[] = [];
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -159,6 +162,12 @@ class GoveeAdapter extends utils.Adapter {
       config.networkInterface || "",
     );
 
+    // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)
+    this.setTimeout(() => {
+      this.lanScanDone = true;
+      this.checkAllReady();
+    }, 3_000);
+
     // --- MQTT (if account credentials provided) ---
     // Initialize MQTT before Cloud so scene library can load on first cycle
     if (config.goveeEmail && config.goveePassword) {
@@ -226,6 +235,11 @@ class GoveeAdapter extends utils.Adapter {
       }
       this.cloudInitDone = true;
     }
+
+    // Wait for all state creation from cache/cloud load to complete
+    await Promise.all(this.stateCreationQueue);
+    this.stateCreationQueue = [];
+    this.statesReady = true;
 
     // Subscribe to all writable device and group states
     await this.subscribeStatesAsync("devices.*");
@@ -640,11 +654,14 @@ class GoveeAdapter extends utils.Adapter {
         capabilityInstance: "snapshotDelete",
       });
 
-      this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
-        this.log.error(
-          `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`,
-        );
-      });
+      const p = this.stateManager
+        .createDeviceStates(device, stateDefs)
+        .catch((e) => {
+          this.log.error(
+            `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`,
+          );
+        });
+      this.stateCreationQueue.push(p);
     }
 
     this.updateConnectionState();
@@ -668,6 +685,14 @@ class GoveeAdapter extends utils.Adapter {
    */
   private checkAllReady(): void {
     if (this.readyLogged) {
+      return;
+    }
+    // Wait for first LAN scan (always active)
+    if (!this.lanScanDone) {
+      return;
+    }
+    // Wait for initial state creation to complete
+    if (!this.statesReady) {
       return;
     }
     // Wait for Cloud init if configured
@@ -719,32 +744,6 @@ class GoveeAdapter extends utils.Adapter {
     this.log.info(
       `Govee adapter ready — ${parts.join(", ")} (channels: ${channels.join("+")})`,
     );
-
-    // Per-device detail lines
-    for (const dev of devices) {
-      const chParts: string[] = [];
-      if (dev.lanIp) {
-        chParts.push(`LAN ${dev.lanIp}`);
-      }
-      if (dev.channels.mqtt) {
-        chParts.push("MQTT");
-      }
-      if (dev.channels.cloud) {
-        chParts.push("Cloud");
-      }
-      const sceneParts: string[] = [];
-      if (dev.scenes.length > 0) {
-        sceneParts.push(`${dev.scenes.length} scenes`);
-      }
-      if (dev.diyScenes.length > 0) {
-        sceneParts.push(`${dev.diyScenes.length} DIY`);
-      }
-      const sceneInfo =
-        sceneParts.length > 0 ? `, ${sceneParts.join(", ")}` : "";
-      this.log.info(
-        `  ${dev.name} (${dev.sku}) — ${chParts.join(", ")}${sceneInfo}`,
-      );
-    }
   }
 
   /**
