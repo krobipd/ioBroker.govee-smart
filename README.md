@@ -98,7 +98,9 @@ govee-smart.0.
 │       │   ├── model           — Product SKU (string)
 │       │   ├── serial          — Device ID (string)
 │       │   ├── online          — Device reachable (boolean)
-│       │   └── ip              — LAN IP address (string, auto-updated)
+│       │   ├── ip              — LAN IP address (string, auto-updated)
+│       │   ├── diagnostics_export — Export device diagnostics (button, writable)
+│       │   └── diagnostics_result — Diagnostics JSON output (string, read-only)
 │       ├── control/
 │       │   ├── power           — On/Off (boolean, writable)
 │       │   ├── brightness      — Brightness 0-100% (number, writable)
@@ -117,9 +119,7 @@ govee-smart.0.
 │       │   ├── snapshot          — Cloud snapshot (string, dropdown, writable)
 │       │   ├── snapshot_local    — Local snapshot (string, dropdown, writable)
 │       │   ├── snapshot_save     — Save current state as local snapshot (string, writable)
-│       │   ├── snapshot_delete   — Delete a local snapshot (string, writable)
-│       │   ├── diagnostics_export — Export device diagnostics (button, writable)
-│       │   └── diagnostics_result — Diagnostics JSON output (string, read-only)
+│       │   └── snapshot_delete   — Delete a local snapshot (string, writable)
 │       └── segments/
 │           ├── count           — Number of segments (number)
 │           ├── command         — Batch control "1-5:#ff0000:20" (string, writable)
@@ -183,6 +183,58 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ---
 
+## Diagnostics Export
+
+Each device has a **diagnostics export** button (`info.diagnostics_export`). Pressing it writes a structured JSON to `info.diagnostics_result` containing:
+
+- Device info (SKU, ID, name, channels, LAN IP)
+- All Cloud capabilities (raw API data)
+- Scenes, DIY scenes, snapshots (names and count)
+- Scene/music/DIY libraries (codes, speed support)
+- Applied quirks and SKU features
+- Current device state
+
+**Usage:** Press the button in ioBroker Objects or vis, copy the JSON from `info.diagnostics_result`, and paste it into a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues). This gives all the data needed to diagnose problems or add support for new devices.
+
+---
+
+## Community Quirks
+
+Some Govee devices report wrong data via the Cloud API (e.g., incorrect color temperature range). The adapter has built-in corrections for known devices, but you can add your own via a `community-quirks.json` file.
+
+### Setup
+
+Create the file in your **adapter data directory** (persistent across updates):
+
+```
+/opt/iobroker/iobroker-data/govee-smart.0/community-quirks.json
+```
+
+### Format
+
+```json
+{
+  "version": 1,
+  "quirks": {
+    "H6XXX": { "colorTempRange": { "min": 2200, "max": 6500 } },
+    "H6YYY": { "brokenPlatformApi": true },
+    "H6ZZZ": { "noMqtt": true }
+  }
+}
+```
+
+### Available quirk options
+
+| Option | Type | Effect |
+|--------|------|--------|
+| `colorTempRange` | `{ min, max }` | Override the color temperature range (Kelvin) |
+| `brokenPlatformApi` | `boolean` | Skip Cloud API for this SKU (broken metadata) |
+| `noMqtt` | `boolean` | Skip MQTT for this SKU (not supported despite being a light) |
+
+Community entries override built-in quirks for the same SKU. Use the **diagnostics export** to gather device data when contributing a new quirk.
+
+---
+
 ## Troubleshooting
 
 ### No devices discovered
@@ -212,6 +264,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ## Changelog
 ### 1.1.1 (2026-04-12)
+- **BREAKING:** Move diagnostics states from `snapshots/` to `info/` channel (where device information belongs)
+- Fix community quirks loading from persistent data directory instead of adapter directory (survives updates)
+- Document diagnostics export and community quirks in README
 - Remove redundant CI checkout, add `no-floating-promises` lint rule, remove unused devDependencies, fix duplicate news entry
 
 ### 1.1.0 (2026-04-11)

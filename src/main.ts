@@ -102,13 +102,13 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
 
-    // Load community quirks from adapter directory
-    const quirksPath = path.join(__dirname, "..", "community-quirks.json");
-    loadCommunityQuirks(quirksPath, this.log);
-
     this.stateManager = new StateManager(this);
     this.deviceManager = new DeviceManager(this.log);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
+
+    // Load community quirks from persistent data directory
+    const quirksPath = path.join(dataDir, "community-quirks.json");
+    loadCommunityQuirks(quirksPath, this.log);
     this.skuCache = new SkuCache(dataDir, this.log);
     this.localSnapshots = new LocalSnapshotStore(dataDir, this.log);
     this.deviceManager.setSkuCache(this.skuCache);
@@ -373,12 +373,12 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     // Diagnostics export button
-    if (stateSuffix === "snapshots.diagnostics_export" && state.val) {
+    if (stateSuffix === "info.diagnostics_export" && state.val) {
       const diag = this.deviceManager.generateDiagnostics(
         device,
         this.version ?? "unknown",
       );
-      const resultId = `${this.namespace}.${prefix}.snapshots.diagnostics_result`;
+      const resultId = `${this.namespace}.${prefix}.info.diagnostics_result`;
       await this.setStateAsync(resultId, {
         val: JSON.stringify(diag, null, 2),
         ack: true,

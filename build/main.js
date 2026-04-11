@@ -107,11 +107,11 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
-    const quirksPath = path.join(__dirname, "..", "community-quirks.json");
-    (0, import_device_quirks.loadCommunityQuirks)(quirksPath, this.log);
     this.stateManager = new import_state_manager.StateManager(this);
     this.deviceManager = new import_device_manager.DeviceManager(this.log);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
+    const quirksPath = path.join(dataDir, "community-quirks.json");
+    (0, import_device_quirks.loadCommunityQuirks)(quirksPath, this.log);
     this.skuCache = new import_sku_cache.SkuCache(dataDir, this.log);
     this.localSnapshots = new import_local_snapshots.LocalSnapshotStore(dataDir, this.log);
     this.deviceManager.setSkuCache(this.skuCache);
@@ -319,12 +319,12 @@ class GoveeAdapter extends utils.Adapter {
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
-    if (stateSuffix === "snapshots.diagnostics_export" && state.val) {
+    if (stateSuffix === "info.diagnostics_export" && state.val) {
       const diag = this.deviceManager.generateDiagnostics(
         device,
         (_a = this.version) != null ? _a : "unknown"
       );
-      const resultId = `${this.namespace}.${prefix}.snapshots.diagnostics_result`;
+      const resultId = `${this.namespace}.${prefix}.info.diagnostics_result`;
       await this.setStateAsync(resultId, {
         val: JSON.stringify(diag, null, 2),
         ack: true

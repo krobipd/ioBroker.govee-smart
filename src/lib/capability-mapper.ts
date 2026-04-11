@@ -757,7 +757,7 @@ export function buildDeviceStateDefs(
     channel: "snapshots",
   });
 
-  // Diagnostics
+  // Diagnostics — under info/ because it exports ALL device data, not just snapshots
   stateDefs.push({
     id: "diagnostics_export",
     name: "Export Diagnostics",
@@ -767,7 +767,7 @@ export function buildDeviceStateDefs(
     def: false,
     capabilityType: "local",
     capabilityInstance: "diagnosticsExport",
-    channel: "snapshots",
+    channel: "info",
   });
   stateDefs.push({
     id: "diagnostics_result",
@@ -778,7 +778,7 @@ export function buildDeviceStateDefs(
     def: "",
     capabilityType: "local",
     capabilityInstance: "diagnosticsResult",
-    channel: "snapshots",
+    channel: "info",
   });
 
   return stateDefs;

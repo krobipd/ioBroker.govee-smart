@@ -567,7 +567,7 @@ function buildDeviceStateDefs(device, localSnapshots) {
     def: false,
     capabilityType: "local",
     capabilityInstance: "diagnosticsExport",
-    channel: "snapshots"
+    channel: "info"
   });
   stateDefs.push({
     id: "diagnostics_result",
@@ -578,7 +578,7 @@ function buildDeviceStateDefs(device, localSnapshots) {
     def: "",
     capabilityType: "local",
     capabilityInstance: "diagnosticsResult",
-    channel: "snapshots"
+    channel: "info"
   });
   return stateDefs;
 }

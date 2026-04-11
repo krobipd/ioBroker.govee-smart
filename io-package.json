@@ -4,17 +4,17 @@
     "version": "1.1.1",
     "news": {
       "1.1.1": {
-        "en": "Remove redundant CI checkout, add no-floating-promises lint rule, remove unused devDependencies, fix duplicate news entry",
-        "de": "Redundantes CI-Checkout entfernt, no-floating-promises Lint-Regel hinzugefügt, ungenutzte DevDependencies entfernt, doppelten News-Eintrag behoben",
-        "ru": "Удалён лишний checkout в CI, добавлено правило no-floating-promises, удалены неиспользуемые devDependencies, исправлен дубль записи news",
-        "pt": "Removido checkout CI redundante, adicionada regra no-floating-promises, removidas devDependencies não usadas, corrigida entrada news duplicada",
-        "nl": "Redundante CI checkout verwijderd, no-floating-promises lintregel toegevoegd, ongebruikte devDependencies verwijderd, dubbele news entry hersteld",
-        "fr": "Suppression checkout CI redondant, ajout règle no-floating-promises, suppression devDependencies inutilisées, correction entrée news dupliquée",
-        "it": "Rimosso checkout CI ridondante, aggiunta regola no-floating-promises, rimosse devDependencies inutilizzate, corretta voce news duplicata",
-        "es": "Eliminado checkout CI redundante, añadida regla no-floating-promises, eliminadas devDependencies no usadas, corregida entrada news duplicada",
-        "pl": "Usunięto redundantny checkout CI, dodano regułę no-floating-promises, usunięto nieużywane devDependencies, naprawiono duplikat wpisu news",
-        "uk": "Видалено зайвий checkout CI, додано правило no-floating-promises, видалено невикористовувані devDependencies, виправлено дубль запису news",
-        "zh-cn": "移除多余的CI checkout，添加no-floating-promises规则，移除未使用的devDependencies，修复重复的news条目"
+        "en": "Move diagnostics states from snapshots/ to info/ channel (where device info belongs)\nFix community quirks loading from persistent data directory (survives adapter updates)\nDocument diagnostics export and community quirks in README\nRemove redundant CI checkout, add no-floating-promises lint rule, remove unused devDependencies",
+        "de": "Diagnostik-States von snapshots/ nach info/ verschoben (gehört zu Geräteinformationen)\nFix Community-Quirks laden aus persistentem Datenverzeichnis (überlebt Adapter-Updates)\nDiagnostik-Export und Community-Quirks im README dokumentiert\nRedundantes CI-Checkout entfernt, no-floating-promises Lint-Regel, ungenutzte DevDependencies entfernt",
+        "ru": "Перенос состояний диагностики из snapshots/ в info/ (информация об устройстве)\nИсправлена загрузка community quirks из постоянного каталога данных\nДокументирован экспорт диагностики и community quirks в README\nУдалён лишний checkout в CI, правило no-floating-promises, удалены devDependencies",
+        "pt": "Mover estados de diagnóstico de snapshots/ para info/ (informações do dispositivo)\nCorrigido carregamento de community quirks do diretório de dados persistente\nDocumentados exportação de diagnóstico e community quirks no README\nRemovido checkout CI redundante, regra no-floating-promises, devDependencies removidas",
+        "nl": "Diagnostiek-states verplaatst van snapshots/ naar info/ (apparaatinformatie)\nFix community quirks laden uit persistente datadirectory (overleeft updates)\nDiagnostiek-export en community quirks gedocumenteerd in README\nRedundante CI checkout verwijderd, no-floating-promises regel, devDependencies verwijderd",
+        "fr": "Déplacement des états diagnostic de snapshots/ vers info/ (informations appareil)\nCorrection chargement community quirks depuis répertoire persistant\nExport diagnostic et community quirks documentés dans README\nSuppression checkout CI redondant, règle no-floating-promises, devDependencies supprimées",
+        "it": "Spostati stati diagnostica da snapshots/ a info/ (informazioni dispositivo)\nFix caricamento community quirks dalla directory dati persistente\nDocumentati esportazione diagnostica e community quirks nel README\nRimosso checkout CI ridondante, regola no-floating-promises, devDependencies rimosse",
+        "es": "Mover estados de diagnóstico de snapshots/ a info/ (información del dispositivo)\nFix carga de community quirks desde directorio de datos persistente\nDocumentados exportación de diagnóstico y community quirks en README\nEliminado checkout CI redundante, regla no-floating-promises, devDependencies eliminadas",
+        "pl": "Przeniesiono stany diagnostyki z snapshots/ do info/ (informacje o urządzeniu)\nNaprawiono ładowanie community quirks z trwałego katalogu danych\nUdokumentowano eksport diagnostyki i community quirks w README\nUsunięto redundantny checkout CI, reguła no-floating-promises, usunięto devDependencies",
+        "uk": "Перенесено стани діагностики з snapshots/ до info/ (інформація пристрою)\nВиправлено завантаження community quirks з постійного каталогу даних\nЗадокументовано експорт діагностики та community quirks у README\nВидалено зайвий checkout CI, правило no-floating-promises, видалено devDependencies",
+        "zh-cn": "将诊断状态从snapshots/移至info/（设备信息所属位置）\n修复community quirks从持久数据目录加载（更新后保留）\n在README中记录诊断导出和community quirks\n移除多余的CI checkout，添加no-floating-promises规则，移除未使用的devDependencies"
       },
       "1.1.0": {
         "en": "Add diagnostics export per device for structured GitHub issue submission\nAdd community quirks database (external JSON for user-contributed SKU overrides)\nFix array bounds checks in scene/DIY/snapshot index lookups\nFix segment batch parsing edge cases\nMajor internal refactoring: 8 focused refactorings for improved maintainability\nTest coverage increased to 309 tests",

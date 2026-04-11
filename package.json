@@ -48,7 +48,6 @@
   "files": [
     "admin",
     "build",
-    "community-quirks.json",
     "io-package.json",
     "LICENSE",
     "README.md"

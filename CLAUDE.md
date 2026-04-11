@@ -74,6 +74,8 @@ govee-smart.0.
 ├── devices.
 │   └── h61be_1d6f.                  (SKU + letzte 4 Hex der Device-ID)
 │       ├── info.name / .model / .serial / .online / .ip
+│       ├── info.diagnostics_export   (Button: Diagnostik-JSON exportieren)
+│       ├── info.diagnostics_result   (String: Diagnostik-JSON Ausgabe, read-only)
 │       ├── control.power / .brightness / .colorRgb / .colorTemperature
 │       ├── control.gradient_toggle   (Boolean: Gradient ein/aus)
 │       ├── scenes.light_scene        (Dropdown: 78-237 Szenen, lokal via ptReal)
@@ -84,8 +86,6 @@ govee-smart.0.
 │       ├── snapshots.snapshot_local     (Dropdown: Lokale Snapshots)
 │       ├── snapshots.snapshot_save      (Text: Neuen lokalen Snapshot speichern)
 │       ├── snapshots.snapshot_delete    (Text: Lokalen Snapshot löschen)
-│       ├── snapshots.diagnostics_export (Button: Diagnostik-JSON exportieren)
-│       ├── snapshots.diagnostics_result (String: Diagnostik-JSON Ausgabe, read-only)
 │       └── segments.count / .command / .0.color / .0.brightness (dynamisch)
 └── groups.
     └── basegroup_1280.              (nur info.name + info.online, kein model/serial/ip)
@@ -189,8 +189,8 @@ Single Page, drei Sektionen:
 32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `def.channel` in StateDefinition, Pfad-Auflösung via `resolveStatePath()`
 33. **Groups minimal** — BaseGroup hat nur `info.name` + `info.online`, kein model/serial/ip
 34. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Segment-Channels werden gelöscht
-35. **Diagnostics Export** — `diagnostics_export` Button pro Gerät erzeugt strukturiertes JSON (Capabilities, Szenen, Libraries, Quirks, State) für GitHub Issues
-36. **Community Quirks** — `community-quirks.json` (extern) erlaubt User-beigetragene SKU-Korrekturen ohne Adapter-Update
+35. **Diagnostics Export** — `info.diagnostics_export` Button pro Gerät erzeugt strukturiertes JSON (Capabilities, Szenen, Libraries, Quirks, State) für GitHub Issues
+36. **Community Quirks** — `community-quirks.json` im Data-Dir (`iobroker-data/govee-smart.0/`) erlaubt User-beigetragene SKU-Korrekturen, persistent über Updates
 37. **Separated Concerns (seit 1.1.0)** — CommandRouter (Routing), GoveeApiClient (undoc API), http-client (shared HTTP), capability-mapper (State-Definitionen) als eigenständige Module
 
 ## Logging-Philosophie (seit 0.9.4)

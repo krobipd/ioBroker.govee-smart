@@ -418,16 +418,16 @@ describe("StateManager", () => {
             expect(sm.resolveStatePath("devices.h6160_0011", "snapshot_local")).to.equal("devices.h6160_0011.snapshots.snapshot_local");
         });
 
-        it("should route diagnostics states to snapshots channel", async () => {
+        it("should route diagnostics states to info channel", async () => {
             const { adapter } = createMockAdapter();
             const sm = new StateManager(adapter as never);
             const dev = createTestDevice();
             await sm.createDeviceStates(dev, [
-                { id: "diagnostics_export", name: "Export", type: "boolean", role: "button", write: true, def: false, capabilityType: "local", capabilityInstance: "diagnosticsExport", channel: "snapshots" },
-                { id: "diagnostics_result", name: "Result", type: "string", role: "json", write: false, def: "", capabilityType: "local", capabilityInstance: "diagnosticsResult", channel: "snapshots" },
+                { id: "diagnostics_export", name: "Export", type: "boolean", role: "button", write: true, def: false, capabilityType: "local", capabilityInstance: "diagnosticsExport", channel: "info" },
+                { id: "diagnostics_result", name: "Result", type: "string", role: "json", write: false, def: "", capabilityType: "local", capabilityInstance: "diagnosticsResult", channel: "info" },
             ]);
-            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_export")).to.equal("devices.h6160_0011.snapshots.diagnostics_export");
-            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_result")).to.equal("devices.h6160_0011.snapshots.diagnostics_result");
+            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_export")).to.equal("devices.h6160_0011.info.diagnostics_export");
+            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_result")).to.equal("devices.h6160_0011.info.diagnostics_result");
         });
 
         it("should route unknown states to control channel", () => {
