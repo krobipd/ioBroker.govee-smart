@@ -34,6 +34,9 @@ class GoveeAdapter extends utils.Adapter {
   private lanScanDone = false;
   private statesReady = false;
   private stateCreationQueue: Promise<void>[] = [];
+  private lanScanTimer: ioBroker.Timeout | undefined;
+  private cleanupTimer: ioBroker.Timeout | undefined;
+  private readyTimer: ioBroker.Timeout | undefined;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -163,7 +166,7 @@ class GoveeAdapter extends utils.Adapter {
     );
 
     // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)
-    this.setTimeout(() => {
+    this.lanScanTimer = this.setTimeout(() => {
       this.lanScanDone = true;
       this.checkAllReady();
     }, 3_000);
@@ -246,7 +249,7 @@ class GoveeAdapter extends utils.Adapter {
     await this.subscribeStatesAsync("groups.*");
 
     // Cleanup stale devices after initial discovery (30s delay for LAN scan)
-    this.setTimeout(() => {
+    this.cleanupTimer = this.setTimeout(() => {
       if (this.stateManager && this.deviceManager) {
         this.stateManager
           .cleanupDevices(this.deviceManager.getDevices())
@@ -259,7 +262,7 @@ class GoveeAdapter extends utils.Adapter {
     // Check if all channels are ready — may already be true if MQTT connected fast
     this.checkAllReady();
     // Safety timeout: log ready even if a channel takes too long
-    this.setTimeout(() => {
+    this.readyTimer = this.setTimeout(() => {
       if (!this.readyLogged) {
         this.readyLogged = true;
         this.logDeviceSummary();
@@ -274,6 +277,15 @@ class GoveeAdapter extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     try {
+      if (this.lanScanTimer) {
+        this.clearTimeout(this.lanScanTimer);
+      }
+      if (this.cleanupTimer) {
+        this.clearTimeout(this.cleanupTimer);
+      }
+      if (this.readyTimer) {
+        this.clearTimeout(this.readyTimer);
+      }
       this.lanClient?.stop();
       this.mqttClient?.disconnect();
       this.rateLimiter?.stop();

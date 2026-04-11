@@ -258,10 +258,15 @@ class StateManager {
       common: { name: "LED Segments" },
       native: {}
     });
-    const segCap = device.capabilities.find(
-      (c) => c.type.includes("segment_color_setting")
-    );
-    const segmentCount = this.getSegmentCount(segCap);
+    let segmentCount = 0;
+    for (const c of device.capabilities) {
+      if (c.type.includes("segment_color_setting")) {
+        const count = this.getSegmentCount(c);
+        if (count > segmentCount) {
+          segmentCount = count;
+        }
+      }
+    }
     device.segmentCount = segmentCount;
     await this.ensureState(
       `${prefix}.segments.count`,

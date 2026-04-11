@@ -46,6 +46,9 @@ class GoveeAdapter extends utils.Adapter {
   lanScanDone = false;
   statesReady = false;
   stateCreationQueue = [];
+  lanScanTimer;
+  cleanupTimer;
+  readyTimer;
   /** @param options Adapter options */
   constructor(options = {}) {
     super({ ...options, name: "govee-smart" });
@@ -160,7 +163,7 @@ class GoveeAdapter extends utils.Adapter {
       3e4,
       config.networkInterface || ""
     );
-    this.setTimeout(() => {
+    this.lanScanTimer = this.setTimeout(() => {
       this.lanScanDone = true;
       this.checkAllReady();
     }, 3e3);
@@ -229,7 +232,7 @@ class GoveeAdapter extends utils.Adapter {
     this.statesReady = true;
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
-    this.setTimeout(() => {
+    this.cleanupTimer = this.setTimeout(() => {
       if (this.stateManager && this.deviceManager) {
         this.stateManager.cleanupDevices(this.deviceManager.getDevices()).catch(() => {
         });
@@ -237,7 +240,7 @@ class GoveeAdapter extends utils.Adapter {
     }, 3e4);
     this.updateConnectionState();
     this.checkAllReady();
-    this.setTimeout(() => {
+    this.readyTimer = this.setTimeout(() => {
       if (!this.readyLogged) {
         this.readyLogged = true;
         this.logDeviceSummary();
@@ -252,6 +255,15 @@ class GoveeAdapter extends utils.Adapter {
   onUnload(callback) {
     var _a, _b, _c;
     try {
+      if (this.lanScanTimer) {
+        this.clearTimeout(this.lanScanTimer);
+      }
+      if (this.cleanupTimer) {
+        this.clearTimeout(this.cleanupTimer);
+      }
+      if (this.readyTimer) {
+        this.clearTimeout(this.readyTimer);
+      }
       (_a = this.lanClient) == null ? void 0 : _a.stop();
       (_b = this.mqttClient) == null ? void 0 : _b.disconnect();
       (_c = this.rateLimiter) == null ? void 0 : _c.stop();

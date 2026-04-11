@@ -23,6 +23,7 @@ function lightCapabilities(): CloudCapability[] {
         { type: "devices.capabilities.dynamic_scene", instance: "snapshot", parameters: { dataType: "STRUCT" } },
         { type: "devices.capabilities.dynamic_scene", instance: "diyScene", parameters: { dataType: "STRUCT" } },
         { type: "devices.capabilities.segment_color_setting", instance: "segmentedColorRgb", parameters: { dataType: "STRUCT" } },
+        { type: "devices.capabilities.segment_color_setting", instance: "segmentedBrightness", parameters: { dataType: "STRUCT" } },
     ];
 }
 
@@ -704,16 +705,18 @@ describe("DeviceManager", () => {
             expect(result.instance).to.equal("diyScene");
         });
 
-        it("should find segment_color_setting for segmentColor", () => {
+        it("should find segmentedColorRgb for segmentColor", () => {
             const result = (dm as any).findCapabilityForCommand(device, "segmentColor:0");
             expect(result).to.not.be.undefined;
             expect(result.type).to.include("segment_color_setting");
+            expect(result.instance).to.equal("segmentedColorRgb");
         });
 
-        it("should find segment_color_setting for segmentBrightness", () => {
+        it("should find segmentedBrightness for segmentBrightness", () => {
             const result = (dm as any).findCapabilityForCommand(device, "segmentBrightness:3");
             expect(result).to.not.be.undefined;
             expect(result.type).to.include("segment_color_setting");
+            expect(result.instance).to.equal("segmentedBrightness");
         });
 
         it("should return undefined for unknown commands", () => {

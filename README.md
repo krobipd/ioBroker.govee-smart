@@ -209,6 +209,12 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 1.0.1 (2026-04-11)
+- Fix segment capability matching: color and brightness commands now route to correct API capabilities
+- Fix segment count using maximum across all segment capabilities instead of first found
+- Fix hardcoded 15-segment fallback replaced with safe default
+- Fix missing clearTimeout for one-shot timers in onUnload
+
 ### 1.0.0 (2026-04-11)
 - **BREAKING:** Multi-channel state tree — states split into `control`, `scenes`, `music`, `snapshots` channels
 - **BREAKING:** Removed `pollInterval` setting (Cloud polling was removed in 0.9.3)
@@ -243,11 +249,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Remove periodic Cloud polling (was every 60s)
 - Add authenticated endpoint support for music/DIY libraries and SKU feature flags
 - Fix MQTT login classification for account-blocked scenarios
-
-### 0.9.1 (2026-04-09)
-- Add ptReal BLE-over-LAN scene activation (local scenes without Cloud API)
-- Fix initialization order: MQTT before Cloud for scene library on first cycle
-- Fix ready message only appears after all channels are fully initialized
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

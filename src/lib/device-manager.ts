@@ -814,7 +814,7 @@ export class DeviceManager {
 
     // Parse segment indices
     const segStr = parts[0].trim();
-    const segCount = device.segmentCount ?? 15;
+    const segCount = device.segmentCount ?? 0;
     let segments: number[];
 
     if (segStr === "all") {
@@ -1125,13 +1125,15 @@ export class DeviceManager {
       }
       if (
         command.startsWith("segmentColor:") &&
-        shortType === "segment_color_setting"
+        shortType === "segment_color_setting" &&
+        !cap.instance.toLowerCase().includes("brightness")
       ) {
         return cap;
       }
       if (
         command.startsWith("segmentBrightness:") &&
-        shortType === "segment_color_setting"
+        shortType === "segment_color_setting" &&
+        cap.instance.toLowerCase().includes("brightness")
       ) {
         return cap;
       }

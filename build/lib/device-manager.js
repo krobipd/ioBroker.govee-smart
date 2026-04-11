@@ -665,7 +665,7 @@ class DeviceManager {
       return null;
     }
     const segStr = parts[0].trim();
-    const segCount = (_a = device.segmentCount) != null ? _a : 15;
+    const segCount = (_a = device.segmentCount) != null ? _a : 0;
     let segments;
     if (segStr === "all") {
       segments = Array.from({ length: segCount }, (_, i) => i);
@@ -894,10 +894,10 @@ class DeviceManager {
       if (command === "snapshot" && shortType === "dynamic_scene" && cap.instance === "snapshot") {
         return cap;
       }
-      if (command.startsWith("segmentColor:") && shortType === "segment_color_setting") {
+      if (command.startsWith("segmentColor:") && shortType === "segment_color_setting" && !cap.instance.toLowerCase().includes("brightness")) {
         return cap;
       }
-      if (command.startsWith("segmentBrightness:") && shortType === "segment_color_setting") {
+      if (command.startsWith("segmentBrightness:") && shortType === "segment_color_setting" && cap.instance.toLowerCase().includes("brightness")) {
         return cap;
       }
     }
