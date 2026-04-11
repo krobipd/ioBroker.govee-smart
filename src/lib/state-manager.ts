@@ -579,7 +579,10 @@ export class StateManager {
     cap:
       | {
           parameters?: {
-            fields?: Array<{ options?: Array<{ value: unknown }> }>;
+            fields?: Array<{
+              fieldName?: string;
+              elementRange?: { min?: number; max?: number };
+            }>;
           };
         }
       | undefined,
@@ -587,11 +590,14 @@ export class StateManager {
     if (!cap?.parameters?.fields) {
       return 0;
     }
-    // Look for segment array field — typically the first field with options
+    // Segment count from "segment" field's elementRange (0-based max → count = max + 1)
     const segField = cap.parameters.fields.find(
-      (f) => f.options && f.options.length > 0,
+      (f) => f.fieldName === "segment",
     );
-    return segField?.options?.length ?? 15; // Default to 15 segments
+    if (segField?.elementRange?.max !== undefined) {
+      return segField.elementRange.max + 1;
+    }
+    return 0;
   }
 
   /**

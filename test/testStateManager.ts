@@ -596,7 +596,7 @@ describe("StateManager", () => {
                     instance: "segmentedColorRgb",
                     parameters: {
                         dataType: "STRUCT",
-                        fields: [{ fieldName: "segment", dataType: "ENUM" as const, options: new Array(10).fill({ value: 0 }) }],
+                        fields: [{ fieldName: "segment", elementRange: { min: 0, max: 9 } }],
                     },
                 }],
             });
@@ -622,8 +622,8 @@ describe("StateManager", () => {
             expect(dev.segmentCount).to.equal(10);
         });
 
-        it("should default to 15 segments when fields exist but have no options", async () => {
-            const { adapter, objects } = createMockAdapter();
+        it("should return 0 segments when field has no elementRange", async () => {
+            const { adapter } = createMockAdapter();
             const sm = new StateManager(adapter as never);
             const dev = createTestDevice({
                 capabilities: [{
@@ -631,7 +631,7 @@ describe("StateManager", () => {
                     instance: "segmentedColorRgb",
                     parameters: {
                         dataType: "STRUCT" as const,
-                        fields: [{ fieldName: "segment", dataType: "ENUM" as const }],
+                        fields: [{ fieldName: "segment" }],
                     },
                 }],
             });
@@ -648,8 +648,7 @@ describe("StateManager", () => {
 
             await sm.createDeviceStates(dev, segmentDefs);
 
-            expect(dev.segmentCount).to.equal(15);
-            expect(objects.has("devices.h6160_0011.segments.14")).to.be.true;
+            expect(dev.segmentCount).to.equal(0);
         });
 
         it("should remove excess segment channels from previous runs", async () => {
@@ -661,7 +660,7 @@ describe("StateManager", () => {
                     instance: "segmentedColorRgb",
                     parameters: {
                         dataType: "STRUCT",
-                        fields: [{ fieldName: "segment", dataType: "ENUM" as const, options: new Array(5).fill({ value: 0 }) }],
+                        fields: [{ fieldName: "segment", elementRange: { min: 0, max: 4 } }],
                     },
                 }],
             });

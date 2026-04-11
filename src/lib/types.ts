@@ -63,11 +63,13 @@ export interface CapabilityField {
   /** Field name identifier */
   fieldName: string;
   /** Value data type */
-  dataType: "ENUM" | "INTEGER" | "STRUCT";
+  dataType?: "ENUM" | "INTEGER" | "STRUCT" | "Array";
   /** Available options for ENUM fields */
   options?: CapabilityOption[];
   /** Value range for INTEGER fields */
   range?: { min: number; max: number; precision: number };
+  /** Element range for Array fields (0-based, segment count = max + 1) */
+  elementRange?: { min: number; max: number };
   /** Whether this field is required */
   required?: boolean;
 }

@@ -501,14 +501,17 @@ class StateManager {
    * @param cap Segment color capability definition
    */
   getSegmentCount(cap) {
-    var _a, _b, _c;
+    var _a, _b;
     if (!((_a = cap == null ? void 0 : cap.parameters) == null ? void 0 : _a.fields)) {
       return 0;
     }
     const segField = cap.parameters.fields.find(
-      (f) => f.options && f.options.length > 0
+      (f) => f.fieldName === "segment"
     );
-    return (_c = (_b = segField == null ? void 0 : segField.options) == null ? void 0 : _b.length) != null ? _c : 15;
+    if (((_b = segField == null ? void 0 : segField.elementRange) == null ? void 0 : _b.max) !== void 0) {
+      return segField.elementRange.max + 1;
+    }
+    return 0;
   }
   /**
    * Create a state if it doesn't exist
