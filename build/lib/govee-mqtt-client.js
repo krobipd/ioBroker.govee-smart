@@ -31,9 +31,9 @@ __export(govee_mqtt_client_exports, {
   GoveeMqttClient: () => GoveeMqttClient
 });
 module.exports = __toCommonJS(govee_mqtt_client_exports);
-var https = __toESM(require("node:https"));
 var forge = __toESM(require("node-forge"));
 var mqtt = __toESM(require("mqtt"));
+var import_http_client = require("./http-client.js");
 var import_types = require("./types.js");
 const MAX_AUTH_FAILURES = 3;
 const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
@@ -352,14 +352,10 @@ class GoveeMqttClient {
   }
   /** Login to Govee account */
   login() {
-    return this.httpsPost(
-      LOGIN_URL,
-      {
-        email: this.email,
-        password: this.password,
-        client: CLIENT_ID
-      },
-      {
+    return (0, import_http_client.httpsRequest)({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: {
         appVersion: APP_VERSION,
         clientId: CLIENT_ID,
         clientType: CLIENT_TYPE,
@@ -368,148 +364,27 @@ class GoveeMqttClient {
         country: "DE",
         envid: "0",
         iotversion: "0"
+      },
+      body: {
+        email: this.email,
+        password: this.password,
+        client: CLIENT_ID
       }
-    );
+    });
   }
   /** Get IoT key (P12 certificate) */
   getIotKey() {
-    return this.httpsGet(IOT_KEY_URL, {
-      Authorization: `Bearer ${this._bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT
+    return (0, import_http_client.httpsRequest)({
+      method: "GET",
+      url: IOT_KEY_URL,
+      headers: {
+        Authorization: `Bearer ${this._bearerToken}`,
+        appVersion: APP_VERSION,
+        clientId: CLIENT_ID,
+        clientType: CLIENT_TYPE,
+        "User-Agent": USER_AGENT
+      }
     });
-  }
-  /**
-   * Fetch scene library for a specific SKU from undocumented API.
-   * Public endpoint — no authentication required, only AppVersion header.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchSceneLibrary(sku) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet(url, {
-      appVersion: APP_VERSION,
-      "User-Agent": USER_AGENT
-    });
-    const scenes = [];
-    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
-      for (const s of (_c = cat.scenes) != null ? _c : []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
-        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
-        if (code > 0) {
-          const si = effect == null ? void 0 : effect.speedInfo;
-          scenes.push({
-            name: s.sceneName,
-            sceneCode: code,
-            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0,
-            speedInfo: (si == null ? void 0 : si.supSpeed) ? {
-              supSpeed: true,
-              speedIndex: (_g = si.speedIndex) != null ? _g : 0,
-              config: (_h = si.config) != null ? _h : ""
-            } : void 0
-          });
-        }
-      }
-    }
-    return scenes;
-  }
-  /** Headers for authenticated undocumented API endpoints */
-  authHeaders() {
-    return {
-      Authorization: `Bearer ${this._bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT
-    };
-  }
-  /**
-   * Fetch music effect library for a specific SKU (requires auth).
-   * Returns music modes with BLE data for ptReal local control.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchMusicLibrary(sku) {
-    var _a, _b, _c, _d, _e, _f;
-    if (!this._bearerToken) {
-      return [];
-    }
-    const url = `https://app2.govee.com/appsku/v1/music-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet(url, this.authHeaders());
-    const modes = [];
-    let modeIdx = 0;
-    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
-      for (const s of (_c = cat.scenes) != null ? _c : []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
-        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
-        if (code > 0) {
-          modes.push({
-            name: s.sceneName,
-            musicCode: code,
-            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0,
-            mode: modeIdx
-          });
-        }
-        modeIdx++;
-      }
-    }
-    return modes;
-  }
-  /**
-   * Fetch DIY light effect library for a specific SKU (requires auth).
-   * Returns DIY scene definitions with BLE data for ptReal local control.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchDiyLibrary(sku) {
-    var _a, _b, _c, _d, _e, _f;
-    if (!this._bearerToken) {
-      return [];
-    }
-    const url = `https://app2.govee.com/appsku/v1/diy-light-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet(url, this.authHeaders());
-    const diys = [];
-    for (const cat of (_b = (_a = resp.data) == null ? void 0 : _a.categories) != null ? _b : []) {
-      for (const s of (_c = cat.scenes) != null ? _c : []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
-        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
-        if (code > 0) {
-          diys.push({
-            name: s.sceneName,
-            diyCode: code,
-            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0
-          });
-        }
-      }
-    }
-    return diys;
-  }
-  /**
-   * Fetch supported features for a specific SKU (requires auth).
-   * Returns feature flags indicating what the device supports.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchSkuFeatures(sku) {
-    var _a;
-    if (!this._bearerToken) {
-      return null;
-    }
-    const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet(url, this.authHeaders());
-    return (_a = resp.data) != null ? _a : null;
   }
   /**
    * Extract PEM key + cert from PKCS12
@@ -545,93 +420,6 @@ class GoveeMqttClient {
       const r = Math.random() * 16 | 0;
       const v = c === "x" ? r : r & 3 | 8;
       return v.toString(16);
-    });
-  }
-  /**
-   * HTTPS POST helper
-   *
-   * @param url Full URL to POST to
-   * @param body Request body object
-   * @param extraHeaders Additional HTTP headers
-   */
-  httpsPost(url, body, extraHeaders) {
-    return new Promise((resolve, reject) => {
-      const u = new URL(url);
-      const postData = JSON.stringify(body);
-      const req = https.request(
-        {
-          method: "POST",
-          hostname: u.hostname,
-          path: u.pathname,
-          headers: {
-            "Content-Type": "application/json",
-            "Content-Length": Buffer.byteLength(postData),
-            ...extraHeaders
-          },
-          timeout: 15e3
-        },
-        (res) => {
-          const chunks = [];
-          res.on("data", (chunk) => chunks.push(chunk));
-          res.on("end", () => {
-            var _a;
-            const raw = Buffer.concat(chunks).toString();
-            if (((_a = res.statusCode) != null ? _a : 0) >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 200)}`));
-              return;
-            }
-            try {
-              resolve(JSON.parse(raw));
-            } catch {
-              reject(new Error(`Invalid JSON: ${raw.slice(0, 200)}`));
-            }
-          });
-        }
-      );
-      req.on("error", reject);
-      req.on("timeout", () => req.destroy(new Error("Timeout")));
-      req.write(postData);
-      req.end();
-    });
-  }
-  /**
-   * HTTPS GET helper
-   *
-   * @param url Full URL to GET
-   * @param headers HTTP headers
-   */
-  httpsGet(url, headers) {
-    return new Promise((resolve, reject) => {
-      const u = new URL(url);
-      const req = https.request(
-        {
-          method: "GET",
-          hostname: u.hostname,
-          path: u.pathname + u.search,
-          headers,
-          timeout: 15e3
-        },
-        (res) => {
-          const chunks = [];
-          res.on("data", (chunk) => chunks.push(chunk));
-          res.on("end", () => {
-            var _a;
-            const raw = Buffer.concat(chunks).toString();
-            if (((_a = res.statusCode) != null ? _a : 0) >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 200)}`));
-              return;
-            }
-            try {
-              resolve(JSON.parse(raw));
-            } catch {
-              reject(new Error(`Invalid JSON: ${raw.slice(0, 200)}`));
-            }
-          });
-        }
-      );
-      req.on("error", reject);
-      req.on("timeout", () => req.destroy(new Error("Timeout")));
-      req.end();
     });
   }
 }

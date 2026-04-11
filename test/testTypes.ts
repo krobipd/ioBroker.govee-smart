@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { normalizeDeviceId, classifyError } from "../src/lib/types";
+import { normalizeDeviceId, classifyError, rgbToHex, hexToRgb, rgbIntToHex } from "../src/lib/types";
 
 describe("Types utilities", () => {
     describe("normalizeDeviceId", () => {
@@ -17,6 +17,52 @@ describe("Types utilities", () => {
 
         it("should handle empty string", () => {
             expect(normalizeDeviceId("")).to.equal("");
+        });
+    });
+
+    describe("rgbToHex", () => {
+        it("should convert RGB to hex", () => {
+            expect(rgbToHex(255, 102, 0)).to.equal("#ff6600");
+        });
+
+        it("should pad single-digit hex values", () => {
+            expect(rgbToHex(0, 0, 0)).to.equal("#000000");
+        });
+
+        it("should handle white", () => {
+            expect(rgbToHex(255, 255, 255)).to.equal("#ffffff");
+        });
+    });
+
+    describe("hexToRgb", () => {
+        it("should parse hex with #", () => {
+            expect(hexToRgb("#ff6600")).to.deep.equal({ r: 255, g: 102, b: 0 });
+        });
+
+        it("should parse hex without #", () => {
+            expect(hexToRgb("ff6600")).to.deep.equal({ r: 255, g: 102, b: 0 });
+        });
+
+        it("should parse black", () => {
+            expect(hexToRgb("#000000")).to.deep.equal({ r: 0, g: 0, b: 0 });
+        });
+
+        it("should handle invalid hex as black", () => {
+            expect(hexToRgb("xyz")).to.deep.equal({ r: 0, g: 0, b: 0 });
+        });
+    });
+
+    describe("rgbIntToHex", () => {
+        it("should convert packed int to hex", () => {
+            expect(rgbIntToHex(0xff6600)).to.equal("#ff6600");
+        });
+
+        it("should handle zero", () => {
+            expect(rgbIntToHex(0)).to.equal("#000000");
+        });
+
+        it("should handle white", () => {
+            expect(rgbIntToHex(0xffffff)).to.equal("#ffffff");
         });
     });
 

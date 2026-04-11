@@ -1,4 +1,9 @@
-import type { CloudCapability, CloudStateCapability } from "./types.js";
+import {
+  rgbToHex,
+  type CloudCapability,
+  type CloudStateCapability,
+  type GoveeDevice,
+} from "./types.js";
 import { applyColorTempQuirk } from "./device-quirks.js";
 
 /** ioBroker state definition derived from a Govee capability */
@@ -27,6 +32,8 @@ export interface StateDefinition {
   capabilityType: string;
   /** Original capability instance */
   capabilityInstance: string;
+  /** Target channel (control, scenes, music, snapshots). Defaults to "control". */
+  channel?: string;
 }
 
 /**
@@ -174,8 +181,14 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
 
     case "dynamic_scene":
     case "work_mode":
-    case "temperature_setting":
+    case "temperature_setting": {
       // Complex types — expose as JSON for now
+      const dsChannel =
+        cap.instance === "snapshot"
+          ? "snapshots"
+          : cap.instance === "lightScene" || cap.instance === "diyScene"
+            ? "scenes"
+            : undefined;
       return [
         {
           id: sanitizeId(cap.instance),
@@ -186,8 +199,10 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           def: "",
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
+          channel: dsChannel,
         },
       ];
+    }
 
     case "music_setting":
       return mapMusicSetting(cap);
@@ -413,6 +428,10 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     });
   }
 
+  // All music states belong to the music channel
+  for (const s of states) {
+    s.channel = "music";
+  }
   return states;
 }
 
@@ -519,12 +538,9 @@ export function mapCloudStateValue(
     case "color_setting":
       if (cap.instance === "colorRgb") {
         const num = typeof raw === "number" ? raw : 0;
-        const r = (num >> 16) & 0xff;
-        const g = (num >> 8) & 0xff;
-        const b = num & 0xff;
         return {
           stateId: "colorRgb",
-          value: `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`,
+          value: rgbToHex((num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff),
         };
       }
       if (cap.instance.includes("colorTem")) {
@@ -576,4 +592,194 @@ export function mapCloudStateValue(
     default:
       return null;
   }
+}
+
+/**
+ * Build complete state definitions for a device.
+ * Combines LAN defaults, Cloud capabilities, quirks, scenes, snapshots, and diagnostics.
+ *
+ * @param device Govee device with capabilities, scenes, etc.
+ * @param localSnapshots Optional local snapshot names
+ */
+export function buildDeviceStateDefs(
+  device: GoveeDevice,
+  localSnapshots?: { name: string }[],
+): StateDefinition[] {
+  let stateDefs: StateDefinition[];
+
+  if (device.lanIp) {
+    stateDefs = getDefaultLanStates();
+    if (device.capabilities.length > 0) {
+      const lanIds = new Set(stateDefs.map((d) => d.id));
+      const cloudDefs = mapCapabilities(device.capabilities);
+      for (const cd of cloudDefs) {
+        if (!lanIds.has(cd.id)) {
+          stateDefs.push(cd);
+        }
+      }
+    }
+  } else {
+    stateDefs = mapCapabilities(device.capabilities);
+  }
+
+  applyQuirksToStates(device.sku, stateDefs);
+
+  // Remove generic JSON stubs — replace with real dropdowns if data available
+  stateDefs = stateDefs.filter(
+    (d) =>
+      d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot",
+  );
+
+  if (device.scenes.length > 0) {
+    const states: Record<string, string> = { 0: "---" };
+    device.scenes.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "light_scene",
+      name: "Light Scene",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "lightScene",
+      channel: "scenes",
+    });
+  }
+
+  // Scene speed slider
+  const maxSpeedLevels = device.sceneLibrary.reduce((max, s) => {
+    if (!s.speedInfo?.supSpeed || !s.speedInfo.config) {
+      return max;
+    }
+    try {
+      const levels = JSON.parse(s.speedInfo.config) as unknown[];
+      return Math.max(max, levels.length);
+    } catch {
+      return max;
+    }
+  }, 0);
+  if (maxSpeedLevels > 1) {
+    stateDefs.push({
+      id: "scene_speed",
+      name: "Scene Speed",
+      type: "number",
+      role: "level",
+      write: true,
+      min: 0,
+      max: maxSpeedLevels - 1,
+      def: 0,
+      capabilityType: "local",
+      capabilityInstance: "sceneSpeed",
+      channel: "scenes",
+    });
+  }
+
+  if (device.diyScenes.length > 0) {
+    const states: Record<string, string> = { 0: "---" };
+    device.diyScenes.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "diy_scene",
+      name: "DIY Scene",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "diyScene",
+      channel: "scenes",
+    });
+  }
+
+  if (device.snapshots.length > 0) {
+    const states: Record<string, string> = { 0: "---" };
+    device.snapshots.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "snapshot",
+      name: "Snapshot",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "snapshot",
+      channel: "snapshots",
+    });
+  }
+
+  // Local snapshots
+  const localSnapStates: Record<string, string> = { 0: "---" };
+  if (localSnapshots) {
+    localSnapshots.forEach((s, i) => {
+      localSnapStates[i + 1] = s.name;
+    });
+  }
+  stateDefs.push({
+    id: "snapshot_local",
+    name: "Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    states: localSnapStates,
+    def: "0",
+    capabilityType: "local",
+    capabilityInstance: "snapshotLocal",
+    channel: "snapshots",
+  });
+  stateDefs.push({
+    id: "snapshot_save",
+    name: "Save Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "snapshotSave",
+    channel: "snapshots",
+  });
+  stateDefs.push({
+    id: "snapshot_delete",
+    name: "Delete Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "snapshotDelete",
+    channel: "snapshots",
+  });
+
+  // Diagnostics
+  stateDefs.push({
+    id: "diagnostics_export",
+    name: "Export Diagnostics",
+    type: "boolean",
+    role: "button",
+    write: true,
+    def: false,
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsExport",
+    channel: "snapshots",
+  });
+  stateDefs.push({
+    id: "diagnostics_result",
+    name: "Diagnostics JSON",
+    type: "string",
+    role: "json",
+    write: false,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsResult",
+    channel: "snapshots",
+  });
+
+  return stateDefs;
 }

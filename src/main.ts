@@ -1,12 +1,13 @@
+import * as path from "node:path";
 import * as utils from "@iobroker/adapter-core";
 import {
-  applyQuirksToStates,
+  buildDeviceStateDefs,
   getDefaultLanStates,
-  mapCapabilities,
   mapCloudStateValue,
-  type StateDefinition,
 } from "./lib/capability-mapper.js";
+import { loadCommunityQuirks } from "./lib/device-quirks.js";
 import { DeviceManager } from "./lib/device-manager.js";
+import { GoveeApiClient } from "./lib/govee-api-client.js";
 import { GoveeCloudClient } from "./lib/govee-cloud-client.js";
 import { GoveeLanClient } from "./lib/govee-lan-client.js";
 import { GoveeMqttClient } from "./lib/govee-mqtt-client.js";
@@ -17,7 +18,12 @@ import {
 import { RateLimiter } from "./lib/rate-limiter.js";
 import { SkuCache } from "./lib/sku-cache.js";
 import { StateManager } from "./lib/state-manager.js";
-import type { AdapterConfig, DeviceState, GoveeDevice } from "./lib/types.js";
+import {
+  rgbIntToHex,
+  type AdapterConfig,
+  type DeviceState,
+  type GoveeDevice,
+} from "./lib/types.js";
 
 class GoveeAdapter extends utils.Adapter {
   private deviceManager: DeviceManager | null = null;
@@ -96,12 +102,20 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
 
+    // Load community quirks from adapter directory
+    const quirksPath = path.join(__dirname, "..", "community-quirks.json");
+    loadCommunityQuirks(quirksPath, this.log);
+
     this.stateManager = new StateManager(this);
     this.deviceManager = new DeviceManager(this.log);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
     this.skuCache = new SkuCache(dataDir, this.log);
     this.localSnapshots = new LocalSnapshotStore(dataDir, this.log);
     this.deviceManager.setSkuCache(this.skuCache);
+
+    // API client for undocumented scene/music/DIY libraries (always available)
+    const apiClient = new GoveeApiClient();
+    this.deviceManager.setApiClient(apiClient);
 
     this.deviceManager.setCallbacks(
       (device, state) => this.onDeviceStateUpdate(device, state),
@@ -121,7 +135,7 @@ class GoveeAdapter extends utils.Adapter {
       const prefix = this.stateManager!.devicePrefix(device);
       for (const idx of batch.segments) {
         if (batch.color !== undefined) {
-          const hex = `#${batch.color.toString(16).padStart(6, "0")}`;
+          const hex = rgbIntToHex(batch.color);
           this.setStateAsync(`${prefix}.segments.${idx}.color`, {
             val: hex,
             ack: true,
@@ -203,6 +217,11 @@ class GoveeAdapter extends utils.Adapter {
           this.updateConnectionState();
         },
       );
+
+      // Forward bearer token to API client for authenticated library endpoints
+      if (this.mqttClient.token) {
+        apiClient.setBearerToken(this.mqttClient.token);
+      }
     }
 
     // --- Device data: Cache first, Cloud only on cache miss ---
@@ -350,6 +369,22 @@ class GoveeAdapter extends utils.Adapter {
     ) {
       this.handleSnapshotDelete(device, state.val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
+      return;
+    }
+
+    // Diagnostics export button
+    if (stateSuffix === "snapshots.diagnostics_export" && state.val) {
+      const diag = this.deviceManager.generateDiagnostics(
+        device,
+        this.version ?? "unknown",
+      );
+      const resultId = `${this.namespace}.${prefix}.snapshots.diagnostics_result`;
+      await this.setStateAsync(resultId, {
+        val: JSON.stringify(diag, null, 2),
+        ack: true,
+      });
+      await this.setStateAsync(id, { val: false, ack: true });
+      this.log.info(`Diagnostics exported for ${device.name} (${device.sku})`);
       return;
     }
 
@@ -521,158 +556,11 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     for (const device of devices) {
-      let stateDefs: StateDefinition[];
-
-      if (device.lanIp) {
-        // LAN-capable: use LAN defaults for basic states, add Cloud extras
-        stateDefs = getDefaultLanStates();
-        if (device.capabilities.length > 0) {
-          const lanIds = new Set(stateDefs.map((d) => d.id));
-          const cloudDefs = mapCapabilities(device.capabilities);
-          for (const cd of cloudDefs) {
-            if (!lanIds.has(cd.id)) {
-              stateDefs.push(cd);
-            }
-          }
-        }
-      } else {
-        // Cloud-only: use Cloud capabilities
-        stateDefs = mapCapabilities(device.capabilities);
-      }
-
-      // Apply device quirks (e.g. correct color temp range for specific SKUs)
-      applyQuirksToStates(device.sku, stateDefs);
-
-      // Remove generic JSON states from capability mapper —
-      // only add back as real dropdowns if we have actual scene/snapshot/diy data
-      stateDefs = stateDefs.filter(
-        (d) =>
-          d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot",
-      );
-
-      if (device.scenes.length > 0) {
-        const sceneStates: Record<string, string> = { 0: "---" };
-        device.scenes.forEach((s, i) => {
-          sceneStates[i + 1] = s.name;
-        });
-        stateDefs.push({
-          id: "light_scene",
-          name: "Light Scene",
-          type: "string",
-          role: "text",
-          write: true,
-          states: sceneStates,
-          def: "0",
-          capabilityType: "devices.capabilities.dynamic_scene",
-          capabilityInstance: "lightScene",
-        });
-      }
-
-      // Scene speed slider — only if any scene supports speed adjustment
-      const maxSpeedLevels = device.sceneLibrary.reduce((max, s) => {
-        if (!s.speedInfo?.supSpeed || !s.speedInfo.config) {
-          return max;
-        }
-        try {
-          const levels = JSON.parse(s.speedInfo.config) as unknown[];
-          return Math.max(max, levels.length);
-        } catch {
-          return max;
-        }
-      }, 0);
-      if (maxSpeedLevels > 1) {
-        stateDefs.push({
-          id: "scene_speed",
-          name: "Scene Speed",
-          type: "number",
-          role: "level",
-          write: true,
-          min: 0,
-          max: maxSpeedLevels - 1,
-          def: 0,
-          capabilityType: "local",
-          capabilityInstance: "sceneSpeed",
-        });
-      }
-
-      if (device.diyScenes.length > 0) {
-        const diyStates: Record<string, string> = { 0: "---" };
-        device.diyScenes.forEach((s, i) => {
-          diyStates[i + 1] = s.name;
-        });
-        stateDefs.push({
-          id: "diy_scene",
-          name: "DIY Scene",
-          type: "string",
-          role: "text",
-          write: true,
-          states: diyStates,
-          def: "0",
-          capabilityType: "devices.capabilities.dynamic_scene",
-          capabilityInstance: "diyScene",
-        });
-      }
-
-      if (device.snapshots.length > 0) {
-        const snapStates: Record<string, string> = { 0: "---" };
-        device.snapshots.forEach((s, i) => {
-          snapStates[i + 1] = s.name;
-        });
-        stateDefs.push({
-          id: "snapshot",
-          name: "Snapshot",
-          type: "string",
-          role: "text",
-          write: true,
-          states: snapStates,
-          def: "0",
-          capabilityType: "devices.capabilities.dynamic_scene",
-          capabilityInstance: "snapshot",
-        });
-      }
-
-      // Local snapshots (100% LAN, no Cloud needed)
       const localSnaps = this.localSnapshots?.getSnapshots(
         device.sku,
         device.deviceId,
       );
-      const localSnapStates: Record<string, string> = { 0: "---" };
-      if (localSnaps) {
-        localSnaps.forEach((s, i) => {
-          localSnapStates[i + 1] = s.name;
-        });
-      }
-      stateDefs.push({
-        id: "snapshot_local",
-        name: "Local Snapshot",
-        type: "string",
-        role: "text",
-        write: true,
-        states: localSnapStates,
-        def: "0",
-        capabilityType: "local",
-        capabilityInstance: "snapshotLocal",
-      });
-      stateDefs.push({
-        id: "snapshot_save",
-        name: "Save Local Snapshot",
-        type: "string",
-        role: "text",
-        write: true,
-        def: "",
-        capabilityType: "local",
-        capabilityInstance: "snapshotSave",
-      });
-      stateDefs.push({
-        id: "snapshot_delete",
-        name: "Delete Local Snapshot",
-        type: "string",
-        role: "text",
-        write: true,
-        def: "",
-        capabilityType: "local",
-        capabilityInstance: "snapshotDelete",
-      });
+      const stateDefs = buildDeviceStateDefs(device, localSnaps);
 
       const p = this.stateManager
         .createDeviceStates(device, stateDefs)

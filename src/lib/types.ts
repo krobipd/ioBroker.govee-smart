@@ -407,6 +407,36 @@ export function classifyError(err: unknown): ErrorCategory {
   return "UNKNOWN";
 }
 
+/**
+ * Convert RGB values to hex color string "#RRGGBB"
+ *
+ * @param r Red channel 0-255
+ * @param g Green channel 0-255
+ * @param b Blue channel 0-255
+ */
+export function rgbToHex(r: number, g: number, b: number): string {
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
+/**
+ * Parse hex color string to RGB values
+ *
+ * @param hex Color string (e.g. "#FF6600" or "FF6600")
+ */
+export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const num = parseInt(hex.replace("#", ""), 16) || 0;
+  return { r: (num >> 16) & 0xff, g: (num >> 8) & 0xff, b: num & 0xff };
+}
+
+/**
+ * Convert packed RGB integer to hex color string "#RRGGBB"
+ *
+ * @param rgb Packed integer (r << 16 | g << 8 | b)
+ */
+export function rgbIntToHex(rgb: number): string {
+  return `#${(rgb & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
 /** Timer/callback interfaces for helper classes */
 export interface TimerAdapter {
   /** Create a repeating interval timer */

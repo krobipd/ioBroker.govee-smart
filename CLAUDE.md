@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 1.0.0 (April 2026)
+- **Version:** 1.1.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -45,18 +45,21 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 ## Architektur
 
 ```
-src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots
-src/lib/types.ts              → Interfaces (API, Config, Capabilities, Devices, Scenes)
+src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots (921 Zeilen)
+src/lib/device-manager.ts     → Device-Map, Cloud-Loading, LAN/MQTT Status Handling (886 Zeilen)
+src/lib/capability-mapper.ts  → Capability → State Definition + buildDeviceStateDefs + Quirks (785 Zeilen)
+src/lib/command-router.ts     → Command Routing LAN → MQTT → Cloud + Segment Batch (718 Zeilen)
+src/lib/state-manager.ts      → State CRUD + Cleanup + Channel Routing (630 Zeilen)
+src/lib/govee-lan-client.ts   → LAN UDP (Discovery + Control + Status + ptReal BLE Packets) (581 Zeilen)
+src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Auth + Status-Push + Control Fallback) (483 Zeilen)
+src/lib/types.ts              → Interfaces + Shared Utilities (rgbToHex, hexToRgb, classifyError) (450 Zeilen)
+src/lib/govee-api-client.ts   → Undocumented API (Scene/Music/DIY Libraries, SKU Features) (237 Zeilen)
 src/lib/govee-cloud-client.ts → Cloud REST API v2 (Devices, Capabilities, Szenen+Snapshots, Control)
-src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Status-Push + Control Fallback + Scene Library)
-src/lib/govee-lan-client.ts   → LAN UDP (Discovery + Control + Status + ptReal BLE Packets)
-src/lib/device-manager.ts     → LAN → MQTT → Cloud Routing, Scene/Snapshot Loading, Device Quirks
-src/lib/rate-limiter.ts       → Rate-Limits für Cloud REST Calls
-src/lib/capability-mapper.ts  → Capability → ioBroker State Definition + Cloud State Value Mapping + Quirks
-src/lib/state-manager.ts      → State CRUD + Cleanup
-src/lib/local-snapshots.ts    → Local Snapshot Store (LAN-based save/restore, JSON files)
-src/lib/device-quirks.ts      → SKU-specific overrides (colorTemp ranges, noMqtt, brokenPlatformApi)
 src/lib/sku-cache.ts          → Persistent SKU cache (device data, scene/music/DIY libraries)
+src/lib/rate-limiter.ts       → Rate-Limits für Cloud REST Calls
+src/lib/local-snapshots.ts    → Local Snapshot Store (LAN-based save/restore, JSON files)
+src/lib/device-quirks.ts      → SKU-specific overrides + community quirks (external JSON)
+src/lib/http-client.ts        → Shared HTTPS request (httpsRequest + HttpError)
 ```
 
 ## State Tree
@@ -77,10 +80,12 @@ govee-smart.0.
 │       ├── scenes.diy_scene          (Dropdown: User-DIY-Szenen, lokal via ptReal)
 │       ├── scenes.scene_speed        (Slider: Szenen-Geschwindigkeit)
 │       ├── music.music_mode / .music_sensitivity / .music_auto_color
-│       ├── snapshots.snapshot        (Dropdown: Cloud-Snapshots)
-│       ├── snapshots.snapshot_local  (Dropdown: Lokale Snapshots)
-│       ├── snapshots.snapshot_save   (Text: Neuen lokalen Snapshot speichern)
-│       ├── snapshots.snapshot_delete (Text: Lokalen Snapshot löschen)
+│       ├── snapshots.snapshot           (Dropdown: Cloud-Snapshots)
+│       ├── snapshots.snapshot_local     (Dropdown: Lokale Snapshots)
+│       ├── snapshots.snapshot_save      (Text: Neuen lokalen Snapshot speichern)
+│       ├── snapshots.snapshot_delete    (Text: Lokalen Snapshot löschen)
+│       ├── snapshots.diagnostics_export (Button: Diagnostik-JSON exportieren)
+│       ├── snapshots.diagnostics_result (String: Diagnostik-JSON Ausgabe, read-only)
 │       └── segments.count / .command / .0.color / .0.brightness (dynamisch)
 └── groups.
     └── basegroup_1280.              (nur info.name + info.online, kein model/serial/ip)
@@ -101,7 +106,7 @@ Szenen kommen vom **separaten Scenes-Endpoint** (`POST /device/scenes`), NICHT a
 - **Endpoint:** `GET https://app2.govee.com/appsku/v1/light-effect-libraries?sku=<SKU>`
 - **Auth:** KEINE! Nur AppVersion + User-Agent Header nötig (public endpoint)
 - Liefert erweiterte Szenen-Daten inkl. `sceneCode` für ptReal BLE-over-LAN
-- Geladen im Poll-Zyklus (MQTT-Client muss initialisiert sein wegen httpsGet-Helper)
+- Geladen via `GoveeApiClient` (eigenständiger HTTP-Client, unabhängig von MQTT)
 - Response: `{data: {categories: [{scenes: [{sceneName, sceneCode, sceneId, sceneParamId}]}]}}`
 
 ## Cloud REST API v2
@@ -181,9 +186,12 @@ Single Page, drei Sektionen:
 29. **Local Snapshots** — `local-snapshots.ts` speichert Gerätezustand per LAN als JSON; Restore replayed einzelne LAN-Commands
 30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, noMqtt, brokenPlatformApi)
 31. **Scene Speed Infrastructure** — `sceneLibrary` enthält `speedInfo` (supSpeed, speedIndex, config); State + Routing fertig, Byte-Manipulation pending
-32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `getChannelForState()`, Pfad-Auflösung via `resolveStatePath()`
+32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `def.channel` in StateDefinition, Pfad-Auflösung via `resolveStatePath()`
 33. **Groups minimal** — BaseGroup hat nur `info.name` + `info.online`, kein model/serial/ip
 34. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Segment-Channels werden gelöscht
+35. **Diagnostics Export** — `diagnostics_export` Button pro Gerät erzeugt strukturiertes JSON (Capabilities, Szenen, Libraries, Quirks, State) für GitHub Issues
+36. **Community Quirks** — `community-quirks.json` (extern) erlaubt User-beigetragene SKU-Korrekturen ohne Adapter-Update
+37. **Separated Concerns (seit 1.1.0)** — CommandRouter (Routing), GoveeApiClient (undoc API), http-client (shared HTTP), capability-mapper (State-Definitionen) als eigenständige Module
 
 ## Logging-Philosophie (seit 0.9.4)
 
@@ -194,7 +202,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (291)
+## Tests (309)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks (40 Tests)
@@ -202,22 +210,24 @@ test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping 
   - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases (10)
   - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases (16)
   - applyQuirksToStates: known SKU, unknown SKU, non-colorTemp (3)
-test/testDeviceManager.ts    → Device Manager (70 Tests)
+test/testDeviceManager.ts    → Device Manager + CommandRouter (75 Tests)
   - LAN discovery, IP update, MQTT status, unknown device/IP handling (7)
   - sendCommand channel routing: LAN→MQTT→Cloud fallback, ptReal scene, segment→Cloud only (9)
   - toCloudValue: power, brightness, color hex→int, scene/snapshot/diy index lookup, segments (14)
   - parseSegmentBatch: range, all, comma, brightness-only, clamp, invalid, mixed (10)
   - findCapabilityForCommand: all command types, unknown, empty capabilities (11)
-  - parseColor: hex with/without #, black, white, invalid (5)
   - logDedup: category tracking, warn vs debug (1+assertions)
   - handleMqttStatus edge cases: partial update, colorTemp, mqtt channel, empty state (4)
   - handleLanStatus edge cases: zero brightness, colorTemInKelvin 0 (2)
   - noMqtt quirk: H6121 skips MQTT, non-quirk uses MQTT (2)
   - DIY scene via LAN: library match, no match fallback (2)
   - colorTemperature via LAN, no channel warning (2)
-test/testDeviceQuirks.ts     → Device Quirks (12 Tests)
+  - generateDiagnostics: all data, quirks (2)
+  - toCloudValue bounds checks: NaN, zero, out-of-range (5)
+test/testDeviceQuirks.ts     → Device Quirks + Community Quirks (17 Tests)
   - getDeviceQuirks: known, case-insensitive, unknown, brokenPlatformApi, noMqtt, all broken, all noMqtt (7)
   - applyColorTempQuirk: override, passthrough, no range, H6022, case-insensitive (5)
+  - loadCommunityQuirks: load+override, add new, missing file, corrupt JSON, case-insensitive (5)
 test/testLocalSnapshots.ts   → Local Snapshots (10 Tests)
   - Create dir, empty device, save/retrieve, overwrite, multiple, delete, non-existent, per-device, corrupt, colorTemp
 test/testLanClient.ts        → LAN Client BLE Packet Builder (16 Tests)
@@ -230,14 +240,17 @@ test/testRateLimiter.ts      → Rate Limiter (9 Tests)
   - Limits, daily usage, queueing, priority sorting, stop/clear, counter tracking
 test/testSkuCache.ts         → SKU Cache (12 Tests)
   - Create dir, null entry, save/load, overwrite, separate devices, same SKU, loadAll, clear, corrupt, normalized ID, libraries, null features
-test/testTypes.ts            → Shared Utilities (19 Tests)
-  - normalizeDeviceId: colons, lowercase, empty string
-  - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property
+test/testTypes.ts            → Shared Utilities (29 Tests)
+  - normalizeDeviceId: colons, lowercase, empty string (4)
+  - rgbToHex: standard, padding, white (3)
+  - hexToRgb: with #, without #, black, invalid (4)
+  - rgbIntToHex: standard, zero, white (3)
+  - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property (15)
 test/testStateManager.ts     → State Manager (37 Tests)
   - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons (4)
   - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip (9)
   - createDeviceStates channels: scenes routing, music routing, snapshot routing, multi-channel (4)
-  - resolveStatePath: control, scenes, music, snapshots, unknown→control (5)
+  - resolveStatePath: control, scenes, music, snapshots, diagnostics, unknown→control (6)
   - updateDeviceState: power, multiple fields, online, undefined fields, missing object (5)
   - removeDevice: recursive delete (1)
   - cleanupDevices: remove stale, keep existing (2)

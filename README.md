@@ -114,10 +114,12 @@ govee-smart.0.
 │       │   ├── music_sensitivity — Music sensitivity 0-100 (number, writable)
 │       │   └── music_auto_color — Music auto color (boolean, writable)
 │       ├── snapshots/
-│       │   ├── snapshot        — Cloud snapshot (string, dropdown, writable)
-│       │   ├── snapshot_local  — Local snapshot (string, dropdown, writable)
-│       │   ├── snapshot_save   — Save current state as local snapshot (string, writable)
-│       │   └── snapshot_delete — Delete a local snapshot (string, writable)
+│       │   ├── snapshot          — Cloud snapshot (string, dropdown, writable)
+│       │   ├── snapshot_local    — Local snapshot (string, dropdown, writable)
+│       │   ├── snapshot_save     — Save current state as local snapshot (string, writable)
+│       │   ├── snapshot_delete   — Delete a local snapshot (string, writable)
+│       │   ├── diagnostics_export — Export device diagnostics (button, writable)
+│       │   └── diagnostics_result — Diagnostics JSON output (string, read-only)
 │       └── segments/
 │           ├── count           — Number of segments (number)
 │           ├── command         — Batch control "1-5:#ff0000:20" (string, writable)
@@ -209,6 +211,21 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 1.1.0 (2026-04-11)
+- Add diagnostics export per device — structured JSON for GitHub issue submission
+- Add community quirks database — external JSON (`community-quirks.json`) for user-contributed SKU overrides
+- Fix array bounds checks in scene/DIY/snapshot index lookups (prevents crash on invalid indices)
+- Fix segment batch parsing edge cases (negative indices, empty device list growth)
+- Major internal refactoring: 8 focused refactorings for improved maintainability
+  - Extract `CommandRouter` from DeviceManager (device-manager.ts: 1,459 → 886 lines)
+  - Extract `GoveeApiClient` from MQTT client (govee-mqtt-client.ts: 785 → 483 lines)
+  - Extract `buildDeviceStateDefs` to capability-mapper (main.ts: 1,077 → 921 lines)
+  - Shared HTTP client replacing 3 duplicate implementations
+  - Shared color utilities (`rgbToHex`, `hexToRgb`, `rgbIntToHex`)
+  - Channel field on `StateDefinition` replacing fragile Set-based routing
+  - Consolidated rate-limiter pattern and split `loadFromCloud` into sub-methods
+- Test coverage increased to 309 tests (was 291)
+
 ### 1.0.1 (2026-04-11)
 - Fix segment capability matching: color and brightness commands now route to correct API capabilities
 - Fix segment count using maximum across all segment capabilities instead of first found

@@ -1,0 +1,20 @@
+{
+  "$comment": "Community quirks database — SKU-specific corrections for wrong API data. Contribute via GitHub issue with diagnostics export.",
+  "version": 1,
+  "quirks": {
+    "H60A1": { "colorTempRange": { "min": 2200, "max": 6500 } },
+    "H6022": { "colorTempRange": { "min": 2700, "max": 6500 } },
+    "H6141": { "brokenPlatformApi": true },
+    "H6159": { "brokenPlatformApi": true },
+    "H6003": { "brokenPlatformApi": true },
+    "H6102": { "brokenPlatformApi": true },
+    "H6053": { "brokenPlatformApi": true },
+    "H617C": { "brokenPlatformApi": true },
+    "H617E": { "brokenPlatformApi": true },
+    "H617F": { "brokenPlatformApi": true },
+    "H6119": { "brokenPlatformApi": true },
+    "H6121": { "noMqtt": true },
+    "H6154": { "noMqtt": true },
+    "H6176": { "noMqtt": true }
+  }
+}

@@ -1,9 +1,7 @@
 "use strict";
-var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -17,14 +15,6 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
-var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
-  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
-  mod
-));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var govee_cloud_client_exports = {};
 __export(govee_cloud_client_exports, {
@@ -32,21 +22,9 @@ __export(govee_cloud_client_exports, {
   GoveeCloudClient: () => GoveeCloudClient
 });
 module.exports = __toCommonJS(govee_cloud_client_exports);
-var https = __toESM(require("node:https"));
+var import_http_client = require("./http-client.js");
 const BASE_URL = "https://openapi.api.govee.com";
-class CloudApiError extends Error {
-  /** HTTP status code */
-  statusCode;
-  /**
-   * @param message Error message
-   * @param statusCode HTTP status code
-   */
-  constructor(message, statusCode) {
-    super(message);
-    this.name = "CloudApiError";
-    this.statusCode = statusCode;
-  }
-}
+const CloudApiError = import_http_client.HttpError;
 class GoveeCloudClient {
   apiKey;
   log;
@@ -186,64 +164,27 @@ class GoveeCloudClient {
    * @param path API endpoint path
    * @param body Optional request body
    */
-  request(method, path, body) {
+  async request(method, path, body) {
+    var _a;
     this.log.debug(`Cloud API: ${method} ${path}`);
-    return new Promise((resolve, reject) => {
-      const url = new URL(path, BASE_URL);
-      const postData = body ? JSON.stringify(body) : void 0;
-      const options = {
+    try {
+      return await (0, import_http_client.httpsRequest)({
         method,
-        hostname: url.hostname,
-        path: url.pathname,
-        headers: {
-          "Content-Type": "application/json",
-          "Govee-API-Key": this.apiKey,
-          ...postData ? { "Content-Length": Buffer.byteLength(postData) } : {}
-        },
-        timeout: 15e3
-      };
-      const req = https.request(options, (res) => {
-        const chunks = [];
-        res.on("data", (chunk) => chunks.push(chunk));
-        res.on("end", () => {
-          var _a;
-          const raw = Buffer.concat(chunks).toString();
-          const statusCode = (_a = res.statusCode) != null ? _a : 0;
-          if (statusCode === 429) {
-            const retryAfter = res.headers["retry-after"];
-            reject(
-              new CloudApiError(
-                `Rate limited \u2014 retry after ${retryAfter != null ? retryAfter : "unknown"}s`,
-                429
-              )
-            );
-            return;
-          }
-          if (statusCode < 200 || statusCode >= 300) {
-            reject(
-              new CloudApiError(
-                `HTTP ${statusCode}: ${raw.slice(0, 200)}`,
-                statusCode
-              )
-            );
-            return;
-          }
-          try {
-            resolve(JSON.parse(raw));
-          } catch {
-            reject(new Error(`Invalid JSON response: ${raw.slice(0, 200)}`));
-          }
-        });
+        url: new URL(path, BASE_URL).toString(),
+        headers: { "Govee-API-Key": this.apiKey },
+        body
       });
-      req.on("error", reject);
-      req.on("timeout", () => {
-        req.destroy(new Error("Request timed out"));
-      });
-      if (postData) {
-        req.write(postData);
+    } catch (err) {
+      if (err instanceof import_http_client.HttpError && err.statusCode === 429) {
+        const retryAfter = String((_a = err.headers["retry-after"]) != null ? _a : "unknown");
+        throw new import_http_client.HttpError(
+          `Rate limited \u2014 retry after ${retryAfter}s`,
+          429,
+          err.headers
+        );
       }
-      req.end();
-    });
+      throw err;
+    }
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

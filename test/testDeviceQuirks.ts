@@ -1,5 +1,8 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { expect } from "chai";
-import { getDeviceQuirks, applyColorTempQuirk } from "../src/lib/device-quirks";
+import { getDeviceQuirks, applyColorTempQuirk, loadCommunityQuirks } from "../src/lib/device-quirks";
 
 describe("getDeviceQuirks", () => {
     it("should return quirks for known SKU", () => {
@@ -71,5 +74,78 @@ describe("applyColorTempQuirk", () => {
     it("should be case-insensitive", () => {
         const result = applyColorTempQuirk("h6022", 2000, 9000);
         expect(result).to.deep.equal({ min: 2700, max: 6500 });
+    });
+});
+
+describe("loadCommunityQuirks", () => {
+    let tmpDir: string;
+
+    beforeEach(() => {
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "quirks-test-"));
+    });
+
+    afterEach(() => {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("should load community quirks and override built-in", () => {
+        const quirksData = {
+            version: 1,
+            quirks: {
+                H60A1: { colorTempRange: { min: 2400, max: 6000 } },
+            },
+        };
+        const filePath = path.join(tmpDir, "community-quirks.json");
+        fs.writeFileSync(filePath, JSON.stringify(quirksData));
+
+        loadCommunityQuirks(filePath);
+        const quirks = getDeviceQuirks("H60A1");
+        expect(quirks?.colorTempRange).to.deep.equal({ min: 2400, max: 6000 });
+    });
+
+    it("should add new SKU from community quirks", () => {
+        const quirksData = {
+            version: 1,
+            quirks: {
+                H9999: { colorTempRange: { min: 3000, max: 5000 }, noMqtt: true },
+            },
+        };
+        const filePath = path.join(tmpDir, "community-quirks.json");
+        fs.writeFileSync(filePath, JSON.stringify(quirksData));
+
+        loadCommunityQuirks(filePath);
+        const quirks = getDeviceQuirks("H9999");
+        expect(quirks).to.not.be.undefined;
+        expect(quirks!.noMqtt).to.be.true;
+        expect(quirks!.colorTempRange).to.deep.equal({ min: 3000, max: 5000 });
+    });
+
+    it("should handle missing file gracefully", () => {
+        loadCommunityQuirks(path.join(tmpDir, "nonexistent.json"));
+        // Built-in quirks should still work
+        expect(getDeviceQuirks("H6121")?.noMqtt).to.be.true;
+    });
+
+    it("should handle corrupt JSON gracefully", () => {
+        const filePath = path.join(tmpDir, "bad.json");
+        fs.writeFileSync(filePath, "not valid json{{{");
+
+        loadCommunityQuirks(filePath);
+        // Built-in quirks should still work
+        expect(getDeviceQuirks("H6121")?.noMqtt).to.be.true;
+    });
+
+    it("should be case-insensitive for community SKUs", () => {
+        const quirksData = {
+            version: 1,
+            quirks: {
+                h7777: { noMqtt: true },
+            },
+        };
+        const filePath = path.join(tmpDir, "community-quirks.json");
+        fs.writeFileSync(filePath, JSON.stringify(quirksData));
+
+        loadCommunityQuirks(filePath);
+        expect(getDeviceQuirks("H7777")?.noMqtt).to.be.true;
     });
 });

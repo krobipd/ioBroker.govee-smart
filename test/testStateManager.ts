@@ -272,6 +272,7 @@ describe("StateManager", () => {
                 def: "0",
                 capabilityType: "dynamic_scene",
                 capabilityInstance: "lightScene",
+                channel: "scenes",
             }];
 
             await sm.createDeviceStates(dev, defs);
@@ -294,8 +295,8 @@ describe("StateManager", () => {
             const dev = createTestDevice();
 
             const defs: StateDefinition[] = [
-                { id: "music_mode", name: "Music Mode", type: "string", role: "text", write: true, def: "0", capabilityType: "music_setting", capabilityInstance: "musicMode" },
-                { id: "music_sensitivity", name: "Sensitivity", type: "number", role: "level", write: true, min: 0, max: 100, def: 100, capabilityType: "music_setting", capabilityInstance: "musicMode" },
+                { id: "music_mode", name: "Music Mode", type: "string", role: "text", write: true, def: "0", capabilityType: "music_setting", capabilityInstance: "musicMode", channel: "music" },
+                { id: "music_sensitivity", name: "Sensitivity", type: "number", role: "level", write: true, min: 0, max: 100, def: 100, capabilityType: "music_setting", capabilityInstance: "musicMode", channel: "music" },
             ];
 
             await sm.createDeviceStates(dev, defs);
@@ -312,10 +313,10 @@ describe("StateManager", () => {
             const dev = createTestDevice();
 
             const defs: StateDefinition[] = [
-                { id: "snapshot", name: "Snapshot", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "snapshot" },
-                { id: "snapshot_local", name: "Local Snapshot", type: "string", role: "text", write: true, def: "0", capabilityType: "local", capabilityInstance: "snapshotLocal" },
-                { id: "snapshot_save", name: "Save", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotSave" },
-                { id: "snapshot_delete", name: "Delete", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotDelete" },
+                { id: "snapshot", name: "Snapshot", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "snapshot", channel: "snapshots" },
+                { id: "snapshot_local", name: "Local Snapshot", type: "string", role: "text", write: true, def: "0", capabilityType: "local", capabilityInstance: "snapshotLocal", channel: "snapshots" },
+                { id: "snapshot_save", name: "Save", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotSave", channel: "snapshots" },
+                { id: "snapshot_delete", name: "Delete", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotDelete", channel: "snapshots" },
             ];
 
             await sm.createDeviceStates(dev, defs);
@@ -335,9 +336,9 @@ describe("StateManager", () => {
 
             const defs: StateDefinition[] = [
                 ...basicControlDefs(),
-                { id: "light_scene", name: "Scene", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "lightScene" },
-                { id: "music_mode", name: "Music", type: "string", role: "text", write: true, def: "0", capabilityType: "music_setting", capabilityInstance: "musicMode" },
-                { id: "snapshot_save", name: "Save", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotSave" },
+                { id: "light_scene", name: "Scene", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "lightScene", channel: "scenes" },
+                { id: "music_mode", name: "Music", type: "string", role: "text", write: true, def: "0", capabilityType: "music_setting", capabilityInstance: "musicMode", channel: "music" },
+                { id: "snapshot_save", name: "Save", type: "string", role: "text", write: true, def: "", capabilityType: "local", capabilityInstance: "snapshotSave", channel: "snapshots" },
             ];
 
             await sm.createDeviceStates(dev, defs);
@@ -381,25 +382,52 @@ describe("StateManager", () => {
             expect(sm.resolveStatePath("devices.h6160_0011", "brightness")).to.equal("devices.h6160_0011.control.brightness");
         });
 
-        it("should route scene states to scenes channel", () => {
+        it("should route scene states to scenes channel", async () => {
             const { adapter } = createMockAdapter();
             const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "light_scene", name: "Scene", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "lightScene", channel: "scenes" },
+                { id: "diy_scene", name: "DIY", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "diyScene", channel: "scenes" },
+                { id: "scene_speed", name: "Speed", type: "number", role: "level", write: true, def: 0, capabilityType: "local", capabilityInstance: "sceneSpeed", channel: "scenes" },
+            ]);
             expect(sm.resolveStatePath("devices.h6160_0011", "light_scene")).to.equal("devices.h6160_0011.scenes.light_scene");
             expect(sm.resolveStatePath("devices.h6160_0011", "diy_scene")).to.equal("devices.h6160_0011.scenes.diy_scene");
             expect(sm.resolveStatePath("devices.h6160_0011", "scene_speed")).to.equal("devices.h6160_0011.scenes.scene_speed");
         });
 
-        it("should route music states to music channel", () => {
+        it("should route music states to music channel", async () => {
             const { adapter } = createMockAdapter();
             const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "music_mode", name: "Music", type: "string", role: "text", write: true, def: "0", capabilityType: "music_setting", capabilityInstance: "musicMode", channel: "music" },
+            ]);
             expect(sm.resolveStatePath("devices.h6160_0011", "music_mode")).to.equal("devices.h6160_0011.music.music_mode");
         });
 
-        it("should route snapshot states to snapshots channel", () => {
+        it("should route snapshot states to snapshots channel", async () => {
             const { adapter } = createMockAdapter();
             const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "snapshot", name: "Snapshot", type: "string", role: "text", write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "snapshot", channel: "snapshots" },
+                { id: "snapshot_local", name: "Local", type: "string", role: "text", write: true, def: "0", capabilityType: "local", capabilityInstance: "snapshotLocal", channel: "snapshots" },
+            ]);
             expect(sm.resolveStatePath("devices.h6160_0011", "snapshot")).to.equal("devices.h6160_0011.snapshots.snapshot");
             expect(sm.resolveStatePath("devices.h6160_0011", "snapshot_local")).to.equal("devices.h6160_0011.snapshots.snapshot_local");
+        });
+
+        it("should route diagnostics states to snapshots channel", async () => {
+            const { adapter } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "diagnostics_export", name: "Export", type: "boolean", role: "button", write: true, def: false, capabilityType: "local", capabilityInstance: "diagnosticsExport", channel: "snapshots" },
+                { id: "diagnostics_result", name: "Result", type: "string", role: "json", write: false, def: "", capabilityType: "local", capabilityInstance: "diagnosticsResult", channel: "snapshots" },
+            ]);
+            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_export")).to.equal("devices.h6160_0011.snapshots.diagnostics_export");
+            expect(sm.resolveStatePath("devices.h6160_0011", "diagnostics_result")).to.equal("devices.h6160_0011.snapshots.diagnostics_result");
         });
 
         it("should route unknown states to control channel", () => {
@@ -573,6 +601,7 @@ describe("StateManager", () => {
             const defs: StateDefinition[] = [{
                 id: "light_scene", name: "Scene", type: "string", role: "text",
                 write: true, def: "0", capabilityType: "dynamic_scene", capabilityInstance: "lightScene",
+                channel: "scenes",
             }];
             await sm.createDeviceStates(dev, defs);
 

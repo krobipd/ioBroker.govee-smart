@@ -1,6 +1,6 @@
-import * as https from "node:https";
 import * as forge from "node-forge";
 import * as mqtt from "mqtt";
+import { httpsRequest } from "./http-client.js";
 import {
   classifyError,
   type ErrorCategory,
@@ -398,14 +398,10 @@ export class GoveeMqttClient {
 
   /** Login to Govee account */
   private login(): Promise<GoveeLoginResponse> {
-    return this.httpsPost<GoveeLoginResponse>(
-      LOGIN_URL,
-      {
-        email: this.email,
-        password: this.password,
-        client: CLIENT_ID,
-      },
-      {
+    return httpsRequest<GoveeLoginResponse>({
+      method: "POST",
+      url: LOGIN_URL,
+      headers: {
         appVersion: APP_VERSION,
         clientId: CLIENT_ID,
         clientType: CLIENT_TYPE,
@@ -415,230 +411,27 @@ export class GoveeMqttClient {
         envid: "0",
         iotversion: "0",
       },
-    );
+      body: {
+        email: this.email,
+        password: this.password,
+        client: CLIENT_ID,
+      },
+    });
   }
 
   /** Get IoT key (P12 certificate) */
   private getIotKey(): Promise<GoveeIotKeyResponse> {
-    return this.httpsGet<GoveeIotKeyResponse>(IOT_KEY_URL, {
-      Authorization: `Bearer ${this._bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT,
+    return httpsRequest<GoveeIotKeyResponse>({
+      method: "GET",
+      url: IOT_KEY_URL,
+      headers: {
+        Authorization: `Bearer ${this._bearerToken}`,
+        appVersion: APP_VERSION,
+        clientId: CLIENT_ID,
+        clientType: CLIENT_TYPE,
+        "User-Agent": USER_AGENT,
+      },
     });
-  }
-
-  /**
-   * Fetch scene library for a specific SKU from undocumented API.
-   * Public endpoint — no authentication required, only AppVersion header.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchSceneLibrary(sku: string): Promise<
-    {
-      name: string;
-      sceneCode: number;
-      scenceParam?: string;
-      speedInfo?: {
-        supSpeed: boolean;
-        speedIndex: number;
-        config: string;
-      };
-    }[]
-  > {
-    const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet<{
-      data?: {
-        categories?: Array<{
-          scenes?: Array<{
-            sceneName?: string;
-            sceneCode?: number;
-            lightEffects?: Array<{
-              sceneCode?: number;
-              scenceParam?: string;
-              speedInfo?: {
-                supSpeed?: boolean;
-                speedIndex?: number;
-                config?: string;
-              };
-            }>;
-          }>;
-        }>;
-      };
-    }>(url, {
-      appVersion: APP_VERSION,
-      "User-Agent": USER_AGENT,
-    });
-
-    const scenes: {
-      name: string;
-      sceneCode: number;
-      scenceParam?: string;
-      speedInfo?: { supSpeed: boolean; speedIndex: number; config: string };
-    }[] = [];
-    for (const cat of resp.data?.categories ?? []) {
-      for (const s of cat.scenes ?? []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        // Use effect-level sceneCode (more reliable than scene-level)
-        const effect = s.lightEffects?.[0];
-        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
-        if (code > 0) {
-          const si = effect?.speedInfo;
-          scenes.push({
-            name: s.sceneName,
-            sceneCode: code,
-            scenceParam: effect?.scenceParam || undefined,
-            speedInfo: si?.supSpeed
-              ? {
-                  supSpeed: true,
-                  speedIndex: si.speedIndex ?? 0,
-                  config: si.config ?? "",
-                }
-              : undefined,
-          });
-        }
-      }
-    }
-
-    return scenes;
-  }
-
-  /** Headers for authenticated undocumented API endpoints */
-  private authHeaders(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this._bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT,
-    };
-  }
-
-  /**
-   * Fetch music effect library for a specific SKU (requires auth).
-   * Returns music modes with BLE data for ptReal local control.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchMusicLibrary(
-    sku: string,
-  ): Promise<
-    { name: string; musicCode: number; scenceParam?: string; mode?: number }[]
-  > {
-    if (!this._bearerToken) {
-      return [];
-    }
-    const url = `https://app2.govee.com/appsku/v1/music-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet<{
-      data?: {
-        categories?: Array<{
-          categoryName?: string;
-          scenes?: Array<{
-            sceneName?: string;
-            sceneCode?: number;
-            lightEffects?: Array<{
-              sceneCode?: number;
-              scenceParam?: string;
-            }>;
-          }>;
-        }>;
-      };
-    }>(url, this.authHeaders());
-
-    const modes: {
-      name: string;
-      musicCode: number;
-      scenceParam?: string;
-      mode?: number;
-    }[] = [];
-    let modeIdx = 0;
-    for (const cat of resp.data?.categories ?? []) {
-      for (const s of cat.scenes ?? []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        const effect = s.lightEffects?.[0];
-        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
-        if (code > 0) {
-          modes.push({
-            name: s.sceneName,
-            musicCode: code,
-            scenceParam: effect?.scenceParam || undefined,
-            mode: modeIdx,
-          });
-        }
-        modeIdx++;
-      }
-    }
-    return modes;
-  }
-
-  /**
-   * Fetch DIY light effect library for a specific SKU (requires auth).
-   * Returns DIY scene definitions with BLE data for ptReal local control.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchDiyLibrary(
-    sku: string,
-  ): Promise<{ name: string; diyCode: number; scenceParam?: string }[]> {
-    if (!this._bearerToken) {
-      return [];
-    }
-    const url = `https://app2.govee.com/appsku/v1/diy-light-effect-libraries?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet<{
-      data?: {
-        categories?: Array<{
-          scenes?: Array<{
-            sceneName?: string;
-            sceneCode?: number;
-            lightEffects?: Array<{
-              sceneCode?: number;
-              scenceParam?: string;
-            }>;
-          }>;
-        }>;
-      };
-    }>(url, this.authHeaders());
-
-    const diys: { name: string; diyCode: number; scenceParam?: string }[] = [];
-    for (const cat of resp.data?.categories ?? []) {
-      for (const s of cat.scenes ?? []) {
-        if (!s.sceneName) {
-          continue;
-        }
-        const effect = s.lightEffects?.[0];
-        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
-        if (code > 0) {
-          diys.push({
-            name: s.sceneName,
-            diyCode: code,
-            scenceParam: effect?.scenceParam || undefined,
-          });
-        }
-      }
-    }
-    return diys;
-  }
-
-  /**
-   * Fetch supported features for a specific SKU (requires auth).
-   * Returns feature flags indicating what the device supports.
-   *
-   * @param sku Product model (e.g. "H61BE")
-   */
-  async fetchSkuFeatures(sku: string): Promise<Record<string, unknown> | null> {
-    if (!this._bearerToken) {
-      return null;
-    }
-    const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
-    const resp = await this.httpsGet<{
-      data?: Record<string, unknown>;
-    }>(url, this.authHeaders());
-    return resp.data ?? null;
   }
 
   /**
@@ -685,101 +478,6 @@ export class GoveeMqttClient {
       const r = (Math.random() * 16) | 0;
       const v = c === "x" ? r : (r & 0x3) | 0x8;
       return v.toString(16);
-    });
-  }
-
-  /**
-   * HTTPS POST helper
-   *
-   * @param url Full URL to POST to
-   * @param body Request body object
-   * @param extraHeaders Additional HTTP headers
-   */
-  private httpsPost<T>(
-    url: string,
-    body: unknown,
-    extraHeaders?: Record<string, string>,
-  ): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const u = new URL(url);
-      const postData = JSON.stringify(body);
-
-      const req = https.request(
-        {
-          method: "POST",
-          hostname: u.hostname,
-          path: u.pathname,
-          headers: {
-            "Content-Type": "application/json",
-            "Content-Length": Buffer.byteLength(postData),
-            ...extraHeaders,
-          },
-          timeout: 15_000,
-        },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => {
-            const raw = Buffer.concat(chunks).toString();
-            if ((res.statusCode ?? 0) >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 200)}`));
-              return;
-            }
-            try {
-              resolve(JSON.parse(raw) as T);
-            } catch {
-              reject(new Error(`Invalid JSON: ${raw.slice(0, 200)}`));
-            }
-          });
-        },
-      );
-      req.on("error", reject);
-      req.on("timeout", () => req.destroy(new Error("Timeout")));
-      req.write(postData);
-      req.end();
-    });
-  }
-
-  /**
-   * HTTPS GET helper
-   *
-   * @param url Full URL to GET
-   * @param headers HTTP headers
-   */
-  private httpsGet<T>(
-    url: string,
-    headers: Record<string, string>,
-  ): Promise<T> {
-    return new Promise((resolve, reject) => {
-      const u = new URL(url);
-      const req = https.request(
-        {
-          method: "GET",
-          hostname: u.hostname,
-          path: u.pathname + u.search,
-          headers,
-          timeout: 15_000,
-        },
-        (res) => {
-          const chunks: Buffer[] = [];
-          res.on("data", (chunk: Buffer) => chunks.push(chunk));
-          res.on("end", () => {
-            const raw = Buffer.concat(chunks).toString();
-            if ((res.statusCode ?? 0) >= 400) {
-              reject(new Error(`HTTP ${res.statusCode}: ${raw.slice(0, 200)}`));
-              return;
-            }
-            try {
-              resolve(JSON.parse(raw) as T);
-            } catch {
-              reject(new Error(`Invalid JSON: ${raw.slice(0, 200)}`));
-            }
-          });
-        },
-      );
-      req.on("error", reject);
-      req.on("timeout", () => req.destroy(new Error("Timeout")));
-      req.end();
     });
   }
 }

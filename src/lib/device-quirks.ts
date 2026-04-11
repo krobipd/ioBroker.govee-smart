@@ -1,6 +1,8 @@
+import * as fs from "node:fs";
+
 /**
  * Device quirks — overrides for SKUs where Govee's API data is wrong.
- * Source: govee2mqtt research, real-world testing.
+ * Source: govee2mqtt research, real-world testing, community reports.
  */
 
 /** Per-SKU quirk overrides */
@@ -13,7 +15,8 @@ export interface DeviceQuirks {
   noMqtt?: boolean;
 }
 
-const QUIRKS: Record<string, DeviceQuirks> = {
+/** Built-in quirks — verified, always available */
+const BUILTIN_QUIRKS: Record<string, DeviceQuirks> = {
   // Color temperature overrides (API claims 2000-9000K)
   H60A1: { colorTempRange: { min: 2200, max: 6500 } },
   H6022: { colorTempRange: { min: 2700, max: 6500 } },
@@ -35,13 +38,62 @@ const QUIRKS: Record<string, DeviceQuirks> = {
   H6176: { noMqtt: true },
 };
 
+/** Merged quirks map: community overrides built-in */
+let mergedQuirks: Record<string, DeviceQuirks> = { ...BUILTIN_QUIRKS };
+
+/** Community quirks JSON file structure */
+interface CommunityQuirksFile {
+  version?: number;
+  quirks: Record<string, DeviceQuirks>;
+}
+
+/**
+ * Load community quirks from a JSON file and merge with built-in quirks.
+ * Community entries override built-in entries for the same SKU.
+ *
+ * @param filePath Path to community-quirks.json
+ * @param log Optional logger with info and debug methods
+ * @param log.info Log info message
+ * @param log.debug Log debug message
+ */
+export function loadCommunityQuirks(
+  filePath: string,
+  log?: { info: (msg: string) => void; debug: (msg: string) => void },
+): void {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw) as CommunityQuirksFile;
+    if (!data.quirks || typeof data.quirks !== "object") {
+      log?.debug("Community quirks file has no valid 'quirks' object");
+      return;
+    }
+
+    // Merge: community overrides built-in
+    mergedQuirks = { ...BUILTIN_QUIRKS };
+    let count = 0;
+    for (const [sku, quirk] of Object.entries(data.quirks)) {
+      mergedQuirks[sku.toUpperCase()] = quirk;
+      count++;
+    }
+    log?.debug(`Loaded ${count} community quirks (v${data.version ?? "?"})`);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      log?.debug("No community quirks file found — using built-in only");
+    } else {
+      log?.info(
+        `Could not load community quirks: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+}
+
 /**
  * Get quirks for a device SKU.
  *
  * @param sku Product model (e.g. "H60A1")
  */
 export function getDeviceQuirks(sku: string): DeviceQuirks | undefined {
-  return QUIRKS[sku.toUpperCase()];
+  return mergedQuirks[sku.toUpperCase()];
 }
 
 /**

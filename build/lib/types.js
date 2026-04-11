@@ -19,7 +19,10 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var types_exports = {};
 __export(types_exports, {
   classifyError: () => classifyError,
-  normalizeDeviceId: () => normalizeDeviceId
+  hexToRgb: () => hexToRgb,
+  normalizeDeviceId: () => normalizeDeviceId,
+  rgbIntToHex: () => rgbIntToHex,
+  rgbToHex: () => rgbToHex
 });
 module.exports = __toCommonJS(types_exports);
 function normalizeDeviceId(id) {
@@ -50,9 +53,22 @@ function classifyError(err) {
   }
   return "UNKNOWN";
 }
+function rgbToHex(r, g, b) {
+  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+function hexToRgb(hex) {
+  const num = parseInt(hex.replace("#", ""), 16) || 0;
+  return { r: num >> 16 & 255, g: num >> 8 & 255, b: num & 255 };
+}
+function rgbIntToHex(rgb) {
+  return `#${(rgb & 16777215).toString(16).padStart(6, "0")}`;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   classifyError,
-  normalizeDeviceId
+  hexToRgb,
+  normalizeDeviceId,
+  rgbIntToHex,
+  rgbToHex
 });
 //# sourceMappingURL=types.js.map

@@ -19,11 +19,13 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var capability_mapper_exports = {};
 __export(capability_mapper_exports, {
   applyQuirksToStates: () => applyQuirksToStates,
+  buildDeviceStateDefs: () => buildDeviceStateDefs,
   getDefaultLanStates: () => getDefaultLanStates,
   mapCapabilities: () => mapCapabilities,
   mapCloudStateValue: () => mapCloudStateValue
 });
 module.exports = __toCommonJS(capability_mapper_exports);
+var import_types = require("./types.js");
 var import_device_quirks = require("./device-quirks.js");
 function mapCapabilities(capabilities) {
   const states = [];
@@ -138,7 +140,8 @@ function mapSingleCapability(cap) {
       ];
     case "dynamic_scene":
     case "work_mode":
-    case "temperature_setting":
+    case "temperature_setting": {
+      const dsChannel = cap.instance === "snapshot" ? "snapshots" : cap.instance === "lightScene" || cap.instance === "diyScene" ? "scenes" : void 0;
       return [
         {
           id: sanitizeId(cap.instance),
@@ -148,9 +151,11 @@ function mapSingleCapability(cap) {
           write: true,
           def: "",
           capabilityType: cap.type,
-          capabilityInstance: cap.instance
+          capabilityInstance: cap.instance,
+          channel: dsChannel
         }
       ];
+    }
     case "music_setting":
       return mapMusicSetting(cap);
     default:
@@ -320,6 +325,9 @@ function mapMusicSetting(cap) {
       capabilityInstance: cap.instance
     });
   }
+  for (const s of states) {
+    s.channel = "music";
+  }
   return states;
 }
 function applyQuirksToStates(sku, states) {
@@ -367,12 +375,9 @@ function mapCloudStateValue(cap) {
     case "color_setting":
       if (cap.instance === "colorRgb") {
         const num = typeof raw === "number" ? raw : 0;
-        const r = num >> 16 & 255;
-        const g = num >> 8 & 255;
-        const b = num & 255;
         return {
           stateId: "colorRgb",
-          value: `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`
+          value: (0, import_types.rgbToHex)(num >> 16 & 255, num >> 8 & 255, num & 255)
         };
       }
       if (cap.instance.includes("colorTem")) {
@@ -412,9 +417,175 @@ function mapCloudStateValue(cap) {
       return null;
   }
 }
+function buildDeviceStateDefs(device, localSnapshots) {
+  let stateDefs;
+  if (device.lanIp) {
+    stateDefs = getDefaultLanStates();
+    if (device.capabilities.length > 0) {
+      const lanIds = new Set(stateDefs.map((d) => d.id));
+      const cloudDefs = mapCapabilities(device.capabilities);
+      for (const cd of cloudDefs) {
+        if (!lanIds.has(cd.id)) {
+          stateDefs.push(cd);
+        }
+      }
+    }
+  } else {
+    stateDefs = mapCapabilities(device.capabilities);
+  }
+  applyQuirksToStates(device.sku, stateDefs);
+  stateDefs = stateDefs.filter(
+    (d) => d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot"
+  );
+  if (device.scenes.length > 0) {
+    const states = { 0: "---" };
+    device.scenes.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "light_scene",
+      name: "Light Scene",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "lightScene",
+      channel: "scenes"
+    });
+  }
+  const maxSpeedLevels = device.sceneLibrary.reduce((max, s) => {
+    var _a;
+    if (!((_a = s.speedInfo) == null ? void 0 : _a.supSpeed) || !s.speedInfo.config) {
+      return max;
+    }
+    try {
+      const levels = JSON.parse(s.speedInfo.config);
+      return Math.max(max, levels.length);
+    } catch {
+      return max;
+    }
+  }, 0);
+  if (maxSpeedLevels > 1) {
+    stateDefs.push({
+      id: "scene_speed",
+      name: "Scene Speed",
+      type: "number",
+      role: "level",
+      write: true,
+      min: 0,
+      max: maxSpeedLevels - 1,
+      def: 0,
+      capabilityType: "local",
+      capabilityInstance: "sceneSpeed",
+      channel: "scenes"
+    });
+  }
+  if (device.diyScenes.length > 0) {
+    const states = { 0: "---" };
+    device.diyScenes.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "diy_scene",
+      name: "DIY Scene",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "diyScene",
+      channel: "scenes"
+    });
+  }
+  if (device.snapshots.length > 0) {
+    const states = { 0: "---" };
+    device.snapshots.forEach((s, i) => {
+      states[i + 1] = s.name;
+    });
+    stateDefs.push({
+      id: "snapshot",
+      name: "Snapshot",
+      type: "string",
+      role: "text",
+      write: true,
+      states,
+      def: "0",
+      capabilityType: "devices.capabilities.dynamic_scene",
+      capabilityInstance: "snapshot",
+      channel: "snapshots"
+    });
+  }
+  const localSnapStates = { 0: "---" };
+  if (localSnapshots) {
+    localSnapshots.forEach((s, i) => {
+      localSnapStates[i + 1] = s.name;
+    });
+  }
+  stateDefs.push({
+    id: "snapshot_local",
+    name: "Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    states: localSnapStates,
+    def: "0",
+    capabilityType: "local",
+    capabilityInstance: "snapshotLocal",
+    channel: "snapshots"
+  });
+  stateDefs.push({
+    id: "snapshot_save",
+    name: "Save Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "snapshotSave",
+    channel: "snapshots"
+  });
+  stateDefs.push({
+    id: "snapshot_delete",
+    name: "Delete Local Snapshot",
+    type: "string",
+    role: "text",
+    write: true,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "snapshotDelete",
+    channel: "snapshots"
+  });
+  stateDefs.push({
+    id: "diagnostics_export",
+    name: "Export Diagnostics",
+    type: "boolean",
+    role: "button",
+    write: true,
+    def: false,
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsExport",
+    channel: "snapshots"
+  });
+  stateDefs.push({
+    id: "diagnostics_result",
+    name: "Diagnostics JSON",
+    type: "string",
+    role: "json",
+    write: false,
+    def: "",
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsResult",
+    channel: "snapshots"
+  });
+  return stateDefs;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   applyQuirksToStates,
+  buildDeviceStateDefs,
   getDefaultLanStates,
   mapCapabilities,
   mapCloudStateValue

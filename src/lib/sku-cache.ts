@@ -4,14 +4,23 @@ import type { CloudCapability, CloudScene } from "./types.js";
 
 /** Data persisted per device in the SKU cache */
 export interface CachedDeviceData {
+  /** Product model (e.g. "H61BE") */
   sku: string;
+  /** Device identifier */
   deviceId: string;
+  /** Display name */
   name: string;
+  /** Device type (e.g. "light") */
   type: string;
+  /** Cloud API capabilities */
   capabilities: CloudCapability[];
+  /** Cloud light scenes */
   scenes: CloudScene[];
+  /** Cloud DIY scenes */
   diyScenes: CloudScene[];
+  /** Cloud snapshots */
   snapshots: CloudScene[];
+  /** Scene library from undocumented API */
   sceneLibrary: Array<{
     name: string;
     sceneCode: number;
@@ -22,18 +31,22 @@ export interface CachedDeviceData {
       config: string;
     };
   }>;
+  /** Music effect library from undocumented API */
   musicLibrary: Array<{
     name: string;
     musicCode: number;
     scenceParam?: string;
     mode?: number;
   }>;
+  /** DIY effect library from undocumented API */
   diyLibrary: Array<{
     name: string;
     diyCode: number;
     scenceParam?: string;
   }>;
+  /** SKU feature flags from undocumented API */
   skuFeatures: Record<string, unknown> | null;
+  /** Timestamp when data was cached */
   cachedAt: number;
 }
 

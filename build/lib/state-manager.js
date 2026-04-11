@@ -25,18 +25,6 @@ var import_types = require("./types.js");
 function sanitize(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
-const SCENE_IDS = /* @__PURE__ */ new Set(["light_scene", "diy_scene", "scene_speed"]);
-const MUSIC_IDS = /* @__PURE__ */ new Set([
-  "music_mode",
-  "music_sensitivity",
-  "music_auto_color"
-]);
-const SNAPSHOT_IDS = /* @__PURE__ */ new Set([
-  "snapshot",
-  "snapshot_local",
-  "snapshot_save",
-  "snapshot_delete"
-]);
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
 const CHANNEL_NAMES = {
   control: "Controls",
@@ -44,22 +32,12 @@ const CHANNEL_NAMES = {
   music: "Music",
   snapshots: "Snapshots"
 };
-function getChannelForState(stateId) {
-  if (SCENE_IDS.has(stateId)) {
-    return "scenes";
-  }
-  if (MUSIC_IDS.has(stateId)) {
-    return "music";
-  }
-  if (SNAPSHOT_IDS.has(stateId)) {
-    return "snapshots";
-  }
-  return "control";
-}
 class StateManager {
   adapter;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
   prefixMap = /* @__PURE__ */ new Map();
+  /** Maps "prefix.stateId" → channel name (populated during createDeviceStates) */
+  stateChannelMap = /* @__PURE__ */ new Map();
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter) {
     this.adapter = adapter;
@@ -72,7 +50,9 @@ class StateManager {
    * @param stateId State ID suffix
    */
   resolveStatePath(prefix, stateId) {
-    return `${prefix}.${getChannelForState(stateId)}.${stateId}`;
+    var _a;
+    const channel = (_a = this.stateChannelMap.get(`${prefix}.${stateId}`)) != null ? _a : "control";
+    return `${prefix}.${channel}.${stateId}`;
   }
   /**
    * Create device object and all states from capability definitions.
@@ -81,7 +61,7 @@ class StateManager {
    * @param stateDefs State definitions from capability mapper
    */
   async createDeviceStates(device, stateDefs) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -181,7 +161,8 @@ class StateManager {
     );
     const channelGroups = /* @__PURE__ */ new Map();
     for (const def of nonSegmentDefs) {
-      const channel = getChannelForState(def.id);
+      const channel = (_c = def.channel) != null ? _c : "control";
+      this.stateChannelMap.set(`${prefix}.${def.id}`, channel);
       if (!channelGroups.has(channel)) {
         channelGroups.set(channel, []);
       }
@@ -193,7 +174,7 @@ class StateManager {
     for (const [channel, defs] of channelGroups) {
       await this.adapter.extendObjectAsync(`${prefix}.${channel}`, {
         type: "channel",
-        common: { name: (_c = CHANNEL_NAMES[channel]) != null ? _c : channel },
+        common: { name: (_d = CHANNEL_NAMES[channel]) != null ? _d : channel },
         native: {}
       });
       for (const def of defs) {
@@ -438,10 +419,10 @@ class StateManager {
    * @param stateDefs Current state definitions (non-segment)
    */
   async cleanupAllChannelStates(prefix, stateDefs) {
-    var _a;
+    var _a, _b;
     const expectedByChannel = /* @__PURE__ */ new Map();
     for (const def of stateDefs) {
-      const channel = getChannelForState(def.id);
+      const channel = (_a = def.channel) != null ? _a : "control";
       if (!expectedByChannel.has(channel)) {
         expectedByChannel.set(channel, /* @__PURE__ */ new Set());
       }
@@ -460,7 +441,7 @@ class StateManager {
       if (!(existing == null ? void 0 : existing.rows)) {
         continue;
       }
-      const validIds = (_a = expectedByChannel.get(channel)) != null ? _a : /* @__PURE__ */ new Set();
+      const validIds = (_b = expectedByChannel.get(channel)) != null ? _b : /* @__PURE__ */ new Set();
       let deleted = 0;
       for (const row of existing.rows) {
         const stateId = row.id.replace(channelPrefix, "");

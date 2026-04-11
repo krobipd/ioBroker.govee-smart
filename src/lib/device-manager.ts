@@ -1,4 +1,6 @@
+import { CommandRouter } from "./command-router.js";
 import { getDeviceQuirks } from "./device-quirks.js";
+import type { GoveeApiClient } from "./govee-api-client.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
 import type { GoveeMqttClient } from "./govee-mqtt-client.js";
@@ -7,6 +9,7 @@ import type { CachedDeviceData, SkuCache } from "./sku-cache.js";
 import {
   classifyError,
   normalizeDeviceId,
+  rgbToHex,
   type CloudDevice,
   type DeviceState,
   type ErrorCategory,
@@ -22,10 +25,9 @@ import {
 export class DeviceManager {
   private readonly log: ioBroker.Logger;
   private readonly devices = new Map<string, GoveeDevice>();
-  private lanClient: GoveeLanClient | null = null;
-  private mqttClient: GoveeMqttClient | null = null;
+  private readonly commandRouter: CommandRouter;
   private cloudClient: GoveeCloudClient | null = null;
-  private rateLimiter: RateLimiter | null = null;
+  private apiClient: GoveeApiClient | null = null;
   private skuCache: SkuCache | null = null;
   private onDeviceUpdate:
     | ((device: GoveeDevice, state: Partial<DeviceState>) => void)
@@ -36,6 +38,7 @@ export class DeviceManager {
   /** @param log ioBroker logger */
   constructor(log: ioBroker.Logger) {
     this.log = log;
+    this.commandRouter = new CommandRouter(log);
   }
 
   /**
@@ -44,7 +47,7 @@ export class DeviceManager {
    * @param client LAN UDP client instance
    */
   setLanClient(client: GoveeLanClient): void {
-    this.lanClient = client;
+    this.commandRouter.setLanClient(client);
   }
 
   /**
@@ -53,7 +56,16 @@ export class DeviceManager {
    * @param client MQTT client instance
    */
   setMqttClient(client: GoveeMqttClient): void {
-    this.mqttClient = client;
+    this.commandRouter.setMqttClient(client);
+  }
+
+  /**
+   * Register the undocumented API client for scene/music/DIY libraries
+   *
+   * @param client API client instance
+   */
+  setApiClient(client: GoveeApiClient): void {
+    this.apiClient = client;
   }
 
   /**
@@ -63,6 +75,7 @@ export class DeviceManager {
    */
   setCloudClient(client: GoveeCloudClient): void {
     this.cloudClient = client;
+    this.commandRouter.setCloudClient(client);
   }
 
   /**
@@ -71,7 +84,7 @@ export class DeviceManager {
    * @param limiter Rate limiter instance
    */
   setRateLimiter(limiter: RateLimiter): void {
-    this.rateLimiter = limiter;
+    this.commandRouter.setRateLimiter(limiter);
   }
 
   /**
@@ -180,34 +193,11 @@ export class DeviceManager {
 
     try {
       const cloudDevices = await this.cloudClient.getDevices();
-      let changed = false;
 
-      for (const cd of cloudDevices) {
-        const existing = this.devices.get(this.deviceKey(cd.sku, cd.device));
-        if (existing) {
-          // Update capabilities and name
-          existing.name = cd.deviceName || existing.name;
-          existing.capabilities = cd.capabilities;
-          existing.type = cd.type;
-          existing.channels.cloud = true;
-        } else {
-          // New device
-          const device = this.cloudDeviceToGoveeDevice(cd);
-          this.devices.set(this.deviceKey(cd.sku, cd.device), device);
-          changed = true;
-          this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
-        }
+      // Step 1: Merge Cloud devices into local device map
+      let changed = this.mergeCloudDevices(cloudDevices);
 
-        // Warn about devices with known broken platform API metadata
-        const quirks = getDeviceQuirks(cd.sku);
-        if (quirks?.brokenPlatformApi) {
-          this.log.debug(
-            `${cd.sku} has known broken platform API metadata — capabilities may be incomplete`,
-          );
-        }
-      }
-
-      // Load scenes and snapshots for light devices
+      // Step 2: Load scenes, snapshots, and libraries for light devices
       for (const cd of cloudDevices) {
         if (
           cd.type === "light" ||
@@ -215,205 +205,19 @@ export class DeviceManager {
         ) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
-            // Scenes come from the dedicated scenes endpoint (refresh each poll)
-            // Rate-limited to avoid hitting API limits during startup
-            const loadScenes = async (): Promise<void> => {
-              try {
-                const { lightScenes, diyScenes, snapshots } =
-                  await this.cloudClient!.getScenes(cd.sku, cd.device);
-                if (
-                  lightScenes.length > 0 ||
-                  diyScenes.length > 0 ||
-                  snapshots.length > 0
-                ) {
-                  const scenesChanged =
-                    lightScenes.length !== device.scenes.length ||
-                    diyScenes.length !== device.diyScenes.length ||
-                    snapshots.length !== device.snapshots.length;
-                  device.scenes = lightScenes;
-                  device.diyScenes = diyScenes;
-                  device.snapshots = snapshots;
-                  if (scenesChanged) {
-                    changed = true;
-                  }
-                }
-              } catch {
-                this.log.debug(`Could not load scenes for ${cd.sku}`);
-              }
-            };
-            if (this.rateLimiter) {
-              await this.rateLimiter.tryExecute(loadScenes, 2);
-            } else {
-              await loadScenes();
+            if (await this.loadDeviceScenes(device, cd)) {
+              changed = true;
             }
-
-            // DIY scenes from dedicated diy-scenes endpoint
-            if (device.diyScenes.length === 0) {
-              const loadDiy = async (): Promise<void> => {
-                try {
-                  const diy = await this.cloudClient!.getDiyScenes(
-                    cd.sku,
-                    cd.device,
-                  );
-                  if (diy.length > 0) {
-                    device.diyScenes = diy;
-                    changed = true;
-                  }
-                } catch {
-                  this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
-                }
-              };
-              if (this.rateLimiter) {
-                await this.rateLimiter.tryExecute(loadDiy, 2);
-              } else {
-                await loadDiy();
-              }
-            }
-
-            // Snapshots from device capabilities (not in scenes endpoint)
-            if (device.snapshots.length === 0) {
-              const snapCap = cd.capabilities.find(
-                (c) =>
-                  c.type === "devices.capabilities.dynamic_scene" &&
-                  c.instance === "snapshot" &&
-                  c.parameters.options,
-              );
-              if (snapCap?.parameters.options) {
-                device.snapshots = snapCap.parameters.options
-                  .filter(
-                    (o) =>
-                      typeof o.name === "string" &&
-                      o.value !== undefined &&
-                      o.value !== null,
-                  )
-                  .map((o) => ({
-                    name: o.name,
-                    value:
-                      typeof o.value === "number"
-                        ? o.value
-                        : (o.value as Record<string, unknown>),
-                  }));
-                this.log.debug(
-                  `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`,
-                );
-              }
-            }
-
-            // Libraries from undocumented API (loaded once per device)
-            if (this.mqttClient) {
-              // Scene library (public, no auth needed)
-              if (device.sceneLibrary.length === 0) {
-                try {
-                  const lib = await this.mqttClient.fetchSceneLibrary(cd.sku);
-                  if (lib.length > 0) {
-                    device.sceneLibrary = lib;
-                    changed = true;
-                    this.log.debug(
-                      `Scene library for ${cd.sku}: ${lib.length} scenes`,
-                    );
-                  }
-                } catch {
-                  this.log.debug(`Could not load scene library for ${cd.sku}`);
-                }
-              }
-              // Music effect library (requires bearer token)
-              if (device.musicLibrary.length === 0) {
-                try {
-                  const lib = await this.mqttClient.fetchMusicLibrary(cd.sku);
-                  if (lib.length > 0) {
-                    device.musicLibrary = lib;
-                    changed = true;
-                    this.log.debug(
-                      `Music library for ${cd.sku}: ${lib.length} modes`,
-                    );
-                  }
-                } catch (e) {
-                  this.log.debug(
-                    `Could not load music library for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-              // DIY light effect library (requires bearer token)
-              if (device.diyLibrary.length === 0) {
-                try {
-                  const lib = await this.mqttClient.fetchDiyLibrary(cd.sku);
-                  if (lib.length > 0) {
-                    device.diyLibrary = lib;
-                    changed = true;
-                    this.log.debug(
-                      `DIY library for ${cd.sku}: ${lib.length} effects`,
-                    );
-                  }
-                } catch (e) {
-                  this.log.debug(
-                    `Could not load DIY library for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-              // SKU supported features (requires bearer token, once per SKU)
-              if (!device.skuFeatures) {
-                try {
-                  const features = await this.mqttClient.fetchSkuFeatures(
-                    cd.sku,
-                  );
-                  if (features) {
-                    device.skuFeatures = features;
-                    changed = true;
-                    this.log.debug(
-                      `SKU features for ${cd.sku}: ${JSON.stringify(features).slice(0, 200)}`,
-                    );
-                  }
-                } catch (e) {
-                  this.log.debug(
-                    `Could not load SKU features for ${cd.sku}: ${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-            }
-
-            if (
-              device.scenes.length > 0 ||
-              device.diyScenes.length > 0 ||
-              device.snapshots.length > 0
-            ) {
+            if (await this.loadDeviceLibraries(device, cd.sku)) {
               changed = true;
             }
           }
         }
       }
 
-      // Save devices to cache — skip devices with incomplete scene data
-      if (this.skuCache) {
-        let cachedCount = 0;
-        let skippedCount = 0;
-        for (const device of this.devices.values()) {
-          const isLight = device.type === "light";
-          const scenesIncomplete =
-            isLight &&
-            device.scenes.length === 0 &&
-            device.capabilities.length > 0;
-          if (scenesIncomplete) {
-            skippedCount++;
-            this.log.debug(
-              `Not caching ${device.name} (${device.sku}) — scene data incomplete`,
-            );
-          } else {
-            this.skuCache.save(this.goveeDeviceToCached(device));
-            cachedCount++;
-          }
-        }
-        if (skippedCount > 0) {
-          this.log.info(
-            `Cached ${cachedCount} device(s), skipped ${skippedCount} with incomplete data — will retry next start`,
-          );
-        } else {
-          this.log.info(
-            `Cached ${cachedCount} device(s) — next start uses cache, no Cloud needed`,
-          );
-        }
-      }
+      // Step 3: Save to cache and finalize
+      this.saveDevicesToCache();
 
-      // Fill scenes from sceneLibrary as fallback for devices still missing scenes
       for (const device of this.devices.values()) {
         this.populateScenesFromLibrary(device);
       }
@@ -426,6 +230,248 @@ export class DeviceManager {
     } catch (err) {
       this.logDedup("Cloud device list failed", err);
       return false;
+    }
+  }
+
+  /**
+   * Merge Cloud device list into local device map.
+   * Updates existing devices, adds new ones.
+   *
+   * @param cloudDevices Devices from Cloud API
+   * @returns true if any new devices were added
+   */
+  private mergeCloudDevices(cloudDevices: CloudDevice[]): boolean {
+    let changed = false;
+    for (const cd of cloudDevices) {
+      const existing = this.devices.get(this.deviceKey(cd.sku, cd.device));
+      if (existing) {
+        existing.name = cd.deviceName || existing.name;
+        existing.capabilities = cd.capabilities;
+        existing.type = cd.type;
+        existing.channels.cloud = true;
+      } else {
+        const device = this.cloudDeviceToGoveeDevice(cd);
+        this.devices.set(this.deviceKey(cd.sku, cd.device), device);
+        changed = true;
+        this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
+      }
+
+      const quirks = getDeviceQuirks(cd.sku);
+      if (quirks?.brokenPlatformApi) {
+        this.log.debug(
+          `${cd.sku} has known broken platform API metadata — capabilities may be incomplete`,
+        );
+      }
+    }
+    return changed;
+  }
+
+  /**
+   * Load scenes, DIY scenes, and snapshots for a device from Cloud API.
+   *
+   * @param device Target device to populate
+   * @param cd Cloud device data with capabilities
+   * @returns true if any scene data changed
+   */
+  private async loadDeviceScenes(
+    device: GoveeDevice,
+    cd: CloudDevice,
+  ): Promise<boolean> {
+    let changed = false;
+
+    // Scenes from dedicated scenes endpoint (rate-limited)
+    const loadScenes = async (): Promise<void> => {
+      try {
+        const { lightScenes, diyScenes, snapshots } =
+          await this.cloudClient!.getScenes(cd.sku, cd.device);
+        if (
+          lightScenes.length > 0 ||
+          diyScenes.length > 0 ||
+          snapshots.length > 0
+        ) {
+          const scenesChanged =
+            lightScenes.length !== device.scenes.length ||
+            diyScenes.length !== device.diyScenes.length ||
+            snapshots.length !== device.snapshots.length;
+          device.scenes = lightScenes;
+          device.diyScenes = diyScenes;
+          device.snapshots = snapshots;
+          if (scenesChanged) {
+            changed = true;
+          }
+        }
+      } catch {
+        this.log.debug(`Could not load scenes for ${cd.sku}`);
+      }
+    };
+    await this.commandRouter.executeRateLimited(loadScenes, 2);
+
+    // DIY scenes from dedicated endpoint
+    if (device.diyScenes.length === 0) {
+      const loadDiy = async (): Promise<void> => {
+        try {
+          const diy = await this.cloudClient!.getDiyScenes(cd.sku, cd.device);
+          if (diy.length > 0) {
+            device.diyScenes = diy;
+            changed = true;
+          }
+        } catch {
+          this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
+        }
+      };
+      await this.commandRouter.executeRateLimited(loadDiy, 2);
+    }
+
+    // Snapshots from device capabilities (fallback)
+    if (device.snapshots.length === 0) {
+      const snapCap = cd.capabilities.find(
+        (c) =>
+          c.type === "devices.capabilities.dynamic_scene" &&
+          c.instance === "snapshot" &&
+          c.parameters.options,
+      );
+      if (snapCap?.parameters.options) {
+        device.snapshots = snapCap.parameters.options
+          .filter(
+            (o) =>
+              typeof o.name === "string" &&
+              o.value !== undefined &&
+              o.value !== null,
+          )
+          .map((o) => ({
+            name: o.name,
+            value:
+              typeof o.value === "number"
+                ? o.value
+                : (o.value as Record<string, unknown>),
+          }));
+        this.log.debug(
+          `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`,
+        );
+      }
+    }
+
+    if (
+      device.scenes.length > 0 ||
+      device.diyScenes.length > 0 ||
+      device.snapshots.length > 0
+    ) {
+      changed = true;
+    }
+
+    return changed;
+  }
+
+  /**
+   * Load scene/music/DIY libraries and SKU features from undocumented API.
+   *
+   * @param device Target device to populate
+   * @param sku Product model
+   * @returns true if any library data changed
+   */
+  private async loadDeviceLibraries(
+    device: GoveeDevice,
+    sku: string,
+  ): Promise<boolean> {
+    if (!this.apiClient) {
+      return false;
+    }
+
+    let changed = false;
+
+    if (device.sceneLibrary.length === 0) {
+      try {
+        const lib = await this.apiClient.fetchSceneLibrary(sku);
+        if (lib.length > 0) {
+          device.sceneLibrary = lib;
+          changed = true;
+          this.log.debug(`Scene library for ${sku}: ${lib.length} scenes`);
+        }
+      } catch {
+        this.log.debug(`Could not load scene library for ${sku}`);
+      }
+    }
+
+    if (device.musicLibrary.length === 0) {
+      try {
+        const lib = await this.apiClient.fetchMusicLibrary(sku);
+        if (lib.length > 0) {
+          device.musicLibrary = lib;
+          changed = true;
+          this.log.debug(`Music library for ${sku}: ${lib.length} modes`);
+        }
+      } catch (e) {
+        this.log.debug(
+          `Could not load music library for ${sku}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
+    if (device.diyLibrary.length === 0) {
+      try {
+        const lib = await this.apiClient.fetchDiyLibrary(sku);
+        if (lib.length > 0) {
+          device.diyLibrary = lib;
+          changed = true;
+          this.log.debug(`DIY library for ${sku}: ${lib.length} effects`);
+        }
+      } catch (e) {
+        this.log.debug(
+          `Could not load DIY library for ${sku}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
+    if (!device.skuFeatures) {
+      try {
+        const features = await this.apiClient.fetchSkuFeatures(sku);
+        if (features) {
+          device.skuFeatures = features;
+          changed = true;
+          this.log.debug(
+            `SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`,
+          );
+        }
+      } catch (e) {
+        this.log.debug(
+          `Could not load SKU features for ${sku}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
+    }
+
+    return changed;
+  }
+
+  /** Save all devices to SKU cache, skipping those with incomplete scene data. */
+  private saveDevicesToCache(): void {
+    if (!this.skuCache) {
+      return;
+    }
+
+    let cachedCount = 0;
+    let skippedCount = 0;
+    for (const device of this.devices.values()) {
+      const isLight = device.type === "light";
+      const scenesIncomplete =
+        isLight && device.scenes.length === 0 && device.capabilities.length > 0;
+      if (scenesIncomplete) {
+        skippedCount++;
+        this.log.debug(
+          `Not caching ${device.name} (${device.sku}) — scene data incomplete`,
+        );
+      } else {
+        this.skuCache.save(this.goveeDeviceToCached(device));
+        cachedCount++;
+      }
+    }
+    if (skippedCount > 0) {
+      this.log.info(
+        `Cached ${cachedCount} device(s), skipped ${skippedCount} with incomplete data — will retry next start`,
+      );
+    } else {
+      this.log.info(
+        `Cached ${cachedCount} device(s) — next start uses cache, no Cloud needed`,
+      );
     }
   }
 
@@ -512,7 +558,7 @@ export class DeviceManager {
       }
       if (update.state.color) {
         const { r, g, b } = update.state.color;
-        state.colorRgb = `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+        state.colorRgb = rgbToHex(r, g, b);
       }
       if (update.state.colorTemInKelvin) {
         state.colorTemperature = update.state.colorTemInKelvin;
@@ -563,12 +609,29 @@ export class DeviceManager {
       online: true,
       power: status.onOff === 1,
       brightness: status.brightness,
-      colorRgb: `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`,
+      colorRgb: rgbToHex(r, g, b),
       colorTemperature: status.colorTemInKelvin || undefined,
     };
 
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);
+  }
+
+  /**
+   * Set the callback for batch segment state sync.
+   * Forwards to the internal CommandRouter.
+   *
+   * @param callback Called when a segment batch command updates segment states
+   */
+  set onSegmentBatchUpdate(
+    callback:
+      | ((
+          device: GoveeDevice,
+          batch: { segments: number[]; color?: number; brightness?: number },
+        ) => void)
+      | undefined,
+  ) {
+    this.commandRouter.onSegmentBatchUpdate = callback;
   }
 
   /**
@@ -583,96 +646,7 @@ export class DeviceManager {
     command: string,
     value: unknown,
   ): Promise<void> {
-    // Segment color: try LAN ptReal first, fall back to Cloud
-    if (command.startsWith("segmentColor:")) {
-      if (device.lanIp && this.lanClient) {
-        const segIdx = parseInt(command.split(":")[1], 10);
-        const { r, g, b } = this.parseColor(value as string);
-        this.lanClient.setSegmentColor(device.lanIp, [segIdx], r, g, b);
-        return;
-      }
-      if (device.channels.cloud && this.cloudClient) {
-        await this.sendCloudCommand(device, command, value);
-        return;
-      }
-      return;
-    }
-
-    // Segment batch: try LAN ptReal first, fall back to Cloud
-    if (command === "segmentBatch") {
-      if (device.lanIp && this.lanClient) {
-        const parsed = this.parseSegmentBatch(device, value as string);
-        if (parsed?.color !== undefined) {
-          const r = (parsed.color >> 16) & 0xff;
-          const g = (parsed.color >> 8) & 0xff;
-          const b = parsed.color & 0xff;
-          this.lanClient.setSegmentColor(
-            device.lanIp,
-            parsed.segments,
-            r,
-            g,
-            b,
-          );
-        }
-        if (parsed) {
-          this.onSegmentBatchUpdate?.(device, parsed);
-        }
-        // Brightness via ptReal not supported — fall through to Cloud if needed
-        if (parsed?.brightness !== undefined && this.cloudClient) {
-          await this.sendSegmentBatch(device, value as string);
-        }
-        return;
-      }
-      if (device.channels.cloud && this.cloudClient) {
-        await this.sendSegmentBatch(device, value as string);
-        return;
-      }
-      return;
-    }
-
-    // Scene speed: re-send active scene with modified speed level (LAN ptReal only)
-    if (command === "sceneSpeed") {
-      if (device.lanIp && this.lanClient) {
-        // TODO: Implement speed byte manipulation in scenceParam once byte layout is verified.
-        // For now, store the speed level for next scene activation.
-        device.state.sceneSpeed = parseInt(String(value), 10) || 0;
-        this.log.debug(
-          `Scene speed set to ${device.state.sceneSpeed} for ${device.name} (applied on next scene activation)`,
-        );
-      }
-      return;
-    }
-
-    // Segment brightness: Cloud only (no ptReal equivalent)
-    if (command.startsWith("segmentBrightness:")) {
-      if (device.channels.cloud && this.cloudClient) {
-        await this.sendCloudCommand(device, command, value);
-        return;
-      }
-      return;
-    }
-
-    // Priority 1: LAN
-    if (device.lanIp && this.lanClient) {
-      this.sendLanCommand(device, command, value);
-      return;
-    }
-
-    // Priority 2: MQTT (skip for devices with noMqtt quirk)
-    const quirks = getDeviceQuirks(device.sku);
-    if (!quirks?.noMqtt && device.channels.mqtt && this.mqttClient?.connected) {
-      if (this.sendMqttCommand(device, command, value)) {
-        return;
-      }
-    }
-
-    // Priority 3: Cloud (rate-limited)
-    if (device.channels.cloud && this.cloudClient) {
-      await this.sendCloudCommand(device, command, value);
-      return;
-    }
-
-    this.log.warn(`No channel available for ${device.name} (${device.sku})`);
+    return this.commandRouter.sendCommand(device, command, value);
   }
 
   /**
@@ -690,526 +664,16 @@ export class DeviceManager {
     capabilityInstance: string,
     value: unknown,
   ): Promise<void> {
-    if (!this.cloudClient || !device.channels.cloud) {
-      this.log.debug(
-        `Cloud not available for generic command on ${device.name}`,
-      );
-      return;
-    }
-
-    const shortType = capabilityType.replace("devices.capabilities.", "");
-    let cloudValue: unknown = value;
-
-    if (shortType === "toggle") {
-      cloudValue = value ? 1 : 0;
-    }
-
-    const execute = async (): Promise<void> => {
-      await this.cloudClient!.controlDevice(
-        device.sku,
-        device.deviceId,
-        capabilityType,
-        capabilityInstance,
-        cloudValue,
-      );
-    };
-
-    if (this.rateLimiter) {
-      await this.rateLimiter.tryExecute(execute, 0);
-    } else {
-      await execute();
-    }
+    return this.commandRouter.sendCapabilityCommand(
+      device,
+      capabilityType,
+      capabilityInstance,
+      value,
+    );
   }
-
-  /**
-   * Send a batch segment command.
-   * Format: "segments:color:brightness" — e.g. "1-5:#ff0000:20", "all:#00ff00", "0,3,7::50"
-   *
-   * @param device Target device
-   * @param commandStr Batch command string
-   */
-  async sendSegmentBatch(
-    device: GoveeDevice,
-    commandStr: string,
-  ): Promise<void> {
-    if (!this.cloudClient) {
-      return;
-    }
-
-    const parsed = this.parseSegmentBatch(device, commandStr);
-    if (!parsed) {
-      this.log.warn(
-        `Invalid segment command "${commandStr}" for ${device.name}`,
-      );
-      return;
-    }
-
-    const cap = this.findCapabilityForCommand(device, "segmentColor:0");
-    if (!cap) {
-      this.log.debug(`No segment capability for ${device.name}`);
-      return;
-    }
-
-    if (parsed.color !== undefined) {
-      const execute = async (): Promise<void> => {
-        await this.cloudClient!.controlDevice(
-          device.sku,
-          device.deviceId,
-          cap.type,
-          cap.instance,
-          { segment: parsed.segments, rgb: parsed.color },
-        );
-      };
-      if (this.rateLimiter) {
-        await this.rateLimiter.tryExecute(execute, 0);
-      } else {
-        await execute();
-      }
-    }
-
-    if (parsed.brightness !== undefined) {
-      const brightCap = device.capabilities.find(
-        (c) =>
-          c.type.includes("segment_color_setting") &&
-          c.instance.toLowerCase().includes("brightness"),
-      );
-      const execute = async (): Promise<void> => {
-        await this.cloudClient!.controlDevice(
-          device.sku,
-          device.deviceId,
-          (brightCap ?? cap).type,
-          (brightCap ?? cap).instance,
-          { segment: parsed.segments, brightness: parsed.brightness },
-        );
-      };
-      if (this.rateLimiter) {
-        await this.rateLimiter.tryExecute(execute, 0);
-      } else {
-        await execute();
-      }
-    }
-
-    // Update individual segment states to stay in sync
-    this.onSegmentBatchUpdate?.(device, parsed);
-  }
-
-  /**
-   * Parse batch segment command string.
-   *
-   * @param device Target device (for segment count)
-   * @param cmd Command string (e.g. "1-5:#ff0000:20")
-   */
-  private parseSegmentBatch(
-    device: GoveeDevice,
-    cmd: string,
-  ): {
-    segments: number[];
-    color?: number;
-    brightness?: number;
-  } | null {
-    const parts = cmd.split(":");
-    if (parts.length < 1 || !parts[0]) {
-      return null;
-    }
-
-    // Parse segment indices
-    const segStr = parts[0].trim();
-    const segCount = device.segmentCount ?? 0;
-    let segments: number[];
-
-    if (segStr === "all") {
-      segments = Array.from({ length: segCount }, (_, i) => i);
-    } else {
-      segments = [];
-      for (const part of segStr.split(",")) {
-        const rangeMatch = /^(\d+)-(\d+)$/.exec(part.trim());
-        if (rangeMatch) {
-          const start = parseInt(rangeMatch[1], 10);
-          const end = parseInt(rangeMatch[2], 10);
-          for (let i = start; i <= end && i < segCount; i++) {
-            segments.push(i);
-          }
-        } else {
-          const idx = parseInt(part.trim(), 10);
-          if (!isNaN(idx) && idx < segCount) {
-            segments.push(idx);
-          }
-        }
-      }
-    }
-
-    if (segments.length === 0) {
-      return null;
-    }
-
-    // Parse color (#RRGGBB → packed int)
-    let color: number | undefined;
-    if (parts.length >= 2 && parts[1]) {
-      const colorStr = parts[1].trim();
-      if (/^#?[0-9a-fA-F]{6}$/.test(colorStr)) {
-        color = parseInt(colorStr.replace("#", ""), 16);
-      }
-    }
-
-    // Parse brightness (0-100)
-    let brightness: number | undefined;
-    if (parts.length >= 3 && parts[2]) {
-      const bri = parseInt(parts[2].trim(), 10);
-      if (!isNaN(bri) && bri >= 0 && bri <= 100) {
-        brightness = bri;
-      }
-    }
-
-    if (color === undefined && brightness === undefined) {
-      return null;
-    }
-
-    return { segments, color, brightness };
-  }
-
-  /** Callback for batch segment state sync */
-  onSegmentBatchUpdate?: (
-    device: GoveeDevice,
-    batch: { segments: number[]; color?: number; brightness?: number },
-  ) => void;
 
   /** Callback when device LAN IP changes */
   onLanIpChanged?: (device: GoveeDevice, ip: string) => void;
-
-  /**
-   * Send command via LAN UDP
-   *
-   * @param device Target device
-   * @param command Command type
-   * @param value Command value
-   */
-  private sendLanCommand(
-    device: GoveeDevice,
-    command: string,
-    value: unknown,
-  ): void {
-    if (!device.lanIp || !this.lanClient) {
-      return;
-    }
-
-    switch (command) {
-      case "power":
-        this.lanClient.setPower(device.lanIp, value as boolean);
-        break;
-      case "brightness":
-        this.lanClient.setBrightness(device.lanIp, value as number);
-        break;
-      case "colorRgb": {
-        const { r, g, b } = this.parseColor(value as string);
-        this.lanClient.setColor(device.lanIp, r, g, b);
-        break;
-      }
-      case "colorTemperature":
-        this.lanClient.setColorTemperature(device.lanIp, value as number);
-        break;
-      case "gradientToggle":
-        this.lanClient.setGradient(device.lanIp, value as boolean);
-        break;
-      case "diyScene": {
-        // Try ptReal BLE-over-LAN if DIY scene is in library
-        const diyIdx = parseInt(String(value), 10);
-        const diyScene = device.diyScenes[diyIdx - 1];
-        if (diyScene) {
-          const diyLib = device.diyLibrary.find(
-            (d) => d.name === diyScene.name,
-          );
-          if (diyLib) {
-            this.log.debug(
-              `ptReal DIY: ${diyScene.name} → code=${diyLib.diyCode}`,
-            );
-            this.lanClient.setDiyScene(device.lanIp, diyLib.scenceParam ?? "");
-            return;
-          }
-        }
-        // No library match — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
-        this.sendCloudCommand(device, command, value).catch(() => {});
-        break;
-      }
-      case "lightScene": {
-        // Try ptReal BLE-over-LAN if scene is in scene library
-        const idx = parseInt(String(value), 10);
-        const scene = device.scenes[idx - 1];
-        if (scene) {
-          // Match by exact name first, then by base name (strip -A/-B suffix)
-          const baseName = scene.name.replace(/-[A-Z]$/, "");
-          const libEntry =
-            device.sceneLibrary.find((s) => s.name === scene.name) ??
-            device.sceneLibrary.find((s) => s.name === baseName);
-          if (libEntry) {
-            this.log.debug(
-              `ptReal: ${scene.name} → code=${libEntry.sceneCode}`,
-            );
-            this.lanClient.setScene(
-              device.lanIp,
-              libEntry.sceneCode,
-              libEntry.scenceParam ?? "",
-            );
-            return;
-          }
-        }
-        // Scene not in library — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
-        this.sendCloudCommand(device, command, value).catch(() => {});
-        break;
-      }
-      default:
-        // LAN doesn't support this command — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
-        this.sendCloudCommand(device, command, value).catch(() => {});
-    }
-  }
-
-  /**
-   * Send command via MQTT — returns true if sent
-   *
-   * @param device Target device
-   * @param command Command type
-   * @param value Command value
-   */
-  private sendMqttCommand(
-    device: GoveeDevice,
-    command: string,
-    value: unknown,
-  ): boolean {
-    if (!this.mqttClient) {
-      return false;
-    }
-
-    switch (command) {
-      case "power":
-        return this.mqttClient.setPower(device.deviceId, value as boolean);
-      case "brightness":
-        return this.mqttClient.setBrightness(device.deviceId, value as number);
-      case "colorRgb": {
-        const { r, g, b } = this.parseColor(value as string);
-        return this.mqttClient.setColor(device.deviceId, r, g, b);
-      }
-      case "colorTemperature":
-        return this.mqttClient.setColorTemperature(
-          device.deviceId,
-          value as number,
-        );
-      default:
-        return false;
-    }
-  }
-
-  /**
-   * Send command via Cloud API (rate-limited)
-   *
-   * @param device Target device
-   * @param command Command type
-   * @param value Command value
-   */
-  private async sendCloudCommand(
-    device: GoveeDevice,
-    command: string,
-    value: unknown,
-  ): Promise<void> {
-    if (!this.cloudClient) {
-      return;
-    }
-
-    // Find the matching capability
-    const cap = this.findCapabilityForCommand(device, command);
-    if (!cap) {
-      this.log.debug(
-        `No Cloud capability for command '${command}' on ${device.sku}`,
-      );
-      return;
-    }
-
-    const cloudValue = this.toCloudValue(device, command, value);
-
-    const execute = async (): Promise<void> => {
-      await this.cloudClient!.controlDevice(
-        device.sku,
-        device.deviceId,
-        cap.type,
-        cap.instance,
-        cloudValue,
-      );
-    };
-
-    if (this.rateLimiter) {
-      await this.rateLimiter.tryExecute(execute, 0);
-    } else {
-      await execute();
-    }
-  }
-
-  /**
-   * Find capability matching a command name
-   *
-   * @param device Target device
-   * @param command Command type to find capability for
-   */
-  private findCapabilityForCommand(
-    device: GoveeDevice,
-    command: string,
-  ): { type: string; instance: string } | undefined {
-    for (const cap of device.capabilities) {
-      const shortType = cap.type.replace("devices.capabilities.", "");
-      if (command === "power" && shortType === "on_off") {
-        return cap;
-      }
-      if (
-        command === "brightness" &&
-        shortType === "range" &&
-        cap.instance.toLowerCase().includes("brightness")
-      ) {
-        return cap;
-      }
-      if (
-        command === "colorRgb" &&
-        shortType === "color_setting" &&
-        cap.instance === "colorRgb"
-      ) {
-        return cap;
-      }
-      if (
-        command === "colorTemperature" &&
-        shortType === "color_setting" &&
-        cap.instance.includes("colorTem")
-      ) {
-        return cap;
-      }
-      if (
-        command === "scene" &&
-        shortType === "mode" &&
-        cap.instance === "presetScene"
-      ) {
-        return cap;
-      }
-      if (
-        command === "lightScene" &&
-        shortType === "dynamic_scene" &&
-        cap.instance === "lightScene"
-      ) {
-        return cap;
-      }
-      if (
-        command === "diyScene" &&
-        shortType === "dynamic_scene" &&
-        cap.instance === "diyScene"
-      ) {
-        return cap;
-      }
-      if (
-        command === "snapshot" &&
-        shortType === "dynamic_scene" &&
-        cap.instance === "snapshot"
-      ) {
-        return cap;
-      }
-      if (
-        command.startsWith("segmentColor:") &&
-        shortType === "segment_color_setting" &&
-        !cap.instance.toLowerCase().includes("brightness")
-      ) {
-        return cap;
-      }
-      if (
-        command.startsWith("segmentBrightness:") &&
-        shortType === "segment_color_setting" &&
-        cap.instance.toLowerCase().includes("brightness")
-      ) {
-        return cap;
-      }
-    }
-    return undefined;
-  }
-
-  /**
-   * Convert adapter value to Cloud API value
-   *
-   * @param device Target device (for scene/snapshot lookup)
-   * @param command Command type
-   * @param value Adapter-side value to convert
-   */
-  private toCloudValue(
-    device: GoveeDevice,
-    command: string,
-    value: unknown,
-  ): unknown {
-    switch (command) {
-      case "power":
-        return value ? 1 : 0;
-      case "brightness":
-        return value;
-      case "colorRgb": {
-        const { r, g, b } = this.parseColor(value as string);
-        return (r << 16) | (g << 8) | b;
-      }
-      case "colorTemperature":
-        return value;
-      case "scene":
-        return value;
-      case "lightScene": {
-        // Value is the dropdown index (string) — resolve to scene activation payload
-        const idx = parseInt(String(value), 10);
-        const scene = device.scenes[idx - 1];
-        return scene?.value ?? value;
-      }
-      case "diyScene": {
-        const idx = parseInt(String(value), 10);
-        const diy = device.diyScenes[idx - 1];
-        return diy?.value ?? value;
-      }
-      case "snapshot": {
-        const idx = parseInt(String(value), 10);
-        const snap = device.snapshots[idx - 1];
-        return snap?.value ?? value;
-      }
-      default:
-        if (command.startsWith("segmentColor:")) {
-          const segIdx = parseInt(command.split(":")[1], 10);
-          const { r, g, b } = this.parseColor(value as string);
-          return { segment: [segIdx], rgb: (r << 16) | (g << 8) | b };
-        }
-        if (command.startsWith("segmentBrightness:")) {
-          const segIdx = parseInt(command.split(":")[1], 10);
-          return { segment: [segIdx], brightness: value };
-        }
-        return value;
-    }
-  }
-
-  /**
-   * Parse "#RRGGBB" hex string to RGB
-   *
-   * @param hex Color hex string (e.g. "#FF6600")
-   */
-  private parseColor(hex: string): { r: number; g: number; b: number } {
-    const clean = hex.replace("#", "");
-    const num = parseInt(clean, 16) || 0;
-    return {
-      r: (num >> 16) & 0xff,
-      g: (num >> 8) & 0xff,
-      b: num & 0xff,
-    };
-  }
 
   /**
    * Convert Cloud device to internal device model
@@ -1291,6 +755,8 @@ export class DeviceManager {
   /**
    * Fill device.scenes from sceneLibrary when Cloud scenes are missing.
    * ptReal activation matches by name, so sceneLibrary names are sufficient.
+   *
+   * @param device Device to populate scenes for
    */
   private populateScenesFromLibrary(device: GoveeDevice): void {
     if (device.scenes.length === 0 && device.sceneLibrary.length > 0) {
@@ -1348,6 +814,73 @@ export class DeviceManager {
       diyLibrary: device.diyLibrary,
       skuFeatures: device.skuFeatures,
       cachedAt: Date.now(),
+    };
+  }
+
+  /**
+   * Generate diagnostics data for a device — structured JSON for GitHub issue submission.
+   *
+   * @param device Target device
+   * @param adapterVersion Adapter version string
+   */
+  generateDiagnostics(
+    device: GoveeDevice,
+    adapterVersion: string,
+  ): Record<string, unknown> {
+    const quirks = getDeviceQuirks(device.sku);
+    return {
+      adapter: "iobroker.govee-smart",
+      version: adapterVersion,
+      exportedAt: new Date().toISOString(),
+      device: {
+        sku: device.sku,
+        deviceId: device.deviceId,
+        name: device.name,
+        type: device.type,
+        segmentCount: device.segmentCount ?? null,
+        channels: { ...device.channels },
+        lanIp: device.lanIp ?? null,
+      },
+      capabilities: device.capabilities,
+      scenes: {
+        count: device.scenes.length,
+        names: device.scenes.map((s) => s.name),
+      },
+      diyScenes: {
+        count: device.diyScenes.length,
+        names: device.diyScenes.map((s) => s.name),
+      },
+      snapshots: {
+        count: device.snapshots.length,
+        names: device.snapshots.map((s) => s.name),
+      },
+      sceneLibrary: {
+        count: device.sceneLibrary.length,
+        entries: device.sceneLibrary.map((s) => ({
+          name: s.name,
+          sceneCode: s.sceneCode,
+          hasParam: !!s.scenceParam,
+          speedSupported: s.speedInfo?.supSpeed ?? false,
+        })),
+      },
+      musicLibrary: {
+        count: device.musicLibrary.length,
+        entries: device.musicLibrary.map((m) => ({
+          name: m.name,
+          musicCode: m.musicCode,
+          mode: m.mode ?? null,
+        })),
+      },
+      diyLibrary: {
+        count: device.diyLibrary.length,
+        entries: device.diyLibrary.map((d) => ({
+          name: d.name,
+          diyCode: d.diyCode,
+        })),
+      },
+      quirks: quirks ?? null,
+      skuFeatures: device.skuFeatures,
+      state: { ...device.state },
     };
   }
 }

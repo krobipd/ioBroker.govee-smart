@@ -15,21 +15,6 @@ function sanitize(str: string): string {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
 
-/** State IDs routed to the scenes channel */
-const SCENE_IDS = new Set(["light_scene", "diy_scene", "scene_speed"]);
-/** State IDs routed to the music channel */
-const MUSIC_IDS = new Set([
-  "music_mode",
-  "music_sensitivity",
-  "music_auto_color",
-]);
-/** State IDs routed to the snapshots channel */
-const SNAPSHOT_IDS = new Set([
-  "snapshot",
-  "snapshot_local",
-  "snapshot_save",
-  "snapshot_delete",
-]);
 /** All managed channels (for cleanup of stale states) */
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
 /** Channel display names */
@@ -40,29 +25,13 @@ const CHANNEL_NAMES: Record<string, string> = {
   snapshots: "Snapshots",
 };
 
-/**
- * Determine which channel a state belongs to.
- *
- * @param stateId State ID suffix (e.g. "power", "light_scene")
- */
-function getChannelForState(stateId: string): string {
-  if (SCENE_IDS.has(stateId)) {
-    return "scenes";
-  }
-  if (MUSIC_IDS.has(stateId)) {
-    return "music";
-  }
-  if (SNAPSHOT_IDS.has(stateId)) {
-    return "snapshots";
-  }
-  return "control";
-}
-
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
   private readonly prefixMap = new Map<string, string>();
+  /** Maps "prefix.stateId" → channel name (populated during createDeviceStates) */
+  private readonly stateChannelMap = new Map<string, string>();
 
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter: utils.AdapterInstance) {
@@ -77,7 +46,9 @@ export class StateManager {
    * @param stateId State ID suffix
    */
   resolveStatePath(prefix: string, stateId: string): string {
-    return `${prefix}.${getChannelForState(stateId)}.${stateId}`;
+    const channel =
+      this.stateChannelMap.get(`${prefix}.${stateId}`) ?? "control";
+    return `${prefix}.${channel}.${stateId}`;
   }
 
   /**
@@ -203,7 +174,8 @@ export class StateManager {
     );
     const channelGroups = new Map<string, StateDefinition[]>();
     for (const def of nonSegmentDefs) {
-      const channel = getChannelForState(def.id);
+      const channel = def.channel ?? "control";
+      this.stateChannelMap.set(`${prefix}.${def.id}`, channel);
       if (!channelGroups.has(channel)) {
         channelGroups.set(channel, []);
       }
@@ -508,7 +480,7 @@ export class StateManager {
     // Build expected state set per channel
     const expectedByChannel = new Map<string, Set<string>>();
     for (const def of stateDefs) {
-      const channel = getChannelForState(def.id);
+      const channel = def.channel ?? "control";
       if (!expectedByChannel.has(channel)) {
         expectedByChannel.set(channel, new Set());
       }

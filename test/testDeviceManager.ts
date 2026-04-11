@@ -511,77 +511,77 @@ describe("DeviceManager", () => {
         });
 
         it("should convert power true to 1", () => {
-            const result = (dm as any).toCloudValue(device, "power", true);
+            const result = (dm as any).commandRouter.toCloudValue(device, "power", true);
             expect(result).to.equal(1);
         });
 
         it("should convert power false to 0", () => {
-            const result = (dm as any).toCloudValue(device, "power", false);
+            const result = (dm as any).commandRouter.toCloudValue(device, "power", false);
             expect(result).to.equal(0);
         });
 
         it("should pass brightness through unchanged", () => {
-            const result = (dm as any).toCloudValue(device, "brightness", 75);
+            const result = (dm as any).commandRouter.toCloudValue(device, "brightness", 75);
             expect(result).to.equal(75);
         });
 
         it("should convert colorRgb hex to packed integer", () => {
-            const result = (dm as any).toCloudValue(device, "colorRgb", "#ff8000");
+            const result = (dm as any).commandRouter.toCloudValue(device, "colorRgb", "#ff8000");
             expect(result).to.equal(0xff8000);
         });
 
         it("should convert black color", () => {
-            const result = (dm as any).toCloudValue(device, "colorRgb", "#000000");
+            const result = (dm as any).commandRouter.toCloudValue(device, "colorRgb", "#000000");
             expect(result).to.equal(0);
         });
 
         it("should convert white color", () => {
-            const result = (dm as any).toCloudValue(device, "colorRgb", "#ffffff");
+            const result = (dm as any).commandRouter.toCloudValue(device, "colorRgb", "#ffffff");
             expect(result).to.equal(0xffffff);
         });
 
         it("should resolve lightScene index to scene value", () => {
-            const result = (dm as any).toCloudValue(device, "lightScene", "1");
+            const result = (dm as any).commandRouter.toCloudValue(device, "lightScene", "1");
             expect(result).to.deep.equal({ id: 1, paramId: "abc" }); // Sunset
         });
 
         it("should resolve lightScene index 2", () => {
-            const result = (dm as any).toCloudValue(device, "lightScene", "2");
+            const result = (dm as any).commandRouter.toCloudValue(device, "lightScene", "2");
             expect(result).to.deep.equal({ id: 2, paramId: "def" }); // Rainbow
         });
 
         it("should fall back to raw value for invalid lightScene index", () => {
-            const result = (dm as any).toCloudValue(device, "lightScene", "99");
+            const result = (dm as any).commandRouter.toCloudValue(device, "lightScene", "99");
             expect(result).to.equal("99");
         });
 
         it("should resolve snapshot index to integer value", () => {
-            const result = (dm as any).toCloudValue(device, "snapshot", "1");
+            const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "1");
             expect(result).to.equal(3782580);
         });
 
         it("should resolve snapshot index 2", () => {
-            const result = (dm as any).toCloudValue(device, "snapshot", "2");
+            const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "2");
             expect(result).to.equal(3782581);
         });
 
         it("should resolve diyScene index", () => {
-            const result = (dm as any).toCloudValue(device, "diyScene", "1");
+            const result = (dm as any).commandRouter.toCloudValue(device, "diyScene", "1");
             expect(result).to.deep.equal({ id: 100, paramId: "xyz" });
         });
 
         it("should convert segmentColor to struct", () => {
-            const result = (dm as any).toCloudValue(device, "segmentColor:3", "#ff0000");
+            const result = (dm as any).commandRouter.toCloudValue(device, "segmentColor:3", "#ff0000");
             expect(result).to.deep.equal({ segment: [3], rgb: 0xff0000 });
         });
 
         it("should convert segmentBrightness to struct", () => {
-            const result = (dm as any).toCloudValue(device, "segmentBrightness:5", 80);
+            const result = (dm as any).commandRouter.toCloudValue(device, "segmentBrightness:5", 80);
             expect(result).to.deep.equal({ segment: [5], brightness: 80 });
         });
 
         it("should pass unknown commands through", () => {
-            const result = (dm as any).toCloudValue(device, "unknownCommand", 42);
+            const result = (dm as any).commandRouter.toCloudValue(device, "unknownCommand", 42);
             expect(result).to.equal(42);
         });
     });
@@ -594,7 +594,7 @@ describe("DeviceManager", () => {
         });
 
         it("should parse range with color and brightness", () => {
-            const result = (dm as any).parseSegmentBatch(device, "1-5:#ff0000:20");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "1-5:#ff0000:20");
             expect(result).to.not.be.null;
             expect(result.segments).to.deep.equal([1, 2, 3, 4, 5]);
             expect(result.color).to.equal(0xff0000);
@@ -602,7 +602,7 @@ describe("DeviceManager", () => {
         });
 
         it("should parse 'all' keyword", () => {
-            const result = (dm as any).parseSegmentBatch(device, "all:#00ff00:50");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "all:#00ff00:50");
             expect(result.segments).to.have.lengthOf(15);
             expect(result.segments[0]).to.equal(0);
             expect(result.segments[14]).to.equal(14);
@@ -611,47 +611,47 @@ describe("DeviceManager", () => {
         });
 
         it("should parse comma-separated indices", () => {
-            const result = (dm as any).parseSegmentBatch(device, "0,3,7:#0000ff");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "0,3,7:#0000ff");
             expect(result.segments).to.deep.equal([0, 3, 7]);
             expect(result.color).to.equal(0x0000ff);
             expect(result.brightness).to.be.undefined;
         });
 
         it("should parse brightness only (empty color)", () => {
-            const result = (dm as any).parseSegmentBatch(device, "all::50");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "all::50");
             expect(result.segments).to.have.lengthOf(15);
             expect(result.color).to.be.undefined;
             expect(result.brightness).to.equal(50);
         });
 
         it("should parse color without # prefix", () => {
-            const result = (dm as any).parseSegmentBatch(device, "0:ff8000");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "0:ff8000");
             expect(result.color).to.equal(0xff8000);
         });
 
         it("should clamp segments to segmentCount", () => {
-            const result = (dm as any).parseSegmentBatch(device, "10-20:#ff0000");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "10-20:#ff0000");
             // Only 10-14 should be included (segmentCount=15)
             expect(result.segments).to.deep.equal([10, 11, 12, 13, 14]);
         });
 
         it("should return null for empty command", () => {
-            const result = (dm as any).parseSegmentBatch(device, "");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "");
             expect(result).to.be.null;
         });
 
         it("should return null when no color or brightness given", () => {
-            const result = (dm as any).parseSegmentBatch(device, "1-5");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "1-5");
             expect(result).to.be.null;
         });
 
         it("should return null for invalid segment indices", () => {
-            const result = (dm as any).parseSegmentBatch(device, "abc:#ff0000");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "abc:#ff0000");
             expect(result).to.be.null;
         });
 
         it("should handle mixed ranges and indices", () => {
-            const result = (dm as any).parseSegmentBatch(device, "0,3-5,10:#ffffff");
+            const result = (dm as any).commandRouter.parseSegmentBatch(device, "0,3-5,10:#ffffff");
             expect(result.segments).to.deep.equal([0, 3, 4, 5, 10]);
         });
     });
@@ -664,97 +664,70 @@ describe("DeviceManager", () => {
         });
 
         it("should find on_off for power", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "power");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "power");
             expect(result).to.not.be.undefined;
             expect(result.type).to.equal("devices.capabilities.on_off");
         });
 
         it("should find range brightness for brightness", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "brightness");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "brightness");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.equal("brightness");
         });
 
         it("should find colorRgb for colorRgb", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "colorRgb");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "colorRgb");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.equal("colorRgb");
         });
 
         it("should find colorTemperatureK for colorTemperature", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "colorTemperature");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "colorTemperature");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.include("colorTem");
         });
 
         it("should find dynamic_scene lightScene for lightScene", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "lightScene");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "lightScene");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.equal("lightScene");
         });
 
         it("should find dynamic_scene snapshot for snapshot", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "snapshot");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "snapshot");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.equal("snapshot");
         });
 
         it("should find dynamic_scene diyScene for diyScene", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "diyScene");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "diyScene");
             expect(result).to.not.be.undefined;
             expect(result.instance).to.equal("diyScene");
         });
 
         it("should find segmentedColorRgb for segmentColor", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "segmentColor:0");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "segmentColor:0");
             expect(result).to.not.be.undefined;
             expect(result.type).to.include("segment_color_setting");
             expect(result.instance).to.equal("segmentedColorRgb");
         });
 
         it("should find segmentedBrightness for segmentBrightness", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "segmentBrightness:3");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "segmentBrightness:3");
             expect(result).to.not.be.undefined;
             expect(result.type).to.include("segment_color_setting");
             expect(result.instance).to.equal("segmentedBrightness");
         });
 
         it("should return undefined for unknown commands", () => {
-            const result = (dm as any).findCapabilityForCommand(device, "unknownCommand");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(device, "unknownCommand");
             expect(result).to.be.undefined;
         });
 
         it("should return undefined for device without capabilities", () => {
             const emptyDevice = createTestDevice({ capabilities: [] });
-            const result = (dm as any).findCapabilityForCommand(emptyDevice, "power");
+            const result = (dm as any).commandRouter.findCapabilityForCommand(emptyDevice, "power");
             expect(result).to.be.undefined;
-        });
-    });
-
-    describe("parseColor", () => {
-        it("should parse #RRGGBB hex string", () => {
-            const result = (dm as any).parseColor("#ff8000");
-            expect(result).to.deep.equal({ r: 255, g: 128, b: 0 });
-        });
-
-        it("should parse without # prefix", () => {
-            const result = (dm as any).parseColor("00ff00");
-            expect(result).to.deep.equal({ r: 0, g: 255, b: 0 });
-        });
-
-        it("should parse black", () => {
-            const result = (dm as any).parseColor("#000000");
-            expect(result).to.deep.equal({ r: 0, g: 0, b: 0 });
-        });
-
-        it("should parse white", () => {
-            const result = (dm as any).parseColor("#ffffff");
-            expect(result).to.deep.equal({ r: 255, g: 255, b: 255 });
-        });
-
-        it("should handle invalid hex as black", () => {
-            const result = (dm as any).parseColor("invalid");
-            expect(result).to.deep.equal({ r: 0, g: 0, b: 0 });
         });
     });
 
@@ -1057,6 +1030,72 @@ describe("DeviceManager", () => {
 
             await noDm.sendCommand(device, "power", true);
             expect(warnings.some(w => w.includes("No channel available"))).to.be.true;
+        });
+    });
+
+    describe("generateDiagnostics", () => {
+        it("should include all device data in diagnostics export", () => {
+            const device = createTestDevice({
+                sceneLibrary: [
+                    { name: "Sunset", sceneCode: 42, speedInfo: { supSpeed: true, speedIndex: 0, config: "[{},{}]" } },
+                ],
+                musicLibrary: [
+                    { name: "Energic", musicCode: 1, mode: 0 },
+                ],
+                diyLibrary: [
+                    { name: "MyDIY", diyCode: 10 },
+                ],
+            });
+
+            const result = dm.generateDiagnostics(device, "1.0.1");
+            expect(result.adapter).to.equal("iobroker.govee-smart");
+            expect(result.version).to.equal("1.0.1");
+            expect(result.exportedAt).to.be.a("string");
+            expect((result.device as any).sku).to.equal("H6160");
+            expect((result.device as any).channels).to.deep.equal({ lan: true, mqtt: true, cloud: true });
+            expect((result.scenes as any).count).to.equal(2);
+            expect((result.scenes as any).names).to.deep.equal(["Sunset", "Rainbow"]);
+            expect((result.sceneLibrary as any).count).to.equal(1);
+            expect((result.sceneLibrary as any).entries[0].speedSupported).to.be.true;
+            expect((result.musicLibrary as any).count).to.equal(1);
+            expect((result.diyLibrary as any).count).to.equal(1);
+            expect(result.quirks).to.be.null; // H6160 has no quirks
+            expect(result.state).to.deep.equal({ online: true });
+        });
+
+        it("should include quirks for known SKU", () => {
+            const device = createTestDevice({ sku: "H6121" });
+            const result = dm.generateDiagnostics(device, "1.0.1");
+            expect((result.quirks as any).noMqtt).to.be.true;
+        });
+    });
+
+    describe("toCloudValue — bounds checks", () => {
+        const device = createTestDevice();
+
+        it("should return raw value for NaN diyScene index", () => {
+            const result = (dm as any).commandRouter.toCloudValue(device, "diyScene", "abc");
+            expect(result).to.equal("abc");
+        });
+
+        it("should return raw value for zero snapshot index", () => {
+            const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "0");
+            expect(result).to.equal("0");
+        });
+
+        it("should return raw value for out-of-range snapshot index", () => {
+            const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "999");
+            expect(result).to.equal("999");
+        });
+
+        it("should return raw value for invalid segment index", () => {
+            const result = (dm as any).commandRouter.toCloudValue(device, "segmentColor:-1", "#ff0000");
+            expect(result).to.equal("#ff0000");
+        });
+
+        it("should return raw value for NaN segment brightness index", () => {
+            const result = (dm as any).commandRouter.toCloudValue(device, "segmentBrightness:abc", 50);
+            expect(result).to.equal(50);
         });
     });
 });

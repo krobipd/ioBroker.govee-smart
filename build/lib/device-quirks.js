@@ -1,7 +1,9 @@
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -15,14 +17,24 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var device_quirks_exports = {};
 __export(device_quirks_exports, {
   applyColorTempQuirk: () => applyColorTempQuirk,
-  getDeviceQuirks: () => getDeviceQuirks
+  getDeviceQuirks: () => getDeviceQuirks,
+  loadCommunityQuirks: () => loadCommunityQuirks
 });
 module.exports = __toCommonJS(device_quirks_exports);
-const QUIRKS = {
+var fs = __toESM(require("node:fs"));
+const BUILTIN_QUIRKS = {
   // Color temperature overrides (API claims 2000-9000K)
   H60A1: { colorTempRange: { min: 2200, max: 6500 } },
   H6022: { colorTempRange: { min: 2700, max: 6500 } },
@@ -41,8 +53,35 @@ const QUIRKS = {
   H6154: { noMqtt: true },
   H6176: { noMqtt: true }
 };
+let mergedQuirks = { ...BUILTIN_QUIRKS };
+function loadCommunityQuirks(filePath, log) {
+  var _a;
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(raw);
+    if (!data.quirks || typeof data.quirks !== "object") {
+      log == null ? void 0 : log.debug("Community quirks file has no valid 'quirks' object");
+      return;
+    }
+    mergedQuirks = { ...BUILTIN_QUIRKS };
+    let count = 0;
+    for (const [sku, quirk] of Object.entries(data.quirks)) {
+      mergedQuirks[sku.toUpperCase()] = quirk;
+      count++;
+    }
+    log == null ? void 0 : log.debug(`Loaded ${count} community quirks (v${(_a = data.version) != null ? _a : "?"})`);
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      log == null ? void 0 : log.debug("No community quirks file found \u2014 using built-in only");
+    } else {
+      log == null ? void 0 : log.info(
+        `Could not load community quirks: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  }
+}
 function getDeviceQuirks(sku) {
-  return QUIRKS[sku.toUpperCase()];
+  return mergedQuirks[sku.toUpperCase()];
 }
 function applyColorTempQuirk(sku, min, max) {
   const quirks = getDeviceQuirks(sku);
@@ -54,6 +93,7 @@ function applyColorTempQuirk(sku, min, max) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   applyColorTempQuirk,
-  getDeviceQuirks
+  getDeviceQuirks,
+  loadCommunityQuirks
 });
 //# sourceMappingURL=device-quirks.js.map

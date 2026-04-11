@@ -1,4 +1,4 @@
-import * as https from "node:https";
+import { httpsRequest, HttpError } from "./http-client.js";
 import type {
   CloudDevice,
   CloudDeviceListResponse,
@@ -10,21 +10,8 @@ import type {
 
 const BASE_URL = "https://openapi.api.govee.com";
 
-/** Error with HTTP status code */
-export class CloudApiError extends Error {
-  /** HTTP status code */
-  readonly statusCode: number;
-
-  /**
-   * @param message Error message
-   * @param statusCode HTTP status code
-   */
-  constructor(message: string, statusCode: number) {
-    super(message);
-    this.name = "CloudApiError";
-    this.statusCode = statusCode;
-  }
-}
+/** Cloud API error with HTTP status code (re-export HttpError for backwards compat) */
+export const CloudApiError = HttpError;
 
 /**
  * Govee Cloud API v2 client.
@@ -200,71 +187,30 @@ export class GoveeCloudClient {
    * @param path API endpoint path
    * @param body Optional request body
    */
-  private request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+  ): Promise<T> {
     this.log.debug(`Cloud API: ${method} ${path}`);
-    return new Promise((resolve, reject) => {
-      const url = new URL(path, BASE_URL);
-      const postData = body ? JSON.stringify(body) : undefined;
-
-      const options: https.RequestOptions = {
-        method,
-        hostname: url.hostname,
-        path: url.pathname,
-        headers: {
-          "Content-Type": "application/json",
-          "Govee-API-Key": this.apiKey,
-          ...(postData
-            ? { "Content-Length": Buffer.byteLength(postData) }
-            : {}),
-        },
-        timeout: 15_000,
-      };
-
-      const req = https.request(options, (res) => {
-        const chunks: Buffer[] = [];
-        res.on("data", (chunk: Buffer) => chunks.push(chunk));
-        res.on("end", () => {
-          const raw = Buffer.concat(chunks).toString();
-          const statusCode = res.statusCode ?? 0;
-
-          if (statusCode === 429) {
-            const retryAfter = res.headers["retry-after"];
-            reject(
-              new CloudApiError(
-                `Rate limited — retry after ${retryAfter ?? "unknown"}s`,
-                429,
-              ),
-            );
-            return;
-          }
-
-          if (statusCode < 200 || statusCode >= 300) {
-            reject(
-              new CloudApiError(
-                `HTTP ${statusCode}: ${raw.slice(0, 200)}`,
-                statusCode,
-              ),
-            );
-            return;
-          }
-
-          try {
-            resolve(JSON.parse(raw) as T);
-          } catch {
-            reject(new Error(`Invalid JSON response: ${raw.slice(0, 200)}`));
-          }
-        });
+    try {
+      return await httpsRequest<T>({
+        method: method as "GET" | "POST",
+        url: new URL(path, BASE_URL).toString(),
+        headers: { "Govee-API-Key": this.apiKey },
+        body,
       });
-
-      req.on("error", reject);
-      req.on("timeout", () => {
-        req.destroy(new Error("Request timed out"));
-      });
-
-      if (postData) {
-        req.write(postData);
+    } catch (err) {
+      // Enhance 429 errors with retry-after info
+      if (err instanceof HttpError && err.statusCode === 429) {
+        const retryAfter = String(err.headers["retry-after"] ?? "unknown");
+        throw new HttpError(
+          `Rate limited — retry after ${retryAfter}s`,
+          429,
+          err.headers,
+        );
       }
-      req.end();
-    });
+      throw err;
+    }
   }
 }
