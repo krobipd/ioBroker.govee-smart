@@ -1,5 +1,12 @@
 # Older Changes
 
+## 0.9.0 (2026-04-09)
+- Add dedicated DIY-scenes endpoint for user-created scenes
+- Add music mode controls: dropdown, sensitivity slider, auto-color toggle
+- Add scene library per SKU from undocumented API (78-159 scenes per device)
+- Fix ready message now waits for MQTT before logging channel summary
+- Fix scene library: correct endpoint path, remove unnecessary auth, preserve query parameters
+
 ## 0.8.3 (2026-04-09)
 - Fix release-script blocking on manual-review plugin
 

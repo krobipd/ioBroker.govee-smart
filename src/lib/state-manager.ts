@@ -15,6 +15,49 @@ function sanitize(str: string): string {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
 
+/** State IDs routed to the scenes channel */
+const SCENE_IDS = new Set(["light_scene", "diy_scene", "scene_speed"]);
+/** State IDs routed to the music channel */
+const MUSIC_IDS = new Set([
+  "music_mode",
+  "music_sensitivity",
+  "music_auto_color",
+]);
+/** State IDs routed to the snapshots channel */
+const SNAPSHOT_IDS = new Set([
+  "snapshot",
+  "snapshot_local",
+  "snapshot_save",
+  "snapshot_delete",
+]);
+/** All managed channels (for cleanup of stale states) */
+const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
+/** Channel display names */
+const CHANNEL_NAMES: Record<string, string> = {
+  control: "Controls",
+  scenes: "Scenes",
+  music: "Music",
+  snapshots: "Snapshots",
+};
+
+/**
+ * Determine which channel a state belongs to.
+ *
+ * @param stateId State ID suffix (e.g. "power", "light_scene")
+ */
+function getChannelForState(stateId: string): string {
+  if (SCENE_IDS.has(stateId)) {
+    return "scenes";
+  }
+  if (MUSIC_IDS.has(stateId)) {
+    return "music";
+  }
+  if (SNAPSHOT_IDS.has(stateId)) {
+    return "snapshots";
+  }
+  return "control";
+}
+
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
@@ -24,6 +67,17 @@ export class StateManager {
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter: utils.AdapterInstance) {
     this.adapter = adapter;
+  }
+
+  /**
+   * Resolve full state path for a given device prefix and state ID.
+   * Routes the state to the correct channel (control, scenes, music, snapshots).
+   *
+   * @param prefix Device object ID prefix
+   * @param stateId State ID suffix
+   */
+  resolveStatePath(prefix: string, stateId: string): string {
+    return `${prefix}.${getChannelForState(stateId)}.${stateId}`;
   }
 
   /**
@@ -50,6 +104,7 @@ export class StateManager {
     this.prefixMap.set(key, newPrefix);
 
     const prefix = newPrefix;
+    const isGroup = device.sku === "BaseGroup";
 
     // Device object with online status indicator
     await this.adapter.extendObjectAsync(prefix, {
@@ -66,7 +121,7 @@ export class StateManager {
       },
     });
 
-    // Info channel
+    // Info channel — groups only get name + online
     await this.adapter.extendObjectAsync(`${prefix}.info`, {
       type: "channel",
       common: { name: "Device Information" },
@@ -81,68 +136,93 @@ export class StateManager {
       false,
     );
     await this.ensureState(
-      `${prefix}.info.model`,
-      "Model",
-      "string",
-      "text",
-      false,
-    );
-    await this.ensureState(
-      `${prefix}.info.serial`,
-      "Serial Number",
-      "string",
-      "text",
-      false,
-    );
-    await this.ensureState(
       `${prefix}.info.online`,
       "Online",
       "boolean",
       "indicator.reachable",
       false,
     );
-    await this.ensureState(
-      `${prefix}.info.ip`,
-      "IP Address",
-      "string",
-      "info.ip",
-      false,
-    );
-
     await this.adapter.setStateAsync(`${prefix}.info.name`, {
       val: device.name,
-      ack: true,
-    });
-    await this.adapter.setStateAsync(`${prefix}.info.model`, {
-      val: device.sku,
-      ack: true,
-    });
-    await this.adapter.setStateAsync(`${prefix}.info.serial`, {
-      val: device.deviceId,
       ack: true,
     });
     await this.adapter.setStateAsync(`${prefix}.info.online`, {
       val: device.state.online ?? false,
       ack: true,
     });
-    await this.adapter.setStateAsync(`${prefix}.info.ip`, {
-      val: device.lanIp ?? "",
-      ack: true,
-    });
 
-    // Control channel
-    const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
-    this.adapter.log.debug(
-      `createDeviceStates ${device.sku}: ${controlDefs.length} control states`,
+    if (!isGroup) {
+      await this.ensureState(
+        `${prefix}.info.model`,
+        "Model",
+        "string",
+        "text",
+        false,
+      );
+      await this.ensureState(
+        `${prefix}.info.serial`,
+        "Serial Number",
+        "string",
+        "text",
+        false,
+      );
+      await this.ensureState(
+        `${prefix}.info.ip`,
+        "IP Address",
+        "string",
+        "info.ip",
+        false,
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.model`, {
+        val: device.sku,
+        ack: true,
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.serial`, {
+        val: device.deviceId,
+        ack: true,
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.ip`, {
+        val: device.lanIp ?? "",
+        ack: true,
+      });
+    } else {
+      // Clean up stale info states from older versions
+      for (const staleId of ["model", "serial", "ip"]) {
+        await this.adapter
+          .delObjectAsync(`${prefix}.info.${staleId}`)
+          .catch(() => {});
+        await this.adapter
+          .delStateAsync(`${prefix}.info.${staleId}`)
+          .catch(() => {});
+      }
+    }
+
+    // Group state defs by channel (control, scenes, music, snapshots)
+    const nonSegmentDefs = stateDefs.filter(
+      (d) => !d.id.startsWith("_segment_"),
     );
-    if (controlDefs.length > 0) {
-      await this.adapter.extendObjectAsync(`${prefix}.control`, {
+    const channelGroups = new Map<string, StateDefinition[]>();
+    for (const def of nonSegmentDefs) {
+      const channel = getChannelForState(def.id);
+      if (!channelGroups.has(channel)) {
+        channelGroups.set(channel, []);
+      }
+      channelGroups.get(channel)!.push(def);
+    }
+
+    this.adapter.log.debug(
+      `createDeviceStates ${device.sku}: ${nonSegmentDefs.length} states in ${channelGroups.size} channel(s)`,
+    );
+
+    // Create states in each channel
+    for (const [channel, defs] of channelGroups) {
+      await this.adapter.extendObjectAsync(`${prefix}.${channel}`, {
         type: "channel",
-        common: { name: "Controls" },
+        common: { name: CHANNEL_NAMES[channel] ?? channel },
         native: {},
       });
 
-      for (const def of controlDefs) {
+      for (const def of defs) {
         const common: Partial<ioBroker.StateCommon> = {
           name: def.name,
           type: def.type,
@@ -167,7 +247,7 @@ export class StateManager {
           common.def = def.def;
         }
 
-        await this.adapter.extendObjectAsync(`${prefix}.control.${def.id}`, {
+        await this.adapter.extendObjectAsync(`${prefix}.${channel}.${def.id}`, {
           type: "state",
           common: common as ioBroker.StateCommon,
           native: {
@@ -179,10 +259,10 @@ export class StateManager {
         // Set default value if state has no value yet
         if (def.def !== undefined) {
           const current = await this.adapter.getStateAsync(
-            `${prefix}.control.${def.id}`,
+            `${prefix}.${channel}.${def.id}`,
           );
           if (!current || current.val === null || current.val === undefined) {
-            await this.adapter.setStateAsync(`${prefix}.control.${def.id}`, {
+            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true,
             });
@@ -191,8 +271,8 @@ export class StateManager {
       }
     }
 
-    // Remove stale control states that are no longer in the current definitions
-    await this.cleanupControlStates(prefix, controlDefs);
+    // Remove stale states across all managed channels
+    await this.cleanupAllChannelStates(prefix, nonSegmentDefs);
 
     // Check if device has segment capabilities
     const segmentDefs = stateDefs.filter((d) => d.id.startsWith("_segment_"));
@@ -285,6 +365,44 @@ export class StateManager {
       } as ioBroker.StateCommon,
       native: {},
     });
+
+    // Remove excess segment channels from previous runs
+    await this.cleanupExcessSegments(prefix, segmentCount);
+  }
+
+  /**
+   * Remove segment sub-channels that exceed the current segment count.
+   *
+   * @param prefix Device prefix
+   * @param segmentCount Current segment count
+   */
+  private async cleanupExcessSegments(
+    prefix: string,
+    segmentCount: number,
+  ): Promise<void> {
+    const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
+    const existing = await this.adapter.getObjectViewAsync(
+      "system",
+      "channel",
+      {
+        startkey: segPrefix,
+        endkey: `${segPrefix}\u9999`,
+      },
+    );
+
+    if (!existing?.rows) {
+      return;
+    }
+
+    for (const row of existing.rows) {
+      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+      const segPart = localId.replace(`${prefix}.segments.`, "");
+      const segIdx = parseInt(segPart, 10);
+      if (!isNaN(segIdx) && segIdx >= segmentCount) {
+        this.adapter.log.debug(`Removing excess segment: ${localId}`);
+        await this.adapter.delObjectAsync(localId, { recursive: true });
+      }
+    }
   }
 
   /**
@@ -372,49 +490,61 @@ export class StateManager {
   }
 
   /**
-   * Remove control states that are no longer in the current definitions.
+   * Remove stale states across all managed channels.
+   * Also handles migration from old single-control layout.
    *
    * @param prefix Device prefix
-   * @param controlDefs Current control state definitions
+   * @param stateDefs Current state definitions (non-segment)
    */
-  private async cleanupControlStates(
+  private async cleanupAllChannelStates(
     prefix: string,
-    controlDefs: StateDefinition[],
+    stateDefs: StateDefinition[],
   ): Promise<void> {
-    const validIds = new Set(controlDefs.map((d) => d.id));
-    const controlPrefix = `${this.adapter.namespace}.${prefix}.control.`;
-    const existing = await this.adapter.getObjectViewAsync("system", "state", {
-      startkey: controlPrefix,
-      endkey: `${controlPrefix}\u9999`,
-    });
-
-    if (!existing?.rows) {
-      return;
-    }
-
-    let deleted = 0;
-    for (const row of existing.rows) {
-      const stateId = row.id.replace(controlPrefix, "");
-      if (!validIds.has(stateId)) {
-        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-        this.adapter.log.debug(`Removing stale control state: ${localId}`);
-        await this.adapter.delObjectAsync(localId);
-        await this.adapter.delStateAsync(localId).catch(() => {
-          // State may not exist
-        });
-        deleted++;
+    // Build expected state set per channel
+    const expectedByChannel = new Map<string, Set<string>>();
+    for (const def of stateDefs) {
+      const channel = getChannelForState(def.id);
+      if (!expectedByChannel.has(channel)) {
+        expectedByChannel.set(channel, new Set());
       }
+      expectedByChannel.get(channel)!.add(def.id);
     }
 
-    // If all control states were deleted, remove empty control/ channel
-    if (deleted > 0 && deleted === existing.rows.length) {
-      const controlChannelId = `${prefix}.control`;
-      this.adapter.log.debug(
-        `Removing empty control channel: ${controlChannelId}`,
+    for (const channel of MANAGED_CHANNELS) {
+      const channelPrefix = `${this.adapter.namespace}.${prefix}.${channel}.`;
+      const existing = await this.adapter.getObjectViewAsync(
+        "system",
+        "state",
+        {
+          startkey: channelPrefix,
+          endkey: `${channelPrefix}\u9999`,
+        },
       );
-      await this.adapter.delObjectAsync(controlChannelId).catch(() => {
-        // Channel may not exist
-      });
+
+      if (!existing?.rows) {
+        continue;
+      }
+
+      const validIds = expectedByChannel.get(channel) ?? new Set<string>();
+      let deleted = 0;
+      for (const row of existing.rows) {
+        const stateId = row.id.replace(channelPrefix, "");
+        if (!validIds.has(stateId)) {
+          const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+          this.adapter.log.debug(`Removing stale state: ${localId}`);
+          await this.adapter.delObjectAsync(localId);
+          await this.adapter.delStateAsync(localId).catch(() => {});
+          deleted++;
+        }
+      }
+
+      // Remove empty channel object
+      if (deleted > 0 && deleted === existing.rows.length) {
+        this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
+        await this.adapter
+          .delObjectAsync(`${prefix}.${channel}`)
+          .catch(() => {});
+      }
     }
   }
 

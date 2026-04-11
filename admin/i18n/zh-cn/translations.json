@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "网络接口",
     "networkInterfaceTooltip": "选择用于 LAN 设备发现的网络接口。留空以使用所有接口（推荐用于大多数设置）。",
     "passwordLabel": "密码",
-    "pollIntervalLabel": "云刷新间隔（秒）",
-    "settingsHeader": "设置",
     "supportHeader": "支持"
 }

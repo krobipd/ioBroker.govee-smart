@@ -93,15 +93,6 @@ class DeviceManager {
     return Array.from(this.devices.values());
   }
   /**
-   * Get a device by its unique key (sku_deviceId)
-   *
-   * @param sku Product model
-   * @param deviceId Unique device identifier
-   */
-  getDevice(sku, deviceId) {
-    return this.devices.get(this.deviceKey(sku, deviceId));
-  }
-  /**
    * Load devices from local SKU cache.
    * Returns true if any devices were loaded (= Cloud not needed).
    */
@@ -140,7 +131,7 @@ class DeviceManager {
       this.log.info(`Loaded ${cached.length} device(s) from cache`);
     }
     const incomplete = Array.from(this.devices.values()).some(
-      (d) => d.scenes.length === 0 && d.sceneLibrary.length > 0 && d.type === "devices.types.light"
+      (d) => d.scenes.length === 0 && d.sceneLibrary.length > 0 && d.type === "light"
     );
     if (incomplete) {
       this.log.info(
@@ -239,15 +230,15 @@ class DeviceManager {
                 (c) => c.type === "devices.capabilities.dynamic_scene" && c.instance === "snapshot" && c.parameters.options
               );
               if (snapCap == null ? void 0 : snapCap.parameters.options) {
-                this.log.debug(
-                  `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`
-                );
                 device.snapshots = snapCap.parameters.options.filter(
                   (o) => typeof o.name === "string" && o.value !== void 0 && o.value !== null
                 ).map((o) => ({
                   name: o.name,
                   value: typeof o.value === "number" ? o.value : o.value
                 }));
+                this.log.debug(
+                  `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`
+                );
               }
             }
             if (this.mqttClient) {
@@ -326,7 +317,7 @@ class DeviceManager {
         let cachedCount = 0;
         let skippedCount = 0;
         for (const device of this.devices.values()) {
-          const isLight = device.type === "devices.types.light";
+          const isLight = device.type === "light";
           const scenesIncomplete = isLight && device.scenes.length === 0 && device.capabilities.length > 0;
           if (scenesIncomplete) {
             skippedCount++;

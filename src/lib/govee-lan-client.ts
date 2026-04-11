@@ -296,11 +296,6 @@ export class GoveeLanClient {
     this.sendCommand(ip, "devStatus", {});
   }
 
-  /** Get known LAN devices */
-  getDevices(): Map<string, LanDevice> {
-    return this.knownDevices;
-  }
-
   /** Send multicast scan */
   private sendScan(): void {
     const scanMsg: LanMessage = {
@@ -369,10 +364,6 @@ export class GoveeLanClient {
       ip,
       device,
       sku,
-      bleVersionHard: (data.bleVersionHard as string) ?? "",
-      bleVersionSoft: (data.bleVersionSoft as string) ?? "",
-      wifiVersionHard: (data.wifiVersionHard as string) ?? "",
-      wifiVersionSoft: (data.wifiVersionSoft as string) ?? "",
     };
 
     const existing = this.knownDevices.get(device);

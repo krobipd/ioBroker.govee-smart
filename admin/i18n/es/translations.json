@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "Interfaz de red",
     "networkInterfaceTooltip": "Seleccione la interfaz de red para la detección de dispositivos LAN. Déjelo vacío para usar todas las interfaces (recomendado para la mayoría de las configuraciones).",
     "passwordLabel": "Contraseña",
-    "pollIntervalLabel": "Intervalo de actualización de la nube (segundos)",
-    "settingsHeader": "Ajustes",
     "supportHeader": "Apoyo"
 }

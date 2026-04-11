@@ -281,17 +281,17 @@ class GoveeAdapter extends utils.Adapter {
     }
     const prefix = this.stateManager.devicePrefix(device);
     const stateSuffix = localId.slice(prefix.length + 1);
-    if (stateSuffix === "control.snapshot_save" && typeof state.val === "string" && state.val.trim()) {
+    if (stateSuffix === "snapshots.snapshot_save" && typeof state.val === "string" && state.val.trim()) {
       await this.handleSnapshotSave(device, state.val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
-    if (stateSuffix === "control.snapshot_local" && state.val !== "0" && state.val !== 0) {
+    if (stateSuffix === "snapshots.snapshot_local" && state.val !== "0" && state.val !== 0) {
       await this.handleSnapshotRestore(device, state.val);
       await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
-    if (stateSuffix === "control.snapshot_delete" && typeof state.val === "string" && state.val.trim()) {
+    if (stateSuffix === "snapshots.snapshot_delete" && typeof state.val === "string" && state.val.trim()) {
       this.handleSnapshotDelete(device, state.val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
@@ -327,8 +327,12 @@ class GoveeAdapter extends utils.Adapter {
       await this.deviceManager.sendCommand(device, command, state.val);
       await this.setStateAsync(id, { val: state.val, ack: true });
       if (command === "colorRgb" || command === "colorTemperature") {
-        for (const sceneKey of ["light_scene", "diy_scene", "snapshot"]) {
-          const sceneId = `${this.namespace}.${prefix}.control.${sceneKey}`;
+        for (const [ch, key] of [
+          ["scenes", "light_scene"],
+          ["scenes", "diy_scene"],
+          ["snapshots", "snapshot"]
+        ]) {
+          const sceneId = `${this.namespace}.${prefix}.${ch}.${key}`;
           const sceneState = await this.getStateAsync(sceneId);
           if ((sceneState == null ? void 0 : sceneState.val) && sceneState.val !== "0") {
             await this.setStateAsync(sceneId, { val: "0", ack: true });
@@ -352,13 +356,15 @@ class GoveeAdapter extends utils.Adapter {
    */
   async sendMusicCommand(device, prefix, changedSuffix, newValue) {
     var _a, _b;
-    const base = `${this.namespace}.${prefix}.control`;
-    const modeState = await this.getStateAsync(`${base}.music_mode`);
-    const sensState = await this.getStateAsync(`${base}.music_sensitivity`);
-    const autoState = await this.getStateAsync(`${base}.music_auto_color`);
-    const musicMode = changedSuffix === "control.music_mode" ? parseInt(String(newValue), 10) : parseInt(String((_a = modeState == null ? void 0 : modeState.val) != null ? _a : 0), 10);
-    const sensitivity = changedSuffix === "control.music_sensitivity" ? newValue : (_b = sensState == null ? void 0 : sensState.val) != null ? _b : 100;
-    const autoColor = changedSuffix === "control.music_auto_color" ? newValue ? 1 : 0 : (autoState == null ? void 0 : autoState.val) ? 1 : 0;
+    const musicBase = `${this.namespace}.${prefix}.music`;
+    const modeState = await this.getStateAsync(`${musicBase}.music_mode`);
+    const sensState = await this.getStateAsync(
+      `${musicBase}.music_sensitivity`
+    );
+    const autoState = await this.getStateAsync(`${musicBase}.music_auto_color`);
+    const musicMode = changedSuffix === "music.music_mode" ? parseInt(String(newValue), 10) : parseInt(String((_a = modeState == null ? void 0 : modeState.val) != null ? _a : 0), 10);
+    const sensitivity = changedSuffix === "music.music_sensitivity" ? newValue : (_b = sensState == null ? void 0 : sensState.val) != null ? _b : 100;
+    const autoColor = changedSuffix === "music.music_auto_color" ? newValue ? 1 : 0 : (autoState == null ? void 0 : autoState.val) ? 1 : 0;
     if (!musicMode || musicMode === 0) {
       this.log.debug("Music mode not selected, skipping command");
       return;
@@ -366,7 +372,9 @@ class GoveeAdapter extends utils.Adapter {
     if (device.lanIp && this.lanClient) {
       let r = 0, g = 0, b = 0;
       if (musicMode === 1 || musicMode === 2) {
-        const colorState = await this.getStateAsync(`${base}.colorRgb`);
+        const colorState = await this.getStateAsync(
+          `${this.namespace}.${prefix}.control.colorRgb`
+        );
         if ((colorState == null ? void 0 : colorState.val) && typeof colorState.val === "string") {
           const hex = colorState.val.replace("#", "");
           const num = parseInt(hex, 16) || 0;
@@ -659,11 +667,13 @@ class GoveeAdapter extends utils.Adapter {
           if (device.lanIp && lanStateIds.has(mapped.stateId)) {
             continue;
           }
-          const obj = await this.getObjectAsync(
-            `${prefix}.control.${mapped.stateId}`
+          const statePath = this.stateManager.resolveStatePath(
+            prefix,
+            mapped.stateId
           );
+          const obj = await this.getObjectAsync(statePath);
           if (obj) {
-            await this.setStateAsync(`${prefix}.control.${mapped.stateId}`, {
+            await this.setStateAsync(statePath, {
               val: mapped.value,
               ack: true
             });
@@ -718,23 +728,23 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "control.scene") {
       return "scene";
     }
-    if (suffix === "control.light_scene") {
-      return "lightScene";
-    }
-    if (suffix === "control.diy_scene") {
-      return "diyScene";
-    }
-    if (suffix === "control.snapshot") {
-      return "snapshot";
-    }
     if (suffix === "control.gradient_toggle") {
       return "gradientToggle";
     }
-    if (suffix === "control.scene_speed") {
+    if (suffix === "scenes.light_scene") {
+      return "lightScene";
+    }
+    if (suffix === "scenes.diy_scene") {
+      return "diyScene";
+    }
+    if (suffix === "scenes.scene_speed") {
       return "sceneSpeed";
     }
-    if (suffix === "control.music_mode" || suffix === "control.music_sensitivity" || suffix === "control.music_auto_color") {
+    if (suffix === "music.music_mode" || suffix === "music.music_sensitivity" || suffix === "music.music_auto_color") {
       return "music";
+    }
+    if (suffix === "snapshots.snapshot") {
+      return "snapshot";
     }
     const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);
     if (segColorMatch) {

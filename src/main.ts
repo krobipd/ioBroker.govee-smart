@@ -314,7 +314,7 @@ class GoveeAdapter extends utils.Adapter {
     const stateSuffix = localId.slice(prefix.length + 1);
     // Handle local snapshot commands (no Cloud/MQTT needed)
     if (
-      stateSuffix === "control.snapshot_save" &&
+      stateSuffix === "snapshots.snapshot_save" &&
       typeof state.val === "string" &&
       state.val.trim()
     ) {
@@ -323,7 +323,7 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
     if (
-      stateSuffix === "control.snapshot_local" &&
+      stateSuffix === "snapshots.snapshot_local" &&
       state.val !== "0" &&
       state.val !== 0
     ) {
@@ -332,7 +332,7 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
     if (
-      stateSuffix === "control.snapshot_delete" &&
+      stateSuffix === "snapshots.snapshot_delete" &&
       typeof state.val === "string" &&
       state.val.trim()
     ) {
@@ -379,8 +379,12 @@ class GoveeAdapter extends utils.Adapter {
       await this.setStateAsync(id, { val: state.val, ack: true });
       // Reset scene dropdowns when switching to solid color/colorTemp
       if (command === "colorRgb" || command === "colorTemperature") {
-        for (const sceneKey of ["light_scene", "diy_scene", "snapshot"]) {
-          const sceneId = `${this.namespace}.${prefix}.control.${sceneKey}`;
+        for (const [ch, key] of [
+          ["scenes", "light_scene"],
+          ["scenes", "diy_scene"],
+          ["snapshots", "snapshot"],
+        ]) {
+          const sceneId = `${this.namespace}.${prefix}.${ch}.${key}`;
           const sceneState = await this.getStateAsync(sceneId);
           if (sceneState?.val && sceneState.val !== "0") {
             await this.setStateAsync(sceneId, { val: "0", ack: true });
@@ -409,24 +413,26 @@ class GoveeAdapter extends utils.Adapter {
     changedSuffix: string,
     newValue: ioBroker.StateValue,
   ): Promise<void> {
-    const base = `${this.namespace}.${prefix}.control`;
+    const musicBase = `${this.namespace}.${prefix}.music`;
 
     // Read current sibling values
-    const modeState = await this.getStateAsync(`${base}.music_mode`);
-    const sensState = await this.getStateAsync(`${base}.music_sensitivity`);
-    const autoState = await this.getStateAsync(`${base}.music_auto_color`);
+    const modeState = await this.getStateAsync(`${musicBase}.music_mode`);
+    const sensState = await this.getStateAsync(
+      `${musicBase}.music_sensitivity`,
+    );
+    const autoState = await this.getStateAsync(`${musicBase}.music_auto_color`);
 
     // Apply the changed value, use siblings for the rest
     const musicMode =
-      changedSuffix === "control.music_mode"
+      changedSuffix === "music.music_mode"
         ? parseInt(String(newValue), 10)
         : parseInt(String(modeState?.val ?? 0), 10);
     const sensitivity =
-      changedSuffix === "control.music_sensitivity"
+      changedSuffix === "music.music_sensitivity"
         ? (newValue as number)
         : ((sensState?.val as number) ?? 100);
     const autoColor =
-      changedSuffix === "control.music_auto_color"
+      changedSuffix === "music.music_auto_color"
         ? newValue
           ? 1
           : 0
@@ -446,7 +452,9 @@ class GoveeAdapter extends utils.Adapter {
         g = 0,
         b = 0;
       if (musicMode === 1 || musicMode === 2) {
-        const colorState = await this.getStateAsync(`${base}.colorRgb`);
+        const colorState = await this.getStateAsync(
+          `${this.namespace}.${prefix}.control.colorRgb`,
+        );
         if (colorState?.val && typeof colorState.val === "string") {
           const hex = colorState.val.replace("#", "");
           const num = parseInt(hex, 16) || 0;
@@ -781,11 +789,13 @@ class GoveeAdapter extends utils.Adapter {
           if (device.lanIp && lanStateIds.has(mapped.stateId)) {
             continue;
           }
-          const obj = await this.getObjectAsync(
-            `${prefix}.control.${mapped.stateId}`,
+          const statePath = this.stateManager.resolveStatePath(
+            prefix,
+            mapped.stateId,
           );
+          const obj = await this.getObjectAsync(statePath);
           if (obj) {
-            await this.setStateAsync(`${prefix}.control.${mapped.stateId}`, {
+            await this.setStateAsync(statePath, {
               val: mapped.value,
               ack: true,
             });
@@ -829,6 +839,7 @@ class GoveeAdapter extends utils.Adapter {
    * @param suffix State ID suffix (e.g. "power", "brightness")
    */
   private stateToCommand(suffix: string): string | null {
+    // Control channel — basic device controls
     if (suffix === "control.power") {
       return "power";
     }
@@ -844,28 +855,30 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "control.scene") {
       return "scene";
     }
-    if (suffix === "control.light_scene") {
-      return "lightScene";
-    }
-    if (suffix === "control.diy_scene") {
-      return "diyScene";
-    }
-    if (suffix === "control.snapshot") {
-      return "snapshot";
-    }
     if (suffix === "control.gradient_toggle") {
       return "gradientToggle";
     }
-    if (suffix === "control.scene_speed") {
+    // Scenes channel
+    if (suffix === "scenes.light_scene") {
+      return "lightScene";
+    }
+    if (suffix === "scenes.diy_scene") {
+      return "diyScene";
+    }
+    if (suffix === "scenes.scene_speed") {
       return "sceneSpeed";
     }
-    // Music mode states — routed via buildMusicCommand
+    // Music channel
     if (
-      suffix === "control.music_mode" ||
-      suffix === "control.music_sensitivity" ||
-      suffix === "control.music_auto_color"
+      suffix === "music.music_mode" ||
+      suffix === "music.music_sensitivity" ||
+      suffix === "music.music_auto_color"
     ) {
       return "music";
+    }
+    // Snapshots channel
+    if (suffix === "snapshots.snapshot") {
+      return "snapshot";
     }
     // Segment commands — encode segment index in command name
     const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);

@@ -11,8 +11,6 @@
     "mqttHeader": "Govee Account (optional)",
     "mqttInfo": "Govee-Zugangsdaten eingeben um Echtzeit-Statusupdates über MQTT zu aktivieren. Ohne diese werden Statuswerte nur auf Anfrage aktualisiert.",
     "passwordLabel": "Passwort",
-    "pollIntervalLabel": "Cloud-Aktualisierungsintervall (Sekunden)",
-    "settingsHeader": "Einstellungen",
     "supportHeader": "Unterstützung",
     "networkInterfaceLabel": "Netzwerk-Interface",
     "networkInterfaceTooltip": "Netzwerk-Interface für die LAN-Geräteerkennung auswählen. Leer lassen um alle Interfaces zu verwenden (empfohlen für die meisten Setups)."

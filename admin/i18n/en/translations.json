@@ -8,8 +8,6 @@
     "mqttInfo": "Enter your Govee account credentials to enable real-time status updates via MQTT. Without this, status is only updated on request.",
     "emailLabel": "Email",
     "passwordLabel": "Password",
-    "settingsHeader": "Settings",
-    "pollIntervalLabel": "Cloud refresh interval (seconds)",
     "supportHeader": "Support",
     "aboutInfo": "This adapter is free and open source. If you find it useful, consider supporting the development.",
     "donateKofi": "Support on Ko-fi",

@@ -322,32 +322,6 @@ export class GoveeMqttClient {
     });
   }
 
-  /**
-   * Request device status via MQTT
-   *
-   * @param deviceId Device identifier
-   */
-  requestStatus(deviceId: string): boolean {
-    const topic = this.deviceTopics.get(deviceId);
-    if (!topic || !this.client?.connected) {
-      return false;
-    }
-
-    const message = {
-      msg: {
-        cmd: "status",
-        cmdVersion: 2,
-        transaction: `v_${Date.now()}000`,
-        type: 0,
-        data: {},
-        accountTopic: this.accountTopic,
-      },
-    };
-
-    this.client.publish(topic, JSON.stringify(message), { qos: 0 });
-    return true;
-  }
-
   /** Whether MQTT is currently connected */
   get connected(): boolean {
     return this.client?.connected ?? false;

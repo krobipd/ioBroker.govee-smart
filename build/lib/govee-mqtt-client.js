@@ -284,30 +284,6 @@ class GoveeMqttClient {
       colorTemInKelvin: kelvin
     });
   }
-  /**
-   * Request device status via MQTT
-   *
-   * @param deviceId Device identifier
-   */
-  requestStatus(deviceId) {
-    var _a;
-    const topic = this.deviceTopics.get(deviceId);
-    if (!topic || !((_a = this.client) == null ? void 0 : _a.connected)) {
-      return false;
-    }
-    const message = {
-      msg: {
-        cmd: "status",
-        cmdVersion: 2,
-        transaction: `v_${Date.now()}000`,
-        type: 0,
-        data: {},
-        accountTopic: this.accountTopic
-      }
-    };
-    this.client.publish(topic, JSON.stringify(message), { qos: 0 });
-    return true;
-  }
   /** Whether MQTT is currently connected */
   get connected() {
     var _a, _b;

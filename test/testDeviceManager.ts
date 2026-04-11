@@ -87,10 +87,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AA:BB:CC:DD:EE:FF:00:11",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
 
             dm.handleLanDiscovery(lanDevice);
@@ -107,19 +103,11 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AA:BB:CC:DD:EE:FF:00:11",
                 sku: "H61BE",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
             const lanDevice2: LanDevice = {
                 ip: "192.168.1.101",
                 device: "11:22:33:44:55:66:77:88",
                 sku: "H61BE",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
 
             dm.handleLanDiscovery(lanDevice1);
@@ -138,10 +126,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AABBCCDDEEFF0011",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
 
             dm.handleLanDiscovery(lanDevice1);
@@ -163,10 +147,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AABBCCDDEEFF0011",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
             dm.handleLanDiscovery(lanDevice);
 
@@ -217,10 +197,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AABBCCDDEEFF0011",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
             dm.handleLanDiscovery(lanDevice);
 
@@ -816,10 +792,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AABBCCDDEEFF0011",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
             dm.handleLanDiscovery(lanDevice);
         }
@@ -888,10 +860,6 @@ describe("DeviceManager", () => {
                 ip: "192.168.1.100",
                 device: "AABBCCDDEEFF0011",
                 sku: "H6160",
-                bleVersionHard: "",
-                bleVersionSoft: "",
-                wifiVersionHard: "",
-                wifiVersionSoft: "",
             };
             dm.handleLanDiscovery(lanDevice);
         }

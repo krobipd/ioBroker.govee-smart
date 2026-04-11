@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "Interfaccia di rete",
     "networkInterfaceTooltip": "Seleziona l'interfaccia di rete per il rilevamento dei dispositivi LAN. Lascia vuoto per utilizzare tutte le interfacce (consigliato per la maggior parte delle configurazioni).",
     "passwordLabel": "Password",
-    "pollIntervalLabel": "Intervallo di aggiornamento del cloud (secondi)",
-    "settingsHeader": "Impostazioni",
     "supportHeader": "Supporto"
 }

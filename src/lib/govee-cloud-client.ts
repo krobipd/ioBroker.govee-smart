@@ -193,27 +193,6 @@ export class GoveeCloudClient {
     return scenes;
   }
 
-  /** Check if the API key is valid */
-  async checkConnection(): Promise<{
-    success: boolean;
-    message: string;
-    deviceCount?: number;
-  }> {
-    try {
-      const devices = await this.getDevices();
-      return {
-        success: true,
-        message: `Connected — ${devices.length} device(s) found`,
-        deviceCount: devices.length,
-      };
-    } catch (err) {
-      return {
-        success: false,
-        message: err instanceof Error ? err.message : String(err),
-      };
-    }
-  }
-
   /**
    * Make an HTTPS request to the Govee Cloud API
    *

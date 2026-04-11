@@ -206,6 +206,14 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 1.0.0 (2026-04-11)
+- **BREAKING:** Multi-channel state tree — states split into `control`, `scenes`, `music`, `snapshots` channels
+- **BREAKING:** Removed `pollInterval` setting (Cloud polling was removed in 0.9.3)
+- Fix incomplete cache detection bug (type check `"devices.types.light"` never matched Cloud's `"light"`)
+- Remove dead code: unused methods, config fields, LanDevice version fields
+- Dynamic segment count from capabilities, excess segments cleaned up on startup
+- Groups minimal: BaseGroup only has `info.name` + `info.online`
+
 ### 0.9.6 (2026-04-11)
 - Fix scenes missing for most devices due to incomplete cache from rate-limited Cloud fetch
 - Fix MQTT "account abnormal" incorrectly treated as wrong credentials (keeps reconnecting instead of stopping)
@@ -237,13 +245,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Add ptReal BLE-over-LAN scene activation (local scenes without Cloud API)
 - Fix initialization order: MQTT before Cloud for scene library on first cycle
 - Fix ready message only appears after all channels are fully initialized
-
-### 0.9.0 (2026-04-09)
-- Add dedicated DIY-scenes endpoint for user-created scenes
-- Add music mode controls: dropdown, sensitivity slider, auto-color toggle
-- Add scene library per SKU from undocumented API (78-159 scenes per device)
-- Fix ready message now waits for MQTT before logging channel summary
-- Fix scene library: correct endpoint path, remove unnecessary auth, preserve query parameters
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

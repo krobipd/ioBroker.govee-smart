@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "Interface réseau",
     "networkInterfaceTooltip": "Sélectionnez l'interface réseau pour la découverte des appareils LAN. Laissez vide pour utiliser toutes les interfaces (recommandé pour la plupart des configurations).",
     "passwordLabel": "Mot de passe",
-    "pollIntervalLabel": "Intervalle d'actualisation du cloud (secondes)",
-    "settingsHeader": "Paramètres",
     "supportHeader": "Soutien"
 }

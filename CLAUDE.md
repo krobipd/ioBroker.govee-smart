@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 0.9.6 (April 2026)
+- **Version:** 1.0.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -72,18 +72,18 @@ govee-smart.0.
 │   └── h61be_1d6f.                  (SKU + letzte 4 Hex der Device-ID)
 │       ├── info.name / .model / .serial / .online / .ip
 │       ├── control.power / .brightness / .colorRgb / .colorTemperature
-│       ├── control.light_scene       (Dropdown: 78-237 Szenen, lokal via ptReal)
-│       ├── control.diy_scene         (Dropdown: User-DIY-Szenen, lokal via ptReal)
-│       ├── control.snapshot          (Dropdown: Cloud-Snapshots)
-│       ├── control.snapshot_local    (Dropdown: Lokale Snapshots)
-│       ├── control.snapshot_save     (Text: Neuen lokalen Snapshot speichern)
-│       ├── control.snapshot_delete   (Text: Lokalen Snapshot löschen)
-│       ├── control.scene_speed       (Slider: Szenen-Geschwindigkeit)
 │       ├── control.gradient_toggle   (Boolean: Gradient ein/aus)
-│       ├── control.music_mode / .music_sensitivity / .music_auto_color
-│       └── segments.count / .command / .0.color / .0.brightness
+│       ├── scenes.light_scene        (Dropdown: 78-237 Szenen, lokal via ptReal)
+│       ├── scenes.diy_scene          (Dropdown: User-DIY-Szenen, lokal via ptReal)
+│       ├── scenes.scene_speed        (Slider: Szenen-Geschwindigkeit)
+│       ├── music.music_mode / .music_sensitivity / .music_auto_color
+│       ├── snapshots.snapshot        (Dropdown: Cloud-Snapshots)
+│       ├── snapshots.snapshot_local  (Dropdown: Lokale Snapshots)
+│       ├── snapshots.snapshot_save   (Text: Neuen lokalen Snapshot speichern)
+│       ├── snapshots.snapshot_delete (Text: Lokalen Snapshot löschen)
+│       └── segments.count / .command / .0.color / .0.brightness (dynamisch)
 └── groups.
-    └── basegroup_1280.              (Govee-Gruppen)
+    └── basegroup_1280.              (nur info.name + info.online, kein model/serial/ip)
 ```
 
 ## Szenen-Architektur (WICHTIG!)
@@ -146,8 +146,7 @@ Single Page, drei Sektionen:
 **1. LAN (immer aktiv)** — "Geräte mit aktivierter LAN-Funktion werden automatisch gefunden"
 **2. Cloud API (optional)** — API Key → "Ermöglicht Szenen, Segmente und Gerätenamen"
 **3. Govee Account (optional)** — Email + Passwort → "Ermöglicht Echtzeit Status-Updates"
-**4. Einstellungen** — Poll Interval
-**5. Donation**
+**4. Donation**
 
 ## Design-Prinzipien
 
@@ -162,7 +161,7 @@ Single Page, drei Sektionen:
 9. **Nahtlos** — User merkt nicht welcher Kanal
 10. **ptReal Scene Activation** — Szenen mit sceneCode aus Scene Library werden via BLE-over-LAN (ptReal) aktiviert statt Cloud; Name-Matching mit Suffix-Stripping (-A/-B)
 11. **Keine null-Werte** — Alle States haben `def` in StateDefinition + werden beim Erstellen initialisiert
-12. **Stale State Cleanup** — `cleanupControlStates()` entfernt alte Control-States + leere Channels
+12. **Stale State Cleanup** — `cleanupAllChannelStates()` entfernt alte States aus allen Channels (control, scenes, music, snapshots) + leere Channels; handelt auch Migration von altem Single-Control-Layout
 13. **Error-Dedup** — `classifyError()` + `lastErrorCategory` in DeviceManager; warn nur bei Kategorie-Wechsel
 14. **Rate-Limited Startup** — Scene-Loading über `rateLimiter.tryExecute()` auch beim Cloud-Init
 15. **Segment-Routing** — `segmentColor:N`/`segmentBrightness:N` Commands → Cloud `segment_color_setting`
@@ -182,6 +181,9 @@ Single Page, drei Sektionen:
 29. **Local Snapshots** — `local-snapshots.ts` speichert Gerätezustand per LAN als JSON; Restore replayed einzelne LAN-Commands
 30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, noMqtt, brokenPlatformApi)
 31. **Scene Speed Infrastructure** — `sceneLibrary` enthält `speedInfo` (supSpeed, speedIndex, config); State + Routing fertig, Byte-Manipulation pending
+32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `getChannelForState()`, Pfad-Auflösung via `resolveStatePath()`
+33. **Groups minimal** — BaseGroup hat nur `info.name` + `info.online`, kein model/serial/ip
+34. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Segment-Channels werden gelöscht
 
 ## Logging-Philosophie (seit 0.9.4)
 
@@ -192,7 +194,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (254)
+## Tests (291)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks (40 Tests)
@@ -231,6 +233,16 @@ test/testSkuCache.ts         → SKU Cache (12 Tests)
 test/testTypes.ts            → Shared Utilities (19 Tests)
   - normalizeDeviceId: colons, lowercase, empty string
   - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property
+test/testStateManager.ts     → State Manager (37 Tests)
+  - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons (4)
+  - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip (9)
+  - createDeviceStates channels: scenes routing, music routing, snapshot routing, multi-channel (4)
+  - resolveStatePath: control, scenes, music, snapshots, unknown→control (5)
+  - updateDeviceState: power, multiple fields, online, undefined fields, missing object (5)
+  - removeDevice: recursive delete (1)
+  - cleanupDevices: remove stale, keep existing (2)
+  - cleanupAllChannelStates: remove stale, remove empty channel, migrate old→new channel (3)
+  - createSegmentStates: per-segment states, default 15, excess cleanup, no fields (4)
 test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 ```
 

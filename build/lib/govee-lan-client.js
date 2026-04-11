@@ -278,10 +278,6 @@ class GoveeLanClient {
   requestStatus(ip) {
     this.sendCommand(ip, "devStatus", {});
   }
-  /** Get known LAN devices */
-  getDevices() {
-    return this.knownDevices;
-  }
   /** Send multicast scan */
   sendScan() {
     var _a;
@@ -334,7 +330,7 @@ class GoveeLanClient {
    * @param data Parsed scan response payload
    */
   handleScanResponse(data) {
-    var _a, _b, _c, _d, _e;
+    var _a;
     const ip = data.ip;
     const device = data.device;
     const sku = data.sku;
@@ -344,17 +340,13 @@ class GoveeLanClient {
     const lanDevice = {
       ip,
       device,
-      sku,
-      bleVersionHard: (_a = data.bleVersionHard) != null ? _a : "",
-      bleVersionSoft: (_b = data.bleVersionSoft) != null ? _b : "",
-      wifiVersionHard: (_c = data.wifiVersionHard) != null ? _c : "",
-      wifiVersionSoft: (_d = data.wifiVersionSoft) != null ? _d : ""
+      sku
     };
     const existing = this.knownDevices.get(device);
     this.knownDevices.set(device, lanDevice);
     if (!existing || existing.ip !== ip) {
       this.log.debug(`LAN: Found ${sku} (${device}) at ${ip}`);
-      (_e = this.onDiscovery) == null ? void 0 : _e.call(this, lanDevice);
+      (_a = this.onDiscovery) == null ? void 0 : _a.call(this, lanDevice);
     }
   }
   /**

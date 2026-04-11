@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "Interfejs sieciowy",
     "networkInterfaceTooltip": "Wybierz interfejs sieciowy do wykrywania urządzeń LAN. Pozostaw puste, aby używać wszystkich interfejsów (zalecane dla większości konfiguracji).",
     "passwordLabel": "Hasło",
-    "pollIntervalLabel": "Interwał odświeżania chmury (sekundy)",
-    "settingsHeader": "Ustawienia",
     "supportHeader": "Wsparcie"
 }

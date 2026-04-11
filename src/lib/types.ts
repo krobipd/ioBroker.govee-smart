@@ -6,8 +6,6 @@ export interface AdapterConfig {
   goveeEmail: string;
   /** Govee account password (optional — enables MQTT real-time status) */
   goveePassword: string;
-  /** Cloud device list refresh interval in seconds */
-  pollInterval: number;
   /** Network interface IP for LAN multicast (empty = all interfaces) */
   networkInterface: string;
 }
@@ -215,14 +213,6 @@ export interface LanDevice {
   device: string;
   /** Product model */
   sku: string;
-  /** BLE hardware version */
-  bleVersionHard: string;
-  /** BLE software version */
-  bleVersionSoft: string;
-  /** Wi-Fi hardware version */
-  wifiVersionHard: string;
-  /** Wi-Fi software version */
-  wifiVersionSoft: string;
 }
 
 /** LAN status response */

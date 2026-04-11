@@ -25,6 +25,37 @@ var import_types = require("./types.js");
 function sanitize(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
+const SCENE_IDS = /* @__PURE__ */ new Set(["light_scene", "diy_scene", "scene_speed"]);
+const MUSIC_IDS = /* @__PURE__ */ new Set([
+  "music_mode",
+  "music_sensitivity",
+  "music_auto_color"
+]);
+const SNAPSHOT_IDS = /* @__PURE__ */ new Set([
+  "snapshot",
+  "snapshot_local",
+  "snapshot_save",
+  "snapshot_delete"
+]);
+const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
+const CHANNEL_NAMES = {
+  control: "Controls",
+  scenes: "Scenes",
+  music: "Music",
+  snapshots: "Snapshots"
+};
+function getChannelForState(stateId) {
+  if (SCENE_IDS.has(stateId)) {
+    return "scenes";
+  }
+  if (MUSIC_IDS.has(stateId)) {
+    return "music";
+  }
+  if (SNAPSHOT_IDS.has(stateId)) {
+    return "snapshots";
+  }
+  return "control";
+}
 class StateManager {
   adapter;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
@@ -34,13 +65,23 @@ class StateManager {
     this.adapter = adapter;
   }
   /**
+   * Resolve full state path for a given device prefix and state ID.
+   * Routes the state to the correct channel (control, scenes, music, snapshots).
+   *
+   * @param prefix Device object ID prefix
+   * @param stateId State ID suffix
+   */
+  resolveStatePath(prefix, stateId) {
+    return `${prefix}.${getChannelForState(stateId)}.${stateId}`;
+  }
+  /**
    * Create device object and all states from capability definitions.
    *
    * @param device Govee device
    * @param stateDefs State definitions from capability mapper
    */
   async createDeviceStates(device, stateDefs) {
-    var _a, _b;
+    var _a, _b, _c;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -52,6 +93,7 @@ class StateManager {
     }
     this.prefixMap.set(key, newPrefix);
     const prefix = newPrefix;
+    const isGroup = device.sku === "BaseGroup";
     await this.adapter.extendObjectAsync(prefix, {
       type: "device",
       common: {
@@ -78,64 +120,83 @@ class StateManager {
       false
     );
     await this.ensureState(
-      `${prefix}.info.model`,
-      "Model",
-      "string",
-      "text",
-      false
-    );
-    await this.ensureState(
-      `${prefix}.info.serial`,
-      "Serial Number",
-      "string",
-      "text",
-      false
-    );
-    await this.ensureState(
       `${prefix}.info.online`,
       "Online",
       "boolean",
       "indicator.reachable",
       false
     );
-    await this.ensureState(
-      `${prefix}.info.ip`,
-      "IP Address",
-      "string",
-      "info.ip",
-      false
-    );
     await this.adapter.setStateAsync(`${prefix}.info.name`, {
       val: device.name,
-      ack: true
-    });
-    await this.adapter.setStateAsync(`${prefix}.info.model`, {
-      val: device.sku,
-      ack: true
-    });
-    await this.adapter.setStateAsync(`${prefix}.info.serial`, {
-      val: device.deviceId,
       ack: true
     });
     await this.adapter.setStateAsync(`${prefix}.info.online`, {
       val: (_a = device.state.online) != null ? _a : false,
       ack: true
     });
-    await this.adapter.setStateAsync(`${prefix}.info.ip`, {
-      val: (_b = device.lanIp) != null ? _b : "",
-      ack: true
-    });
-    const controlDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
-    this.adapter.log.debug(
-      `createDeviceStates ${device.sku}: ${controlDefs.length} control states`
+    if (!isGroup) {
+      await this.ensureState(
+        `${prefix}.info.model`,
+        "Model",
+        "string",
+        "text",
+        false
+      );
+      await this.ensureState(
+        `${prefix}.info.serial`,
+        "Serial Number",
+        "string",
+        "text",
+        false
+      );
+      await this.ensureState(
+        `${prefix}.info.ip`,
+        "IP Address",
+        "string",
+        "info.ip",
+        false
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.model`, {
+        val: device.sku,
+        ack: true
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.serial`, {
+        val: device.deviceId,
+        ack: true
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.ip`, {
+        val: (_b = device.lanIp) != null ? _b : "",
+        ack: true
+      });
+    } else {
+      for (const staleId of ["model", "serial", "ip"]) {
+        await this.adapter.delObjectAsync(`${prefix}.info.${staleId}`).catch(() => {
+        });
+        await this.adapter.delStateAsync(`${prefix}.info.${staleId}`).catch(() => {
+        });
+      }
+    }
+    const nonSegmentDefs = stateDefs.filter(
+      (d) => !d.id.startsWith("_segment_")
     );
-    if (controlDefs.length > 0) {
-      await this.adapter.extendObjectAsync(`${prefix}.control`, {
+    const channelGroups = /* @__PURE__ */ new Map();
+    for (const def of nonSegmentDefs) {
+      const channel = getChannelForState(def.id);
+      if (!channelGroups.has(channel)) {
+        channelGroups.set(channel, []);
+      }
+      channelGroups.get(channel).push(def);
+    }
+    this.adapter.log.debug(
+      `createDeviceStates ${device.sku}: ${nonSegmentDefs.length} states in ${channelGroups.size} channel(s)`
+    );
+    for (const [channel, defs] of channelGroups) {
+      await this.adapter.extendObjectAsync(`${prefix}.${channel}`, {
         type: "channel",
-        common: { name: "Controls" },
+        common: { name: (_c = CHANNEL_NAMES[channel]) != null ? _c : channel },
         native: {}
       });
-      for (const def of controlDefs) {
+      for (const def of defs) {
         const common = {
           name: def.name,
           type: def.type,
@@ -158,7 +219,7 @@ class StateManager {
         if (def.def !== void 0) {
           common.def = def.def;
         }
-        await this.adapter.extendObjectAsync(`${prefix}.control.${def.id}`, {
+        await this.adapter.extendObjectAsync(`${prefix}.${channel}.${def.id}`, {
           type: "state",
           common,
           native: {
@@ -168,10 +229,10 @@ class StateManager {
         });
         if (def.def !== void 0) {
           const current = await this.adapter.getStateAsync(
-            `${prefix}.control.${def.id}`
+            `${prefix}.${channel}.${def.id}`
           );
           if (!current || current.val === null || current.val === void 0) {
-            await this.adapter.setStateAsync(`${prefix}.control.${def.id}`, {
+            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true
             });
@@ -179,7 +240,7 @@ class StateManager {
         }
       }
     }
-    await this.cleanupControlStates(prefix, controlDefs);
+    await this.cleanupAllChannelStates(prefix, nonSegmentDefs);
     const segmentDefs = stateDefs.filter((d) => d.id.startsWith("_segment_"));
     if (segmentDefs.length > 0) {
       await this.createSegmentStates(device);
@@ -260,6 +321,36 @@ class StateManager {
       },
       native: {}
     });
+    await this.cleanupExcessSegments(prefix, segmentCount);
+  }
+  /**
+   * Remove segment sub-channels that exceed the current segment count.
+   *
+   * @param prefix Device prefix
+   * @param segmentCount Current segment count
+   */
+  async cleanupExcessSegments(prefix, segmentCount) {
+    const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
+    const existing = await this.adapter.getObjectViewAsync(
+      "system",
+      "channel",
+      {
+        startkey: segPrefix,
+        endkey: `${segPrefix}\u9999`
+      }
+    );
+    if (!(existing == null ? void 0 : existing.rows)) {
+      return;
+    }
+    for (const row of existing.rows) {
+      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+      const segPart = localId.replace(`${prefix}.segments.`, "");
+      const segIdx = parseInt(segPart, 10);
+      if (!isNaN(segIdx) && segIdx >= segmentCount) {
+        this.adapter.log.debug(`Removing excess segment: ${localId}`);
+        await this.adapter.delObjectAsync(localId, { recursive: true });
+      }
+    }
   }
   /**
    * Update device state from any source (LAN, MQTT, Cloud).
@@ -335,40 +426,53 @@ class StateManager {
     }
   }
   /**
-   * Remove control states that are no longer in the current definitions.
+   * Remove stale states across all managed channels.
+   * Also handles migration from old single-control layout.
    *
    * @param prefix Device prefix
-   * @param controlDefs Current control state definitions
+   * @param stateDefs Current state definitions (non-segment)
    */
-  async cleanupControlStates(prefix, controlDefs) {
-    const validIds = new Set(controlDefs.map((d) => d.id));
-    const controlPrefix = `${this.adapter.namespace}.${prefix}.control.`;
-    const existing = await this.adapter.getObjectViewAsync("system", "state", {
-      startkey: controlPrefix,
-      endkey: `${controlPrefix}\u9999`
-    });
-    if (!(existing == null ? void 0 : existing.rows)) {
-      return;
-    }
-    let deleted = 0;
-    for (const row of existing.rows) {
-      const stateId = row.id.replace(controlPrefix, "");
-      if (!validIds.has(stateId)) {
-        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-        this.adapter.log.debug(`Removing stale control state: ${localId}`);
-        await this.adapter.delObjectAsync(localId);
-        await this.adapter.delStateAsync(localId).catch(() => {
-        });
-        deleted++;
+  async cleanupAllChannelStates(prefix, stateDefs) {
+    var _a;
+    const expectedByChannel = /* @__PURE__ */ new Map();
+    for (const def of stateDefs) {
+      const channel = getChannelForState(def.id);
+      if (!expectedByChannel.has(channel)) {
+        expectedByChannel.set(channel, /* @__PURE__ */ new Set());
       }
+      expectedByChannel.get(channel).add(def.id);
     }
-    if (deleted > 0 && deleted === existing.rows.length) {
-      const controlChannelId = `${prefix}.control`;
-      this.adapter.log.debug(
-        `Removing empty control channel: ${controlChannelId}`
+    for (const channel of MANAGED_CHANNELS) {
+      const channelPrefix = `${this.adapter.namespace}.${prefix}.${channel}.`;
+      const existing = await this.adapter.getObjectViewAsync(
+        "system",
+        "state",
+        {
+          startkey: channelPrefix,
+          endkey: `${channelPrefix}\u9999`
+        }
       );
-      await this.adapter.delObjectAsync(controlChannelId).catch(() => {
-      });
+      if (!(existing == null ? void 0 : existing.rows)) {
+        continue;
+      }
+      const validIds = (_a = expectedByChannel.get(channel)) != null ? _a : /* @__PURE__ */ new Set();
+      let deleted = 0;
+      for (const row of existing.rows) {
+        const stateId = row.id.replace(channelPrefix, "");
+        if (!validIds.has(stateId)) {
+          const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+          this.adapter.log.debug(`Removing stale state: ${localId}`);
+          await this.adapter.delObjectAsync(localId);
+          await this.adapter.delStateAsync(localId).catch(() => {
+          });
+          deleted++;
+        }
+      }
+      if (deleted > 0 && deleted === existing.rows.length) {
+        this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
+        await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => {
+        });
+      }
     }
   }
   /**

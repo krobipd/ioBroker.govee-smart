@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "0.9.6",
+    "version": "1.0.0",
     "news": {
+      "1.0.0": {
+        "en": "Multi-channel state tree: states split into control/scenes/music/snapshots channels\nFix incomplete cache detection (type check never matched)\nRemove dead code: unused methods, config fields, LanDevice version fields\nRemove pollInterval setting (Cloud polling was removed in 0.9.3)\nDynamic segment count from capabilities, excess segments cleaned up\nGroups minimal: only info.name + info.online",
+        "de": "Multi-Channel State-Tree: States aufgeteilt in control/scenes/music/snapshots\nFix unvollständige Cache-Erkennung (Typ-Check hat nie gematcht)\nToter Code entfernt: ungenutzte Methoden, Config-Felder, LanDevice-Versionsfelder\npollInterval-Einstellung entfernt (Cloud-Polling wurde in 0.9.3 entfernt)\nDynamische Segment-Anzahl aus Capabilities, überschüssige Segmente werden gelöscht\nGruppen minimal: nur info.name + info.online",
+        "ru": "Многоканальное дерево состояний: разделение на control/scenes/music/snapshots\nИсправлено обнаружение неполного кэша (проверка типа никогда не срабатывала)\nУдалён мёртвый код: неиспользуемые методы, поля конфигурации, версии LanDevice\nУдалена настройка pollInterval (опрос Cloud удалён в 0.9.3)\nДинамическое количество сегментов из capabilities\nГруппы минимальны: только info.name + info.online",
+        "pt": "Árvore de estados multi-canal: separação em control/scenes/music/snapshots\nCorrigida detecção de cache incompleto (verificação de tipo nunca correspondia)\nRemovido código morto: métodos não usados, campos de config, versões LanDevice\nRemovida configuração pollInterval (polling Cloud removido em 0.9.3)\nContagem dinâmica de segmentos a partir de capabilities\nGrupos mínimos: apenas info.name + info.online",
+        "nl": "Multi-kanaal state tree: states verdeeld in control/scenes/music/snapshots\nFix onvolledige cache-detectie (type check matchte nooit)\nDode code verwijderd: ongebruikte methoden, configvelden, LanDevice versievelden\npollInterval instelling verwijderd (Cloud polling verwijderd in 0.9.3)\nDynamisch segment aantal uit capabilities\nGroepen minimaal: alleen info.name + info.online",
+        "fr": "Arbre d'états multi-canal : séparation en control/scenes/music/snapshots\nCorrection détection de cache incomplet (vérification de type ne correspondait jamais)\nCode mort supprimé : méthodes inutilisées, champs config, versions LanDevice\nParamètre pollInterval supprimé (polling Cloud supprimé en 0.9.3)\nNombre dynamique de segments depuis les capabilities\nGroupes minimaux : uniquement info.name + info.online",
+        "it": "Albero stati multi-canale: separazione in control/scenes/music/snapshots\nCorretta rilevazione cache incompleta (controllo tipo non corrispondeva mai)\nCodice morto rimosso: metodi inutilizzati, campi config, versioni LanDevice\nImpostazione pollInterval rimossa (polling Cloud rimosso in 0.9.3)\nConteggio dinamico segmenti dalle capabilities\nGruppi minimali: solo info.name + info.online",
+        "es": "Árbol de estados multi-canal: separación en control/scenes/music/snapshots\nCorregida detección de caché incompleto (verificación de tipo nunca coincidía)\nCódigo muerto eliminado: métodos no usados, campos de config, versiones LanDevice\nConfiguración pollInterval eliminada (polling Cloud eliminado en 0.9.3)\nConteo dinámico de segmentos desde capabilities\nGrupos mínimos: solo info.name + info.online",
+        "pl": "Wielokanałowe drzewo stanów: podział na control/scenes/music/snapshots\nNaprawiono wykrywanie niekompletnego cache (sprawdzanie typu nigdy nie pasowało)\nUsunięto martwy kod: nieużywane metody, pola konfiguracji, wersje LanDevice\nUsunięto ustawienie pollInterval (odpytywanie Cloud usunięte w 0.9.3)\nDynamiczna liczba segmentów z capabilities\nGrupy minimalne: tylko info.name + info.online",
+        "uk": "Багатоканальне дерево станів: розділення на control/scenes/music/snapshots\nВиправлено виявлення неповного кешу (перевірка типу ніколи не спрацьовувала)\nВидалено мертвий код: невикористовувані методи, поля конфігурації, версії LanDevice\nВидалено налаштування pollInterval (опитування Cloud видалено в 0.9.3)\nДинамічна кількість сегментів з capabilities\nГрупи мінімальні: тільки info.name + info.online",
+        "zh-cn": "多通道状态树：分离为control/scenes/music/snapshots\n修复不完整缓存检测（类型检查从未匹配）\n移除死代码：未使用的方法、配置字段、LanDevice版本字段\n移除pollInterval设置（Cloud轮询已在0.9.3中移除）\n从capabilities动态确定分段数量\n组最小化：仅info.name + info.online"
+      },
       "0.9.6": {
         "en": "Fix scenes missing for most devices due to incomplete cache from rate-limited Cloud fetch\nFix MQTT 'account abnormal' incorrectly treated as wrong credentials\nReady message now waits for LAN scan and state creation before logging\nRemove per-device detail lines from ready summary (redundant with state tree)",
         "de": "Fix fehlende Szenen bei den meisten Geräten durch unvollständigen Cache nach Rate-Limit\nFix MQTT 'Account abnormal' fälschlich als falsche Zugangsdaten behandelt\nReady-Meldung wartet jetzt auf LAN-Scan und State-Erstellung\nPer-Device Details aus Ready-Summary entfernt (redundant mit State-Tree)",
@@ -80,19 +93,6 @@
         "pl": "Dodaj dedykowany punkt końcowy dla scen stworzonych przez użytkownika\nDodaj sterowniki trybu muzycznego: zrzut, suwak wrażliwości, przełączanie autokolorów\nDodaj bibliotekę sceny na SKU z nieudokumentowanego API (78- 159 scen na urządzenie)\nNapraw gotowy komunikat teraz czeka na MQTT przed logowaniem podsumowania kanału\nNapraw bibliotekę sceny: poprawna ścieżka punktowa, usuń niepotrzebne auth, zachowaj parametry zapytania",
         "uk": "Додайте виділену кінцеву точку DIY-scens для створення користувацьких сцен\nДодати керування музичним режимом: випадання, чутливість слайдера, авто-колірний перемикач\nРусский EnglishРусскийУкраїнськаPolskiItalianoEspañol汉语Bahasa Indonesiaहिन्दीPortuguês日本語DeutschFrançaisภาษาไทยελληνικά اللغة العربية\nВиправлення готового повідомлення тепер чекає на MQTT перед залоговим каналом\nРусский EnglishРусскийУкраїнськаPolskiItalianoEspañol汉语Bahasa Indonesiaहिन्दीPortuguês日本語DeutschFrançaisภาษาไทยελληνικά اللغة العربية",
         "zh-cn": "为用户创建的场景添加专用的 DIY 场景端点\n添加音乐模式控件: 下拉、 灵敏度滑动、 自动色彩切换\n从无记录的 API (每个设备78-159个场景) 添加场景库\n在登录频道摘要之前, 修复已准备好的消息等待 MQTT\n修复场景库:正确的端点路径,删除不必要的认证,保存查询参数"
-      },
-      "0.8.3": {
-        "en": "Fix release-script blocking on manual-review plugin",
-        "de": "Fix Release-script Sperrung auf manuelle Vorschau-Plugin",
-        "ru": "Исправьте блокировку сценария выпуска на плагине ручного обзора",
-        "pt": "Corrigir bloqueio release-script no plugin de revisão manual",
-        "nl": "Release-script blokkeren op manual-review plugin",
-        "fr": "Correction du blocage de la version-script sur le plugin de révision manuelle",
-        "it": "Bloccaggio di rilascio-script sul plugin di revisione manuale",
-        "es": "Arreglar bloqueo de la publicación en el plugin de revisión manual",
-        "pl": "Fix release- script blocking na wtyczce manual- review",
-        "uk": "Виправлення блокування записів на ручний плагін",
-        "zh-cn": "在手动审查插件上修复发布标记屏蔽"
       }
     },
     "titleLang": {
@@ -169,7 +169,6 @@
     "apiKey": "",
     "goveeEmail": "",
     "goveePassword": "",
-    "pollInterval": 60,
     "networkInterface": "0.0.0.0"
   }
 }

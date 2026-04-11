@@ -103,16 +103,6 @@ export class DeviceManager {
   }
 
   /**
-   * Get a device by its unique key (sku_deviceId)
-   *
-   * @param sku Product model
-   * @param deviceId Unique device identifier
-   */
-  getDevice(sku: string, deviceId: string): GoveeDevice | undefined {
-    return this.devices.get(this.deviceKey(sku, deviceId));
-  }
-
-  /**
    * Load devices from local SKU cache.
    * Returns true if any devices were loaded (= Cloud not needed).
    */
@@ -159,7 +149,7 @@ export class DeviceManager {
       (d) =>
         d.scenes.length === 0 &&
         d.sceneLibrary.length > 0 &&
-        d.type === "devices.types.light",
+        d.type === "light",
     );
     if (incomplete) {
       this.log.info(
@@ -289,9 +279,6 @@ export class DeviceManager {
                   c.parameters.options,
               );
               if (snapCap?.parameters.options) {
-                this.log.debug(
-                  `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`,
-                );
                 device.snapshots = snapCap.parameters.options
                   .filter(
                     (o) =>
@@ -306,6 +293,9 @@ export class DeviceManager {
                         ? o.value
                         : (o.value as Record<string, unknown>),
                   }));
+                this.log.debug(
+                  `Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`,
+                );
               }
             }
 
@@ -397,7 +387,7 @@ export class DeviceManager {
         let cachedCount = 0;
         let skippedCount = 0;
         for (const device of this.devices.values()) {
-          const isLight = device.type === "devices.types.light";
+          const isLight = device.type === "light";
           const scenesIncomplete =
             isLight &&
             device.scenes.length === 0 &&

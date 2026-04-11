@@ -13,7 +13,5 @@
     "networkInterfaceLabel": "Interface de rede",
     "networkInterfaceTooltip": "Selecione a interface de rede para descoberta de dispositivos LAN. Deixe vazio para usar todas as interfaces (recomendado para a maioria das configurações).",
     "passwordLabel": "Senha",
-    "pollIntervalLabel": "Intervalo de atualização da nuvem (segundos)",
-    "settingsHeader": "Configurações",
     "supportHeader": "Apoiar"
 }
