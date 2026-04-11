@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 1.1.0 (April 2026)
+- **Version:** 1.1.1 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -258,6 +258,16 @@ test/testStateManager.ts     → State Manager (37 Tests)
   - createSegmentStates: per-segment states, default 15, excess cleanup, no fields (4)
 test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 ```
+
+## Versionshistorie (letzte 5)
+
+| Version | Highlights |
+|---------|------------|
+| 1.1.1 | CI checkout entfernt, no-floating-promises, unused devDeps entfernt, doppelter news-Eintrag gefixt |
+| 1.1.0 | Diagnostics export, community quirks, R1-R8 refactoring, 309 Tests |
+| 1.0.1 | Segment capability matching, segment count, clearTimeout fixes |
+| 1.0.0 | Multi-channel state tree, dynamic segments, groups minimal, dead code removal |
+| 0.9.6 | Scenes missing fix, MQTT account abnormal fix, ready message wait |
 
 ## Befehle
 

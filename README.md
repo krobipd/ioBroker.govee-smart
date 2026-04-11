@@ -211,6 +211,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ---
 
 ## Changelog
+### 1.1.1 (2026-04-12)
+- Remove redundant CI checkout, add `no-floating-promises` lint rule, remove unused devDependencies, fix duplicate news entry
+
 ### 1.1.0 (2026-04-11)
 - Add diagnostics export per device — structured JSON for GitHub issue submission
 - Add community quirks database — external JSON (`community-quirks.json`) for user-contributed SKU overrides
@@ -260,12 +263,6 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Add device quirks system: correct wrong API data for specific SKUs
 - Add scene speed control infrastructure (speed adjustment pending live testing)
 - Extend test coverage to 254 tests
-
-### 0.9.2 (2026-04-09)
-- Add SKU cache: device data persisted locally, zero Cloud calls after first start
-- Remove periodic Cloud polling (was every 60s)
-- Add authenticated endpoint support for music/DIY libraries and SKU feature flags
-- Fix MQTT login classification for account-blocked scenarios
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

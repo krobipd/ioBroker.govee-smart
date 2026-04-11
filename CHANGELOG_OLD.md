@@ -1,5 +1,11 @@
 # Older Changes
 
+## 0.9.2 (2026-04-09)
+- Add SKU cache: device data persisted locally, zero Cloud calls after first start
+- Remove periodic Cloud polling (was every 60s)
+- Add authenticated endpoint support for music/DIY libraries and SKU feature flags
+- Fix MQTT login classification for account-blocked scenarios
+
 ## 0.9.1 (2026-04-09)
 - Add ptReal BLE-over-LAN scene activation (local scenes without Cloud API)
 - Fix initialization order: MQTT before Cloud for scene library on first cycle

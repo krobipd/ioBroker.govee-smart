@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "news": {
+      "1.1.1": {
+        "en": "Remove redundant CI checkout, add no-floating-promises lint rule, remove unused devDependencies, fix duplicate news entry",
+        "de": "Redundantes CI-Checkout entfernt, no-floating-promises Lint-Regel hinzugefügt, ungenutzte DevDependencies entfernt, doppelten News-Eintrag behoben",
+        "ru": "Удалён лишний checkout в CI, добавлено правило no-floating-promises, удалены неиспользуемые devDependencies, исправлен дубль записи news",
+        "pt": "Removido checkout CI redundante, adicionada regra no-floating-promises, removidas devDependencies não usadas, corrigida entrada news duplicada",
+        "nl": "Redundante CI checkout verwijderd, no-floating-promises lintregel toegevoegd, ongebruikte devDependencies verwijderd, dubbele news entry hersteld",
+        "fr": "Suppression checkout CI redondant, ajout règle no-floating-promises, suppression devDependencies inutilisées, correction entrée news dupliquée",
+        "it": "Rimosso checkout CI ridondante, aggiunta regola no-floating-promises, rimosse devDependencies inutilizzate, corretta voce news duplicata",
+        "es": "Eliminado checkout CI redundante, añadida regla no-floating-promises, eliminadas devDependencies no usadas, corregida entrada news duplicada",
+        "pl": "Usunięto redundantny checkout CI, dodano regułę no-floating-promises, usunięto nieużywane devDependencies, naprawiono duplikat wpisu news",
+        "uk": "Видалено зайвий checkout CI, додано правило no-floating-promises, видалено невикористовувані devDependencies, виправлено дубль запису news",
+        "zh-cn": "移除多余的CI checkout，添加no-floating-promises规则，移除未使用的devDependencies，修复重复的news条目"
+      },
       "1.1.0": {
         "en": "Add diagnostics export per device for structured GitHub issue submission\nAdd community quirks database (external JSON for user-contributed SKU overrides)\nFix array bounds checks in scene/DIY/snapshot index lookups\nFix segment batch parsing edge cases\nMajor internal refactoring: 8 focused refactorings for improved maintainability\nTest coverage increased to 309 tests",
         "de": "Diagnostik-Export pro Gerät für strukturierte GitHub-Issue-Erstellung\nCommunity-Quirks-Datenbank (externe JSON für User-beigetragene SKU-Korrekturen)\nFix Array-Grenzen bei Szenen-/DIY-/Snapshot-Index-Zugriff\nFix Segment-Batch-Parsing Randfälle\nGroßes internes Refactoring: 8 fokussierte Refactorings für bessere Wartbarkeit\nTestabdeckung auf 309 Tests erhöht",
@@ -80,32 +93,6 @@
         "pl": "Poprawiono logowanie startu z podsumowaniem kanałów i szczegółami urządzeń\nUsunięto nadmierny szum debug\nPierwsze połączenie MQTT na poziomie info",
         "uk": "Покращено логування запуску з оглядом каналів та деталями пристроїв\nВидалено надмірний debug-шум\nПерше підключення MQTT на рівні info",
         "zh-cn": "改进启动和就绪日志，包含通道摘要和设备详情\n移除过多的调试噪音\nMQTT首次连接提升至info级别"
-      },
-      "0.9.3": {
-        "en": "Add SKU cache: zero Cloud calls after first start\nAdd local snapshots: save/restore device state via LAN without Cloud\nAdd device quirks system and authenticated endpoints for music/DIY libraries\nRemove periodic Cloud polling, add scene speed infrastructure\nExtend test coverage to 254 tests",
-        "de": "SKU-Cache: keine Cloud-Aufrufe nach dem ersten Start\nLokale Snapshots: Gerätezustand per LAN speichern/wiederherstellen ohne Cloud\nDevice-Quirks-System und authentifizierte Endpoints für Music-/DIY-Libraries\nPeriodisches Cloud-Polling entfernt, Scene-Speed-Infrastruktur vorbereitet\nTestabdeckung auf 254 Tests erweitert",
-        "ru": "SKU-кэш: ноль Cloud-вызовов после первого запуска\nЛокальные снимки: сохранение/восстановление состояния через LAN без Cloud\nСистема квирков устройств и аутентифицированные эндпоинты для музыкальных/DIY библиотек\nУдалён периодический опрос Cloud, добавлена инфраструктура скорости сцен\nРасширено покрытие тестами до 254",
-        "pt": "Cache SKU: zero chamadas Cloud após primeiro início\nSnapshots locais: salvar/restaurar estado via LAN sem Cloud\nSistema de quirks e endpoints autenticados para bibliotecas música/DIY\nPolling Cloud removido, infraestrutura de velocidade de cenas adicionada\nCobertura de testes ampliada para 254",
-        "nl": "SKU-cache: nul Cloud-aanroepen na eerste start\nLokale snapshots: apparaatstatus opslaan/herstellen via LAN zonder Cloud\nDevice quirks systeem en geauthenticeerde endpoints voor muziek-/DIY-bibliotheken\nPeriodieke Cloud-polling verwijderd, scene speed infrastructuur toegevoegd\nTestdekking uitgebreid naar 254 tests",
-        "fr": "Cache SKU : zéro appels Cloud après le premier démarrage\nSnapshots locaux : sauvegarder/restaurer l'état via LAN sans Cloud\nSystème de quirks et endpoints authentifiés pour bibliothèques musique/DIY\nPolling Cloud supprimé, infrastructure vitesse des scènes ajoutée\nCouverture de tests étendue à 254",
-        "it": "Cache SKU: zero chiamate Cloud dopo il primo avvio\nSnapshot locali: salva/ripristina stato via LAN senza Cloud\nSistema quirks e endpoint autenticati per librerie musica/DIY\nPolling Cloud rimosso, infrastruttura velocità scene aggiunta\nCopertura test estesa a 254",
-        "es": "Caché SKU: cero llamadas Cloud después del primer inicio\nSnapshots locales: guardar/restaurar estado vía LAN sin Cloud\nSistema de quirks y endpoints autenticados para bibliotecas música/DIY\nPolling Cloud eliminado, infraestructura velocidad de escenas añadida\nCobertura de pruebas ampliada a 254",
-        "pl": "Cache SKU: zero wywołań Cloud po pierwszym uruchomieniu\nLokalne snapshoty: zapis/przywracanie stanu przez LAN bez Cloud\nSystem quirków i uwierzytelnione endpointy dla bibliotek muzycznych/DIY\nUsunięto odpytywanie Cloud, dodano infrastrukturę prędkości scen\nPokrycie testami rozszerzone do 254",
-        "uk": "SKU-кеш: нуль Cloud-викликів після першого запуску\nЛокальні снапшоти: збереження/відновлення стану через LAN без Cloud\nСистема квірків та автентифіковані ендпоінти для музичних/DIY бібліотек\nВидалено опитування Cloud, додано інфраструктуру швидкості сцен\nПокриття тестами розширено до 254",
-        "zh-cn": "SKU缓存：首次启动后零Cloud调用\n本地快照：通过LAN保存/恢复设备状态无需Cloud\n设备怪癖系统和认证端点支持音乐/DIY库\n移除Cloud轮询，添加场景速度基础设施\n测试覆盖扩展至254个"
-      },
-      "0.9.3": {
-        "en": "Add SKU cache: zero Cloud calls after first start\nAdd local snapshots: save/restore device state via LAN without Cloud\nAdd device quirks system and authenticated endpoints for music/DIY libraries\nRemove periodic Cloud polling, add scene speed infrastructure\nExtend test coverage to 254 tests",
-        "de": "SKU-Cache: keine Cloud-Aufrufe nach dem ersten Start\nLokale Snapshots: Gerätezustand per LAN speichern/wiederherstellen ohne Cloud\nDevice-Quirks-System und authentifizierte Endpoints für Music-/DIY-Libraries\nPeriodisches Cloud-Polling entfernt, Scene-Speed-Infrastruktur vorbereitet\nTestabdeckung auf 254 Tests erweitert",
-        "ru": "SKU-кэш: ноль Cloud-вызовов после первого запуска\nЛокальные снимки: сохранение/восстановление состояния через LAN без Cloud\nСистема квирков устройств и аутентифицированные эндпоинты для музыкальных/DIY библиотек\nУдалён периодический опрос Cloud, добавлена инфраструктура скорости сцен\nРасширено покрытие тестами до 254",
-        "pt": "Cache SKU: zero chamadas Cloud após primeiro início\nSnapshots locais: salvar/restaurar estado via LAN sem Cloud\nSistema de quirks e endpoints autenticados para bibliotecas música/DIY\nPolling Cloud removido, infraestrutura de velocidade de cenas adicionada\nCobertura de testes ampliada para 254",
-        "nl": "SKU-cache: nul Cloud-aanroepen na eerste start\nLokale snapshots: apparaatstatus opslaan/herstellen via LAN zonder Cloud\nDevice quirks systeem en geauthenticeerde endpoints voor muziek-/DIY-bibliotheken\nPeriodieke Cloud-polling verwijderd, scene speed infrastructuur toegevoegd\nTestdekking uitgebreid naar 254 tests",
-        "fr": "Cache SKU : zéro appels Cloud après le premier démarrage\nSnapshots locaux : sauvegarder/restaurer l'état via LAN sans Cloud\nSystème de quirks et endpoints authentifiés pour bibliothèques musique/DIY\nPolling Cloud supprimé, infrastructure vitesse des scènes ajoutée\nCouverture de tests étendue à 254",
-        "it": "Cache SKU: zero chiamate Cloud dopo il primo avvio\nSnapshot locali: salva/ripristina stato via LAN senza Cloud\nSistema quirks e endpoint autenticati per librerie musica/DIY\nPolling Cloud rimosso, infrastruttura velocità scene aggiunta\nCopertura test estesa a 254",
-        "es": "Caché SKU: cero llamadas Cloud después del primer inicio\nSnapshots locales: guardar/restaurar estado vía LAN sin Cloud\nSistema de quirks y endpoints autenticados para bibliotecas música/DIY\nPolling Cloud eliminado, infraestructura velocidad de escenas añadida\nCobertura de pruebas ampliada a 254",
-        "pl": "Cache SKU: zero wywołań Cloud po pierwszym uruchomieniu\nLokalne snapshoty: zapis/przywracanie stanu przez LAN bez Cloud\nSystem quirków i uwierzytelnione endpointy dla bibliotek muzycznych/DIY\nUsunięto odpytywanie Cloud, dodano infrastrukturę prędkości scen\nPokrycie testami rozszerzone do 254",
-        "uk": "SKU-кеш: нуль Cloud-викликів після першого запуску\nЛокальні снапшоти: збереження/відновлення стану через LAN без Cloud\nСистема квірків та автентифіковані ендпоінти для музичних/DIY бібліотек\nВидалено опитування Cloud, додано інфраструктуру швидкості сцен\nПокриття тестами розширено до 254",
-        "zh-cn": "SKU缓存：首次启动后零Cloud调用\n本地快照：通过LAN保存/恢复设备状态无需Cloud\n设备怪癖系统和认证端点支持音乐/DIY库\n移除Cloud轮询，添加场景速度基础设施\n测试覆盖扩展至254个"
       }
     },
     "titleLang": {
