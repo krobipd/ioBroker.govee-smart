@@ -136,6 +136,7 @@
     "tier": 3,
     "loglevel": "info",
     "mode": "daemon",
+    "keywords": ["govee", "smart home", "lights", "led", "lan", "mqtt", "ble"],
     "type": "lighting",
     "compact": true,
     "connectionType": "local",
