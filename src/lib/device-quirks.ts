@@ -11,8 +11,6 @@ export interface DeviceQuirks {
   colorTempRange?: { min: number; max: number };
   /** Device has broken/bogus platform API metadata */
   brokenPlatformApi?: boolean;
-  /** Device does not support MQTT despite being a light */
-  noMqtt?: boolean;
 }
 
 /** Built-in quirks — verified, always available */
@@ -31,11 +29,6 @@ const BUILTIN_QUIRKS: Record<string, DeviceQuirks> = {
   H617E: { brokenPlatformApi: true },
   H617F: { brokenPlatformApi: true },
   H6119: { brokenPlatformApi: true },
-
-  // No MQTT support despite being light-type
-  H6121: { noMqtt: true },
-  H6154: { noMqtt: true },
-  H6176: { noMqtt: true },
 };
 
 /** Merged quirks map: community overrides built-in */

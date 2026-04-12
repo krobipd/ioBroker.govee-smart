@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "news": {
+      "1.1.2": {
+        "en": "Remove dead MQTT command code (MQTT is status-push only)\nRemove noMqtt device quirk (obsolete without MQTT commands)\nRemove dead CloudApiError re-export\nReplace inline hex parsing with shared hexToRgb() utility\nSimplify command routing: LAN → Cloud (was LAN → MQTT → Cloud)",
+        "de": "Toten MQTT-Command-Code entfernt (MQTT ist nur Status-Push)\nnoMqtt Device-Quirk entfernt (obsolet ohne MQTT-Commands)\nToten CloudApiError Re-Export entfernt\nInline Hex-Parsing durch gemeinsame hexToRgb()-Utility ersetzt\nCommand-Routing vereinfacht: LAN → Cloud (war LAN → MQTT → Cloud)",
+        "ru": "Удалён мёртвый код MQTT-команд (MQTT только для push-статусов)\nУдалён квирк noMqtt (устарел без MQTT-команд)\nУдалён мёртвый ре-экспорт CloudApiError\nЗамена инлайн hex-парсинга на общую утилиту hexToRgb()\nУпрощена маршрутизация: LAN → Cloud (было LAN → MQTT → Cloud)",
+        "pt": "Removido código morto de comandos MQTT (MQTT é apenas push de status)\nRemovido quirk noMqtt (obsoleto sem comandos MQTT)\nRemovido re-export morto CloudApiError\nSubstituído parsing hex inline por utilitário hexToRgb()\nRoteamento simplificado: LAN → Cloud (era LAN → MQTT → Cloud)",
+        "nl": "Dode MQTT-commandocode verwijderd (MQTT is alleen status-push)\nnoMqtt device quirk verwijderd (overbodig zonder MQTT-commando's)\nDode CloudApiError re-export verwijderd\nInline hex-parsing vervangen door gedeelde hexToRgb() utility\nCommand-routing vereenvoudigd: LAN → Cloud (was LAN → MQTT → Cloud)",
+        "fr": "Suppression du code MQTT mort (MQTT est uniquement push de statut)\nSuppression du quirk noMqtt (obsolète sans commandes MQTT)\nSuppression du ré-export CloudApiError mort\nRemplacement du parsing hex inline par l'utilitaire hexToRgb()\nRoutage simplifié : LAN → Cloud (était LAN → MQTT → Cloud)",
+        "it": "Rimosso codice morto comandi MQTT (MQTT è solo push di stato)\nRimosso quirk noMqtt (obsoleto senza comandi MQTT)\nRimosso ri-export morto CloudApiError\nSostituito parsing hex inline con utility hexToRgb()\nRouting semplificato: LAN → Cloud (era LAN → MQTT → Cloud)",
+        "es": "Eliminado código muerto de comandos MQTT (MQTT es solo push de estado)\nEliminado quirk noMqtt (obsoleto sin comandos MQTT)\nEliminado re-export muerto CloudApiError\nReemplazado parsing hex inline por utilidad hexToRgb()\nEnrutamiento simplificado: LAN → Cloud (era LAN → MQTT → Cloud)",
+        "pl": "Usunięto martwy kod komend MQTT (MQTT tylko do push statusu)\nUsunięto quirk noMqtt (przestarzały bez komend MQTT)\nUsunięto martwy re-eksport CloudApiError\nZastąpiono inline parsing hex przez wspólną utilkę hexToRgb()\nUproszczono routing: LAN → Cloud (było LAN → MQTT → Cloud)",
+        "uk": "Видалено мертвий код MQTT-команд (MQTT лише для push-статусів)\nВидалено квірк noMqtt (застарілий без MQTT-команд)\nВидалено мертвий ре-експорт CloudApiError\nЗамінено інлайн hex-парсинг на спільну утиліту hexToRgb()\nСпрощено маршрутизацію: LAN → Cloud (було LAN → MQTT → Cloud)",
+        "zh-cn": "移除死代码MQTT命令（MQTT仅用于状态推送）\n移除noMqtt设备怪癖（无MQTT命令后已过时）\n移除死代码CloudApiError重新导出\n用共享hexToRgb()工具替换内联十六进制解析\n简化命令路由：LAN → Cloud（原为LAN → MQTT → Cloud）"
+      },
       "1.1.1": {
         "en": "Move diagnostics states from snapshots/ to info/ channel (where device info belongs)\nFix community quirks loading from persistent data directory (survives adapter updates)\nDocument diagnostics export and community quirks in README\nRemove redundant CI checkout, add no-floating-promises lint rule, remove unused devDependencies",
         "de": "Diagnostik-States von snapshots/ nach info/ verschoben (gehört zu Geräteinformationen)\nFix Community-Quirks laden aus persistentem Datenverzeichnis (überlebt Adapter-Updates)\nDiagnostik-Export und Community-Quirks im README dokumentiert\nRedundantes CI-Checkout entfernt, no-floating-promises Lint-Regel, ungenutzte DevDependencies entfernt",
@@ -80,19 +93,6 @@
         "pl": "Naprawiono: nazwy urządzeń nie aktualizowane z cache gdy LAN discovery startuje pierwszy",
         "uk": "Виправлено: імена пристроїв не оновлюються з кешу коли LAN discovery запускається першим",
         "zh-cn": "修复LAN发现先运行时设备名称未从缓存更新"
-      },
-      "0.9.4": {
-        "en": "Improve startup and ready logging with channel summary and per-device details\nRemove excessive debug noise (default checks, scan messages)\nPromote MQTT first-connect to info level",
-        "de": "Startup- und Ready-Logging verbessert mit Kanal-Übersicht und Gerätedetails\nÜbermäßiges Debug-Logging entfernt (Default-Checks, Scan-Meldungen)\nMQTT-Erstverbindung auf Info-Level hochgestuft",
-        "ru": "Улучшено логирование запуска с обзором каналов и деталями устройств\nУдалены избыточные debug-сообщения\nПервое подключение MQTT на уровне info",
-        "pt": "Melhorado logging de inicialização com resumo de canais e detalhes por dispositivo\nRemovido ruído excessivo de debug\nPrimeira conexão MQTT promovida para nível info",
-        "nl": "Startup- en ready-logging verbeterd met kanaaloverzicht en apparaatdetails\nOvermatige debug-meldingen verwijderd\nMQTT eerste verbinding naar info-niveau",
-        "fr": "Amélioration du logging de démarrage avec résumé des canaux et détails par appareil\nSuppression du bruit de debug excessif\nPremière connexion MQTT au niveau info",
-        "it": "Migliorato logging di avvio con riepilogo canali e dettagli per dispositivo\nRimosso rumore debug eccessivo\nPrima connessione MQTT promossa a livello info",
-        "es": "Mejorado logging de inicio con resumen de canales y detalles por dispositivo\nEliminado ruido excesivo de debug\nPrimera conexión MQTT promovida a nivel info",
-        "pl": "Poprawiono logowanie startu z podsumowaniem kanałów i szczegółami urządzeń\nUsunięto nadmierny szum debug\nPierwsze połączenie MQTT na poziomie info",
-        "uk": "Покращено логування запуску з оглядом каналів та деталями пристроїв\nВидалено надмірний debug-шум\nПерше підключення MQTT на рівні info",
-        "zh-cn": "改进启动和就绪日志，包含通道摘要和设备详情\n移除过多的调试噪音\nMQTT首次连接提升至info级别"
       }
     },
     "titleLang": {

@@ -48,14 +48,6 @@ class DeviceManager {
     this.commandRouter.setLanClient(client);
   }
   /**
-   * Register the MQTT client
-   *
-   * @param client MQTT client instance
-   */
-  setMqttClient(client) {
-    this.commandRouter.setMqttClient(client);
-  }
-  /**
    * Register the undocumented API client for scene/music/DIY libraries
    *
    * @param client API client instance

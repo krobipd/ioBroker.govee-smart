@@ -19,6 +19,7 @@ import { RateLimiter } from "./lib/rate-limiter.js";
 import { SkuCache } from "./lib/sku-cache.js";
 import { StateManager } from "./lib/state-manager.js";
 import {
+  hexToRgb,
   rgbIntToHex,
   type AdapterConfig,
   type DeviceState,
@@ -194,7 +195,6 @@ class GoveeAdapter extends utils.Adapter {
         this.log,
         this,
       );
-      this.deviceManager.setMqttClient(this.mqttClient);
 
       await this.mqttClient.connect(
         (update) => this.deviceManager!.handleMqttStatus(update),
@@ -204,14 +204,6 @@ class GoveeAdapter extends utils.Adapter {
             ack: true,
           }).catch(() => {});
           if (connected) {
-            for (const dev of this.deviceManager!.getDevices()) {
-              if (dev.mqttTopic) {
-                this.mqttClient!.registerDeviceTopic(
-                  dev.deviceId,
-                  dev.mqttTopic,
-                );
-              }
-            }
             this.checkAllReady();
           }
           this.updateConnectionState();
@@ -503,11 +495,7 @@ class GoveeAdapter extends utils.Adapter {
           `${this.namespace}.${prefix}.control.colorRgb`,
         );
         if (colorState?.val && typeof colorState.val === "string") {
-          const hex = colorState.val.replace("#", "");
-          const num = parseInt(hex, 16) || 0;
-          r = (num >> 16) & 0xff;
-          g = (num >> 8) & 0xff;
-          b = num & 0xff;
+          ({ r, g, b } = hexToRgb(colorState.val));
         }
       }
       this.lanClient.setMusicMode(device.lanIp, musicMode, r, g, b);

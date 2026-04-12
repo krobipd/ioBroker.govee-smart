@@ -27,12 +27,6 @@ describe("getDeviceQuirks", () => {
         expect(quirks!.brokenPlatformApi).to.be.true;
     });
 
-    it("should return noMqtt for H6121", () => {
-        const quirks = getDeviceQuirks("H6121");
-        expect(quirks).to.not.be.undefined;
-        expect(quirks!.noMqtt).to.be.true;
-    });
-
     it("should return all brokenPlatformApi devices", () => {
         const brokenSkus = ["H6141", "H6159", "H6003", "H6102", "H6053", "H617C", "H617E", "H617F", "H6119"];
         for (const sku of brokenSkus) {
@@ -41,13 +35,6 @@ describe("getDeviceQuirks", () => {
         }
     });
 
-    it("should return all noMqtt devices", () => {
-        const noMqttSkus = ["H6121", "H6154", "H6176"];
-        for (const sku of noMqttSkus) {
-            const quirks = getDeviceQuirks(sku);
-            expect(quirks?.noMqtt, `${sku} should have noMqtt`).to.be.true;
-        }
-    });
 });
 
 describe("applyColorTempQuirk", () => {
@@ -107,7 +94,7 @@ describe("loadCommunityQuirks", () => {
         const quirksData = {
             version: 1,
             quirks: {
-                H9999: { colorTempRange: { min: 3000, max: 5000 }, noMqtt: true },
+                H9999: { colorTempRange: { min: 3000, max: 5000 } },
             },
         };
         const filePath = path.join(tmpDir, "community-quirks.json");
@@ -116,14 +103,13 @@ describe("loadCommunityQuirks", () => {
         loadCommunityQuirks(filePath);
         const quirks = getDeviceQuirks("H9999");
         expect(quirks).to.not.be.undefined;
-        expect(quirks!.noMqtt).to.be.true;
         expect(quirks!.colorTempRange).to.deep.equal({ min: 3000, max: 5000 });
     });
 
     it("should handle missing file gracefully", () => {
         loadCommunityQuirks(path.join(tmpDir, "nonexistent.json"));
         // Built-in quirks should still work
-        expect(getDeviceQuirks("H6121")?.noMqtt).to.be.true;
+        expect(getDeviceQuirks("H6141")?.brokenPlatformApi).to.be.true;
     });
 
     it("should handle corrupt JSON gracefully", () => {
@@ -132,20 +118,20 @@ describe("loadCommunityQuirks", () => {
 
         loadCommunityQuirks(filePath);
         // Built-in quirks should still work
-        expect(getDeviceQuirks("H6121")?.noMqtt).to.be.true;
+        expect(getDeviceQuirks("H6141")?.brokenPlatformApi).to.be.true;
     });
 
     it("should be case-insensitive for community SKUs", () => {
         const quirksData = {
             version: 1,
             quirks: {
-                h7777: { noMqtt: true },
+                h7777: { brokenPlatformApi: true },
             },
         };
         const filePath = path.join(tmpDir, "community-quirks.json");
         fs.writeFileSync(filePath, JSON.stringify(quirksData));
 
         loadCommunityQuirks(filePath);
-        expect(getDeviceQuirks("H7777")?.noMqtt).to.be.true;
+        expect(getDeviceQuirks("H7777")?.brokenPlatformApi).to.be.true;
     });
 });

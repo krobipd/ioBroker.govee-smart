@@ -182,7 +182,6 @@ class GoveeAdapter extends utils.Adapter {
         this.log,
         this
       );
-      this.deviceManager.setMqttClient(this.mqttClient);
       await this.mqttClient.connect(
         (update) => this.deviceManager.handleMqttStatus(update),
         (connected) => {
@@ -192,14 +191,6 @@ class GoveeAdapter extends utils.Adapter {
           }).catch(() => {
           });
           if (connected) {
-            for (const dev of this.deviceManager.getDevices()) {
-              if (dev.mqttTopic) {
-                this.mqttClient.registerDeviceTopic(
-                  dev.deviceId,
-                  dev.mqttTopic
-                );
-              }
-            }
             this.checkAllReady();
           }
           this.updateConnectionState();
@@ -413,11 +404,7 @@ class GoveeAdapter extends utils.Adapter {
           `${this.namespace}.${prefix}.control.colorRgb`
         );
         if ((colorState == null ? void 0 : colorState.val) && typeof colorState.val === "string") {
-          const hex = colorState.val.replace("#", "");
-          const num = parseInt(hex, 16) || 0;
-          r = num >> 16 & 255;
-          g = num >> 8 & 255;
-          b = num & 255;
+          ({ r, g, b } = (0, import_types.hexToRgb)(colorState.val));
         }
       }
       this.lanClient.setMusicMode(device.lanIp, musicMode, r, g, b);

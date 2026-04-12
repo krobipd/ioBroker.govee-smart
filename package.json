@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Control Govee smart home devices via LAN, MQTT and Cloud",
   "author": {
     "name": "krobi",

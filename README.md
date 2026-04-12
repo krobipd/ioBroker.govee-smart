@@ -27,7 +27,7 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 - **Segment Control** — Per-segment color and brightness for LED strips
 - **SKU Cache** — Device data persisted locally, zero Cloud calls after first start
 - **Device Quirks** — Automatic correction of wrong API data for specific SKUs
-- **Seamless Channel Routing** — Automatically uses the fastest available channel (LAN > MQTT > Cloud)
+- **Seamless Channel Routing** — Automatically uses the fastest available channel (LAN > Cloud)
 - **Graceful Degradation** — Works LAN-only without any credentials; each credential level unlocks more features
 - **Rate Limited** — Respects Govee API limits (10/min, 10,000/day) with priority queue
 
@@ -62,7 +62,7 @@ The adapter works with different levels of configuration. Each level unlocks add
 |-------|-------------|----------|
 | **LAN Only** | None | Power, brightness, color, color temperature via LAN |
 | **+ Cloud API** | API Key | Device names, capabilities, scenes, segments, cloud fallback |
-| **+ MQTT** | Email + Password | Real-time status push, MQTT control fallback |
+| **+ MQTT** | Email + Password | Real-time status push |
 
 ### Getting a Govee API Key
 
@@ -217,8 +217,7 @@ Create the file in your **adapter data directory** (persistent across updates):
   "version": 1,
   "quirks": {
     "H6XXX": { "colorTempRange": { "min": 2200, "max": 6500 } },
-    "H6YYY": { "brokenPlatformApi": true },
-    "H6ZZZ": { "noMqtt": true }
+    "H6YYY": { "brokenPlatformApi": true }
   }
 }
 ```
@@ -229,7 +228,6 @@ Create the file in your **adapter data directory** (persistent across updates):
 |--------|------|--------|
 | `colorTempRange` | `{ min, max }` | Override the color temperature range (Kelvin) |
 | `brokenPlatformApi` | `boolean` | Skip Cloud API for this SKU (broken metadata) |
-| `noMqtt` | `boolean` | Skip MQTT for this SKU (not supported despite being a light) |
 
 Community entries override built-in quirks for the same SKU. Use the **diagnostics export** to gather device data when contributing a new quirk.
 
@@ -263,6 +261,13 @@ Community entries override built-in quirks for the same SKU. Use the **diagnosti
 ---
 
 ## Changelog
+### 1.1.2 (2026-04-12)
+- Remove dead MQTT command code (MQTT is status-push only, never sent commands)
+- Remove `noMqtt` device quirk (no longer needed without MQTT commands)
+- Remove dead `CloudApiError` re-export
+- Replace inline hex parsing with shared `hexToRgb()` utility
+- Simplify LAN fallback to Cloud-only (was LAN → MQTT → Cloud)
+
 ### 1.1.1 (2026-04-12)
 - **BREAKING:** Move diagnostics states from `snapshots/` to `info/` channel (where device information belongs)
 - Fix community quirks loading from persistent data directory instead of adapter directory (survives updates)

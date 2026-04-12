@@ -10,9 +10,6 @@ import type {
 
 const BASE_URL = "https://openapi.api.govee.com";
 
-/** Cloud API error with HTTP status code (re-export HttpError for backwards compat) */
-export const CloudApiError = HttpError;
-
 /**
  * Govee Cloud API v2 client.
  * Used for device list, capabilities, scenes, segments, and as control fallback.

@@ -19,18 +19,20 @@
 - State-Werte: `loadCloudStates()` filtert LAN-State-IDs für LAN-fähige Geräte
 - Cloud ist NUR für: Szenen, Snapshots, Toggles, Segmente, Sensoren
 
-## Kanal-Priorität: LAN → MQTT → Cloud
+## Kanal-Priorität: LAN → Cloud
 
 Jeder Kanal hat genau eine Rolle. Kein Overlap.
 
-| Feature | LAN UDP (1.) | MQTT (2.) | Cloud REST (3.) |
-|---------|-------------|-----------|----------------|
-| Steuern (Power, Brightness, Color) | **primär** | Fallback | letzter Ausweg |
-| Status anfragen | **primär** | Fallback | letzter Ausweg |
+| Feature | LAN UDP (1.) | MQTT (Status) | Cloud REST (2.) |
+|---------|-------------|---------------|----------------|
+| Steuern (Power, Brightness, Color) | **primär** | — | Fallback |
+| Status anfragen | **primär** | — | Fallback |
 | Status Push (echtzeit) | — | **einzige Quelle** | — |
 | Geräteliste + Capabilities | — | — | **einzige Quelle** |
 | Szenen + Snapshots | — | — | **einzige Quelle** |
 | Segmente | — | — | **einzige Quelle** |
+
+> **MQTT ist nur Status-Push.** Commands werden über LAN oder Cloud gesendet, nie über MQTT.
 
 **Nur Lights!** Keine Appliances, Sensoren, Plugs — dafür ggf. eigener Adapter. Nur Geräte mit lokaler API. Siehe [Supported devices](https://app-h5.govee.com/user-manual/wlan-guide).
 
@@ -45,14 +47,14 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 ## Architektur
 
 ```
-src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots (921 Zeilen)
-src/lib/device-manager.ts     → Device-Map, Cloud-Loading, LAN/MQTT Status Handling (886 Zeilen)
+src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots (909 Zeilen)
+src/lib/device-manager.ts     → Device-Map, Cloud-Loading, LAN/MQTT Status Handling (876 Zeilen)
 src/lib/capability-mapper.ts  → Capability → State Definition + buildDeviceStateDefs + Quirks (785 Zeilen)
-src/lib/command-router.ts     → Command Routing LAN → MQTT → Cloud + Segment Batch (718 Zeilen)
+src/lib/command-router.ts     → Command Routing LAN → Cloud + Segment Batch (645 Zeilen)
 src/lib/state-manager.ts      → State CRUD + Cleanup + Channel Routing (630 Zeilen)
 src/lib/govee-lan-client.ts   → LAN UDP (Discovery + Control + Status + ptReal BLE Packets) (581 Zeilen)
-src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Auth + Status-Push + Control Fallback) (483 Zeilen)
-src/lib/types.ts              → Interfaces + Shared Utilities (rgbToHex, hexToRgb, classifyError) (450 Zeilen)
+src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Auth + Status-Push, kein Command-Senden) (391 Zeilen)
+src/lib/types.ts              → Interfaces + Shared Utilities (rgbToHex, hexToRgb, classifyError) (448 Zeilen)
 src/lib/govee-api-client.ts   → Undocumented API (Scene/Music/DIY Libraries, SKU Features) (237 Zeilen)
 src/lib/govee-cloud-client.ts → Cloud REST API v2 (Devices, Capabilities, Szenen+Snapshots, Control)
 src/lib/sku-cache.ts          → Persistent SKU cache (device data, scene/music/DIY libraries)
@@ -156,7 +158,7 @@ Single Page, drei Sektionen:
 ## Design-Prinzipien
 
 1. **LAN first** — schnellster Kanal, Kern des Adapters, Cloud darf NIE LAN-States überschreiben
-2. **MQTT für Echtzeit** — Status-Push, Steuer-Fallback
+2. **MQTT für Echtzeit** — Status-Push only (kein Command-Sending)
 3. **Cloud nur wo nötig** — Definitionen, Szenen, Snapshots, Segmente
 4. **Graceful degradation** — ohne Credentials: LAN-only funktioniert
 5. **Capability-driven** — States aus API generiert, nichts hardcodiert
@@ -184,7 +186,7 @@ Single Page, drei Sektionen:
 27. **Ready-Message Ordering** — `checkAllReady()` prüft MQTT+Cloud bevor Ready geloggt wird; Safety-Timeout 30s
 28. **SKU Cache** — `sku-cache.ts` persistiert Device-Daten + Libraries lokal; nach erstem Start null Cloud-Calls nötig. `loadFromCache()` mergt in bereits vorhandene LAN-Geräte (Name, Capabilities, Szenen). Incomplete Cache (scenes=0 bei Lights) triggert automatisch Cloud re-fetch
 29. **Local Snapshots** — `local-snapshots.ts` speichert Gerätezustand per LAN als JSON; Restore replayed einzelne LAN-Commands
-30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, noMqtt, brokenPlatformApi)
+30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, brokenPlatformApi)
 31. **Scene Speed Infrastructure** — `sceneLibrary` enthält `speedInfo` (supSpeed, speedIndex, config); State + Routing fertig, Byte-Manipulation pending
 32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `def.channel` in StateDefinition, Pfad-Auflösung via `resolveStatePath()`
 33. **Groups minimal** — BaseGroup hat nur `info.name` + `info.online`, kein model/serial/ip
@@ -202,7 +204,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (309)
+## Tests (304)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks (40 Tests)
@@ -210,22 +212,21 @@ test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping 
   - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases (10)
   - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases (16)
   - applyQuirksToStates: known SKU, unknown SKU, non-colorTemp (3)
-test/testDeviceManager.ts    → Device Manager + CommandRouter (75 Tests)
+test/testDeviceManager.ts    → Device Manager + CommandRouter (71 Tests)
   - LAN discovery, IP update, MQTT status, unknown device/IP handling (7)
-  - sendCommand channel routing: LAN→MQTT→Cloud fallback, ptReal scene, segment→Cloud only (9)
+  - sendCommand channel routing: LAN→Cloud fallback, ptReal scene, segment→Cloud, gradient (10)
   - toCloudValue: power, brightness, color hex→int, scene/snapshot/diy index lookup, segments (14)
   - parseSegmentBatch: range, all, comma, brightness-only, clamp, invalid, mixed (10)
   - findCapabilityForCommand: all command types, unknown, empty capabilities (11)
   - logDedup: category tracking, warn vs debug (1+assertions)
   - handleMqttStatus edge cases: partial update, colorTemp, mqtt channel, empty state (4)
   - handleLanStatus edge cases: zero brightness, colorTemInKelvin 0 (2)
-  - noMqtt quirk: H6121 skips MQTT, non-quirk uses MQTT (2)
   - DIY scene via LAN: library match, no match fallback (2)
   - colorTemperature via LAN, no channel warning (2)
   - generateDiagnostics: all data, quirks (2)
   - toCloudValue bounds checks: NaN, zero, out-of-range (5)
-test/testDeviceQuirks.ts     → Device Quirks + Community Quirks (17 Tests)
-  - getDeviceQuirks: known, case-insensitive, unknown, brokenPlatformApi, noMqtt, all broken, all noMqtt (7)
+test/testDeviceQuirks.ts     → Device Quirks + Community Quirks (15 Tests)
+  - getDeviceQuirks: known, case-insensitive, unknown, brokenPlatformApi, all broken (5)
   - applyColorTempQuirk: override, passthrough, no range, H6022, case-insensitive (5)
   - loadCommunityQuirks: load+override, add new, missing file, corrupt JSON, case-insensitive (5)
 test/testLocalSnapshots.ts   → Local Snapshots (10 Tests)
@@ -263,11 +264,11 @@ test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 
 | Version | Highlights |
 |---------|------------|
+| 1.1.2 | Dead MQTT command code entfernt, noMqtt quirk entfernt, dead CloudApiError export entfernt, inline hex→hexToRgb(), 304 Tests |
 | 1.1.1 | CI checkout entfernt, no-floating-promises, unused devDeps entfernt, doppelter news-Eintrag gefixt |
 | 1.1.0 | Diagnostics export, community quirks, R1-R8 refactoring, 309 Tests |
 | 1.0.1 | Segment capability matching, segment count, clearTimeout fixes |
 | 1.0.0 | Multi-channel state tree, dynamic segments, groups minimal, dead code removal |
-| 0.9.6 | Scenes missing fix, MQTT account abnormal fix, ready message wait |
 
 ## Befehle
 

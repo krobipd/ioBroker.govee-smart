@@ -297,27 +297,7 @@ describe("DeviceManager", () => {
             expect(tracker.calls[0].args).to.deep.equal(["192.168.1.100", 255, 128, 0]);
         });
 
-        it("should fall back to MQTT when LAN is not available", async () => {
-            const tracker = createCallTracker();
-            const mockMqtt = {
-                connected: true,
-                setPower: tracker.track("setPower"),
-                setBrightness: tracker.track("setBrightness"),
-                setColor: tracker.track("setColor"),
-                setColorTemperature: tracker.track("setColorTemperature"),
-            };
-            dm.setMqttClient(mockMqtt as any);
-
-            const device = createTestDevice({ lanIp: undefined, channels: { lan: false, mqtt: true, cloud: true } });
-            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-
-            await dm.sendCommand(device, "power", false);
-            expect(tracker.calls).to.have.lengthOf(1);
-            expect(tracker.calls[0].method).to.equal("setPower");
-            expect(tracker.calls[0].args).to.deep.equal(["AABBCCDDEEFF0011", false]);
-        });
-
-        it("should fall back to Cloud when LAN and MQTT are not available", async () => {
+        it("should fall back to Cloud when LAN is not available", async () => {
             const tracker = createCallTracker();
             const mockCloud = {
                 controlDevice: (...args: unknown[]) => {
@@ -870,62 +850,6 @@ describe("DeviceManager", () => {
         });
     });
 
-    describe("sendCommand — noMqtt quirk", () => {
-        it("should skip MQTT for noMqtt device (H6121) and fall to Cloud", async () => {
-            const mqttTracker = createCallTracker();
-            const mockMqtt = {
-                connected: true,
-                setPower: mqttTracker.track("setPower"),
-            };
-            dm.setMqttClient(mockMqtt as any);
-
-            const cloudTracker = createCallTracker();
-            const mockCloud = {
-                controlDevice: (...args: unknown[]) => {
-                    cloudTracker.calls.push({ method: "controlDevice", args });
-                    return Promise.resolve();
-                },
-            };
-            dm.setCloudClient(mockCloud as any);
-
-            // H6121 has noMqtt quirk
-            const device = createTestDevice({
-                sku: "H6121",
-                lanIp: undefined,
-                channels: { lan: false, mqtt: true, cloud: true },
-            });
-            (dm as any).devices.set("H6121_aabbccddeeff0011", device);
-
-            await dm.sendCommand(device, "power", true);
-            // MQTT should NOT be called
-            expect(mqttTracker.calls).to.have.lengthOf(0);
-            // Cloud should be called instead
-            expect(cloudTracker.calls).to.have.lengthOf(1);
-        });
-
-        it("should still use MQTT for non-quirk devices", async () => {
-            const mqttTracker = createCallTracker();
-            const mockMqtt = {
-                connected: true,
-                setPower: mqttTracker.track("setPower"),
-                setBrightness: mqttTracker.track("setBrightness"),
-                setColor: mqttTracker.track("setColor"),
-                setColorTemperature: mqttTracker.track("setColorTemperature"),
-            };
-            dm.setMqttClient(mockMqtt as any);
-
-            const device = createTestDevice({
-                lanIp: undefined,
-                channels: { lan: false, mqtt: true, cloud: true },
-            });
-            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-
-            await dm.sendCommand(device, "power", true);
-            expect(mqttTracker.calls).to.have.lengthOf(1);
-            expect(mqttTracker.calls[0].method).to.equal("setPower");
-        });
-    });
-
     describe("sendCommand — DIY scene via LAN", () => {
         it("should route DIY scene via ptReal when library match found", async () => {
             const lanTracker = createCallTracker();
@@ -1064,9 +988,9 @@ describe("DeviceManager", () => {
         });
 
         it("should include quirks for known SKU", () => {
-            const device = createTestDevice({ sku: "H6121" });
+            const device = createTestDevice({ sku: "H6141" });
             const result = dm.generateDiagnostics(device, "1.0.1");
-            expect((result.quirks as any).noMqtt).to.be.true;
+            expect((result.quirks as any).brokenPlatformApi).to.be.true;
         });
     });
 

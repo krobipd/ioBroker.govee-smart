@@ -18,13 +18,11 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var govee_cloud_client_exports = {};
 __export(govee_cloud_client_exports, {
-  CloudApiError: () => CloudApiError,
   GoveeCloudClient: () => GoveeCloudClient
 });
 module.exports = __toCommonJS(govee_cloud_client_exports);
 var import_http_client = require("./http-client.js");
 const BASE_URL = "https://openapi.api.govee.com";
-const CloudApiError = import_http_client.HttpError;
 class GoveeCloudClient {
   apiKey;
   log;
@@ -189,7 +187,6 @@ class GoveeCloudClient {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  CloudApiError,
   GoveeCloudClient
 });
 //# sourceMappingURL=govee-cloud-client.js.map

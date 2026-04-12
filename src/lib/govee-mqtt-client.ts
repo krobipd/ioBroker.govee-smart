@@ -68,8 +68,6 @@ export class GoveeMqttClient {
   private lastErrorCategory: ErrorCategory | null = null;
   private onStatus: MqttStatusCallback | null = null;
   private onConnection: MqttConnectionCallback | null = null;
-  /** Map of device ID → MQTT topic for publishing commands */
-  private readonly deviceTopics = new Map<string, string>();
 
   /**
    * @param email Govee account email
@@ -230,96 +228,6 @@ export class GoveeMqttClient {
 
       this.scheduleReconnect();
     }
-  }
-
-  /**
-   * Register a device topic for MQTT command publishing
-   *
-   * @param deviceId Device identifier
-   * @param topic MQTT topic for this device
-   */
-  registerDeviceTopic(deviceId: string, topic: string): void {
-    this.deviceTopics.set(deviceId, topic);
-  }
-
-  /**
-   * Send a control command via MQTT
-   *
-   * @param deviceId Device ID
-   * @param cmd Command name (turn, brightness, colorwc)
-   * @param data Command data
-   */
-  sendCommand(
-    deviceId: string,
-    cmd: string,
-    data: Record<string, unknown>,
-  ): boolean {
-    const topic = this.deviceTopics.get(deviceId);
-    if (!topic || !this.client?.connected) {
-      return false;
-    }
-
-    const message = {
-      msg: {
-        cmd,
-        data,
-        cmdVersion: 0,
-        transaction: `v_${Date.now()}000`,
-        type: 1,
-      },
-    };
-
-    this.client.publish(topic, JSON.stringify(message), { qos: 0 });
-    this.log.debug(`MQTT command sent: ${cmd} to ${deviceId}`);
-    return true;
-  }
-
-  /**
-   * Send power command
-   *
-   * @param deviceId Device identifier
-   * @param on Power state
-   */
-  setPower(deviceId: string, on: boolean): boolean {
-    return this.sendCommand(deviceId, "turn", { val: on ? 1 : 0 });
-  }
-
-  /**
-   * Send brightness command
-   *
-   * @param deviceId Device identifier
-   * @param brightness Brightness 0-100
-   */
-  setBrightness(deviceId: string, brightness: number): boolean {
-    return this.sendCommand(deviceId, "brightness", { val: brightness });
-  }
-
-  /**
-   * Send color command
-   *
-   * @param deviceId Device identifier
-   * @param r Red channel 0-255
-   * @param g Green channel 0-255
-   * @param b Blue channel 0-255
-   */
-  setColor(deviceId: string, r: number, g: number, b: number): boolean {
-    return this.sendCommand(deviceId, "colorwc", {
-      color: { r, g, b },
-      colorTemInKelvin: 0,
-    });
-  }
-
-  /**
-   * Send color temperature command
-   *
-   * @param deviceId Device identifier
-   * @param kelvin Color temperature in Kelvin
-   */
-  setColorTemperature(deviceId: string, kelvin: number): boolean {
-    return this.sendCommand(deviceId, "colorwc", {
-      color: { r: 0, g: 0, b: 0 },
-      colorTemInKelvin: kelvin,
-    });
   }
 
   /** Whether MQTT is currently connected */

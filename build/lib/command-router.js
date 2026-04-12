@@ -21,12 +21,10 @@ __export(command_router_exports, {
   CommandRouter: () => CommandRouter
 });
 module.exports = __toCommonJS(command_router_exports);
-var import_device_quirks = require("./device-quirks.js");
 var import_types = require("./types.js");
 class CommandRouter {
   log;
   lanClient = null;
-  mqttClient = null;
   cloudClient = null;
   rateLimiter = null;
   /** Callback for batch segment state sync */
@@ -42,14 +40,6 @@ class CommandRouter {
    */
   setLanClient(client) {
     this.lanClient = client;
-  }
-  /**
-   * Register the MQTT client
-   *
-   * @param client MQTT client instance
-   */
-  setMqttClient(client) {
-    this.mqttClient = client;
   }
   /**
    * Register the Cloud client
@@ -88,7 +78,7 @@ class CommandRouter {
    * @param value Command value
    */
   async sendCommand(device, command, value) {
-    var _a, _b;
+    var _a;
     if (command.startsWith("segmentColor:")) {
       if (device.lanIp && this.lanClient) {
         const segIdx = parseInt(command.split(":")[1], 10);
@@ -154,12 +144,6 @@ class CommandRouter {
     if (device.lanIp && this.lanClient) {
       this.sendLanCommand(device, command, value);
       return;
-    }
-    const quirks = (0, import_device_quirks.getDeviceQuirks)(device.sku);
-    if (!(quirks == null ? void 0 : quirks.noMqtt) && device.channels.mqtt && ((_b = this.mqttClient) == null ? void 0 : _b.connected)) {
-      if (this.sendMqttCommand(device, command, value)) {
-        return;
-      }
     }
     if (device.channels.cloud && this.cloudClient) {
       await this.sendCloudCommand(device, command, value);
@@ -431,7 +415,7 @@ class CommandRouter {
    * @param value Command value
    */
   sendLanCommand(device, command, value) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c;
     if (!device.lanIp || !this.lanClient) {
       return;
     }
@@ -474,9 +458,6 @@ class CommandRouter {
             return;
           }
         }
-        if (((_b = this.mqttClient) == null ? void 0 : _b.connected) && this.sendMqttCommand(device, command, value)) {
-          return;
-        }
         this.sendCloudCommand(device, command, value).catch(() => {
         });
         break;
@@ -492,7 +473,7 @@ class CommandRouter {
         const scene = device.scenes[idx - 1];
         if (scene) {
           const baseName = scene.name.replace(/-[A-Z]$/, "");
-          const libEntry = (_c = device.sceneLibrary.find((s) => s.name === scene.name)) != null ? _c : device.sceneLibrary.find((s) => s.name === baseName);
+          const libEntry = (_b = device.sceneLibrary.find((s) => s.name === scene.name)) != null ? _b : device.sceneLibrary.find((s) => s.name === baseName);
           if (libEntry) {
             this.log.debug(
               `ptReal: ${scene.name} \u2192 code=${libEntry.sceneCode}`
@@ -500,53 +481,18 @@ class CommandRouter {
             this.lanClient.setScene(
               device.lanIp,
               libEntry.sceneCode,
-              (_d = libEntry.scenceParam) != null ? _d : ""
+              (_c = libEntry.scenceParam) != null ? _c : ""
             );
             return;
           }
-        }
-        if (((_e = this.mqttClient) == null ? void 0 : _e.connected) && this.sendMqttCommand(device, command, value)) {
-          return;
         }
         this.sendCloudCommand(device, command, value).catch(() => {
         });
         break;
       }
       default:
-        if (((_f = this.mqttClient) == null ? void 0 : _f.connected) && this.sendMqttCommand(device, command, value)) {
-          return;
-        }
         this.sendCloudCommand(device, command, value).catch(() => {
         });
-    }
-  }
-  /**
-   * Send command via MQTT — returns true if sent
-   *
-   * @param device Target device
-   * @param command Command type
-   * @param value Command value
-   */
-  sendMqttCommand(device, command, value) {
-    if (!this.mqttClient) {
-      return false;
-    }
-    switch (command) {
-      case "power":
-        return this.mqttClient.setPower(device.deviceId, value);
-      case "brightness":
-        return this.mqttClient.setBrightness(device.deviceId, value);
-      case "colorRgb": {
-        const { r, g, b } = (0, import_types.hexToRgb)(value);
-        return this.mqttClient.setColor(device.deviceId, r, g, b);
-      }
-      case "colorTemperature":
-        return this.mqttClient.setColorTemperature(
-          device.deviceId,
-          value
-        );
-      default:
-        return false;
     }
   }
   /**

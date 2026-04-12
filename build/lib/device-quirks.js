@@ -47,11 +47,7 @@ const BUILTIN_QUIRKS = {
   H617C: { brokenPlatformApi: true },
   H617E: { brokenPlatformApi: true },
   H617F: { brokenPlatformApi: true },
-  H6119: { brokenPlatformApi: true },
-  // No MQTT support despite being light-type
-  H6121: { noMqtt: true },
-  H6154: { noMqtt: true },
-  H6176: { noMqtt: true }
+  H6119: { brokenPlatformApi: true }
 };
 let mergedQuirks = { ...BUILTIN_QUIRKS };
 function loadCommunityQuirks(filePath, log) {

@@ -254,8 +254,6 @@ export interface GoveeDevice {
   type: string;
   /** LAN IP address if discovered */
   lanIp?: string;
-  /** MQTT device topic for publishing commands */
-  mqttTopic?: string;
   /** Capabilities from Cloud API */
   capabilities: CloudCapability[];
   /** Available light scenes (from Cloud scenes endpoint) */

@@ -1,19 +1,16 @@
-import { getDeviceQuirks } from "./device-quirks.js";
 import { hexToRgb } from "./types.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
-import type { GoveeMqttClient } from "./govee-mqtt-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
 import type { GoveeDevice } from "./types.js";
 
 /**
  * Command router — routes device commands through the fastest available
- * channel: LAN → MQTT → Cloud.
+ * channel: LAN → Cloud.
  */
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
   private lanClient: GoveeLanClient | null = null;
-  private mqttClient: GoveeMqttClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
 
@@ -35,15 +32,6 @@ export class CommandRouter {
    */
   setLanClient(client: GoveeLanClient): void {
     this.lanClient = client;
-  }
-
-  /**
-   * Register the MQTT client
-   *
-   * @param client MQTT client instance
-   */
-  setMqttClient(client: GoveeMqttClient): void {
-    this.mqttClient = client;
   }
 
   /**
@@ -172,15 +160,7 @@ export class CommandRouter {
       return;
     }
 
-    // Priority 2: MQTT (skip for devices with noMqtt quirk)
-    const quirks = getDeviceQuirks(device.sku);
-    if (!quirks?.noMqtt && device.channels.mqtt && this.mqttClient?.connected) {
-      if (this.sendMqttCommand(device, command, value)) {
-        return;
-      }
-    }
-
-    // Priority 3: Cloud (rate-limited)
+    // Priority 2: Cloud (rate-limited)
     if (device.channels.cloud && this.cloudClient) {
       await this.sendCloudCommand(device, command, value);
       return;
@@ -581,13 +561,7 @@ export class CommandRouter {
             return;
           }
         }
-        // No library match — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
+        // No library match — fall through to Cloud
         this.sendCloudCommand(device, command, value).catch(() => {});
         break;
       }
@@ -619,60 +593,13 @@ export class CommandRouter {
             return;
           }
         }
-        // Scene not in library — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
+        // Scene not in library — fall through to Cloud
         this.sendCloudCommand(device, command, value).catch(() => {});
         break;
       }
       default:
-        // LAN doesn't support this command — fall through to MQTT/Cloud
-        if (
-          this.mqttClient?.connected &&
-          this.sendMqttCommand(device, command, value)
-        ) {
-          return;
-        }
+        // LAN doesn't support this command — fall through to Cloud
         this.sendCloudCommand(device, command, value).catch(() => {});
-    }
-  }
-
-  /**
-   * Send command via MQTT — returns true if sent
-   *
-   * @param device Target device
-   * @param command Command type
-   * @param value Command value
-   */
-  private sendMqttCommand(
-    device: GoveeDevice,
-    command: string,
-    value: unknown,
-  ): boolean {
-    if (!this.mqttClient) {
-      return false;
-    }
-
-    switch (command) {
-      case "power":
-        return this.mqttClient.setPower(device.deviceId, value as boolean);
-      case "brightness":
-        return this.mqttClient.setBrightness(device.deviceId, value as number);
-      case "colorRgb": {
-        const { r, g, b } = hexToRgb(value as string);
-        return this.mqttClient.setColor(device.deviceId, r, g, b);
-      }
-      case "colorTemperature":
-        return this.mqttClient.setColorTemperature(
-          device.deviceId,
-          value as number,
-        );
-      default:
-        return false;
     }
   }
 

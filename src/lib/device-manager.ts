@@ -3,7 +3,6 @@ import { getDeviceQuirks } from "./device-quirks.js";
 import type { GoveeApiClient } from "./govee-api-client.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
-import type { GoveeMqttClient } from "./govee-mqtt-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
 import type { CachedDeviceData, SkuCache } from "./sku-cache.js";
 import {
@@ -48,15 +47,6 @@ export class DeviceManager {
    */
   setLanClient(client: GoveeLanClient): void {
     this.commandRouter.setLanClient(client);
-  }
-
-  /**
-   * Register the MQTT client
-   *
-   * @param client MQTT client instance
-   */
-  setMqttClient(client: GoveeMqttClient): void {
-    this.commandRouter.setMqttClient(client);
   }
 
   /**
