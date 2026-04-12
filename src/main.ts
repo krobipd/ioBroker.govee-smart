@@ -104,6 +104,8 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
 
     this.stateManager = new StateManager(this);
+    // General groups online state (reflects Cloud connection)
+    await this.stateManager.createGroupsOnlineState(false);
     this.deviceManager = new DeviceManager(this.log);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
 
@@ -235,6 +237,7 @@ class GoveeAdapter extends utils.Adapter {
           val: cloudOk,
           ack: true,
         }).catch(() => {});
+        this.stateManager?.updateGroupsOnline(cloudOk).catch(() => {});
 
         if (cloudOk) {
           await this.loadCloudStates();
@@ -246,6 +249,7 @@ class GoveeAdapter extends utils.Adapter {
           val: true,
           ack: true,
         }).catch(() => {});
+        this.stateManager?.updateGroupsOnline(true).catch(() => {});
       }
       this.cloudInitDone = true;
     }
@@ -345,12 +349,11 @@ class GoveeAdapter extends utils.Adapter {
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
-    if (
-      stateSuffix === "snapshots.snapshot_local" &&
-      state.val !== "0" &&
-      state.val !== 0
-    ) {
-      await this.handleSnapshotRestore(device, state.val);
+    if (stateSuffix === "snapshots.snapshot_local") {
+      if (state.val !== "0" && state.val !== 0) {
+        await this.handleSnapshotRestore(device, state.val);
+        await this.resetRelatedDropdowns(prefix, "snapshotLocal");
+      }
       await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
@@ -405,31 +408,42 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
 
+    // Dropdown reset to "---" (value 0) — acknowledge without sending command
+    if (
+      (command === "lightScene" ||
+        command === "diyScene" ||
+        command === "snapshot") &&
+      (state.val === "0" || state.val === 0)
+    ) {
+      await this.setStateAsync(id, { val: state.val, ack: true });
+      return;
+    }
+
     try {
       // Music mode: combine all music states into one STRUCT command
       if (command === "music") {
+        // music_mode "---" (value 0) — acknowledge without sending command
+        if (
+          stateSuffix === "music.music_mode" &&
+          (state.val === "0" || state.val === 0)
+        ) {
+          await this.setStateAsync(id, { val: state.val, ack: true });
+          return;
+        }
         await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
         await this.setStateAsync(id, { val: state.val, ack: true });
+        // Reset scene/snapshot dropdowns when activating music mode
+        if (stateSuffix === "music.music_mode") {
+          await this.resetRelatedDropdowns(prefix, "music");
+        }
         return;
       }
 
       await this.deviceManager.sendCommand(device, command, state.val);
       // Optimistic ack
       await this.setStateAsync(id, { val: state.val, ack: true });
-      // Reset scene dropdowns when switching to solid color/colorTemp
-      if (command === "colorRgb" || command === "colorTemperature") {
-        for (const [ch, key] of [
-          ["scenes", "light_scene"],
-          ["scenes", "diy_scene"],
-          ["snapshots", "snapshot"],
-        ]) {
-          const sceneId = `${this.namespace}.${prefix}.${ch}.${key}`;
-          const sceneState = await this.getStateAsync(sceneId);
-          if (sceneState?.val && sceneState.val !== "0") {
-            await this.setStateAsync(sceneId, { val: "0", ack: true });
-          }
-        }
-      }
+      // Reset related dropdowns when switching modes
+      await this.resetRelatedDropdowns(prefix, command);
     } catch (err) {
       this.log.warn(
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`,
@@ -897,6 +911,54 @@ class GoveeAdapter extends utils.Adapter {
       this.onDeviceListChanged(this.deviceManager!.getDevices());
     } else {
       this.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
+    }
+  }
+
+  /**
+   * Reset related dropdown states when switching between scenes/snapshots/colors.
+   * Each mode-switch resets all OTHER mode dropdowns to "---" (0).
+   *
+   * @param prefix Device state prefix
+   * @param activeCommand The command that was just executed
+   */
+  private async resetRelatedDropdowns(
+    prefix: string,
+    activeCommand: string,
+  ): Promise<void> {
+    const ALL_DROPDOWNS = [
+      "scenes.light_scene",
+      "scenes.diy_scene",
+      "snapshots.snapshot",
+      "snapshots.snapshot_local",
+      "music.music_mode",
+    ];
+
+    // Map command → its own dropdown path (excluded from reset)
+    const COMMAND_DROPDOWN: Record<string, string> = {
+      lightScene: "scenes.light_scene",
+      diyScene: "scenes.diy_scene",
+      snapshot: "snapshots.snapshot",
+      snapshotLocal: "snapshots.snapshot_local",
+      music: "music.music_mode",
+      colorRgb: "",
+      colorTemperature: "",
+    };
+
+    if (!(activeCommand in COMMAND_DROPDOWN)) {
+      return;
+    }
+
+    const ownDropdown = COMMAND_DROPDOWN[activeCommand];
+
+    for (const dropdown of ALL_DROPDOWNS) {
+      if (dropdown === ownDropdown) {
+        continue;
+      }
+      const stateId = `${this.namespace}.${prefix}.${dropdown}`;
+      const current = await this.getStateAsync(stateId);
+      if (current?.val && current.val !== "0" && current.val !== 0) {
+        await this.setStateAsync(stateId, { val: "0", ack: true });
+      }
     }
   }
 }

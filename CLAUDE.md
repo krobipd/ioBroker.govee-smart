@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 1.1.1 (April 2026)
+- **Version:** 1.2.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -90,7 +90,8 @@ govee-smart.0.
 │       ├── snapshots.snapshot_delete    (Text: Lokalen Snapshot löschen)
 │       └── segments.count / .command / .0.color / .0.brightness (dynamisch)
 └── groups.
-    └── basegroup_1280.              (nur info.name + info.online, kein model/serial/ip)
+    ├── info.online                  (Cloud-Verbindungsstatus, allgemein für alle Gruppen)
+    └── basegroup_1280.              (nur info.name, kein model/serial/ip/online)
 ```
 
 ## Szenen-Architektur (WICHTIG!)
@@ -171,10 +172,10 @@ Single Page, drei Sektionen:
 12. **Stale State Cleanup** — `cleanupAllChannelStates()` entfernt alte States aus allen Channels (control, scenes, music, snapshots) + leere Channels; handelt auch Migration von altem Single-Control-Layout
 13. **Error-Dedup** — `classifyError()` + `lastErrorCategory` in DeviceManager; warn nur bei Kategorie-Wechsel
 14. **Rate-Limited Startup** — Scene-Loading über `rateLimiter.tryExecute()` auch beim Cloud-Init
-15. **Segment-Routing** — `segmentColor:N`/`segmentBrightness:N` Commands → Cloud `segment_color_setting`
+15. **Segment-Routing** — `segmentColor:N`/`segmentBrightness:N` → Cloud only (ptReal segment color akzeptiert aber nicht gerendert)
 16. **Shared Utilities** — `normalizeDeviceId()` + `classifyError()` in types.ts, nicht dupliziert
 17. **Kein Fire-and-forget** — Alle async void-Calls haben `.catch()` Handler
-18. **Scene-State Sync** — `light_scene` wird auf "0" zurückgesetzt wenn colorRgb/colorTemperature gesetzt wird
+18. **Dropdown-Reset** — Moduswechsel (Scene/DIY/Snapshot/Music/Color) setzt alle ANDEREN Dropdowns auf "---" (0) zurück
 19. **Generic Capability Routing** — States mit `native.capabilityType/Instance` werden automatisch via Cloud API geroutet (toggle, dynamic_scene, etc.)
 20. **Batch Segment Command** — `segments.command` State: `1-5:#ff0000:20`, `all:#00ff00`, `0,3,7::50` — max 2 API-Calls statt N×2
 21. **MQTT Auth-Backoff** — Nach 3 konsekutiven Login-Fehlern Reconnect stoppen, actionable Warning
@@ -189,7 +190,7 @@ Single Page, drei Sektionen:
 30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, brokenPlatformApi)
 31. **Scene Speed Infrastructure** — `sceneLibrary` enthält `speedInfo` (supSpeed, speedIndex, config); State + Routing fertig, Byte-Manipulation pending
 32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `def.channel` in StateDefinition, Pfad-Auflösung via `resolveStatePath()`
-33. **Groups minimal** — BaseGroup hat nur `info.name` + `info.online`, kein model/serial/ip
+33. **Groups minimal** — BaseGroup hat nur `info.name`, kein model/serial/ip/online; allgemeines `groups.info.online` = Cloud-Status
 34. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Segment-Channels werden gelöscht
 35. **Diagnostics Export** — `info.diagnostics_export` Button pro Gerät erzeugt strukturiertes JSON (Capabilities, Szenen, Libraries, Quirks, State) für GitHub Issues
 36. **Community Quirks** — `community-quirks.json` im Data-Dir (`iobroker-data/govee-smart.0/`) erlaubt User-beigetragene SKU-Korrekturen, persistent über Updates
@@ -204,7 +205,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (304)
+## Tests (308)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks (40 Tests)
@@ -247,15 +248,16 @@ test/testTypes.ts            → Shared Utilities (29 Tests)
   - hexToRgb: with #, without #, black, invalid (4)
   - rgbIntToHex: standard, zero, white (3)
   - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property (15)
-test/testStateManager.ts     → State Manager (37 Tests)
+test/testStateManager.ts     → State Manager (41 Tests)
   - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons (4)
-  - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip (9)
+  - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip/online (9)
   - createDeviceStates channels: scenes routing, music routing, snapshot routing, multi-channel (4)
+  - createGroupsOnlineState: create + update (2)
   - resolveStatePath: control, scenes, music, snapshots, diagnostics, unknown→control (6)
   - updateDeviceState: power, multiple fields, online, undefined fields, missing object (5)
   - removeDevice: recursive delete (1)
   - cleanupDevices: remove stale, keep existing (2)
-  - cleanupAllChannelStates: remove stale, remove empty channel, migrate old→new channel (3)
+  - cleanupAllChannelStates: remove stale, remove empty channel, migrate old→new channel, dropdown reset, dropdown keep (5)
   - createSegmentStates: per-segment states, default 15, excess cleanup, no fields (4)
 test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 ```
@@ -264,11 +266,11 @@ test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 
 | Version | Highlights |
 |---------|------------|
+| 1.2.0 | Fix Segment-Farben (ptReal→Cloud), Dropdown-Reset bei Moduswechsel, Groups Online vereinfacht, 308 Tests |
 | 1.1.2 | Dead MQTT command code entfernt, noMqtt quirk entfernt, dead CloudApiError export entfernt, inline hex→hexToRgb(), 304 Tests |
 | 1.1.1 | CI checkout entfernt, no-floating-promises, unused devDeps entfernt, doppelter news-Eintrag gefixt |
 | 1.1.0 | Diagnostics export, community quirks, R1-R8 refactoring, 309 Tests |
 | 1.0.1 | Segment capability matching, segment count, clearTimeout fixes |
-| 1.0.0 | Multi-channel state tree, dynamic segments, groups minimal, dead code removal |
 
 ## Befehle
 

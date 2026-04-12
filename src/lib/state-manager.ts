@@ -78,13 +78,15 @@ export class StateManager {
     const isGroup = device.sku === "BaseGroup";
 
     // Device object with online status indicator
+    // Groups use the general groups.info.online state instead of per-group online
+    const onlineId = isGroup
+      ? `${this.adapter.namespace}.groups.info.online`
+      : `${this.adapter.namespace}.${prefix}.info.online`;
     await this.adapter.extendObjectAsync(prefix, {
       type: "device",
       common: {
         name: device.name,
-        statusStates: {
-          onlineId: `${this.adapter.namespace}.${prefix}.info.online`,
-        },
+        statusStates: { onlineId },
       } as ioBroker.DeviceCommon,
       native: {
         sku: device.sku,
@@ -92,7 +94,7 @@ export class StateManager {
       },
     });
 
-    // Info channel — groups only get name + online
+    // Info channel — groups only get name (no individual online)
     await this.adapter.extendObjectAsync(`${prefix}.info`, {
       type: "channel",
       common: { name: "Device Information" },
@@ -106,21 +108,30 @@ export class StateManager {
       "text",
       false,
     );
-    await this.ensureState(
-      `${prefix}.info.online`,
-      "Online",
-      "boolean",
-      "indicator.reachable",
-      false,
-    );
     await this.adapter.setStateAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true,
     });
-    await this.adapter.setStateAsync(`${prefix}.info.online`, {
-      val: device.state.online ?? false,
-      ack: true,
-    });
+
+    if (!isGroup) {
+      await this.ensureState(
+        `${prefix}.info.online`,
+        "Online",
+        "boolean",
+        "indicator.reachable",
+        false,
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.online`, {
+        val: device.state.online ?? false,
+        ack: true,
+      });
+    } else {
+      // Clean up stale per-group online state from older versions
+      await this.adapter
+        .delObjectAsync(`${prefix}.info.online`)
+        .catch(() => {});
+      await this.adapter.delStateAsync(`${prefix}.info.online`).catch(() => {});
+    }
 
     if (!isGroup) {
       await this.ensureState(
@@ -228,12 +239,22 @@ export class StateManager {
           },
         });
 
-        // Set default value if state has no value yet
+        // Initialize or validate state value
         if (def.def !== undefined) {
           const current = await this.adapter.getStateAsync(
             `${prefix}.${channel}.${def.id}`,
           );
           if (!current || current.val === null || current.val === undefined) {
+            // Set default value for new states
+            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
+              val: def.def,
+              ack: true,
+            });
+          } else if (def.states && !(String(current.val) in def.states)) {
+            // Reset dropdown to default if current value is no longer valid
+            this.adapter.log.debug(
+              `Resetting stale dropdown: ${prefix}.${channel}.${def.id} = "${String(current.val)}" → "${String(def.def)}"`,
+            );
             await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true,
@@ -418,6 +439,44 @@ export class StateManager {
     if (state.scene !== undefined) {
       await this.setStateIfExists(`${prefix}.control.scene`, state.scene);
     }
+  }
+
+  /**
+   * Create the general groups.info.online state (reflects Cloud connection).
+   *
+   * @param online Initial online value
+   */
+  async createGroupsOnlineState(online: boolean): Promise<void> {
+    await this.adapter.extendObjectAsync("groups", {
+      type: "folder",
+      common: { name: "Groups" },
+      native: {},
+    });
+    await this.adapter.extendObjectAsync("groups.info", {
+      type: "channel",
+      common: { name: "Groups Status" },
+      native: {},
+    });
+    await this.ensureState(
+      "groups.info.online",
+      "Cloud Online",
+      "boolean",
+      "indicator.reachable",
+      false,
+    );
+    await this.adapter.setStateAsync("groups.info.online", {
+      val: online,
+      ack: true,
+    });
+  }
+
+  /**
+   * Update the general groups online state.
+   *
+   * @param online Cloud connection status
+   */
+  async updateGroupsOnline(online: boolean): Promise<void> {
+    await this.setStateIfExists("groups.info.online", online);
   }
 
   /**

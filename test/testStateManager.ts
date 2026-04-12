@@ -359,7 +359,7 @@ describe("StateManager", () => {
             expect(states.get("devices.h6160_0011.info.ip")).to.deep.include({ val: "" });
         });
 
-        it("should not create model/serial/ip for BaseGroup", async () => {
+        it("should not create model/serial/ip/online for BaseGroup", async () => {
             const { adapter, objects } = createMockAdapter();
             const sm = new StateManager(adapter as never);
             const dev = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
@@ -367,10 +367,37 @@ describe("StateManager", () => {
             await sm.createDeviceStates(dev, []);
 
             expect(objects.has("groups.basegroup_1280.info.name")).to.be.true;
-            expect(objects.has("groups.basegroup_1280.info.online")).to.be.true;
+            expect(objects.has("groups.basegroup_1280.info.online")).to.be.false;
             expect(objects.has("groups.basegroup_1280.info.model")).to.be.false;
             expect(objects.has("groups.basegroup_1280.info.serial")).to.be.false;
             expect(objects.has("groups.basegroup_1280.info.ip")).to.be.false;
+        });
+    });
+
+    describe("createGroupsOnlineState", () => {
+        it("should create groups.info.online state", async () => {
+            const { adapter, objects, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+
+            await sm.createGroupsOnlineState(true);
+
+            expect(objects.has("groups")).to.be.true;
+            expect(objects.has("groups.info")).to.be.true;
+            expect(objects.has("groups.info.online")).to.be.true;
+            expect(states.get("groups.info.online")).to.deep.include({ val: true });
+        });
+
+        it("should update groups online state", async () => {
+            const { adapter, objects, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+
+            await sm.createGroupsOnlineState(false);
+            expect(states.get("groups.info.online")).to.deep.include({ val: false });
+
+            // Simulate object exists for setStateIfExists
+            objects.set("groups.info.online", { type: "state" } as never);
+            await sm.updateGroupsOnline(true);
+            expect(states.get("groups.info.online")).to.deep.include({ val: true });
         });
     });
 
@@ -612,6 +639,60 @@ describe("StateManager", () => {
             expect(delCalls.length).to.be.greaterThan(0);
             // New scenes.light_scene should exist
             expect(objects.has("devices.h6160_0011.scenes.light_scene")).to.be.true;
+        });
+
+        it("should reset dropdown to default when current value is no longer in states map", async () => {
+            const { adapter, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+
+            // Create with 3 scenes: {0: "---", 1: "Scene A", 2: "Scene B"}
+            const defs: StateDefinition[] = [{
+                id: "light_scene", name: "Scene", type: "string", role: "text",
+                write: true, def: "0", states: { 0: "---", 1: "Scene A", 2: "Scene B" },
+                capabilityType: "dynamic_scene", capabilityInstance: "lightScene",
+                channel: "scenes",
+            }];
+            await sm.createDeviceStates(dev, defs);
+
+            // Simulate user selected scene 2
+            states.set("devices.h6160_0011.scenes.light_scene", { val: "2", ack: true } as ioBroker.State);
+
+            // Re-create with only 1 scene — scene 2 no longer valid
+            const newDefs: StateDefinition[] = [{
+                id: "light_scene", name: "Scene", type: "string", role: "text",
+                write: true, def: "0", states: { 0: "---", 1: "Scene A" },
+                capabilityType: "dynamic_scene", capabilityInstance: "lightScene",
+                channel: "scenes",
+            }];
+            await sm.createDeviceStates(dev, newDefs);
+
+            // Value should be reset to default "0"
+            const final = states.get("devices.h6160_0011.scenes.light_scene");
+            expect(final?.val).to.equal("0");
+        });
+
+        it("should keep dropdown value when it is still valid in states map", async () => {
+            const { adapter, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+
+            const defs: StateDefinition[] = [{
+                id: "light_scene", name: "Scene", type: "string", role: "text",
+                write: true, def: "0", states: { 0: "---", 1: "Scene A", 2: "Scene B" },
+                capabilityType: "dynamic_scene", capabilityInstance: "lightScene",
+                channel: "scenes",
+            }];
+            await sm.createDeviceStates(dev, defs);
+
+            // Simulate user selected scene 1
+            states.set("devices.h6160_0011.scenes.light_scene", { val: "1", ack: true } as ioBroker.State);
+
+            // Re-create with same scenes — value should remain
+            await sm.createDeviceStates(dev, defs);
+
+            const final = states.get("devices.h6160_0011.scenes.light_scene");
+            expect(final?.val).to.equal("1");
         });
     });
 

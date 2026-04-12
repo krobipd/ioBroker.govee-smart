@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "1.1.2",
+    "version": "1.2.0",
     "news": {
+      "1.2.0": {
+        "en": "Fix segment color commands not working (ptReal accepted but not rendered) — rerouted via Cloud\nFix dropdown states not resetting on mode switch (scene/music/snapshot/color)\nReplace individual group online states with single groups.info.online (Cloud status)\nAdd channel annotations to state tree documentation",
+        "de": "Fix Segment-Farbsteuerung funktioniert nicht (ptReal akzeptiert aber nicht gerendert) — über Cloud umgeleitet\nFix Dropdown-States werden bei Moduswechsel nicht zurückgesetzt (Szene/Musik/Snapshot/Farbe)\nEinzel-Gruppen-Online-States durch allgemeines groups.info.online ersetzt (Cloud-Status)\nKanal-Annotationen zur State-Tree-Dokumentation hinzugefügt",
+        "ru": "Исправлены команды цвета сегментов (ptReal принимался, но не отображался) — перенаправлено через Cloud\nИсправлен сброс выпадающих списков при смене режима (сцена/музыка/снимок/цвет)\nИндивидуальные статусы групп заменены на единый groups.info.online (статус Cloud)\nДобавлены аннотации каналов в документацию дерева состояний",
+        "pt": "Corrigido comandos de cor de segmento não funcionando (ptReal aceito mas não renderizado) — redirecionado via Cloud\nCorrigido dropdowns não resetando na troca de modo (cena/música/snapshot/cor)\nSubstituídos estados online individuais de grupos por groups.info.online único (status Cloud)\nAdicionadas anotações de canal à documentação da árvore de estados",
+        "nl": "Fix segmentkleurcommando's werken niet (ptReal geaccepteerd maar niet gerenderd) — omgeleid via Cloud\nFix dropdowns resetten niet bij moduswisseling (scène/muziek/snapshot/kleur)\nIndividuele groep online-states vervangen door enkele groups.info.online (Cloud-status)\nKanaalannotaties toegevoegd aan state tree documentatie",
+        "fr": "Correction commandes couleur segment ne fonctionnant pas (ptReal accepté mais non rendu) — redirigé via Cloud\nCorrection dropdowns non réinitialisés lors du changement de mode (scène/musique/snapshot/couleur)\nÉtats en ligne individuels des groupes remplacés par groups.info.online unique (statut Cloud)\nAnnotations de canal ajoutées à la documentation de l'arbre d'états",
+        "it": "Fix comandi colore segmento non funzionanti (ptReal accettato ma non renderizzato) — reindirizzato via Cloud\nFix dropdown non resettati al cambio modalità (scena/musica/snapshot/colore)\nStati online individuali dei gruppi sostituiti con groups.info.online singolo (stato Cloud)\nAnnotazioni canale aggiunte alla documentazione dell'albero stati",
+        "es": "Fix comandos de color de segmento no funcionan (ptReal aceptado pero no renderizado) — redirigido vía Cloud\nFix dropdowns no se resetean al cambiar modo (escena/música/snapshot/color)\nEstados online individuales de grupos reemplazados por groups.info.online único (estado Cloud)\nAnotaciones de canal añadidas a la documentación del árbol de estados",
+        "pl": "Naprawiono komendy koloru segmentów nie działające (ptReal akceptowany ale nie renderowany) — przekierowano przez Cloud\nNaprawiono dropdowny nie resetujące się przy zmianie trybu (scena/muzyka/snapshot/kolor)\nIndywidualne stany online grup zastąpione pojedynczym groups.info.online (status Cloud)\nDodano adnotacje kanałów do dokumentacji drzewa stanów",
+        "uk": "Виправлено команди кольору сегментів не працюють (ptReal прийнятий але не відображений) — перенаправлено через Cloud\nВиправлено випадаючі списки не скидаються при зміні режиму (сцена/музика/знімок/колір)\nІндивідуальні статуси груп замінено на єдиний groups.info.online (статус Cloud)\nДодано анотації каналів до документації дерева станів",
+        "zh-cn": "修复分段颜色命令不工作（ptReal被接受但未渲染）— 改由Cloud路由\n修复模式切换时下拉菜单未重置（场景/音乐/快照/颜色）\n将各组在线状态替换为单一groups.info.online（Cloud状态）\n添加通道注释到状态树文档"
+      },
       "1.1.2": {
         "en": "Remove dead MQTT command code (MQTT is status-push only)\nRemove noMqtt device quirk (obsolete without MQTT commands)\nRemove dead CloudApiError re-export\nReplace inline hex parsing with shared hexToRgb() utility\nSimplify command routing: LAN → Cloud (was LAN → MQTT → Cloud)",
         "de": "Toten MQTT-Command-Code entfernt (MQTT ist nur Status-Push)\nnoMqtt Device-Quirk entfernt (obsolet ohne MQTT-Commands)\nToten CloudApiError Re-Export entfernt\nInline Hex-Parsing durch gemeinsame hexToRgb()-Utility ersetzt\nCommand-Routing vereinfacht: LAN → Cloud (war LAN → MQTT → Cloud)",
@@ -80,19 +93,6 @@
         "pl": "Naprawiono brakujące sceny z powodu niekompletnego cache po limicie zapytań Cloud\nNaprawiono MQTT 'konto nietypowe' błędnie traktowane jako złe dane logowania\nKomunikat gotowości czeka teraz na skan LAN i utworzenie stanów\nUsunięto szczegóły urządzeń z podsumowania gotowości",
         "uk": "Виправлено відсутні сцени через неповний кеш після обмеження запитів Cloud\nВиправлено MQTT 'аккаунт аномальний' помилково оброблявся як невірні облікові дані\nПовідомлення готовності тепер чекає LAN-сканування та створення станів\nВидалено деталі пристроїв з підсумку готовності",
         "zh-cn": "修复因Cloud请求限制导致缓存不完整而缺少场景的问题\n修复MQTT'账户异常'被错误地视为凭证错误\n就绪消息现在等待LAN扫描和状态创建完成\n从就绪摘要中移除逐设备详情"
-      },
-      "0.9.5": {
-        "en": "Fix device names not updating from cache when LAN discovery runs first",
-        "de": "Fix Gerätenamen werden nicht aus Cache aktualisiert wenn LAN-Discovery zuerst läuft",
-        "ru": "Исправлено: имена устройств не обновляются из кэша при первом запуске LAN",
-        "pt": "Corrigido: nomes dos dispositivos não atualizados do cache quando LAN roda primeiro",
-        "nl": "Fix apparaatnamen worden niet bijgewerkt uit cache wanneer LAN-discovery eerst draait",
-        "fr": "Correction: noms des appareils non mis à jour depuis le cache quand LAN démarre en premier",
-        "it": "Fix nomi dispositivi non aggiornati dalla cache quando LAN discovery parte prima",
-        "es": "Fix nombres de dispositivos no actualizados desde caché cuando LAN se ejecuta primero",
-        "pl": "Naprawiono: nazwy urządzeń nie aktualizowane z cache gdy LAN discovery startuje pierwszy",
-        "uk": "Виправлено: імена пристроїв не оновлюються з кешу коли LAN discovery запускається першим",
-        "zh-cn": "修复LAN发现先运行时设备名称未从缓存更新"
       }
     },
     "titleLang": {

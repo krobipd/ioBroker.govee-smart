@@ -62,6 +62,7 @@ class GoveeAdapter extends utils.Adapter {
   }
   /** Adapter started — initialize all channels */
   async onReady() {
+    var _a, _b;
     const config = this.config;
     await this.setObjectNotExistsAsync("info", {
       type: "channel",
@@ -108,6 +109,7 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
     this.stateManager = new import_state_manager.StateManager(this);
+    await this.stateManager.createGroupsOnlineState(false);
     this.deviceManager = new import_device_manager.DeviceManager(this.log);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
     const quirksPath = path.join(dataDir, "community-quirks.json");
@@ -215,6 +217,8 @@ class GoveeAdapter extends utils.Adapter {
           ack: true
         }).catch(() => {
         });
+        (_a = this.stateManager) == null ? void 0 : _a.updateGroupsOnline(cloudOk).catch(() => {
+        });
         if (cloudOk) {
           await this.loadCloudStates();
         }
@@ -225,6 +229,8 @@ class GoveeAdapter extends utils.Adapter {
           val: true,
           ack: true
         }).catch(() => {
+        });
+        (_b = this.stateManager) == null ? void 0 : _b.updateGroupsOnline(true).catch(() => {
         });
       }
       this.cloudInitDone = true;
@@ -300,8 +306,11 @@ class GoveeAdapter extends utils.Adapter {
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
-    if (stateSuffix === "snapshots.snapshot_local" && state.val !== "0" && state.val !== 0) {
-      await this.handleSnapshotRestore(device, state.val);
+    if (stateSuffix === "snapshots.snapshot_local") {
+      if (state.val !== "0" && state.val !== 0) {
+        await this.handleSnapshotRestore(device, state.val);
+        await this.resetRelatedDropdowns(prefix, "snapshotLocal");
+      }
       await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
@@ -346,27 +355,26 @@ class GoveeAdapter extends utils.Adapter {
       }
       return;
     }
+    if ((command === "lightScene" || command === "diyScene" || command === "snapshot") && (state.val === "0" || state.val === 0)) {
+      await this.setStateAsync(id, { val: state.val, ack: true });
+      return;
+    }
     try {
       if (command === "music") {
+        if (stateSuffix === "music.music_mode" && (state.val === "0" || state.val === 0)) {
+          await this.setStateAsync(id, { val: state.val, ack: true });
+          return;
+        }
         await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
         await this.setStateAsync(id, { val: state.val, ack: true });
+        if (stateSuffix === "music.music_mode") {
+          await this.resetRelatedDropdowns(prefix, "music");
+        }
         return;
       }
       await this.deviceManager.sendCommand(device, command, state.val);
       await this.setStateAsync(id, { val: state.val, ack: true });
-      if (command === "colorRgb" || command === "colorTemperature") {
-        for (const [ch, key] of [
-          ["scenes", "light_scene"],
-          ["scenes", "diy_scene"],
-          ["snapshots", "snapshot"]
-        ]) {
-          const sceneId = `${this.namespace}.${prefix}.${ch}.${key}`;
-          const sceneState = await this.getStateAsync(sceneId);
-          if ((sceneState == null ? void 0 : sceneState.val) && sceneState.val !== "0") {
-            await this.setStateAsync(sceneId, { val: "0", ack: true });
-          }
-        }
-      }
+      await this.resetRelatedDropdowns(prefix, command);
     } catch (err) {
       this.log.warn(
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -741,6 +749,45 @@ class GoveeAdapter extends utils.Adapter {
       this.onDeviceListChanged(this.deviceManager.getDevices());
     } else {
       this.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
+    }
+  }
+  /**
+   * Reset related dropdown states when switching between scenes/snapshots/colors.
+   * Each mode-switch resets all OTHER mode dropdowns to "---" (0).
+   *
+   * @param prefix Device state prefix
+   * @param activeCommand The command that was just executed
+   */
+  async resetRelatedDropdowns(prefix, activeCommand) {
+    const ALL_DROPDOWNS = [
+      "scenes.light_scene",
+      "scenes.diy_scene",
+      "snapshots.snapshot",
+      "snapshots.snapshot_local",
+      "music.music_mode"
+    ];
+    const COMMAND_DROPDOWN = {
+      lightScene: "scenes.light_scene",
+      diyScene: "scenes.diy_scene",
+      snapshot: "snapshots.snapshot",
+      snapshotLocal: "snapshots.snapshot_local",
+      music: "music.music_mode",
+      colorRgb: "",
+      colorTemperature: ""
+    };
+    if (!(activeCommand in COMMAND_DROPDOWN)) {
+      return;
+    }
+    const ownDropdown = COMMAND_DROPDOWN[activeCommand];
+    for (const dropdown of ALL_DROPDOWNS) {
+      if (dropdown === ownDropdown) {
+        continue;
+      }
+      const stateId = `${this.namespace}.${prefix}.${dropdown}`;
+      const current = await this.getStateAsync(stateId);
+      if ((current == null ? void 0 : current.val) && current.val !== "0" && current.val !== 0) {
+        await this.setStateAsync(stateId, { val: "0", ack: true });
+      }
     }
   }
 }

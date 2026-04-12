@@ -81,18 +81,8 @@ export class CommandRouter {
     command: string,
     value: unknown,
   ): Promise<void> {
-    // Segment color: try LAN ptReal first, fall back to Cloud
+    // Segment color: Cloud only (ptReal segment color accepted but not rendered)
     if (command.startsWith("segmentColor:")) {
-      if (device.lanIp && this.lanClient) {
-        const segIdx = parseInt(command.split(":")[1], 10);
-        if (isNaN(segIdx) || segIdx < 0) {
-          this.log.warn(`${device.sku}: invalid segment index in ${command}`);
-          return;
-        }
-        const { r, g, b } = hexToRgb(value as string);
-        this.lanClient.setSegmentColor(device.lanIp, [segIdx], r, g, b);
-        return;
-      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -100,30 +90,11 @@ export class CommandRouter {
       return;
     }
 
-    // Segment batch: try LAN ptReal first, fall back to Cloud
+    // Segment batch: Cloud for color+brightness, local state update
     if (command === "segmentBatch") {
-      if (device.lanIp && this.lanClient) {
-        const parsed = this.parseSegmentBatch(device, value as string);
-        if (parsed?.color !== undefined) {
-          const r = (parsed.color >> 16) & 0xff;
-          const g = (parsed.color >> 8) & 0xff;
-          const b = parsed.color & 0xff;
-          this.lanClient.setSegmentColor(
-            device.lanIp,
-            parsed.segments,
-            r,
-            g,
-            b,
-          );
-        }
-        if (parsed) {
-          this.onSegmentBatchUpdate?.(device, parsed);
-        }
-        // Brightness via ptReal not supported — fall through to Cloud if needed
-        if (parsed?.brightness !== undefined && this.cloudClient) {
-          await this.sendSegmentBatch(device, value as string);
-        }
-        return;
+      const parsed = this.parseSegmentBatch(device, value as string);
+      if (parsed) {
+        this.onSegmentBatchUpdate?.(device, parsed);
       }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendSegmentBatch(device, value as string);

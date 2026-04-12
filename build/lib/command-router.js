@@ -80,16 +80,6 @@ class CommandRouter {
   async sendCommand(device, command, value) {
     var _a;
     if (command.startsWith("segmentColor:")) {
-      if (device.lanIp && this.lanClient) {
-        const segIdx = parseInt(command.split(":")[1], 10);
-        if (isNaN(segIdx) || segIdx < 0) {
-          this.log.warn(`${device.sku}: invalid segment index in ${command}`);
-          return;
-        }
-        const { r, g, b } = (0, import_types.hexToRgb)(value);
-        this.lanClient.setSegmentColor(device.lanIp, [segIdx], r, g, b);
-        return;
-      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -97,27 +87,9 @@ class CommandRouter {
       return;
     }
     if (command === "segmentBatch") {
-      if (device.lanIp && this.lanClient) {
-        const parsed = this.parseSegmentBatch(device, value);
-        if ((parsed == null ? void 0 : parsed.color) !== void 0) {
-          const r = parsed.color >> 16 & 255;
-          const g = parsed.color >> 8 & 255;
-          const b = parsed.color & 255;
-          this.lanClient.setSegmentColor(
-            device.lanIp,
-            parsed.segments,
-            r,
-            g,
-            b
-          );
-        }
-        if (parsed) {
-          (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
-        }
-        if ((parsed == null ? void 0 : parsed.brightness) !== void 0 && this.cloudClient) {
-          await this.sendSegmentBatch(device, value);
-        }
-        return;
+      const parsed = this.parseSegmentBatch(device, value);
+      if (parsed) {
+        (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
       }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendSegmentBatch(device, value);

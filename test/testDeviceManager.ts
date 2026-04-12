@@ -412,7 +412,7 @@ describe("DeviceManager", () => {
             expect(cloudTracker.calls[0].method).to.equal("controlDevice");
         });
 
-        it("should route segment color via LAN ptReal when available", async () => {
+        it("should route segment color via Cloud (ptReal not reliable)", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
@@ -433,15 +433,11 @@ describe("DeviceManager", () => {
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
             await dm.sendCommand(device, "segmentColor:3", "#ff0000");
-            // LAN should be called with ptReal
-            expect(lanTracker.calls).to.have.lengthOf(1);
-            expect(lanTracker.calls[0].method).to.equal("setSegmentColor");
-            expect(lanTracker.calls[0].args[1]).to.deep.equal([3]); // segments
-            expect(lanTracker.calls[0].args[2]).to.equal(255); // R
-            expect(lanTracker.calls[0].args[3]).to.equal(0);   // G
-            expect(lanTracker.calls[0].args[4]).to.equal(0);   // B
-            // Cloud should NOT be called
-            expect(cloudTracker.calls).to.have.lengthOf(0);
+            // Cloud should be called (ptReal segment color not reliable)
+            expect(cloudTracker.calls).to.have.lengthOf(1);
+            expect(cloudTracker.calls[0].method).to.equal("controlDevice");
+            // LAN should NOT be called for segment color
+            expect(lanTracker.calls).to.have.lengthOf(0);
         });
 
         it("should fall back to Cloud for segment color without LAN", async () => {

@@ -1,5 +1,8 @@
 # Older Changes
 
+## 0.9.5 (2026-04-11)
+- Fix device names not updating from cache when LAN discovery runs first
+
 ## 0.9.4 (2026-04-11)
 - Improve startup and ready logging: clear channel summary, per-device details with LAN IPs and scene counts
 - Remove excessive debug noise: default value checks, periodic LAN scan messages

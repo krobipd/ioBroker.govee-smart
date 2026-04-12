@@ -85,6 +85,8 @@ The adapter works with different levels of configuration. Each level unlocks add
 
 Device folders use a stable `sku_shortId` naming (e.g., `h61be_1d6f`). The human-readable Cloud device name is stored in `common.name` and `info.name`. Groups (BaseGroup) are separated into a `groups/` folder.
 
+Channel indicators: **[LAN]** = LAN UDP, **[Cloud]** = Cloud REST API, **[MQTT]** = AWS IoT MQTT, **[local]** = adapter-internal.
+
 ```
 govee-smart.0.
 ├── info/
@@ -94,43 +96,44 @@ govee-smart.0.
 ├── devices/
 │   └── h61be_1d6f/             — Stable SKU + short device ID
 │       ├── info/
-│       │   ├── name            — Cloud device name (string)
-│       │   ├── model           — Product SKU (string)
-│       │   ├── serial          — Device ID (string)
-│       │   ├── online          — Device reachable (boolean)
-│       │   ├── ip              — LAN IP address (string, auto-updated)
-│       │   ├── diagnostics_export — Export device diagnostics (button, writable)
-│       │   └── diagnostics_result — Diagnostics JSON output (string, read-only)
+│       │   ├── name            — Cloud device name (string) [Cloud]
+│       │   ├── model           — Product SKU (string) [Cloud]
+│       │   ├── serial          — Device ID (string) [Cloud]
+│       │   ├── online          — Device reachable (boolean) [LAN]
+│       │   ├── ip              — LAN IP address (string, auto-updated) [LAN]
+│       │   ├── diagnostics_export — Export device diagnostics (button) [local]
+│       │   └── diagnostics_result — Diagnostics JSON output (string) [local]
 │       ├── control/
-│       │   ├── power           — On/Off (boolean, writable)
-│       │   ├── brightness      — Brightness 0-100% (number, writable)
-│       │   ├── colorRgb        — Color as "#RRGGBB" (string, writable)
-│       │   ├── colorTemperature — Color temperature in Kelvin (number, writable)
-│       │   └── gradient_toggle — Gradient on/off (boolean, writable)
+│       │   ├── power           — On/Off (boolean, writable) [LAN]
+│       │   ├── brightness      — Brightness 0-100% (number, writable) [LAN]
+│       │   ├── colorRgb        — Color as "#RRGGBB" (string, writable) [LAN]
+│       │   ├── colorTemperature — Color temp in Kelvin (number, writable) [LAN]
+│       │   └── gradient_toggle — Gradient on/off (boolean, writable) [Cloud]
 │       ├── scenes/
-│       │   ├── light_scene     — Light scene (string, dropdown, writable)
-│       │   ├── diy_scene       — DIY scene (string, dropdown, writable)
-│       │   └── scene_speed     — Scene speed level (number, slider, writable)
+│       │   ├── light_scene     — Light scene (dropdown, writable) [LAN ptReal]
+│       │   ├── diy_scene       — DIY scene (dropdown, writable) [LAN ptReal]
+│       │   └── scene_speed     — Scene speed (number, slider, writable) [LAN ptReal]
 │       ├── music/
-│       │   ├── music_mode      — Music mode effect (string, dropdown, writable)
-│       │   ├── music_sensitivity — Music sensitivity 0-100 (number, writable)
-│       │   └── music_auto_color — Music auto color (boolean, writable)
+│       │   ├── music_mode      — Music effect (dropdown, writable) [LAN ptReal]
+│       │   ├── music_sensitivity — Sensitivity 0-100 (number, writable) [LAN ptReal]
+│       │   └── music_auto_color — Auto color (boolean, writable) [LAN ptReal]
 │       ├── snapshots/
-│       │   ├── snapshot          — Cloud snapshot (string, dropdown, writable)
-│       │   ├── snapshot_local    — Local snapshot (string, dropdown, writable)
-│       │   ├── snapshot_save     — Save current state as local snapshot (string, writable)
-│       │   └── snapshot_delete   — Delete a local snapshot (string, writable)
+│       │   ├── snapshot          — Cloud snapshot (dropdown, writable) [Cloud]
+│       │   ├── snapshot_local    — Local snapshot (dropdown, writable) [LAN]
+│       │   ├── snapshot_save     — Save state as local snapshot (string) [LAN]
+│       │   └── snapshot_delete   — Delete a local snapshot (string) [LAN]
 │       └── segments/
-│           ├── count           — Number of segments (number)
-│           ├── command         — Batch control "1-5:#ff0000:20" (string, writable)
+│           ├── count           — Number of segments (number) [Cloud]
+│           ├── command         — Batch "1-5:#ff0000:20" (string, writable) [Cloud]
 │           └── {0..n}/
-│               ├── color       — Segment color "#RRGGBB" (string, writable)
-│               └── brightness  — Segment brightness 0-100% (number, writable)
+│               ├── color       — Segment color "#RRGGBB" (writable) [Cloud]
+│               └── brightness  — Segment brightness 0-100% (writable) [Cloud]
 └── groups/
+    ├── info/
+    │   └── online              — Cloud connection status (boolean) [Cloud]
     └── basegroup_1280/         — Govee device groups
         └── info/
-            ├── name            — Group name (string)
-            └── online          — Group reachable (boolean)
+            └── name            — Group name (string) [Cloud]
 ```
 
 ---
@@ -233,6 +236,12 @@ Community entries override built-in quirks for the same SKU. Use the **diagnosti
 
 ---
 
+## Acknowledgments
+
+This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementation was informed by research from [govee2mqtt](https://github.com/wez/govee2mqtt) by Wez Furlong. Their reverse-engineering of the Govee AWS IoT MQTT protocol and undocumented API endpoints was invaluable.
+
+---
+
 ## Troubleshooting
 
 ### No devices discovered
@@ -261,6 +270,13 @@ Community entries override built-in quirks for the same SKU. Use the **diagnosti
 ---
 
 ## Changelog
+### 1.2.0 (2026-04-12)
+- Fix segment color commands not working (ptReal accepted but not rendered) — rerouted via Cloud API
+- Fix dropdown states not resetting on mode switch (scene/music/snapshot/color changes now reset all other dropdowns)
+- Replace individual group online states with single `groups.info.online` reflecting Cloud connection status
+- Add channel annotations to state tree documentation
+- Add acknowledgments for govee2mqtt project
+
 ### 1.1.2 (2026-04-12)
 - Remove dead MQTT command code (MQTT is status-push only, never sent commands)
 - Remove `noMqtt` device quirk (no longer needed without MQTT commands)
@@ -309,9 +325,6 @@ Community entries override built-in quirks for the same SKU. Use the **diagnosti
 - Ready message now waits for LAN scan and state creation before logging
 - Remove per-device detail lines from ready summary (redundant with state tree)
 - Fill scenes from scene library when Cloud scenes are missing (ptReal fallback)
-
-### 0.9.5 (2026-04-11)
-- Fix device names not updating from cache when LAN discovery runs first
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
