@@ -47,11 +47,11 @@ Jeder Kanal hat genau eine Rolle. Kein Overlap.
 ## Architektur
 
 ```
-src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots (909 Zeilen)
+src/main.ts                   → Lifecycle, StateChange, Cloud State Loading, Local Snapshots, Dropdown-Reset (971 Zeilen)
 src/lib/device-manager.ts     → Device-Map, Cloud-Loading, LAN/MQTT Status Handling (876 Zeilen)
 src/lib/capability-mapper.ts  → Capability → State Definition + buildDeviceStateDefs + Quirks (785 Zeilen)
-src/lib/command-router.ts     → Command Routing LAN → Cloud + Segment Batch (645 Zeilen)
-src/lib/state-manager.ts      → State CRUD + Cleanup + Channel Routing (630 Zeilen)
+src/lib/command-router.ts     → Command Routing LAN → Cloud + Segment Batch (616 Zeilen)
+src/lib/state-manager.ts      → State CRUD + Cleanup + Channel Routing + Groups Online (689 Zeilen)
 src/lib/govee-lan-client.ts   → LAN UDP (Discovery + Control + Status + ptReal BLE Packets) (581 Zeilen)
 src/lib/govee-mqtt-client.ts  → AWS IoT MQTT (Auth + Status-Push, kein Command-Senden) (391 Zeilen)
 src/lib/types.ts              → Interfaces + Shared Utilities (rgbToHex, hexToRgb, classifyError) (448 Zeilen)
