@@ -19,7 +19,7 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 
 - **LAN First** — UDP multicast discovery and control for lowest latency
 - **Real-Time Status** — AWS IoT MQTT push updates (no polling)
-- **BLE-over-LAN Scenes** — 78-237 scenes per device activated locally via ptReal protocol (no Cloud needed)
+- **BLE-over-LAN Scenes** — All available scenes activated locally via ptReal protocol (loaded once from Cloud, then cached)
 - **Music Mode** — Local BLE-over-LAN music reactive effects with sensitivity and auto-color control
 - **DIY Scenes** — User-created scenes activated locally via ptReal
 - **Local Snapshots** — Save and restore basic device state (power, brightness, color) via LAN — no Cloud needed, but limited to LAN-controllable states
@@ -200,7 +200,7 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ### Light Scenes
 
-The `scenes.light_scene` dropdown lists all available scenes for a device (78–237 depending on model). Scenes are **loaded from the Cloud API** on first start (requires API key), then cached locally. Activation happens **locally via BLE-over-LAN** (ptReal protocol) — fast and without Cloud calls.
+The `scenes.light_scene` dropdown lists all available scenes for a device. Scenes are **loaded from the Cloud API** on first start (requires API key), then cached locally. Activation happens **locally via BLE-over-LAN** (ptReal protocol) — fast and without Cloud calls.
 
 ### DIY Scenes
 
@@ -216,7 +216,7 @@ Music-reactive effects are activated via `music.music_mode` (dropdown). The devi
 | `music_sensitivity` | Microphone sensitivity 0–100% |
 | `music_auto_color` | Automatic color cycling on/off |
 
-Music mode is activated **locally via BLE-over-LAN** — no Cloud needed after initial scene list load.
+Music mode is activated **locally via BLE-over-LAN**. The music library is loaded once from Cloud, then cached — after that no Cloud needed.
 
 ### Dropdown Reset Behavior
 
