@@ -401,6 +401,89 @@ describe("StateManager", () => {
         });
     });
 
+    describe("group members", () => {
+        it("should create info.members for BaseGroup with groupMembers", async () => {
+            const { adapter, objects, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice({
+                sku: "BaseGroup",
+                deviceId: "6781311",
+                name: "living",
+                groupMembers: [
+                    { sku: "H61BE", deviceId: "22:78:CA:39:32:35:52:5F" },
+                    { sku: "H61BC", deviceId: "AA:BB:CC:DD:EE:FF:1A:2B" },
+                ],
+            });
+
+            await sm.createDeviceStates(dev, []);
+
+            expect(objects.has("groups.basegroup_1311.info.members")).to.be.true;
+            const val = states.get("groups.basegroup_1311.info.members");
+            expect(val).to.exist;
+            expect(val!.val).to.equal("h61be_525f, h61bc_1a2b");
+        });
+
+        it("should create empty info.members for BaseGroup without groupMembers", async () => {
+            const { adapter, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice({
+                sku: "BaseGroup",
+                deviceId: "6781280",
+                name: "test group",
+            });
+
+            await sm.createDeviceStates(dev, []);
+
+            const val = states.get("groups.basegroup_1280.info.members");
+            expect(val).to.exist;
+            expect(val!.val).to.equal("");
+        });
+
+        it("should clean up diagnostics states for BaseGroup", async () => {
+            const { adapter, calls } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
+
+            await sm.createDeviceStates(dev, []);
+
+            const delCalls = calls
+                .filter((c) => c.method === "delObjectAsync")
+                .map((c) => c.args[0] as string);
+            expect(delCalls).to.include("groups.basegroup_1311.info.diagnostics_export");
+            expect(delCalls).to.include("groups.basegroup_1311.info.diagnostics_result");
+        });
+    });
+
+    describe("updateGroupMembersUnreachable", () => {
+        it("should create state when unreachable members exist", async () => {
+            const { adapter, objects, states } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
+            const m1 = createTestDevice({ sku: "H61BE", deviceId: "AABB0011", state: { online: false } });
+            const m2 = createTestDevice({ sku: "H61BC", deviceId: "CCDD2233", state: { online: true } });
+
+            await sm.updateGroupMembersUnreachable(group, [m1, m2]);
+
+            expect(objects.has("groups.basegroup_1311.info.membersUnreachable")).to.be.true;
+            const val = states.get("groups.basegroup_1311.info.membersUnreachable");
+            expect(val!.val).to.equal("h61be_0011");
+        });
+
+        it("should delete state when all members are reachable", async () => {
+            const { adapter, calls } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
+            const m1 = createTestDevice({ state: { online: true } });
+
+            await sm.updateGroupMembersUnreachable(group, [m1]);
+
+            const delCalls = calls
+                .filter((c) => c.method === "delObjectAsync")
+                .map((c) => c.args[0] as string);
+            expect(delCalls).to.include("groups.basegroup_1311.info.membersUnreachable");
+        });
+    });
+
     describe("resolveStatePath", () => {
         it("should route control states to control channel", () => {
             const { adapter } = createMockAdapter();

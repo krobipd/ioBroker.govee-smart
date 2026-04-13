@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "news": {
+      "1.4.0": {
+        "en": "Redesign group handling: fan-out commands to member devices via LAN/ptReal instead of Cloud\nGroup capabilities computed as intersection of member devices (power, brightness, color, scenes, music)\nAdd info.members state showing group member device IDs\nAdd dynamic info.membersUnreachable state (only when needed)\nRemove snapshots and diagnostics from groups (not applicable)\nUpdate undocumented API headers to match current Govee app version",
+        "de": "Gruppen-Handling redesigned: Fan-Out-Befehle an Mitgliedsgeräte über LAN/ptReal statt Cloud\nGruppen-Capabilities berechnet als Schnittmenge der Mitgliedsgeräte (Power, Helligkeit, Farbe, Szenen, Musik)\ninfo.members State zeigt Gruppen-Mitglieds-IDs\nDynamischer info.membersUnreachable State (nur wenn nötig)\nSnapshots und Diagnostics aus Gruppen entfernt (nicht anwendbar)\nUndokumentierte API-Header auf aktuelle Govee-App-Version aktualisiert",
+        "ru": "Редизайн управления группами: fan-out команды на устройства-участники через LAN/ptReal вместо Cloud\nВозможности групп вычисляются как пересечение устройств-участников\nДобавлен state info.members с ID устройств группы\nДобавлен динамический state info.membersUnreachable (только при необходимости)\nУдалены снимки и диагностика из групп\nОбновлены заголовки недокументированного API",
+        "pt": "Redesign do gerenciamento de grupos: fan-out de comandos para dispositivos membros via LAN/ptReal\nCapacidades do grupo calculadas como interseção dos dispositivos membros\nAdicionado state info.members com IDs dos dispositivos do grupo\nAdicionado state dinâmico info.membersUnreachable (apenas quando necessário)\nRemovidos snapshots e diagnósticos dos grupos\nAtualizados headers da API não documentada",
+        "nl": "Groepenbeheer herontworpen: fan-out commando's naar lidapparaten via LAN/ptReal\nGroepscapaciteiten berekend als doorsnede van lidapparaten\ninfo.members state toegevoegd met groepsleden-ID's\nDynamische info.membersUnreachable state (alleen indien nodig)\nSnapshots en diagnostiek verwijderd uit groepen\nOngedocumenteerde API-headers bijgewerkt",
+        "fr": "Refonte gestion des groupes : fan-out des commandes vers les appareils membres via LAN/ptReal\nCapacités de groupe calculées comme intersection des appareils membres\nAjout du state info.members avec les ID des appareils du groupe\nAjout du state dynamique info.membersUnreachable (uniquement si nécessaire)\nSuppression des snapshots et diagnostics des groupes\nMise à jour des en-têtes API non documentée",
+        "it": "Ridisegnata gestione gruppi: fan-out comandi ai dispositivi membri via LAN/ptReal\nCapacità del gruppo calcolate come intersezione dei dispositivi membri\nAggiunto state info.members con ID dispositivi del gruppo\nAggiunto state dinamico info.membersUnreachable (solo quando necessario)\nRimossi snapshot e diagnostica dai gruppi\nAggiornati header API non documentata",
+        "es": "Rediseño del manejo de grupos: fan-out de comandos a dispositivos miembros vía LAN/ptReal\nCapacidades del grupo calculadas como intersección de dispositivos miembros\nAñadido state info.members con IDs de dispositivos del grupo\nAñadido state dinámico info.membersUnreachable (solo cuando es necesario)\nEliminados snapshots y diagnósticos de grupos\nActualizados headers de API no documentada",
+        "pl": "Przeprojektowanie obsługi grup: fan-out poleceń do urządzeń członkowskich przez LAN/ptReal\nMożliwości grupy obliczane jako część wspólna urządzeń członkowskich\nDodano state info.members z ID urządzeń grupy\nDodano dynamiczny state info.membersUnreachable (tylko gdy potrzebny)\nUsunięto snapshoty i diagnostykę z grup\nZaktualizowano nagłówki niedokumentowanego API",
+        "uk": "Редизайн управління групами: fan-out команди на пристрої-учасники через LAN/ptReal\nМожливості групи обчислюються як перетин пристроїв-учасників\nДодано state info.members з ID пристроїв групи\nДодано динамічний state info.membersUnreachable (тільки коли потрібно)\nВидалено знімки та діагностику з груп\nОновлено заголовки недокументованого API",
+        "zh-cn": "重新设计组处理：通过LAN/ptReal向成员设备扇出命令\n组功能计算为成员设备的交集\n添加info.members状态显示组成员设备ID\n添加动态info.membersUnreachable状态（仅在需要时）\n从组中移除快照和诊断\n更新未记录API头以匹配当前Govee应用版本"
+      },
       "1.3.0": {
         "en": "Add MQTT segment state sync (per-segment brightness + color updated in real-time)\nRemove non-functional scene speed slider (byte layout unknown worldwide)\nRemove dead code: unused types, methods, write-only fields (8 findings)",
         "de": "MQTT Segment-State-Sync hinzugefügt (Per-Segment Helligkeit + Farbe in Echtzeit aktualisiert)\nNicht-funktionalen Scene-Speed-Slider entfernt (Byte-Layout weltweit unbekannt)\nToten Code entfernt: unbenutzte Typen, Methoden, write-only Felder (8 Findings)",
@@ -80,19 +93,6 @@
         "pl": "Naprawiono dopasowanie capabilities segmentów: komendy koloru i jasności kierowane do właściwych API\nNaprawiono liczenie segmentów — używa maksimum ze wszystkich capabilities\nNaprawiono zakodowany fallback 15 segmentów zastąpiony bezpieczną wartością\nNaprawiono brakujące clearTimeout dla jednorazowych timerów w onUnload",
         "uk": "Виправлено зіставлення можливостей сегментів: команди кольору та яскравості тепер направляються правильно\nВиправлено підрахунок сегментів — використовує максимум усіх можливостей\nВиправлено фіксований відкат 15 сегментів замінено безпечним значенням\nВиправлено відсутній clearTimeout для одноразових таймерів в onUnload",
         "zh-cn": "修复段能力匹配：颜色和亮度命令现在路由到正确的API能力\n修复段数量使用所有段能力的最大值而非第一个\n修复硬编码的15段回退替换为安全默认值\n修复onUnload中一次性定时器缺少clearTimeout"
-      },
-      "1.0.0": {
-        "en": "Multi-channel state tree: states split into control/scenes/music/snapshots channels\nFix incomplete cache detection (type check never matched)\nRemove dead code: unused methods, config fields, LanDevice version fields\nRemove pollInterval setting (Cloud polling was removed in 0.9.3)\nDynamic segment count from capabilities, excess segments cleaned up\nGroups minimal: only info.name + info.online",
-        "de": "Multi-Channel State-Tree: States aufgeteilt in control/scenes/music/snapshots\nFix unvollständige Cache-Erkennung (Typ-Check hat nie gematcht)\nToter Code entfernt: ungenutzte Methoden, Config-Felder, LanDevice-Versionsfelder\npollInterval-Einstellung entfernt (Cloud-Polling wurde in 0.9.3 entfernt)\nDynamische Segment-Anzahl aus Capabilities, überschüssige Segmente werden gelöscht\nGruppen minimal: nur info.name + info.online",
-        "ru": "Многоканальное дерево состояний: разделение на control/scenes/music/snapshots\nИсправлено обнаружение неполного кэша (проверка типа никогда не срабатывала)\nУдалён мёртвый код: неиспользуемые методы, поля конфигурации, версии LanDevice\nУдалена настройка pollInterval (опрос Cloud удалён в 0.9.3)\nДинамическое количество сегментов из capabilities\nГруппы минимальны: только info.name + info.online",
-        "pt": "Árvore de estados multi-canal: separação em control/scenes/music/snapshots\nCorrigida detecção de cache incompleto (verificação de tipo nunca correspondia)\nRemovido código morto: métodos não usados, campos de config, versões LanDevice\nRemovida configuração pollInterval (polling Cloud removido em 0.9.3)\nContagem dinâmica de segmentos a partir de capabilities\nGrupos mínimos: apenas info.name + info.online",
-        "nl": "Multi-kanaal state tree: states verdeeld in control/scenes/music/snapshots\nFix onvolledige cache-detectie (type check matchte nooit)\nDode code verwijderd: ongebruikte methoden, configvelden, LanDevice versievelden\npollInterval instelling verwijderd (Cloud polling verwijderd in 0.9.3)\nDynamisch segment aantal uit capabilities\nGroepen minimaal: alleen info.name + info.online",
-        "fr": "Arbre d'états multi-canal : séparation en control/scenes/music/snapshots\nCorrection détection de cache incomplet (vérification de type ne correspondait jamais)\nCode mort supprimé : méthodes inutilisées, champs config, versions LanDevice\nParamètre pollInterval supprimé (polling Cloud supprimé en 0.9.3)\nNombre dynamique de segments depuis les capabilities\nGroupes minimaux : uniquement info.name + info.online",
-        "it": "Albero stati multi-canale: separazione in control/scenes/music/snapshots\nCorretta rilevazione cache incompleta (controllo tipo non corrispondeva mai)\nCodice morto rimosso: metodi inutilizzati, campi config, versioni LanDevice\nImpostazione pollInterval rimossa (polling Cloud rimosso in 0.9.3)\nConteggio dinamico segmenti dalle capabilities\nGruppi minimali: solo info.name + info.online",
-        "es": "Árbol de estados multi-canal: separación en control/scenes/music/snapshots\nCorregida detección de caché incompleto (verificación de tipo nunca coincidía)\nCódigo muerto eliminado: métodos no usados, campos de config, versiones LanDevice\nConfiguración pollInterval eliminada (polling Cloud eliminado en 0.9.3)\nConteo dinámico de segmentos desde capabilities\nGrupos mínimos: solo info.name + info.online",
-        "pl": "Wielokanałowe drzewo stanów: podział na control/scenes/music/snapshots\nNaprawiono wykrywanie niekompletnego cache (sprawdzanie typu nigdy nie pasowało)\nUsunięto martwy kod: nieużywane metody, pola konfiguracji, wersje LanDevice\nUsunięto ustawienie pollInterval (odpytywanie Cloud usunięte w 0.9.3)\nDynamiczna liczba segmentów z capabilities\nGrupy minimalne: tylko info.name + info.online",
-        "uk": "Багатоканальне дерево станів: розділення на control/scenes/music/snapshots\nВиправлено виявлення неповного кешу (перевірка типу ніколи не спрацьовувала)\nВидалено мертвий код: невикористовувані методи, поля конфігурації, версії LanDevice\nВидалено налаштування pollInterval (опитування Cloud видалено в 0.9.3)\nДинамічна кількість сегментів з capabilities\nГрупи мінімальні: тільки info.name + info.online",
-        "zh-cn": "多通道状态树：分离为control/scenes/music/snapshots\n修复不完整缓存检测（类型检查从未匹配）\n移除死代码：未使用的方法、配置字段、LanDevice版本字段\n移除pollInterval设置（Cloud轮询已在0.9.3中移除）\n从capabilities动态确定分段数量\n组最小化：仅info.name + info.online"
       }
     },
     "titleLang": {
@@ -136,7 +136,14 @@
     "tier": 3,
     "loglevel": "info",
     "mode": "daemon",
-    "keywords": ["govee", "lights", "led", "lan", "mqtt", "ble"],
+    "keywords": [
+      "govee",
+      "lights",
+      "led",
+      "lan",
+      "mqtt",
+      "ble"
+    ],
     "type": "lighting",
     "compact": true,
     "connectionType": "local",

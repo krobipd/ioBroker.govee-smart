@@ -248,6 +248,7 @@ class GoveeAdapter extends utils.Adapter {
         (_b = this.stateManager) == null ? void 0 : _b.updateGroupsOnline(true).catch(() => {
         });
       }
+      await this.deviceManager.loadGroupMembers();
       this.cloudInitDone = true;
     }
     await Promise.all(this.stateCreationQueue);
@@ -316,6 +317,17 @@ class GoveeAdapter extends utils.Adapter {
     }
     const prefix = this.stateManager.devicePrefix(device);
     const stateSuffix = localId.slice(prefix.length + 1);
+    if (device.sku === "BaseGroup" && device.groupMembers) {
+      await this.handleGroupFanOut(device, stateSuffix, state.val);
+      await this.setStateAsync(id, { val: state.val, ack: true });
+      if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
+        await this.resetRelatedDropdowns(
+          prefix,
+          stateSuffix === "scenes.light_scene" ? "lightScene" : "music"
+        );
+      }
+      return;
+    }
     if (stateSuffix === "snapshots.snapshot_save" && typeof state.val === "string" && state.val.trim()) {
       await this.handleSnapshotSave(device, state.val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
@@ -457,6 +469,155 @@ class GoveeAdapter extends utils.Adapter {
       });
     }
     this.updateConnectionState();
+    if (state.online !== void 0) {
+      this.updateGroupReachability();
+    }
+  }
+  /**
+   * Fan out a group command to all member devices.
+   * Basic controls (power, brightness, color) are sent directly.
+   * Scenes/music are matched by name across members.
+   *
+   * @param group BaseGroup device
+   * @param stateSuffix State path suffix (e.g. "control.power")
+   * @param value Command value
+   */
+  async handleGroupFanOut(group, stateSuffix, value) {
+    if (!this.deviceManager || !group.groupMembers) {
+      return;
+    }
+    const devices = this.deviceManager.getDevices();
+    const members = this.resolveGroupMembers(group, devices).filter(
+      (d) => d.state.online
+    );
+    if (members.length === 0) {
+      this.log.debug(`Group "${group.name}": no reachable members for fan-out`);
+      return;
+    }
+    const command = this.stateToCommand(stateSuffix);
+    if (!command) {
+      return;
+    }
+    if ((command === "lightScene" || command === "music") && (value === "0" || value === 0)) {
+      return;
+    }
+    for (const member of members) {
+      try {
+        if (command === "lightScene") {
+          await this.fanOutScene(group, member, value);
+        } else if (command === "music") {
+          await this.fanOutMusic(group, member, stateSuffix, value);
+        } else {
+          await this.deviceManager.sendCommand(member, command, value);
+        }
+      } catch (err) {
+        this.log.debug(
+          `Group fan-out to ${member.name}: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
+    }
+  }
+  /**
+   * Fan out a scene command: match group scene name to member scene index.
+   *
+   * @param group BaseGroup device
+   * @param member Target member device
+   * @param value Dropdown index value
+   */
+  async fanOutScene(group, member, value) {
+    var _a;
+    if (!this.deviceManager || !this.stateManager) {
+      return;
+    }
+    const groupPrefix = this.stateManager.devicePrefix(group);
+    const obj = await this.getObjectAsync(
+      `${this.namespace}.${groupPrefix}.scenes.light_scene`
+    );
+    const groupStates = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.states;
+    const sceneName = groupStates == null ? void 0 : groupStates[String(value)];
+    if (!sceneName) {
+      return;
+    }
+    const memberIdx = member.scenes.findIndex((s) => s.name === sceneName);
+    if (memberIdx >= 0) {
+      await this.deviceManager.sendCommand(member, "lightScene", memberIdx + 1);
+    }
+  }
+  /**
+   * Fan out a music command: match group music name to member music index.
+   *
+   * @param group BaseGroup device
+   * @param member Target member device
+   * @param stateSuffix Music state path suffix
+   * @param value Command value
+   */
+  async fanOutMusic(group, member, stateSuffix, value) {
+    var _a;
+    if (!this.deviceManager || !this.stateManager) {
+      return;
+    }
+    if (stateSuffix !== "music.music_mode") {
+      await this.sendMusicCommand(
+        member,
+        this.stateManager.devicePrefix(member),
+        stateSuffix,
+        value
+      );
+      return;
+    }
+    const groupPrefix = this.stateManager.devicePrefix(group);
+    const obj = await this.getObjectAsync(
+      `${this.namespace}.${groupPrefix}.music.music_mode`
+    );
+    const groupStates = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.states;
+    const musicName = groupStates == null ? void 0 : groupStates[String(value)];
+    if (!musicName) {
+      return;
+    }
+    const memberIdx = member.musicLibrary.findIndex(
+      (m) => m.name === musicName
+    );
+    if (memberIdx >= 0) {
+      const memberPrefix = this.stateManager.devicePrefix(member);
+      await this.sendMusicCommand(
+        member,
+        memberPrefix,
+        "music.music_mode",
+        memberIdx + 1
+      );
+    }
+  }
+  /**
+   * Resolve group member references to actual device objects.
+   *
+   * @param group BaseGroup device with groupMembers
+   * @param devices Full device list to search
+   */
+  resolveGroupMembers(group, devices) {
+    if (!group.groupMembers) {
+      return [];
+    }
+    return group.groupMembers.map(
+      (m) => devices.find((d) => d.sku === m.sku && d.deviceId === m.deviceId)
+    ).filter((d) => d !== void 0);
+  }
+  /**
+   * Recalculate info.membersUnreachable for all groups.
+   * Called when any device's online status changes.
+   */
+  updateGroupReachability() {
+    if (!this.deviceManager || !this.stateManager) {
+      return;
+    }
+    const devices = this.deviceManager.getDevices();
+    for (const group of devices) {
+      if (group.sku !== "BaseGroup" || !group.groupMembers) {
+        continue;
+      }
+      const memberDevices = this.resolveGroupMembers(group, devices);
+      this.stateManager.updateGroupMembersUnreachable(group, memberDevices).catch(() => {
+      });
+    }
   }
   /**
    * Called by device-manager when the device list changes
@@ -473,7 +634,11 @@ class GoveeAdapter extends utils.Adapter {
         device.sku,
         device.deviceId
       );
-      const stateDefs = (0, import_capability_mapper.buildDeviceStateDefs)(device, localSnaps);
+      let memberDevices;
+      if (device.sku === "BaseGroup" && device.groupMembers) {
+        memberDevices = this.resolveGroupMembers(device, devices);
+      }
+      const stateDefs = (0, import_capability_mapper.buildDeviceStateDefs)(device, localSnaps, memberDevices);
       const p = this.stateManager.createDeviceStates(device, stateDefs).catch((e) => {
         this.log.error(
           `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`

@@ -1,9 +1,9 @@
 import { httpsRequest } from "./http-client.js";
 
-const APP_VERSION = "5.6.01";
+const APP_VERSION = "7.3.30";
 const USER_AGENT =
-  "GoveeHome/5.6.01 (com.ihoment.GoVeeSensor; build:2; iOS 16.5)";
-const CLIENT_ID = "5a31302ebc5c4627b6fc3690c331c6f0";
+  "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
+const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
 const CLIENT_TYPE = "1";
 
 /**
@@ -233,5 +233,62 @@ export class GoveeApiClient {
       data?: Record<string, unknown>;
     }>({ method: "GET", url, headers: this.authHeaders() });
     return resp.data ?? null;
+  }
+
+  /**
+   * Fetch group membership from undocumented exec-plat/home endpoint.
+   * Returns groups with their member device references.
+   */
+  async fetchGroupMembers(): Promise<
+    {
+      groupId: number;
+      name: string;
+      devices: { sku: string; deviceId: string }[];
+    }[]
+  > {
+    if (!this.bearerToken) {
+      return [];
+    }
+    const url = "https://app2.govee.com/bff-app/v1/exec-plat/home";
+    const resp = await httpsRequest<{
+      data?: {
+        components?: Array<{
+          groups?: Array<{
+            groupId?: number;
+            groupName?: string;
+            devices?: Array<{
+              sku?: string;
+              device?: string;
+              deviceExt?: { deviceId?: string };
+            }>;
+          }>;
+        }>;
+      };
+    }>({ method: "GET", url, headers: this.authHeaders() });
+
+    const groups: {
+      groupId: number;
+      name: string;
+      devices: { sku: string; deviceId: string }[];
+    }[] = [];
+    for (const comp of resp.data?.components ?? []) {
+      for (const g of comp.groups ?? []) {
+        if (g.groupId == null) {
+          continue;
+        }
+        const devices: { sku: string; deviceId: string }[] = [];
+        for (const d of g.devices ?? []) {
+          const sku = d.sku;
+          const deviceId = d.device || d.deviceExt?.deviceId;
+          if (sku && deviceId) {
+            devices.push({ sku, deviceId });
+          }
+        }
+        if (devices.length > 0) {
+          groups.push({ groupId: g.groupId, name: g.groupName || "", devices });
+        }
+      }
+    }
+    return groups;
   }
 }

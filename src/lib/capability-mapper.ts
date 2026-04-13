@@ -597,14 +597,20 @@ export function mapCloudStateValue(
 /**
  * Build complete state definitions for a device.
  * Combines LAN defaults, Cloud capabilities, quirks, scenes, snapshots, and diagnostics.
+ * For groups: computes capability intersection of member devices (no snapshots/diagnostics).
  *
  * @param device Govee device with capabilities, scenes, etc.
  * @param localSnapshots Optional local snapshot names
+ * @param memberDevices Resolved member devices (only for BaseGroup)
  */
 export function buildDeviceStateDefs(
   device: GoveeDevice,
   localSnapshots?: { name: string }[],
+  memberDevices?: GoveeDevice[],
 ): StateDefinition[] {
+  if (device.sku === "BaseGroup") {
+    return buildGroupStateDefs(memberDevices || []);
+  }
   let stateDefs: StateDefinition[];
 
   if (device.lanIp) {
@@ -752,6 +758,116 @@ export function buildDeviceStateDefs(
     capabilityInstance: "diagnosticsResult",
     channel: "info",
   });
+
+  return stateDefs;
+}
+
+/**
+ * Check if a member device supports a given control state.
+ * LAN-capable devices support all basic controls.
+ *
+ * @param member Group member device
+ * @param stateId Control state ID (e.g. "power", "brightness")
+ */
+function memberHasControlState(member: GoveeDevice, stateId: string): boolean {
+  if (member.lanIp) {
+    return true;
+  }
+  switch (stateId) {
+    case "power":
+      return member.capabilities.some((c) => c.type.endsWith("on_off"));
+    case "brightness":
+      return member.capabilities.some(
+        (c) => c.type.endsWith("range") && c.instance === "brightness",
+      );
+    case "colorRgb":
+      return member.capabilities.some(
+        (c) => c.type.endsWith("color_setting") && c.instance === "colorRgb",
+      );
+    case "colorTemperature":
+      return member.capabilities.some(
+        (c) =>
+          c.type.endsWith("color_setting") &&
+          (c.instance === "colorTem" || c.instance === "colorTemperatureK"),
+      );
+    default:
+      return false;
+  }
+}
+
+/**
+ * Build state definitions for a BaseGroup device.
+ * Capabilities = intersection of controllable member devices.
+ * No snapshots, no diagnostics, no segments.
+ *
+ * @param members Resolved member devices
+ */
+function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
+  const controllable = members.filter((m) => m.lanIp || m.channels.cloud);
+  if (controllable.length === 0) {
+    return [];
+  }
+
+  const stateDefs: StateDefinition[] = [];
+
+  // Control states: intersection of member capabilities
+  for (const ld of getDefaultLanStates()) {
+    if (controllable.every((m) => memberHasControlState(m, ld.id))) {
+      stateDefs.push(ld);
+    }
+  }
+
+  // Scenes: intersection of member scene names
+  if (controllable.every((m) => m.scenes.length > 0)) {
+    const firstNames = controllable[0].scenes.map((s) => s.name);
+    const commonNames = firstNames.filter((name) =>
+      controllable.every((m) => m.scenes.some((s) => s.name === name)),
+    );
+    if (commonNames.length > 0) {
+      const states: Record<string, string> = { 0: "---" };
+      commonNames.forEach((name, i) => {
+        states[i + 1] = name;
+      });
+      stateDefs.push({
+        id: "light_scene",
+        name: "Light Scene",
+        type: "string",
+        role: "text",
+        write: true,
+        states,
+        def: "0",
+        capabilityType: "devices.capabilities.dynamic_scene",
+        capabilityInstance: "lightScene",
+        channel: "scenes",
+      });
+    }
+  }
+
+  // Music: intersection of member music libraries
+  if (controllable.every((m) => m.musicLibrary.length > 0)) {
+    const firstNames = controllable[0].musicLibrary.map((m) => m.name);
+    const commonNames = firstNames.filter((name) =>
+      controllable.every((m) => m.musicLibrary.some((ml) => ml.name === name)),
+    );
+    if (commonNames.length > 0) {
+      const states: Record<string, string> = { 0: "---" };
+      commonNames.forEach((name, i) => {
+        states[i + 1] = name;
+      });
+      stateDefs.push({
+        id: "music_mode",
+        name: "Music Mode",
+        type: "string",
+        role: "text",
+        write: true,
+        states,
+        def: "0",
+        capabilityType: "devices.capabilities.music_setting",
+        capabilityInstance: "musicMode",
+        channel: "music",
+      });
+    }
+  }
 
   return stateDefs;
 }

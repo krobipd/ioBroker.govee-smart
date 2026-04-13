@@ -22,9 +22,9 @@ __export(govee_api_client_exports, {
 });
 module.exports = __toCommonJS(govee_api_client_exports);
 var import_http_client = require("./http-client.js");
-const APP_VERSION = "5.6.01";
-const USER_AGENT = "GoveeHome/5.6.01 (com.ihoment.GoVeeSensor; build:2; iOS 16.5)";
-const CLIENT_ID = "5a31302ebc5c4627b6fc3690c331c6f0";
+const APP_VERSION = "7.3.30";
+const USER_AGENT = "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
+const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
 const CLIENT_TYPE = "1";
 class GoveeApiClient {
   bearerToken = null;
@@ -166,6 +166,38 @@ class GoveeApiClient {
     const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
     const resp = await (0, import_http_client.httpsRequest)({ method: "GET", url, headers: this.authHeaders() });
     return (_a = resp.data) != null ? _a : null;
+  }
+  /**
+   * Fetch group membership from undocumented exec-plat/home endpoint.
+   * Returns groups with their member device references.
+   */
+  async fetchGroupMembers() {
+    var _a, _b, _c, _d, _e;
+    if (!this.bearerToken) {
+      return [];
+    }
+    const url = "https://app2.govee.com/bff-app/v1/exec-plat/home";
+    const resp = await (0, import_http_client.httpsRequest)({ method: "GET", url, headers: this.authHeaders() });
+    const groups = [];
+    for (const comp of (_b = (_a = resp.data) == null ? void 0 : _a.components) != null ? _b : []) {
+      for (const g of (_c = comp.groups) != null ? _c : []) {
+        if (g.groupId == null) {
+          continue;
+        }
+        const devices = [];
+        for (const d of (_d = g.devices) != null ? _d : []) {
+          const sku = d.sku;
+          const deviceId = d.device || ((_e = d.deviceExt) == null ? void 0 : _e.deviceId);
+          if (sku && deviceId) {
+            devices.push({ sku, deviceId });
+          }
+        }
+        if (devices.length > 0) {
+          groups.push({ groupId: g.groupId, name: g.groupName || "", devices });
+        }
+      }
+    }
+    return groups;
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

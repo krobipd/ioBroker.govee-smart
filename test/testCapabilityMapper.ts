@@ -1,6 +1,6 @@
 import { expect } from "chai";
-import { applyQuirksToStates, getDefaultLanStates, mapCapabilities, mapCloudStateValue } from "../src/lib/capability-mapper";
-import type { CloudCapability, CloudStateCapability } from "../src/lib/types";
+import { applyQuirksToStates, buildDeviceStateDefs, getDefaultLanStates, mapCapabilities, mapCloudStateValue } from "../src/lib/capability-mapper";
+import type { CloudCapability, CloudStateCapability, GoveeDevice } from "../src/lib/types";
 
 describe("CapabilityMapper", () => {
     describe("mapCapabilities", () => {
@@ -566,6 +566,158 @@ describe("CapabilityMapper", () => {
             const brightness = states.find((s) => s.id === "brightness");
             expect(brightness!.min).to.equal(0);
             expect(brightness!.max).to.equal(100);
+        });
+    });
+
+    describe("buildDeviceStateDefs for groups", () => {
+        function createMember(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
+            return {
+                sku: "H61BE",
+                deviceId: "AABBCCDDEEFF0011",
+                name: "Test Light",
+                type: "light",
+                lanIp: "192.168.1.100",
+                capabilities: [],
+                scenes: [
+                    { name: "Sunset", value: { id: 1 } },
+                    { name: "Rainbow", value: { id: 2 } },
+                ],
+                diyScenes: [],
+                snapshots: [],
+                sceneLibrary: [],
+                musicLibrary: [
+                    { name: "Energic", musicCode: 1 },
+                    { name: "Rhythm", musicCode: 2 },
+                ],
+                diyLibrary: [],
+                skuFeatures: null,
+                state: { online: true },
+                channels: { lan: true, mqtt: false, cloud: false },
+                ...overrides,
+            };
+        }
+
+        function createGroup(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
+            return {
+                sku: "BaseGroup",
+                deviceId: "6781311",
+                name: "living",
+                type: "unknown",
+                capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } }],
+                scenes: [],
+                diyScenes: [],
+                snapshots: [],
+                sceneLibrary: [],
+                musicLibrary: [],
+                diyLibrary: [],
+                skuFeatures: null,
+                state: { online: true },
+                channels: { lan: false, mqtt: false, cloud: true },
+                ...overrides,
+            };
+        }
+
+        it("should return empty for group with no members", () => {
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, []);
+            expect(result).to.have.lengthOf(0);
+        });
+
+        it("should return control states from LAN member intersection", () => {
+            const group = createGroup();
+            const m1 = createMember({ sku: "H61BE", lanIp: "192.168.1.1" });
+            const m2 = createMember({ sku: "H61BC", lanIp: "192.168.1.2" });
+            const result = buildDeviceStateDefs(group, undefined, [m1, m2]);
+            const ids = result.map((d) => d.id);
+            expect(ids).to.include("power");
+            expect(ids).to.include("brightness");
+            expect(ids).to.include("colorRgb");
+            expect(ids).to.include("colorTemperature");
+        });
+
+        it("should not include snapshots or diagnostics for groups", () => {
+            const group = createGroup();
+            const m1 = createMember();
+            const result = buildDeviceStateDefs(group, undefined, [m1]);
+            const ids = result.map((d) => d.id);
+            expect(ids).to.not.include("snapshot_local");
+            expect(ids).to.not.include("snapshot_save");
+            expect(ids).to.not.include("snapshot_delete");
+            expect(ids).to.not.include("snapshot");
+            expect(ids).to.not.include("diagnostics_export");
+            expect(ids).to.not.include("diagnostics_result");
+        });
+
+        it("should compute scene intersection across members", () => {
+            const m1 = createMember({ scenes: [
+                { name: "Sunset", value: { id: 1 } },
+                { name: "Rainbow", value: { id: 2 } },
+                { name: "Ocean", value: { id: 3 } },
+            ] });
+            const m2 = createMember({ scenes: [
+                { name: "Rainbow", value: { id: 5 } },
+                { name: "Ocean", value: { id: 6 } },
+            ] });
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, [m1, m2]);
+            const sceneDef = result.find((d) => d.id === "light_scene");
+            expect(sceneDef).to.exist;
+            // "---" + 2 common scenes (Rainbow, Ocean)
+            expect(Object.keys(sceneDef!.states!)).to.have.lengthOf(3);
+            expect(Object.values(sceneDef!.states!)).to.include("Rainbow");
+            expect(Object.values(sceneDef!.states!)).to.include("Ocean");
+            expect(Object.values(sceneDef!.states!)).to.not.include("Sunset");
+        });
+
+        it("should compute music intersection across members", () => {
+            const m1 = createMember({ musicLibrary: [
+                { name: "Energic", musicCode: 1 },
+                { name: "Rhythm", musicCode: 2 },
+            ] });
+            const m2 = createMember({ musicLibrary: [
+                { name: "Rhythm", musicCode: 3 },
+                { name: "Spectrum", musicCode: 4 },
+            ] });
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, [m1, m2]);
+            const musicDef = result.find((d) => d.id === "music_mode");
+            expect(musicDef).to.exist;
+            expect(Object.values(musicDef!.states!)).to.include("Rhythm");
+            expect(Object.values(musicDef!.states!)).to.not.include("Energic");
+            expect(Object.values(musicDef!.states!)).to.not.include("Spectrum");
+        });
+
+        it("should skip scenes when a member has no scenes", () => {
+            const m1 = createMember({ scenes: [{ name: "Sunset", value: { id: 1 } }] });
+            const m2 = createMember({ scenes: [] });
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, [m1, m2]);
+            expect(result.find((d) => d.id === "light_scene")).to.be.undefined;
+        });
+
+        it("should filter control states by Cloud caps when no LAN", () => {
+            const m1 = createMember({
+                lanIp: undefined,
+                capabilities: [
+                    { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+                    { type: "devices.capabilities.range", instance: "brightness", parameters: { dataType: "INTEGER" } },
+                ],
+                channels: { lan: false, mqtt: false, cloud: true },
+            });
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, [m1]);
+            const ids = result.map((d) => d.id);
+            expect(ids).to.include("power");
+            expect(ids).to.include("brightness");
+            expect(ids).to.not.include("colorRgb");
+            expect(ids).to.not.include("colorTemperature");
+        });
+
+        it("should skip unreachable members (no LAN, no Cloud)", () => {
+            const m1 = createMember({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: false } });
+            const group = createGroup();
+            const result = buildDeviceStateDefs(group, undefined, [m1]);
+            expect(result).to.have.lengthOf(0);
         });
     });
 });

@@ -61,7 +61,7 @@ class StateManager {
    * @param stateDefs State definitions from capability mapper
    */
   async createDeviceStates(device, stateDefs) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -119,6 +119,27 @@ class StateManager {
       });
       await this.adapter.delStateAsync(`${prefix}.info.online`).catch(() => {
       });
+      const memberIds = ((_b = device.groupMembers) != null ? _b : []).map((m) => {
+        const shortId = (0, import_types.normalizeDeviceId)(m.deviceId).slice(-4);
+        return sanitize(`${m.sku}_${shortId}`);
+      }).join(", ");
+      await this.ensureState(
+        `${prefix}.info.members`,
+        "Members",
+        "string",
+        "text",
+        false
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.members`, {
+        val: memberIds,
+        ack: true
+      });
+      for (const staleId of ["diagnostics_export", "diagnostics_result"]) {
+        await this.adapter.delObjectAsync(`${prefix}.info.${staleId}`).catch(() => {
+        });
+        await this.adapter.delStateAsync(`${prefix}.info.${staleId}`).catch(() => {
+        });
+      }
     }
     if (!isGroup) {
       await this.ensureState(
@@ -151,7 +172,7 @@ class StateManager {
         ack: true
       });
       await this.adapter.setStateAsync(`${prefix}.info.ip`, {
-        val: (_b = device.lanIp) != null ? _b : "",
+        val: (_c = device.lanIp) != null ? _c : "",
         ack: true
       });
     } else {
@@ -167,7 +188,7 @@ class StateManager {
     );
     const channelGroups = /* @__PURE__ */ new Map();
     for (const def of nonSegmentDefs) {
-      const channel = (_c = def.channel) != null ? _c : "control";
+      const channel = (_d = def.channel) != null ? _d : "control";
       this.stateChannelMap.set(`${prefix}.${def.id}`, channel);
       if (!channelGroups.has(channel)) {
         channelGroups.set(channel, []);
@@ -180,7 +201,7 @@ class StateManager {
     for (const [channel, defs] of channelGroups) {
       await this.adapter.extendObjectAsync(`${prefix}.${channel}`, {
         type: "channel",
-        common: { name: (_d = CHANNEL_NAMES[channel]) != null ? _d : channel },
+        common: { name: (_e = CHANNEL_NAMES[channel]) != null ? _e : channel },
         native: {}
       });
       for (const def of defs) {
@@ -420,6 +441,39 @@ class StateManager {
    */
   async updateGroupsOnline(online) {
     await this.setStateIfExists("groups.info.online", online);
+  }
+  /**
+   * Update info.membersUnreachable for a group.
+   * Creates the state if unreachable members exist, deletes it when all are reachable.
+   *
+   * @param group BaseGroup device
+   * @param memberDevices Resolved member devices
+   */
+  async updateGroupMembersUnreachable(group, memberDevices) {
+    const prefix = this.devicePrefix(group);
+    const stateId = `${prefix}.info.membersUnreachable`;
+    const unreachable = memberDevices.filter((m) => !m.state.online).map((m) => {
+      const shortId = (0, import_types.normalizeDeviceId)(m.deviceId).slice(-4);
+      return sanitize(`${m.sku}_${shortId}`);
+    });
+    if (unreachable.length === 0) {
+      await this.adapter.delObjectAsync(stateId).catch(() => {
+      });
+      await this.adapter.delStateAsync(stateId).catch(() => {
+      });
+    } else {
+      await this.ensureState(
+        stateId,
+        "Unreachable Members",
+        "string",
+        "text",
+        false
+      );
+      await this.adapter.setStateAsync(stateId, {
+        val: unreachable.join(", "),
+        ack: true
+      });
+    }
   }
   /**
    * Cleanup stale devices that no longer exist.

@@ -497,6 +497,70 @@ export class DeviceManager {
     return changed;
   }
 
+  /**
+   * Load group membership from undocumented API and attach to BaseGroup devices.
+   * Resolves member device references against the current device map.
+   *
+   * @returns true if any group memberships were resolved
+   */
+  async loadGroupMembers(): Promise<boolean> {
+    if (!this.apiClient) {
+      return false;
+    }
+
+    try {
+      const apiGroups = await this.apiClient.fetchGroupMembers();
+      if (apiGroups.length === 0) {
+        return false;
+      }
+
+      let changed = false;
+      for (const group of this.devices.values()) {
+        if (group.sku !== "BaseGroup") {
+          continue;
+        }
+        // Match by groupId: BaseGroup deviceId is the numeric group ID as string
+        const apiGroup = apiGroups.find(
+          (g) => String(g.groupId) === group.deviceId,
+        );
+        if (!apiGroup) {
+          continue;
+        }
+
+        // Resolve member devices against our device map
+        const members: { sku: string; deviceId: string }[] = [];
+        for (const m of apiGroup.devices) {
+          const resolved = this.findDeviceBySkuAndId(m.sku, m.deviceId);
+          if (resolved) {
+            members.push({ sku: resolved.sku, deviceId: resolved.deviceId });
+          } else {
+            this.log.debug(
+              `Group "${group.name}": member ${m.sku}/${m.deviceId} not in device map`,
+            );
+          }
+        }
+
+        group.groupMembers = members;
+        if (members.length > 0) {
+          changed = true;
+        }
+        this.log.debug(
+          `Group "${group.name}": ${members.length}/${apiGroup.devices.length} members resolved`,
+        );
+      }
+
+      if (changed) {
+        this.onDeviceListChanged?.(this.getDevices());
+      }
+      return changed;
+    } catch (e) {
+      this.log.debug(
+        `Could not load group members: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      return false;
+    }
+  }
+
   /** Save all devices to SKU cache, skipping those with incomplete scene data. */
   private saveDevicesToCache(): void {
     if (!this.skuCache) {

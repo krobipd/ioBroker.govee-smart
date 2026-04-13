@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart-Home-Geräte. LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig.
 
-- **Version:** 1.3.0 (April 2026)
+- **Version:** 1.4.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -90,7 +90,11 @@ govee-smart.0.
 │       └── segments.count / .command / .0.color / .0.brightness (dynamisch)
 └── groups.
     ├── info.online                  (Cloud-Verbindungsstatus, allgemein für alle Gruppen)
-    └── basegroup_1280.              (nur info.name, kein model/serial/ip/online)
+    └── basegroup_1311.
+        ├── info.name / .members / .membersUnreachable (dynamisch)
+        ├── control.power / .brightness / .colorRgb / .colorTemperature (Fan-Out → LAN)
+        ├── scenes.light_scene       (Fan-Out → ptReal, Name-basiertes Matching)
+        └── music.music_mode         (Fan-Out → ptReal, Name-basiertes Matching)
 ```
 
 ## Szenen-Architektur (WICHTIG!)
@@ -189,7 +193,7 @@ Single Page, drei Sektionen:
 30. **Device Quirks** — `device-quirks.ts` korrigiert falsche API-Daten (colorTemp-Ranges, brokenPlatformApi)
 31. **Scene Speed nicht implementierbar** — `sceneLibrary` enthält `speedInfo`-Daten (supSpeed, config), aber Byte-Layout im scenceParam ist unbekannt (kein Projekt weltweit hat das reverse-engineered); Slider + Command-Routing entfernt, speedInfo bleibt als Daten in API/Cache/Diagnostik
 32. **Multi-Channel State Tree** — States aufgeteilt in 4 Channels: `control` (Basis), `scenes` (Szenen), `music` (Musik), `snapshots` (Aktionen); Routing über `def.channel` in StateDefinition, Pfad-Auflösung via `resolveStatePath()`
-33. **Groups minimal** — BaseGroup hat nur `info.name`, kein model/serial/ip/online; allgemeines `groups.info.online` = Cloud-Status
+33. **Groups Fan-Out** — BaseGroup fan-out: Capabilities = Intersection der Mitgliedsgeräte; Befehle → LAN/ptReal pro Mitglied; `info.members` + dynamisches `info.membersUnreachable`; keine Snapshots/Diagnostics
 34. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Segment-Channels werden gelöscht
 35. **Diagnostics Export** — `info.diagnostics_export` Button pro Gerät erzeugt strukturiertes JSON (Capabilities, Szenen, Libraries, Quirks, State) für GitHub Issues
 36. **Community Quirks** — `community-quirks.json` im Data-Dir (`iobroker-data/govee-smart.0/`) erlaubt User-beigetragene SKU-Korrekturen, persistent über Updates
@@ -205,14 +209,15 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (314)
+## Tests (327)
 
 ```
-test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks (40 Tests)
+test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks + Groups (48 Tests)
   - mapCapabilities: on_off, range, color, scenes, property, toggle, LAN defaults (11)
   - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases (10)
   - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases (16)
   - applyQuirksToStates: known SKU, unknown SKU, non-colorTemp (3)
+  - buildDeviceStateDefs groups: no members, control intersection, no snapshots/diag, scene/music intersection, Cloud-only caps, unreachable (8)
 test/testDeviceManager.ts    → Device Manager + CommandRouter (83 Tests)
   - LAN discovery, IP update, MQTT status, unknown device/IP handling (7)
   - sendCommand channel routing: LAN→Cloud fallback, ptReal scene, segment→Cloud, gradient (10)
@@ -249,11 +254,13 @@ test/testTypes.ts            → Shared Utilities (29 Tests)
   - hexToRgb: with #, without #, black, invalid (4)
   - rgbIntToHex: standard, zero, white (3)
   - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property (15)
-test/testStateManager.ts     → State Manager (40 Tests)
+test/testStateManager.ts     → State Manager (45 Tests)
   - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons (4)
   - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip/online (9)
   - createDeviceStates channels: scenes routing, music routing, snapshot routing, multi-channel (4)
   - createGroupsOnlineState: create + update (2)
+  - group members: info.members with groupMembers, empty members, diagnostics cleanup (3)
+  - updateGroupMembersUnreachable: create when unreachable, delete when all reachable (2)
   - resolveStatePath: control, scenes, music, snapshots, diagnostics, unknown→control (6)
   - updateDeviceState: power, multiple fields, online, undefined fields, missing object (5)
   - cleanupDevices: remove stale, keep existing (2)
@@ -266,11 +273,11 @@ test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 
 | Version | Highlights |
 |---------|------------|
+| 1.4.0 | Group Fan-Out Redesign (LAN/ptReal statt Cloud), info.members, membersUnreachable, 327 Tests |
 | 1.3.0 | MQTT Segment State-Sync, Scene Speed entfernt, Dead-Code-Audit (8 Findings), 314 Tests |
 | 1.2.0 | Fix Segment-Farben (ptReal→Cloud), Dropdown-Reset bei Moduswechsel, Groups Online vereinfacht, 308 Tests |
 | 1.1.2 | Dead MQTT command code entfernt, noMqtt quirk entfernt, dead CloudApiError export entfernt, inline hex→hexToRgb(), 304 Tests |
-| 1.1.1 | CI checkout entfernt, no-floating-promises, unused devDeps entfernt, doppelter news-Eintrag gefixt |
-| 1.1.0 | Diagnostics export, community quirks, R1-R8 refactoring, 309 Tests |
+| 1.1.1 | CI checkout entfernt, no-floating-promises, unused devDeps entfernt |
 
 ## Befehle
 

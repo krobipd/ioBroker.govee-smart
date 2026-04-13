@@ -282,6 +282,8 @@ export interface GoveeDevice {
   }>;
   /** Supported feature flags per SKU (from authenticated API) */
   skuFeatures: Record<string, unknown> | null;
+  /** Group member devices (only for BaseGroup) */
+  groupMembers?: { sku: string; deviceId: string }[];
   /** Last known state */
   state: DeviceState;
   /** Which channels are available */

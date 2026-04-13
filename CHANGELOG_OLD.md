@@ -1,5 +1,13 @@
 # Older Changes
 
+## 1.0.0 (2026-04-11)
+- **BREAKING:** Multi-channel state tree — states split into `control`, `scenes`, `music`, `snapshots` channels
+- **BREAKING:** Removed `pollInterval` setting (Cloud polling was removed in 0.9.3)
+- Fix incomplete cache detection bug (type check `"devices.types.light"` never matched Cloud's `"light"`)
+- Remove dead code: unused methods, config fields, LanDevice version fields
+- Dynamic segment count from capabilities, excess segments cleaned up on startup
+- Groups minimal: BaseGroup only has `info.name` + `info.online`
+
 ## 0.9.6 (2026-04-11)
 - Fix scenes missing for most devices due to incomplete cache from rate-limited Cloud fetch
 - Fix MQTT "account abnormal" incorrectly treated as wrong credentials (keeps reconnecting instead of stopping)

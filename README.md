@@ -373,6 +373,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.4.0 (2026-04-13)
+- Redesign group handling: fan-out commands to member devices via LAN/ptReal instead of Cloud-only power toggle
+- Group capabilities computed as intersection of member devices (power, brightness, color, scenes, music)
+- Add `info.members` state showing group member device IDs
+- Add dynamic `info.membersUnreachable` state (only created when unreachable members exist)
+- Remove snapshots and diagnostics from groups (not applicable to virtual devices)
+- Update undocumented API headers to match current Govee app version (7.3.30)
+- 327 tests (was 314)
+
 ### 1.3.0 (2026-04-12)
 - Add MQTT segment state sync — per-segment brightness and color updated in real-time via MQTT BLE notifications
 - Remove non-functional scene speed slider (byte layout unknown, no project worldwide implements this)
@@ -418,14 +427,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fix segment count using maximum across all segment capabilities instead of first found
 - Fix hardcoded 15-segment fallback replaced with safe default
 - Fix missing clearTimeout for one-shot timers in onUnload
-
-### 1.0.0 (2026-04-11)
-- **BREAKING:** Multi-channel state tree — states split into `control`, `scenes`, `music`, `snapshots` channels
-- **BREAKING:** Removed `pollInterval` setting (Cloud polling was removed in 0.9.3)
-- Fix incomplete cache detection bug (type check `"devices.types.light"` never matched Cloud's `"light"`)
-- Remove dead code: unused methods, config fields, LanDevice version fields
-- Dynamic segment count from capabilities, excess segments cleaned up on startup
-- Groups minimal: BaseGroup only has `info.name` + `info.online`
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

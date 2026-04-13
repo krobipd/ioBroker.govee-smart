@@ -417,7 +417,10 @@ function mapCloudStateValue(cap) {
       return null;
   }
 }
-function buildDeviceStateDefs(device, localSnapshots) {
+function buildDeviceStateDefs(device, localSnapshots, memberDevices) {
+  if (device.sku === "BaseGroup") {
+    return buildGroupStateDefs(memberDevices || []);
+  }
   let stateDefs;
   if (device.lanIp) {
     stateDefs = getDefaultLanStates();
@@ -553,6 +556,90 @@ function buildDeviceStateDefs(device, localSnapshots) {
     capabilityInstance: "diagnosticsResult",
     channel: "info"
   });
+  return stateDefs;
+}
+function memberHasControlState(member, stateId) {
+  if (member.lanIp) {
+    return true;
+  }
+  switch (stateId) {
+    case "power":
+      return member.capabilities.some((c) => c.type.endsWith("on_off"));
+    case "brightness":
+      return member.capabilities.some(
+        (c) => c.type.endsWith("range") && c.instance === "brightness"
+      );
+    case "colorRgb":
+      return member.capabilities.some(
+        (c) => c.type.endsWith("color_setting") && c.instance === "colorRgb"
+      );
+    case "colorTemperature":
+      return member.capabilities.some(
+        (c) => c.type.endsWith("color_setting") && (c.instance === "colorTem" || c.instance === "colorTemperatureK")
+      );
+    default:
+      return false;
+  }
+}
+function buildGroupStateDefs(members) {
+  const controllable = members.filter((m) => m.lanIp || m.channels.cloud);
+  if (controllable.length === 0) {
+    return [];
+  }
+  const stateDefs = [];
+  for (const ld of getDefaultLanStates()) {
+    if (controllable.every((m) => memberHasControlState(m, ld.id))) {
+      stateDefs.push(ld);
+    }
+  }
+  if (controllable.every((m) => m.scenes.length > 0)) {
+    const firstNames = controllable[0].scenes.map((s) => s.name);
+    const commonNames = firstNames.filter(
+      (name) => controllable.every((m) => m.scenes.some((s) => s.name === name))
+    );
+    if (commonNames.length > 0) {
+      const states = { 0: "---" };
+      commonNames.forEach((name, i) => {
+        states[i + 1] = name;
+      });
+      stateDefs.push({
+        id: "light_scene",
+        name: "Light Scene",
+        type: "string",
+        role: "text",
+        write: true,
+        states,
+        def: "0",
+        capabilityType: "devices.capabilities.dynamic_scene",
+        capabilityInstance: "lightScene",
+        channel: "scenes"
+      });
+    }
+  }
+  if (controllable.every((m) => m.musicLibrary.length > 0)) {
+    const firstNames = controllable[0].musicLibrary.map((m) => m.name);
+    const commonNames = firstNames.filter(
+      (name) => controllable.every((m) => m.musicLibrary.some((ml) => ml.name === name))
+    );
+    if (commonNames.length > 0) {
+      const states = { 0: "---" };
+      commonNames.forEach((name, i) => {
+        states[i + 1] = name;
+      });
+      stateDefs.push({
+        id: "music_mode",
+        name: "Music Mode",
+        type: "string",
+        role: "text",
+        write: true,
+        states,
+        def: "0",
+        capabilityType: "devices.capabilities.music_setting",
+        capabilityInstance: "musicMode",
+        channel: "music"
+      });
+    }
+  }
   return stateDefs;
 }
 // Annotate the CommonJS export names for ESM import in node:

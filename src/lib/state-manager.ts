@@ -131,6 +131,35 @@ export class StateManager {
         .delObjectAsync(`${prefix}.info.online`)
         .catch(() => {});
       await this.adapter.delStateAsync(`${prefix}.info.online`).catch(() => {});
+
+      // Group members: comma-separated device prefix IDs
+      const memberIds = (device.groupMembers ?? [])
+        .map((m) => {
+          const shortId = normalizeDeviceId(m.deviceId).slice(-4);
+          return sanitize(`${m.sku}_${shortId}`);
+        })
+        .join(", ");
+      await this.ensureState(
+        `${prefix}.info.members`,
+        "Members",
+        "string",
+        "text",
+        false,
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.members`, {
+        val: memberIds,
+        ack: true,
+      });
+
+      // Clean up stale diagnostics states from older versions
+      for (const staleId of ["diagnostics_export", "diagnostics_result"]) {
+        await this.adapter
+          .delObjectAsync(`${prefix}.info.${staleId}`)
+          .catch(() => {});
+        await this.adapter
+          .delStateAsync(`${prefix}.info.${staleId}`)
+          .catch(() => {});
+      }
     }
 
     if (!isGroup) {
@@ -477,6 +506,46 @@ export class StateManager {
    */
   async updateGroupsOnline(online: boolean): Promise<void> {
     await this.setStateIfExists("groups.info.online", online);
+  }
+
+  /**
+   * Update info.membersUnreachable for a group.
+   * Creates the state if unreachable members exist, deletes it when all are reachable.
+   *
+   * @param group BaseGroup device
+   * @param memberDevices Resolved member devices
+   */
+  async updateGroupMembersUnreachable(
+    group: GoveeDevice,
+    memberDevices: GoveeDevice[],
+  ): Promise<void> {
+    const prefix = this.devicePrefix(group);
+    const stateId = `${prefix}.info.membersUnreachable`;
+
+    const unreachable = memberDevices
+      .filter((m) => !m.state.online)
+      .map((m) => {
+        const shortId = normalizeDeviceId(m.deviceId).slice(-4);
+        return sanitize(`${m.sku}_${shortId}`);
+      });
+
+    if (unreachable.length === 0) {
+      // All members reachable — delete the state
+      await this.adapter.delObjectAsync(stateId).catch(() => {});
+      await this.adapter.delStateAsync(stateId).catch(() => {});
+    } else {
+      await this.ensureState(
+        stateId,
+        "Unreachable Members",
+        "string",
+        "text",
+        false,
+      );
+      await this.adapter.setStateAsync(stateId, {
+        val: unreachable.join(", "),
+        ack: true,
+      });
+    }
   }
 
   /**
