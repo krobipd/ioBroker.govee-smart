@@ -22,6 +22,11 @@ export class GoveeApiClient {
     this.bearerToken = token;
   }
 
+  /** Check if bearer token is available (set after MQTT login) */
+  hasBearerToken(): boolean {
+    return !!this.bearerToken;
+  }
+
   /**
    * Fetch scene library for a specific SKU from undocumented API.
    * Public endpoint — no authentication required, only AppVersion header.
@@ -254,12 +259,11 @@ export class GoveeApiClient {
       data?: {
         components?: Array<{
           groups?: Array<{
-            groupId?: number;
-            groupName?: string;
+            gId?: number;
+            name?: string;
             devices?: Array<{
               sku?: string;
               device?: string;
-              deviceExt?: { deviceId?: string };
             }>;
           }>;
         }>;
@@ -273,19 +277,17 @@ export class GoveeApiClient {
     }[] = [];
     for (const comp of resp.data?.components ?? []) {
       for (const g of comp.groups ?? []) {
-        if (g.groupId == null) {
+        if (g.gId == null) {
           continue;
         }
         const devices: { sku: string; deviceId: string }[] = [];
         for (const d of g.devices ?? []) {
-          const sku = d.sku;
-          const deviceId = d.device || d.deviceExt?.deviceId;
-          if (sku && deviceId) {
-            devices.push({ sku, deviceId });
+          if (d.sku && d.device) {
+            devices.push({ sku: d.sku, deviceId: d.device });
           }
         }
         if (devices.length > 0) {
-          groups.push({ groupId: g.groupId, name: g.groupName || "", devices });
+          groups.push({ groupId: g.gId, name: g.name || "", devices });
         }
       }
     }

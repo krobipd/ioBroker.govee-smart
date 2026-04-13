@@ -394,9 +394,16 @@ class DeviceManager {
     if (!this.apiClient) {
       return false;
     }
+    if (!this.apiClient.hasBearerToken()) {
+      this.log.debug(
+        "Group membership requires Email+Password \u2014 skipping member resolution"
+      );
+      return false;
+    }
     try {
       const apiGroups = await this.apiClient.fetchGroupMembers();
       if (apiGroups.length === 0) {
+        this.log.debug("No group membership data from API");
         return false;
       }
       let changed = false;

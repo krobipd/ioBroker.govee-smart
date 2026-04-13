@@ -36,6 +36,10 @@ class GoveeApiClient {
   setBearerToken(token) {
     this.bearerToken = token;
   }
+  /** Check if bearer token is available (set after MQTT login) */
+  hasBearerToken() {
+    return !!this.bearerToken;
+  }
   /**
    * Fetch scene library for a specific SKU from undocumented API.
    * Public endpoint — no authentication required, only AppVersion header.
@@ -172,7 +176,7 @@ class GoveeApiClient {
    * Returns groups with their member device references.
    */
   async fetchGroupMembers() {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d;
     if (!this.bearerToken) {
       return [];
     }
@@ -181,19 +185,17 @@ class GoveeApiClient {
     const groups = [];
     for (const comp of (_b = (_a = resp.data) == null ? void 0 : _a.components) != null ? _b : []) {
       for (const g of (_c = comp.groups) != null ? _c : []) {
-        if (g.groupId == null) {
+        if (g.gId == null) {
           continue;
         }
         const devices = [];
         for (const d of (_d = g.devices) != null ? _d : []) {
-          const sku = d.sku;
-          const deviceId = d.device || ((_e = d.deviceExt) == null ? void 0 : _e.deviceId);
-          if (sku && deviceId) {
-            devices.push({ sku, deviceId });
+          if (d.sku && d.device) {
+            devices.push({ sku: d.sku, deviceId: d.device });
           }
         }
         if (devices.length > 0) {
-          groups.push({ groupId: g.groupId, name: g.groupName || "", devices });
+          groups.push({ groupId: g.gId, name: g.name || "", devices });
         }
       }
     }
