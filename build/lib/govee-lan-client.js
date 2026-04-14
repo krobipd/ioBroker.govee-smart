@@ -29,10 +29,14 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var govee_lan_client_exports = {};
 __export(govee_lan_client_exports, {
   GoveeLanClient: () => GoveeLanClient,
+  applySceneSpeed: () => applySceneSpeed,
   buildDiyPackets: () => buildDiyPackets,
   buildGradientPacket: () => buildGradientPacket,
   buildMusicModePacket: () => buildMusicModePacket,
-  buildScenePackets: () => buildScenePackets
+  buildScenePackets: () => buildScenePackets,
+  buildSegmentBitmask: () => buildSegmentBitmask,
+  buildSegmentBrightnessPacket: () => buildSegmentBrightnessPacket,
+  buildSegmentColorPacket: () => buildSegmentColorPacket
 });
 module.exports = __toCommonJS(govee_lan_client_exports);
 var dgram = __toESM(require("node:dgram"));
@@ -257,6 +261,28 @@ class GoveeLanClient {
     this.sendPtReal(ip, [buildMusicModePacket(subMode, r, g, b)]);
   }
   /**
+   * Set segment color via ptReal BLE-passthrough (command 33 05 15 01).
+   *
+   * @param ip Device IP address
+   * @param r Red 0-255
+   * @param g Green 0-255
+   * @param b Blue 0-255
+   * @param segments Array of 0-based segment indices
+   */
+  setSegmentColor(ip, r, g, b, segments) {
+    this.sendPtReal(ip, [buildSegmentColorPacket(r, g, b, segments)]);
+  }
+  /**
+   * Set segment brightness via ptReal BLE-passthrough (command 33 05 15 02).
+   *
+   * @param ip Device IP address
+   * @param brightness Brightness 0-100
+   * @param segments Array of 0-based segment indices
+   */
+  setSegmentBrightness(ip, brightness, segments) {
+    this.sendPtReal(ip, [buildSegmentBrightnessPacket(brightness, segments)]);
+  }
+  /**
    * Request device status
    *
    * @param ip Device IP address
@@ -440,12 +466,91 @@ function buildMusicModePacket(subMode, r = 0, g = 0, b = 0) {
   }
   return Buffer.from(finishPacket(data)).toString("base64");
 }
+function buildSegmentBitmask(segments, byteCount) {
+  const mask = new Array(byteCount).fill(0);
+  for (const seg of segments) {
+    const byteIdx = Math.floor(seg / 8);
+    const bitIdx = seg % 8;
+    if (byteIdx < byteCount) {
+      mask[byteIdx] |= 1 << bitIdx;
+    }
+  }
+  return mask;
+}
+function buildSegmentColorPacket(r, g, b, segments) {
+  const data = [
+    51,
+    5,
+    21,
+    1,
+    r & 255,
+    g & 255,
+    b & 255,
+    0,
+    0,
+    0,
+    0,
+    0,
+    ...buildSegmentBitmask(segments, 7)
+  ];
+  return Buffer.from(finishPacket(data)).toString("base64");
+}
+function buildSegmentBrightnessPacket(brightness, segments) {
+  const data = [
+    51,
+    5,
+    21,
+    2,
+    Math.max(0, Math.min(100, brightness)),
+    ...buildSegmentBitmask(segments, 14)
+  ];
+  return Buffer.from(finishPacket(data)).toString("base64");
+}
+function applySceneSpeed(scenceParam, speedLevel, speedConfig) {
+  if (!scenceParam || !speedConfig) {
+    return scenceParam;
+  }
+  let configEntries;
+  try {
+    configEntries = JSON.parse(speedConfig);
+  } catch {
+    return scenceParam;
+  }
+  if (!Array.isArray(configEntries) || configEntries.length === 0) {
+    return scenceParam;
+  }
+  const bytes = Array.from(Buffer.from(scenceParam, "base64"));
+  if (bytes.length === 0) {
+    return scenceParam;
+  }
+  const pageCount = bytes[0];
+  let offset = 1;
+  for (let pageIdx = 0; pageIdx < pageCount && offset < bytes.length; pageIdx++) {
+    const pageLen = bytes[offset];
+    if (offset + 1 + pageLen > bytes.length) {
+      break;
+    }
+    const cfg = configEntries.find((c) => c.page === pageIdx);
+    if ((cfg == null ? void 0 : cfg.moveIn) && speedLevel >= 0 && speedLevel < cfg.moveIn.length) {
+      const speedBytePos = offset + 1 + (pageLen - 5);
+      if (speedBytePos > offset && speedBytePos < offset + 1 + pageLen) {
+        bytes[speedBytePos] = cfg.moveIn[speedLevel];
+      }
+    }
+    offset += 1 + pageLen;
+  }
+  return Buffer.from(bytes).toString("base64");
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   GoveeLanClient,
+  applySceneSpeed,
   buildDiyPackets,
   buildGradientPacket,
   buildMusicModePacket,
-  buildScenePackets
+  buildScenePackets,
+  buildSegmentBitmask,
+  buildSegmentBrightnessPacket,
+  buildSegmentColorPacket
 });
 //# sourceMappingURL=govee-lan-client.js.map

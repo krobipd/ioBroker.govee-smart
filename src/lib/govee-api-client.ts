@@ -54,6 +54,7 @@ export class GoveeApiClient {
             sceneCode?: number;
             lightEffects?: Array<{
               sceneCode?: number;
+              scenceName?: string;
               scenceParam?: string;
               speedInfo?: {
                 supSpeed?: boolean;
@@ -81,15 +82,30 @@ export class GoveeApiClient {
         if (!s.sceneName) {
           continue;
         }
-        // Use effect-level sceneCode (more reliable than scene-level)
-        const effect = s.lightEffects?.[0];
-        const code = effect?.sceneCode ?? s.sceneCode ?? 0;
-        if (code > 0) {
-          const si = effect?.speedInfo;
+        const effects = s.lightEffects ?? [];
+        if (effects.length === 0) {
+          // No effects — use scene-level code
+          const code = s.sceneCode ?? 0;
+          if (code > 0) {
+            scenes.push({ name: s.sceneName, sceneCode: code });
+          }
+          continue;
+        }
+        const multiVariant = effects.length > 1;
+        for (const effect of effects) {
+          const code = effect.sceneCode ?? s.sceneCode ?? 0;
+          if (code <= 0) {
+            continue;
+          }
+          const name =
+            multiVariant && effect.scenceName
+              ? `${s.sceneName}-${effect.scenceName}`
+              : s.sceneName;
+          const si = effect.speedInfo;
           scenes.push({
-            name: s.sceneName,
+            name,
             sceneCode: code,
-            scenceParam: effect?.scenceParam || undefined,
+            scenceParam: effect.scenceParam || undefined,
             speedInfo: si?.supSpeed
               ? {
                   supSpeed: true,
@@ -238,6 +254,58 @@ export class GoveeApiClient {
       data?: Record<string, unknown>;
     }>({ method: "GET", url, headers: this.authHeaders() });
     return resp.data ?? null;
+  }
+
+  /**
+   * Fetch snapshot BLE commands for local activation via ptReal.
+   * Each snapshot contains one or more cmds with Base64 BLE packets.
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier (colon-separated)
+   */
+  async fetchSnapshots(
+    sku: string,
+    deviceId: string,
+  ): Promise<{ name: string; bleCmds: string[][] }[]> {
+    if (!this.bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/bff-app/v1/devices/snapshots?sku=${encodeURIComponent(sku)}&device=${encodeURIComponent(deviceId)}&snapshotId=-1`;
+    const resp = await httpsRequest<{
+      data?: {
+        snapshots?: Array<{
+          name?: string;
+          cmds?: Array<{
+            bleCmds?: string;
+          }>;
+        }>;
+      };
+    }>({ method: "GET", url, headers: this.authHeaders() });
+
+    const results: { name: string; bleCmds: string[][] }[] = [];
+    for (const snap of resp.data?.snapshots ?? []) {
+      if (!snap.name) {
+        continue;
+      }
+      const allCmdPackets: string[][] = [];
+      for (const cmd of snap.cmds ?? []) {
+        if (!cmd.bleCmds) {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(cmd.bleCmds) as { bleCmd?: string };
+          if (parsed.bleCmd) {
+            allCmdPackets.push(parsed.bleCmd.split(","));
+          }
+        } catch {
+          // skip malformed bleCmds JSON
+        }
+      }
+      if (allCmdPackets.length > 0) {
+        results.push({ name: snap.name, bleCmds: allCmdPackets });
+      }
+    }
+    return results;
   }
 
   /**

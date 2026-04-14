@@ -22,8 +22,11 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 - **Scenes** — All available scenes as dropdown, loaded once from Cloud then cached, activated locally via BLE-over-LAN (ptReal)
 - **Music Mode** — Local BLE-over-LAN music reactive effects with sensitivity and auto-color control
 - **DIY Scenes** — User-created scenes activated locally via ptReal
-- **Local Snapshots** — Save and restore basic device state (power, brightness, color) via LAN — no Cloud needed, but limited to LAN-controllable states
-- **Segment Control** — Per-segment color and brightness for LED strips
+- **Local Snapshots** — Save and restore device state including per-segment colors via LAN — no Cloud needed
+- **Cloud Snapshots** — Restore complete device state (scenes, effects) locally via BLE-over-LAN
+- **Segment Control** — Per-segment color and brightness for LED strips, controlled locally via BLE-over-LAN
+- **Scene Speed** — Adjust playback speed for supported scenes via slider
+- **Scene Variants** — All light effect variants per scene (A/B/C/D) available as separate dropdown entries
 - **SKU Cache** — Device data persisted locally, zero Cloud calls after first start
 - **Device Quirks** — Automatic correction of wrong API data for specific SKUs
 - **Seamless Channel Routing** — Automatically uses the fastest available channel (LAN > Cloud)
@@ -110,22 +113,23 @@ govee-smart.0.
 │       │   └── gradient_toggle — Gradient on/off (boolean, writable) [Cloud]
 │       ├── scenes/
 │       │   ├── light_scene     — Light scene (dropdown, writable) [LAN ptReal]
-│       │   └── diy_scene       — DIY scene (dropdown, writable) [LAN ptReal]
+│       │   ├── diy_scene       — DIY scene (dropdown, writable) [LAN ptReal]
+│       │   └── scene_speed     — Scene playback speed (number, writable) [LAN ptReal]
 │       ├── music/
 │       │   ├── music_mode      — Music effect (dropdown, writable) [LAN ptReal]
 │       │   ├── music_sensitivity — Sensitivity 0-100 (number, writable) [LAN ptReal]
 │       │   └── music_auto_color — Auto color (boolean, writable) [LAN ptReal]
 │       ├── snapshots/
-│       │   ├── snapshot          — Cloud snapshot (dropdown, writable) [Cloud]
+│       │   ├── snapshot          — Cloud snapshot (dropdown, writable) [LAN ptReal, Cloud fallback]
 │       │   ├── snapshot_local    — Local snapshot (dropdown, writable) [LAN]
 │       │   ├── snapshot_save     — Save state as local snapshot (string) [LAN]
 │       │   └── snapshot_delete   — Delete a local snapshot (string) [LAN]
 │       └── segments/
 │           ├── count           — Number of segments (number) [Cloud]
-│           ├── command         — Batch "1-5:#ff0000:20" (string, writable) [Cloud]
+│           ├── command         — Batch "1-5:#ff0000:20" (string, writable) [LAN ptReal, Cloud fallback]
 │           └── {0..n}/
-│               ├── color       — Segment color "#RRGGBB" (writable) [Cloud, MQTT sync]
-│               └── brightness  — Segment brightness 0-100% (writable) [Cloud, MQTT sync]
+│               ├── color       — Segment color "#RRGGBB" (writable) [LAN ptReal, MQTT sync]
+│               └── brightness  — Segment brightness 0-100% (writable) [LAN ptReal, MQTT sync]
 └── groups/
     ├── info/
     │   └── online              — Cloud connection status (boolean) [Cloud]
@@ -189,8 +193,9 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 
 ### Notes
 
-- Requires a **Cloud API key** (segments are controlled via Cloud API)
-- Each command sends at most 2 API calls (one for color, one for brightness) regardless of how many segments are selected
+- Requires a **Cloud API key** (segment definitions come from Cloud API)
+- Segments are controlled **locally via BLE-over-LAN** (ptReal) with Cloud fallback
+- Each command sends at most 2 packets (one for color, one for brightness) using a multi-segment bitmask
 - Individual segment states (`segments.0.color`, `segments.0.brightness`, etc.) are automatically updated after a batch command
 
 ---
@@ -200,6 +205,14 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 ### Light Scenes
 
 The `scenes.light_scene` dropdown lists all available scenes for a device. Scenes are **loaded from the Cloud API** on first start (requires API key), then cached locally. Activation happens **locally via BLE-over-LAN** (ptReal protocol) — fast and without Cloud calls.
+
+### Scene Variants
+
+Some scenes have multiple visual variants (A, B, C, D). These appear as separate entries in the dropdown (e.g., "Aurora-A", "Aurora-B"). Each variant has its own light effect and can be selected independently.
+
+### Scene Speed
+
+For scenes that support speed adjustment, a `scenes.scene_speed` slider appears (0 = slowest, higher = faster). Set the speed level first, then activate or re-activate a scene — the speed is applied on the next scene activation.
 
 ### DIY Scenes
 
@@ -235,37 +248,38 @@ There are two types of snapshots — **Cloud snapshots** and **local snapshots**
 
 ### Cloud Snapshots (`snapshots.snapshot`)
 
-Cloud snapshots are created in the **Govee Home app** and stored on Govee's servers. They can capture the complete device state including scenes, segments, and effects. Selecting one sends a Cloud API command to restore it.
+Cloud snapshots are created in the **Govee Home app** and stored on Govee's servers. They can capture the complete device state including scenes, segments, and effects. Selecting one activates it **locally via BLE-over-LAN** (ptReal) when BLE data is available, with Cloud API as fallback.
 
 - Requires **Cloud API key**
 - Created/managed in the Govee Home app only
 - Can restore any state the app can set
+- Activation is fast (~100ms) when BLE packets are cached
 
 ### Local Snapshots (`snapshots.snapshot_local`)
 
-Local snapshots are created and stored **by the adapter** on your ioBroker server. They are independent of Govee Cloud but can only save what the LAN API can control.
+Local snapshots are created and stored **by the adapter** on your ioBroker server. They are independent of Govee Cloud and capture the visual state that can be controlled via LAN.
 
 **What is saved:**
 - Power on/off
 - Brightness
 - Color (RGB)
 - Color temperature (Kelvin)
+- Per-segment color and brightness (for LED strips with segments)
 
 **What is NOT saved:**
 - Scenes, DIY scenes
 - Music mode settings
-- Segment colors and brightness
 - Gradient toggle
 
 ### Local Snapshot Workflow
 
 **Save:** Write a name into `snapshots.snapshot_save` (e.g., "Evening Warm"). The adapter reads the current device state and saves it locally. The name appears in the `snapshot_local` dropdown.
 
-**Restore:** Select a snapshot from the `snapshots.snapshot_local` dropdown. The adapter sends individual LAN commands for power, brightness, and color/colorTemp.
+**Restore:** Select a snapshot from the `snapshots.snapshot_local` dropdown. The adapter sends individual LAN commands for power, brightness, color/colorTemp, and per-segment colors.
 
 **Delete:** Write the exact snapshot name into `snapshots.snapshot_delete`.
 
-**Tip:** If you want to save a complete setup with segments and scenes, use **Cloud snapshots** via the Govee Home app instead.
+**Tip:** Local snapshots capture the full visual state including segments. For saving scene/effect configurations, use **Cloud snapshots** via the Govee Home app.
 
 ---
 
@@ -358,15 +372,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ### Segment colors don't change
 
-- Segment control requires a **Cloud API key** — segments are controlled exclusively via Cloud API
-- Check that `info.cloudConnected` is `true`
-- Make sure you're not exceeding the rate limit (10 commands/min per device)
+- Segment control requires a **Cloud API key** (segment definitions come from Cloud)
+- Segments are controlled locally via BLE-over-LAN with Cloud fallback
+- Make sure the device is reachable on LAN (check `info.online`)
 
-### Local snapshot doesn't restore my scene/segments
+### Local snapshot doesn't restore my scene
 
-- Local snapshots only save **basic LAN states**: power, brightness, color, color temperature
-- Scenes, segments, gradient, and music mode are **not included**
-- Use **Cloud snapshots** (via Govee Home app) to save complete device states including scenes and segments
+- Local snapshots save visual state: power, brightness, color, color temperature, and per-segment colors
+- Scenes, gradient, and music mode are **not included** (these are modes, not visual state)
+- Use **Cloud snapshots** (via Govee Home app) to save scene/effect configurations
 
 ### Groups not showing
 
@@ -393,6 +407,14 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.5.0 (2026-04-14)
+- Add local segment control via BLE-over-LAN (ptReal) — segments now controlled locally (~100ms) instead of Cloud (5-10s)
+- Add scene variants — all light effects per scene (A/B/C/D) instead of only the first variant
+- Add local snapshot activation via ptReal BLE packets — Cloud snapshots now activated locally
+- Add scene speed control — adjust playback speed for supported scenes via slider
+- Add per-segment color and brightness to local snapshots — full visual state capture without Cloud
+- 352 tests (was 327)
+
 ### 1.4.1 (2026-04-13)
 - Fix group member resolution returning empty (API field name mismatch: `gId`/`name` vs `groupId`/`groupName`)
 - Add bearer token pre-check with descriptive log message for group membership loading
@@ -425,27 +447,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Remove dead `CloudApiError` re-export
 - Replace inline hex parsing with shared `hexToRgb()` utility
 - Simplify LAN fallback to Cloud-only (was LAN → MQTT → Cloud)
-
-### 1.1.1 (2026-04-12)
-- **BREAKING:** Move diagnostics states from `snapshots/` to `info/` channel (where device information belongs)
-- Fix community quirks loading from persistent data directory instead of adapter directory (survives updates)
-- Document diagnostics export and community quirks in README
-- Remove redundant CI checkout, add `no-floating-promises` lint rule, remove unused devDependencies, fix duplicate news entry
-
-### 1.1.0 (2026-04-11)
-- Add diagnostics export per device — structured JSON for GitHub issue submission
-- Add community quirks database — external JSON (`community-quirks.json`) for user-contributed SKU overrides
-- Fix array bounds checks in scene/DIY/snapshot index lookups (prevents crash on invalid indices)
-- Fix segment batch parsing edge cases (negative indices, empty device list growth)
-- Major internal refactoring: 8 focused refactorings for improved maintainability
-  - Extract `CommandRouter` from DeviceManager (device-manager.ts: 1,459 → 886 lines)
-  - Extract `GoveeApiClient` from MQTT client (govee-mqtt-client.ts: 785 → 483 lines)
-  - Extract `buildDeviceStateDefs` to capability-mapper (main.ts: 1,077 → 921 lines)
-  - Shared HTTP client replacing 3 duplicate implementations
-  - Shared color utilities (`rgbToHex`, `hexToRgb`, `rgbIntToHex`)
-  - Channel field on `StateDefinition` replacing fragile Set-based routing
-  - Consolidated rate-limiter pattern and split `loadFromCloud` into sub-methods
-- Test coverage increased to 309 tests (was 291)
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

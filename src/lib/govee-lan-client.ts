@@ -272,6 +272,40 @@ export class GoveeLanClient {
   }
 
   /**
+   * Set segment color via ptReal BLE-passthrough (command 33 05 15 01).
+   *
+   * @param ip Device IP address
+   * @param r Red 0-255
+   * @param g Green 0-255
+   * @param b Blue 0-255
+   * @param segments Array of 0-based segment indices
+   */
+  setSegmentColor(
+    ip: string,
+    r: number,
+    g: number,
+    b: number,
+    segments: number[],
+  ): void {
+    this.sendPtReal(ip, [buildSegmentColorPacket(r, g, b, segments)]);
+  }
+
+  /**
+   * Set segment brightness via ptReal BLE-passthrough (command 33 05 15 02).
+   *
+   * @param ip Device IP address
+   * @param brightness Brightness 0-100
+   * @param segments Array of 0-based segment indices
+   */
+  setSegmentBrightness(
+    ip: string,
+    brightness: number,
+    segments: number[],
+  ): void {
+    this.sendPtReal(ip, [buildSegmentBrightnessPacket(brightness, segments)]);
+  }
+
+  /**
    * Request device status
    *
    * @param ip Device IP address
@@ -532,4 +566,146 @@ export function buildMusicModePacket(
     data.push(r & 0xff, g & 0xff, b & 0xff);
   }
   return Buffer.from(finishPacket(data)).toString("base64");
+}
+
+/**
+ * Build a little-endian segment bitmask.
+ * Segment 0 = byte[0] bit 0, Segment 8 = byte[1] bit 0, etc.
+ *
+ * @param segments Array of 0-based segment indices
+ * @param byteCount Number of bitmask bytes (7 for color, 14 for brightness)
+ */
+export function buildSegmentBitmask(
+  segments: number[],
+  byteCount: number,
+): number[] {
+  const mask = new Array<number>(byteCount).fill(0);
+  for (const seg of segments) {
+    const byteIdx = Math.floor(seg / 8);
+    const bitIdx = seg % 8;
+    if (byteIdx < byteCount) {
+      mask[byteIdx] |= 1 << bitIdx;
+    }
+  }
+  return mask;
+}
+
+/**
+ * Build a Base64-encoded BLE packet for segment color via ptReal.
+ * Command: 33 05 15 01 RR GG BB 00×5 bitmask×7
+ *
+ * @param r Red 0-255
+ * @param g Green 0-255
+ * @param b Blue 0-255
+ * @param segments Array of 0-based segment indices
+ */
+export function buildSegmentColorPacket(
+  r: number,
+  g: number,
+  b: number,
+  segments: number[],
+): string {
+  const data = [
+    0x33,
+    0x05,
+    0x15,
+    0x01,
+    r & 0xff,
+    g & 0xff,
+    b & 0xff,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    ...buildSegmentBitmask(segments, 7),
+  ];
+  return Buffer.from(finishPacket(data)).toString("base64");
+}
+
+/**
+ * Build a Base64-encoded BLE packet for segment brightness via ptReal.
+ * Command: 33 05 15 02 BB bitmask×14
+ *
+ * @param brightness Brightness 0-100
+ * @param segments Array of 0-based segment indices
+ */
+export function buildSegmentBrightnessPacket(
+  brightness: number,
+  segments: number[],
+): string {
+  const data = [
+    0x33,
+    0x05,
+    0x15,
+    0x02,
+    Math.max(0, Math.min(100, brightness)),
+    ...buildSegmentBitmask(segments, 14),
+  ];
+  return Buffer.from(finishPacket(data)).toString("base64");
+}
+
+/**
+ * Apply speed level to a scene's scenceParam by replacing speed bytes in each page.
+ * scenceParam structure: byte[0] = page count, then per page: 1 byte length + N bytes data.
+ * Speed byte position within each page: pageLength - 5.
+ *
+ * @param scenceParam Base64-encoded scene parameter data
+ * @param speedLevel Speed level index (0-based)
+ * @param speedConfig JSON config string from speedInfo.config
+ * @returns Modified Base64-encoded scenceParam with speed bytes replaced
+ */
+export function applySceneSpeed(
+  scenceParam: string,
+  speedLevel: number,
+  speedConfig: string,
+): string {
+  if (!scenceParam || !speedConfig) {
+    return scenceParam;
+  }
+
+  let configEntries: Array<{
+    page: number;
+    moveIn?: number[];
+  }>;
+  try {
+    configEntries = JSON.parse(speedConfig);
+  } catch {
+    return scenceParam;
+  }
+
+  if (!Array.isArray(configEntries) || configEntries.length === 0) {
+    return scenceParam;
+  }
+
+  const bytes = Array.from(Buffer.from(scenceParam, "base64"));
+  if (bytes.length === 0) {
+    return scenceParam;
+  }
+
+  const pageCount = bytes[0];
+  let offset = 1;
+
+  for (
+    let pageIdx = 0;
+    pageIdx < pageCount && offset < bytes.length;
+    pageIdx++
+  ) {
+    const pageLen = bytes[offset];
+    if (offset + 1 + pageLen > bytes.length) {
+      break;
+    }
+
+    const cfg = configEntries.find((c) => c.page === pageIdx);
+    if (cfg?.moveIn && speedLevel >= 0 && speedLevel < cfg.moveIn.length) {
+      const speedBytePos = offset + 1 + (pageLen - 5);
+      if (speedBytePos > offset && speedBytePos < offset + 1 + pageLen) {
+        bytes[speedBytePos] = cfg.moveIn[speedLevel];
+      }
+    }
+
+    offset += 1 + pageLen;
+  }
+
+  return Buffer.from(bytes).toString("base64");
 }

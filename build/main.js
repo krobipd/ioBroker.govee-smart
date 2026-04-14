@@ -386,6 +386,14 @@ class GoveeAdapter extends utils.Adapter {
       await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
+    if (command === "sceneSpeed") {
+      const level = typeof state.val === "number" ? state.val : parseInt(String(state.val), 10);
+      if (!isNaN(level)) {
+        device.sceneSpeed = level;
+      }
+      await this.setStateAsync(id, { val: state.val, ack: true });
+      return;
+    }
     try {
       if (command === "music") {
         if (stateSuffix === "music.music_mode" && (state.val === "0" || state.val === 0)) {
@@ -818,6 +826,9 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "scenes.diy_scene") {
       return "diyScene";
     }
+    if (suffix === "scenes.scene_speed") {
+      return "sceneSpeed";
+    }
     if (suffix === "music.music_mode" || suffix === "music.music_sensitivity" || suffix === "music.music_auto_color") {
       return "music";
     }
@@ -844,6 +855,7 @@ class GoveeAdapter extends utils.Adapter {
    * @param name Snapshot name
    */
   async handleSnapshotSave(device, name) {
+    var _a;
     if (!this.localSnapshots || !this.stateManager) {
       return;
     }
@@ -861,12 +873,30 @@ class GoveeAdapter extends utils.Adapter {
     const ctState = await this.getStateAsync(
       `${ns}.${prefix}.control.colorTemperature`
     );
+    let segments;
+    const segCount = (_a = device.segmentCount) != null ? _a : 0;
+    if (segCount > 0) {
+      segments = [];
+      for (let i = 0; i < segCount; i++) {
+        const segColor = await this.getStateAsync(
+          `${ns}.${prefix}.segments.${i}.color`
+        );
+        const segBright = await this.getStateAsync(
+          `${ns}.${prefix}.segments.${i}.brightness`
+        );
+        segments.push({
+          color: typeof (segColor == null ? void 0 : segColor.val) === "string" ? segColor.val : "#000000",
+          brightness: typeof (segBright == null ? void 0 : segBright.val) === "number" ? segBright.val : 100
+        });
+      }
+    }
     const snapshot = {
       name,
       power: (powerState == null ? void 0 : powerState.val) === true,
       brightness: typeof (brightState == null ? void 0 : brightState.val) === "number" ? brightState.val : 0,
       colorRgb: typeof (colorState == null ? void 0 : colorState.val) === "string" ? colorState.val : "#000000",
       colorTemperature: typeof (ctState == null ? void 0 : ctState.val) === "number" ? ctState.val : 0,
+      segments,
       savedAt: Date.now()
     };
     this.localSnapshots.saveSnapshot(device.sku, device.deviceId, snapshot);
@@ -909,6 +939,21 @@ class GoveeAdapter extends utils.Adapter {
         );
       } else {
         await this.deviceManager.sendCommand(device, "colorRgb", snap.colorRgb);
+      }
+      if (snap.segments && snap.segments.length > 0) {
+        for (let i = 0; i < snap.segments.length; i++) {
+          const seg = snap.segments[i];
+          await this.deviceManager.sendCommand(
+            device,
+            `segmentColor:${i}`,
+            seg.color
+          );
+          await this.deviceManager.sendCommand(
+            device,
+            `segmentBrightness:${i}`,
+            seg.brightness
+          );
+        }
       }
     }
   }

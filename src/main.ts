@@ -14,6 +14,7 @@ import { GoveeMqttClient } from "./lib/govee-mqtt-client.js";
 import {
   LocalSnapshotStore,
   type LocalSnapshot,
+  type SnapshotSegment,
 } from "./lib/local-snapshots.js";
 import { RateLimiter } from "./lib/rate-limiter.js";
 import { SkuCache } from "./lib/sku-cache.js";
@@ -451,6 +452,19 @@ class GoveeAdapter extends utils.Adapter {
         command === "snapshot") &&
       (state.val === "0" || state.val === 0)
     ) {
+      await this.setStateAsync(id, { val: state.val, ack: true });
+      return;
+    }
+
+    // Scene speed: store on device, applied on next scene activation
+    if (command === "sceneSpeed") {
+      const level =
+        typeof state.val === "number"
+          ? state.val
+          : parseInt(String(state.val), 10);
+      if (!isNaN(level)) {
+        device.sceneSpeed = level;
+      }
       await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
@@ -1008,6 +1022,9 @@ class GoveeAdapter extends utils.Adapter {
     if (suffix === "scenes.diy_scene") {
       return "diyScene";
     }
+    if (suffix === "scenes.scene_speed") {
+      return "sceneSpeed";
+    }
     // Music channel
     if (
       suffix === "music.music_mode" ||
@@ -1067,6 +1084,25 @@ class GoveeAdapter extends utils.Adapter {
       `${ns}.${prefix}.control.colorTemperature`,
     );
 
+    // Read per-segment states if device has segments
+    let segments: SnapshotSegment[] | undefined;
+    const segCount = device.segmentCount ?? 0;
+    if (segCount > 0) {
+      segments = [];
+      for (let i = 0; i < segCount; i++) {
+        const segColor = await this.getStateAsync(
+          `${ns}.${prefix}.segments.${i}.color`,
+        );
+        const segBright = await this.getStateAsync(
+          `${ns}.${prefix}.segments.${i}.brightness`,
+        );
+        segments.push({
+          color: typeof segColor?.val === "string" ? segColor.val : "#000000",
+          brightness: typeof segBright?.val === "number" ? segBright.val : 100,
+        });
+      }
+    }
+
     const snapshot: LocalSnapshot = {
       name,
       power: powerState?.val === true,
@@ -1074,6 +1110,7 @@ class GoveeAdapter extends utils.Adapter {
       colorRgb:
         typeof colorState?.val === "string" ? colorState.val : "#000000",
       colorTemperature: typeof ctState?.val === "number" ? ctState.val : 0,
+      segments,
       savedAt: Date.now(),
     };
 
@@ -1128,6 +1165,23 @@ class GoveeAdapter extends utils.Adapter {
         );
       } else {
         await this.deviceManager.sendCommand(device, "colorRgb", snap.colorRgb);
+      }
+
+      // Restore per-segment states via ptReal
+      if (snap.segments && snap.segments.length > 0) {
+        for (let i = 0; i < snap.segments.length; i++) {
+          const seg = snap.segments[i];
+          await this.deviceManager.sendCommand(
+            device,
+            `segmentColor:${i}`,
+            seg.color,
+          );
+          await this.deviceManager.sendCommand(
+            device,
+            `segmentBrightness:${i}`,
+            seg.brightness,
+          );
+        }
       }
     }
   }

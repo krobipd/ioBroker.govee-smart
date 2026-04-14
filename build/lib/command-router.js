@@ -22,6 +22,7 @@ __export(command_router_exports, {
 });
 module.exports = __toCommonJS(command_router_exports);
 var import_types = require("./types.js");
+var import_govee_lan_client = require("./govee-lan-client.js");
 class CommandRouter {
   log;
   lanClient = null;
@@ -80,6 +81,15 @@ class CommandRouter {
   async sendCommand(device, command, value) {
     var _a;
     if (command.startsWith("segmentColor:")) {
+      const segIdx = parseInt(command.split(":")[1], 10);
+      if (isNaN(segIdx) || segIdx < 0) {
+        return;
+      }
+      if (device.lanIp && this.lanClient) {
+        const { r, g, b } = (0, import_types.hexToRgb)(value);
+        this.lanClient.setSegmentColor(device.lanIp, r, g, b, [segIdx]);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -91,6 +101,28 @@ class CommandRouter {
       if (parsed) {
         (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
       }
+      if (device.lanIp && this.lanClient && parsed) {
+        if (parsed.color !== void 0) {
+          const r = parsed.color >> 16 & 255;
+          const g = parsed.color >> 8 & 255;
+          const b = parsed.color & 255;
+          this.lanClient.setSegmentColor(
+            device.lanIp,
+            r,
+            g,
+            b,
+            parsed.segments
+          );
+        }
+        if (parsed.brightness !== void 0) {
+          this.lanClient.setSegmentBrightness(
+            device.lanIp,
+            parsed.brightness,
+            parsed.segments
+          );
+        }
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendSegmentBatchParsed(device, value, parsed);
         return;
@@ -98,6 +130,16 @@ class CommandRouter {
       return;
     }
     if (command.startsWith("segmentBrightness:")) {
+      const segIdx = parseInt(command.split(":")[1], 10);
+      if (isNaN(segIdx) || segIdx < 0) {
+        return;
+      }
+      if (device.lanIp && this.lanClient) {
+        this.lanClient.setSegmentBrightness(device.lanIp, value, [
+          segIdx
+        ]);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -377,7 +419,7 @@ class CommandRouter {
    * @param value Command value
    */
   sendLanCommand(device, command, value) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     if (!device.lanIp || !this.lanClient) {
       return;
     }
@@ -437,14 +479,41 @@ class CommandRouter {
           const baseName = scene.name.replace(/-[A-Z]$/, "");
           const libEntry = (_b = device.sceneLibrary.find((s) => s.name === scene.name)) != null ? _b : device.sceneLibrary.find((s) => s.name === baseName);
           if (libEntry) {
+            let param = (_c = libEntry.scenceParam) != null ? _c : "";
+            if (device.sceneSpeed !== void 0 && device.sceneSpeed > 0 && ((_d = libEntry.speedInfo) == null ? void 0 : _d.supSpeed) && libEntry.speedInfo.config) {
+              param = (0, import_govee_lan_client.applySceneSpeed)(
+                param,
+                device.sceneSpeed,
+                libEntry.speedInfo.config
+              );
+            }
             this.log.debug(
               `ptReal: ${scene.name} \u2192 code=${libEntry.sceneCode}`
             );
-            this.lanClient.setScene(
-              device.lanIp,
-              libEntry.sceneCode,
-              (_c = libEntry.scenceParam) != null ? _c : ""
+            this.lanClient.setScene(device.lanIp, libEntry.sceneCode, param);
+            return;
+          }
+        }
+        this.sendCloudCommand(device, command, value).catch(() => {
+        });
+        break;
+      }
+      case "snapshot": {
+        const idx = parseInt(String(value), 10);
+        if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
+          this.log.warn(
+            `${device.sku}: invalid snapshot index ${String(value)}`
+          );
+          return;
+        }
+        const cmdGroups = (_e = device.snapshotBleCmds) == null ? void 0 : _e[idx - 1];
+        if (cmdGroups && cmdGroups.length > 0) {
+          const allPackets = cmdGroups.flat();
+          if (allPackets.length > 0) {
+            this.log.debug(
+              `ptReal Snapshot: ${device.snapshots[idx - 1].name} \u2192 ${allPackets.length} packets`
             );
+            this.lanClient.sendPtReal(device.lanIp, allPackets);
             return;
           }
         }

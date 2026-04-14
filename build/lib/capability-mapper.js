@@ -458,6 +458,36 @@ function buildDeviceStateDefs(device, localSnapshots, memberDevices) {
       channel: "scenes"
     });
   }
+  const maxSpeedLevel = device.sceneLibrary.reduce((max, entry) => {
+    var _a;
+    if (((_a = entry.speedInfo) == null ? void 0 : _a.supSpeed) && entry.speedInfo.config) {
+      try {
+        const configs = JSON.parse(entry.speedInfo.config);
+        for (const cfg of configs) {
+          if (cfg.moveIn && cfg.moveIn.length - 1 > max) {
+            max = cfg.moveIn.length - 1;
+          }
+        }
+      } catch {
+      }
+    }
+    return max;
+  }, -1);
+  if (maxSpeedLevel > 0) {
+    stateDefs.push({
+      id: "scene_speed",
+      name: "Scene Speed",
+      type: "number",
+      role: "level",
+      write: true,
+      min: 0,
+      max: maxSpeedLevel,
+      def: 0,
+      capabilityType: "local",
+      capabilityInstance: "sceneSpeed",
+      channel: "scenes"
+    });
+  }
   if (device.diyScenes.length > 0) {
     const states = { 0: "---" };
     device.diyScenes.forEach((s, i) => {

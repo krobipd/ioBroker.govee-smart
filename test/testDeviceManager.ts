@@ -412,10 +412,12 @@ describe("DeviceManager", () => {
             expect(cloudTracker.calls[0].method).to.equal("controlDevice");
         });
 
-        it("should route segment color via Cloud (ptReal not reliable)", async () => {
+        it("should route segment color via LAN ptReal", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
+                setSegmentColor: lanTracker.track("setSegmentColor"),
+                setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
             };
             dm.setLanClient(mockLan as any);
 
@@ -432,11 +434,33 @@ describe("DeviceManager", () => {
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
             await dm.sendCommand(device, "segmentColor:3", "#ff0000");
-            // Cloud should be called (ptReal segment color not reliable)
-            expect(cloudTracker.calls).to.have.lengthOf(1);
-            expect(cloudTracker.calls[0].method).to.equal("controlDevice");
-            // LAN should NOT be called for segment color
-            expect(lanTracker.calls).to.have.lengthOf(0);
+            // LAN should be called for segment color
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("setSegmentColor");
+            expect(lanTracker.calls[0].args[0]).to.equal("192.168.1.100");
+            expect(lanTracker.calls[0].args[1]).to.equal(255); // R
+            expect(lanTracker.calls[0].args[2]).to.equal(0);   // G
+            expect(lanTracker.calls[0].args[3]).to.equal(0);   // B
+            // Cloud should NOT be called
+            expect(cloudTracker.calls).to.have.lengthOf(0);
+        });
+
+        it("should route segment brightness via LAN ptReal", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                setSegmentColor: lanTracker.track("setSegmentColor"),
+                setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice();
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "segmentBrightness:5", 50);
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("setSegmentBrightness");
+            expect(lanTracker.calls[0].args[1]).to.equal(50);
         });
 
         it("should fall back to Cloud for segment color without LAN", async () => {
@@ -453,6 +477,55 @@ describe("DeviceManager", () => {
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
             await dm.sendCommand(device, "segmentColor:0", "#00ff00");
+            expect(cloudTracker.calls).to.have.lengthOf(1);
+        });
+
+        it("should route snapshot via LAN ptReal when BLE data available", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                sendPtReal: lanTracker.track("sendPtReal"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const device = createTestDevice({
+                snapshotBleCmds: [
+                    [["cGFja2V0MQ==", "cGFja2V0Mg=="]], // Snap1
+                    [], // Snap2 has no BLE data
+                ],
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "snapshot", 1);
+            expect(lanTracker.calls).to.have.lengthOf(1);
+            expect(lanTracker.calls[0].method).to.equal("sendPtReal");
+            expect(lanTracker.calls[0].args[1]).to.deep.equal(["cGFja2V0MQ==", "cGFja2V0Mg=="]);
+        });
+
+        it("should fall back to Cloud for snapshot without BLE data", async () => {
+            const lanTracker = createCallTracker();
+            const mockLan = {
+                setPower: lanTracker.track("setPower"),
+                sendPtReal: lanTracker.track("sendPtReal"),
+            };
+            dm.setLanClient(mockLan as any);
+
+            const cloudTracker = createCallTracker();
+            const mockCloud = {
+                controlDevice: (...args: unknown[]) => {
+                    cloudTracker.calls.push({ method: "controlDevice", args });
+                    return Promise.resolve();
+                },
+            };
+            dm.setCloudClient(mockCloud as any);
+
+            const device = createTestDevice({
+                snapshotBleCmds: [[], []], // no BLE data
+            });
+            (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+
+            await dm.sendCommand(device, "snapshot", 1);
+            expect(lanTracker.calls).to.have.lengthOf(0);
             expect(cloudTracker.calls).to.have.lengthOf(1);
         });
 

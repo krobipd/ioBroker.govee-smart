@@ -1,6 +1,7 @@
 import { hexToRgb } from "./types.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
+import { applySceneSpeed } from "./govee-lan-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
 import type { GoveeDevice } from "./types.js";
 
@@ -81,8 +82,17 @@ export class CommandRouter {
     command: string,
     value: unknown,
   ): Promise<void> {
-    // Segment color: Cloud only (ptReal segment color accepted but not rendered)
+    // Segment color: LAN ptReal first, Cloud fallback
     if (command.startsWith("segmentColor:")) {
+      const segIdx = parseInt(command.split(":")[1], 10);
+      if (isNaN(segIdx) || segIdx < 0) {
+        return;
+      }
+      if (device.lanIp && this.lanClient) {
+        const { r, g, b } = hexToRgb(value as string);
+        this.lanClient.setSegmentColor(device.lanIp, r, g, b, [segIdx]);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -90,11 +100,33 @@ export class CommandRouter {
       return;
     }
 
-    // Segment batch: Cloud for color+brightness, local state update
+    // Segment batch: LAN ptReal first (multi-segment bitmask), Cloud fallback
     if (command === "segmentBatch") {
       const parsed = this.parseSegmentBatch(device, value as string);
       if (parsed) {
         this.onSegmentBatchUpdate?.(device, parsed);
+      }
+      if (device.lanIp && this.lanClient && parsed) {
+        if (parsed.color !== undefined) {
+          const r = (parsed.color >> 16) & 0xff;
+          const g = (parsed.color >> 8) & 0xff;
+          const b = parsed.color & 0xff;
+          this.lanClient.setSegmentColor(
+            device.lanIp,
+            r,
+            g,
+            b,
+            parsed.segments,
+          );
+        }
+        if (parsed.brightness !== undefined) {
+          this.lanClient.setSegmentBrightness(
+            device.lanIp,
+            parsed.brightness,
+            parsed.segments,
+          );
+        }
+        return;
       }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendSegmentBatchParsed(device, value as string, parsed);
@@ -103,8 +135,18 @@ export class CommandRouter {
       return;
     }
 
-    // Segment brightness: Cloud only (no ptReal equivalent)
+    // Segment brightness: LAN ptReal first, Cloud fallback
     if (command.startsWith("segmentBrightness:")) {
+      const segIdx = parseInt(command.split(":")[1], 10);
+      if (isNaN(segIdx) || segIdx < 0) {
+        return;
+      }
+      if (device.lanIp && this.lanClient) {
+        this.lanClient.setSegmentBrightness(device.lanIp, value as number, [
+          segIdx,
+        ]);
+        return;
+      }
       if (device.channels.cloud && this.cloudClient) {
         await this.sendCloudCommand(device, command, value);
         return;
@@ -540,18 +582,50 @@ export class CommandRouter {
             device.sceneLibrary.find((s) => s.name === scene.name) ??
             device.sceneLibrary.find((s) => s.name === baseName);
           if (libEntry) {
+            let param = libEntry.scenceParam ?? "";
+            if (
+              device.sceneSpeed !== undefined &&
+              device.sceneSpeed > 0 &&
+              libEntry.speedInfo?.supSpeed &&
+              libEntry.speedInfo.config
+            ) {
+              param = applySceneSpeed(
+                param,
+                device.sceneSpeed,
+                libEntry.speedInfo.config,
+              );
+            }
             this.log.debug(
               `ptReal: ${scene.name} → code=${libEntry.sceneCode}`,
             );
-            this.lanClient.setScene(
-              device.lanIp,
-              libEntry.sceneCode,
-              libEntry.scenceParam ?? "",
-            );
+            this.lanClient.setScene(device.lanIp, libEntry.sceneCode, param);
             return;
           }
         }
         // Scene not in library — fall through to Cloud
+        this.sendCloudCommand(device, command, value).catch(() => {});
+        break;
+      }
+      case "snapshot": {
+        const idx = parseInt(String(value), 10);
+        if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
+          this.log.warn(
+            `${device.sku}: invalid snapshot index ${String(value)}`,
+          );
+          return;
+        }
+        const cmdGroups = device.snapshotBleCmds?.[idx - 1];
+        if (cmdGroups && cmdGroups.length > 0) {
+          const allPackets = cmdGroups.flat();
+          if (allPackets.length > 0) {
+            this.log.debug(
+              `ptReal Snapshot: ${device.snapshots[idx - 1].name} → ${allPackets.length} packets`,
+            );
+            this.lanClient.sendPtReal(device.lanIp, allPackets);
+            return;
+          }
+        }
+        // No BLE data — fall through to Cloud
         this.sendCloudCommand(device, command, value).catch(() => {});
         break;
       }

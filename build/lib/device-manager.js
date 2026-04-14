@@ -155,6 +155,7 @@ class DeviceManager {
         existing.musicLibrary = entry.musicLibrary;
         existing.diyLibrary = entry.diyLibrary;
         existing.skuFeatures = entry.skuFeatures;
+        existing.snapshotBleCmds = entry.snapshotBleCmds;
         existing.channels.cloud = entry.capabilities.length > 0;
         changed = true;
       } else {
@@ -378,6 +379,26 @@ class DeviceManager {
       } catch (e) {
         this.log.debug(
           `Could not load SKU features for ${sku}: ${e instanceof Error ? e.message : String(e)}`
+        );
+      }
+    }
+    if (!device.snapshotBleCmds && device.snapshots.length > 0) {
+      try {
+        const snaps = await this.apiClient.fetchSnapshots(sku, device.deviceId);
+        if (snaps.length > 0) {
+          device.snapshotBleCmds = device.snapshots.map((ds) => {
+            var _a;
+            const match = snaps.find((s) => s.name === ds.name);
+            return (_a = match == null ? void 0 : match.bleCmds) != null ? _a : [];
+          });
+          changed = true;
+          this.log.debug(
+            `Snapshot BLE for ${sku}: ${snaps.length} snapshots with local data`
+          );
+        }
+      } catch (e) {
+        this.log.debug(
+          `Could not load snapshot BLE for ${sku}: ${e instanceof Error ? e.message : String(e)}`
         );
       }
     }
@@ -750,6 +771,7 @@ class DeviceManager {
       musicLibrary: cached.musicLibrary,
       diyLibrary: cached.diyLibrary,
       skuFeatures: cached.skuFeatures,
+      snapshotBleCmds: cached.snapshotBleCmds,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false }
     };
@@ -773,6 +795,7 @@ class DeviceManager {
       musicLibrary: device.musicLibrary,
       diyLibrary: device.diyLibrary,
       skuFeatures: device.skuFeatures,
+      snapshotBleCmds: device.snapshotBleCmds,
       cachedAt: Date.now()
     };
   }

@@ -1,5 +1,26 @@
 # Older Changes
 
+## 1.1.1 (2026-04-12)
+- **BREAKING:** Move diagnostics states from `snapshots/` to `info/` channel (where device information belongs)
+- Fix community quirks loading from persistent data directory instead of adapter directory (survives updates)
+- Document diagnostics export and community quirks in README
+- Remove redundant CI checkout, add `no-floating-promises` lint rule, remove unused devDependencies, fix duplicate news entry
+
+## 1.1.0 (2026-04-11)
+- Add diagnostics export per device — structured JSON for GitHub issue submission
+- Add community quirks database — external JSON (`community-quirks.json`) for user-contributed SKU overrides
+- Fix array bounds checks in scene/DIY/snapshot index lookups (prevents crash on invalid indices)
+- Fix segment batch parsing edge cases (negative indices, empty device list growth)
+- Major internal refactoring: 8 focused refactorings for improved maintainability
+  - Extract `CommandRouter` from DeviceManager (device-manager.ts: 1,459 → 886 lines)
+  - Extract `GoveeApiClient` from MQTT client (govee-mqtt-client.ts: 785 → 483 lines)
+  - Extract `buildDeviceStateDefs` to capability-mapper (main.ts: 1,077 → 921 lines)
+  - Shared HTTP client replacing 3 duplicate implementations
+  - Shared color utilities (`rgbToHex`, `hexToRgb`, `rgbIntToHex`)
+  - Channel field on `StateDefinition` replacing fragile Set-based routing
+  - Consolidated rate-limiter pattern and split `loadFromCloud` into sub-methods
+- Test coverage increased to 309 tests (was 291)
+
 ## 1.0.1 (2026-04-11)
 - Fix segment capability matching: color and brightness commands now route to correct API capabilities
 - Fix segment count using maximum across all segment capabilities instead of first found

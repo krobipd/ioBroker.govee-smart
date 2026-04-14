@@ -47,7 +47,7 @@ class GoveeApiClient {
    * @param sku Product model (e.g. "H61BE")
    */
   async fetchSceneLibrary(sku) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
     const resp = await (0, import_http_client.httpsRequest)({
       method: "GET",
@@ -60,18 +60,30 @@ class GoveeApiClient {
         if (!s.sceneName) {
           continue;
         }
-        const effect = (_d = s.lightEffects) == null ? void 0 : _d[0];
-        const code = (_f = (_e = effect == null ? void 0 : effect.sceneCode) != null ? _e : s.sceneCode) != null ? _f : 0;
-        if (code > 0) {
-          const si = effect == null ? void 0 : effect.speedInfo;
+        const effects = (_d = s.lightEffects) != null ? _d : [];
+        if (effects.length === 0) {
+          const code = (_e = s.sceneCode) != null ? _e : 0;
+          if (code > 0) {
+            scenes.push({ name: s.sceneName, sceneCode: code });
+          }
+          continue;
+        }
+        const multiVariant = effects.length > 1;
+        for (const effect of effects) {
+          const code = (_g = (_f = effect.sceneCode) != null ? _f : s.sceneCode) != null ? _g : 0;
+          if (code <= 0) {
+            continue;
+          }
+          const name = multiVariant && effect.scenceName ? `${s.sceneName}-${effect.scenceName}` : s.sceneName;
+          const si = effect.speedInfo;
           scenes.push({
-            name: s.sceneName,
+            name,
             sceneCode: code,
-            scenceParam: (effect == null ? void 0 : effect.scenceParam) || void 0,
+            scenceParam: effect.scenceParam || void 0,
             speedInfo: (si == null ? void 0 : si.supSpeed) ? {
               supSpeed: true,
-              speedIndex: (_g = si.speedIndex) != null ? _g : 0,
-              config: (_h = si.config) != null ? _h : ""
+              speedIndex: (_h = si.speedIndex) != null ? _h : 0,
+              config: (_i = si.config) != null ? _i : ""
             } : void 0
           });
         }
@@ -170,6 +182,44 @@ class GoveeApiClient {
     const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
     const resp = await (0, import_http_client.httpsRequest)({ method: "GET", url, headers: this.authHeaders() });
     return (_a = resp.data) != null ? _a : null;
+  }
+  /**
+   * Fetch snapshot BLE commands for local activation via ptReal.
+   * Each snapshot contains one or more cmds with Base64 BLE packets.
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier (colon-separated)
+   */
+  async fetchSnapshots(sku, deviceId) {
+    var _a, _b, _c;
+    if (!this.bearerToken) {
+      return [];
+    }
+    const url = `https://app2.govee.com/bff-app/v1/devices/snapshots?sku=${encodeURIComponent(sku)}&device=${encodeURIComponent(deviceId)}&snapshotId=-1`;
+    const resp = await (0, import_http_client.httpsRequest)({ method: "GET", url, headers: this.authHeaders() });
+    const results = [];
+    for (const snap of (_b = (_a = resp.data) == null ? void 0 : _a.snapshots) != null ? _b : []) {
+      if (!snap.name) {
+        continue;
+      }
+      const allCmdPackets = [];
+      for (const cmd of (_c = snap.cmds) != null ? _c : []) {
+        if (!cmd.bleCmds) {
+          continue;
+        }
+        try {
+          const parsed = JSON.parse(cmd.bleCmds);
+          if (parsed.bleCmd) {
+            allCmdPackets.push(parsed.bleCmd.split(","));
+          }
+        } catch {
+        }
+      }
+      if (allCmdPackets.length > 0) {
+        results.push({ name: snap.name, bleCmds: allCmdPackets });
+      }
+    }
+    return results;
   }
   /**
    * Fetch group membership from undocumented exec-plat/home endpoint.

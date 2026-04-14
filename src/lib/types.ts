@@ -286,9 +286,12 @@ export interface GoveeDevice {
   groupMembers?: { sku: string; deviceId: string }[];
   /** Last known state */
   state: DeviceState;
-  /** Which channels are available */
   /** Number of LED segments (from capability) */
   segmentCount?: number;
+  /** BLE packets per cloud snapshot for ptReal activation [snapshotIdx][cmdIdx][packetBase64] */
+  snapshotBleCmds?: string[][][];
+  /** Current speed level for scene playback (0-based, applied on next scene activation) */
+  sceneSpeed?: number;
   /** Which channels are available */
   channels: {
     /** LAN UDP reachable */

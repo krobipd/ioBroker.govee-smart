@@ -169,6 +169,77 @@ describe("LocalSnapshotStore", () => {
         expect(result).to.deep.equal([]);
     });
 
+    it("should save and retrieve snapshot with segment data", () => {
+        const snap: LocalSnapshot = {
+            name: "Segments",
+            power: true,
+            brightness: 80,
+            colorRgb: "#ff6600",
+            colorTemperature: 0,
+            segments: [
+                { color: "#ff0000", brightness: 100 },
+                { color: "#00ff00", brightness: 50 },
+                { color: "#0000ff", brightness: 75 },
+            ],
+            savedAt: 3000,
+        };
+
+        store.saveSnapshot("H6160", "AABBCCDDEEFF0011", snap);
+        const result = store.getSnapshots("H6160", "AABBCCDDEEFF0011");
+        expect(result).to.have.lengthOf(1);
+        expect(result[0].segments).to.have.lengthOf(3);
+        expect(result[0].segments![0]).to.deep.equal({ color: "#ff0000", brightness: 100 });
+        expect(result[0].segments![1]).to.deep.equal({ color: "#00ff00", brightness: 50 });
+        expect(result[0].segments![2]).to.deep.equal({ color: "#0000ff", brightness: 75 });
+    });
+
+    it("should handle snapshot without segments (backwards compatible)", () => {
+        const snap: LocalSnapshot = {
+            name: "NoSegments",
+            power: true,
+            brightness: 50,
+            colorRgb: "#ffffff",
+            colorTemperature: 4000,
+            savedAt: 4000,
+        };
+
+        store.saveSnapshot("H6160", "AABBCCDDEEFF0011", snap);
+        const result = store.getSnapshots("H6160", "AABBCCDDEEFF0011");
+        expect(result[0].segments).to.be.undefined;
+    });
+
+    it("should overwrite segment data when updating snapshot", () => {
+        const snap1: LocalSnapshot = {
+            name: "SegUpdate",
+            power: true,
+            brightness: 80,
+            colorRgb: "#ff0000",
+            colorTemperature: 0,
+            segments: [{ color: "#ff0000", brightness: 100 }],
+            savedAt: 1000,
+        };
+        const snap2: LocalSnapshot = {
+            name: "SegUpdate",
+            power: true,
+            brightness: 80,
+            colorRgb: "#00ff00",
+            colorTemperature: 0,
+            segments: [
+                { color: "#00ff00", brightness: 50 },
+                { color: "#0000ff", brightness: 25 },
+            ],
+            savedAt: 2000,
+        };
+
+        store.saveSnapshot("H6160", "AABBCCDDEEFF0011", snap1);
+        store.saveSnapshot("H6160", "AABBCCDDEEFF0011", snap2);
+
+        const result = store.getSnapshots("H6160", "AABBCCDDEEFF0011");
+        expect(result).to.have.lengthOf(1);
+        expect(result[0].segments).to.have.lengthOf(2);
+        expect(result[0].segments![0].color).to.equal("#00ff00");
+    });
+
     it("should preserve color temperature in snapshot", () => {
         const snap: LocalSnapshot = {
             name: "Warm",

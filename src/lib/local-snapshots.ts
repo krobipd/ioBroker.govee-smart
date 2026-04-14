@@ -1,6 +1,14 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+/** Per-segment state in a local snapshot */
+export interface SnapshotSegment {
+  /** Color as "#RRGGBB" */
+  color: string;
+  /** Brightness 0-100 */
+  brightness: number;
+}
+
 /** A single locally saved device state snapshot */
 export interface LocalSnapshot {
   /** User-given name */
@@ -13,6 +21,8 @@ export interface LocalSnapshot {
   colorRgb: string;
   /** Color temperature in Kelvin (0 = RGB mode) */
   colorTemperature: number;
+  /** Per-segment color+brightness (index = segment number) */
+  segments?: SnapshotSegment[];
   /** Timestamp when saved */
   savedAt: number;
 }

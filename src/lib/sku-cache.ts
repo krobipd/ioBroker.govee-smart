@@ -46,6 +46,8 @@ export interface CachedDeviceData {
   }>;
   /** SKU feature flags from undocumented API */
   skuFeatures: Record<string, unknown> | null;
+  /** BLE packets per cloud snapshot for ptReal [snapshotIdx][cmdIdx][packetBase64] */
+  snapshotBleCmds?: string[][][];
   /** Timestamp when data was cached */
   cachedAt: number;
 }

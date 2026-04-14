@@ -655,6 +655,40 @@ export function buildDeviceStateDefs(
     });
   }
 
+  // Scene speed slider — only if any scene supports speed adjustment
+  const maxSpeedLevel = device.sceneLibrary.reduce((max, entry) => {
+    if (entry.speedInfo?.supSpeed && entry.speedInfo.config) {
+      try {
+        const configs = JSON.parse(entry.speedInfo.config) as Array<{
+          moveIn?: number[];
+        }>;
+        for (const cfg of configs) {
+          if (cfg.moveIn && cfg.moveIn.length - 1 > max) {
+            max = cfg.moveIn.length - 1;
+          }
+        }
+      } catch {
+        /* ignore invalid config JSON */
+      }
+    }
+    return max;
+  }, -1);
+  if (maxSpeedLevel > 0) {
+    stateDefs.push({
+      id: "scene_speed",
+      name: "Scene Speed",
+      type: "number",
+      role: "level",
+      write: true,
+      min: 0,
+      max: maxSpeedLevel,
+      def: 0,
+      capabilityType: "local",
+      capabilityInstance: "sceneSpeed",
+      channel: "scenes",
+    });
+  }
+
   if (device.diyScenes.length > 0) {
     const states: Record<string, string> = { 0: "---" };
     device.diyScenes.forEach((s, i) => {
