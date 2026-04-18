@@ -13,5 +13,15 @@
     "donateKofi": "Support on Ko-fi",
     "donatePaypal": "Donate via PayPal",
     "networkInterfaceLabel": "Network Interface",
-    "networkInterfaceTooltip": "Select the network interface for LAN device discovery. Leave empty to use all interfaces (recommended for most setups)."
+    "networkInterfaceTooltip": "Select the network interface for LAN device discovery. Leave empty to use all interfaces (recommended for most setups).",
+    "tabMain": "Main Configuration",
+    "tabWizard": "Segment Detection",
+    "wizardHeader": "Segment Detection Wizard",
+    "wizardInfo": "For LED strips that have been cut shorter than their factory length, use this wizard to identify which segments are physically present. Select the strip, click Start, then answer Yes/No for each segment that lights up.",
+    "wizardDeviceLabel": "LED Strip",
+    "wizardBtnStart": "Start",
+    "wizardBtnYes": "✓ Yes, visible",
+    "wizardBtnNo": "✗ No, nothing",
+    "wizardBtnAbort": "Abort",
+    "wizardHelp": "After each Start or answer, the selected segment flashes bright white while all others stay dark. Only one wizard can run at a time. The session auto-aborts after 5 minutes of inactivity. The result is stored in segments.manual_mode and segments.manual_list and can be edited manually (e.g. '0-9' for the first 10 of 15 segments, or '0-8,10-14' to skip segment 9)."
 }

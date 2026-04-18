@@ -21,9 +21,11 @@ import { SkuCache } from "./lib/sku-cache.js";
 import { StateManager } from "./lib/state-manager.js";
 import {
   hexToRgb,
+  parseSegmentList,
   rgbIntToHex,
   rgbToHex,
   type AdapterConfig,
+  type CloudLoadResult,
   type DeviceState,
   type GoveeDevice,
 } from "./lib/types.js";
@@ -32,6 +34,31 @@ import {
 const FULL_LIMITS = { perMinute: 8, perDay: 9000 };
 const SHARED_LIMITS = { perMinute: 4, perDay: 4500 };
 const SIBLING_ALIVE_ID = "system.adapter.govee-appliances.0.alive";
+
+/** Session state for the interactive segment-detection wizard */
+interface SegmentWizardSession {
+  /** Target device key (sku_shortid) */
+  deviceKey: string;
+  /** Device SKU for display */
+  sku: string;
+  /** Display name */
+  name: string;
+  /** Current segment index being tested */
+  current: number;
+  /** Total number of segments to test (from device.segmentCount) */
+  total: number;
+  /** Indices confirmed visible by user */
+  visible: number[];
+  /** Timestamp of session start (for idle-timeout) */
+  startedAt: number;
+  /** Baseline snapshot for restore on abort/finish */
+  baseline: {
+    power?: boolean;
+    brightness?: number;
+    colorRgb?: string;
+    segmentColors: { idx: number; color: string; brightness: number }[];
+  };
+}
 
 class GoveeAdapter extends utils.Adapter {
   private deviceManager: DeviceManager | null = null;
@@ -52,12 +79,16 @@ class GoveeAdapter extends utils.Adapter {
   private lanScanTimer: ioBroker.Timeout | undefined;
   private cleanupTimer: ioBroker.Timeout | undefined;
   private readyTimer: ioBroker.Timeout | undefined;
+  private cloudRetryTimer: ioBroker.Timeout | undefined;
+  private wizardSession: SegmentWizardSession | null = null;
+  private wizardTimeoutTimer: ioBroker.Timeout | undefined;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "govee-smart" });
     this.on("ready", () => this.onReady());
     this.on("stateChange", (id, state) => this.onStateChange(id, state));
+    this.on("message", (obj) => this.onMessage(obj));
     this.on("unload", (callback) => this.onUnload(callback));
   }
 
@@ -261,17 +292,20 @@ class GoveeAdapter extends utils.Adapter {
       await this.detectSiblingAdapter();
 
       if (!cachedOk) {
-        // No cache — first start, fetch from Cloud once
-        const cloudOk = await this.deviceManager.loadFromCloud();
-        this.cloudWasConnected = cloudOk;
+        // No cache — first start, fetch from Cloud with 60s hard-timeout.
+        // If Cloud hangs/fails, we don't want to block adapter startup indefinitely.
+        const result = await this.cloudInitWithTimeout();
+        this.cloudWasConnected = result.ok;
         this.setStateAsync("info.cloudConnected", {
-          val: cloudOk,
+          val: result.ok,
           ack: true,
         }).catch(() => {});
-        this.stateManager?.updateGroupsOnline(cloudOk).catch(() => {});
+        this.stateManager?.updateGroupsOnline(result.ok).catch(() => {});
 
-        if (cloudOk) {
+        if (result.ok) {
           await this.loadCloudStates();
+        } else {
+          this.handleCloudFailure(result);
         }
       } else {
         this.log.info("Using cached device data — no Cloud calls needed");
@@ -310,13 +344,101 @@ class GoveeAdapter extends utils.Adapter {
 
     // Check if all channels are ready — may already be true if MQTT connected fast
     this.checkAllReady();
-    // Safety timeout: log ready even if a channel takes too long
+    // Safety timeout: log ready even if a channel takes too long.
+    // 60s deckt normalen MQTT-Connect + 1 Reconnect-Attempt ab.
     this.readyTimer = this.setTimeout(() => {
       if (!this.readyLogged) {
         this.readyLogged = true;
         this.logDeviceSummary();
       }
-    }, 30_000);
+    }, 60_000);
+  }
+
+  /**
+   * Initial Cloud-Load mit 60-Sekunden-Hardtimeout.
+   * Blockiert nicht länger — wenn Cloud hängt, geht Adapter mit LAN+MQTT weiter,
+   * und der Retry-Loop probiert's passend zum Fehlergrund erneut.
+   */
+  private async cloudInitWithTimeout(): Promise<CloudLoadResult> {
+    if (!this.deviceManager) {
+      return { ok: false, reason: "transient" };
+    }
+    const loadPromise = this.deviceManager.loadFromCloud();
+    const timeoutPromise = new Promise<CloudLoadResult>((resolve) => {
+      this.setTimeout(
+        () => resolve({ ok: false, reason: "transient" }),
+        60_000,
+      );
+    });
+    try {
+      return await Promise.race([loadPromise, timeoutPromise]);
+    } catch {
+      return { ok: false, reason: "transient" };
+    }
+  }
+
+  /**
+   * React to a failed Cloud load — schedule retry or stop depending on reason.
+   *
+   * @param result CloudLoadResult from initial load or retry attempt
+   */
+  private handleCloudFailure(result: CloudLoadResult): void {
+    if (result.ok) {
+      return;
+    }
+    switch (result.reason) {
+      case "auth-failed":
+        this.log.warn(
+          `Govee Cloud: authentication failed — check API-Key in adapter settings. Not retrying automatically.`,
+        );
+        // Kein Retry bei Auth-Fail — User muss Config korrigieren
+        return;
+      case "rate-limited":
+        this.log.warn(
+          `Govee Cloud: rate-limited — pausing for ${Math.round(result.retryAfterMs / 1000)}s before retry`,
+        );
+        this.scheduleCloudRetry(result.retryAfterMs);
+        return;
+      case "transient":
+      default:
+        // Netzwerk/Timeout — moderater Retry nach 5 Min
+        this.scheduleCloudRetry(5 * 60_000);
+        return;
+    }
+  }
+
+  /**
+   * Background-Retry für Cloud mit expliziter Delay (aus Rate-Limit oder Standard).
+   * Erneuter Versuch; bei Erfolg "restored"-Log + loadCloudStates.
+   *
+   * @param delayMs Wartezeit bis zum nächsten Retry in Millisekunden
+   */
+  private scheduleCloudRetry(delayMs: number): void {
+    if (this.cloudRetryTimer) {
+      return; // already scheduled
+    }
+    this.cloudRetryTimer = this.setTimeout(() => {
+      this.cloudRetryTimer = undefined;
+      void this.retryCloudOnce();
+    }, delayMs);
+  }
+
+  private async retryCloudOnce(): Promise<void> {
+    if (!this.deviceManager || this.cloudWasConnected) {
+      return; // meanwhile restored elsewhere
+    }
+    const result = await this.cloudInitWithTimeout();
+    if (result.ok) {
+      this.cloudWasConnected = true;
+      this.log.info("Govee Cloud connection restored");
+      this.setStateAsync("info.cloudConnected", { val: true, ack: true }).catch(
+        () => {},
+      );
+      this.stateManager?.updateGroupsOnline(true).catch(() => {});
+      await this.loadCloudStates();
+    } else {
+      this.handleCloudFailure(result);
+    }
   }
 
   /**
@@ -334,6 +456,12 @@ class GoveeAdapter extends utils.Adapter {
       }
       if (this.readyTimer) {
         this.clearTimeout(this.readyTimer);
+      }
+      if (this.cloudRetryTimer) {
+        this.clearTimeout(this.cloudRetryTimer);
+      }
+      if (this.wizardTimeoutTimer) {
+        this.clearTimeout(this.wizardTimeoutTimer);
       }
       this.lanClient?.stop();
       this.mqttClient?.disconnect();
@@ -421,6 +549,16 @@ class GoveeAdapter extends utils.Adapter {
     ) {
       this.handleSnapshotDelete(device, state.val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
+      return;
+    }
+
+    // Manual segments toggle/list — reconfigure segment tree on change
+    if (
+      stateSuffix === "segments.manual_mode" ||
+      stateSuffix === "segments.manual_list"
+    ) {
+      await this.handleManualSegmentsChange(device, stateSuffix, state.val);
+      await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
 
@@ -953,9 +1091,23 @@ class GoveeAdapter extends utils.Adapter {
       channels.push("MQTT");
     }
 
+    // If a channel is configured but not connected, note it honestly —
+    // background reconnect will continue and log "restored" on success.
+    const pending: string[] = [];
+    if (this.cloudClient && !this.cloudWasConnected) {
+      pending.push("Cloud");
+    }
+    if (this.mqttClient && !this.mqttClient.connected) {
+      pending.push("MQTT");
+    }
+    const pendingNote =
+      pending.length > 0
+        ? `, ${pending.join("+")} noch im Aufbau — wird im Hintergrund fortgesetzt`
+        : "";
+
     if (devices.length === 0 && groups.length === 0) {
       this.log.info(
-        `Govee adapter ready — no devices found (channels: ${channels.join("+")})`,
+        `Govee adapter ready — no devices found (channels: ${channels.join("+")}${pendingNote})`,
       );
       return;
     }
@@ -969,7 +1121,7 @@ class GoveeAdapter extends utils.Adapter {
       parts.push(`${groups.length} group${groups.length > 1 ? "s" : ""}`);
     }
     this.log.info(
-      `Govee adapter ready — ${parts.join(", ")} (channels: ${channels.join("+")})`,
+      `Govee adapter ready — ${parts.join(", ")} (channels: ${channels.join("+")}${pendingNote})`,
     );
   }
 
@@ -1113,6 +1265,433 @@ class GoveeAdapter extends utils.Adapter {
       return "segmentBatch";
     }
     return null;
+  }
+
+  /**
+   * React to manual-segments state changes — parses list, updates device runtime,
+   * rebuilds segment tree. Reverts manual_mode on parse error.
+   *
+   * @param device Target device
+   * @param suffix State suffix (either "segments.manual_mode" or "segments.manual_list")
+   * @param newValue Written value
+   */
+  private async handleManualSegmentsChange(
+    device: GoveeDevice,
+    suffix: string,
+    newValue: unknown,
+  ): Promise<void> {
+    if (!this.stateManager) {
+      return;
+    }
+    const prefix = this.stateManager.devicePrefix(device);
+    const ns = this.namespace;
+
+    // Read both states (the one not being written we get from current state)
+    const modeVal =
+      suffix === "segments.manual_mode"
+        ? Boolean(newValue)
+        : Boolean(
+            (await this.getStateAsync(`${ns}.${prefix}.segments.manual_mode`))
+              ?.val,
+          );
+    const listVal =
+      suffix === "segments.manual_list"
+        ? typeof newValue === "string"
+          ? newValue
+          : ""
+        : String(
+            (await this.getStateAsync(`${ns}.${prefix}.segments.manual_list`))
+              ?.val ?? "",
+          );
+
+    if (!modeVal) {
+      // Manual mode off → back to Cloud defaults
+      device.manualMode = false;
+      device.manualSegments = undefined;
+      this.log.info(
+        `${device.name}: manual segments disabled — using Cloud defaults`,
+      );
+      await this.stateManager.createSegmentStates(device);
+      return;
+    }
+
+    // Manual mode on: parse list, validate against device.segmentCount
+    const maxIdx = Math.max(0, (device.segmentCount ?? 0) - 1);
+    const parsed = parseSegmentList(listVal, maxIdx);
+    if (parsed.error) {
+      this.log.warn(
+        `${device.name}: manual_list invalid (${parsed.error}) — disabling manual mode`,
+      );
+      // Revert toggle in state and runtime
+      device.manualMode = false;
+      device.manualSegments = undefined;
+      await this.setStateAsync(`${ns}.${prefix}.segments.manual_mode`, {
+        val: false,
+        ack: true,
+      });
+      return;
+    }
+
+    device.manualMode = true;
+    device.manualSegments = parsed.indices;
+    this.log.info(
+      `${device.name}: manual segments active — ${parsed.indices.length} physical segments (${listVal})`,
+    );
+    await this.stateManager.createSegmentStates(device);
+  }
+
+  // ───────── Segment-Detection-Wizard ─────────
+
+  /**
+   * Handle incoming sendTo messages (from jsonConfig).
+   *
+   * @param obj ioBroker message object
+   */
+  private onMessage(obj: ioBroker.Message): void {
+    if (!obj?.command) {
+      return;
+    }
+    void this.handleMessage(obj);
+  }
+
+  private async handleMessage(obj: ioBroker.Message): Promise<void> {
+    try {
+      if (obj.command === "getSegmentDevices") {
+        const devices = this.deviceManager?.getDevices() ?? [];
+        const list = devices
+          .filter(
+            (d) =>
+              d.sku !== "BaseGroup" &&
+              typeof d.segmentCount === "number" &&
+              d.segmentCount > 0,
+          )
+          .map((d) => ({
+            value: this.deviceKeyFor(d),
+            label: `${d.name} (${d.sku}, ${d.segmentCount} segs)`,
+          }));
+        this.sendMessageResponse(obj, { list });
+        return;
+      }
+      if (obj.command === "segmentWizard") {
+        const payload = (obj.message ?? {}) as {
+          action?: string;
+          device?: string;
+        };
+        const response = await this.runWizardStep(
+          payload.action ?? "",
+          payload.device ?? "",
+        );
+        this.sendMessageResponse(obj, response);
+        return;
+      }
+    } catch (e) {
+      this.log.warn(
+        `onMessage failed for ${obj.command}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      this.sendMessageResponse(obj, {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  private sendMessageResponse(
+    obj: ioBroker.Message,
+    data: Record<string, unknown>,
+  ): void {
+    if (obj.callback && obj.from) {
+      this.sendTo(obj.from, obj.command, data, obj.callback);
+    }
+  }
+
+  /**
+   * Stable device key for wizard session tracking.
+   *
+   * @param device Target device
+   */
+  private deviceKeyFor(device: GoveeDevice): string {
+    return `${device.sku}:${device.deviceId}`;
+  }
+
+  private findDeviceByKey(key: string): GoveeDevice | undefined {
+    const devices = this.deviceManager?.getDevices() ?? [];
+    return devices.find((d) => this.deviceKeyFor(d) === key);
+  }
+
+  /**
+   * Execute one wizard step (start/yes/no/abort).
+   *
+   * @param action "start" | "yes" | "no" | "abort"
+   * @param deviceKey device identifier (only required for "start")
+   */
+  private async runWizardStep(
+    action: string,
+    deviceKey: string,
+  ): Promise<Record<string, unknown>> {
+    if (action === "start") {
+      return this.wizardStart(deviceKey);
+    }
+    if (!this.wizardSession) {
+      return {
+        error: "Kein Wizard aktiv. Bitte zuerst 'Start' klicken.",
+      };
+    }
+    if (action === "abort") {
+      return this.wizardAbort();
+    }
+    if (action === "yes" || action === "no") {
+      return this.wizardAnswer(action === "yes");
+    }
+    return { error: `Unbekannte Aktion: ${action}` };
+  }
+
+  private async wizardStart(
+    deviceKey: string,
+  ): Promise<Record<string, unknown>> {
+    if (this.wizardSession) {
+      return {
+        error: `Wizard bereits aktiv für ${this.wizardSession.name}. Bitte zuerst abbrechen.`,
+      };
+    }
+    const device = this.findDeviceByKey(deviceKey);
+    if (!device) {
+      return { error: `Gerät nicht gefunden: ${deviceKey}` };
+    }
+    const total = device.segmentCount ?? 0;
+    if (total <= 0) {
+      return { error: `${device.name} hat keine Segmente (segmentCount=0)` };
+    }
+
+    // Capture baseline
+    const baseline = await this.captureWizardBaseline(device);
+
+    this.wizardSession = {
+      deviceKey,
+      sku: device.sku,
+      name: device.name,
+      current: 0,
+      total,
+      visible: [],
+      startedAt: Date.now(),
+      baseline,
+    };
+    this.scheduleWizardTimeout();
+
+    // Step 1: all segments black, first segment bright white
+    await this.setAllSegmentsBlack(device);
+    await this.flashSegment(device, 0);
+
+    return {
+      status: `Segment 0 von ${total} leuchtet weiß. Siehst du Licht auf dem Strip?`,
+      progress: `1 / ${total}`,
+      active: true,
+    };
+  }
+
+  private async wizardAnswer(
+    wasVisible: boolean,
+  ): Promise<Record<string, unknown>> {
+    if (!this.wizardSession) {
+      return { error: "Kein Wizard aktiv" };
+    }
+    const session = this.wizardSession;
+    if (wasVisible) {
+      session.visible.push(session.current);
+    }
+    session.current += 1;
+    this.scheduleWizardTimeout();
+
+    if (session.current >= session.total) {
+      return this.wizardFinish();
+    }
+
+    const device = this.findDeviceByKey(session.deviceKey);
+    if (!device) {
+      this.wizardSession = null;
+      return { error: "Gerät während des Wizards verschwunden" };
+    }
+    await this.flashSegment(device, session.current);
+    return {
+      status: `Segment ${session.current} von ${session.total} leuchtet weiß. Siehst du Licht?`,
+      progress: `${session.current + 1} / ${session.total}`,
+      active: true,
+    };
+  }
+
+  private async wizardFinish(): Promise<Record<string, unknown>> {
+    const session = this.wizardSession;
+    if (!session) {
+      return { error: "Kein Wizard aktiv" };
+    }
+    const device = this.findDeviceByKey(session.deviceKey);
+    if (!device || !this.stateManager) {
+      this.wizardSession = null;
+      return { error: "Gerät verschwunden" };
+    }
+    const listStr = session.visible.join(",");
+    const prefix = this.stateManager.devicePrefix(device);
+    const ns = this.namespace;
+
+    // Write manual_list first, then manual_mode=true — triggers reconfig via onStateChange
+    await this.setStateAsync(`${ns}.${prefix}.segments.manual_list`, {
+      val: listStr,
+      ack: false,
+    });
+    await this.setStateAsync(`${ns}.${prefix}.segments.manual_mode`, {
+      val: true,
+      ack: false,
+    });
+
+    // Restore baseline after reconfig (async, don't block)
+    await this.restoreWizardBaseline(device, session.baseline);
+
+    const found = session.visible.length;
+    this.log.info(
+      `Segment-Wizard für ${device.name}: ${found} von ${session.total} Segmenten sichtbar → manual_list="${listStr}"`,
+    );
+
+    this.wizardSession = null;
+    if (this.wizardTimeoutTimer) {
+      this.clearTimeout(this.wizardTimeoutTimer);
+      this.wizardTimeoutTimer = undefined;
+    }
+
+    return {
+      status: `Fertig: ${found} von ${session.total} Segmenten sichtbar. Liste "${listStr}" gespeichert, manual_mode aktiv.`,
+      progress: `${session.total} / ${session.total}`,
+      done: true,
+      result: found,
+      list: listStr,
+    };
+  }
+
+  private async wizardAbort(): Promise<Record<string, unknown>> {
+    const session = this.wizardSession;
+    if (!session) {
+      return { error: "Kein Wizard aktiv" };
+    }
+    const device = this.findDeviceByKey(session.deviceKey);
+    if (device) {
+      await this.restoreWizardBaseline(device, session.baseline);
+    }
+    this.wizardSession = null;
+    if (this.wizardTimeoutTimer) {
+      this.clearTimeout(this.wizardTimeoutTimer);
+      this.wizardTimeoutTimer = undefined;
+    }
+    return {
+      status: "Wizard abgebrochen, Strip auf Ausgangszustand zurückgesetzt.",
+      done: true,
+      aborted: true,
+    };
+  }
+
+  private scheduleWizardTimeout(): void {
+    if (this.wizardTimeoutTimer) {
+      this.clearTimeout(this.wizardTimeoutTimer);
+    }
+    this.wizardTimeoutTimer = this.setTimeout(() => {
+      if (this.wizardSession) {
+        this.log.warn(
+          `Segment-Wizard für ${this.wizardSession.name}: Idle-Timeout (5 Min), abgebrochen`,
+        );
+        void this.wizardAbort();
+      }
+    }, 5 * 60_000);
+  }
+
+  private async captureWizardBaseline(
+    device: GoveeDevice,
+  ): Promise<SegmentWizardSession["baseline"]> {
+    const prefix = this.stateManager?.devicePrefix(device) ?? "";
+    const ns = this.namespace;
+    const power = (await this.getStateAsync(`${ns}.${prefix}.control.power`))
+      ?.val;
+    const brightness = (
+      await this.getStateAsync(`${ns}.${prefix}.control.brightness`)
+    )?.val;
+    const colorRgb = (
+      await this.getStateAsync(`${ns}.${prefix}.control.colorRgb`)
+    )?.val;
+    const segmentColors: SegmentWizardSession["baseline"]["segmentColors"] = [];
+    const total = device.segmentCount ?? 0;
+    for (let i = 0; i < total; i++) {
+      const c = (
+        await this.getStateAsync(`${ns}.${prefix}.segments.${i}.color`)
+      )?.val;
+      const b = (
+        await this.getStateAsync(`${ns}.${prefix}.segments.${i}.brightness`)
+      )?.val;
+      segmentColors.push({
+        idx: i,
+        color: typeof c === "string" ? c : "#ffffff",
+        brightness: typeof b === "number" ? b : 100,
+      });
+    }
+    return {
+      power: typeof power === "boolean" ? power : undefined,
+      brightness: typeof brightness === "number" ? brightness : undefined,
+      colorRgb: typeof colorRgb === "string" ? colorRgb : undefined,
+      segmentColors,
+    };
+  }
+
+  /**
+   * Set all segments to solid black (prepares for wizard flash).
+   *
+   * @param device Target device
+   */
+  private async setAllSegmentsBlack(device: GoveeDevice): Promise<void> {
+    const total = device.segmentCount ?? 0;
+    if (total <= 0) {
+      return;
+    }
+    await this.deviceManager?.sendCommand(device, "segmentBatch", {
+      segments: Array.from({ length: total }, (_, i) => i),
+      color: 0, // #000000
+      brightness: 1, // lowest non-zero to stay in color-mode
+    });
+  }
+
+  /**
+   * Flash a single segment bright white for visual identification.
+   *
+   * @param device Target device
+   * @param idx Segment index to flash white (others go black)
+   */
+  private async flashSegment(device: GoveeDevice, idx: number): Promise<void> {
+    // First black everything else, then white the target
+    const total = device.segmentCount ?? 0;
+    const others = Array.from({ length: total }, (_, i) => i).filter(
+      (i) => i !== idx,
+    );
+    if (others.length > 0) {
+      await this.deviceManager?.sendCommand(device, "segmentBatch", {
+        segments: others,
+        color: 0,
+        brightness: 1,
+      });
+    }
+    await this.deviceManager?.sendCommand(device, "segmentBatch", {
+      segments: [idx],
+      color: 0xffffff,
+      brightness: 100,
+    });
+  }
+
+  private async restoreWizardBaseline(
+    device: GoveeDevice,
+    baseline: SegmentWizardSession["baseline"],
+  ): Promise<void> {
+    if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb)) {
+      const total = device.segmentCount ?? 0;
+      if (total > 0) {
+        await this.deviceManager?.sendCommand(device, "segmentBatch", {
+          segments: Array.from({ length: total }, (_, i) => i),
+          color: parseInt(baseline.colorRgb.slice(1), 16),
+          brightness: baseline.brightness ?? 100,
+        });
+      }
+    }
   }
 
   /**

@@ -334,6 +334,15 @@ export class StateManager {
     }
     device.segmentCount = segmentCount;
 
+    // Effective segment list — honor manual override if active (cut-strip support)
+    const validIndices =
+      device.manualMode &&
+      Array.isArray(device.manualSegments) &&
+      device.manualSegments.length > 0
+        ? device.manualSegments.slice().sort((a, b) => a - b)
+        : Array.from({ length: segmentCount }, (_, i) => i);
+    const reportedCount = validIndices.length;
+
     await this.ensureState(
       `${prefix}.segments.count`,
       "Segment Count",
@@ -342,11 +351,39 @@ export class StateManager {
       false,
     );
     await this.adapter.setStateAsync(`${prefix}.segments.count`, {
-      val: segmentCount,
+      val: reportedCount,
       ack: true,
     });
 
-    for (let i = 0; i < segmentCount; i++) {
+    // Manual-mode toggle and list — user-writable for cut-strip overrides
+    await this.adapter.extendObjectAsync(`${prefix}.segments.manual_mode`, {
+      type: "state",
+      common: {
+        name: "Manual Segments Active",
+        type: "boolean",
+        role: "switch",
+        read: true,
+        write: true,
+        def: false,
+        desc: "Enable manual segment list (e.g. for cut LED strips with fewer physical segments than reported)",
+      } as ioBroker.StateCommon,
+      native: {},
+    });
+    await this.adapter.extendObjectAsync(`${prefix}.segments.manual_list`, {
+      type: "state",
+      common: {
+        name: "Manual Segment List",
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+        def: "",
+        desc: 'Comma-separated indices + ranges, e.g. "0-9" or "0-8,10-14" (only used when manual_mode=true)',
+      } as ioBroker.StateCommon,
+      native: {},
+    });
+
+    for (const i of validIndices) {
       await this.adapter.extendObjectAsync(`${prefix}.segments.${i}`, {
         type: "channel",
         common: { name: `Segment ${i}` },
@@ -398,20 +435,22 @@ export class StateManager {
       native: {},
     });
 
-    // Remove excess segment channels from previous runs
-    await this.cleanupExcessSegments(prefix, segmentCount);
+    // Remove segment channels that aren't in the valid list (supports gaps for manual mode)
+    await this.cleanupExcessSegments(prefix, validIndices);
   }
 
   /**
-   * Remove segment sub-channels that exceed the current segment count.
+   * Remove segment sub-channels that are not in the valid-indices list.
+   * Supports gaps (e.g. manual list "0-8,10-14" → segment 9 channel gets removed).
    *
    * @param prefix Device prefix
-   * @param segmentCount Current segment count
+   * @param validIndices Valid segment indices (all others will be deleted)
    */
   private async cleanupExcessSegments(
     prefix: string,
-    segmentCount: number,
+    validIndices: number[],
   ): Promise<void> {
+    const valid = new Set(validIndices);
     const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
     const existing = await this.adapter.getObjectViewAsync(
       "system",
@@ -430,7 +469,7 @@ export class StateManager {
       const localId = row.id.replace(`${this.adapter.namespace}.`, "");
       const segPart = localId.replace(`${prefix}.segments.`, "");
       const segIdx = parseInt(segPart, 10);
-      if (!isNaN(segIdx) && segIdx >= segmentCount) {
+      if (!isNaN(segIdx) && !valid.has(segIdx)) {
         this.adapter.log.debug(`Removing excess segment: ${localId}`);
         await this.adapter.delObjectAsync(localId, { recursive: true });
       }

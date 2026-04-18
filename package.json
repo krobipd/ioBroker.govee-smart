@@ -1,7 +1,7 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "1.5.2",
-  "description": "Control Govee smart lights (LED strips, bulbs, panels) via LAN, MQTT and Cloud — lights only, no appliances",
+  "version": "1.6.0",
+  "description": "Control Govee smart lights (LED strips, bulbs, panels) via LAN, MQTT and Cloud \u2014 lights only, no appliances",
   "author": {
     "name": "krobi",
     "email": "krobi@power-dreams.com"

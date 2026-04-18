@@ -253,11 +253,13 @@ class CommandRouter {
     if (parts.length < 1 || !parts[0]) {
       return null;
     }
-    const segStr = parts[0].trim();
+    const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? new Set(device.manualSegments) : null;
     const segCount = (_a = device.segmentCount) != null ? _a : 0;
+    const isValid = (i) => validIndices ? validIndices.has(i) : i >= 0 && i < segCount;
+    const segStr = parts[0].trim();
     let segments;
     if (segStr === "all") {
-      segments = Array.from({ length: segCount }, (_, i) => i);
+      segments = validIndices ? Array.from(validIndices).sort((a, b) => a - b) : Array.from({ length: segCount }, (_, i) => i);
     } else {
       segments = [];
       for (const part of segStr.split(",")) {
@@ -265,12 +267,14 @@ class CommandRouter {
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10);
           const end = parseInt(rangeMatch[2], 10);
-          for (let i = start; i <= end && i < segCount; i++) {
-            segments.push(i);
+          for (let i = start; i <= end; i++) {
+            if (isValid(i)) {
+              segments.push(i);
+            }
           }
         } else {
           const idx = parseInt(part.trim(), 10);
-          if (!isNaN(idx) && idx >= 0 && idx < segCount) {
+          if (!isNaN(idx) && isValid(idx)) {
             segments.push(idx);
           }
         }

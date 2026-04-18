@@ -702,6 +702,44 @@ describe("DeviceManager", () => {
             const result = (dm as any).commandRouter.parseSegmentBatch(device, "0,3-5,10:#ffffff");
             expect(result.segments).to.deep.equal([0, 3, 4, 5, 10]);
         });
+
+        describe("manual segment override", () => {
+            it("should honor manualSegments for 'all'", () => {
+                device.manualMode = true;
+                device.manualSegments = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+                const result = (dm as any).commandRouter.parseSegmentBatch(device, "all:#ff0000");
+                expect(result).to.not.be.null;
+                expect(result.segments).to.deep.equal([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+            });
+
+            it("should honor non-contiguous manualSegments for 'all'", () => {
+                device.manualMode = true;
+                device.manualSegments = [0, 1, 2, 5, 6, 7]; // gap at 3,4
+                const result = (dm as any).commandRouter.parseSegmentBatch(device, "all:#00ff00");
+                expect(result.segments).to.deep.equal([0, 1, 2, 5, 6, 7]);
+            });
+
+            it("should filter out invalid indices when manual mode active", () => {
+                device.manualMode = true;
+                device.manualSegments = [0, 1, 2, 5, 6]; // user says 3,4,7..14 not physical
+                const result = (dm as any).commandRouter.parseSegmentBatch(device, "0-14:#0000ff");
+                expect(result.segments).to.deep.equal([0, 1, 2, 5, 6]);
+            });
+
+            it("should return null if no valid indices after filtering", () => {
+                device.manualMode = true;
+                device.manualSegments = [0, 1, 2];
+                const result = (dm as any).commandRouter.parseSegmentBatch(device, "10-14:#ff0000");
+                expect(result).to.be.null;
+            });
+
+            it("should fall back to segmentCount when manualMode=false", () => {
+                device.manualMode = false;
+                device.manualSegments = [0, 1, 2]; // list ignored when mode off
+                const result = (dm as any).commandRouter.parseSegmentBatch(device, "all:#ff0000");
+                expect(result.segments).to.have.lengthOf(15);
+            });
+        });
     });
 
     describe("findCapabilityForCommand", () => {

@@ -10,12 +10,14 @@ import {
   normalizeDeviceId,
   rgbToHex,
   type CloudDevice,
+  type CloudLoadResult,
   type DeviceState,
   type ErrorCategory,
   type GoveeDevice,
   type LanDevice,
   type MqttStatusUpdate,
 } from "./types.js";
+import { HttpError } from "./http-client.js";
 
 /** Appliance device types — filtered out (handled by govee-appliances adapter) */
 const APPLIANCE_TYPES = new Set([
@@ -95,6 +97,28 @@ export function parseMqttSegmentData(
   }
 
   return segments;
+}
+
+/**
+ * Effective physical segment indices for a device.
+ * Uses `device.manualSegments` when `device.manualMode=true` (cut strip override),
+ * falls back to `0..segmentCount-1` otherwise. Empty if device has no segments.
+ *
+ * @param device Target device
+ */
+export function getEffectiveSegmentIndices(device: GoveeDevice): number[] {
+  if (
+    device.manualMode &&
+    Array.isArray(device.manualSegments) &&
+    device.manualSegments.length > 0
+  ) {
+    return device.manualSegments.slice();
+  }
+  const count = device.segmentCount ?? 0;
+  if (count <= 0) {
+    return [];
+  }
+  return Array.from({ length: count }, (_, i) => i);
 }
 
 /**
@@ -216,6 +240,8 @@ export class DeviceManager {
         existing.diyLibrary = entry.diyLibrary;
         existing.skuFeatures = entry.skuFeatures;
         existing.snapshotBleCmds = entry.snapshotBleCmds;
+        existing.scenesChecked = entry.scenesChecked;
+        existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
         existing.channels.cloud = entry.capabilities.length > 0;
         changed = true;
       } else {
@@ -228,16 +254,14 @@ export class DeviceManager {
       this.log.info(`Loaded ${cached.length} device(s) from cache`);
     }
 
-    // Check if cache has incomplete scene data (e.g. from previous rate limit)
-    const incomplete = Array.from(this.devices.values()).some(
-      (d) =>
-        d.scenes.length === 0 &&
-        d.sceneLibrary.length > 0 &&
-        d.type === "devices.types.light",
+    // Refetch trigger: a light device where we never confirmed the scene situation.
+    // scenesChecked=true means we already asked Cloud (empty result is legitimate).
+    const needsRefetch = Array.from(this.devices.values()).some(
+      (d) => d.type === "devices.types.light" && !d.scenesChecked,
     );
-    if (incomplete) {
+    if (needsRefetch) {
       this.log.info(
-        "Cache has incomplete scene data — will re-fetch from Cloud",
+        "Cache has unchecked scene data — will confirm once via Cloud",
       );
       return false;
     }
@@ -257,13 +281,36 @@ export class DeviceManager {
    * Load devices from Cloud API and save to cache.
    * Only called when cache is empty (first start) or manual refresh.
    */
-  async loadFromCloud(): Promise<boolean> {
+  async loadFromCloud(): Promise<CloudLoadResult> {
     if (!this.cloudClient) {
-      return false;
+      return { ok: false, reason: "transient" };
     }
 
     try {
-      const cloudDevices = await this.cloudClient.getDevices();
+      const rawCloudDevices = await this.cloudClient.getDevices();
+
+      // Hard-filter: Govee's Device-List API returns historical/stale entries
+      // (deleted devices that are no longer in the app). Filter out entries
+      // without capabilities — those are almost certainly stale registrations.
+      const cloudDevices = Array.isArray(rawCloudDevices)
+        ? rawCloudDevices.filter(
+            (cd) =>
+              cd &&
+              typeof cd.sku === "string" &&
+              typeof cd.device === "string" &&
+              Array.isArray(cd.capabilities) &&
+              cd.capabilities.length > 0,
+          )
+        : [];
+
+      if (
+        Array.isArray(rawCloudDevices) &&
+        rawCloudDevices.length !== cloudDevices.length
+      ) {
+        this.log.info(
+          `Cloud: received ${rawCloudDevices.length} devices raw, ${cloudDevices.length} after filter (skipped stale entries without capabilities)`,
+        );
+      }
 
       // Step 1: Merge Cloud devices into local device map
       let changed = this.mergeCloudDevices(cloudDevices);
@@ -271,15 +318,15 @@ export class DeviceManager {
       // Step 2: Load scenes, snapshots, and libraries for light devices
       for (const cd of cloudDevices) {
         const caps = Array.isArray(cd.capabilities) ? cd.capabilities : [];
-        if (
+        const isLight =
           cd.type === "devices.types.light" ||
           caps.some(
             (c) =>
               c &&
               typeof c.type === "string" &&
               c.type.includes("dynamic_scene"),
-          )
-        ) {
+          );
+        if (isLight) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
             if (await this.loadDeviceScenes(device, cd)) {
@@ -288,11 +335,20 @@ export class DeviceManager {
             if (await this.loadDeviceLibraries(device, cd.sku)) {
               changed = true;
             }
+            // Mark scenes as checked regardless of result — empty is legitimate,
+            // and we've now confirmed that via Cloud. Prevents refetch loop.
+            device.scenesChecked = true;
           }
         }
       }
 
-      // Step 3: Save to cache and finalize
+      // Step 3: Prune stale cache entries (only after successful Cloud-load
+      // with a plausible response — never prune on Cloud failure or empty list)
+      if (this.skuCache && cloudDevices.length > 0) {
+        this.skuCache.pruneStale(14);
+      }
+
+      // Step 4: Save to cache and finalize
       this.saveDevicesToCache();
 
       for (const device of this.devices.values()) {
@@ -303,10 +359,36 @@ export class DeviceManager {
         this.onDeviceListChanged?.(this.getDevices());
       }
       this.lastErrorCategory = null;
-      return true;
+      return { ok: true };
     } catch (err) {
       this.logDedup("Cloud device list failed", err);
-      return false;
+
+      // Govee 429: respect Retry-After header (default 60s if missing)
+      if (err instanceof HttpError && err.statusCode === 429) {
+        const retryAfterRaw = err.headers["retry-after"];
+        const retryAfterSec =
+          typeof retryAfterRaw === "string" && /^\d+$/.test(retryAfterRaw)
+            ? parseInt(retryAfterRaw, 10)
+            : 60;
+        return {
+          ok: false,
+          reason: "rate-limited",
+          retryAfterMs: retryAfterSec * 1000,
+        };
+      }
+
+      // Auth failure: API-Key falsch oder widerrufen — KEIN Retry
+      const category = classifyError(err);
+      if (category === "AUTH") {
+        return {
+          ok: false,
+          reason: "auth-failed",
+          message: err instanceof Error ? err.message : String(err),
+        };
+      }
+
+      // Netzwerk/Timeout/Unknown: transient, einfach später
+      return { ok: false, reason: "transient" };
     }
   }
 
@@ -627,7 +709,7 @@ export class DeviceManager {
     }
   }
 
-  /** Save all devices to SKU cache, skipping those with incomplete scene data. */
+  /** Save all devices to SKU cache, skipping only those never confirmed via Cloud yet. */
   private saveDevicesToCache(): void {
     if (!this.skuCache) {
       return;
@@ -637,12 +719,12 @@ export class DeviceManager {
     let skippedCount = 0;
     for (const device of this.devices.values()) {
       const isLight = device.type === "devices.types.light";
-      const scenesIncomplete =
-        isLight && device.scenes.length === 0 && device.capabilities.length > 0;
-      if (scenesIncomplete) {
+      // Skip only if we never asked Cloud yet — empty scenes are legitimate
+      // once confirmed via scenesChecked=true.
+      if (isLight && !device.scenesChecked) {
         skippedCount++;
         this.log.debug(
-          `Not caching ${device.name} (${device.sku}) — scene data incomplete`,
+          `Not caching ${device.name} (${device.sku}) — scenes not yet checked`,
         );
       } else {
         this.skuCache.save(this.goveeDeviceToCached(device));
@@ -651,7 +733,7 @@ export class DeviceManager {
     }
     if (skippedCount > 0) {
       this.log.info(
-        `Cached ${cachedCount} device(s), skipped ${skippedCount} with incomplete data — will retry next start`,
+        `Cached ${cachedCount} device(s), skipped ${skippedCount} not yet checked — will confirm next start`,
       );
     } else {
       this.log.info(
@@ -686,6 +768,7 @@ export class DeviceManager {
       const ipChanged = matched.lanIp !== lanDevice.ip;
       matched.lanIp = lanDevice.ip;
       matched.channels.lan = true;
+      matched.lastSeenOnNetwork = Date.now();
       if (ipChanged) {
         this.log.debug(
           `LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`,
@@ -710,6 +793,7 @@ export class DeviceManager {
         musicLibrary: [],
         diyLibrary: [],
         skuFeatures: null,
+        lastSeenOnNetwork: Date.now(),
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false },
       };
@@ -732,6 +816,7 @@ export class DeviceManager {
     }
 
     device.channels.mqtt = true;
+    device.lastSeenOnNetwork = Date.now();
     const state: Partial<DeviceState> = { online: true };
 
     if (update.state) {
@@ -760,8 +845,16 @@ export class DeviceManager {
         update.op.command,
         device.segmentCount,
       );
-      if (segData.length > 0) {
-        this.onMqttSegmentUpdate?.(device, segData);
+      // Filter by manual-segments override if active — ignore indices the user
+      // has declared as "not physically present" (cut strip).
+      const filtered =
+        device.manualMode &&
+        Array.isArray(device.manualSegments) &&
+        device.manualSegments.length > 0
+          ? segData.filter((s) => device.manualSegments!.includes(s.index))
+          : segData;
+      if (filtered.length > 0) {
+        this.onMqttSegmentUpdate?.(device, filtered);
       }
     }
   }
@@ -800,6 +893,7 @@ export class DeviceManager {
       return;
     }
 
+    device.lastSeenOnNetwork = Date.now();
     const { r, g, b } = status.color;
     const state: Partial<DeviceState> = {
       online: true,
@@ -992,6 +1086,8 @@ export class DeviceManager {
       diyLibrary: cached.diyLibrary,
       skuFeatures: cached.skuFeatures,
       snapshotBleCmds: cached.snapshotBleCmds,
+      scenesChecked: cached.scenesChecked,
+      lastSeenOnNetwork: cached.lastSeenOnNetwork,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false },
     };
@@ -1017,6 +1113,8 @@ export class DeviceManager {
       diyLibrary: device.diyLibrary,
       skuFeatures: device.skuFeatures,
       snapshotBleCmds: device.snapshotBleCmds,
+      scenesChecked: device.scenesChecked,
+      lastSeenOnNetwork: device.lastSeenOnNetwork,
       cachedAt: Date.now(),
     };
   }

@@ -300,13 +300,26 @@ export class CommandRouter {
       return null;
     }
 
+    // Effective physical segments: honor manual override for cut strips
+    const validIndices =
+      device.manualMode &&
+      Array.isArray(device.manualSegments) &&
+      device.manualSegments.length > 0
+        ? new Set(device.manualSegments)
+        : null;
+    const segCount = device.segmentCount ?? 0;
+    const isValid = (i: number): boolean =>
+      validIndices ? validIndices.has(i) : i >= 0 && i < segCount;
+
     // Parse segment indices
     const segStr = parts[0].trim();
-    const segCount = device.segmentCount ?? 0;
     let segments: number[];
 
     if (segStr === "all") {
-      segments = Array.from({ length: segCount }, (_, i) => i);
+      // "all" expands to valid physical segments only (skip cut ones)
+      segments = validIndices
+        ? Array.from(validIndices).sort((a, b) => a - b)
+        : Array.from({ length: segCount }, (_, i) => i);
     } else {
       segments = [];
       for (const part of segStr.split(",")) {
@@ -314,12 +327,14 @@ export class CommandRouter {
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10);
           const end = parseInt(rangeMatch[2], 10);
-          for (let i = start; i <= end && i < segCount; i++) {
-            segments.push(i);
+          for (let i = start; i <= end; i++) {
+            if (isValid(i)) {
+              segments.push(i);
+            }
           }
         } else {
           const idx = parseInt(part.trim(), 10);
-          if (!isNaN(idx) && idx >= 0 && idx < segCount) {
+          if (!isNaN(idx) && isValid(idx)) {
             segments.push(idx);
           }
         }

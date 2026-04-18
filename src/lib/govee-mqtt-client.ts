@@ -204,6 +204,9 @@ export class GoveeMqttClient {
       const category = classifyError(err);
       const msg = `MQTT connection failed: ${err instanceof Error ? err.message : String(err)}`;
 
+      // State-Sync: connect() throw = not connected, unabhängig von Fehlertyp
+      this.onConnection?.(false);
+
       // Auth backoff — stop reconnecting after repeated auth failures
       if (category === "AUTH") {
         this.authFailCount++;
@@ -211,7 +214,6 @@ export class GoveeMqttClient {
           this.log.warn(
             `MQTT login failed ${this.authFailCount} times — check email/password in adapter settings`,
           );
-          this.onConnection?.(false);
           return;
         }
       } else {

@@ -27,9 +27,11 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 - **Local Snapshots** — Save and restore device state including per-segment colors via LAN — no Cloud needed
 - **Cloud Snapshots** — Restore complete device state (scenes, effects) locally via BLE-over-LAN
 - **Segment Control** — Per-segment color and brightness for LED strips, controlled locally via BLE-over-LAN
+- **Manual Segments (Cut Strips)** — For LED strips that have been shortened physically, define which segment indices actually exist. Includes an interactive wizard in the admin UI to detect the count automatically (flash + Yes/No per segment)
 - **Scene Speed** — Adjust playback speed for supported scenes via slider
 - **Scene Variants** — All light effect variants per scene (A/B/C/D) available as separate dropdown entries
-- **SKU Cache** — Device data persisted locally, zero Cloud calls after first start
+- **SKU Cache** — Device data persisted locally, zero Cloud calls after first start. Stale entries are pruned automatically after 14 days without network sighting.
+- **Resilient Startup** — 60-second startup grace for MQTT + Cloud; each channel keeps retrying in the background (MQTT auto-reconnect, Cloud every 5 min, Rate-Limit-Header respected)
 - **Device Quirks** — Automatic correction of wrong API data for specific SKUs
 - **Seamless Channel Routing** — Automatically uses the fastest available channel (LAN > Cloud)
 - **Graceful Degradation** — Works LAN-only without any credentials; each credential level unlocks more features
@@ -129,6 +131,8 @@ govee-smart.0.
 │       └── segments/
 │           ├── count           — Number of segments (number) [Cloud]
 │           ├── command         — Batch "1-5:#ff0000:20" (string, writable) [LAN ptReal, Cloud fallback]
+│           ├── manual_mode     — Manual segments active (boolean, writable) [local]
+│           ├── manual_list     — Physical indices "0-9" or "0-8,10-14" (string, writable) [local]
 │           └── {0..n}/
 │               ├── color       — Segment color "#RRGGBB" (writable) [LAN ptReal, MQTT sync]
 │               └── brightness  — Segment brightness 0-100% (writable) [LAN ptReal, MQTT sync]
@@ -199,6 +203,45 @@ Segment indices start at 0. Values beyond the device's segment count are automat
 - Segments are controlled **locally via BLE-over-LAN** (ptReal) with Cloud fallback
 - Each command sends at most 2 packets (one for color, one for brightness) using a multi-segment bitmask
 - Individual segment states (`segments.0.color`, `segments.0.brightness`, etc.) are automatically updated after a batch command
+
+---
+
+## Cut LED Strips — Manual Segments
+
+If your LED strip has been cut shorter than its factory length, Govee still reports the **original** segment count via the Cloud API. Setting segments that no longer exist physically is silently ignored by the device but clutters the object tree.
+
+This adapter supports a manual override to declare which segment indices actually exist.
+
+### Option 1 — Interactive Wizard (Admin UI)
+
+Open the adapter settings, switch to the **Segment Detection** tab:
+
+1. Pick the LED strip from the dropdown
+2. Click **Start** — the first segment flashes bright white, all others dark
+3. Look at the strip: does it light up? Click **✓ Yes, visible** or **✗ No, nothing**
+4. Repeat for each segment
+5. After the last segment, the adapter automatically stores the result in `segments.manual_list` and enables `segments.manual_mode`. Overflow segment states are cleaned up.
+
+The session auto-aborts after 5 minutes of inactivity, restoring the original colors.
+
+### Option 2 — Direct State Editing
+
+Write the states yourself:
+
+- `segments.manual_list` — comma-separated indices, supports ranges:
+  - `"0-9"` — first 10 segments of a 15-segment strip
+  - `"0-8,10-14"` — segment 9 is broken, skip it
+  - `"0,1,2,3,4,5,6"` — individual indices equivalent to `"0-6"`
+- `segments.manual_mode` — set to `true` to activate, `false` to fall back to Cloud default
+
+After both states are written, the adapter re-creates the segment channel tree to match the list (removes excess entries) and uses the manual indices for all future segment commands.
+
+### Behavior details
+
+- `segments.count` reflects the manual list length, not the Cloud-reported value
+- `segments.command all:...` expands to the manual indices only, skipping cut ones
+- MQTT status updates for non-existent segments are ignored
+- Turning `manual_mode` off restores the full Cloud-reported segment tree
 
 ---
 

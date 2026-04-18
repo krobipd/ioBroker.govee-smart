@@ -84,6 +84,48 @@ class SkuCache {
     }
     return results;
   }
+  /**
+   * Remove cache entries that have not been seen on the local network within maxAgeDays.
+   * Entries without `lastSeenOnNetwork` (legacy) are treated as just seen to avoid
+   * accidentally deleting them on first upgrade.
+   *
+   * @param maxAgeDays  Age threshold in days (default 14)
+   * @returns  Number of pruned entries
+   */
+  pruneStale(maxAgeDays = 14) {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1e3;
+    let pruned = 0;
+    try {
+      if (!fs.existsSync(this.cacheDir)) {
+        return 0;
+      }
+      for (const file of fs.readdirSync(this.cacheDir)) {
+        if (!file.endsWith(".json")) {
+          continue;
+        }
+        const full = path.join(this.cacheDir, file);
+        try {
+          const raw = fs.readFileSync(full, "utf-8");
+          const data = JSON.parse(raw);
+          if (typeof data.lastSeenOnNetwork !== "number") {
+            continue;
+          }
+          if (data.lastSeenOnNetwork < cutoff) {
+            fs.unlinkSync(full);
+            pruned++;
+          }
+        } catch {
+        }
+      }
+    } catch {
+    }
+    if (pruned > 0) {
+      this.log.info(
+        `Cache: pruned ${pruned} stale entries (not seen on network for ${maxAgeDays}+ days)`
+      );
+    }
+    return pruned;
+  }
   /** Delete all cached files. */
   clear() {
     try {

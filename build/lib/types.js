@@ -21,6 +21,7 @@ __export(types_exports, {
   classifyError: () => classifyError,
   hexToRgb: () => hexToRgb,
   normalizeDeviceId: () => normalizeDeviceId,
+  parseSegmentList: () => parseSegmentList,
   rgbIntToHex: () => rgbIntToHex,
   rgbToHex: () => rgbToHex
 });
@@ -66,11 +67,76 @@ function hexToRgb(hex) {
 function rgbIntToHex(rgb) {
   return `#${(rgb & 16777215).toString(16).padStart(6, "0")}`;
 }
+function parseSegmentList(input, maxIndex) {
+  const HARD_MAX = 99;
+  if (typeof input !== "string") {
+    return { indices: [], error: "Input muss ein String sein" };
+  }
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return { indices: [], error: "Liste ist leer" };
+  }
+  const effectiveMax = Math.min(
+    Number.isFinite(maxIndex) && maxIndex >= 0 ? Math.floor(maxIndex) : HARD_MAX,
+    HARD_MAX
+  );
+  const set = /* @__PURE__ */ new Set();
+  const parts = trimmed.split(",");
+  for (const raw of parts) {
+    const part = raw.trim();
+    if (part === "") {
+      continue;
+    }
+    const rangeMatch = /^(\d+)\s*-\s*(\d+)$/.exec(part);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      if (start > end) {
+        return {
+          indices: [],
+          error: `Ung\xFCltiger Bereich "${part}" (Start > Ende)`
+        };
+      }
+      for (let i = start; i <= end; i++) {
+        if (i < 0 || i > effectiveMax) {
+          return {
+            indices: [],
+            error: `Segment ${i} liegt au\xDFerhalb 0-${effectiveMax} f\xFCr dieses Ger\xE4t`
+          };
+        }
+        set.add(i);
+      }
+      continue;
+    }
+    if (!/^\d+$/.test(part)) {
+      return {
+        indices: [],
+        error: `Ung\xFCltiger Eintrag "${part}" (nur Zahlen und Ranges erlaubt)`
+      };
+    }
+    const idx = parseInt(part, 10);
+    if (idx < 0 || idx > effectiveMax) {
+      return {
+        indices: [],
+        error: `Segment ${idx} liegt au\xDFerhalb 0-${effectiveMax} f\xFCr dieses Ger\xE4t`
+      };
+    }
+    set.add(idx);
+  }
+  if (set.size === 0) {
+    return { indices: [], error: "Keine g\xFCltigen Indices in der Liste" };
+  }
+  return {
+    indices: Array.from(set).sort((a, b) => a - b),
+    error: null
+  };
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   classifyError,
   hexToRgb,
   normalizeDeviceId,
+  parseSegmentList,
   rgbIntToHex,
   rgbToHex
 });

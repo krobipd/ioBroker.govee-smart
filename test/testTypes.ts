@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { normalizeDeviceId, classifyError, rgbToHex, hexToRgb, rgbIntToHex } from "../src/lib/types";
+import { normalizeDeviceId, classifyError, rgbToHex, hexToRgb, rgbIntToHex, parseSegmentList } from "../src/lib/types";
 
 describe("Types utilities", () => {
     describe("normalizeDeviceId", () => {
@@ -152,6 +152,101 @@ describe("Types utilities", () => {
 
         it("should handle non-Error objects", () => {
             expect(classifyError({ code: "ERR" })).to.equal("UNKNOWN");
+        });
+    });
+
+    describe("parseSegmentList", () => {
+        it("should parse comma-separated indices", () => {
+            const r = parseSegmentList("0,1,2,3", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([0, 1, 2, 3]);
+        });
+
+        it("should parse a range", () => {
+            const r = parseSegmentList("0-9", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        });
+
+        it("should parse mixed ranges and individuals", () => {
+            const r = parseSegmentList("0-2,4-6,10", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([0, 1, 2, 4, 5, 6, 10]);
+        });
+
+        it("should tolerate whitespace", () => {
+            const r = parseSegmentList("0, 3, 5 - 7, 10-12", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([0, 3, 5, 6, 7, 10, 11, 12]);
+        });
+
+        it("should dedupe entries", () => {
+            const r = parseSegmentList("0,0,1,1,2", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([0, 1, 2]);
+        });
+
+        it("should sort ascending", () => {
+            const r = parseSegmentList("5,3,1,4,2", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([1, 2, 3, 4, 5]);
+        });
+
+        it("should reject empty string", () => {
+            const r = parseSegmentList("", 14);
+            expect(r.error).to.not.be.null;
+            expect(r.indices).to.deep.equal([]);
+        });
+
+        it("should reject whitespace-only", () => {
+            const r = parseSegmentList("   ", 14);
+            expect(r.error).to.not.be.null;
+        });
+
+        it("should reject negative numbers", () => {
+            const r = parseSegmentList("-1,0,1", 14);
+            expect(r.error).to.not.be.null;
+        });
+
+        it("should reject indices above per-device max", () => {
+            const r = parseSegmentList("0-15", 14);
+            expect(r.error).to.not.be.null;
+            expect(r.error).to.include("15");
+            expect(r.error).to.include("0-14");
+        });
+
+        it("should reject indices above hard backstop 99", () => {
+            const r = parseSegmentList("0,100", 200); // maxIndex=200, but 100 > 99 backstop
+            expect(r.error).to.not.be.null;
+        });
+
+        it("should reject non-numeric tokens", () => {
+            const r = parseSegmentList("0,abc,2", 14);
+            expect(r.error).to.not.be.null;
+        });
+
+        it("should reject reversed range", () => {
+            const r = parseSegmentList("9-0", 14);
+            expect(r.error).to.not.be.null;
+            expect(r.error).to.include("Start");
+        });
+
+        it("should handle single index", () => {
+            const r = parseSegmentList("5", 14);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([5]);
+        });
+
+        it("should handle non-string input safely", () => {
+            const r = parseSegmentList(null as unknown as string, 14);
+            expect(r.error).to.not.be.null;
+            expect(r.indices).to.deep.equal([]);
+        });
+
+        it("should use hard backstop 99 when maxIndex is invalid", () => {
+            const r = parseSegmentList("50", -1);
+            expect(r.error).to.be.null;
+            expect(r.indices).to.deep.equal([50]);
         });
     });
 });

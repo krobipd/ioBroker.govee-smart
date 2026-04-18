@@ -10,6 +10,20 @@ export interface AdapterConfig {
   networkInterface: string;
 }
 
+/**
+ * Ergebnis eines Cloud-Load-Versuchs. Der Retry-Loop wertet `reason` aus,
+ * um Rate-Limits und permanente Fehler korrekt zu behandeln.
+ */
+export type CloudLoadResult =
+  /** Erfolgreich */
+  | { ok: true }
+  /** Netzwerk/Timeout — einfach später retryen */
+  | { ok: false; reason: "transient" }
+  /** Govee 429 — retry-after respektieren */
+  | { ok: false; reason: "rate-limited"; retryAfterMs: number }
+  /** Auth-Fehler (ungültiger API-Key) — KEIN Retry, User muss Config korrigieren */
+  | { ok: false; reason: "auth-failed"; message: string };
+
 // --- Cloud API v2 Types ---
 
 /** Device from Cloud API GET /router/api/v1/user/devices */
@@ -292,6 +306,26 @@ export interface GoveeDevice {
   snapshotBleCmds?: string[][][];
   /** Current speed level for scene playback (0-based, applied on next scene activation) */
   sceneSpeed?: number;
+  /**
+   * Set to true after a Cloud scene-fetch attempt completed (success or confirmed empty).
+   * Used to distinguish "not yet tried" from "legitimately empty" — prevents endless refetch.
+   */
+  scenesChecked?: boolean;
+  /**
+   * Manual segment override: if true, `manualSegments` defines the physical segment
+   * indices — used for cut LED strips where the Cloud-reported count is wrong.
+   */
+  manualMode?: boolean;
+  /**
+   * Explicit physical segment indices (parsed from `segments.manual_list` state).
+   * Only used when `manualMode=true`. Empty or undefined = fall back to Cloud count.
+   */
+  manualSegments?: number[];
+  /**
+   * Timestamp (ms) when device was last seen via LAN discovery or MQTT status push.
+   * Used for cache pruning — stale entries without recent network sighting get removed.
+   */
+  lastSeenOnNetwork?: number;
   /** Which channels are available */
   channels: {
     /** LAN UDP reachable */
@@ -423,6 +457,99 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
  */
 export function rgbIntToHex(rgb: number): string {
   return `#${(rgb & 0xffffff).toString(16).padStart(6, "0")}`;
+}
+
+/**
+ * Result of parsing a manual-segments string like "0-9", "0-2,4-9", "0,3,5".
+ *
+ * indices  Deduplicated, sorted list of segment indices
+ *
+ * error    Human-readable error (null on success)
+ */
+export interface SegmentListParseResult {
+  /** Deduplicated, sorted list of segment indices */
+  indices: number[];
+  /** Human-readable error (null on success) */
+  error: string | null;
+}
+
+/**
+ * Parse a user-provided segment-list string.
+ * Akzeptiert Komma-Einzeln ("0,1,2"), Range ("0-9"), Mixed ("0-8,10-14"),
+ * whitespace-tolerant. Dedupe automatisch. Sortiert aufsteigend.
+ *
+ * @param input User-Input string
+ * @param maxIndex Obergrenze pro Gerät (z. B. device.segmentCount - 1). Indices > maxIndex werden abgelehnt.
+ * @returns SegmentListParseResult mit indices + optional error
+ */
+export function parseSegmentList(
+  input: string,
+  maxIndex: number,
+): SegmentListParseResult {
+  const HARD_MAX = 99; // Backstop, deckt alle realistischen Govee-Geräte
+  if (typeof input !== "string") {
+    return { indices: [], error: "Input muss ein String sein" };
+  }
+  const trimmed = input.trim();
+  if (trimmed === "") {
+    return { indices: [], error: "Liste ist leer" };
+  }
+  const effectiveMax = Math.min(
+    Number.isFinite(maxIndex) && maxIndex >= 0
+      ? Math.floor(maxIndex)
+      : HARD_MAX,
+    HARD_MAX,
+  );
+  const set = new Set<number>();
+  const parts = trimmed.split(",");
+  for (const raw of parts) {
+    const part = raw.trim();
+    if (part === "") {
+      continue;
+    }
+    const rangeMatch = /^(\d+)\s*-\s*(\d+)$/.exec(part);
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      if (start > end) {
+        return {
+          indices: [],
+          error: `Ungültiger Bereich "${part}" (Start > Ende)`,
+        };
+      }
+      for (let i = start; i <= end; i++) {
+        if (i < 0 || i > effectiveMax) {
+          return {
+            indices: [],
+            error: `Segment ${i} liegt außerhalb 0-${effectiveMax} für dieses Gerät`,
+          };
+        }
+        set.add(i);
+      }
+      continue;
+    }
+    if (!/^\d+$/.test(part)) {
+      return {
+        indices: [],
+        error: `Ungültiger Eintrag "${part}" (nur Zahlen und Ranges erlaubt)`,
+      };
+    }
+    const idx = parseInt(part, 10);
+    if (idx < 0 || idx > effectiveMax) {
+      return {
+        indices: [],
+        error: `Segment ${idx} liegt außerhalb 0-${effectiveMax} für dieses Gerät`,
+      };
+    }
+    set.add(idx);
+  }
+  if (set.size === 0) {
+    return { indices: [], error: "Keine gültigen Indices in der Liste" };
+  }
+  return {
+    indices: Array.from(set).sort((a, b) => a - b),
+    error: null,
+  };
 }
 
 /** Timer/callback interfaces for helper classes */

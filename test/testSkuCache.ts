@@ -189,4 +189,80 @@ describe("SkuCache", () => {
     (data as unknown as { sku: unknown }).sku = null;
     expect(() => cache.save(data)).to.not.throw();
   });
+
+  describe("pruneStale", () => {
+    const DAY_MS = 24 * 60 * 60 * 1000;
+
+    it("removes entries older than maxAgeDays", () => {
+      const cache = new SkuCache(dir, mockLog);
+      const old = createTestData("H6001", "OLD:00:00:00:00:00:00:01");
+      old.lastSeenOnNetwork = Date.now() - 30 * DAY_MS; // 30 days ago
+      const fresh = createTestData("H6002", "NEW:00:00:00:00:00:00:02");
+      fresh.lastSeenOnNetwork = Date.now() - 2 * DAY_MS; // 2 days ago
+      cache.save(old);
+      cache.save(fresh);
+
+      const pruned = cache.pruneStale(14);
+      expect(pruned).to.equal(1);
+      const remaining = cache.loadAll();
+      expect(remaining).to.have.length(1);
+      expect(remaining[0].sku).to.equal("H6002");
+    });
+
+    it("keeps legacy entries without lastSeenOnNetwork", () => {
+      const cache = new SkuCache(dir, mockLog);
+      const legacy = createTestData("H6003", "OLD:00:00:00:00:00:00:03");
+      delete (legacy as { lastSeenOnNetwork?: number }).lastSeenOnNetwork;
+      cache.save(legacy);
+
+      const pruned = cache.pruneStale(14);
+      expect(pruned).to.equal(0);
+      expect(cache.loadAll()).to.have.length(1);
+    });
+
+    it("returns 0 on empty cache", () => {
+      const cache = new SkuCache(dir, mockLog);
+      expect(cache.pruneStale(14)).to.equal(0);
+    });
+
+    it("respects custom maxAgeDays threshold", () => {
+      const cache = new SkuCache(dir, mockLog);
+      const data = createTestData("H6004", "MID:00:00:00:00:00:00:04");
+      data.lastSeenOnNetwork = Date.now() - 5 * DAY_MS; // 5 days ago
+      cache.save(data);
+
+      // With 7-day threshold: still fresh
+      expect(cache.pruneStale(7)).to.equal(0);
+      expect(cache.loadAll()).to.have.length(1);
+      // With 3-day threshold: stale
+      expect(cache.pruneStale(3)).to.equal(1);
+      expect(cache.loadAll()).to.have.length(0);
+    });
+
+    it("skips corrupt cache files silently", () => {
+      const cache = new SkuCache(dir, mockLog);
+      const cacheDir = path.join(dir, "cache");
+      fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
+      expect(() => cache.pruneStale(14)).to.not.throw();
+    });
+  });
+
+  it("should persist scenesChecked flag", () => {
+    const cache = new SkuCache(dir, mockLog);
+    const data = createTestData();
+    data.scenesChecked = true;
+    cache.save(data);
+    const loaded = cache.loadAll()[0];
+    expect(loaded.scenesChecked).to.equal(true);
+  });
+
+  it("should persist lastSeenOnNetwork timestamp", () => {
+    const cache = new SkuCache(dir, mockLog);
+    const data = createTestData();
+    const now = Date.now();
+    data.lastSeenOnNetwork = now;
+    cache.save(data);
+    const loaded = cache.loadAll()[0];
+    expect(loaded.lastSeenOnNetwork).to.equal(now);
+  });
 });

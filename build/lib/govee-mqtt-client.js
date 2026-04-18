@@ -182,13 +182,13 @@ class GoveeMqttClient {
     } catch (err) {
       const category = (0, import_types.classifyError)(err);
       const msg = `MQTT connection failed: ${err instanceof Error ? err.message : String(err)}`;
+      (_d = this.onConnection) == null ? void 0 : _d.call(this, false);
       if (category === "AUTH") {
         this.authFailCount++;
         if (this.authFailCount >= MAX_AUTH_FAILURES) {
           this.log.warn(
             `MQTT login failed ${this.authFailCount} times \u2014 check email/password in adapter settings`
           );
-          (_d = this.onConnection) == null ? void 0 : _d.call(this, false);
           return;
         }
       } else {

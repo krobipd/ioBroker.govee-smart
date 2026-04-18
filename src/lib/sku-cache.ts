@@ -50,6 +50,10 @@ export interface CachedDeviceData {
   snapshotBleCmds?: string[][][];
   /** Timestamp when data was cached */
   cachedAt: number;
+  /** True after a Cloud scene-fetch attempt has completed (success or confirmed empty). */
+  scenesChecked?: boolean;
+  /** Timestamp (ms) when device was last seen on local network (LAN/MQTT). */
+  lastSeenOnNetwork?: number;
 }
 
 /**
@@ -111,6 +115,52 @@ export class SkuCache {
       // cache dir doesn't exist yet
     }
     return results;
+  }
+
+  /**
+   * Remove cache entries that have not been seen on the local network within maxAgeDays.
+   * Entries without `lastSeenOnNetwork` (legacy) are treated as just seen to avoid
+   * accidentally deleting them on first upgrade.
+   *
+   * @param maxAgeDays  Age threshold in days (default 14)
+   * @returns  Number of pruned entries
+   */
+  pruneStale(maxAgeDays = 14): number {
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    let pruned = 0;
+    try {
+      if (!fs.existsSync(this.cacheDir)) {
+        return 0;
+      }
+      for (const file of fs.readdirSync(this.cacheDir)) {
+        if (!file.endsWith(".json")) {
+          continue;
+        }
+        const full = path.join(this.cacheDir, file);
+        try {
+          const raw = fs.readFileSync(full, "utf-8");
+          const data = JSON.parse(raw) as CachedDeviceData;
+          // Legacy entries without timestamp: keep, set timestamp on next save
+          if (typeof data.lastSeenOnNetwork !== "number") {
+            continue;
+          }
+          if (data.lastSeenOnNetwork < cutoff) {
+            fs.unlinkSync(full);
+            pruned++;
+          }
+        } catch {
+          // skip corrupt files
+        }
+      }
+    } catch {
+      // cache dir doesn't exist yet
+    }
+    if (pruned > 0) {
+      this.log.info(
+        `Cache: pruned ${pruned} stale entries (not seen on network for ${maxAgeDays}+ days)`,
+      );
+    }
+    return pruned;
   }
 
   /** Delete all cached files. */

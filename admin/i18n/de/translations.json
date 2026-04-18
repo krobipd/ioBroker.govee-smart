@@ -13,5 +13,15 @@
     "passwordLabel": "Passwort",
     "supportHeader": "Unterstützung",
     "networkInterfaceLabel": "Netzwerk-Interface",
-    "networkInterfaceTooltip": "Netzwerk-Interface für die LAN-Geräteerkennung auswählen. Leer lassen um alle Interfaces zu verwenden (empfohlen für die meisten Setups)."
+    "networkInterfaceTooltip": "Netzwerk-Interface für die LAN-Geräteerkennung auswählen. Leer lassen um alle Interfaces zu verwenden (empfohlen für die meisten Setups).",
+    "tabMain": "Hauptkonfiguration",
+    "tabWizard": "Segment-Erkennung",
+    "wizardHeader": "Segment-Erkennungs-Assistent",
+    "wizardInfo": "Für LED-Strips, die auf eine kürzere Länge als die Werkseinstellung zugeschnitten wurden. Wähle den Strip, klicke Start und beantworte für jedes Segment mit Ja oder Nein, ob du das Licht siehst.",
+    "wizardDeviceLabel": "LED-Strip",
+    "wizardBtnStart": "Start",
+    "wizardBtnYes": "✓ Ja, sichtbar",
+    "wizardBtnNo": "✗ Nein, nichts",
+    "wizardBtnAbort": "Abbrechen",
+    "wizardHelp": "Bei jedem Start oder Antwort leuchtet das aktuelle Segment hellweiß, alle anderen bleiben dunkel. Nur ein Wizard kann gleichzeitig laufen, die Session bricht nach 5 Minuten Inaktivität automatisch ab. Das Ergebnis wird in segments.manual_mode und segments.manual_list gespeichert und kann manuell editiert werden (z.B. '0-9' für die ersten 10 von 15 Segmenten, oder '0-8,10-14' wenn Segment 9 fehlt)."
 }

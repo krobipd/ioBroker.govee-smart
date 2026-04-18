@@ -285,6 +285,8 @@ class StateManager {
       }
     }
     device.segmentCount = segmentCount;
+    const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
+    const reportedCount = validIndices.length;
     await this.ensureState(
       `${prefix}.segments.count`,
       "Segment Count",
@@ -293,10 +295,36 @@ class StateManager {
       false
     );
     await this.adapter.setStateAsync(`${prefix}.segments.count`, {
-      val: segmentCount,
+      val: reportedCount,
       ack: true
     });
-    for (let i = 0; i < segmentCount; i++) {
+    await this.adapter.extendObjectAsync(`${prefix}.segments.manual_mode`, {
+      type: "state",
+      common: {
+        name: "Manual Segments Active",
+        type: "boolean",
+        role: "switch",
+        read: true,
+        write: true,
+        def: false,
+        desc: "Enable manual segment list (e.g. for cut LED strips with fewer physical segments than reported)"
+      },
+      native: {}
+    });
+    await this.adapter.extendObjectAsync(`${prefix}.segments.manual_list`, {
+      type: "state",
+      common: {
+        name: "Manual Segment List",
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+        def: "",
+        desc: 'Comma-separated indices + ranges, e.g. "0-9" or "0-8,10-14" (only used when manual_mode=true)'
+      },
+      native: {}
+    });
+    for (const i of validIndices) {
       await this.adapter.extendObjectAsync(`${prefix}.segments.${i}`, {
         type: "channel",
         common: { name: `Segment ${i}` },
@@ -343,15 +371,17 @@ class StateManager {
       },
       native: {}
     });
-    await this.cleanupExcessSegments(prefix, segmentCount);
+    await this.cleanupExcessSegments(prefix, validIndices);
   }
   /**
-   * Remove segment sub-channels that exceed the current segment count.
+   * Remove segment sub-channels that are not in the valid-indices list.
+   * Supports gaps (e.g. manual list "0-8,10-14" → segment 9 channel gets removed).
    *
    * @param prefix Device prefix
-   * @param segmentCount Current segment count
+   * @param validIndices Valid segment indices (all others will be deleted)
    */
-  async cleanupExcessSegments(prefix, segmentCount) {
+  async cleanupExcessSegments(prefix, validIndices) {
+    const valid = new Set(validIndices);
     const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
     const existing = await this.adapter.getObjectViewAsync(
       "system",
@@ -368,7 +398,7 @@ class StateManager {
       const localId = row.id.replace(`${this.adapter.namespace}.`, "");
       const segPart = localId.replace(`${prefix}.segments.`, "");
       const segIdx = parseInt(segPart, 10);
-      if (!isNaN(segIdx) && segIdx >= segmentCount) {
+      if (!isNaN(segIdx) && !valid.has(segIdx)) {
         this.adapter.log.debug(`Removing excess segment: ${localId}`);
         await this.adapter.delObjectAsync(localId, { recursive: true });
       }

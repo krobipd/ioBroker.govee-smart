@@ -19,12 +19,14 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var device_manager_exports = {};
 __export(device_manager_exports, {
   DeviceManager: () => DeviceManager,
+  getEffectiveSegmentIndices: () => getEffectiveSegmentIndices,
   parseMqttSegmentData: () => parseMqttSegmentData
 });
 module.exports = __toCommonJS(device_manager_exports);
 var import_command_router = require("./command-router.js");
 var import_device_quirks = require("./device-quirks.js");
 var import_types = require("./types.js");
+var import_http_client = require("./http-client.js");
 const APPLIANCE_TYPES = /* @__PURE__ */ new Set([
   "devices.types.heater",
   "devices.types.humidifier",
@@ -69,6 +71,17 @@ function parseMqttSegmentData(commands, segmentCount) {
     }
   }
   return segments;
+}
+function getEffectiveSegmentIndices(device) {
+  var _a;
+  if (device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0) {
+    return device.manualSegments.slice();
+  }
+  const count = (_a = device.segmentCount) != null ? _a : 0;
+  if (count <= 0) {
+    return [];
+  }
+  return Array.from({ length: count }, (_, i) => i);
 }
 class DeviceManager {
   log;
@@ -169,6 +182,8 @@ class DeviceManager {
         existing.diyLibrary = entry.diyLibrary;
         existing.skuFeatures = entry.skuFeatures;
         existing.snapshotBleCmds = entry.snapshotBleCmds;
+        existing.scenesChecked = entry.scenesChecked;
+        existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
         existing.channels.cloud = entry.capabilities.length > 0;
         changed = true;
       } else {
@@ -179,12 +194,12 @@ class DeviceManager {
     if (changed) {
       this.log.info(`Loaded ${cached.length} device(s) from cache`);
     }
-    const incomplete = Array.from(this.devices.values()).some(
-      (d) => d.scenes.length === 0 && d.sceneLibrary.length > 0 && d.type === "devices.types.light"
+    const needsRefetch = Array.from(this.devices.values()).some(
+      (d) => d.type === "devices.types.light" && !d.scenesChecked
     );
-    if (incomplete) {
+    if (needsRefetch) {
       this.log.info(
-        "Cache has incomplete scene data \u2014 will re-fetch from Cloud"
+        "Cache has unchecked scene data \u2014 will confirm once via Cloud"
       );
       return false;
     }
@@ -203,16 +218,25 @@ class DeviceManager {
   async loadFromCloud() {
     var _a;
     if (!this.cloudClient) {
-      return false;
+      return { ok: false, reason: "transient" };
     }
     try {
-      const cloudDevices = await this.cloudClient.getDevices();
+      const rawCloudDevices = await this.cloudClient.getDevices();
+      const cloudDevices = Array.isArray(rawCloudDevices) ? rawCloudDevices.filter(
+        (cd) => cd && typeof cd.sku === "string" && typeof cd.device === "string" && Array.isArray(cd.capabilities) && cd.capabilities.length > 0
+      ) : [];
+      if (Array.isArray(rawCloudDevices) && rawCloudDevices.length !== cloudDevices.length) {
+        this.log.info(
+          `Cloud: received ${rawCloudDevices.length} devices raw, ${cloudDevices.length} after filter (skipped stale entries without capabilities)`
+        );
+      }
       let changed = this.mergeCloudDevices(cloudDevices);
       for (const cd of cloudDevices) {
         const caps = Array.isArray(cd.capabilities) ? cd.capabilities : [];
-        if (cd.type === "devices.types.light" || caps.some(
+        const isLight = cd.type === "devices.types.light" || caps.some(
           (c) => c && typeof c.type === "string" && c.type.includes("dynamic_scene")
-        )) {
+        );
+        if (isLight) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
             if (await this.loadDeviceScenes(device, cd)) {
@@ -221,8 +245,12 @@ class DeviceManager {
             if (await this.loadDeviceLibraries(device, cd.sku)) {
               changed = true;
             }
+            device.scenesChecked = true;
           }
         }
+      }
+      if (this.skuCache && cloudDevices.length > 0) {
+        this.skuCache.pruneStale(14);
       }
       this.saveDevicesToCache();
       for (const device of this.devices.values()) {
@@ -232,10 +260,27 @@ class DeviceManager {
         (_a = this.onDeviceListChanged) == null ? void 0 : _a.call(this, this.getDevices());
       }
       this.lastErrorCategory = null;
-      return true;
+      return { ok: true };
     } catch (err) {
       this.logDedup("Cloud device list failed", err);
-      return false;
+      if (err instanceof import_http_client.HttpError && err.statusCode === 429) {
+        const retryAfterRaw = err.headers["retry-after"];
+        const retryAfterSec = typeof retryAfterRaw === "string" && /^\d+$/.test(retryAfterRaw) ? parseInt(retryAfterRaw, 10) : 60;
+        return {
+          ok: false,
+          reason: "rate-limited",
+          retryAfterMs: retryAfterSec * 1e3
+        };
+      }
+      const category = (0, import_types.classifyError)(err);
+      if (category === "AUTH") {
+        return {
+          ok: false,
+          reason: "auth-failed",
+          message: err instanceof Error ? err.message : String(err)
+        };
+      }
+      return { ok: false, reason: "transient" };
     }
   }
   /**
@@ -498,7 +543,7 @@ class DeviceManager {
       return false;
     }
   }
-  /** Save all devices to SKU cache, skipping those with incomplete scene data. */
+  /** Save all devices to SKU cache, skipping only those never confirmed via Cloud yet. */
   saveDevicesToCache() {
     if (!this.skuCache) {
       return;
@@ -507,11 +552,10 @@ class DeviceManager {
     let skippedCount = 0;
     for (const device of this.devices.values()) {
       const isLight = device.type === "devices.types.light";
-      const scenesIncomplete = isLight && device.scenes.length === 0 && device.capabilities.length > 0;
-      if (scenesIncomplete) {
+      if (isLight && !device.scenesChecked) {
         skippedCount++;
         this.log.debug(
-          `Not caching ${device.name} (${device.sku}) \u2014 scene data incomplete`
+          `Not caching ${device.name} (${device.sku}) \u2014 scenes not yet checked`
         );
       } else {
         this.skuCache.save(this.goveeDeviceToCached(device));
@@ -520,7 +564,7 @@ class DeviceManager {
     }
     if (skippedCount > 0) {
       this.log.info(
-        `Cached ${cachedCount} device(s), skipped ${skippedCount} with incomplete data \u2014 will retry next start`
+        `Cached ${cachedCount} device(s), skipped ${skippedCount} not yet checked \u2014 will confirm next start`
       );
     } else {
       this.log.info(
@@ -550,6 +594,7 @@ class DeviceManager {
       const ipChanged = matched.lanIp !== lanDevice.ip;
       matched.lanIp = lanDevice.ip;
       matched.channels.lan = true;
+      matched.lastSeenOnNetwork = Date.now();
       if (ipChanged) {
         this.log.debug(
           `LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`
@@ -572,6 +617,7 @@ class DeviceManager {
         musicLibrary: [],
         diyLibrary: [],
         skuFeatures: null,
+        lastSeenOnNetwork: Date.now(),
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: false }
       };
@@ -593,6 +639,7 @@ class DeviceManager {
       return;
     }
     device.channels.mqtt = true;
+    device.lastSeenOnNetwork = Date.now();
     const state = { online: true };
     if (update.state) {
       if (update.state.onOff !== void 0) {
@@ -616,8 +663,9 @@ class DeviceManager {
         update.op.command,
         device.segmentCount
       );
-      if (segData.length > 0) {
-        (_c = this.onMqttSegmentUpdate) == null ? void 0 : _c.call(this, device, segData);
+      const filtered = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? segData.filter((s) => device.manualSegments.includes(s.index)) : segData;
+      if (filtered.length > 0) {
+        (_c = this.onMqttSegmentUpdate) == null ? void 0 : _c.call(this, device, filtered);
       }
     }
   }
@@ -646,6 +694,7 @@ class DeviceManager {
     if (!device) {
       return;
     }
+    device.lastSeenOnNetwork = Date.now();
     const { r, g, b } = status.color;
     const state = {
       online: true,
@@ -802,6 +851,8 @@ class DeviceManager {
       diyLibrary: cached.diyLibrary,
       skuFeatures: cached.skuFeatures,
       snapshotBleCmds: cached.snapshotBleCmds,
+      scenesChecked: cached.scenesChecked,
+      lastSeenOnNetwork: cached.lastSeenOnNetwork,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false }
     };
@@ -826,6 +877,8 @@ class DeviceManager {
       diyLibrary: device.diyLibrary,
       skuFeatures: device.skuFeatures,
       snapshotBleCmds: device.snapshotBleCmds,
+      scenesChecked: device.scenesChecked,
+      lastSeenOnNetwork: device.lastSeenOnNetwork,
       cachedAt: Date.now()
     };
   }
@@ -903,6 +956,7 @@ class DeviceManager {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   DeviceManager,
+  getEffectiveSegmentIndices,
   parseMqttSegmentData
 });
 //# sourceMappingURL=device-manager.js.map
