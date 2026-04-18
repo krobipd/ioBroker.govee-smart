@@ -1,5 +1,14 @@
 # Older Changes
 
+## 1.6.0 (2026-04-18)
+- Add manual segment override for cut LED strips — declare which segment indices actually exist via `segments.manual_mode` + `segments.manual_list` (supports ranges like `"0-9"` or gaps like `"0-8,10-14"`)
+- Add Segment Detection Wizard in admin UI — flashes each segment bright white one-by-one and records which indices the user confirms visible, writes result as `manual_list`
+- Add Cloud-Retry-Loop with Rate-Limit handling — 429 responses honour `Retry-After`, auth-failures stop permanently, transient errors retry after 5 min
+- Add SKU-cache pruning — 14-day aging + `scenesChecked` flag + hard-filter of stale Cloud entries without capabilities
+- Extend startup grace period for MQTT+Cloud from 30s to 60s — covers normal MQTT reconnect-attempt timing
+- Fix `info.mqttConnected` state not updating on disconnect
+- 427 tests (was 399)
+
 ## 1.5.2 (2026-04-17)
 - Harden all Cloud API boundaries against schema drift — `typeof`/`Array.isArray` guards and string coercion on every external field access (sku, device, capabilities, parameters, type, instance)
 - Type `CloudCapability.parameters` is now optional — API may omit it even when docs require it

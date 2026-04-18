@@ -869,14 +869,19 @@ export class DeviceManager {
       if (segData.length > 0) {
         // Discovery: if MQTT shows more segments than the Cloud said,
         // trust the device. Bump segmentCount, rebuild the state tree so
-        // the extra segments get their datapoints.
+        // the extra segments get their datapoints BEFORE we try to write
+        // values into them — otherwise ioBroker warns about missing objects.
         const maxSeen = Math.max(...segData.map((s) => s.index)) + 1;
         if (maxSeen > (device.segmentCount ?? 0)) {
           this.log.info(
             `${device.name}: MQTT shows ${maxSeen} segments (Cloud reported ${device.segmentCount}) — updating state tree`,
           );
           device.segmentCount = maxSeen;
+          // Skip the segment-state sync for THIS push — the objects aren't
+          // ready yet. The next AA A5 push (a few seconds later) will hit
+          // the fully-built tree.
           this.onSegmentCountGrown?.(device);
+          return;
         }
       }
 

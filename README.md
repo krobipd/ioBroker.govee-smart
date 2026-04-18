@@ -452,6 +452,9 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.6.7 (2026-04-19)
+- Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so the new datapoints get created first (no more "State has no existing object" warnings). The next AA A5 push seconds later populates the fully-built tree.
+
 ### 1.6.6 (2026-04-19)
 - Fix under-reporting of segment count — when Govee Cloud advertises fewer segments than the strip physically has, MQTT `AA A5` packets reveal the real count, and the adapter now bumps `segmentCount` and rebuilds the state tree so datapoints appear for ALL segments (fixes 20 m strips where Cloud says 15 but physical is 20)
 - `parseMqttSegmentData` no longer caps output at Cloud's segmentCount; trailing all-zero padding slots are stripped so packet-padding is not mistaken for real segments
@@ -480,15 +483,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 1.6.1 (2026-04-18)
 - Fix Segment Detection Wizard in admin UI — jsonConfig button type was `sendto` (lowercase) instead of `sendTo` causing validation errors
 - Fix LED strip dropdown showed as free-text input because `selectSendTo` response was wrapped in `{list: [...]}` instead of bare array
-
-### 1.6.0 (2026-04-18)
-- Add manual segment override for cut LED strips — declare which segment indices actually exist via `segments.manual_mode` + `segments.manual_list` (supports ranges like `"0-9"` or gaps like `"0-8,10-14"`)
-- Add Segment Detection Wizard in admin UI — flashes each segment bright white one-by-one and records which indices the user confirms visible, writes result as `manual_list`
-- Add Cloud-Retry-Loop with Rate-Limit handling — 429 responses honour `Retry-After`, auth-failures stop permanently, transient errors retry after 5 min
-- Add SKU-cache pruning — 14-day aging + `scenesChecked` flag + hard-filter of stale Cloud entries without capabilities
-- Extend startup grace period for MQTT+Cloud from 30s to 60s — covers normal MQTT reconnect-attempt timing
-- Fix `info.mqttConnected` state not updating on disconnect
-- 427 tests (was 399)
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

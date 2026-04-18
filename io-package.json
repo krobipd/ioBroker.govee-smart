@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "1.6.6",
+        "version": "1.6.7",
         "news": {
+            "1.6.7": {
+                "en": "Fix race condition when MQTT reveals more segments than Cloud — skip the segment-state sync for the discovery push so new datapoints get created first (no more \"State has no existing object\" warnings). Next AA A5 push (seconds later) populates the fully-built tree",
+                "de": "Race-Condition behoben wenn MQTT mehr Segmente meldet als Cloud — Segment-Sync beim Discovery-Push überspringen, damit die neuen Datenpunkte erst angelegt werden (keine \"State has no existing object\"-Warnungen mehr). Der nächste AA A5-Push befüllt den fertigen Tree Sekunden später",
+                "ru": "Исправлено состояние гонки при обнаружении новых сегментов через MQTT",
+                "pt": "Corrigida condição de corrida ao descobrir mais segmentos via MQTT",
+                "nl": "Race condition bij ontdekken van meer segmenten via MQTT opgelost",
+                "fr": "Condition de concurrence corrigée lors de la découverte de segments via MQTT",
+                "it": "Risolta race condition durante la scoperta di segmenti via MQTT",
+                "es": "Corregida condición de carrera al descubrir más segmentos vía MQTT",
+                "pl": "Naprawiono wyścig przy wykrywaniu większej liczby segmentów przez MQTT",
+                "uk": "Виправлено race condition під час виявлення сегментів через MQTT",
+                "zh-cn": "修复通过 MQTT 发现更多分段时的竞态条件"
+            },
             "1.6.6": {
                 "en": "Fix under-reporting of segment count from Cloud — when MQTT AA A5 packets reveal more physical segments than Cloud advertised, bump segmentCount and rebuild state tree so datapoints appear for ALL segments\nparseMqttSegmentData no longer caps at Cloud segmentCount, returns every real segment it sees; trailing all-zero padding slots are still stripped\nflashSingleSegment dims segments 0-55 (Govee bitmask maximum) instead of capping at segmentCount, so under-reported strips cannot leave extra segments lit during wizard runs\nmanual_list validation accepts indices up to 55 instead of capping at Cloud segmentCount",
                 "de": "Fix Under-Reporting der Segmentzahl von der Cloud — wenn MQTT AA A5 mehr echte Segmente zeigt als Cloud meldet, wird segmentCount hochgezählt und der State-Tree neu gebaut, Datenpunkte erscheinen für ALLE Segmente\nparseMqttSegmentData cappt nicht mehr bei Cloud segmentCount, gibt jedes echte Segment zurück; trailing all-zero Padding-Slots werden trotzdem entfernt\nflashSingleSegment dimmt Segmente 0-55 (Govee-Bitmask-Max) statt bei segmentCount zu cappen, damit unter-gemeldete Strips keine hellen Restsegmente mehr zurücklassen\nmanual_list-Validierung akzeptiert Indizes bis 55 statt bei Cloud segmentCount zu cappen",
@@ -80,19 +93,6 @@
                 "pl": "Naprawa Kreatora Wykrywania Segmentów w admin UI — typ przycisku jsonConfig, dropdown urządzeń",
                 "uk": "Виправлено майстер виявлення сегментів в admin UI — тип кнопки jsonConfig, dropdown пристроїв",
                 "zh-cn": "修复管理界面中的分段检测向导 — jsonConfig 按钮类型和设备下拉框"
-            },
-            "1.6.0": {
-                "en": "Add manual segment override for cut LED strips — declare which segment indices actually exist via segments.manual_mode + segments.manual_list (supports ranges like \"0-9\" or gaps like \"0-8,10-14\")\nAdd interactive Segment Detection wizard in admin UI — flashes each segment, user answers Yes/No, adapter writes the manual list\nAdd SKU cache pruning — stale entries without network sighting for 14+ days are removed automatically; scenesChecked flag prevents endless Cloud refetch when scenes are legitimately empty\nHard-filter Cloud device list — stale registrations without capabilities are skipped and no longer clutter the cache\nMQTT/Cloud startup grace raised to 60s with honest \"still connecting\" status; Cloud now has a background retry loop (5 min default, Retry-After respected on rate-limit, no retry on auth failure)\nFix info.mqttConnected staying stale — state now reliably reflects current connection on any failure\n427 tests (was 399)",
-                "de": "Manuelle Segment-Definition für abgeschnittene LED-Strips — Indizes über segments.manual_mode + segments.manual_list festlegen (Ranges wie \"0-9\" oder Lücken wie \"0-8,10-14\")\nInteraktiver Segment-Erkennungs-Assistent im Admin-UI — flasht jedes Segment, User bestätigt Ja/Nein, Adapter schreibt die Liste\nSKU-Cache-Aufräumen — Einträge ohne Netzwerk-Sichtung seit 14+ Tagen werden automatisch entfernt; scenesChecked-Flag verhindert Endlos-Refetch bei legitim leeren Szenen-Listen\nHard-Filter für Cloud-Geräteliste — stale Registrierungen ohne Capabilities werden übersprungen, kein Cache-Müll mehr\nMQTT/Cloud-Startup-Grace auf 60s erhöht mit ehrlicher \"noch im Aufbau\"-Meldung; Cloud mit Background-Retry-Loop (5 Min default, Retry-After bei Rate-Limit respektiert, kein Retry bei Auth-Fehler)\nFix info.mqttConnected hängt auf altem Wert — State reflektiert jetzt zuverlässig den aktuellen Verbindungszustand\n427 Tests (vorher 399)",
-                "ru": "Ручное переопределение сегментов для обрезанных LED-лент + мастер определения в админ-UI + цикл повторного подключения к облаку",
-                "pt": "Substituição manual de segmentos para fitas LED cortadas + assistente de detecção no admin + loop de reconexão à nuvem",
-                "nl": "Handmatige segment-override voor geknipte LED-strips + detectie-wizard in admin + cloud-retry-loop",
-                "fr": "Remplacement manuel des segments pour les rubans LED coupés + assistant de détection dans l'admin + boucle de reconnexion au cloud",
-                "it": "Override manuale segmenti per strip LED tagliate + wizard di rilevamento in admin + loop di riconnessione cloud",
-                "es": "Anulación manual de segmentos para tiras LED cortadas + asistente de detección en admin + bucle de reconexión a la nube",
-                "pl": "Ręczne zastąpienie segmentów dla przyciętych taśm LED + kreator wykrywania w admin + pętla ponownego łączenia z chmurą",
-                "uk": "Ручне перевизначення сегментів для обрізаних LED-стрічок + майстер виявлення в admin + цикл повторного підключення до хмари",
-                "zh-cn": "为裁剪的 LED 灯带添加手动分段覆盖 + 管理界面检测向导 + 云重连循环"
             }
         },
         "titleLang": {

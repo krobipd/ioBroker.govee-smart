@@ -680,6 +680,7 @@ class DeviceManager {
           );
           device.segmentCount = maxSeen;
           (_d = this.onSegmentCountGrown) == null ? void 0 : _d.call(this, device);
+          return;
         }
       }
       const filtered = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? segData.filter((s) => device.manualSegments.includes(s.index)) : segData;
