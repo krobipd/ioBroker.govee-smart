@@ -452,6 +452,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.6.5 (2026-04-19)
+- Fix wizard flash — all three BLE packets (others-dim + target-color + target-brightness) are now bundled into one `ptReal` UDP datagram. Previously separate datagrams were dropped by the device under back-pressure, leading to "only some segments went dark" symptoms
+- Wizard now switches the strip ON and sets global brightness to 100 before the first flash, so the selected segment is visible regardless of the previous dim state (baseline is still captured and restored on abort/finish)
+- Live status box — new `info.wizardStatus` state, written on every wizard step; admin panel uses `type: "state"` to show the current segment, the total and the next action live (Admin 7.1+)
+
 ### 1.6.4 (2026-04-18)
 - Wizard UX rewrite — dropdown now shows only online devices, a persistent status box indicates which segment is currently being checked, and each button click triggers a multi-line info toast with clear Yes/No guidance
 - Status box uses `textSendTo` (refreshes when the device is re-selected); button responses use the `message` field so admin shows info toasts correctly (previously silent because of wrong field name)
@@ -484,12 +489,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Type `CloudCapability.parameters` is now optional — API may omit it even when docs require it
 - `normalizeDeviceId` and cache file naming safe against non-string input
 - 45 new regression tests covering API drift scenarios (399 tests total)
-
-### 1.5.1 (2026-04-15)
-- Fix device type matching — scenes only loaded via fallback because type comparison never matched Cloud API format
-- Add dynamic API rate limit sharing with other Govee adapters on the same account
-- Filter non-light device types (heaters, fans, sensors etc.) — this adapter handles lights only
-- 354 tests (was 352)
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

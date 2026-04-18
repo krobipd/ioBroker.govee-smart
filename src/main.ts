@@ -128,9 +128,25 @@ class GoveeAdapter extends utils.Adapter {
       },
       native: {},
     });
+    await this.setObjectNotExistsAsync("info.wizardStatus", {
+      type: "state",
+      common: {
+        name: "Segment-Wizard status",
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: "",
+      },
+      native: {},
+    });
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
+    await this.setStateAsync("info.wizardStatus", {
+      val: "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.",
+      ack: true,
+    });
 
     this.stateManager = new StateManager(this);
     // General groups online state (reflects Cloud connection)
@@ -1350,14 +1366,6 @@ class GoveeAdapter extends utils.Adapter {
         this.sendMessageResponse(obj, list);
         return;
       }
-      if (obj.command === "getWizardStatus") {
-        // Called by textSendTo — returns current wizard state as display string
-        const text =
-          this.segmentWizard?.getStatusText?.() ??
-          "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke Start.";
-        this.sendMessageResponse(obj, text);
-        return;
-      }
       if (obj.command === "segmentWizard") {
         const payload = (obj.message ?? {}) as {
           action?: string;
@@ -1418,6 +1426,30 @@ class GoveeAdapter extends utils.Adapter {
       sendCommand: async (device, command, value) => {
         await this.deviceManager?.sendCommand(device, command, value);
       },
+      flashSegmentAtomic: (device, total, idx) => {
+        if (!device.lanIp || !this.lanClient) {
+          return Promise.resolve(false);
+        }
+        this.lanClient.flashSingleSegment(device.lanIp, total, idx);
+        return Promise.resolve(true);
+      },
+      restoreStripAtomic: (device, total, color, brightness) => {
+        if (!device.lanIp || !this.lanClient) {
+          return Promise.resolve(false);
+        }
+        const r = (color >> 16) & 0xff;
+        const g = (color >> 8) & 0xff;
+        const b = color & 0xff;
+        this.lanClient.restoreAllSegments(
+          device.lanIp,
+          total,
+          r,
+          g,
+          b,
+          brightness,
+        );
+        return Promise.resolve(true);
+      },
       findDevice: (key) => this.findDeviceByKey(key),
       namespace: this.namespace,
       devicePrefix: (device) => this.stateManager?.devicePrefix(device) ?? "",
@@ -1440,7 +1472,15 @@ class GoveeAdapter extends utils.Adapter {
     if (!this.segmentWizard) {
       this.segmentWizard = new SegmentWizard(this.buildWizardHost());
     }
-    return this.segmentWizard.runStep(action, deviceKey);
+    const response = await this.segmentWizard.runStep(action, deviceKey);
+    // Mirror the current wizard status into a plain state so admin's
+    // `type: "state"` component can show it live via state subscription.
+    const statusText = this.segmentWizard.getStatusText();
+    await this.setStateAsync("info.wizardStatus", {
+      val: statusText,
+      ack: true,
+    });
+    return response;
   }
 
   /**

@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "1.6.4",
+        "version": "1.6.5",
         "news": {
+            "1.6.5": {
+                "en": "Fix Wizard flash — all three BLE packets (others dim + target color + target brightness) now bundled in one ptReal UDP datagram, no more dropped packets on Govee back-pressure\nBefore flashing: set power ON + global brightness 100 so user sees the strip regardless of previous dim state\nLive status via state — new info.wizardStatus state written on every wizard step, admin panel uses type:\"state\" to show it live (Admin 7.1+)",
+                "de": "Fix Wizard-Flash — alle drei BLE-Pakete (others dim + target color + target brightness) jetzt in einem ptReal-UDP gebündelt, keine verschluckten Pakete mehr bei Govee-Rückstau\nVor dem Flash: Power AN + globale Helligkeit 100, damit der Strip sichtbar ist egal wie er vorher gedimmt war\nLive-Status via State — neuer info.wizardStatus wird bei jedem Schritt geschrieben, Admin-Panel zeigt ihn live via type:\"state\" (Admin 7.1+)",
+                "ru": "Исправлен flash мастера — все три BLE-пакета в одной ptReal UDP-дейтаграмме\nПеред flash: Power ON + яркость 100\nЖивой статус через state info.wizardStatus",
+                "pt": "Fix flash do assistente — três pacotes BLE em um UDP ptReal\nAntes do flash: Power ON + brilho 100\nStatus ao vivo via state info.wizardStatus",
+                "nl": "Wizard flash fix — drie BLE-pakketten in één ptReal UDP\nVoor flash: Power AAN + helderheid 100\nLive status via state info.wizardStatus",
+                "fr": "Correction flash assistant — trois paquets BLE dans un seul UDP ptReal\nAvant flash: Power ON + luminosité 100\nStatut en direct via state info.wizardStatus",
+                "it": "Fix flash wizard — tre pacchetti BLE in un singolo UDP ptReal\nPrima del flash: Power ON + luminosità 100\nStato live via state info.wizardStatus",
+                "es": "Corrección flash asistente — tres paquetes BLE en un UDP ptReal\nAntes del flash: Power ON + brillo 100\nEstado en vivo via state info.wizardStatus",
+                "pl": "Naprawa flash kreatora — trzy pakiety BLE w jednym UDP ptReal\nPrzed flash: Power ON + jasność 100\nStatus na żywo przez state info.wizardStatus",
+                "uk": "Виправлено flash майстра — три BLE-пакети в одній ptReal UDP\nПеред flash: Power ON + яскравість 100\nЖивий статус через state info.wizardStatus",
+                "zh-cn": "修复向导闪烁 — 三个 BLE 数据包合并到一个 ptReal UDP\n闪烁前: Power ON + 亮度 100\n通过 state info.wizardStatus 实时显示状态"
+            },
             "1.6.4": {
                 "en": "Wizard UX rewrite — only online devices in dropdown, persistent status box shows which segment is being checked, multi-line toast feedback on every button click\nStatus box via textSendTo (refreshes when device is re-selected), button responses now use `message` field so admin shows info-toasts correctly",
                 "de": "Wizard UX-Überarbeitung — nur online-Geräte im Dropdown, permanente Status-Box zeigt welches Segment gerade geprüft wird, mehrzeiliger Toast-Text bei jedem Button-Klick\nStatus-Box via textSendTo (refreshed bei Device-Neuauswahl), Button-Responses nutzen jetzt `message`-Feld damit Admin Info-Toasts korrekt anzeigt",
@@ -80,19 +93,6 @@
                 "pl": "Wzmocniono odporność na dryf Cloud API — capabilities bez pola parameters, nie-tekstowe type/instance i zniekształcone wpisy urządzeń nie powodują już awarii adaptera\nWartości logiczne jako string (\"1\"/\"true\") i stringi liczbowe (\"75\") z Cloud API są teraz poprawnie konwertowane — wcześniej cichy błędny stan\nDodano 45 testów regresyjnych dla scenariuszy dryfu API — łącznie 399 testów",
                 "uk": "Підсилено захист від дрейфу Cloud API — можливості без поля parameters, не-рядкові type/instance і неправильні записи пристроїв більше не крешать адаптер\nРядкові булеві (\"1\"/\"true\") та числові рядки (\"75\") з Cloud API тепер коректно конвертуються — раніше тихо давали неправильні значення\nДодано 45 регресійних тестів для сценаріїв дрейфу API — всього 399 тестів",
                 "zh-cn": "加固Cloud API抗漂移能力 — 缺少parameters字段的能力、非字符串type/instance和格式错误的设备条目不再导致适配器崩溃\n来自Cloud API的字符串布尔值(\"1\"/\"true\")和数值字符串(\"75\")现在正确转换 — 之前静默产生错误状态值\n新增45个API漂移场景回归测试 — 共399个测试"
-            },
-            "1.5.1": {
-                "en": "Fix device type matching — scenes only loaded via fallback because type comparison never matched Cloud API format\nAdd dynamic API rate limit sharing with other Govee adapters on the same account\nFilter non-light device types (heaters, fans, sensors etc.) — this adapter handles lights only\n354 tests (was 352)",
-                "de": "Fix Gerätetyp-Vergleich — Szenen wurden nur über Fallback geladen weil Typ-Vergleich nie mit Cloud-API-Format übereinstimmte\nDynamische API-Rate-Limit-Aufteilung mit anderen Govee-Adaptern auf demselben Account\nNicht-Licht-Gerätetypen gefiltert (Heizungen, Ventilatoren, Sensoren etc.) — dieser Adapter ist nur für Lichter\n354 Tests (vorher 352)",
-                "ru": "Исправлено сравнение типа устройства — сцены загружались только через запасной механизм из-за несоответствия формата Cloud API\nДинамическое разделение лимитов API с другими адаптерами Govee на том же аккаунте\nФильтрация не-световых типов устройств (обогреватели, вентиляторы, датчики) — этот адаптер только для света\n354 теста (было 352)",
-                "pt": "Corrigida comparação de tipo de dispositivo — cenas carregadas apenas via fallback devido a incompatibilidade com formato Cloud API\nCompartilhamento dinâmico de limite de taxa API com outros adaptadores Govee na mesma conta\nFiltrar tipos de dispositivos não-luz (aquecedores, ventiladores, sensores) — este adaptador é apenas para luzes\n354 testes (eram 352)",
-                "nl": "Fix apparaattype vergelijking — scènes alleen geladen via fallback vanwege mismatch met Cloud API formaat\nDynamisch API rate limit delen met andere Govee adapters op hetzelfde account\nNiet-licht apparaattypen gefilterd (verwarmers, ventilatoren, sensoren) — deze adapter is alleen voor lampen\n354 tests (was 352)",
-                "fr": "Correction comparaison type d'appareil — scènes chargées uniquement via fallback à cause d'incompatibilité avec format Cloud API\nPartage dynamique des limites de taux API avec d'autres adaptateurs Govee sur le même compte\nFiltrage des types d'appareils non-lumière (chauffages, ventilateurs, capteurs) — cet adaptateur est uniquement pour les lumières\n354 tests (était 352)",
-                "it": "Fix confronto tipo dispositivo — scene caricate solo via fallback per mancata corrispondenza con formato Cloud API\nCondivisione dinamica dei limiti API con altri adattatori Govee sullo stesso account\nFiltro tipi dispositivi non-luce (riscaldatori, ventilatori, sensori) — questo adattatore è solo per le luci\n354 test (erano 352)",
-                "es": "Fix comparación tipo de dispositivo — escenas cargadas solo vía fallback por incompatibilidad con formato Cloud API\nCompartición dinámica de límites de tasa API con otros adaptadores Govee en la misma cuenta\nFiltrar tipos de dispositivos no-luz (calentadores, ventiladores, sensores) — este adaptador es solo para luces\n354 pruebas (eran 352)",
-                "pl": "Naprawiono porównanie typu urządzenia — sceny ładowane tylko przez fallback z powodu niezgodności z formatem Cloud API\nDynamiczne współdzielenie limitów API z innymi adapterami Govee na tym samym koncie\nFiltrowanie typów urządzeń nie-świetlnych (grzejniki, wentylatory, czujniki) — ten adapter jest tylko dla lamp\n354 testy (było 352)",
-                "uk": "Виправлено порівняння типу пристрою — сцени завантажувалися лише через резервний механізм через невідповідність формату Cloud API\nДинамічний поділ лімітів API з іншими адаптерами Govee на тому ж акаунті\nФільтрація типів пристроїв не-світло (обігрівачі, вентилятори, датчики) — цей адаптер лише для світла\n354 тести (було 352)",
-                "zh-cn": "修复设备类型比较 — 场景仅通过备用机制加载因为类型比较从未匹配Cloud API格式\n与同账户其他Govee适配器动态共享API速率限制\n过滤非灯具设备类型（加热器、风扇、传感器等）— 此适配器仅处理灯具\n354个测试（原352个）"
             }
         },
         "titleLang": {

@@ -70,6 +70,39 @@ class TestHost implements WizardHost {
         this.calls.push({ kind: "sendCommand", device, command, value });
     }
 
+    /** Filter host.calls down to only the segmentBatch commands (drops the
+     *  preparation calls like `power` and `brightness` that the wizard now
+     *  issues before flashing segment 0). */
+    public segmentBatchCalls(): HostCall[] {
+        return this.calls.filter((c) => c.command === "segmentBatch");
+    }
+
+    // Default: return false so sendCommand fallback path runs — most tests
+    // assert on host.calls. Individual tests can override to true to exercise
+    // the atomic path.
+    public atomicFlashUsed = false;
+    public atomicRestoreUsed = false;
+    public atomicEnabled = false;
+
+    public async flashSegmentAtomic(
+        _device: GoveeDevice,
+        _total: number,
+        _idx: number,
+    ): Promise<boolean> {
+        this.atomicFlashUsed = true;
+        return this.atomicEnabled;
+    }
+
+    public async restoreStripAtomic(
+        _device: GoveeDevice,
+        _total: number,
+        _color: number,
+        _brightness: number,
+    ): Promise<boolean> {
+        this.atomicRestoreUsed = true;
+        return this.atomicEnabled;
+    }
+
     public findDevice(key: string): GoveeDevice | undefined {
         return this.devices.get(key);
     }
@@ -166,6 +199,15 @@ describe("SegmentWizard", () => {
             expect(wizard.isActive()).to.be.false;
         });
 
+        it("should ensure strip is on + full brightness before flashing", async () => {
+            await wizard.start(key);
+            // First two calls must be the strip-preparation step
+            expect(host.calls[0].command).to.equal("power");
+            expect(host.calls[0].value).to.equal(true);
+            expect(host.calls[1].command).to.equal("brightness");
+            expect(host.calls[1].value).to.equal(100);
+        });
+
         it("should open a session and flash segment 0", async () => {
             const r = await wizard.start(key);
             expect(r.error).to.be.undefined;
@@ -173,15 +215,15 @@ describe("SegmentWizard", () => {
             expect(r.progress).to.equal("1 / 5");
             expect(wizard.isActive()).to.be.true;
 
-            // Two sendCommand calls: others→dim, target→bright
-            expect(host.calls).to.have.lengthOf(2);
-            expect(host.calls[0].command).to.equal("segmentBatch");
-            expect(host.calls[0].value).to.deep.equal({
+            // Two segmentBatch calls: others→dim, target→bright
+            const batches = host.segmentBatchCalls();
+            expect(batches).to.have.lengthOf(2);
+            expect(batches[0].value).to.deep.equal({
                 segments: [1, 2, 3, 4],
                 color: 0,
-                brightness: 1,
+                brightness: 0,
             });
-            expect(host.calls[1].value).to.deep.equal({
+            expect(batches[1].value).to.deep.equal({
                 segments: [0],
                 color: 0xffffff,
                 brightness: 100,
@@ -192,7 +234,9 @@ describe("SegmentWizard", () => {
             // This is the exact regression from v1.6.2 where parseSegmentBatch
             // called cmd.split(":") on a non-string value and crashed.
             await wizard.start(key);
-            for (const c of host.calls) {
+            const batches = host.segmentBatchCalls();
+            expect(batches.length).to.be.greaterThan(0);
+            for (const c of batches) {
                 expect(c.value).to.be.an("object");
                 expect(c.value).to.not.be.a("string");
                 const v = c.value as { segments: number[] };
@@ -492,8 +536,7 @@ describe("SegmentWizard", () => {
             await wizard.answer(true);
             await wizard.answer(true);
             await wizard.answer(true);
-            for (const c of host.calls) {
-                expect(c.command).to.equal("segmentBatch");
+            for (const c of host.segmentBatchCalls()) {
                 expect(c.value).to.be.an("object");
                 expect(c.value).to.not.be.a("string");
             }
@@ -508,9 +551,10 @@ describe("SegmentWizard", () => {
 
             host.calls.length = 0;
             await wizard.start(k2);
-            // Only 1 segment → no "others" to dim → single sendCommand
-            expect(host.calls).to.have.lengthOf(1);
-            const v = host.calls[0].value as { segments: number[] };
+            // Only 1 segment → no "others" to dim → single segmentBatch call
+            const batches = host.segmentBatchCalls();
+            expect(batches).to.have.lengthOf(1);
+            const v = batches[0].value as { segments: number[] };
             expect(v.segments).to.deep.equal([0]);
         });
     });

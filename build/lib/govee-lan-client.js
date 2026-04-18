@@ -283,6 +283,57 @@ class GoveeLanClient {
     this.sendPtReal(ip, [buildSegmentBrightnessPacket(brightness, segments)]);
   }
   /**
+   * Flash a single segment bright white and dim all other segments, in ONE
+   * atomic ptReal transmission. All three required BLE packets are bundled
+   * into a single UDP datagram so the device cannot drop intermediate steps.
+   *
+   * Packet order:
+   *   1. All other segments → brightness 0 (turn them off visually)
+   *   2. Target segment → color 0xFFFFFF (full white)
+   *   3. Target segment → brightness 100 (make it bright)
+   *
+   * @param ip Device IP address
+   * @param total Total number of segments on the device
+   * @param idx Target segment index (0-based) to flash white
+   */
+  flashSingleSegment(ip, total, idx) {
+    if (total <= 0 || idx < 0 || idx >= total) {
+      return;
+    }
+    const others = Array.from({ length: total }, (_, i) => i).filter(
+      (i) => i !== idx
+    );
+    const packets = [];
+    if (others.length > 0) {
+      packets.push(buildSegmentBrightnessPacket(0, others));
+    }
+    packets.push(buildSegmentColorPacket(255, 255, 255, [idx]));
+    packets.push(buildSegmentBrightnessPacket(100, [idx]));
+    this.sendPtReal(ip, packets);
+  }
+  /**
+   * Restore a segment strip to a uniform color + brightness in one atomic
+   * ptReal transmission. Used at wizard end/abort to put the strip back to
+   * the captured baseline.
+   *
+   * @param ip Device IP address
+   * @param total Total number of segments
+   * @param r Red 0-255
+   * @param g Green 0-255
+   * @param b Blue 0-255
+   * @param brightness Brightness 0-100
+   */
+  restoreAllSegments(ip, total, r, g, b, brightness) {
+    if (total <= 0) {
+      return;
+    }
+    const all = Array.from({ length: total }, (_, i) => i);
+    this.sendPtReal(ip, [
+      buildSegmentColorPacket(r, g, b, all),
+      buildSegmentBrightnessPacket(brightness, all)
+    ]);
+  }
+  /**
    * Request device status
    *
    * @param ip Device IP address

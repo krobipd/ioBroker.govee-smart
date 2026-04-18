@@ -131,9 +131,25 @@ class GoveeAdapter extends utils.Adapter {
       },
       native: {}
     });
+    await this.setObjectNotExistsAsync("info.wizardStatus", {
+      type: "state",
+      common: {
+        name: "Segment-Wizard status",
+        type: "string",
+        role: "text",
+        read: true,
+        write: false,
+        def: ""
+      },
+      native: {}
+    });
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
+    await this.setStateAsync("info.wizardStatus", {
+      val: "Kein Wizard aktiv. W\xE4hle oben einen LED-Strip und klicke \u25B6 Start.",
+      ack: true
+    });
     this.stateManager = new import_state_manager.StateManager(this);
     await this.stateManager.createGroupsOnlineState(false);
     this.deviceManager = new import_device_manager.DeviceManager(this.log);
@@ -1076,7 +1092,7 @@ class GoveeAdapter extends utils.Adapter {
     });
   }
   async handleMessage(obj) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+    var _a, _b, _c, _d, _e;
     try {
       if (obj.command === "getSegmentDevices") {
         const devices = (_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : [];
@@ -1092,16 +1108,11 @@ class GoveeAdapter extends utils.Adapter {
         this.sendMessageResponse(obj, list);
         return;
       }
-      if (obj.command === "getWizardStatus") {
-        const text = (_e = (_d = (_c = this.segmentWizard) == null ? void 0 : _c.getStatusText) == null ? void 0 : _d.call(_c)) != null ? _e : "Kein Wizard aktiv. W\xE4hle oben einen LED-Strip und klicke Start.";
-        this.sendMessageResponse(obj, text);
-        return;
-      }
       if (obj.command === "segmentWizard") {
-        const payload = (_f = obj.message) != null ? _f : {};
+        const payload = (_c = obj.message) != null ? _c : {};
         const response = await this.runWizardStep(
-          (_g = payload.action) != null ? _g : "",
-          (_h = payload.device) != null ? _h : ""
+          (_d = payload.action) != null ? _d : "",
+          (_e = payload.device) != null ? _e : ""
         );
         this.sendMessageResponse(obj, response);
         return;
@@ -1151,6 +1162,30 @@ class GoveeAdapter extends utils.Adapter {
         var _a;
         await ((_a = this.deviceManager) == null ? void 0 : _a.sendCommand(device, command, value));
       },
+      flashSegmentAtomic: (device, total, idx) => {
+        if (!device.lanIp || !this.lanClient) {
+          return Promise.resolve(false);
+        }
+        this.lanClient.flashSingleSegment(device.lanIp, total, idx);
+        return Promise.resolve(true);
+      },
+      restoreStripAtomic: (device, total, color, brightness) => {
+        if (!device.lanIp || !this.lanClient) {
+          return Promise.resolve(false);
+        }
+        const r = color >> 16 & 255;
+        const g = color >> 8 & 255;
+        const b = color & 255;
+        this.lanClient.restoreAllSegments(
+          device.lanIp,
+          total,
+          r,
+          g,
+          b,
+          brightness
+        );
+        return Promise.resolve(true);
+      },
       findDevice: (key) => this.findDeviceByKey(key),
       namespace: this.namespace,
       devicePrefix: (device) => {
@@ -1172,7 +1207,13 @@ class GoveeAdapter extends utils.Adapter {
     if (!this.segmentWizard) {
       this.segmentWizard = new import_segment_wizard.SegmentWizard(this.buildWizardHost());
     }
-    return this.segmentWizard.runStep(action, deviceKey);
+    const response = await this.segmentWizard.runStep(action, deviceKey);
+    const statusText = this.segmentWizard.getStatusText();
+    await this.setStateAsync("info.wizardStatus", {
+      val: statusText,
+      ack: true
+    });
+    return response;
   }
   /**
    * Save current device state as a local snapshot.

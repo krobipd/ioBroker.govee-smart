@@ -51,6 +51,28 @@ export interface WizardHost {
     command: string,
     value: unknown,
   ): Promise<void>;
+  /**
+   * Flash one segment bright white and dim all others — atomically, in a
+   * single ptReal datagram. Required because separate UDP sends get dropped
+   * by the Govee device under ~50 ms of back-pressure. Returns `true` if
+   * the atomic path was used (LAN available), `false` if host fell back to
+   * sendCommand (Cloud or no LAN).
+   */
+  flashSegmentAtomic(
+    device: GoveeDevice,
+    total: number,
+    idx: number,
+  ): Promise<boolean>;
+  /**
+   * Restore the whole strip to a uniform color + brightness atomically.
+   * Returns `true` if LAN atomic path was used.
+   */
+  restoreStripAtomic(
+    device: GoveeDevice,
+    total: number,
+    color: number,
+    brightness: number,
+  ): Promise<boolean>;
   /** Look up a device by its wizard-session key. */
   findDevice(key: string): GoveeDevice | undefined;
   /** Adapter namespace (e.g. "govee-smart.0"). */
@@ -172,6 +194,11 @@ export class SegmentWizard {
       baseline,
     };
     this.scheduleIdleTimeout();
+    // Make sure the strip is ON and at full global brightness before we
+    // start flashing segments — otherwise a user with their strip dimmed to
+    // e.g. 10% would see nothing.
+    await this.host.sendCommand(device, "power", true);
+    await this.host.sendCommand(device, "brightness", 100);
     await this.flashSegment(device, 0);
 
     return {
@@ -377,6 +404,15 @@ export class SegmentWizard {
     if (total <= 0) {
       return;
     }
+    // Atomic path: LAN ptReal with all three packets bundled in one UDP.
+    // Back-pressure on Govee devices drops the second+third packet when
+    // they arrive in separate datagrams (observed on H61BE), producing the
+    // "only some segments went dark" symptom.
+    const atomic = await this.host.flashSegmentAtomic(device, total, idx);
+    if (atomic) {
+      return;
+    }
+    // Fallback (Cloud or no LAN): two sendCommand calls with pacing.
     const others = Array.from({ length: total }, (_, i) => i).filter(
       (i) => i !== idx,
     );
@@ -384,7 +420,7 @@ export class SegmentWizard {
       await this.host.sendCommand(device, "segmentBatch", {
         segments: others,
         color: 0,
-        brightness: 1,
+        brightness: 0,
       });
     }
     await this.host.sendCommand(device, "segmentBatch", {
@@ -405,15 +441,29 @@ export class SegmentWizard {
     device: GoveeDevice,
     baseline: SegmentWizardSession["baseline"],
   ): Promise<void> {
-    if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb)) {
-      const total = device.segmentCount ?? 0;
-      if (total > 0) {
-        await this.host.sendCommand(device, "segmentBatch", {
-          segments: Array.from({ length: total }, (_, i) => i),
-          color: parseInt(baseline.colorRgb.slice(1), 16),
-          brightness: baseline.brightness ?? 100,
-        });
-      }
+    if (!baseline.colorRgb || !/^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb)) {
+      return;
     }
+    const total = device.segmentCount ?? 0;
+    if (total <= 0) {
+      return;
+    }
+    const color = parseInt(baseline.colorRgb.slice(1), 16);
+    const brightness = baseline.brightness ?? 100;
+    // Atomic path first — same back-pressure avoidance as flashSegment.
+    const atomic = await this.host.restoreStripAtomic(
+      device,
+      total,
+      color,
+      brightness,
+    );
+    if (atomic) {
+      return;
+    }
+    await this.host.sendCommand(device, "segmentBatch", {
+      segments: Array.from({ length: total }, (_, i) => i),
+      color,
+      brightness,
+    });
   }
 }

@@ -1,5 +1,11 @@
 # Older Changes
 
+## 1.5.1 (2026-04-15)
+- Fix device type matching — scenes only loaded via fallback because type comparison never matched Cloud API format
+- Add dynamic API rate limit sharing with other Govee adapters on the same account
+- Filter non-light device types (heaters, fans, sensors etc.) — this adapter handles lights only
+- 354 tests (was 352)
+
 ## 1.5.0 (2026-04-14)
 - Add local segment control via BLE-over-LAN (ptReal) — segments now controlled locally (~100ms) instead of Cloud (5-10s)
 - Add scene variants — all light effects per scene (A/B/C/D) instead of only the first variant
