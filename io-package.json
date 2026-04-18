@@ -1,8 +1,12 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "1.6.1",
+    "version": "1.6.2",
     "news": {
+      "1.6.2": {
+        "en": "Fix jsonConfig schema warnings for Segment Detection Wizard — removed unsupported \"button\" property, aligned variant/color to admin schema (primary/secondary, contained/outlined), set xs=12 for mobile-full-width on sendTo buttons\nNo functionality change, purely schema compliance",
+        "de": "jsonConfig-Schema-Warnings für Segment-Erkennungs-Assistent behoben — nicht unterstütztes \"button\"-Property entfernt, variant/color an Admin-Schema angepasst (primary/secondary, contained/outlined), xs=12 für sendTo-Buttons (volle Breite mobil)\nKeine Funktionsänderung, reine Schema-Compliance"
+      },
       "1.6.1": {
         "en": "Fix Segment Detection Wizard in admin UI — jsonConfig button type was \"sendto\" (lowercase) instead of \"sendTo\" causing validation errors\nFix LED strip dropdown showed as free-text input because selectSendTo expects the array directly, not wrapped in {list: ...}",
         "de": "Fix Segment-Erkennungs-Assistent im Admin-UI — jsonConfig-Button-Typ war \"sendto\" (klein) statt \"sendTo\", führte zu Validierungsfehlern\nFix LED-Strip-Dropdown erschien als freies Texteingabefeld, weil selectSendTo das Array direkt erwartet, nicht in {list: ...} verpackt"
@@ -62,19 +66,6 @@
         "pl": "Naprawiono pustą rozdzielczość członków grupy (niezgodność nazw pól API)\nDodano wstępne sprawdzanie bearer token z opisowym komunikatem\nDodano logowanie debug gdy API grup nie zwraca danych",
         "uk": "Виправлено порожнє розв'язування учасників групи (невідповідність назв полів API)\nДодано попередню перевірку bearer token з описовим повідомленням\nДодано debug-логування коли API груп не повертає даних",
         "zh-cn": "修复组成员解析返回空（API字段名不匹配）\n添加bearer token预检查及描述性日志消息\n添加组成员API返回空数据时的debug日志"
-      },
-      "1.4.0": {
-        "en": "Redesign group handling: fan-out commands to member devices via LAN/ptReal instead of Cloud\nGroup capabilities computed as intersection of member devices (power, brightness, color, scenes, music)\nAdd info.members state showing group member device IDs\nAdd dynamic info.membersUnreachable state (only when needed)\nRemove snapshots and diagnostics from groups (not applicable)\nUpdate undocumented API headers to match current Govee app version",
-        "de": "Gruppen-Handling redesigned: Fan-Out-Befehle an Mitgliedsgeräte über LAN/ptReal statt Cloud\nGruppen-Capabilities berechnet als Schnittmenge der Mitgliedsgeräte (Power, Helligkeit, Farbe, Szenen, Musik)\ninfo.members State zeigt Gruppen-Mitglieds-IDs\nDynamischer info.membersUnreachable State (nur wenn nötig)\nSnapshots und Diagnostics aus Gruppen entfernt (nicht anwendbar)\nUndokumentierte API-Header auf aktuelle Govee-App-Version aktualisiert",
-        "ru": "Редизайн управления группами: fan-out команды на устройства-участники через LAN/ptReal вместо Cloud\nВозможности групп вычисляются как пересечение устройств-участников\nДобавлен state info.members с ID устройств группы\nДобавлен динамический state info.membersUnreachable (только при необходимости)\nУдалены снимки и диагностика из групп\nОбновлены заголовки недокументированного API",
-        "pt": "Redesign do gerenciamento de grupos: fan-out de comandos para dispositivos membros via LAN/ptReal\nCapacidades do grupo calculadas como interseção dos dispositivos membros\nAdicionado state info.members com IDs dos dispositivos do grupo\nAdicionado state dinâmico info.membersUnreachable (apenas quando necessário)\nRemovidos snapshots e diagnósticos dos grupos\nAtualizados headers da API não documentada",
-        "nl": "Groepenbeheer herontworpen: fan-out commando's naar lidapparaten via LAN/ptReal\nGroepscapaciteiten berekend als doorsnede van lidapparaten\ninfo.members state toegevoegd met groepsleden-ID's\nDynamische info.membersUnreachable state (alleen indien nodig)\nSnapshots en diagnostiek verwijderd uit groepen\nOngedocumenteerde API-headers bijgewerkt",
-        "fr": "Refonte gestion des groupes : fan-out des commandes vers les appareils membres via LAN/ptReal\nCapacités de groupe calculées comme intersection des appareils membres\nAjout du state info.members avec les ID des appareils du groupe\nAjout du state dynamique info.membersUnreachable (uniquement si nécessaire)\nSuppression des snapshots et diagnostics des groupes\nMise à jour des en-têtes API non documentée",
-        "it": "Ridisegnata gestione gruppi: fan-out comandi ai dispositivi membri via LAN/ptReal\nCapacità del gruppo calcolate come intersezione dei dispositivi membri\nAggiunto state info.members con ID dispositivi del gruppo\nAggiunto state dinamico info.membersUnreachable (solo quando necessario)\nRimossi snapshot e diagnostica dai gruppi\nAggiornati header API non documentata",
-        "es": "Rediseño del manejo de grupos: fan-out de comandos a dispositivos miembros vía LAN/ptReal\nCapacidades del grupo calculadas como intersección de dispositivos miembros\nAñadido state info.members con IDs de dispositivos del grupo\nAñadido state dinámico info.membersUnreachable (solo cuando es necesario)\nEliminados snapshots y diagnósticos de grupos\nActualizados headers de API no documentada",
-        "pl": "Przeprojektowanie obsługi grup: fan-out poleceń do urządzeń członkowskich przez LAN/ptReal\nMożliwości grupy obliczane jako część wspólna urządzeń członkowskich\nDodano state info.members z ID urządzeń grupy\nDodano dynamiczny state info.membersUnreachable (tylko gdy potrzebny)\nUsunięto snapshoty i diagnostykę z grup\nZaktualizowano nagłówki niedokumentowanego API",
-        "uk": "Редизайн управління групами: fan-out команди на пристрої-учасники через LAN/ptReal\nМожливості групи обчислюються як перетин пристроїв-учасників\nДодано state info.members з ID пристроїв групи\nДодано динамічний state info.membersUnreachable (тільки коли потрібно)\nВидалено знімки та діагностику з груп\nОновлено заголовки недокументованого API",
-        "zh-cn": "重新设计组处理：通过LAN/ptReal向成员设备扇出命令\n组功能计算为成员设备的交集\n添加info.members状态显示组成员设备ID\n添加动态info.membersUnreachable状态（仅在需要时）\n从组中移除快照和诊断\n更新未记录API头以匹配当前Govee应用版本"
       }
     },
     "titleLang": {

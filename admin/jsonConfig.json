@@ -131,40 +131,36 @@
                     "command": "segmentWizard",
                     "jsonData": "{ \"action\": \"start\", \"device\": \"${data._wizDevice}\" }",
                     "label": "wizardBtnStart",
-                    "button": true,
                     "variant": "contained",
                     "color": "primary",
-                    "xs": 6, "sm": 4, "md": 3, "lg": 2, "xl": 2
+                    "xs": 12, "sm": 4, "md": 3, "lg": 2, "xl": 2
                 },
                 "_wizYes": {
                     "type": "sendTo",
                     "command": "segmentWizard",
                     "jsonData": "{ \"action\": \"yes\" }",
                     "label": "wizardBtnYes",
-                    "button": true,
                     "variant": "contained",
                     "color": "primary",
-                    "xs": 6, "sm": 4, "md": 3, "lg": 2, "xl": 2
+                    "xs": 12, "sm": 4, "md": 3, "lg": 2, "xl": 2
                 },
                 "_wizNo": {
                     "type": "sendTo",
                     "command": "segmentWizard",
                     "jsonData": "{ \"action\": \"no\" }",
                     "label": "wizardBtnNo",
-                    "button": true,
                     "variant": "outlined",
                     "color": "secondary",
-                    "xs": 6, "sm": 4, "md": 3, "lg": 2, "xl": 2
+                    "xs": 12, "sm": 4, "md": 3, "lg": 2, "xl": 2
                 },
                 "_wizAbort": {
                     "type": "sendTo",
                     "command": "segmentWizard",
                     "jsonData": "{ \"action\": \"abort\" }",
                     "label": "wizardBtnAbort",
-                    "button": true,
-                    "variant": "text",
-                    "color": "default",
-                    "xs": 6, "sm": 4, "md": 3, "lg": 2, "xl": 2
+                    "variant": "outlined",
+                    "color": "secondary",
+                    "xs": 12, "sm": 4, "md": 3, "lg": 2, "xl": 2
                 },
                 "_wizHelp": {
                     "newLine": true,
