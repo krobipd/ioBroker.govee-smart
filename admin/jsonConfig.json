@@ -151,7 +151,6 @@
                     "label": "wizardStatusLabel",
                     "foreign": false,
                     "controlDelay": 0,
-                    "controls": "text",
                     "readOnly": true,
                     "xs": 12, "sm": 12, "md": 12, "lg": 12, "xl": 12,
                     "style": { "fontSize": 15, "fontWeight": "500", "marginTop": 16, "marginBottom": 8, "padding": 16, "backgroundColor": "rgba(33, 150, 243, 0.12)", "borderRadius": 4, "whiteSpace": "pre-line", "lineHeight": 1.5 }
