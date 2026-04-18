@@ -54,6 +54,13 @@ export interface CachedDeviceData {
   scenesChecked?: boolean;
   /** Timestamp (ms) when device was last seen on local network (LAN/MQTT). */
   lastSeenOnNetwork?: number;
+  /**
+   * Physical segment count discovered from MQTT `AA A5` stream — wins over
+   * the Cloud capability value when the device pushes more segments than
+   * Cloud admits (under-reporting bug on long strips). Only set by the
+   * MQTT discovery path; Cloud data never writes this.
+   */
+  discoveredSegmentCount?: number;
 }
 
 /**

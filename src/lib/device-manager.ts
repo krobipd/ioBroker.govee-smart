@@ -877,6 +877,12 @@ export class DeviceManager {
             `${device.name}: MQTT shows ${maxSeen} segments (Cloud reported ${device.segmentCount}) — updating state tree`,
           );
           device.segmentCount = maxSeen;
+          // Persist immediately so the next restart reads the real count
+          // from cache — otherwise capability=15 would win and segments
+          // 15+ would get deleted as "excess" before rediscovery.
+          if (this.skuCache) {
+            this.skuCache.save(this.goveeDeviceToCached(device));
+          }
           // Skip the segment-state sync for THIS push — the objects aren't
           // ready yet. The next AA A5 push (a few seconds later) will hit
           // the fully-built tree.
@@ -1136,6 +1142,11 @@ export class DeviceManager {
       snapshotBleCmds: cached.snapshotBleCmds,
       scenesChecked: cached.scenesChecked,
       lastSeenOnNetwork: cached.lastSeenOnNetwork,
+      // Restore the MQTT-discovered count so it wins over Cloud capability
+      // after a restart. Without this the next createSegmentStates would
+      // immediately delete segments 15-19 as "excess" before MQTT gets a
+      // chance to rediscover.
+      segmentCount: cached.discoveredSegmentCount,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false },
     };
@@ -1147,6 +1158,15 @@ export class DeviceManager {
    * @param device Runtime device
    */
   private goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
+    // Only persist discoveredSegmentCount when it actually exceeds the
+    // capability value — avoids persisting Cloud defaults and pointing
+    // future starts at a discovery that didn't really happen.
+    const capabilityCount = this.capabilityCountFor(device);
+    const discoveredSegmentCount =
+      typeof device.segmentCount === "number" &&
+      device.segmentCount > capabilityCount
+        ? device.segmentCount
+        : undefined;
     return {
       sku: device.sku,
       deviceId: device.deviceId,
@@ -1163,8 +1183,41 @@ export class DeviceManager {
       snapshotBleCmds: device.snapshotBleCmds,
       scenesChecked: device.scenesChecked,
       lastSeenOnNetwork: device.lastSeenOnNetwork,
+      discoveredSegmentCount,
       cachedAt: Date.now(),
     };
+  }
+
+  /**
+   * Max segment count advertised by capabilities (0 if none).
+   *
+   * @param device Target device
+   */
+  private capabilityCountFor(device: GoveeDevice): number {
+    let max = 0;
+    const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+    for (const c of caps) {
+      if (
+        c &&
+        typeof c.type === "string" &&
+        c.type.includes("segment_color_setting")
+      ) {
+        const params = (c as { parameters?: { fields?: unknown[] } })
+          .parameters;
+        const fields = Array.isArray(params?.fields) ? params.fields : [];
+        for (const f of fields) {
+          const fieldName = (f as { fieldName?: unknown }).fieldName;
+          const range = (f as { elementRange?: { max?: unknown } })
+            .elementRange;
+          const rawMax =
+            range && typeof range.max === "number" ? range.max : -1;
+          if (fieldName === "segment" && rawMax + 1 > max) {
+            max = rawMax + 1;
+          }
+        }
+      }
+    }
+    return max;
   }
 
   /**

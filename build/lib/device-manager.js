@@ -679,6 +679,9 @@ class DeviceManager {
             `${device.name}: MQTT shows ${maxSeen} segments (Cloud reported ${device.segmentCount}) \u2014 updating state tree`
           );
           device.segmentCount = maxSeen;
+          if (this.skuCache) {
+            this.skuCache.save(this.goveeDeviceToCached(device));
+          }
           (_d = this.onSegmentCountGrown) == null ? void 0 : _d.call(this, device);
           return;
         }
@@ -880,6 +883,11 @@ class DeviceManager {
       snapshotBleCmds: cached.snapshotBleCmds,
       scenesChecked: cached.scenesChecked,
       lastSeenOnNetwork: cached.lastSeenOnNetwork,
+      // Restore the MQTT-discovered count so it wins over Cloud capability
+      // after a restart. Without this the next createSegmentStates would
+      // immediately delete segments 15-19 as "excess" before MQTT gets a
+      // chance to rediscover.
+      segmentCount: cached.discoveredSegmentCount,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false }
     };
@@ -890,6 +898,8 @@ class DeviceManager {
    * @param device Runtime device
    */
   goveeDeviceToCached(device) {
+    const capabilityCount = this.capabilityCountFor(device);
+    const discoveredSegmentCount = typeof device.segmentCount === "number" && device.segmentCount > capabilityCount ? device.segmentCount : void 0;
     return {
       sku: device.sku,
       deviceId: device.deviceId,
@@ -906,8 +916,33 @@ class DeviceManager {
       snapshotBleCmds: device.snapshotBleCmds,
       scenesChecked: device.scenesChecked,
       lastSeenOnNetwork: device.lastSeenOnNetwork,
+      discoveredSegmentCount,
       cachedAt: Date.now()
     };
+  }
+  /**
+   * Max segment count advertised by capabilities (0 if none).
+   *
+   * @param device Target device
+   */
+  capabilityCountFor(device) {
+    let max = 0;
+    const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+    for (const c of caps) {
+      if (c && typeof c.type === "string" && c.type.includes("segment_color_setting")) {
+        const params = c.parameters;
+        const fields = Array.isArray(params == null ? void 0 : params.fields) ? params.fields : [];
+        for (const f of fields) {
+          const fieldName = f.fieldName;
+          const range = f.elementRange;
+          const rawMax = range && typeof range.max === "number" ? range.max : -1;
+          if (fieldName === "segment" && rawMax + 1 > max) {
+            max = rawMax + 1;
+          }
+        }
+      }
+    }
+    return max;
   }
   /**
    * Generate diagnostics data for a device — structured JSON for GitHub issue submission.
