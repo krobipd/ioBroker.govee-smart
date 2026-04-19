@@ -26,6 +26,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 - **[Scenes and Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Scenes-and-Snapshots)** / **[Szenen und Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Szenen-und-Snapshots)** — scene library, speed slider, Cloud vs local snapshots
 - **[Groups](https://github.com/krobipd/ioBroker.govee-smart/wiki/Groups)** / **[Gruppen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Gruppen)** — group fan-out, capability intersection
 - **[Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior)** / **[Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten)** — folder naming, startup, diagnostics, troubleshooting
+- **[Device Quirks](https://github.com/krobipd/ioBroker.govee-smart/wiki/Device-Quirks)** / **[Geräte-Korrekturen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete-Korrekturen)** — built-in corrections, community-quirks.json format, reporting new cases
 
 ---
 
