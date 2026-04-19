@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "1.7.0",
+        "version": "1.7.1",
         "news": {
+            "1.7.1": {
+                "en": "Segment commands now force static-color mode before sending — fixes the \"I set one segment and nothing happens\" symptom when the strip was in Scene/Gradient/Music mode. Side benefit: the color-mode switch also gets the device to push MQTT AA A5 packets, which is how the adapter learns the real segment count automatically.",
+                "de": "Segment-Befehle erzwingen jetzt vorher Static-Color-Mode — behebt das \"ich setze ein Segment und nichts passiert\"-Verhalten wenn der Strip vorher in Scene/Gradient/Music-Mode war. Nebeneffekt: durch den Mode-Switch pusht das Gerät MQTT AA A5 Pakete, und der Adapter lernt dadurch die echte Segmentanzahl automatisch.",
+                "ru": "Сегментные команды теперь принудительно переключают в static-color режим перед отправкой",
+                "pt": "Comandos de segmento agora forçam modo static-color antes de enviar",
+                "nl": "Segmentcommando's forceren nu static-color modus voor verzenden",
+                "fr": "Les commandes de segment forcent maintenant le mode static-color avant envoi",
+                "it": "I comandi segmento ora forzano la modalità static-color prima dell'invio",
+                "es": "Los comandos de segmento ahora fuerzan modo static-color antes de enviar",
+                "pl": "Polecenia segmentów teraz wymuszają tryb static-color przed wysłaniem",
+                "uk": "Команди сегментів тепер примусово перемикають у static-color режим",
+                "zh-cn": "分段命令现在会先强制切换到静态颜色模式"
+            },
             "1.7.0": {
                 "en": "Reliable segment count — the adapter now uses a single source of truth (cache → MQTT-learned → Cloud-min) that survives restarts. Resolves the Esszimmer-style case where Cloud says 15 and the strip really has 20\nSegment Wizard redesign — ONE clear flow, 3 buttons: ✓ Yes visible, ✗ No dark, ■ Done – end of strip. Wizard now measures the REAL length regardless of what Cloud reports, detects gaps automatically (cut strips)\nPersisted manual_mode + manual_list across restarts — cut-strip settings no longer get lost",
                 "de": "Segmentzahl verlässlich — der Adapter nutzt jetzt eine klare Quelle-der-Wahrheit (Cache → MQTT-gelernt → Cloud-Min) die Neustarts überlebt. Löst den Esszimmer-Fall bei dem Cloud 15 meldet der Strip aber 20 hat\nSegment-Wizard neu gedacht — EIN klarer Flow, 3 Buttons: ✓ Ja sichtbar, ✗ Nein dunkel, ■ Fertig - Strip zu Ende. Der Wizard misst die ECHTE Länge unabhängig von Cloud-Angabe, Lücken (Cut-Strips) werden automatisch erkannt\nmanual_mode + manual_list überleben jetzt Neustarts — Cut-Strip-Einstellungen gehen nie verloren",
@@ -80,19 +93,6 @@
                 "pl": "Naprawa crashu Kreatora Wykrywania Segmentów przy starcie — parseSegmentBatch waliduje wartości nie-string, flashSegment akceptuje sparsowane obiekty bezpośrednio\nHandlery async zabezpieczone przed unhandled rejection\nGranice Cloud/API/MQTT/LAN wzmocnione guardami typeof/Array.isArray\n511 testów (było 427)",
                 "uk": "Виправлено збій майстра виявлення сегментів під час запуску — parseSegmentBatch перевіряє нестрокові значення\nАсинхронні обробники подій захищені від необроблених rejection\nМежі Cloud/API/MQTT/LAN посилено перевірками typeof/Array.isArray\n511 тестів (було 427)",
                 "zh-cn": "修复分段检测向导启动崩溃 — parseSegmentBatch 防御非字符串值,flashSegment 直接接受解析对象\n所有异步事件处理器防止未处理的 rejection\nCloud/API/MQTT/LAN 边界通过 typeof/Array.isArray 守卫加固\n共 511 项测试(原 427)"
-            },
-            "1.6.2": {
-                "en": "Fix jsonConfig schema warnings for Segment Detection Wizard — removed unsupported \"button\" property, aligned variant/color to admin schema (primary/secondary, contained/outlined), set xs=12 for mobile-full-width on sendTo buttons\nNo functionality change, purely schema compliance",
-                "de": "jsonConfig-Schema-Warnings für Segment-Erkennungs-Assistent behoben — nicht unterstütztes \"button\"-Property entfernt, variant/color an Admin-Schema angepasst (primary/secondary, contained/outlined), xs=12 für sendTo-Buttons (volle Breite mobil)\nKeine Funktionsänderung, reine Schema-Compliance",
-                "ru": "Исправлены предупреждения схемы jsonConfig для мастера определения сегментов",
-                "pt": "Corrigidos avisos de schema jsonConfig para o Assistente de Detecção de Segmentos",
-                "nl": "jsonConfig schema-waarschuwingen voor Segment Detection Wizard opgelost",
-                "fr": "Correction des avertissements de schéma jsonConfig pour l'Assistant de Détection de Segments",
-                "it": "Correzione warning schema jsonConfig per Segment Detection Wizard",
-                "es": "Corregidas advertencias de esquema jsonConfig para el Asistente de Detección de Segmentos",
-                "pl": "Naprawa ostrzeżeń schematu jsonConfig dla Kreatora Wykrywania Segmentów",
-                "uk": "Виправлено попередження схеми jsonConfig для майстра виявлення сегментів",
-                "zh-cn": "修复分段检测向导的 jsonConfig 架构警告"
             }
         },
         "titleLang": {

@@ -417,10 +417,11 @@ describe("DeviceManager", () => {
             expect(cloudTracker.calls[0].method).to.equal("controlDevice");
         });
 
-        it("should route segment color via LAN ptReal", async () => {
+        it("should route segment color via LAN ptReal (after forcing color mode)", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
+                setColor: lanTracker.track("setColor"),
                 setSegmentColor: lanTracker.track("setSegmentColor"),
                 setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
             };
@@ -439,21 +440,25 @@ describe("DeviceManager", () => {
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
             await dm.sendCommand(device, "segmentColor:3", "#ff0000");
-            // LAN should be called for segment color
-            expect(lanTracker.calls).to.have.lengthOf(1);
-            expect(lanTracker.calls[0].method).to.equal("setSegmentColor");
-            expect(lanTracker.calls[0].args[0]).to.equal("192.168.1.100");
-            expect(lanTracker.calls[0].args[1]).to.equal(255); // R
-            expect(lanTracker.calls[0].args[2]).to.equal(0);   // G
-            expect(lanTracker.calls[0].args[3]).to.equal(0);   // B
+            // v1.7.1: colorwc pre-amble forces color mode before the ptReal burst
+            expect(lanTracker.calls.map((c) => c.method)).to.deep.equal([
+                "setColor",
+                "setSegmentColor",
+            ]);
+            const segCall = lanTracker.calls[1];
+            expect(segCall.args[0]).to.equal("192.168.1.100");
+            expect(segCall.args[1]).to.equal(255); // R
+            expect(segCall.args[2]).to.equal(0);   // G
+            expect(segCall.args[3]).to.equal(0);   // B
             // Cloud should NOT be called
             expect(cloudTracker.calls).to.have.lengthOf(0);
         });
 
-        it("should route segment brightness via LAN ptReal", async () => {
+        it("should route segment brightness via LAN ptReal (after forcing color mode)", async () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
+                setColor: lanTracker.track("setColor"),
                 setSegmentColor: lanTracker.track("setSegmentColor"),
                 setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
             };
@@ -463,9 +468,11 @@ describe("DeviceManager", () => {
             (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
             await dm.sendCommand(device, "segmentBrightness:5", 50);
-            expect(lanTracker.calls).to.have.lengthOf(1);
-            expect(lanTracker.calls[0].method).to.equal("setSegmentBrightness");
-            expect(lanTracker.calls[0].args[1]).to.equal(50);
+            expect(lanTracker.calls.map((c) => c.method)).to.deep.equal([
+                "setColor",
+                "setSegmentBrightness",
+            ]);
+            expect(lanTracker.calls[1].args[1]).to.equal(50);
         });
 
         // Regression: v1.6.0-1.6.2 shipped with sendCommand(segmentBatch, object)
@@ -474,6 +481,7 @@ describe("DeviceManager", () => {
             const lanTracker = createCallTracker();
             const mockLan = {
                 setPower: lanTracker.track("setPower"),
+                setColor: lanTracker.track("setColor"),
                 setSegmentColor: lanTracker.track("setSegmentColor"),
                 setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
             };

@@ -453,6 +453,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.7.1 (2026-04-19)
+- **Segment commands now force color mode before sending.** Previously, setting `segments.5.color` (or any segment-level state) while the strip was running a Scene, Gradient, or Music mode had no visible effect — the device silently ignored the ptReal packet. The CommandRouter now emits a `colorwc` pre-amble using the device's last-known colorRgb (so the strip doesn't visibly flicker if it was already in color mode) and waits 150 ms before sending the segment packet.
+- **Side effect: automatic segment-count learning.** Because the color-mode switch also makes the device push MQTT AA A5 packets, the adapter now learns the real segment count the first time you touch any segment control — no manual Wizard run needed for strips that under-report via Cloud.
+
 ### 1.7.0 (2026-04-19)
 - **Reliable segment count.** The adapter now uses a single source of truth for how many segments your strip has: cache → MQTT-learned → minimum of Cloud-advertised. Once the real length is discovered it's persisted and survives restarts. No more "Cloud said 15, strip really has 20" headaches
 - **Segment Wizard redesign — one clear flow.** Three buttons: **✓ Ja sichtbar / ✗ Nein dunkel / ■ Fertig – Strip zu Ende**. The wizard measures the REAL length regardless of what Cloud reports (runs up to the Govee protocol limit of 55), detects gaps automatically (cut strips), and applies the result atomically — segmentCount, manualMode, manualList get set together, state tree gets rebuilt, everything persists

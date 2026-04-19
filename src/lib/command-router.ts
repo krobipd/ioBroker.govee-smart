@@ -71,6 +71,33 @@ export class CommandRouter {
   }
 
   /**
+   * Force the device into static-color mode before sending segment_color_setting
+   * ptReal packets. Without this, the device silently ignores segment-level
+   * overrides while it's in Scene/Gradient/Music mode — the classic "I set
+   * segment 5 red and nothing happened" symptom. Sends a `colorwc` command with
+   * the device's last-known colorRgb (so the strip doesn't visibly change if it
+   * was already in color mode), then waits 150 ms so the firmware can switch.
+   *
+   * As a bonus: once the device is in color mode, subsequent segment commands
+   * trigger AA A5 MQTT pushes — so the adapter learns the real segmentCount
+   * automatically the first time the user touches segment controls.
+   *
+   * @param device Target device
+   */
+  private async forceColorMode(device: GoveeDevice): Promise<void> {
+    if (!device.lanIp || !this.lanClient) {
+      return;
+    }
+    const current =
+      typeof device.state.colorRgb === "string" ? device.state.colorRgb : null;
+    const { r, g, b } = current
+      ? hexToRgb(current)
+      : { r: 255, g: 255, b: 255 };
+    this.lanClient.setColor(device.lanIp, r, g, b);
+    await new Promise<void>((resolve) => setTimeout(resolve, 150));
+  }
+
+  /**
    * Send a command to a device — routes through LAN → MQTT → Cloud.
    *
    * @param device Target device
@@ -89,6 +116,7 @@ export class CommandRouter {
         return;
       }
       if (device.lanIp && this.lanClient) {
+        await this.forceColorMode(device);
         const { r, g, b } = hexToRgb(value as string);
         this.lanClient.setSegmentColor(device.lanIp, r, g, b, [segIdx]);
         return;
@@ -113,6 +141,7 @@ export class CommandRouter {
         this.onSegmentBatchUpdate?.(device, parsed);
       }
       if (device.lanIp && this.lanClient && parsed) {
+        await this.forceColorMode(device);
         if (parsed.color !== undefined) {
           const r = (parsed.color >> 16) & 0xff;
           const g = (parsed.color >> 8) & 0xff;
@@ -152,6 +181,7 @@ export class CommandRouter {
         return;
       }
       if (device.lanIp && this.lanClient) {
+        await this.forceColorMode(device);
         this.lanClient.setSegmentBrightness(device.lanIp, value as number, [
           segIdx,
         ]);
