@@ -98,31 +98,32 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ## Changelog
 
 ### 1.7.7 (2026-04-19)
-- **Fix: Wizard and MQTT-learned segment state was lost on every restart.** `loadFromCache` didn't merge `segmentCount`, `manualMode` and `manualSegments` into LAN-discovered devices (the existing-branch merge was incomplete). Since the LAN scan always runs before the cache load on startup, every adapter restart fell back to Cloud's min-advertised segment count and forgot the cut-strip list — the wizard's result "lived" for exactly one session. The three fields are now merged alongside the other cached data.
-- **Cache writes now force `fsync` after writing.** Plain `writeFileSync` only pushes data to the kernel page cache; if the adapter gets SIGKILLed during stop (e.g. Admin-UI "Save & Close" exceeding the 1 s SIGTERM grace period), the save was silently dropped. `openSync → writeSync → fsyncSync → closeSync` guarantees the bytes hit disk before the call returns.
+- Fix wizard result and MQTT-learned segment count lost on every restart — cache load didn't merge the segment fields into LAN-discovered devices
+- Cache write now fsyncs so a SIGKILL during adapter stop can't silently drop the save
 
 ### 1.7.6 (2026-04-19)
-- **Manual-segment rollback no longer bounces the rejected value back.** When a user wrote an invalid `segments.manual_list`, the handler rewrote `manual_mode=false` but the outer state-change loop acked the original `true` right after, leaving the UI and the device model out of sync. The handler now owns the ack for both manual states, and `manual_list` is also reset when manual mode is disabled on parse error.
-- **Admin UI shows wizard labels in all 11 languages.** The Segment-Detection tab had only English + German translations — nine languages showed raw keys like `wizardBtnStart` instead of buttons. All keys are now present and the worst machine-translation bloopers (`pl: Poronić` → `Przerwij`, `zh-cn: 地位` → `状态`, fr/es/pt/it Abort-buttons) are hand-corrected.
-- **`info` channel keeps its "Device Information" display name.** `CHANNEL_NAMES` lacked an entry for `info`, so the generic channel-create path overwrote the name set earlier in the same function. Visible in ioBroker Objects, zero runtime impact.
-- **Admin UI copy: drop the "~100 ms" latency claim from the LAN section.** User-facing text doesn't need developer numbers. Reworded in all 11 languages to match the Wiki rewrite.
-- **Internal cleanup, no behavioural change:** `applyManualSegments` helper unifies the user-edit path and the wizard-result path (was duplicated); `refreshDeviceStates` targets one device instead of rebuilding the entire state tree on each snapshot save/delete; `dynamic_scene` mapping skips the generic stub for `lightScene/diyScene/snapshot` instead of creating and filtering it out later; `prefixMap` + `stateChannelMap` now get cleaned when a device is removed (no more indefinite growth); `loadDeviceScenes` dropped redundant change-tracking; routing docstrings corrected from "LAN → MQTT → Cloud" to "LAN → Cloud" (MQTT is status-push only).
+- Fix manual_mode rollback on invalid manual_list no longer bounces the rejected value back into the state
+- Complete wizard translations in 9 admin languages (previously raw keys), worst machine-translation glitches hand-corrected
+- info channel keeps its "Device Information" display name
+- Drop "~100 ms" latency claim from LAN section, reworded in all 11 languages
+- Internal: applyManualSegments helper, targeted state refresh on snapshot ops, dynamic_scene mapping cleanup, prefix-map cleanup on device removal, loadDeviceScenes dead-logic removed, MQTT/Cloud routing docstrings corrected
 
 ### 1.7.5 (2026-04-19)
-- **Fix the Wiki link at the top of the adapter settings.** The Markdown in the previous `staticText` wasn't rendered as a clickable link. Replaced with two `staticLink` buttons side by side: **Wiki (Deutsch)** pointing to the Startseite and **Wiki (English)** pointing to the Home page. Consistent with the Ko-Fi/PayPal button pattern used in the other adapters in the workspace.
+- Fix Wiki link in adapter settings — Markdown in staticText wasn't rendered, replaced with two staticLink buttons (DE + EN)
 
 ### 1.7.4 (2026-04-19)
-- **Admin UI: language-aware Wiki link at the top of the main configuration tab.** On a German Admin instance it points to the Startseite, every other language to the English Home. All 11 translation files carry a localised label. No runtime change — this is purely the Admin config page.
+- Add language-aware Wiki link at the top of the main configuration tab
 
 ### 1.7.3 (2026-04-19)
-- **Latest-repo review compliance.** `common.messagebox=true` added to `io-package.json` because the Segment Wizard uses `onMessage`. The two 150 ms delays used for Govee's colour-mode preamble (in the LAN client and the CommandRouter) are now routed through the adapter timer wrapper, so pending delays get cancelled on `onUnload` instead of firing into a torn-down adapter. No runtime-visible change.
+- `common.messagebox=true` for onMessage wizard (latest-repo review compliance)
+- Color-mode preamble delays routed through adapter timer wrapper (onUnload-safe)
 
 ### 1.7.2 (2026-04-19)
-- **Test infrastructure aligned with the ioBroker standard.** `test/package.js` and `test/integration.js` are now plain JS calling `tests.packageFiles` / `tests.integration` directly, matching the template every other adapter in this workspace uses. Previously only a TypeScript-based package-files test existed, and the `test:integration` script silently re-ran the unit tests instead of spinning up a real js-controller. No runtime change — this only affects CI and the Latest-repo review.
+- Test infrastructure aligned with ioBroker standard — plain-JS package.js + integration.js
 
 ### 1.7.1 (2026-04-19)
-- **Segment commands now force color mode before sending.** Previously, setting `segments.5.color` (or any segment-level state) while the strip was running a Scene, Gradient, or Music mode had no visible effect — the device silently ignored the ptReal packet. The CommandRouter now emits a `colorwc` pre-amble using the device's last-known colorRgb (so the strip doesn't visibly flicker if it was already in color mode) and waits 150 ms before sending the segment packet.
-- **Side effect: automatic segment-count learning.** Because the color-mode switch also makes the device push MQTT AA A5 packets, the adapter now learns the real segment count the first time you touch any segment control — no manual Wizard run needed for strips that under-report via Cloud.
+- Segment commands force color mode before sending — previously silently ignored in Scene/Gradient/Music mode
+- Side effect: automatic segment-count learning once you touch any segment control
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
