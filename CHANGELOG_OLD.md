@@ -1,11 +1,11 @@
 # Older Changes
 
 ## 1.7.0 (2026-04-19)
-- **Reliable segment count.** The adapter now uses a single source of truth for how many segments your strip has: cache → MQTT-learned → minimum of Cloud-advertised. Once the real length is discovered it's persisted and survives restarts. No more "Cloud said 15, strip really has 20" headaches
-- **Segment Wizard redesign — one clear flow.** Three buttons: **✓ Ja sichtbar / ✗ Nein dunkel / ■ Fertig – Strip zu Ende**. The wizard measures the REAL length regardless of what Cloud reports (runs up to the Govee protocol limit of 55), detects gaps automatically (cut strips), and applies the result atomically — segmentCount, manualMode, manualList get set together, state tree gets rebuilt, everything persists
-- **Wizard now forces color mode before each flash.** Previously the flash packets were silently ignored when the strip happened to be in Scene/Gradient/Music mode. The wizard now sends a `colorwc` pre-amble that moves the device into static-color mode, so the segment-level white flash is always visible
-- **Manual-mode survives restarts.** Cut-strip settings (`manual_mode` + `manual_list`) are now part of the SKU cache — previously they could be lost on the first rebuild after startup
-- Cloud-internal contradictions (e.g. H70D1 Icicle reporting `segmentedBrightness=10` and `segmentedColorRgb=15` in the same response) are resolved conservatively: take the smaller value and let MQTT correct upwards if the real device proves bigger
+- Reliable segment count via single source of truth — cache → MQTT-learned → min of Cloud-advertised, persists across restarts
+- Wizard redesign — three buttons (visible / dark / end-of-strip), measures real length up to Govee protocol limit 55, detects gaps automatically for cut strips
+- Wizard forces color mode before each flash so the white flash isn't silently ignored in Scene/Gradient/Music mode
+- Cut-strip settings (`manual_mode` + `manual_list`) are now part of the SKU cache, survive restarts
+- Cloud-internal contradictions resolved conservatively — take the smaller value, let MQTT correct upwards
 
 ## 1.6.7 (2026-04-19)
 - Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so the new datapoints get created first (no more "State has no existing object" warnings). The next AA A5 push seconds later populates the fully-built tree.
