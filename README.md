@@ -453,6 +453,9 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ---
 
 ## Changelog
+### 1.7.2 (2026-04-19)
+- **Test infrastructure aligned with the ioBroker standard.** `test/package.js` and `test/integration.js` are now plain JS calling `tests.packageFiles` / `tests.integration` directly, matching the template every other adapter in this workspace uses. Previously only a TypeScript-based package-files test existed, and the `test:integration` script silently re-ran the unit tests instead of spinning up a real js-controller. No runtime change — this only affects CI and the Latest-repo review.
+
 ### 1.7.1 (2026-04-19)
 - **Segment commands now force color mode before sending.** Previously, setting `segments.5.color` (or any segment-level state) while the strip was running a Scene, Gradient, or Music mode had no visible effect — the device silently ignored the ptReal packet. The CommandRouter now emits a `colorwc` pre-amble using the device's last-known colorRgb (so the strip doesn't visibly flicker if it was already in color mode) and waits 150 ms before sending the segment packet.
 - **Side effect: automatic segment-count learning.** Because the color-mode switch also makes the device push MQTT AA A5 packets, the adapter now learns the real segment count the first time you touch any segment control — no manual Wizard run needed for strips that under-report via Cloud.

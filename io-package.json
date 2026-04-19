@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "1.7.1",
+        "version": "1.7.2",
         "news": {
+            "1.7.2": {
+                "en": "Move test infrastructure to the ioBroker standard: test/package.js and test/integration.js as plain JS, calling tests.packageFiles / tests.integration directly. Previously only a TS-based packageFiles test existed and the integration script re-ran the unit tests instead of spinning up a real js-controller. No runtime change — this only affects CI and the Latest-repo review.",
+                "de": "Test-Infrastruktur auf ioBroker-Standard umgestellt: test/package.js und test/integration.js als plain JS, ruft tests.packageFiles / tests.integration direkt auf. Bisher gab es nur den TS-basierten PackageFiles-Test und das Integration-Script hat die Unit-Tests erneut ausgeführt statt einen echten js-controller hochzufahren. Keine Laufzeit-Änderung — betrifft nur CI und Latest-Repo-Review.",
+                "ru": "Тестовая инфраструктура переведена на стандарт ioBroker: test/package.js и test/integration.js как plain JS. Только CI, без изменений во время выполнения.",
+                "pt": "Infraestrutura de testes migrada para o padrão ioBroker: test/package.js e test/integration.js como plain JS. Apenas CI, sem mudanças em runtime.",
+                "nl": "Testinfrastructuur naar ioBroker-standaard: test/package.js en test/integration.js als plain JS. Alleen CI, geen runtime-wijziging.",
+                "fr": "Infrastructure de test alignée sur le standard ioBroker : test/package.js et test/integration.js en JS. Uniquement CI, aucun changement runtime.",
+                "it": "Infrastruttura di test allineata allo standard ioBroker: test/package.js e test/integration.js come plain JS. Solo CI, nessuna modifica a runtime.",
+                "es": "Infraestructura de pruebas alineada con el estándar de ioBroker: test/package.js y test/integration.js como JS. Solo CI, sin cambios en runtime.",
+                "pl": "Infrastruktura testów przeniesiona na standard ioBroker: test/package.js i test/integration.js jako plain JS. Tylko CI, bez zmian w runtime.",
+                "uk": "Інфраструктура тестів переведена на стандарт ioBroker: test/package.js і test/integration.js як plain JS. Лише CI, без змін у runtime.",
+                "zh-cn": "测试基础设施迁移到 ioBroker 标准: test/package.js 和 test/integration.js 作为纯 JS。仅影响 CI，运行时无变化。"
+            },
             "1.7.1": {
                 "en": "Segment commands now force static-color mode before sending — fixes the \"I set one segment and nothing happens\" symptom when the strip was in Scene/Gradient/Music mode. Side benefit: the color-mode switch also gets the device to push MQTT AA A5 packets, which is how the adapter learns the real segment count automatically.",
                 "de": "Segment-Befehle erzwingen jetzt vorher Static-Color-Mode — behebt das \"ich setze ein Segment und nichts passiert\"-Verhalten wenn der Strip vorher in Scene/Gradient/Music-Mode war. Nebeneffekt: durch den Mode-Switch pusht das Gerät MQTT AA A5 Pakete, und der Adapter lernt dadurch die echte Segmentanzahl automatisch.",
@@ -80,19 +93,6 @@
                 "pl": "Przepisanie UX kreatora — tylko urządzenia online w dropdown, trwałe pole statusu pokazuje sprawdzany segment, wielolinijkowy toast przy każdym kliknięciu",
                 "uk": "Переробка UX майстра — лише онлайн-пристрої у випадаючому списку, постійне поле статусу показує сегмент, що перевіряється",
                 "zh-cn": "向导 UX 重写 — 下拉列表仅显示在线设备,持久状态框显示当前检查的分段,每次点击显示多行 toast"
-            },
-            "1.6.3": {
-                "en": "Fix Segment Detection Wizard crash on Start — parseSegmentBatch now guards against non-string values, flashSegment-routing reworked to accept parsed objects directly (the cmd.split crash that produced the v1.6.2 restart loop)\nHarden all async event handlers against unhandled rejections — ready/stateChange/onMessage now route errors via .catch; prevents SIGKILL-code-6 restart loops\nHarden all Cloud/API/MQTT/LAN boundary types — Array.isArray + typeof guards added across every external-data for-loop, rgbToHex NaN/clamp, hexToRgb non-string safe, snapshot file path safe against non-string deviceId\nRefactor segment-wizard and cloud-retry-loop into testable modules; 511 tests total (was 427)",
-                "de": "Fix Segment-Detection-Wizard-Absturz beim Start — parseSegmentBatch prüft jetzt auf Nicht-String-Werte, flashSegment-Routing nimmt geparste Objekte direkt entgegen (cmd.split-Crash aus 1.6.2-Restart-Loop)\nAlle async Event-Handler gegen unhandled rejection gehärtet — ready/stateChange/onMessage fangen Fehler jetzt per .catch ab; verhindert SIGKILL-code-6 Restart-Loops\nCloud/API/MQTT/LAN-Grenzen gehärtet — Array.isArray + typeof Guards in jedem externen Daten-Loop, rgbToHex NaN/clamp, hexToRgb non-string safe, Snapshot-Pfad safe gegen non-string deviceId\nSegment-Wizard und Cloud-Retry-Loop in testbare Module refaktoriert; 511 Tests gesamt (war 427)",
-                "ru": "Исправлен сбой мастера определения сегментов при запуске — parseSegmentBatch проверяет нестроковые значения, flashSegment принимает разобранные объекты напрямую\nАсинхронные обработчики событий защищены от необработанных rejection\nГраницы Cloud/API/MQTT/LAN усилены typeof/Array.isArray проверками\n511 тестов (было 427)",
-                "pt": "Corrigido crash do Assistente de Detecção de Segmentos — parseSegmentBatch valida valores não-string, flashSegment aceita objetos já analisados\nHandlers async reforçados contra rejections não tratadas\nLimites Cloud/API/MQTT/LAN endurecidos com guards typeof/Array.isArray\n511 testes (era 427)",
-                "nl": "Segment Detection Wizard crash bij start opgelost — parseSegmentBatch valideert niet-string waarden, flashSegment accepteert geparste objecten direct\nAlle async event-handlers afgeschermd tegen unhandled rejections\nCloud/API/MQTT/LAN grenzen gehard met typeof/Array.isArray guards\n511 tests (was 427)",
-                "fr": "Correctif du crash de l'Assistant de Détection de Segments au démarrage — parseSegmentBatch rejette les valeurs non-string, flashSegment accepte directement les objets analysés\nGestionnaires async durcis contre les rejections non gérées\nFrontières Cloud/API/MQTT/LAN durcies avec des guards typeof/Array.isArray\n511 tests (était 427)",
-                "it": "Correzione crash Segment Detection Wizard all'avvio — parseSegmentBatch valida valori non-string, flashSegment accetta oggetti parsati direttamente\nHandler async protetti da rejection non gestite\nConfini Cloud/API/MQTT/LAN rafforzati con typeof/Array.isArray guards\n511 test (era 427)",
-                "es": "Corrección del crash del Asistente de Detección de Segmentos al iniciar — parseSegmentBatch valida valores no-string, flashSegment acepta objetos parseados directamente\nHandlers async protegidos contra rejections sin manejar\nLímites Cloud/API/MQTT/LAN reforzados con guards typeof/Array.isArray\n511 tests (antes 427)",
-                "pl": "Naprawa crashu Kreatora Wykrywania Segmentów przy starcie — parseSegmentBatch waliduje wartości nie-string, flashSegment akceptuje sparsowane obiekty bezpośrednio\nHandlery async zabezpieczone przed unhandled rejection\nGranice Cloud/API/MQTT/LAN wzmocnione guardami typeof/Array.isArray\n511 testów (było 427)",
-                "uk": "Виправлено збій майстра виявлення сегментів під час запуску — parseSegmentBatch перевіряє нестрокові значення\nАсинхронні обробники подій захищені від необроблених rejection\nМежі Cloud/API/MQTT/LAN посилено перевірками typeof/Array.isArray\n511 тестів (було 427)",
-                "zh-cn": "修复分段检测向导启动崩溃 — parseSegmentBatch 防御非字符串值,flashSegment 直接接受解析对象\n所有异步事件处理器防止未处理的 rejection\nCloud/API/MQTT/LAN 边界通过 typeof/Array.isArray 守卫加固\n共 511 项测试(原 427)"
             }
         },
         "titleLang": {

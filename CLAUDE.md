@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart Lights (LED-Strips, Lampen, Panels). LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig. Nur Lichter, keine Haushaltsgeräte.
 
-- **Version:** 1.7.0 (April 2026)
+- **Version:** 1.7.2 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -227,7 +227,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (530)
+## Tests (473 custom + 57 package + integration)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks + Groups + Drift (80 Tests)
@@ -300,7 +300,9 @@ test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
 
 | Version | Highlights |
 |---------|------------|
-| 1.7.0 | Segment-Count Single-Source-of-Truth (resolveSegmentCount + Cache-persist → 20m-Strips korrekt erkannt, Cloud-Widersprüche aufgelöst). Wizard komplett neu gedacht: misst die echte Länge, 3 Buttons (Ja/Nein/Fertig), erkennt Lücken automatisch. manualMode+List überleben Neustarts. 530 Tests (war 511) |
+| 1.7.2 | Test-Infrastruktur auf ioBroker-Standard: `test/package.js` + `test/integration.js` als plain JS (ruft tests.packageFiles / tests.integration direkt auf). Vorher war das Integration-Script ein Papier-Tiger. Keine Runtime-Änderung |
+| 1.7.1 | Color-Mode-Force (colorwc) vor allen Segment-Commands im CommandRouter — fixt "direkt Segment setzen tut nix im Scene-Mode" + triggert nebenbei MQTT AA A5 Pushes (auto-learn Count) |
+| 1.7.0 | Segment-Count Single-Source-of-Truth (resolveSegmentCount + Cache-persist → 20m-Strips korrekt erkannt, Cloud-Widersprüche aufgelöst). Wizard komplett neu gedacht: misst die echte Länge, 3 Buttons (Ja/Nein/Fertig), erkennt Lücken automatisch. manualMode+List überleben Neustarts |
 | 1.6.7 | Fix Race-Condition beim MQTT-Discovery-Push — Segment-State-Sync übersprungen wenn Count wächst, damit Objects-Tree erst fertig gebaut wird |
 | 1.6.6 | MQTT-Bump bei Under-Reporting: wenn AA A5 mehr Segmente zeigt als Cloud meldet, wird segmentCount hochgezählt (reaktiv, war ohne Persist — in 1.7.0 richtig gelöst) |
 | 1.6.5 | Wizard-Flash atomic via ptReal — alle 3 BLE-Pakete in einem UDP. Vor Flash: Power ON + Brightness 100. info.wizardStatus als Live-State |

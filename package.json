@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "Control Govee smart lights (LED strips, bulbs, panels) via LAN, MQTT and Cloud \u2014 lights only, no appliances",
   "author": {
     "name": "krobi",
@@ -64,9 +64,10 @@
     "build:test": "tsc -p tsconfig.test.json",
     "watch": "build-adapter ts --watch",
     "check": "tsc --noEmit",
-    "test:package": "npm run build:test && mocha --exit \"build/test/testPackageFiles.js\"",
-    "test:integration": "npm run build:test && mocha --exit \"build/test/**/*.js\"",
-    "test": "npm run build && npm run build:test && mocha --exit \"build/test/**/*.js\"",
+    "test:ts": "npm run build:test && mocha --exit \"build/test/test*.js\"",
+    "test:package": "mocha test/package --exit",
+    "test:integration": "mocha test/integration --exit",
+    "test": "npm run build && npm run test:ts && npm run test:package",
     "lint": "eslint",
     "lint:fix": "eslint --fix",
     "translate": "translate-adapter",
