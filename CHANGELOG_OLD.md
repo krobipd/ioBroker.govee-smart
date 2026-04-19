@@ -1,5 +1,19 @@
 # Older Changes
 
+## 1.6.4 (2026-04-18)
+- Wizard UX rewrite — dropdown now shows only online devices, a persistent status box indicates which segment is currently being checked, and each button click triggers a multi-line info toast with clear Yes/No guidance
+- Status box uses `textSendTo` (refreshes when the device is re-selected); button responses use the `message` field so admin shows info toasts correctly (previously silent because of wrong field name)
+
+## 1.6.3 (2026-04-18)
+- Fix Segment Detection Wizard crash on Start — `parseSegmentBatch` now guards against non-string values; `flashSegment` routing accepts parsed objects directly (the `cmd.split is not a function` crash that produced the v1.6.2 restart loop)
+- Harden all async event handlers against unhandled rejections — `ready`/`stateChange`/`onMessage` now route errors via `.catch`; prevents SIGKILL-code-6 restart loops
+- Harden Cloud/API/MQTT/LAN boundary types — `Array.isArray` + `typeof` guards added across every external-data iteration, `rgbToHex` NaN/clamp, `hexToRgb` non-string safe, snapshot file path safe against non-string deviceId
+- Refactor segment-wizard and cloud-retry-loop into dedicated testable modules
+- 511 tests (was 427)
+
+## 1.6.2 (2026-04-18)
+- Fix jsonConfig schema warnings for Segment Detection Wizard — removed unsupported `button` property, aligned variant/color to admin schema (`primary`/`secondary`, `contained`/`outlined`), set `xs=12` for mobile layout
+
 ## 1.6.1 (2026-04-18)
 - Fix Segment Detection Wizard in admin UI — jsonConfig button type was `"sendto"` (lowercase) instead of `"sendTo"` causing validation errors
 - Fix LED strip dropdown showed as free-text input because `selectSendTo` expects the array directly, not wrapped in `{list: ...}`

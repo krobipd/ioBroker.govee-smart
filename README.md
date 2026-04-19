@@ -19,14 +19,17 @@ Control [Govee](https://www.govee.com/) smart lights via three seamless channels
 
 ## Documentation
 
-Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroker.govee-smart/wiki)** — available in [English](https://github.com/krobipd/ioBroker.govee-smart/wiki/Home) and [Deutsch](https://github.com/krobipd/ioBroker.govee-smart/wiki/Startseite):
+Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroker.govee-smart/wiki)**.
 
-- **[Setup](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup)** / **[Einrichtung](https://github.com/krobipd/ioBroker.govee-smart/wiki/Einrichtung)** — credentials, API key, coexistence with govee-appliances
-- **[Segments](https://github.com/krobipd/ioBroker.govee-smart/wiki/Segments)** / **[Segmente](https://github.com/krobipd/ioBroker.govee-smart/wiki/Segmente)** — segment count handling, the wizard, cut strips, batch commands
-- **[Scenes and Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Scenes-and-Snapshots)** / **[Szenen und Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Szenen-und-Snapshots)** — scene library, speed slider, Cloud vs local snapshots
-- **[Groups](https://github.com/krobipd/ioBroker.govee-smart/wiki/Groups)** / **[Gruppen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Gruppen)** — group fan-out, capability intersection
-- **[Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior)** / **[Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten)** — folder naming, startup, diagnostics, troubleshooting
-- **[Device Quirks](https://github.com/krobipd/ioBroker.govee-smart/wiki/Device-Quirks)** / **[Geräte-Korrekturen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete-Korrekturen)** — built-in corrections, community-quirks.json format, reporting new cases
+| Topic | English | Deutsch |
+|---|---|---|
+| Landing page | [Home](https://github.com/krobipd/ioBroker.govee-smart/wiki/Home) | [Startseite](https://github.com/krobipd/ioBroker.govee-smart/wiki/Startseite) |
+| Credentials, API key, coexistence | [Setup](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup) | [Einrichtung](https://github.com/krobipd/ioBroker.govee-smart/wiki/Einrichtung) |
+| Segment count, wizard, cut strips, batch commands | [Segments](https://github.com/krobipd/ioBroker.govee-smart/wiki/Segments) | [Segmente](https://github.com/krobipd/ioBroker.govee-smart/wiki/Segmente) |
+| Scene library, speed slider, Cloud vs local snapshots | [Scenes and Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Scenes-and-Snapshots) | [Szenen und Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Szenen-und-Snapshots) |
+| Group fan-out, capability intersection | [Groups](https://github.com/krobipd/ioBroker.govee-smart/wiki/Groups) | [Gruppen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Gruppen) |
+| Folder naming, startup, diagnostics, troubleshooting | [Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior) | [Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten) |
+| Built-in corrections, community-quirks.json, reporting | [Device Quirks](https://github.com/krobipd/ioBroker.govee-smart/wiki/Device-Quirks) | [Geräte-Korrekturen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete-Korrekturen) |
 
 ---
 
@@ -38,6 +41,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 - Cloud and local snapshots
 - Per-segment color and brightness for LED strips, including batch commands
 - Interactive Segment Detection Wizard for cut strips
+- Diagnostics export button per device — one-click JSON dump for bug reports
 - Groups with LAN fan-out
 - Graceful degradation — works LAN-only, each credential tier unlocks more
 - Rate-limited Cloud usage, coexists with ioBroker.govee-appliances
@@ -74,6 +78,14 @@ See the [Setup page](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup)
 | 4003 | UDP | Outbound | LAN device commands |
 
 All ports are fixed by the Govee LAN protocol and cannot be changed.
+
+---
+
+## Troubleshooting
+
+Common issues (no devices discovered, empty scenes dropdown, segment colors not changing, limited group commands, delayed status updates) are covered on the Wiki [Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior) / [Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten) page.
+
+For anything else, press **`info.diagnostics_export`** on the affected device, copy the JSON from `info.diagnostics_result`, and open a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues).
 
 ---
 
@@ -115,24 +127,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fix wizard flash — all three BLE packets (others-dim + target-color + target-brightness) are now bundled into one `ptReal` UDP datagram. Previously separate datagrams were dropped by the device under back-pressure, leading to "only some segments went dark" symptoms
 - Wizard now switches the strip ON and sets global brightness to 100 before the first flash, so the selected segment is visible regardless of the previous dim state (baseline is still captured and restored on abort/finish)
 - Live status box — new `info.wizardStatus` state, written on every wizard step; admin panel uses `type: "state"` to show the current segment, the total and the next action live (Admin 7.1+)
-
-### 1.6.4 (2026-04-18)
-- Wizard UX rewrite — dropdown now shows only online devices, a persistent status box indicates which segment is currently being checked, and each button click triggers a multi-line info toast with clear Yes/No guidance
-- Status box uses `textSendTo` (refreshes when the device is re-selected); button responses use the `message` field so admin shows info toasts correctly (previously silent because of wrong field name)
-
-### 1.6.3 (2026-04-18)
-- Fix Segment Detection Wizard crash on Start — `parseSegmentBatch` now guards against non-string values; `flashSegment` routing accepts parsed objects directly (the `cmd.split is not a function` crash that produced the v1.6.2 restart loop)
-- Harden all async event handlers against unhandled rejections — `ready`/`stateChange`/`onMessage` now route errors via `.catch`; prevents SIGKILL-code-6 restart loops
-- Harden Cloud/API/MQTT/LAN boundary types — `Array.isArray` + `typeof` guards added across every external-data iteration, `rgbToHex` NaN/clamp, `hexToRgb` non-string safe, snapshot file path safe against non-string deviceId
-- Refactor segment-wizard and cloud-retry-loop into dedicated testable modules
-- 511 tests (was 427)
-
-### 1.6.2 (2026-04-18)
-- Fix jsonConfig schema warnings for Segment Detection Wizard — removed unsupported `button` property, aligned variant/color to admin schema (`primary`/`secondary`, `contained`/`outlined`), set `xs=12` for mobile layout
-
-### 1.6.1 (2026-04-18)
-- Fix Segment Detection Wizard in admin UI — jsonConfig button type was `sendto` (lowercase) instead of `sendTo` causing validation errors
-- Fix LED strip dropdown showed as free-text input because `selectSendTo` response was wrapped in `{list: [...]}` instead of bare array
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
