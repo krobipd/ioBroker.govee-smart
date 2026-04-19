@@ -76,24 +76,6 @@ All ports are fixed by the Govee LAN protocol and cannot be changed.
 
 ---
 
-## Community Quirks
-
-Some Govee devices report wrong metadata via the Cloud API (e.g., incorrect color temperature range). The adapter has built-in corrections for known devices. You can add your own via a `community-quirks.json` file in the adapter data directory (`/opt/iobroker/iobroker-data/govee-smart.0/community-quirks.json`):
-
-```json
-{
-  "version": 1,
-  "quirks": {
-    "H6XXX": { "colorTempRange": { "min": 2200, "max": 6500 } },
-    "H6YYY": { "brokenPlatformApi": true }
-  }
-}
-```
-
-Use the `info.diagnostics_export` button on a device to gather data when contributing a new quirk via [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues) — built-in quirks help everyone.
-
----
-
 ## Acknowledgments
 
 This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementation was informed by research from [govee2mqtt](https://github.com/wez/govee2mqtt) by Wez Furlong. Their reverse-engineering of the Govee AWS IoT MQTT protocol and undocumented API endpoints was invaluable.
