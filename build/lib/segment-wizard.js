@@ -18,11 +18,13 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var segment_wizard_exports = {};
 __export(segment_wizard_exports, {
-  SegmentWizard: () => SegmentWizard
+  SegmentWizard: () => SegmentWizard,
+  WIZARD_IDLE_TEXT: () => WIZARD_IDLE_TEXT
 });
 module.exports = __toCommonJS(segment_wizard_exports);
 var import_device_manager = require("./device-manager.js");
 const IDLE_TIMEOUT_MS = 5 * 6e4;
+const WIZARD_IDLE_TEXT = "Kein Wizard aktiv. W\xE4hle oben einen LED-Strip und klicke \u25B6 Start.";
 function hasSegmentCapability(device) {
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
   return caps.some(
@@ -47,7 +49,7 @@ class SegmentWizard {
   getStatusText() {
     const s = this.session;
     if (!s) {
-      return "Kein Wizard aktiv. W\xE4hle oben einen LED-Strip und klicke \u25B6 Start.";
+      return WIZARD_IDLE_TEXT;
     }
     const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "\u2014";
     return `Ger\xE4t: ${s.name}
@@ -391,6 +393,7 @@ function compactIndices(sorted) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  SegmentWizard
+  SegmentWizard,
+  WIZARD_IDLE_TEXT
 });
 //# sourceMappingURL=segment-wizard.js.map

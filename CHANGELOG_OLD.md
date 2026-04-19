@@ -1,5 +1,8 @@
 # Older Changes
 
+## 1.6.7 (2026-04-19)
+- Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so the new datapoints get created first (no more "State has no existing object" warnings). The next AA A5 push seconds later populates the fully-built tree.
+
 ## 1.6.6 (2026-04-19)
 - Fix under-reporting of segment count — when Govee Cloud advertises fewer segments than the strip physically has, MQTT `AA A5` packets reveal the real count, and the adapter now bumps `segmentCount` and rebuilds the state tree so datapoints appear for ALL segments (fixes 20 m strips where Cloud says 15 but physical is 20)
 - `parseMqttSegmentData` no longer caps output at Cloud's segmentCount; trailing all-zero padding slots are stripped so packet-padding is not mistaken for real segments

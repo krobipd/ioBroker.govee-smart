@@ -97,6 +97,13 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### 1.7.6 (2026-04-19)
+- **Manual-segment rollback no longer bounces the rejected value back.** When a user wrote an invalid `segments.manual_list`, the handler rewrote `manual_mode=false` but the outer state-change loop acked the original `true` right after, leaving the UI and the device model out of sync. The handler now owns the ack for both manual states, and `manual_list` is also reset when manual mode is disabled on parse error.
+- **Admin UI shows wizard labels in all 11 languages.** The Segment-Detection tab had only English + German translations — nine languages showed raw keys like `wizardBtnStart` instead of buttons. All keys are now present and the worst machine-translation bloopers (`pl: Poronić` → `Przerwij`, `zh-cn: 地位` → `状态`, fr/es/pt/it Abort-buttons) are hand-corrected.
+- **`info` channel keeps its "Device Information" display name.** `CHANNEL_NAMES` lacked an entry for `info`, so the generic channel-create path overwrote the name set earlier in the same function. Visible in ioBroker Objects, zero runtime impact.
+- **Admin UI copy: drop the "~100 ms" latency claim from the LAN section.** User-facing text doesn't need developer numbers. Reworded in all 11 languages to match the Wiki rewrite.
+- **Internal cleanup, no behavioural change:** `applyManualSegments` helper unifies the user-edit path and the wizard-result path (was duplicated); `refreshDeviceStates` targets one device instead of rebuilding the entire state tree on each snapshot save/delete; `dynamic_scene` mapping skips the generic stub for `lightScene/diyScene/snapshot` instead of creating and filtering it out later; `prefixMap` + `stateChannelMap` now get cleaned when a device is removed (no more indefinite growth); `loadDeviceScenes` dropped redundant change-tracking; routing docstrings corrected from "LAN → MQTT → Cloud" to "LAN → Cloud" (MQTT is status-push only).
+
 ### 1.7.5 (2026-04-19)
 - **Fix the Wiki link at the top of the adapter settings.** The Markdown in the previous `staticText` wasn't rendered as a clickable link. Replaced with two `staticLink` buttons side by side: **Wiki (Deutsch)** pointing to the Startseite and **Wiki (English)** pointing to the Home page. Consistent with the Ko-Fi/PayPal button pattern used in the other adapters in the workspace.
 
@@ -119,9 +126,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - **Wizard now forces color mode before each flash.** Previously the flash packets were silently ignored when the strip happened to be in Scene/Gradient/Music mode. The wizard now sends a `colorwc` pre-amble that moves the device into static-color mode, so the segment-level white flash is always visible
 - **Manual-mode survives restarts.** Cut-strip settings (`manual_mode` + `manual_list`) are now part of the SKU cache — previously they could be lost on the first rebuild after startup
 - Cloud-internal contradictions (e.g. H70D1 Icicle reporting `segmentedBrightness=10` and `segmentedColorRgb=15` in the same response) are resolved conservatively: take the smaller value and let MQTT correct upwards if the real device proves bigger
-
-### 1.6.7 (2026-04-19)
-- Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so the new datapoints get created first (no more "State has no existing object" warnings). The next AA A5 push seconds later populates the fully-built tree.
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

@@ -1,6 +1,6 @@
 {
     "lanHeader": "LAN Control (always active)",
-    "lanInfo": "Devices with LAN mode enabled in the Govee Home app are discovered automatically. This provides the fastest control (~100ms).",
+    "lanInfo": "Devices with LAN mode enabled in the Govee Home app are discovered automatically. LAN is the fastest control channel.",
     "cloudHeader": "Cloud API (optional)",
     "cloudInfo": "Enter your Govee API key to enable device names, scenes and segment control. Get your key in the Govee Home app under Account > Settings > About Us > Apply for API Key.",
     "apiKeyLabel": "API Key",

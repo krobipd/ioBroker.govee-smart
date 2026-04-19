@@ -218,15 +218,16 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       ];
 
     case "dynamic_scene":
-    case "work_mode":
-    case "temperature_setting": {
-      // Complex types — expose as JSON for now
-      const dsChannel =
+      // lightScene / diyScene / snapshot get real dropdowns built later in
+      // buildDeviceStateDefs from the scenes/snapshots arrays — skip the
+      // generic stub here so we don't create and immediately delete it.
+      if (
+        cap.instance === "lightScene" ||
+        cap.instance === "diyScene" ||
         cap.instance === "snapshot"
-          ? "snapshots"
-          : cap.instance === "lightScene" || cap.instance === "diyScene"
-            ? "scenes"
-            : undefined;
+      ) {
+        return null;
+      }
       return [
         {
           id: sanitizeId(cap.instance),
@@ -237,10 +238,23 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
           def: "",
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
-          channel: dsChannel,
         },
       ];
-    }
+
+    case "work_mode":
+    case "temperature_setting":
+      return [
+        {
+          id: sanitizeId(cap.instance),
+          name: humanize(cap.instance),
+          type: "string",
+          role: "json",
+          write: true,
+          def: "",
+          capabilityType: cap.type,
+          capabilityInstance: cap.instance,
+        },
+      ];
 
     case "music_setting":
       return mapMusicSetting(cap);
@@ -708,12 +722,6 @@ export function buildDeviceStateDefs(
   }
 
   applyQuirksToStates(device.sku, stateDefs);
-
-  // Remove generic JSON stubs — replace with real dropdowns if data available
-  stateDefs = stateDefs.filter(
-    (d) =>
-      d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot",
-  );
 
   if (device.scenes.length > 0) {
     const states: Record<string, string> = { 0: "---" };

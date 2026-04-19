@@ -108,7 +108,8 @@ export class CommandRouter {
   }
 
   /**
-   * Send a command to a device — routes through LAN → MQTT → Cloud.
+   * Send a command to a device — routes through LAN → Cloud.
+   * MQTT is status-push only and never used for commands.
    *
    * @param device Target device
    * @param command Command type

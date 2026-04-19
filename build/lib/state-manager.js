@@ -31,7 +31,8 @@ const CHANNEL_NAMES = {
   control: "Controls",
   scenes: "Scenes",
   music: "Music",
-  snapshots: "Snapshots"
+  snapshots: "Snapshots",
+  info: "Device Information"
 };
 class StateManager {
   adapter;
@@ -115,34 +116,6 @@ class StateManager {
         val: (_a = device.state.online) != null ? _a : false,
         ack: true
       });
-    } else {
-      await this.adapter.delObjectAsync(`${prefix}.info.online`).catch(() => {
-      });
-      await this.adapter.delStateAsync(`${prefix}.info.online`).catch(() => {
-      });
-      const memberIds = ((_b = device.groupMembers) != null ? _b : []).map((m) => {
-        const shortId = (0, import_types.normalizeDeviceId)(m.deviceId).slice(-4);
-        return sanitize(`${m.sku}_${shortId}`);
-      }).join(", ");
-      await this.ensureState(
-        `${prefix}.info.members`,
-        "Members",
-        "string",
-        "text",
-        false
-      );
-      await this.adapter.setStateAsync(`${prefix}.info.members`, {
-        val: memberIds,
-        ack: true
-      });
-      for (const staleId of ["diagnostics_export", "diagnostics_result"]) {
-        await this.adapter.delObjectAsync(`${prefix}.info.${staleId}`).catch(() => {
-        });
-        await this.adapter.delStateAsync(`${prefix}.info.${staleId}`).catch(() => {
-        });
-      }
-    }
-    if (!isGroup) {
       await this.ensureState(
         `${prefix}.info.model`,
         "Model",
@@ -173,11 +146,33 @@ class StateManager {
         ack: true
       });
       await this.adapter.setStateAsync(`${prefix}.info.ip`, {
-        val: (_c = device.lanIp) != null ? _c : "",
+        val: (_b = device.lanIp) != null ? _b : "",
         ack: true
       });
     } else {
-      for (const staleId of ["model", "serial", "ip"]) {
+      const memberIds = ((_c = device.groupMembers) != null ? _c : []).map((m) => {
+        const shortId = (0, import_types.normalizeDeviceId)(m.deviceId).slice(-4);
+        return sanitize(`${m.sku}_${shortId}`);
+      }).join(", ");
+      await this.ensureState(
+        `${prefix}.info.members`,
+        "Members",
+        "string",
+        "text",
+        false
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.members`, {
+        val: memberIds,
+        ack: true
+      });
+      for (const staleId of [
+        "online",
+        "model",
+        "serial",
+        "ip",
+        "diagnostics_export",
+        "diagnostics_result"
+      ]) {
         await this.adapter.delObjectAsync(`${prefix}.info.${staleId}`).catch(() => {
         });
         await this.adapter.delStateAsync(`${prefix}.info.${staleId}`).catch(() => {
@@ -536,6 +531,7 @@ class StateManager {
         if (!currentPrefixes.has(localId)) {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           await this.adapter.delObjectAsync(localId, { recursive: true });
+          this.forgetPrefix(localId);
         }
       }
     }
@@ -601,6 +597,25 @@ class StateManager {
     const shortId = (0, import_types.normalizeDeviceId)(device.deviceId).slice(-4);
     const folder = device.sku === "BaseGroup" ? "groups" : "devices";
     return `${folder}.${sanitize(`${device.sku}_${shortId}`)}`;
+  }
+  /**
+   * Drop prefix + stateChannel entries for a device that was removed.
+   * Prevents the maps from growing indefinitely across adapter lifetime.
+   *
+   * @param prefix Device prefix that was removed
+   */
+  forgetPrefix(prefix) {
+    for (const key of this.prefixMap.keys()) {
+      if (this.prefixMap.get(key) === prefix) {
+        this.prefixMap.delete(key);
+      }
+    }
+    const stalePrefix = `${prefix}.`;
+    for (const key of this.stateChannelMap.keys()) {
+      if (key.startsWith(stalePrefix)) {
+        this.stateChannelMap.delete(key);
+      }
+    }
   }
   /**
    * Unique key for internal tracking (not used as object ID).

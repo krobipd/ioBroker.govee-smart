@@ -1,13 +1,13 @@
 # CLAUDE.md — ioBroker.govee-smart
 
 > Gemeinsame ioBroker-Wissensbasis: `../CLAUDE.md` (lokal, nicht im Git). Standards dort, Projekt-Spezifisches hier.
-> Vollständige API-Recherche: Memory `research_govee.md`
+> Vollständige API-Recherche: `/Volumes/ssd/ioBroker/Ressourcen/govee-smart/` (LAN-Protokoll, MQTT AWS IoT, ptReal BLE, Scene-Speed, Segment-Detection, Snapshot-ptReal, API-Referenz, Features-Roadmap, Konkurrenz)
 
 ## Projekt
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart Lights (LED-Strips, Lampen, Panels). LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig. Nur Lichter, keine Haushaltsgeräte.
 
-- **Version:** 1.7.3 (April 2026)
+- **Version:** 1.7.5 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -230,86 +230,91 @@ Single Page, drei Sektionen:
 ## Tests (473 custom + 57 package + integration)
 
 ```
-test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks + Groups + Drift (80 Tests)
-  - mapCapabilities: on_off, range, color, scenes, property, toggle, LAN defaults (11)
-  - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases (10)
-  - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases (16)
-  - applyQuirksToStates: known SKU, unknown SKU, non-colorTemp (3)
-  - buildDeviceStateDefs groups: no members, control intersection, no snapshots/diag, scene/music intersection, Cloud-only caps, unreachable (8)
-  - Drift: API schema violations (30) — mapCapabilities non-array/malformed/null/undefined, missing `parameters`, non-string cap.type/instance, non-array options/fields, mapCloudStateValue string coercion (boolean-strings, numeric-strings, out-of-range), returns null on coercion failure
-test/testDeviceManager.ts    → Device Manager + CommandRouter + Drift (93 Tests)
-  - LAN discovery, IP update, MQTT status, unknown device/IP handling (7)
-  - sendCommand channel routing: LAN→Cloud fallback, ptReal scene, segment→LAN ptReal, gradient, snapshot ptReal (14)
-  - toCloudValue: power, brightness, color hex→int, scene/snapshot/diy index lookup, segments (14)
-  - parseSegmentBatch: range, all, comma, brightness-only, clamp, invalid, mixed (10)
-  - findCapabilityForCommand: all command types, unknown, empty capabilities, non-array, malformed entries (13)
-  - Drift: malformed cloud device list (5) — non-string sku/device, non-array capabilities, non-array input, null entries
-  - logDedup: category tracking, warn vs debug (1+assertions)
-  - handleMqttStatus edge cases: partial update, colorTemp, mqtt channel, empty state (4)
-  - handleLanStatus edge cases: zero brightness, colorTemInKelvin 0 (2)
-  - DIY scene via LAN: library match, no match fallback (2)
-  - colorTemperature via LAN, no channel warning (2)
-  - generateDiagnostics: all data, quirks (2)
-  - toCloudValue bounds checks: NaN, zero, out-of-range (5)
-  - parseMqttSegmentData: single packet, multi-packet indices, segmentCount limit, non-AA-A5 filter, empty/zero/invalid, full 5-packet (8)
-  - handleMqttStatus segment sync: AA A5 callback, no segmentCount skip, no AA A5 skip (3)
-test/testDeviceQuirks.ts     → Device Quirks + Community Quirks (15 Tests)
-  - getDeviceQuirks: known, case-insensitive, unknown, brokenPlatformApi, all broken (5)
-  - applyColorTempQuirk: override, passthrough, no range, H6022, case-insensitive (5)
-  - loadCommunityQuirks: load+override, add new, missing file, corrupt JSON, case-insensitive (5)
-test/testLocalSnapshots.ts   → Local Snapshots + Drift (15 Tests)
+test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks + Groups + Drift (80)
+  - mapCapabilities: on_off, range, color, scenes, property, toggle, LAN defaults
+  - mapCapabilities branches: segment, dynamic_scene, music, work_mode, unknown, edge cases
+  - mapCloudStateValue: all types, null/undefined, unknown capability, edge cases
+  - applyQuirksToStates: known SKU, unknown SKU, non-colorTemp
+  - buildDeviceStateDefs groups: no members, control intersection, scene/music intersection, Cloud-only caps, unreachable
+  - Drift: API schema violations — non-array/malformed/null/undefined, missing parameters, string coercion
+test/testCloudRetry.ts       → Cloud-Retry-Loop state machine (24)
+  - handleResult: transient / rate-limited / auth-failed / ok
+  - Retry scheduling: retryAfterMs respect, 5-min transient backoff, auth stops permanently
+  - onCloudRestored callback firing order
+test/testDeviceManager.ts    → Device Manager + CommandRouter + Drift (123)
+  - LAN discovery, IP update, MQTT status, unknown device/IP handling
+  - sendCommand channel routing: LAN→Cloud fallback, ptReal scene, segment→LAN ptReal, gradient, snapshot ptReal
+  - toCloudValue: power, brightness, color hex→int, scene/snapshot/diy index lookup, segments
+  - parseSegmentBatch: range, all, comma, brightness-only, clamp, invalid, mixed
+  - findCapabilityForCommand: all command types, unknown, empty caps, non-array, malformed entries
+  - Drift: malformed cloud device list, non-string sku/device, non-array caps, null entries
+  - logDedup: category tracking, warn vs debug
+  - handleMqttStatus edge cases + segment sync (AA A5 callback path)
+  - handleLanStatus edge cases: zero brightness, colorTemInKelvin 0
+  - DIY scene via LAN: library match, no match fallback
+  - colorTemperature via LAN, no channel warning
+  - generateDiagnostics: all data, quirks
+  - parseMqttSegmentData: single packet, multi-packet indices, limit, non-AA-A5 filter, empty/zero/invalid, full 5-packet
+  - resolveSegmentCount: cache-wins, Cloud-min fallback, widersprüchliche Caps
+  - getEffectiveSegmentIndices: manualMode on/off, empty, edge cases
+test/testDeviceQuirks.ts     → Device Quirks + Community Quirks (15)
+  - getDeviceQuirks + applyColorTempQuirk + loadCommunityQuirks (load, override, missing, corrupt)
+test/testLocalSnapshots.ts   → Local Snapshots + Drift (17)
   - Create dir, empty device, save/retrieve, overwrite, multiple, delete, non-existent, per-device, corrupt, colorTemp
-  - Segment data: save/retrieve with segments, backwards compat without segments, overwrite segment data
-  - Drift: non-string deviceId/sku must not throw (2)
-test/testLanClient.ts        → LAN Client BLE Packet Builder (33 Tests)
-  - buildScenePackets: activation, little-endian, A3 data, XOR checksum, empty param (5)
-  - buildGradientPacket: ON, OFF, checksum (3)
-  - buildMusicModePacket: Energic, Spectrum, Rolling, Rhythm, checksum (5 → overlaps)
-  - buildDiyPackets: activation-only, A1 data, checksums (3)
-  - buildSegmentBitmask: bit0, bit5, multi-byte, multi-segment same byte, overflow (5)
-  - buildSegmentColorPacket: header, verified segment 5 green, segments 3+4+5 blue, segments 10+11+12 red, checksum (5)
-  - buildSegmentBrightnessPacket: header, verified segment 5 30%, clamp, checksum (4)
-  - applySceneSpeed: single page, multi-page, no match, empty/invalid, out-of-range (5)
-test/testRateLimiter.ts      → Rate Limiter (11 Tests)
+  - Segment data: save/retrieve with segments, backwards compat, overwrite
+  - Drift: non-string deviceId/sku must not throw
+test/testLanClient.ts        → LAN Client BLE Packet Builder (35)
+  - buildScenePackets: activation, little-endian, A3 data, XOR checksum, empty param
+  - buildGradientPacket: ON, OFF, checksum
+  - buildMusicModePacket: Energic, Spectrum, Rolling, Rhythm, checksum
+  - buildDiyPackets: activation-only, A1 data, checksums
+  - buildSegmentBitmask / SegmentColorPacket / SegmentBrightnessPacket: verified against real captures
+  - flashSingleSegment + restoreAllSegments atomic datagram builds
+  - applySceneSpeed: single page, multi-page, no match, empty/invalid, out-of-range
+test/testRateLimiter.ts      → Rate Limiter (11)
   - Limits, daily usage, queueing, priority sorting, stop/clear, counter tracking
-test/testSkuCache.ts         → SKU Cache + Drift (14 Tests)
-  - Create dir, empty cache, save/loadAll, overwrite, separate devices, same SKU, loadAll, clear, corrupt, normalized ID, libraries, null features
-  - Drift: non-string deviceId/sku must not throw (2)
-test/testTypes.ts            → Shared Utilities + Drift (33 Tests)
-  - normalizeDeviceId: colons, lowercase, empty string, undefined/null/number/object safe returns (9)
-  - rgbToHex: standard, padding, white (3)
-  - hexToRgb: with #, without #, black, invalid (4)
-  - rgbIntToHex: standard, zero, white (3)
-  - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property (15)
-test/testStateManager.ts     → State Manager (45 Tests)
-  - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons (4)
-  - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip/online (9)
-  - createDeviceStates channels: scenes routing, music routing, snapshot routing, multi-channel (4)
-  - createGroupsOnlineState: create + update (2)
-  - group members: info.members with groupMembers, empty members, diagnostics cleanup (3)
-  - updateGroupMembersUnreachable: create when unreachable, delete when all reachable (2)
-  - resolveStatePath: control, scenes, music, snapshots, diagnostics, unknown→control (6)
-  - updateDeviceState: power, multiple fields, online, undefined fields, missing object (5)
-  - cleanupDevices: remove stale, keep existing (2)
-  - cleanupAllChannelStates: remove stale, remove empty channel, migrate old→new channel, dropdown reset, dropdown keep (5)
-  - createSegmentStates: per-segment states, default 15, excess cleanup, no fields (4)
-test/testPackageFiles.ts     → @iobroker/testing (57 Tests)
+test/testSegmentWizard.ts    → Segment-Detection-Wizard state machine (39)
+  - runStep routing: start / yes / no / done / abort / unknown action
+  - start: device-not-found, no-segment-capability, already-active guard, baseline capture, initial flash
+  - answer: visible vs dark tracking, advance, auto-finalize at SEGMENT_HARD_MAX
+  - done: requires at least one answer, finalizes with contiguous or gaps
+  - finish: applyWizardResult host call, restoreBaseline, session close
+  - compactIndices: range-notation output
+  - Idle timeout: 5-min auto-abort, clearIdleTimer on dispose
+test/testSkuCache.ts         → SKU Cache + Drift (23)
+  - Create dir, empty cache, save/loadAll, overwrite, separate devices, same SKU, clear, corrupt, normalized ID, libraries, null features
+  - pruneStale: age-based eviction, scenesChecked-guard
+  - segmentCount / manualMode / manualSegments round-trip (cut-strip persistence)
+  - Drift: non-string deviceId/sku must not throw
+test/testTypes.ts            → Shared Utilities + Drift (57)
+  - normalizeDeviceId: colons, lowercase, empty string, undefined/null/number/object safe returns
+  - rgbToHex / hexToRgb / rgbIntToHex: standard + edge cases
+  - classifyError: NETWORK, TIMEOUT, AUTH, RATE_LIMIT, UNKNOWN, string/non-Error, .code property
+  - parseSegmentList: comma / range / mixed / whitespace / dedupe / sort / invalid / reversed / per-device-max / hard-backstop
+test/testStateManager.ts     → State Manager (49)
+  - devicePrefix: SKU+shortId, BaseGroup folder, special chars, colons
+  - createDeviceStates: device+info+control, native props, defaults, unit/min/max, no IP, BaseGroup no model/serial/ip/online
+  - createDeviceStates channels: scenes / music / snapshot routing, multi-channel
+  - createGroupsOnlineState: create + update
+  - group members: info.members with groupMembers, empty members, diagnostics cleanup
+  - updateGroupMembersUnreachable: create when unreachable, delete when all reachable
+  - resolveStatePath: control, scenes, music, snapshots, diagnostics, unknown→control
+  - updateDeviceState / cleanupDevices / cleanupAllChannelStates (stale removal, empty channel, migration, dropdown reset)
+  - createSegmentStates: per-segment states, default, excess cleanup, no fields, manual-mode list normalisation
+test/testPackageFiles.ts     → @iobroker/testing (57)
 ```
 
-## Versionshistorie (letzte 5)
+## Versionshistorie (letzte 7)
 
 | Version | Highlights |
 |---------|------------|
+| 1.7.5 | Wiki-Link oben im Main-Tab: `staticText` mit Markdown wurde von Admin nicht als klickbarer Link gerendert → ersetzt durch zwei nebeneinander liegende `staticLink`-Buttons "Wiki (Deutsch)" → `/wiki/Startseite` und "Wiki (English)" → `/wiki/Home`. Konsistent mit dem Ko-Fi/PayPal-Button-Muster |
+| 1.7.4 | Admin-UI: sprachabhängiger Wiki-Link oben im Main-Tab als `staticText` mit i18n-Markdown (`_docLink` vor `_lanHeader`). In 1.7.5 ersetzt, weil Markdown nicht gerendert wurde |
 | 1.7.3 | Latest-repo review compliance: `common.messagebox=true` wegen onMessage-Wizard, native `setTimeout`-Delays (150 ms für Color-Mode-Preamble) über Adapter-Timer-Wrapper (onUnload-safe) |
 | 1.7.2 | Test-Infrastruktur auf ioBroker-Standard: `test/package.js` + `test/integration.js` als plain JS (ruft tests.packageFiles / tests.integration direkt auf). Vorher war das Integration-Script ein Papier-Tiger. Keine Runtime-Änderung |
 | 1.7.1 | Color-Mode-Force (colorwc) vor allen Segment-Commands im CommandRouter — fixt "direkt Segment setzen tut nix im Scene-Mode" + triggert nebenbei MQTT AA A5 Pushes (auto-learn Count) |
 | 1.7.0 | Segment-Count Single-Source-of-Truth (resolveSegmentCount + Cache-persist → 20m-Strips korrekt erkannt, Cloud-Widersprüche aufgelöst). Wizard komplett neu gedacht: misst die echte Länge, 3 Buttons (Ja/Nein/Fertig), erkennt Lücken automatisch. manualMode+List überleben Neustarts |
 | 1.6.7 | Fix Race-Condition beim MQTT-Discovery-Push — Segment-State-Sync übersprungen wenn Count wächst, damit Objects-Tree erst fertig gebaut wird |
-| 1.6.6 | MQTT-Bump bei Under-Reporting: wenn AA A5 mehr Segmente zeigt als Cloud meldet, wird segmentCount hochgezählt (reaktiv, war ohne Persist — in 1.7.0 richtig gelöst) |
-| 1.6.5 | Wizard-Flash atomic via ptReal — alle 3 BLE-Pakete in einem UDP. Vor Flash: Power ON + Brightness 100. info.wizardStatus als Live-State |
-| 1.6.4 | Wizard UX: nur online-Geräte im Dropdown, persistente Status-Box, multi-line Toasts |
-| 1.6.3 | Fix Wizard-Start-Crash (cmd.split in parseSegmentBatch), alle async Event-Handler mit .catch gegen SIGKILL-6, komplette API-Boundary-Härtung über alle Clients (Array.isArray+typeof), rgbToHex NaN/clamp + hexToRgb typeof-guard, SegmentWizard + CloudRetryLoop in eigene testbare Module, 511 Tests (war 427) |
-| 1.6.2 | Fix jsonConfig-Schema-Warnungen für Wizard (button-Prop entfernt, variant/color korrigiert, xs=12) |
 
 ## Befehle
 

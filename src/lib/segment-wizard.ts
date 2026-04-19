@@ -103,6 +103,10 @@ export interface WizardHost {
 
 const IDLE_TIMEOUT_MS = 5 * 60_000;
 
+/** Status text shown when no wizard session is active. */
+export const WIZARD_IDLE_TEXT =
+  "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.";
+
 /**
  * Check whether a device has any segment capability at all. A strip with
  * zero segments (e.g. Curtain H70B3) can't be wizard-tested.
@@ -150,7 +154,7 @@ export class SegmentWizard {
   public getStatusText(): string {
     const s = this.session;
     if (!s) {
-      return "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.";
+      return WIZARD_IDLE_TEXT;
     }
     const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "—";
     return (

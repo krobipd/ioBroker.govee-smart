@@ -24,6 +24,7 @@ import { CloudRetryLoop, type CloudRetryHost } from "./lib/cloud-retry.js";
 import { RateLimiter } from "./lib/rate-limiter.js";
 import {
   SegmentWizard,
+  WIZARD_IDLE_TEXT,
   type WizardHost,
   type WizardResult,
 } from "./lib/segment-wizard.js";
@@ -152,7 +153,7 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
     await this.setStateAsync("info.wizardStatus", {
-      val: "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.",
+      val: WIZARD_IDLE_TEXT,
       ack: true,
     });
 
@@ -554,13 +555,14 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
 
-    // Manual segments toggle/list — reconfigure segment tree on change
+    // Manual segments toggle/list — handler owns the ack because a parse
+    // error rewrites manual_mode to false, and an outer ack with state.val
+    // would resurrect the rejected value.
     if (
       stateSuffix === "segments.manual_mode" ||
       stateSuffix === "segments.manual_list"
     ) {
       await this.handleManualSegmentsChange(device, stateSuffix, state.val);
-      await this.setStateAsync(id, { val: state.val, ack: true });
       return;
     }
 
@@ -958,6 +960,41 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
+   * Rebuild state definitions for one device and feed them into StateManager.
+   * Used both from the full-list callback and from targeted refreshes
+   * (e.g. after a local snapshot was added or removed — no reason to rebuild
+   * the entire tree for every device then).
+   *
+   * @param device Target device
+   * @param allDevices Full device list (needed to resolve group members)
+   */
+  private refreshDeviceStates(
+    device: GoveeDevice,
+    allDevices: GoveeDevice[],
+  ): void {
+    if (!this.stateManager) {
+      return;
+    }
+    const localSnaps = this.localSnapshots?.getSnapshots(
+      device.sku,
+      device.deviceId,
+    );
+    let memberDevices: GoveeDevice[] | undefined;
+    if (device.sku === "BaseGroup" && device.groupMembers) {
+      memberDevices = this.resolveGroupMembers(device, allDevices);
+    }
+    const stateDefs = buildDeviceStateDefs(device, localSnaps, memberDevices);
+    const p = this.stateManager
+      .createDeviceStates(device, stateDefs)
+      .catch((e) => {
+        this.log.error(
+          `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      });
+    this.stateCreationQueue.push(p);
+  }
+
+  /**
    * Called by device-manager when the device list changes
    *
    * @param devices Current list of all devices
@@ -968,27 +1005,7 @@ class GoveeAdapter extends utils.Adapter {
     }
 
     for (const device of devices) {
-      const localSnaps = this.localSnapshots?.getSnapshots(
-        device.sku,
-        device.deviceId,
-      );
-
-      // Resolve group members for BaseGroup devices
-      let memberDevices: GoveeDevice[] | undefined;
-      if (device.sku === "BaseGroup" && device.groupMembers) {
-        memberDevices = this.resolveGroupMembers(device, devices);
-      }
-
-      const stateDefs = buildDeviceStateDefs(device, localSnaps, memberDevices);
-
-      const p = this.stateManager
-        .createDeviceStates(device, stateDefs)
-        .catch((e) => {
-          this.log.error(
-            `createDeviceStates failed for ${device.name}: ${e instanceof Error ? e.message : String(e)}`,
-          );
-        });
-      this.stateCreationQueue.push(p);
+      this.refreshDeviceStates(device, devices);
     }
 
     this.updateConnectionState();
@@ -1279,8 +1296,36 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * React to manual-segments state changes — parses list, updates device runtime,
-   * rebuilds segment tree. Reverts manual_mode on parse error.
+   * Central entry point for manual-segment updates. Sets the device flags,
+   * rebuilds the segment tree (which writes manual_mode + manual_list with
+   * ack=true), and persists to cache. Both the user state-change handler
+   * and the wizard route their final decisions here.
+   *
+   * @param device Target device
+   * @param mode    Whether manual mode should be active
+   * @param indices Physical indices when mode=true, ignored otherwise
+   */
+  private async applyManualSegments(
+    device: GoveeDevice,
+    mode: boolean,
+    indices?: number[],
+  ): Promise<void> {
+    if (!this.stateManager) {
+      return;
+    }
+    device.manualMode = mode;
+    device.manualSegments =
+      mode && Array.isArray(indices) && indices.length > 0
+        ? indices.slice()
+        : undefined;
+    await this.stateManager.createSegmentStates(device);
+    this.deviceManager?.persistDeviceToCache(device);
+  }
+
+  /**
+   * React to manual-segments state changes — parses list, forwards to
+   * {@link applyManualSegments}. On parse error disables manual mode so the
+   * rejected value doesn't survive in the state tree.
    *
    * @param device Target device
    * @param suffix State suffix (either "segments.manual_mode" or "segments.manual_list")
@@ -1291,46 +1336,32 @@ class GoveeAdapter extends utils.Adapter {
     suffix: string,
     newValue: unknown,
   ): Promise<void> {
-    if (!this.stateManager) {
-      return;
-    }
-    const prefix = this.stateManager.devicePrefix(device);
-    const ns = this.namespace;
-
-    // Read both states (the one not being written we get from current state)
+    // Peer value that wasn't just written comes from the device object
+    // (kept in sync via createSegmentStates), not a separate state read.
     const modeVal =
       suffix === "segments.manual_mode"
         ? Boolean(newValue)
-        : Boolean(
-            (await this.getStateAsync(`${ns}.${prefix}.segments.manual_mode`))
-              ?.val,
-          );
+        : device.manualMode === true;
     const listVal =
       suffix === "segments.manual_list"
         ? typeof newValue === "string"
           ? newValue
           : ""
-        : String(
-            (await this.getStateAsync(`${ns}.${prefix}.segments.manual_list`))
-              ?.val ?? "",
-          );
+        : Array.isArray(device.manualSegments)
+          ? device.manualSegments.join(",")
+          : "";
 
     if (!modeVal) {
-      // Manual mode off → gaps removed, back to contiguous strip
-      device.manualMode = false;
-      device.manualSegments = undefined;
       this.log.info(
         `${device.name}: manual segments disabled — strip treated as contiguous`,
       );
-      await this.stateManager.createSegmentStates(device);
-      this.deviceManager?.persistDeviceToCache(device);
+      await this.applyManualSegments(device, false);
       return;
     }
 
-    // Upper bound for the list parser: cap at the strip's real length when
-    // we know it (device.segmentCount), otherwise at the protocol limit.
-    // The real length itself may still grow via MQTT discovery, so SEGMENT_HARD_MAX
-    // stays as absolute safety net.
+    // Upper bound: cap at the real length if known, otherwise the protocol limit.
+    // Real length can still grow via MQTT discovery, so SEGMENT_HARD_MAX is the
+    // absolute safety net.
     const maxIndex =
       typeof device.segmentCount === "number" && device.segmentCount > 0
         ? device.segmentCount - 1
@@ -1340,23 +1371,14 @@ class GoveeAdapter extends utils.Adapter {
       this.log.warn(
         `${device.name}: manual_list invalid (${parsed.error}) — disabling manual mode`,
       );
-      device.manualMode = false;
-      device.manualSegments = undefined;
-      await this.setStateAsync(`${ns}.${prefix}.segments.manual_mode`, {
-        val: false,
-        ack: true,
-      });
-      this.deviceManager?.persistDeviceToCache(device);
+      await this.applyManualSegments(device, false);
       return;
     }
 
-    device.manualMode = true;
-    device.manualSegments = parsed.indices;
     this.log.info(
       `${device.name}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`,
     );
-    await this.stateManager.createSegmentStates(device);
-    this.deviceManager?.persistDeviceToCache(device);
+    await this.applyManualSegments(device, true, parsed.indices);
   }
 
   // ───────── Segment-Detection-Wizard ─────────
@@ -1494,10 +1516,9 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * Apply a finished wizard's measurement to the device: set the real
-   * segment count, toggle manual-mode only if gaps were detected, rebuild
-   * the state tree, persist to cache. Runs with ack=true so the state
-   * writes don't bounce through {@link handleManualSegmentsChange}.
+   * Apply a finished wizard's measurement: set the real segment count, then
+   * route through {@link applyManualSegments} so the same state-tree rebuild
+   * and cache-persist path runs for both wizard results and user edits.
    *
    * @param device Target device
    * @param result Wizard's measurement
@@ -1506,31 +1527,22 @@ class GoveeAdapter extends utils.Adapter {
     device: GoveeDevice,
     result: WizardResult,
   ): Promise<void> {
-    if (!this.stateManager) {
-      return;
-    }
-    const prefix = this.stateManager.devicePrefix(device);
-    const ns = this.namespace;
-
     device.segmentCount = result.segmentCount;
     if (result.hasGaps) {
       const parsed = parseSegmentList(
         result.manualList,
         result.segmentCount - 1,
       );
-      device.manualMode = true;
-      device.manualSegments = parsed.error ? undefined : parsed.indices;
+      await this.applyManualSegments(
+        device,
+        true,
+        parsed.error ? undefined : parsed.indices,
+      );
     } else {
-      device.manualMode = false;
-      device.manualSegments = undefined;
+      await this.applyManualSegments(device, false);
     }
-
-    await this.stateManager.createSegmentStates(device);
-    // createSegmentStates already wrote manual_mode / manual_list from the
-    // device object — no separate state writes needed here.
-    this.deviceManager?.persistDeviceToCache(device);
     this.log.debug(
-      `applyWizardResult: ${ns}.${prefix} → segmentCount=${result.segmentCount}, ` +
+      `applyWizardResult: ${device.sku} → segmentCount=${result.segmentCount}, ` +
         `manualMode=${device.manualMode}, list="${result.manualList}"`,
     );
   }
@@ -1624,8 +1636,8 @@ class GoveeAdapter extends utils.Adapter {
     this.localSnapshots.saveSnapshot(device.sku, device.deviceId, snapshot);
     this.log.info(`Local snapshot saved: "${name}" for ${device.name}`);
 
-    // Refresh device states to update the dropdown
-    this.onDeviceListChanged(this.deviceManager!.getDevices());
+    // Targeted refresh — only this device's snapshot_local dropdown changed.
+    this.refreshDeviceStates(device, this.deviceManager!.getDevices());
   }
 
   /**
@@ -1656,7 +1668,7 @@ class GoveeAdapter extends utils.Adapter {
 
     this.log.info(`Restoring local snapshot "${snap.name}" for ${device.name}`);
 
-    // Send each state via LAN → MQTT → Cloud routing
+    // Send each state via LAN → Cloud routing
     await this.deviceManager.sendCommand(device, "power", snap.power);
     if (snap.power) {
       await this.deviceManager.sendCommand(
@@ -1706,8 +1718,8 @@ class GoveeAdapter extends utils.Adapter {
 
     if (this.localSnapshots.deleteSnapshot(device.sku, device.deviceId, name)) {
       this.log.info(`Local snapshot deleted: "${name}" for ${device.name}`);
-      // Refresh device states to update the dropdown
-      this.onDeviceListChanged(this.deviceManager!.getDevices());
+      // Targeted refresh — only this device's snapshot_local dropdown changed.
+      this.refreshDeviceStates(device, this.deviceManager!.getDevices());
     } else {
       this.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
     }

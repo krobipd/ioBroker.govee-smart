@@ -380,18 +380,13 @@ class DeviceManager {
    */
   async loadDeviceScenes(device, cd) {
     var _a;
-    let changed = false;
     const loadScenes = async () => {
       try {
         const { lightScenes, diyScenes, snapshots } = await this.cloudClient.getScenes(cd.sku, cd.device);
         if (lightScenes.length > 0 || diyScenes.length > 0 || snapshots.length > 0) {
-          const scenesChanged = lightScenes.length !== device.scenes.length || diyScenes.length !== device.diyScenes.length || snapshots.length !== device.snapshots.length;
           device.scenes = lightScenes;
           device.diyScenes = diyScenes;
           device.snapshots = snapshots;
-          if (scenesChanged) {
-            changed = true;
-          }
         }
       } catch {
         this.log.debug(`Could not load scenes for ${cd.sku}`);
@@ -404,7 +399,6 @@ class DeviceManager {
           const diy = await this.cloudClient.getDiyScenes(cd.sku, cd.device);
           if (diy.length > 0) {
             device.diyScenes = diy;
-            changed = true;
           }
         } catch {
           this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
@@ -432,10 +426,7 @@ class DeviceManager {
         );
       }
     }
-    if (device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0) {
-      changed = true;
-    }
-    return changed;
+    return device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0;
   }
   /**
    * Load scene/music/DIY libraries and SKU features from undocumented API.
@@ -774,7 +765,7 @@ class DeviceManager {
     this.commandRouter.onSegmentBatchUpdate = callback;
   }
   /**
-   * Send a command to a device — routes through LAN → MQTT → Cloud.
+   * Send a command to a device — routes through LAN → Cloud.
    *
    * @param device Target device
    * @param command Command type

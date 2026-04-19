@@ -24,6 +24,7 @@ const CHANNEL_NAMES: Record<string, string> = {
   scenes: "Scenes",
   music: "Music",
   snapshots: "Snapshots",
+  info: "Device Information",
 };
 
 /** Manages ioBroker state creation and updates for Govee devices */
@@ -126,44 +127,6 @@ export class StateManager {
         val: device.state.online ?? false,
         ack: true,
       });
-    } else {
-      // Clean up stale per-group online state from older versions
-      await this.adapter
-        .delObjectAsync(`${prefix}.info.online`)
-        .catch(() => {});
-      await this.adapter.delStateAsync(`${prefix}.info.online`).catch(() => {});
-
-      // Group members: comma-separated device prefix IDs
-      const memberIds = (device.groupMembers ?? [])
-        .map((m) => {
-          const shortId = normalizeDeviceId(m.deviceId).slice(-4);
-          return sanitize(`${m.sku}_${shortId}`);
-        })
-        .join(", ");
-      await this.ensureState(
-        `${prefix}.info.members`,
-        "Members",
-        "string",
-        "text",
-        false,
-      );
-      await this.adapter.setStateAsync(`${prefix}.info.members`, {
-        val: memberIds,
-        ack: true,
-      });
-
-      // Clean up stale diagnostics states from older versions
-      for (const staleId of ["diagnostics_export", "diagnostics_result"]) {
-        await this.adapter
-          .delObjectAsync(`${prefix}.info.${staleId}`)
-          .catch(() => {});
-        await this.adapter
-          .delStateAsync(`${prefix}.info.${staleId}`)
-          .catch(() => {});
-      }
-    }
-
-    if (!isGroup) {
       await this.ensureState(
         `${prefix}.info.model`,
         "Model",
@@ -198,8 +161,36 @@ export class StateManager {
         ack: true,
       });
     } else {
-      // Clean up stale info states from older versions
-      for (const staleId of ["model", "serial", "ip"]) {
+      // Group members: comma-separated device prefix IDs
+      const memberIds = (device.groupMembers ?? [])
+        .map((m) => {
+          const shortId = normalizeDeviceId(m.deviceId).slice(-4);
+          return sanitize(`${m.sku}_${shortId}`);
+        })
+        .join(", ");
+      await this.ensureState(
+        `${prefix}.info.members`,
+        "Members",
+        "string",
+        "text",
+        false,
+      );
+      await this.adapter.setStateAsync(`${prefix}.info.members`, {
+        val: memberIds,
+        ack: true,
+      });
+
+      // Legacy cleanup — groups never carry device-level info states or
+      // diagnostics, but older installs had them. Drop any leftovers so the
+      // tree reflects the current layout.
+      for (const staleId of [
+        "online",
+        "model",
+        "serial",
+        "ip",
+        "diagnostics_export",
+        "diagnostics_result",
+      ]) {
         await this.adapter
           .delObjectAsync(`${prefix}.info.${staleId}`)
           .catch(() => {});
@@ -637,6 +628,7 @@ export class StateManager {
         if (!currentPrefixes.has(localId)) {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           await this.adapter.delObjectAsync(localId, { recursive: true });
+          this.forgetPrefix(localId);
         }
       }
     }
@@ -712,6 +704,26 @@ export class StateManager {
     const shortId = normalizeDeviceId(device.deviceId).slice(-4);
     const folder = device.sku === "BaseGroup" ? "groups" : "devices";
     return `${folder}.${sanitize(`${device.sku}_${shortId}`)}`;
+  }
+
+  /**
+   * Drop prefix + stateChannel entries for a device that was removed.
+   * Prevents the maps from growing indefinitely across adapter lifetime.
+   *
+   * @param prefix Device prefix that was removed
+   */
+  private forgetPrefix(prefix: string): void {
+    for (const key of this.prefixMap.keys()) {
+      if (this.prefixMap.get(key) === prefix) {
+        this.prefixMap.delete(key);
+      }
+    }
+    const stalePrefix = `${prefix}.`;
+    for (const key of this.stateChannelMap.keys()) {
+      if (key.startsWith(stalePrefix)) {
+        this.stateChannelMap.delete(key);
+      }
+    }
   }
 
   /**

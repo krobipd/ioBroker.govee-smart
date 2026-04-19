@@ -197,7 +197,8 @@ export const SEGMENT_HARD_MAX = 55;
 
 /**
  * Device manager — maintains unified device list and routes commands
- * through the fastest available channel: LAN → MQTT → Cloud.
+ * through the fastest available channel: LAN → Cloud.
+ * MQTT is status-push only and never used for commands.
  */
 export class DeviceManager {
   private readonly log: ioBroker.Logger;
@@ -527,8 +528,6 @@ export class DeviceManager {
     device: GoveeDevice,
     cd: CloudDevice,
   ): Promise<boolean> {
-    let changed = false;
-
     // Scenes from dedicated scenes endpoint (rate-limited)
     const loadScenes = async (): Promise<void> => {
       try {
@@ -539,16 +538,9 @@ export class DeviceManager {
           diyScenes.length > 0 ||
           snapshots.length > 0
         ) {
-          const scenesChanged =
-            lightScenes.length !== device.scenes.length ||
-            diyScenes.length !== device.diyScenes.length ||
-            snapshots.length !== device.snapshots.length;
           device.scenes = lightScenes;
           device.diyScenes = diyScenes;
           device.snapshots = snapshots;
-          if (scenesChanged) {
-            changed = true;
-          }
         }
       } catch {
         this.log.debug(`Could not load scenes for ${cd.sku}`);
@@ -563,7 +555,6 @@ export class DeviceManager {
           const diy = await this.cloudClient!.getDiyScenes(cd.sku, cd.device);
           if (diy.length > 0) {
             device.diyScenes = diy;
-            changed = true;
           }
         } catch {
           this.log.debug(`Could not load DIY scenes for ${cd.sku}`);
@@ -604,15 +595,13 @@ export class DeviceManager {
       }
     }
 
-    if (
+    // "Changed" = we ended up with any scene/snapshot data. Inner tracking
+    // was redundant with this single-source check.
+    return (
       device.scenes.length > 0 ||
       device.diyScenes.length > 0 ||
       device.snapshots.length > 0
-    ) {
-      changed = true;
-    }
-
-    return changed;
+    );
   }
 
   /**
@@ -1024,7 +1013,7 @@ export class DeviceManager {
   }
 
   /**
-   * Send a command to a device — routes through LAN → MQTT → Cloud.
+   * Send a command to a device — routes through LAN → Cloud.
    *
    * @param device Target device
    * @param command Command type

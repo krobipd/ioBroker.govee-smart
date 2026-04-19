@@ -201,18 +201,28 @@ describe("CapabilityMapper", () => {
             expect(result[0].role).to.equal("json");
         });
 
-        it("should map dynamic_scene to JSON state", () => {
+        it("should skip dynamic_scene for lightScene/diyScene/snapshot (handled by buildDeviceStateDefs)", () => {
             const caps: CloudCapability[] = [
                 {
                     type: "devices.capabilities.dynamic_scene",
                     instance: "lightScene",
                     parameters: { dataType: "STRUCT" },
                 },
+                {
+                    type: "devices.capabilities.dynamic_scene",
+                    instance: "diyScene",
+                    parameters: { dataType: "STRUCT" },
+                },
+                {
+                    type: "devices.capabilities.dynamic_scene",
+                    instance: "snapshot",
+                    parameters: { dataType: "STRUCT" },
+                },
             ];
-            const result = mapCapabilities(caps);
-            expect(result).to.have.lengthOf(1);
-            expect(result[0].id).to.equal("light_scene");
-            expect(result[0].write).to.be.true;
+            // These three instances become real dropdowns in buildDeviceStateDefs
+            // fed from device.scenes / diyScenes / snapshots — mapCapabilities
+            // returns nothing so no generic stub has to be filtered out later.
+            expect(mapCapabilities(caps)).to.have.lengthOf(0);
         });
 
         it("should skip music_setting without fields", () => {

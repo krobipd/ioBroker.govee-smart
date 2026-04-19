@@ -160,9 +160,9 @@ function mapSingleCapability(cap) {
         }
       ];
     case "dynamic_scene":
-    case "work_mode":
-    case "temperature_setting": {
-      const dsChannel = cap.instance === "snapshot" ? "snapshots" : cap.instance === "lightScene" || cap.instance === "diyScene" ? "scenes" : void 0;
+      if (cap.instance === "lightScene" || cap.instance === "diyScene" || cap.instance === "snapshot") {
+        return null;
+      }
       return [
         {
           id: sanitizeId(cap.instance),
@@ -172,11 +172,23 @@ function mapSingleCapability(cap) {
           write: true,
           def: "",
           capabilityType: cap.type,
-          capabilityInstance: cap.instance,
-          channel: dsChannel
+          capabilityInstance: cap.instance
         }
       ];
-    }
+    case "work_mode":
+    case "temperature_setting":
+      return [
+        {
+          id: sanitizeId(cap.instance),
+          name: humanize(cap.instance),
+          type: "string",
+          role: "json",
+          write: true,
+          def: "",
+          capabilityType: cap.type,
+          capabilityInstance: cap.instance
+        }
+      ];
     case "music_setting":
       return mapMusicSetting(cap);
     default:
@@ -489,9 +501,6 @@ function buildDeviceStateDefs(device, localSnapshots, memberDevices) {
     stateDefs = mapCapabilities(device.capabilities);
   }
   applyQuirksToStates(device.sku, stateDefs);
-  stateDefs = stateDefs.filter(
-    (d) => d.id !== "light_scene" && d.id !== "diy_scene" && d.id !== "snapshot"
-  );
   if (device.scenes.length > 0) {
     const states = { 0: "---" };
     device.scenes.forEach((s, i) => {
