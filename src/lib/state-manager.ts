@@ -86,6 +86,14 @@ export class StateManager {
         `Migrating device ${device.sku}: ${oldPrefix} → ${newPrefix}`,
       );
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
+      // Drop stale channel-map entries under the old prefix so they don't
+      // shadow resolveStatePath lookups after the rename.
+      const oldChannelKey = `${oldPrefix}.`;
+      for (const mapKey of this.stateChannelMap.keys()) {
+        if (mapKey.startsWith(oldChannelKey)) {
+          this.stateChannelMap.delete(mapKey);
+        }
+      }
     }
     this.prefixMap.set(key, newPrefix);
 
@@ -498,6 +506,13 @@ export class StateManager {
   /**
    * Update device state from any source (LAN, MQTT, Cloud).
    *
+   * Writes are fire-and-forget and run in parallel — they're independent,
+   * and the "does this state exist?" check that used to guard each write
+   * was an extra object-read on the hot path (one MQTT push = one update
+   * call). createDeviceStates has already run before any update lands,
+   * so the states are guaranteed to exist; if one disappears (manual
+   * deletion), the setStateAsync will reject and we swallow it.
+   *
    * @param device Govee device
    * @param state Partial state update
    */
@@ -506,31 +521,36 @@ export class StateManager {
     state: Partial<DeviceState>,
   ): Promise<void> {
     const prefix = this.devicePrefix(device);
+    const writes: Promise<unknown>[] = [];
+
+    const set = (id: string, val: ioBroker.StateValue): void => {
+      writes.push(
+        this.adapter
+          .setStateAsync(id, { val, ack: true })
+          .catch(() => undefined),
+      );
+    };
 
     if (state.online !== undefined) {
-      await this.setStateIfExists(`${prefix}.info.online`, state.online);
+      set(`${prefix}.info.online`, state.online);
     }
     if (state.power !== undefined) {
-      await this.setStateIfExists(`${prefix}.control.power`, state.power);
+      set(`${prefix}.control.power`, state.power);
     }
     if (state.brightness !== undefined) {
-      await this.setStateIfExists(
-        `${prefix}.control.brightness`,
-        state.brightness,
-      );
+      set(`${prefix}.control.brightness`, state.brightness);
     }
     if (state.colorRgb !== undefined) {
-      await this.setStateIfExists(`${prefix}.control.colorRgb`, state.colorRgb);
+      set(`${prefix}.control.colorRgb`, state.colorRgb);
     }
     if (state.colorTemperature !== undefined) {
-      await this.setStateIfExists(
-        `${prefix}.control.colorTemperature`,
-        state.colorTemperature,
-      );
+      set(`${prefix}.control.colorTemperature`, state.colorTemperature);
     }
     if (state.scene !== undefined) {
-      await this.setStateIfExists(`${prefix}.control.scene`, state.scene);
+      set(`${prefix}.control.scene`, state.scene);
     }
+
+    await Promise.all(writes);
   }
 
   /**
@@ -568,7 +588,9 @@ export class StateManager {
    * @param online Cloud connection status
    */
   async updateGroupsOnline(online: boolean): Promise<void> {
-    await this.setStateIfExists("groups.info.online", online);
+    await this.adapter
+      .setStateAsync("groups.info.online", { val: online, ack: true })
+      .catch(() => undefined);
   }
 
   /**
@@ -614,12 +636,18 @@ export class StateManager {
   /**
    * Cleanup stale devices that no longer exist.
    *
+   * Returns the prefixes of removed devices so callers (DeviceManager,
+   * adapter-level maps) can drop their own entries for the same devices
+   * and prevent unbounded map growth across the adapter's lifetime.
+   *
    * @param currentDevices Current device list
+   * @returns Prefixes of removed devices (e.g. "devices.h61be_1d6f")
    */
-  async cleanupDevices(currentDevices: GoveeDevice[]): Promise<void> {
+  async cleanupDevices(currentDevices: GoveeDevice[]): Promise<string[]> {
     const currentPrefixes = new Set(
       currentDevices.map((d) => this.devicePrefix(d)),
     );
+    const removed: string[] = [];
 
     // Cleanup both devices/ and groups/ folders
     for (const folder of ["devices", "groups"]) {
@@ -642,14 +670,20 @@ export class StateManager {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           await this.adapter.delObjectAsync(localId, { recursive: true });
           this.forgetPrefix(localId);
+          removed.push(localId);
         }
       }
     }
+    return removed;
   }
 
   /**
    * Remove stale states across all managed channels.
    * Also handles migration from old single-control layout.
+   *
+   * One broad view-query across the whole device prefix replaces the old
+   * four-per-device pass — the channel partition is recovered by parsing
+   * the object id, saving three round-trips per device on every refresh.
    *
    * @param prefix Device prefix
    * @param stateDefs Current state definitions (non-segment)
@@ -668,40 +702,50 @@ export class StateManager {
       expectedByChannel.get(channel)!.add(def.id);
     }
 
-    for (const channel of MANAGED_CHANNELS) {
-      const channelPrefix = `${this.adapter.namespace}.${prefix}.${channel}.`;
-      const existing = await this.adapter.getObjectViewAsync(
-        "system",
-        "state",
-        {
-          startkey: channelPrefix,
-          endkey: `${channelPrefix}\u9999`,
-        },
-      );
+    const devicePrefix = `${this.adapter.namespace}.${prefix}.`;
+    const existing = await this.adapter.getObjectViewAsync("system", "state", {
+      startkey: devicePrefix,
+      endkey: `${devicePrefix}\u9999`,
+    });
+    if (!existing?.rows) {
+      return;
+    }
 
-      if (!existing?.rows) {
+    const totalsPerChannel = new Map<
+      string,
+      { seen: number; deleted: number }
+    >();
+    for (const row of existing.rows) {
+      const rest = row.id.replace(devicePrefix, "");
+      const dotIdx = rest.indexOf(".");
+      if (dotIdx < 0) {
         continue;
       }
-
-      const validIds = expectedByChannel.get(channel) ?? new Set<string>();
-      let deleted = 0;
-      for (const row of existing.rows) {
-        const stateId = row.id.replace(channelPrefix, "");
-        if (!validIds.has(stateId)) {
-          const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-          this.adapter.log.debug(`Removing stale state: ${localId}`);
-          await this.adapter.delObjectAsync(localId);
-          await this.adapter.delStateAsync(localId).catch(() => {});
-          deleted++;
-        }
+      const channel = rest.slice(0, dotIdx);
+      const stateId = rest.slice(dotIdx + 1);
+      if (!MANAGED_CHANNELS.includes(channel)) {
+        continue;
       }
+      const totals = totalsPerChannel.get(channel) ?? { seen: 0, deleted: 0 };
+      totals.seen++;
+      const validIds = expectedByChannel.get(channel) ?? new Set<string>();
+      if (!validIds.has(stateId)) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        this.adapter.log.debug(`Removing stale state: ${localId}`);
+        await this.adapter.delObjectAsync(localId);
+        await this.adapter.delStateAsync(localId).catch(() => {});
+        totals.deleted++;
+      }
+      totalsPerChannel.set(channel, totals);
+    }
 
-      // Remove empty channel object
-      if (deleted > 0 && deleted === existing.rows.length) {
+    // Remove empty channel objects — no surviving states for this channel
+    for (const [channel, totals] of totalsPerChannel) {
+      if (totals.deleted > 0 && totals.deleted === totals.seen) {
         this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
         await this.adapter
           .delObjectAsync(`${prefix}.${channel}`)
-          .catch(() => {});
+          .catch(() => undefined);
       }
     }
   }
@@ -783,21 +827,5 @@ export class StateManager {
       common: common as ioBroker.StateCommon,
       native: {},
     });
-  }
-
-  /**
-   * Set state value only if the object exists
-   *
-   * @param id State object ID
-   * @param value Value to set
-   */
-  private async setStateIfExists(
-    id: string,
-    value: ioBroker.StateValue,
-  ): Promise<void> {
-    const obj = await this.adapter.getObjectAsync(id);
-    if (obj) {
-      await this.adapter.setStateAsync(id, { val: value, ack: true });
-    }
   }
 }

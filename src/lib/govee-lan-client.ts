@@ -324,11 +324,9 @@ export class GoveeLanClient {
    *   3. Target segment → brightness 100 (make it bright)
    *
    * @param ip Device IP address
-   * @param total Unused — kept for backwards compatibility, see note above
    * @param idx Target segment index (0-based) to flash white
    */
-  flashSingleSegment(ip: string, total: number, idx: number): void {
-    void total; // intentionally unused — see JSDoc
+  flashSingleSegment(ip: string, idx: number): void {
     if (idx < 0 || idx >= 56) {
       return;
     }

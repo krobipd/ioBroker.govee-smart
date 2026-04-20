@@ -202,6 +202,17 @@ class DeviceManager {
     return Array.from(this.devices.values());
   }
   /**
+   * Drop a device from the internal map. Called after the state-manager
+   * has deleted its object tree so the DeviceManager's map doesn't grow
+   * unboundedly across the adapter's lifetime.
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier
+   */
+  removeDevice(sku, deviceId) {
+    this.devices.delete(this.deviceKey(sku, deviceId));
+  }
+  /**
    * Load devices from local SKU cache.
    * Returns true if any devices were loaded (= Cloud not needed).
    */
@@ -434,6 +445,11 @@ class DeviceManager {
   /**
    * Load scene/music/DIY libraries and SKU features from undocumented API.
    *
+   * Each fetch runs through the rate-limiter so a fresh install with 10
+   * devices doesn't slam app2.govee.com with 40 back-to-back requests —
+   * those endpoints are undocumented and aggressive callers can get the
+   * account temporarily locked.
+   *
    * @param device Target device to populate
    * @param sku Product model
    * @returns true if any library data changed
@@ -443,81 +459,97 @@ class DeviceManager {
       return false;
     }
     let changed = false;
+    const runLimited = async (fn) => {
+      await this.commandRouter.executeRateLimited(fn, 2);
+    };
     if (device.sceneLibrary.length === 0) {
-      try {
-        const lib = await this.apiClient.fetchSceneLibrary(sku);
-        if (lib.length > 0) {
-          device.sceneLibrary = lib;
-          changed = true;
-          this.log.debug(`Scene library for ${sku}: ${lib.length} scenes`);
+      await runLimited(async () => {
+        try {
+          const lib = await this.apiClient.fetchSceneLibrary(sku);
+          if (lib.length > 0) {
+            device.sceneLibrary = lib;
+            changed = true;
+            this.log.debug(`Scene library for ${sku}: ${lib.length} scenes`);
+          }
+        } catch {
+          this.log.debug(`Could not load scene library for ${sku}`);
         }
-      } catch {
-        this.log.debug(`Could not load scene library for ${sku}`);
-      }
+      });
     }
     if (device.musicLibrary.length === 0) {
-      try {
-        const lib = await this.apiClient.fetchMusicLibrary(sku);
-        if (lib.length > 0) {
-          device.musicLibrary = lib;
-          changed = true;
-          this.log.debug(`Music library for ${sku}: ${lib.length} modes`);
+      await runLimited(async () => {
+        try {
+          const lib = await this.apiClient.fetchMusicLibrary(sku);
+          if (lib.length > 0) {
+            device.musicLibrary = lib;
+            changed = true;
+            this.log.debug(`Music library for ${sku}: ${lib.length} modes`);
+          }
+        } catch (e) {
+          this.log.debug(
+            `Could not load music library for ${sku}: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
-      } catch (e) {
-        this.log.debug(
-          `Could not load music library for ${sku}: ${e instanceof Error ? e.message : String(e)}`
-        );
-      }
+      });
     }
     if (device.diyLibrary.length === 0) {
-      try {
-        const lib = await this.apiClient.fetchDiyLibrary(sku);
-        if (lib.length > 0) {
-          device.diyLibrary = lib;
-          changed = true;
-          this.log.debug(`DIY library for ${sku}: ${lib.length} effects`);
+      await runLimited(async () => {
+        try {
+          const lib = await this.apiClient.fetchDiyLibrary(sku);
+          if (lib.length > 0) {
+            device.diyLibrary = lib;
+            changed = true;
+            this.log.debug(`DIY library for ${sku}: ${lib.length} effects`);
+          }
+        } catch (e) {
+          this.log.debug(
+            `Could not load DIY library for ${sku}: ${e instanceof Error ? e.message : String(e)}`
+          );
         }
-      } catch (e) {
-        this.log.debug(
-          `Could not load DIY library for ${sku}: ${e instanceof Error ? e.message : String(e)}`
-        );
-      }
+      });
     }
     if (!device.skuFeatures) {
-      try {
-        const features = await this.apiClient.fetchSkuFeatures(sku);
-        if (features) {
-          device.skuFeatures = features;
-          changed = true;
+      await runLimited(async () => {
+        try {
+          const features = await this.apiClient.fetchSkuFeatures(sku);
+          if (features) {
+            device.skuFeatures = features;
+            changed = true;
+            this.log.debug(
+              `SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`
+            );
+          }
+        } catch (e) {
           this.log.debug(
-            `SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`
+            `Could not load SKU features for ${sku}: ${e instanceof Error ? e.message : String(e)}`
           );
         }
-      } catch (e) {
-        this.log.debug(
-          `Could not load SKU features for ${sku}: ${e instanceof Error ? e.message : String(e)}`
-        );
-      }
+      });
     }
     if (!device.snapshotBleCmds && device.snapshots.length > 0) {
-      try {
-        const snaps = await this.apiClient.fetchSnapshots(sku, device.deviceId);
-        if (snaps.length > 0) {
-          device.snapshotBleCmds = device.snapshots.map((ds) => {
-            var _a;
-            const match = snaps.find((s) => s.name === ds.name);
-            return (_a = match == null ? void 0 : match.bleCmds) != null ? _a : [];
-          });
-          changed = true;
+      await runLimited(async () => {
+        try {
+          const snaps = await this.apiClient.fetchSnapshots(
+            sku,
+            device.deviceId
+          );
+          if (snaps.length > 0) {
+            device.snapshotBleCmds = device.snapshots.map((ds) => {
+              var _a;
+              const match = snaps.find((s) => s.name === ds.name);
+              return (_a = match == null ? void 0 : match.bleCmds) != null ? _a : [];
+            });
+            changed = true;
+            this.log.debug(
+              `Snapshot BLE for ${sku}: ${snaps.length} snapshots with local data`
+            );
+          }
+        } catch (e) {
           this.log.debug(
-            `Snapshot BLE for ${sku}: ${snaps.length} snapshots with local data`
+            `Could not load snapshot BLE for ${sku}: ${e instanceof Error ? e.message : String(e)}`
           );
         }
-      } catch (e) {
-        this.log.debug(
-          `Could not load snapshot BLE for ${sku}: ${e instanceof Error ? e.message : String(e)}`
-        );
-      }
+      });
     }
     return changed;
   }

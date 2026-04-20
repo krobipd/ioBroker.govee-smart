@@ -24,7 +24,7 @@ import { CloudRetryLoop, type CloudRetryHost } from "./lib/cloud-retry.js";
 import { RateLimiter } from "./lib/rate-limiter.js";
 import {
   SegmentWizard,
-  WIZARD_IDLE_TEXT,
+  wizardIdleText,
   type WizardHost,
   type WizardResult,
 } from "./lib/segment-wizard.js";
@@ -44,7 +44,45 @@ import {
 /** Rate limit defaults */
 const FULL_LIMITS = { perMinute: 8, perDay: 9000 };
 const SHARED_LIMITS = { perMinute: 4, perDay: 4500 };
-const SIBLING_ALIVE_ID = "system.adapter.govee-appliances.0.alive";
+/**
+ * Alive-state pattern for govee-appliances instances. The adapter subscribes
+ * to every matching instance so a `.0` / `.1` / multi-instance setup all
+ * participate in the shared rate-limit halving instead of silently running
+ * both adapters at full budget.
+ */
+const SIBLING_ALIVE_PATTERN = "system.adapter.govee-appliances.*.alive";
+/**
+ * Simple test matching the pattern above against a concrete state id.
+ *
+ * @param id Fully-qualified foreign state id (e.g. `system.adapter.govee-appliances.0.alive`)
+ */
+function isSiblingAliveId(id: string): boolean {
+  return (
+    id.startsWith("system.adapter.govee-appliances.") && id.endsWith(".alive")
+  );
+}
+
+/**
+ * State-suffix → command-name lookup for writable states. Segment indices
+ * are dynamic and handled by regex in stateToCommand — everything else is
+ * a straight string mapping.
+ */
+const STATE_TO_COMMAND: Readonly<Record<string, string>> = {
+  "control.power": "power",
+  "control.brightness": "brightness",
+  "control.colorRgb": "colorRgb",
+  "control.colorTemperature": "colorTemperature",
+  "control.scene": "scene",
+  "control.gradient_toggle": "gradientToggle",
+  "scenes.light_scene": "lightScene",
+  "scenes.diy_scene": "diyScene",
+  "scenes.scene_speed": "sceneSpeed",
+  "music.music_mode": "music",
+  "music.music_sensitivity": "music",
+  "music.music_auto_color": "music",
+  "snapshots.snapshot": "snapshot",
+  "segments.command": "segmentBatch",
+};
 
 class GoveeAdapter extends utils.Adapter {
   private deviceManager: DeviceManager | null = null;
@@ -71,6 +109,10 @@ class GoveeAdapter extends utils.Adapter {
   private uncaughtExceptionHandler: ((err: Error) => void) | null = null;
   /** Per-device timestamp of the last diagnostics export — throttle gate */
   private diagnosticsLastRun = new Map<string, number>();
+  /** Cached admin language from system.config — used for wizard UI text */
+  private adminLanguage = "en";
+  /** Active govee-appliances instance ids (e.g. "govee-appliances.0") */
+  private siblingInstancesAlive = new Set<string>();
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -170,8 +212,20 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
+    // Load admin language from system.config so wizard prose matches the
+    // user's Admin UI. Falls back to English on any lookup failure.
+    try {
+      const sysConf = await this.getForeignObjectAsync("system.config");
+      const lang = (sysConf?.common as { language?: string } | undefined)
+        ?.language;
+      if (typeof lang === "string" && lang.length > 0) {
+        this.adminLanguage = lang;
+      }
+    } catch {
+      // Keep default "en"
+    }
     await this.setStateAsync("info.wizardStatus", {
-      val: WIZARD_IDLE_TEXT,
+      val: wizardIdleText(this.adminLanguage),
       ack: true,
     });
 
@@ -372,22 +426,31 @@ class GoveeAdapter extends utils.Adapter {
       this.cloudInitDone = true;
     }
 
-    // Wait for all state creation from cache/cloud load to complete
-    await Promise.all(this.stateCreationQueue);
-    this.stateCreationQueue = [];
+    // Wait for all state creation from cache/cloud load to complete.
+    // Drain-loop: a callback that fires during the await (e.g. a late LAN
+    // discovery) can push fresh promises into the queue — we need to await
+    // those too before flipping statesReady, otherwise the initial state
+    // tree would be incomplete on very fast startups.
+    while (this.stateCreationQueue.length > 0) {
+      const pending = this.stateCreationQueue;
+      this.stateCreationQueue = [];
+      await Promise.all(pending);
+    }
     this.statesReady = true;
 
     // Subscribe to all writable device and group states
     await this.subscribeStatesAsync("devices.*");
     await this.subscribeStatesAsync("groups.*");
 
-    // Cleanup stale devices after initial discovery (30s delay for LAN scan)
+    // Cleanup stale devices after initial discovery (30s delay for LAN scan).
+    // Reaps devices from every adapter-level map that was keyed on them so the
+    // process doesn't leak memory across Cloud-side device turnover.
     this.cleanupTimer = this.setTimeout(() => {
-      if (this.stateManager && this.deviceManager) {
-        this.stateManager
-          .cleanupDevices(this.deviceManager.getDevices())
-          .catch(() => {});
-      }
+      this.reapStaleDevices().catch((e) =>
+        this.log.debug(
+          `Device cleanup failed: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      );
     }, 30_000);
 
     this.updateConnectionState();
@@ -521,9 +584,20 @@ class GoveeAdapter extends utils.Adapter {
     id: string,
     state: ioBroker.State | null | undefined,
   ): Promise<void> {
-    // Sibling adapter alive state change (foreign state, always ack)
-    if (id === SIBLING_ALIVE_ID) {
-      this.applySiblingLimits(state?.val === true);
+    // Sibling adapter alive state change (foreign state, always ack).
+    // Any govee-appliances instance (.0, .1, ...) contributes to the
+    // siblingActive signal — the adapter halves its budget when at least
+    // one is running, restores full limits only when all are down.
+    if (isSiblingAliveId(id)) {
+      const instance = id
+        .replace("system.adapter.", "")
+        .replace(/\.alive$/, "");
+      if (state?.val === true) {
+        this.siblingInstancesAlive.add(instance);
+      } else {
+        this.siblingInstancesAlive.delete(instance);
+      }
+      this.applySiblingLimits(this.siblingInstancesAlive.size > 0);
       return;
     }
 
@@ -1066,6 +1140,14 @@ class GoveeAdapter extends utils.Adapter {
     // Cache sync happens once after the initial setup completes (see
     // checkAllReady) — triggering here would fire on every device update
     // and spam the log.
+
+    // Keep adapter-level per-device maps (diagnosticsLastRun, ...) aligned
+    // with the new device list so removed devices don't leave orphan keys.
+    // Skip during the initial boot phase — the startup cleanupTimer handles
+    // that pass with proper LAN-scan-settled timing.
+    if (this.statesReady) {
+      this.reapStaleDevices().catch(() => undefined);
+    }
   }
 
   /** Update global info.connection */
@@ -1081,16 +1163,55 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * Detect if sibling adapter (govee-appliances) is running and adjust rate limits.
-   * Subscribes to alive state for dynamic updates.
+   * Delete ioBroker objects for devices no longer present and drop the same
+   * devices from adapter-level maps. Called after the initial-discovery
+   * window and every time the device list changes so per-device state
+   * (diagnostics throttle, etc.) doesn't outlive the device in the tree.
+   */
+  private async reapStaleDevices(): Promise<void> {
+    if (!this.stateManager || !this.deviceManager) {
+      return;
+    }
+    const currentDevices = this.deviceManager.getDevices();
+    await this.stateManager.cleanupDevices(currentDevices);
+
+    // Adapter-level maps are keyed by sku:deviceId. Drop any entry that
+    // doesn't match a currently-known device so the maps stay bounded.
+    const liveKeys = new Set(
+      currentDevices.map((d) => `${d.sku}:${d.deviceId}`),
+    );
+    for (const key of this.diagnosticsLastRun.keys()) {
+      if (!liveKeys.has(key)) {
+        this.diagnosticsLastRun.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Detect which govee-appliances instances (if any) are running. Subscribes
+   * to the whole `system.adapter.govee-appliances.*.alive` namespace so
+   * start/stop of any instance feeds back into applySiblingLimits.
    */
   private async detectSiblingAdapter(): Promise<void> {
     try {
-      const alive = await this.getForeignStateAsync(SIBLING_ALIVE_ID);
-      this.applySiblingLimits(alive?.val === true);
-      await this.subscribeForeignStatesAsync(SIBLING_ALIVE_ID);
+      // Scan for all configured instances first — subscribeForeignStates
+      // with a wildcard only fires on *future* changes, so the initial
+      // alive state is read here.
+      const instances = await this.getForeignObjectsAsync(
+        "system.adapter.govee-appliances.*",
+        "instance",
+      );
+      for (const id of Object.keys(instances ?? {})) {
+        const aliveId = `${id}.alive`;
+        const state = await this.getForeignStateAsync(aliveId);
+        if (state?.val === true) {
+          this.siblingInstancesAlive.add(id.replace("system.adapter.", ""));
+        }
+      }
+      this.applySiblingLimits(this.siblingInstancesAlive.size > 0);
+      await this.subscribeForeignStatesAsync(SIBLING_ALIVE_PATTERN);
     } catch {
-      // Sibling not installed — use full limits
+      // Sibling not installed / lookup failed — use full limits
       this.applySiblingLimits(false);
     }
   }
@@ -1233,6 +1354,7 @@ class GoveeAdapter extends utils.Adapter {
         );
         const prefix = this.stateManager.devicePrefix(device);
 
+        const writes: Promise<unknown>[] = [];
         for (const cap of caps) {
           const mapped = mapCloudStateValue(cap);
           if (!mapped) {
@@ -1246,14 +1368,17 @@ class GoveeAdapter extends utils.Adapter {
             prefix,
             mapped.stateId,
           );
-          const obj = await this.getObjectAsync(statePath);
-          if (obj) {
-            await this.setStateAsync(statePath, {
+          // Fire-and-forget — States are created before loadCloudStates runs;
+          // a rejection here means the state was deleted out-of-band and
+          // can be safely ignored.
+          writes.push(
+            this.setStateAsync(statePath, {
               val: mapped.value,
               ack: true,
-            });
-          }
+            }).catch(() => undefined),
+          );
         }
+        await Promise.all(writes);
         loaded++;
       } catch {
         this.log.debug(
@@ -1287,53 +1412,19 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * Map state suffix to command name
+   * Map state suffix to command name.
+   *
+   * Simple suffixes live in a lookup table, segment indices need regex
+   * extraction because they're dynamic. The three music states all route
+   * to the same "music" command — the handler reads sibling values.
    *
    * @param suffix State ID suffix (e.g. "power", "brightness")
    */
   private stateToCommand(suffix: string): string | null {
-    // Control channel — basic device controls
-    if (suffix === "control.power") {
-      return "power";
+    const direct = STATE_TO_COMMAND[suffix];
+    if (direct) {
+      return direct;
     }
-    if (suffix === "control.brightness") {
-      return "brightness";
-    }
-    if (suffix === "control.colorRgb") {
-      return "colorRgb";
-    }
-    if (suffix === "control.colorTemperature") {
-      return "colorTemperature";
-    }
-    if (suffix === "control.scene") {
-      return "scene";
-    }
-    if (suffix === "control.gradient_toggle") {
-      return "gradientToggle";
-    }
-    // Scenes channel
-    if (suffix === "scenes.light_scene") {
-      return "lightScene";
-    }
-    if (suffix === "scenes.diy_scene") {
-      return "diyScene";
-    }
-    if (suffix === "scenes.scene_speed") {
-      return "sceneSpeed";
-    }
-    // Music channel
-    if (
-      suffix === "music.music_mode" ||
-      suffix === "music.music_sensitivity" ||
-      suffix === "music.music_auto_color"
-    ) {
-      return "music";
-    }
-    // Snapshots channel
-    if (suffix === "snapshots.snapshot") {
-      return "snapshot";
-    }
-    // Segment commands — encode segment index in command name
     const segColorMatch = /^segments\.(\d+)\.color$/.exec(suffix);
     if (segColorMatch) {
       return `segmentColor:${segColorMatch[1]}`;
@@ -1341,10 +1432,6 @@ class GoveeAdapter extends utils.Adapter {
     const segBrightMatch = /^segments\.(\d+)\.brightness$/.exec(suffix);
     if (segBrightMatch) {
       return `segmentBrightness:${segBrightMatch[1]}`;
-    }
-    // Batch segment command
-    if (suffix === "segments.command") {
-      return "segmentBatch";
     }
     return null;
   }
@@ -1535,11 +1622,11 @@ class GoveeAdapter extends utils.Adapter {
       sendCommand: async (device, command, value) => {
         await this.deviceManager?.sendCommand(device, command, value);
       },
-      flashSegmentAtomic: (device, total, idx) => {
+      flashSegmentAtomic: (device, idx) => {
         if (!device.lanIp || !this.lanClient) {
           return Promise.resolve(false);
         }
-        this.lanClient.flashSingleSegment(device.lanIp, total, idx);
+        this.lanClient.flashSingleSegment(device.lanIp, idx);
         return Promise.resolve(true);
       },
       restoreStripAtomic: (device, total, color, brightness) => {
@@ -1566,6 +1653,7 @@ class GoveeAdapter extends utils.Adapter {
       clearTimeout: (h) => this.clearTimeout(h as ioBroker.Timeout),
       applyWizardResult: (device, result) =>
         this.applyWizardResult(device, result),
+      getLanguage: () => this.adminLanguage,
     };
   }
 
@@ -1643,37 +1731,35 @@ class GoveeAdapter extends utils.Adapter {
     const prefix = this.stateManager.devicePrefix(device);
     const ns = this.namespace;
 
-    // Read current state values
-    const powerState = await this.getStateAsync(
-      `${ns}.${prefix}.control.power`,
-    );
-    const brightState = await this.getStateAsync(
-      `${ns}.${prefix}.control.brightness`,
-    );
-    const colorState = await this.getStateAsync(
-      `${ns}.${prefix}.control.colorRgb`,
-    );
-    const ctState = await this.getStateAsync(
-      `${ns}.${prefix}.control.colorTemperature`,
-    );
+    // Read device-level state in parallel
+    const [powerState, brightState, colorState, ctState] = await Promise.all([
+      this.getStateAsync(`${ns}.${prefix}.control.power`),
+      this.getStateAsync(`${ns}.${prefix}.control.brightness`),
+      this.getStateAsync(`${ns}.${prefix}.control.colorRgb`),
+      this.getStateAsync(`${ns}.${prefix}.control.colorTemperature`),
+    ]);
 
-    // Read per-segment states if device has segments
+    // Read per-segment states in parallel — 20 segments × 2 reads used to run
+    // sequentially (~80ms), parallel completes in a single round-trip.
     let segments: SnapshotSegment[] | undefined;
     const segCount = device.segmentCount ?? 0;
     if (segCount > 0) {
-      segments = [];
+      const segReads: Promise<
+        [ioBroker.State | null | undefined, ioBroker.State | null | undefined]
+      >[] = [];
       for (let i = 0; i < segCount; i++) {
-        const segColor = await this.getStateAsync(
-          `${ns}.${prefix}.segments.${i}.color`,
+        segReads.push(
+          Promise.all([
+            this.getStateAsync(`${ns}.${prefix}.segments.${i}.color`),
+            this.getStateAsync(`${ns}.${prefix}.segments.${i}.brightness`),
+          ]),
         );
-        const segBright = await this.getStateAsync(
-          `${ns}.${prefix}.segments.${i}.brightness`,
-        );
-        segments.push({
-          color: typeof segColor?.val === "string" ? segColor.val : "#000000",
-          brightness: typeof segBright?.val === "number" ? segBright.val : 100,
-        });
       }
+      const segResults = await Promise.all(segReads);
+      segments = segResults.map(([segColor, segBright]) => ({
+        color: typeof segColor?.val === "string" ? segColor.val : "#000000",
+        brightness: typeof segBright?.val === "number" ? segBright.val : 100,
+      }));
     }
 
     const snapshot: LocalSnapshot = {

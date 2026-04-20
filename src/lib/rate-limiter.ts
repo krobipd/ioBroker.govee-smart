@@ -21,6 +21,7 @@ export class RateLimiter {
   private callsToday = 0;
   private minuteResetTimer: ioBroker.Interval | undefined = undefined;
   private dayResetTimer: ioBroker.Interval | undefined = undefined;
+  private dayResetKickoff: ioBroker.Timeout | undefined = undefined;
 
   /** Max calls per minute */
   private perMinuteLimit: number;
@@ -64,13 +65,19 @@ export class RateLimiter {
       this.processQueue();
     }, 60_000);
 
-    // Reset daily counter every 24h
-    this.dayResetTimer = this.timers.setInterval(() => {
-      this.log.debug(
-        `Rate limiter: daily reset (used ${this.callsToday} calls today)`,
+    // Reset daily counter aligned to UTC midnight — Govee's daily quota
+    // resets on the API's clock (UTC). A plain setInterval(24h) starting
+    // at adapter launch would drift the reset to a non-midnight offset and
+    // waste quota: after 18:00 start you'd get a full budget until 18:00
+    // next day even though Govee gives you a fresh budget at 00:00.
+    const msUntilMidnight = this.millisUntilNextUtcMidnight();
+    this.dayResetKickoff = this.timers.setTimeout(() => {
+      this.resetDaily();
+      this.dayResetTimer = this.timers.setInterval(
+        () => this.resetDaily(),
+        86_400_000,
       );
-      this.callsToday = 0;
-    }, 86_400_000);
+    }, msUntilMidnight);
 
     // Process queue every 2s
     this.processTimer = this.timers.setInterval(() => {
@@ -84,6 +91,10 @@ export class RateLimiter {
       this.timers.clearInterval(this.minuteResetTimer);
       this.minuteResetTimer = undefined;
     }
+    if (this.dayResetKickoff) {
+      this.timers.clearTimeout(this.dayResetKickoff);
+      this.dayResetKickoff = undefined;
+    }
     if (this.dayResetTimer) {
       this.timers.clearInterval(this.dayResetTimer);
       this.dayResetTimer = undefined;
@@ -93,6 +104,31 @@ export class RateLimiter {
       this.processTimer = undefined;
     }
     this.queue.length = 0;
+  }
+
+  /** Zero the daily counter and log. Separate so kickoff + interval share it. */
+  private resetDaily(): void {
+    this.log.debug(
+      `Rate limiter: daily reset (used ${this.callsToday} calls today)`,
+    );
+    this.callsToday = 0;
+  }
+
+  /** Milliseconds from now until the next UTC midnight tick. */
+  private millisUntilNextUtcMidnight(): number {
+    const now = new Date();
+    const next = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+        0,
+        0,
+        0,
+        0,
+      ),
+    );
+    return next.getTime() - now.getTime();
   }
 
   /**

@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart Lights (LED-Strips, Lampen, Panels). LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig. Nur Lichter, keine Haushaltsgeräte.
 
-- **Version:** 1.7.7 (April 2026)
+- **Version:** 1.8.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -308,14 +308,13 @@ test/testPackageFiles.ts     → @iobroker/testing (57)
 
 | Version | Highlights |
 |---------|------------|
+| 1.8.0 | Clean-up Release: Hot-Path-Schreibweise parallelisiert (updateDeviceState ohne getObject-Probe + Snapshot-Save mit Promise.all), cleanupAllChannelStates auf ein View statt vier, Rate-Limiter-Daily-Reset an UTC-Mitternacht, Wizard-Text vollständig lokalisiert (EN/DE) über system.config.language, govee-appliances-Erkennung für alle Instanzen (.0/.1/...), stabile MQTT-Session-UUID über Reconnects (AWS IoT kann Socket sauber übernehmen), Library-Fetches durch Rate-Limiter, Local-Snapshots mit fsync, Memory-Leak-Prevention (adapter-level Maps werden beim Device-Remove bereinigt), shared govee-constants.ts, crypto.randomUUID |
+| 1.7.8 | Audit-Follow-up: MQTT bearer-token wird jetzt bei jedem Reconnect-Login an api-client weitergegeben (bisher nur initial), LAN-devStatus-Poll entfällt bei aktiver MQTT-Verbindung, process.on unhandledRejection/uncaughtException-Handler als Last-Line-Defence. Plus Hygiene: seenDeviceIps-Eviction bei IP-Wechsel, stateCreationQueue beschränkt auf Startup, connected-states reset on unload, Diagnostics-Throttle 2s/Device |
 | 1.7.7 | Hotfix für Regression seit v1.7.0: loadFromCache-Merge unvollständig → Wizard-Segment-State ging bei jedem Restart verloren. Plus sku-cache save mit fsync gegen SIGKILL-Data-Loss |
 | 1.7.6 | Audit-Release: ack-Race bei manual_mode-Rollback, CHANNEL_NAMES.info wiederhergestellt, 9 Admin-Sprachen Wizard-Keys + Übersetzungs-Böcke, Latency-Copy raus. Refactors: applyManualSegments-Helper, targeted snapshot-refresh, dynamic_scene mapping cleanup, Map-Cleanup beim Device-Remove |
 | 1.7.5 | Wiki-Link oben im Main-Tab: `staticText` mit Markdown wurde von Admin nicht als klickbarer Link gerendert → ersetzt durch zwei nebeneinander liegende `staticLink`-Buttons "Wiki (Deutsch)" → `/wiki/Startseite` und "Wiki (English)" → `/wiki/Home`. Konsistent mit dem Ko-Fi/PayPal-Button-Muster |
 | 1.7.4 | Admin-UI: sprachabhängiger Wiki-Link oben im Main-Tab als `staticText` mit i18n-Markdown (`_docLink` vor `_lanHeader`). In 1.7.5 ersetzt, weil Markdown nicht gerendert wurde |
 | 1.7.3 | Latest-repo review compliance: `common.messagebox=true` wegen onMessage-Wizard, native `setTimeout`-Delays (150 ms für Color-Mode-Preamble) über Adapter-Timer-Wrapper (onUnload-safe) |
-| 1.7.2 | Test-Infrastruktur auf ioBroker-Standard: `test/package.js` + `test/integration.js` als plain JS (ruft tests.packageFiles / tests.integration direkt auf). Vorher war das Integration-Script ein Papier-Tiger. Keine Runtime-Änderung |
-| 1.7.1 | Color-Mode-Force (colorwc) vor allen Segment-Commands im CommandRouter — fixt "direkt Segment setzen tut nix im Scene-Mode" + triggert nebenbei MQTT AA A5 Pushes (auto-learn Count) |
-| 1.7.0 | Segment-Count Single-Source-of-Truth (resolveSegmentCount + Cache-persist → 20m-Strips korrekt erkannt, Cloud-Widersprüche aufgelöst). Wizard komplett neu gedacht: misst die echte Länge, 3 Buttons (Ja/Nein/Fertig), erkennt Lücken automatisch. manualMode+List überleben Neustarts |
 
 ## Befehle
 

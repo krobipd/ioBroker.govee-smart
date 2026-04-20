@@ -1,6 +1,13 @@
+import * as crypto from "node:crypto";
 import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest } from "./http-client.js";
+import {
+  GOVEE_APP_VERSION,
+  GOVEE_CLIENT_ID,
+  GOVEE_CLIENT_TYPE,
+  GOVEE_USER_AGENT,
+} from "./govee-constants.js";
 import {
   classifyError,
   type ErrorCategory,
@@ -15,11 +22,6 @@ const MAX_AUTH_FAILURES = 3;
 
 const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
 const IOT_KEY_URL = "https://app2.govee.com/app/v1/account/iot/key";
-const APP_VERSION = "7.3.30";
-const CLIENT_TYPE = "1";
-const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
-const USER_AGENT =
-  "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
 
 /** Amazon Root CA 1 — required for AWS IoT Core TLS */
 const AMAZON_ROOT_CA1 = `-----BEGIN CERTIFICATE-----
@@ -65,6 +67,13 @@ export class GoveeMqttClient {
   private accountTopic = "";
   private _bearerToken = "";
   private accountId = "";
+  /**
+   * Stable session UUID, generated once per adapter process.
+   * AWS IoT uses the clientId to track connection ownership — reusing the
+   * same id on reconnect lets the broker cleanly take over from a stale
+   * socket instead of refusing a new connection while the old one lingers.
+   */
+  private readonly sessionUuid: string = crypto.randomUUID();
   private reconnectTimer: ioBroker.Timeout | undefined = undefined;
   private reconnectAttempts = 0;
   private authFailCount = 0;
@@ -162,7 +171,7 @@ export class GoveeMqttClient {
       const { key, cert, ca } = this.extractCertsFromP12(p12, p12Pass);
 
       // Step 4: Connect MQTT with mutual TLS
-      const clientId = `AP/${this.accountId}/${this.generateUuid()}`;
+      const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
       this.client = mqtt.connect(`mqtts://${endpoint}:8883`, {
         clientId,
         key,
@@ -329,10 +338,10 @@ export class GoveeMqttClient {
       method: "POST",
       url: LOGIN_URL,
       headers: {
-        appVersion: APP_VERSION,
-        clientId: CLIENT_ID,
-        clientType: CLIENT_TYPE,
-        "User-Agent": USER_AGENT,
+        appVersion: GOVEE_APP_VERSION,
+        clientId: GOVEE_CLIENT_ID,
+        clientType: GOVEE_CLIENT_TYPE,
+        "User-Agent": GOVEE_USER_AGENT,
         timezone: "Europe/Berlin",
         country: "DE",
         envid: "0",
@@ -341,7 +350,7 @@ export class GoveeMqttClient {
       body: {
         email: this.email,
         password: this.password,
-        client: CLIENT_ID,
+        client: GOVEE_CLIENT_ID,
       },
     });
   }
@@ -353,10 +362,10 @@ export class GoveeMqttClient {
       url: IOT_KEY_URL,
       headers: {
         Authorization: `Bearer ${this._bearerToken}`,
-        appVersion: APP_VERSION,
-        clientId: CLIENT_ID,
-        clientType: CLIENT_TYPE,
-        "User-Agent": USER_AGENT,
+        appVersion: GOVEE_APP_VERSION,
+        clientId: GOVEE_CLIENT_ID,
+        clientType: GOVEE_CLIENT_TYPE,
+        "User-Agent": GOVEE_USER_AGENT,
       },
     });
   }
@@ -397,14 +406,5 @@ export class GoveeMqttClient {
     const ca = AMAZON_ROOT_CA1;
 
     return { key, cert, ca };
-  }
-
-  /** Generate UUID v4 */
-  private generateUuid(): string {
-    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === "x" ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
   }
 }

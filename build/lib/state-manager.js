@@ -72,6 +72,12 @@ class StateManager {
         `Migrating device ${device.sku}: ${oldPrefix} \u2192 ${newPrefix}`
       );
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
+      const oldChannelKey = `${oldPrefix}.`;
+      for (const mapKey of this.stateChannelMap.keys()) {
+        if (mapKey.startsWith(oldChannelKey)) {
+          this.stateChannelMap.delete(mapKey);
+        }
+      }
     }
     this.prefixMap.set(key, newPrefix);
     const prefix = newPrefix;
@@ -406,35 +412,43 @@ class StateManager {
   /**
    * Update device state from any source (LAN, MQTT, Cloud).
    *
+   * Writes are fire-and-forget and run in parallel — they're independent,
+   * and the "does this state exist?" check that used to guard each write
+   * was an extra object-read on the hot path (one MQTT push = one update
+   * call). createDeviceStates has already run before any update lands,
+   * so the states are guaranteed to exist; if one disappears (manual
+   * deletion), the setStateAsync will reject and we swallow it.
+   *
    * @param device Govee device
    * @param state Partial state update
    */
   async updateDeviceState(device, state) {
     const prefix = this.devicePrefix(device);
+    const writes = [];
+    const set = (id, val) => {
+      writes.push(
+        this.adapter.setStateAsync(id, { val, ack: true }).catch(() => void 0)
+      );
+    };
     if (state.online !== void 0) {
-      await this.setStateIfExists(`${prefix}.info.online`, state.online);
+      set(`${prefix}.info.online`, state.online);
     }
     if (state.power !== void 0) {
-      await this.setStateIfExists(`${prefix}.control.power`, state.power);
+      set(`${prefix}.control.power`, state.power);
     }
     if (state.brightness !== void 0) {
-      await this.setStateIfExists(
-        `${prefix}.control.brightness`,
-        state.brightness
-      );
+      set(`${prefix}.control.brightness`, state.brightness);
     }
     if (state.colorRgb !== void 0) {
-      await this.setStateIfExists(`${prefix}.control.colorRgb`, state.colorRgb);
+      set(`${prefix}.control.colorRgb`, state.colorRgb);
     }
     if (state.colorTemperature !== void 0) {
-      await this.setStateIfExists(
-        `${prefix}.control.colorTemperature`,
-        state.colorTemperature
-      );
+      set(`${prefix}.control.colorTemperature`, state.colorTemperature);
     }
     if (state.scene !== void 0) {
-      await this.setStateIfExists(`${prefix}.control.scene`, state.scene);
+      set(`${prefix}.control.scene`, state.scene);
     }
+    await Promise.all(writes);
   }
   /**
    * Create the general groups.info.online state (reflects Cloud connection).
@@ -470,7 +484,7 @@ class StateManager {
    * @param online Cloud connection status
    */
   async updateGroupsOnline(online) {
-    await this.setStateIfExists("groups.info.online", online);
+    await this.adapter.setStateAsync("groups.info.online", { val: online, ack: true }).catch(() => void 0);
   }
   /**
    * Update info.membersUnreachable for a group.
@@ -508,12 +522,18 @@ class StateManager {
   /**
    * Cleanup stale devices that no longer exist.
    *
+   * Returns the prefixes of removed devices so callers (DeviceManager,
+   * adapter-level maps) can drop their own entries for the same devices
+   * and prevent unbounded map growth across the adapter's lifetime.
+   *
    * @param currentDevices Current device list
+   * @returns Prefixes of removed devices (e.g. "devices.h61be_1d6f")
    */
   async cleanupDevices(currentDevices) {
     const currentPrefixes = new Set(
       currentDevices.map((d) => this.devicePrefix(d))
     );
+    const removed = [];
     for (const folder of ["devices", "groups"]) {
       const existingObjects = await this.adapter.getObjectViewAsync(
         "system",
@@ -532,19 +552,25 @@ class StateManager {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           await this.adapter.delObjectAsync(localId, { recursive: true });
           this.forgetPrefix(localId);
+          removed.push(localId);
         }
       }
     }
+    return removed;
   }
   /**
    * Remove stale states across all managed channels.
    * Also handles migration from old single-control layout.
    *
+   * One broad view-query across the whole device prefix replaces the old
+   * four-per-device pass — the channel partition is recovered by parsing
+   * the object id, saving three round-trips per device on every refresh.
+   *
    * @param prefix Device prefix
    * @param stateDefs Current state definitions (non-segment)
    */
   async cleanupAllChannelStates(prefix, stateDefs) {
-    var _a, _b;
+    var _a, _b, _c;
     const expectedByChannel = /* @__PURE__ */ new Map();
     for (const def of stateDefs) {
       const channel = (_a = def.channel) != null ? _a : "control";
@@ -553,36 +579,43 @@ class StateManager {
       }
       expectedByChannel.get(channel).add(def.id);
     }
-    for (const channel of MANAGED_CHANNELS) {
-      const channelPrefix = `${this.adapter.namespace}.${prefix}.${channel}.`;
-      const existing = await this.adapter.getObjectViewAsync(
-        "system",
-        "state",
-        {
-          startkey: channelPrefix,
-          endkey: `${channelPrefix}\u9999`
-        }
-      );
-      if (!(existing == null ? void 0 : existing.rows)) {
+    const devicePrefix = `${this.adapter.namespace}.${prefix}.`;
+    const existing = await this.adapter.getObjectViewAsync("system", "state", {
+      startkey: devicePrefix,
+      endkey: `${devicePrefix}\u9999`
+    });
+    if (!(existing == null ? void 0 : existing.rows)) {
+      return;
+    }
+    const totalsPerChannel = /* @__PURE__ */ new Map();
+    for (const row of existing.rows) {
+      const rest = row.id.replace(devicePrefix, "");
+      const dotIdx = rest.indexOf(".");
+      if (dotIdx < 0) {
         continue;
       }
-      const validIds = (_b = expectedByChannel.get(channel)) != null ? _b : /* @__PURE__ */ new Set();
-      let deleted = 0;
-      for (const row of existing.rows) {
-        const stateId = row.id.replace(channelPrefix, "");
-        if (!validIds.has(stateId)) {
-          const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-          this.adapter.log.debug(`Removing stale state: ${localId}`);
-          await this.adapter.delObjectAsync(localId);
-          await this.adapter.delStateAsync(localId).catch(() => {
-          });
-          deleted++;
-        }
+      const channel = rest.slice(0, dotIdx);
+      const stateId = rest.slice(dotIdx + 1);
+      if (!MANAGED_CHANNELS.includes(channel)) {
+        continue;
       }
-      if (deleted > 0 && deleted === existing.rows.length) {
-        this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
-        await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => {
+      const totals = (_b = totalsPerChannel.get(channel)) != null ? _b : { seen: 0, deleted: 0 };
+      totals.seen++;
+      const validIds = (_c = expectedByChannel.get(channel)) != null ? _c : /* @__PURE__ */ new Set();
+      if (!validIds.has(stateId)) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        this.adapter.log.debug(`Removing stale state: ${localId}`);
+        await this.adapter.delObjectAsync(localId);
+        await this.adapter.delStateAsync(localId).catch(() => {
         });
+        totals.deleted++;
+      }
+      totalsPerChannel.set(channel, totals);
+    }
+    for (const [channel, totals] of totalsPerChannel) {
+      if (totals.deleted > 0 && totals.deleted === totals.seen) {
+        this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
+        await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => void 0);
       }
     }
   }
@@ -651,18 +684,6 @@ class StateManager {
       common,
       native: {}
     });
-  }
-  /**
-   * Set state value only if the object exists
-   *
-   * @param id State object ID
-   * @param value Value to set
-   */
-  async setStateIfExists(id, value) {
-    const obj = await this.adapter.getObjectAsync(id);
-    if (obj) {
-      await this.adapter.setStateAsync(id, { val: value, ack: true });
-    }
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

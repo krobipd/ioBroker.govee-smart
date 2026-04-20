@@ -30,6 +30,7 @@ class RateLimiter {
   callsToday = 0;
   minuteResetTimer = void 0;
   dayResetTimer = void 0;
+  dayResetKickoff = void 0;
   /** Max calls per minute */
   perMinuteLimit;
   /** Max calls per day (with safety buffer) */
@@ -62,12 +63,14 @@ class RateLimiter {
       this.callsThisMinute = 0;
       this.processQueue();
     }, 6e4);
-    this.dayResetTimer = this.timers.setInterval(() => {
-      this.log.debug(
-        `Rate limiter: daily reset (used ${this.callsToday} calls today)`
+    const msUntilMidnight = this.millisUntilNextUtcMidnight();
+    this.dayResetKickoff = this.timers.setTimeout(() => {
+      this.resetDaily();
+      this.dayResetTimer = this.timers.setInterval(
+        () => this.resetDaily(),
+        864e5
       );
-      this.callsToday = 0;
-    }, 864e5);
+    }, msUntilMidnight);
     this.processTimer = this.timers.setInterval(() => {
       this.processQueue();
     }, 2e3);
@@ -78,6 +81,10 @@ class RateLimiter {
       this.timers.clearInterval(this.minuteResetTimer);
       this.minuteResetTimer = void 0;
     }
+    if (this.dayResetKickoff) {
+      this.timers.clearTimeout(this.dayResetKickoff);
+      this.dayResetKickoff = void 0;
+    }
     if (this.dayResetTimer) {
       this.timers.clearInterval(this.dayResetTimer);
       this.dayResetTimer = void 0;
@@ -87,6 +94,29 @@ class RateLimiter {
       this.processTimer = void 0;
     }
     this.queue.length = 0;
+  }
+  /** Zero the daily counter and log. Separate so kickoff + interval share it. */
+  resetDaily() {
+    this.log.debug(
+      `Rate limiter: daily reset (used ${this.callsToday} calls today)`
+    );
+    this.callsToday = 0;
+  }
+  /** Milliseconds from now until the next UTC midnight tick. */
+  millisUntilNextUtcMidnight() {
+    const now = /* @__PURE__ */ new Date();
+    const next = new Date(
+      Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+        0,
+        0,
+        0,
+        0
+      )
+    );
+    return next.getTime() - now.getTime();
   }
   /**
    * Enqueue an API call. It will be executed when rate limits allow.

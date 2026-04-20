@@ -75,7 +75,6 @@ class TestHost implements WizardHost {
 
     public async flashSegmentAtomic(
         _device: GoveeDevice,
-        _total: number,
         _idx: number,
     ): Promise<boolean> {
         this.atomicFlashUsed = true;
@@ -128,6 +127,12 @@ class TestHost implements WizardHost {
         // Mimic the host's runtime side-effect so subsequent logic that
         // reads device.segmentCount (e.g. restoreBaseline) sees the update.
         device.segmentCount = result.segmentCount;
+    }
+
+    public language = "en";
+
+    public getLanguage(): string {
+        return this.language;
     }
 }
 
@@ -203,7 +208,7 @@ describe("SegmentWizard", () => {
     describe("start", () => {
         it("should refuse when device key is unknown", async () => {
             const r = await wizard.start("H9999:NOPE");
-            expect(r.error).to.be.a("string").and.include("nicht gefunden");
+            expect(r.error).to.be.a("string").and.include("not found");
             expect(wizard.isActive()).to.be.false;
         });
 
@@ -212,7 +217,7 @@ describe("SegmentWizard", () => {
             const r = await wizard.start(key);
             expect(r.error)
                 .to.be.a("string")
-                .and.include("keine Segmente");
+                .and.include("no segments");
             expect(wizard.isActive()).to.be.false;
         });
 
@@ -290,7 +295,7 @@ describe("SegmentWizard", () => {
             const first = await wizard.start(key);
             expect(first.active).to.be.true;
             const second = await wizard.start(key);
-            expect(second.error).to.be.a("string").and.include("bereits aktiv");
+            expect(second.error).to.be.a("string").and.include("already active");
             expect(wizard.isActive()).to.be.true;
         });
 
@@ -304,7 +309,7 @@ describe("SegmentWizard", () => {
     describe("answer", () => {
         it("should return error when no session active", async () => {
             const r = await wizard.answer(true);
-            expect(r.error).to.be.a("string").and.include("Kein Wizard aktiv");
+            expect(r.error).to.be.a("string").and.include("No wizard active");
         });
 
         it("should record 'yes' answers into the visible list", async () => {
@@ -351,7 +356,7 @@ describe("SegmentWizard", () => {
     describe("done", () => {
         it("should error when no session active", async () => {
             const r = await wizard.done();
-            expect(r.error).to.be.a("string").and.include("Kein Wizard");
+            expect(r.error).to.be.a("string").and.include("No wizard");
         });
 
         it("should error when no answer has been given yet", async () => {
@@ -359,7 +364,7 @@ describe("SegmentWizard", () => {
             const r = await wizard.done();
             expect(r.error)
                 .to.be.a("string")
-                .and.include("mindestens eine Antwort");
+                .and.include("at least once first");
             expect(wizard.isActive()).to.be.true;
         });
 
@@ -491,14 +496,14 @@ describe("SegmentWizard", () => {
         it("should reject yes/no/done/abort without a session", async () => {
             for (const a of ["yes", "no", "done", "abort"]) {
                 const r = await wizard.runStep(a, "");
-                expect(r.error).to.include("Kein Wizard");
+                expect(r.error).to.include("No wizard");
             }
         });
 
         it("should reject unknown actions", async () => {
             await wizard.start(key);
             const r = await wizard.runStep("maybe", "");
-            expect(r.error).to.include("Unbekannte Aktion");
+            expect(r.error).to.include("Unknown action");
         });
 
         it("should route 'yes'/'no'/'done'/'abort'", async () => {
@@ -525,8 +530,8 @@ describe("SegmentWizard", () => {
             await new Promise((resolve) => setImmediate(resolve));
             expect(wizard.isActive()).to.be.false;
             const warns = host.logs.filter((l) => l.level === "warn");
-            expect(warns.some((l) => l.msg.includes("Idle-Timeout"))).to.be
-                .true;
+            expect(warns.some((l) => l.msg.toLowerCase().includes("idle timeout")))
+                .to.be.true;
         });
 
         it("should do nothing if the session is already gone when firing", async () => {
@@ -550,7 +555,7 @@ describe("SegmentWizard", () => {
             await wizard.start(key);
             host.devices.delete(key);
             const r = await wizard.answer(true);
-            expect(r.error).to.be.a("string").and.include("verschwunden");
+            expect(r.error).to.be.a("string").and.include("disappeared");
             expect(wizard.isActive()).to.be.false;
         });
 
@@ -559,7 +564,7 @@ describe("SegmentWizard", () => {
             await wizard.answer(true);
             host.devices.delete(key);
             const r = await wizard.done();
-            expect(r.error).to.be.a("string").and.include("verschwunden");
+            expect(r.error).to.be.a("string").and.include("disappeared");
             expect(wizard.isActive()).to.be.false;
         });
     });
@@ -574,6 +579,27 @@ describe("SegmentWizard", () => {
 
         it("should be safe to call without a session", () => {
             expect(() => wizard.dispose()).to.not.throw();
+        });
+    });
+
+    describe("localization", () => {
+        it("should render English strings by default", async () => {
+            const r = await wizard.start(key);
+            expect(r.message).to.be.a("string").and.include("Wizard started");
+            expect(wizard.getStatusText()).to.include("Can you see");
+        });
+
+        it("should render German strings when language is 'de'", async () => {
+            host.language = "de";
+            const r = await wizard.start(key);
+            expect(r.message).to.be.a("string").and.include("gestartet");
+            expect(wizard.getStatusText()).to.include("Siehst du");
+        });
+
+        it("should fall back to English for unknown languages", async () => {
+            host.language = "fr"; // not in WIZARD_STRINGS
+            const r = await wizard.start(key);
+            expect(r.message).to.be.a("string").and.include("Wizard started");
         });
     });
 

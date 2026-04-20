@@ -1,5 +1,8 @@
 # Older Changes
 
+## 1.7.2 (2026-04-19)
+- Test infrastructure aligned with ioBroker standard — plain-JS package.js + integration.js
+
 ## 1.7.1 (2026-04-19)
 - Segment commands force color mode before sending — previously silently ignored in Scene/Gradient/Music mode
 - Side effect: automatic segment-count learning once you touch any segment control

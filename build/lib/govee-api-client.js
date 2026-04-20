@@ -22,10 +22,7 @@ __export(govee_api_client_exports, {
 });
 module.exports = __toCommonJS(govee_api_client_exports);
 var import_http_client = require("./http-client.js");
-const APP_VERSION = "7.3.30";
-const USER_AGENT = "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
-const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
-const CLIENT_TYPE = "1";
+var import_govee_constants = require("./govee-constants.js");
 class GoveeApiClient {
   bearerToken = null;
   /**
@@ -52,7 +49,10 @@ class GoveeApiClient {
     const resp = await (0, import_http_client.httpsRequest)({
       method: "GET",
       url,
-      headers: { appVersion: APP_VERSION, "User-Agent": USER_AGENT }
+      headers: {
+        appVersion: import_govee_constants.GOVEE_APP_VERSION,
+        "User-Agent": import_govee_constants.GOVEE_USER_AGENT
+      }
     });
     const scenes = [];
     const categories = Array.isArray((_a = resp == null ? void 0 : resp.data) == null ? void 0 : _a.categories) ? resp.data.categories : [];
@@ -97,10 +97,10 @@ class GoveeApiClient {
   authHeaders() {
     return {
       Authorization: `Bearer ${this.bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT
+      appVersion: import_govee_constants.GOVEE_APP_VERSION,
+      clientId: import_govee_constants.GOVEE_CLIENT_ID,
+      clientType: import_govee_constants.GOVEE_CLIENT_TYPE,
+      "User-Agent": import_govee_constants.GOVEE_USER_AGENT
     };
   }
   /**

@@ -582,29 +582,37 @@ describe("StateManager", () => {
             expect(states.get("devices.h6160_0011.info.online")).to.deep.include({ val: false });
         });
 
-        it("should not update fields that are undefined", async () => {
+        it("should not write anything when given an empty update", async () => {
             const { adapter, calls } = createMockAdapter();
             const sm = new StateManager(adapter as never);
             const dev = createTestDevice();
             await sm.createDeviceStates(dev, basicControlDefs());
 
-            const before = calls.filter((c) => c.method === "getObjectAsync").length;
+            const before = calls.filter((c) => c.method === "setStateAsync").length;
             await sm.updateDeviceState(dev, {});
-            const after = calls.filter((c) => c.method === "getObjectAsync").length;
-            // No getObjectAsync calls means nothing was checked
+            const after = calls.filter((c) => c.method === "setStateAsync").length;
             expect(after - before).to.equal(0);
         });
 
-        it("should skip if object does not exist", async () => {
-            const { adapter, states } = createMockAdapter();
+        it("should fire writes in parallel, not sequentially", async () => {
+            const { adapter, calls } = createMockAdapter();
             const sm = new StateManager(adapter as never);
             const dev = createTestDevice();
-            // Don't create states first
+            await sm.createDeviceStates(dev, basicControlDefs());
 
-            await sm.updateDeviceState(dev, { colorRgb: "#ff0000" });
-            // No state should have been set (object doesn't exist)
-            const setStateCalls = [...states.keys()];
-            expect(setStateCalls).to.not.include("devices.h6160_0011.control.colorRgb");
+            const before = calls.filter((c) => c.method === "setStateAsync").length;
+            await sm.updateDeviceState(dev, {
+                power: true,
+                brightness: 75,
+                colorRgb: "#ff0000",
+            });
+            const after = calls.filter((c) => c.method === "setStateAsync").length;
+            // Three fields set → three setStateAsync calls, no extra getObjectAsync
+            expect(after - before).to.equal(3);
+            const getObjectCalls = calls.filter((c) => c.method === "getObjectAsync");
+            expect(
+                getObjectCalls.filter((c) => String(c.args[0]).includes(".control.")),
+            ).to.have.lengthOf(0);
         });
     });
 

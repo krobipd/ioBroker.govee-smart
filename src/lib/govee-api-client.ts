@@ -1,10 +1,10 @@
 import { httpsRequest } from "./http-client.js";
-
-const APP_VERSION = "7.3.30";
-const USER_AGENT =
-  "GoveeHome/7.3.30 (com.ihoment.GoVeeSensor; build:3; iOS 26.3.1) Alamofire/5.11.1";
-const CLIENT_ID = "d39f7b0732a24e58acf771103ebefc04";
-const CLIENT_TYPE = "1";
+import {
+  GOVEE_APP_VERSION,
+  GOVEE_CLIENT_ID,
+  GOVEE_CLIENT_TYPE,
+  GOVEE_USER_AGENT,
+} from "./govee-constants.js";
 
 /**
  * Govee undocumented API client for scene/music/DIY libraries.
@@ -68,7 +68,10 @@ export class GoveeApiClient {
     }>({
       method: "GET",
       url,
-      headers: { appVersion: APP_VERSION, "User-Agent": USER_AGENT },
+      headers: {
+        appVersion: GOVEE_APP_VERSION,
+        "User-Agent": GOVEE_USER_AGENT,
+      },
     });
 
     const scenes: {
@@ -129,10 +132,10 @@ export class GoveeApiClient {
   private authHeaders(): Record<string, string> {
     return {
       Authorization: `Bearer ${this.bearerToken}`,
-      appVersion: APP_VERSION,
-      clientId: CLIENT_ID,
-      clientType: CLIENT_TYPE,
-      "User-Agent": USER_AGENT,
+      appVersion: GOVEE_APP_VERSION,
+      clientId: GOVEE_CLIENT_ID,
+      clientType: GOVEE_CLIENT_TYPE,
+      "User-Agent": GOVEE_USER_AGENT,
     };
   }
 

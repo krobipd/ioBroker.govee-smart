@@ -106,6 +106,11 @@ class LocalSnapshotStore {
   /**
    * Write snapshot file for a device.
    *
+   * Uses explicit open/write/fsync/close so the data hits disk before the
+   * call returns — plain writeFileSync only pushes to the kernel page cache
+   * and an adapter SIGKILL within the dirty-writeback window would lose the
+   * save silently. Same hardening as sku-cache.
+   *
    * @param sku Product model
    * @param deviceId Device identifier
    * @param snapshots Snapshot array to persist
@@ -114,7 +119,13 @@ class LocalSnapshotStore {
     const file = this.snapshotFile(sku, deviceId);
     try {
       const data = { snapshots };
-      fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf-8");
+      const fd = fs.openSync(file, "w");
+      try {
+        fs.writeSync(fd, JSON.stringify(data, null, 2), 0, "utf-8");
+        fs.fsyncSync(fd);
+      } finally {
+        fs.closeSync(fd);
+      }
     } catch (e) {
       this.log.warn(
         `Snapshot write failed for ${sku}: ${e instanceof Error ? e.message : String(e)}`

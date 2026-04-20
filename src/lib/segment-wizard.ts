@@ -1,6 +1,120 @@
 import { SEGMENT_HARD_MAX } from "./device-manager.js";
 import type { GoveeDevice } from "./types.js";
 
+/**
+ * Wizard UI text, keyed by message id and language. The handful of admin
+ * languages that don't have a dedicated table fall through to English — the
+ * wizard is a power-user feature and English is the closest-to-universal
+ * admin default.
+ */
+type WizardLang = "en" | "de";
+
+const WIZARD_STRINGS: Record<WizardLang, Record<string, string>> = {
+  en: {
+    idle: "No wizard active. Pick an LED strip above and click ▶ Start.",
+    btnYes: "✓ Yes, visible",
+    btnNo: "✗ No, dark",
+    btnDone: "■ Done – end of strip",
+    deviceHeader: "Device",
+    segmentFlashing: "► Segment {idx} is now lit WHITE.",
+    canYouSeeStrip: "Can you see the light on the strip?",
+    canYouSeeShort: "Can you see the light?",
+    seenSoFar: "Marked visible so far: [{list}]",
+    yesNoDoneLine:
+      "→ Yes, visible   or   → No, dark   or   → Done – end of strip",
+    wizardStartedFor: "Wizard started for {name}.",
+    markedVisible: "✓ Segment {idx} marked as visible.",
+    markedDark: "✗ Segment {idx} marked as dark (gap).",
+    errNoWizard: "No wizard active. Please click 'Start' first.",
+    errNoWizardShort: "No wizard active",
+    errUnknownAction: "Unknown action: {action}",
+    errAlreadyActive: "Wizard already active for {name}. Please abort first.",
+    errDeviceNotFound: "Device not found: {key}",
+    errNoSegments: "{name} has no segments — wizard not applicable.",
+    errDeviceGone: "Device disappeared during the wizard",
+    errDeviceGoneShort: "Device disappeared",
+    errAnswerFirst:
+      "Please answer at least once first (Yes visible or No dark).",
+    abortTitle: "Wizard aborted.",
+    abortRestored: "The strip has been restored to its previous state.",
+    abortRestart: "You can restart the wizard at any time.",
+    finishDone: "✓ DONE!",
+    finishCount: "{count} segments detected.",
+    finishGaps: "Gap list: {list} — manual-mode active.",
+    finishNoGaps: "No gaps — manual-mode disabled.",
+    finishTreeRebuilt: "State tree has been rebuilt.",
+    progressSegment: "Segment {idx}",
+    progressCount: "{count} segments",
+    logIdleTimeout: "Segment wizard for {name}: idle timeout (5 min), aborted",
+    logAbortFailed: "Wizard abort after timeout failed: {msg}",
+    logDetected: "Segment wizard for {name}: {count} segments detected{gaps}",
+    logGapsSuffix: ', gaps detected (manual_list="{list}")',
+    logNoGapsSuffix: ", no gaps",
+  },
+  de: {
+    idle: "Kein Assistent aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.",
+    btnYes: "✓ Ja, sichtbar",
+    btnNo: "✗ Nein, dunkel",
+    btnDone: "■ Fertig – Strip zu Ende",
+    deviceHeader: "Gerät",
+    segmentFlashing: "► Segment {idx} leuchtet jetzt WEISS.",
+    canYouSeeStrip: "Siehst du das Licht auf dem Strip?",
+    canYouSeeShort: "Siehst du das Licht?",
+    seenSoFar: "Bisher als sichtbar markiert: [{list}]",
+    yesNoDoneLine:
+      "→ Ja, sichtbar   oder   → Nein, dunkel   oder   → Fertig – Strip zu Ende",
+    wizardStartedFor: "Assistent gestartet für {name}.",
+    markedVisible: "✓ Segment {idx} als sichtbar markiert.",
+    markedDark: "✗ Segment {idx} als dunkel markiert (Lücke).",
+    errNoWizard: "Kein Assistent aktiv. Bitte zuerst 'Start' klicken.",
+    errNoWizardShort: "Kein Assistent aktiv",
+    errUnknownAction: "Unbekannte Aktion: {action}",
+    errAlreadyActive:
+      "Assistent bereits aktiv für {name}. Bitte zuerst abbrechen.",
+    errDeviceNotFound: "Gerät nicht gefunden: {key}",
+    errNoSegments: "{name} hat keine Segmente — Assistent nicht anwendbar.",
+    errDeviceGone: "Gerät während des Assistenten verschwunden",
+    errDeviceGoneShort: "Gerät verschwunden",
+    errAnswerFirst:
+      "Bitte zuerst mindestens eine Antwort geben (Ja sichtbar oder Nein dunkel).",
+    abortTitle: "Assistent abgebrochen.",
+    abortRestored: "Der Strip wurde auf den vorherigen Zustand zurückgesetzt.",
+    abortRestart: "Du kannst den Assistenten jederzeit neu starten.",
+    finishDone: "✓ FERTIG!",
+    finishCount: "{count} Segmente erkannt.",
+    finishGaps: "Lücken-Liste: {list} — Manual-Mode aktiv.",
+    finishNoGaps: "Keine Lücken — Manual-Mode deaktiviert.",
+    finishTreeRebuilt: "State-Tree wurde neu gebaut.",
+    progressSegment: "Segment {idx}",
+    progressCount: "{count} Segmente",
+    logIdleTimeout:
+      "Segment-Assistent für {name}: Idle-Timeout (5 Min), abgebrochen",
+    logAbortFailed:
+      "Abbruch des Assistenten nach Timeout fehlgeschlagen: {msg}",
+    logDetected: "Segment-Assistent für {name}: {count} Segmente erkannt{gaps}",
+    logGapsSuffix: ', Lücken erkannt (manual_list="{list}")',
+    logNoGapsSuffix: ", keine Lücken",
+  },
+};
+
+/**
+ * Interpolate {name} placeholders against a params object.
+ *
+ * @param template Message template with `{placeholder}` slots
+ * @param params Values to substitute — keys must match the placeholder names
+ */
+function format(
+  template: string,
+  params?: Record<string, string | number>,
+): string {
+  if (!params) {
+    return template;
+  }
+  return template.replace(/\{(\w+)\}/g, (m, key: string) =>
+    key in params ? String(params[key]) : m,
+  );
+}
+
 /** Session state for the interactive segment-detection wizard */
 export interface SegmentWizardSession {
   /** Target device key (sku:deviceId) */
@@ -67,11 +181,7 @@ export interface WizardHost {
    * the atomic path was used (LAN available), `false` if host fell back to
    * sendCommand (Cloud or no LAN).
    */
-  flashSegmentAtomic(
-    device: GoveeDevice,
-    total: number,
-    idx: number,
-  ): Promise<boolean>;
+  flashSegmentAtomic(device: GoveeDevice, idx: number): Promise<boolean>;
   /**
    * Restore the whole strip to a uniform color + brightness atomically.
    * Returns `true` if LAN atomic path was used.
@@ -99,13 +209,26 @@ export interface WizardHost {
    * DeviceManager and SkuCache.
    */
   applyWizardResult(device: GoveeDevice, result: WizardResult): Promise<void>;
+  /**
+   * Admin-UI language for all user-facing wizard text. Called on every
+   * getStatusText / step response so a live system.config.language change
+   * propagates without an adapter restart.
+   */
+  getLanguage(): string;
 }
 
 const IDLE_TIMEOUT_MS = 5 * 60_000;
 
-/** Status text shown when no wizard session is active. */
-export const WIZARD_IDLE_TEXT =
-  "Kein Wizard aktiv. Wähle oben einen LED-Strip und klicke ▶ Start.";
+/**
+ * Resolve the idle-state text in the requested language. Fallbacks to English
+ * for any admin language we don't have a dedicated table for — the adapter
+ * supports 11 admin languages in the UI, but the wizard prose lives here.
+ *
+ * @param lang Language code (e.g. "en", "de"); non-matching codes fall back to English
+ */
+export function wizardIdleText(lang: string): string {
+  return WIZARD_STRINGS[lang === "de" ? "de" : "en"].idle;
+}
 
 /**
  * Check whether a device has any segment capability at all. A strip with
@@ -148,24 +271,36 @@ export class SegmentWizard {
   }
 
   /**
+   * Look up a localized string, resolving against the host's current language.
+   *
+   * @param key Lookup key into WIZARD_STRINGS
+   * @param params Optional placeholder values for `{name}` slots in the template
+   */
+  private t(key: string, params?: Record<string, string | number>): string {
+    const lang = this.host.getLanguage() === "de" ? "de" : "en";
+    const template = WIZARD_STRINGS[lang][key] ?? WIZARD_STRINGS.en[key] ?? key;
+    return format(template, params);
+  }
+
+  /**
    * Human-readable status string for the admin UI (rendered via textSendTo).
    * Must stay a plain string — Admin renders it as-is into a read-only field.
    */
   public getStatusText(): string {
     const s = this.session;
     if (!s) {
-      return WIZARD_IDLE_TEXT;
+      return this.t("idle");
     }
     const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "—";
     return (
-      `Gerät: ${s.name}\n` +
-      `► Segment ${s.current} leuchtet jetzt WEISS.\n` +
-      `Siehst du das Licht auf dem Strip?\n` +
-      `  ✓ Ja, sichtbar   → weiter zum nächsten Segment\n` +
-      `  ✗ Nein, dunkel   → Lücke, weiter zum nächsten Segment\n` +
-      `  ■ Fertig – Strip zu Ende → Ergebnis speichern\n` +
+      `${this.t("deviceHeader")}: ${s.name}\n` +
+      `${this.t("segmentFlashing", { idx: s.current })}\n` +
+      `${this.t("canYouSeeStrip")}\n` +
+      `  ${this.t("btnYes")}\n` +
+      `  ${this.t("btnNo")}\n` +
+      `  ${this.t("btnDone")}\n` +
       `\n` +
-      `Bisher als sichtbar markiert: [${visibleStr}]`
+      `${this.t("seenSoFar", { list: visibleStr })}`
     );
   }
 
@@ -189,7 +324,7 @@ export class SegmentWizard {
       return this.start(deviceKey);
     }
     if (!this.session) {
-      return { error: "Kein Wizard aktiv. Bitte zuerst 'Start' klicken." };
+      return { error: this.t("errNoWizard") };
     }
     if (action === "abort") {
       return this.abort();
@@ -200,7 +335,7 @@ export class SegmentWizard {
     if (action === "yes" || action === "no") {
       return this.answer(action === "yes");
     }
-    return { error: `Unbekannte Aktion: ${action}` };
+    return { error: this.t("errUnknownAction", { action }) };
   }
 
   /**
@@ -211,16 +346,16 @@ export class SegmentWizard {
   public async start(deviceKey: string): Promise<WizardResponse> {
     if (this.session) {
       return {
-        error: `Wizard bereits aktiv für ${this.session.name}. Bitte zuerst abbrechen.`,
+        error: this.t("errAlreadyActive", { name: this.session.name }),
       };
     }
     const device = this.host.findDevice(deviceKey);
     if (!device) {
-      return { error: `Gerät nicht gefunden: ${deviceKey}` };
+      return { error: this.t("errDeviceNotFound", { key: deviceKey }) };
     }
     if (!hasSegmentCapability(device)) {
       return {
-        error: `${device.name} hat keine Segmente — Wizard nicht anwendbar.`,
+        error: this.t("errNoSegments", { name: device.name }),
       };
     }
 
@@ -246,11 +381,11 @@ export class SegmentWizard {
 
     return {
       message:
-        `Wizard gestartet für ${device.name}.\n\n` +
-        `► SEGMENT 0 leuchtet jetzt WEISS.\n` +
-        `Siehst du das Licht auf dem Strip?\n` +
-        `→ Ja, sichtbar   oder   → Nein, dunkel   oder   → Fertig – Strip zu Ende`,
-      progress: `Segment 0`,
+        `${this.t("wizardStartedFor", { name: device.name })}\n\n` +
+        `${this.t("segmentFlashing", { idx: 0 })}\n` +
+        `${this.t("canYouSeeStrip")}\n` +
+        `${this.t("yesNoDoneLine")}`,
+      progress: this.t("progressSegment", { idx: 0 }),
       active: true,
     };
   }
@@ -263,7 +398,7 @@ export class SegmentWizard {
   public async answer(wasVisible: boolean): Promise<WizardResponse> {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     if (wasVisible) {
       session.visible.push(session.current);
@@ -282,19 +417,19 @@ export class SegmentWizard {
     if (!device) {
       this.session = null;
       this.clearIdleTimer();
-      return { error: "Gerät während des Wizards verschwunden" };
+      return { error: this.t("errDeviceGone") };
     }
     await this.flashSegment(device, session.current);
-    const lastNote = wasVisible
-      ? `✓ Segment ${answeredIdx} als sichtbar markiert.`
-      : `✗ Segment ${answeredIdx} als dunkel markiert (Lücke).`;
+    const lastNote = this.t(wasVisible ? "markedVisible" : "markedDark", {
+      idx: answeredIdx,
+    });
     return {
       message:
         `${lastNote}\n\n` +
-        `► SEGMENT ${session.current} leuchtet jetzt WEISS.\n` +
-        `Siehst du das Licht?\n` +
-        `→ Ja, sichtbar   oder   → Nein, dunkel   oder   → Fertig – Strip zu Ende`,
-      progress: `Segment ${session.current}`,
+        `${this.t("segmentFlashing", { idx: session.current })}\n` +
+        `${this.t("canYouSeeShort")}\n` +
+        `${this.t("yesNoDoneLine")}`,
+      progress: this.t("progressSegment", { idx: session.current }),
       active: true,
     };
   }
@@ -306,13 +441,10 @@ export class SegmentWizard {
   public async done(): Promise<WizardResponse> {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     if (session.current === 0) {
-      return {
-        error:
-          "Bitte zuerst mindestens eine Antwort geben (Ja sichtbar oder Nein dunkel).",
-      };
+      return { error: this.t("errAnswerFirst") };
     }
     return this.finish();
   }
@@ -321,7 +453,7 @@ export class SegmentWizard {
   public async abort(): Promise<WizardResponse> {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     const device = this.host.findDevice(session.deviceKey);
     if (device) {
@@ -331,9 +463,9 @@ export class SegmentWizard {
     this.clearIdleTimer();
     return {
       message:
-        `Wizard abgebrochen.\n` +
-        `Der Strip wurde auf den vorherigen Zustand zurückgesetzt.\n` +
-        `Du kannst den Wizard jederzeit neu starten.`,
+        `${this.t("abortTitle")}\n` +
+        `${this.t("abortRestored")}\n` +
+        `${this.t("abortRestart")}`,
       done: true,
       aborted: true,
     };
@@ -346,13 +478,13 @@ export class SegmentWizard {
   private async finish(): Promise<WizardResponse> {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     const device = this.host.findDevice(session.deviceKey);
     if (!device) {
       this.session = null;
       this.clearIdleTimer();
-      return { error: "Gerät verschwunden" };
+      return { error: this.t("errDeviceGoneShort") };
     }
 
     const segmentCount = session.current;
@@ -369,27 +501,30 @@ export class SegmentWizard {
     await this.host.applyWizardResult(device, result);
     await this.restoreBaseline(device, session.baseline);
 
+    const gapsSuffix = result.hasGaps
+      ? this.t("logGapsSuffix", { list: manualList })
+      : this.t("logNoGapsSuffix");
     this.host.log.info(
-      `Segment-Wizard für ${device.name}: ${segmentCount} Segmente erkannt${
-        result.hasGaps
-          ? `, Lücken erkannt (manual_list="${manualList}")`
-          : ", keine Lücken"
-      }`,
+      this.t("logDetected", {
+        name: device.name,
+        count: segmentCount,
+        gaps: gapsSuffix,
+      }),
     );
 
     this.session = null;
     this.clearIdleTimer();
 
     const summary = result.hasGaps
-      ? `Lücken-Liste: ${manualList} — Manual-Mode aktiv.`
-      : `Keine Lücken — Manual-Mode deaktiviert.`;
+      ? this.t("finishGaps", { list: manualList })
+      : this.t("finishNoGaps");
     return {
       message:
-        `✓ FERTIG!\n\n` +
-        `${segmentCount} Segmente erkannt.\n` +
+        `${this.t("finishDone")}\n\n` +
+        `${this.t("finishCount", { count: segmentCount })}\n` +
         `${summary}\n` +
-        `State-Tree wurde neu gebaut.`,
-      progress: `${segmentCount} Segmente`,
+        `${this.t("finishTreeRebuilt")}`,
+      progress: this.t("progressCount", { count: segmentCount }),
       done: true,
       segmentCount,
       list: manualList,
@@ -404,12 +539,12 @@ export class SegmentWizard {
       if (!this.session) {
         return;
       }
-      this.host.log.warn(
-        `Segment-Wizard für ${this.session.name}: Idle-Timeout (5 Min), abgebrochen`,
-      );
+      this.host.log.warn(this.t("logIdleTimeout", { name: this.session.name }));
       this.abort().catch((e) => {
         this.host.log.warn(
-          `Wizard-Abort nach Timeout fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`,
+          this.t("logAbortFailed", {
+            msg: e instanceof Error ? e.message : String(e),
+          }),
         );
         this.session = null;
       });
@@ -474,15 +609,14 @@ export class SegmentWizard {
    * @param idx Segment to flash white (others go near-black)
    */
   private async flashSegment(device: GoveeDevice, idx: number): Promise<void> {
-    // Flash-extent = what we'll address: we can't know the real count yet,
-    // so drive the full protocol range. The device silently drops indices
-    // it doesn't physically have.
-    const total = SEGMENT_HARD_MAX + 1;
-    const atomic = await this.host.flashSegmentAtomic(device, total, idx);
+    const atomic = await this.host.flashSegmentAtomic(device, idx);
     if (atomic) {
       return;
     }
     // Fallback (Cloud or no LAN): two sendCommand calls with pacing.
+    // Fallback drives the full protocol range — we can't know the real count
+    // yet. The device silently drops indices it doesn't physically have.
+    const total = SEGMENT_HARD_MAX + 1;
     const others = Array.from({ length: total }, (_, i) => i).filter(
       (i) => i !== idx,
     );

@@ -19,12 +19,103 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var segment_wizard_exports = {};
 __export(segment_wizard_exports, {
   SegmentWizard: () => SegmentWizard,
-  WIZARD_IDLE_TEXT: () => WIZARD_IDLE_TEXT
+  wizardIdleText: () => wizardIdleText
 });
 module.exports = __toCommonJS(segment_wizard_exports);
 var import_device_manager = require("./device-manager.js");
+const WIZARD_STRINGS = {
+  en: {
+    idle: "No wizard active. Pick an LED strip above and click \u25B6 Start.",
+    btnYes: "\u2713 Yes, visible",
+    btnNo: "\u2717 No, dark",
+    btnDone: "\u25A0 Done \u2013 end of strip",
+    deviceHeader: "Device",
+    segmentFlashing: "\u25BA Segment {idx} is now lit WHITE.",
+    canYouSeeStrip: "Can you see the light on the strip?",
+    canYouSeeShort: "Can you see the light?",
+    seenSoFar: "Marked visible so far: [{list}]",
+    yesNoDoneLine: "\u2192 Yes, visible   or   \u2192 No, dark   or   \u2192 Done \u2013 end of strip",
+    wizardStartedFor: "Wizard started for {name}.",
+    markedVisible: "\u2713 Segment {idx} marked as visible.",
+    markedDark: "\u2717 Segment {idx} marked as dark (gap).",
+    errNoWizard: "No wizard active. Please click 'Start' first.",
+    errNoWizardShort: "No wizard active",
+    errUnknownAction: "Unknown action: {action}",
+    errAlreadyActive: "Wizard already active for {name}. Please abort first.",
+    errDeviceNotFound: "Device not found: {key}",
+    errNoSegments: "{name} has no segments \u2014 wizard not applicable.",
+    errDeviceGone: "Device disappeared during the wizard",
+    errDeviceGoneShort: "Device disappeared",
+    errAnswerFirst: "Please answer at least once first (Yes visible or No dark).",
+    abortTitle: "Wizard aborted.",
+    abortRestored: "The strip has been restored to its previous state.",
+    abortRestart: "You can restart the wizard at any time.",
+    finishDone: "\u2713 DONE!",
+    finishCount: "{count} segments detected.",
+    finishGaps: "Gap list: {list} \u2014 manual-mode active.",
+    finishNoGaps: "No gaps \u2014 manual-mode disabled.",
+    finishTreeRebuilt: "State tree has been rebuilt.",
+    progressSegment: "Segment {idx}",
+    progressCount: "{count} segments",
+    logIdleTimeout: "Segment wizard for {name}: idle timeout (5 min), aborted",
+    logAbortFailed: "Wizard abort after timeout failed: {msg}",
+    logDetected: "Segment wizard for {name}: {count} segments detected{gaps}",
+    logGapsSuffix: ', gaps detected (manual_list="{list}")',
+    logNoGapsSuffix: ", no gaps"
+  },
+  de: {
+    idle: "Kein Assistent aktiv. W\xE4hle oben einen LED-Strip und klicke \u25B6 Start.",
+    btnYes: "\u2713 Ja, sichtbar",
+    btnNo: "\u2717 Nein, dunkel",
+    btnDone: "\u25A0 Fertig \u2013 Strip zu Ende",
+    deviceHeader: "Ger\xE4t",
+    segmentFlashing: "\u25BA Segment {idx} leuchtet jetzt WEISS.",
+    canYouSeeStrip: "Siehst du das Licht auf dem Strip?",
+    canYouSeeShort: "Siehst du das Licht?",
+    seenSoFar: "Bisher als sichtbar markiert: [{list}]",
+    yesNoDoneLine: "\u2192 Ja, sichtbar   oder   \u2192 Nein, dunkel   oder   \u2192 Fertig \u2013 Strip zu Ende",
+    wizardStartedFor: "Assistent gestartet f\xFCr {name}.",
+    markedVisible: "\u2713 Segment {idx} als sichtbar markiert.",
+    markedDark: "\u2717 Segment {idx} als dunkel markiert (L\xFCcke).",
+    errNoWizard: "Kein Assistent aktiv. Bitte zuerst 'Start' klicken.",
+    errNoWizardShort: "Kein Assistent aktiv",
+    errUnknownAction: "Unbekannte Aktion: {action}",
+    errAlreadyActive: "Assistent bereits aktiv f\xFCr {name}. Bitte zuerst abbrechen.",
+    errDeviceNotFound: "Ger\xE4t nicht gefunden: {key}",
+    errNoSegments: "{name} hat keine Segmente \u2014 Assistent nicht anwendbar.",
+    errDeviceGone: "Ger\xE4t w\xE4hrend des Assistenten verschwunden",
+    errDeviceGoneShort: "Ger\xE4t verschwunden",
+    errAnswerFirst: "Bitte zuerst mindestens eine Antwort geben (Ja sichtbar oder Nein dunkel).",
+    abortTitle: "Assistent abgebrochen.",
+    abortRestored: "Der Strip wurde auf den vorherigen Zustand zur\xFCckgesetzt.",
+    abortRestart: "Du kannst den Assistenten jederzeit neu starten.",
+    finishDone: "\u2713 FERTIG!",
+    finishCount: "{count} Segmente erkannt.",
+    finishGaps: "L\xFCcken-Liste: {list} \u2014 Manual-Mode aktiv.",
+    finishNoGaps: "Keine L\xFCcken \u2014 Manual-Mode deaktiviert.",
+    finishTreeRebuilt: "State-Tree wurde neu gebaut.",
+    progressSegment: "Segment {idx}",
+    progressCount: "{count} Segmente",
+    logIdleTimeout: "Segment-Assistent f\xFCr {name}: Idle-Timeout (5 Min), abgebrochen",
+    logAbortFailed: "Abbruch des Assistenten nach Timeout fehlgeschlagen: {msg}",
+    logDetected: "Segment-Assistent f\xFCr {name}: {count} Segmente erkannt{gaps}",
+    logGapsSuffix: ', L\xFCcken erkannt (manual_list="{list}")',
+    logNoGapsSuffix: ", keine L\xFCcken"
+  }
+};
+function format(template, params) {
+  if (!params) {
+    return template;
+  }
+  return template.replace(
+    /\{(\w+)\}/g,
+    (m, key) => key in params ? String(params[key]) : m
+  );
+}
 const IDLE_TIMEOUT_MS = 5 * 6e4;
-const WIZARD_IDLE_TEXT = "Kein Wizard aktiv. W\xE4hle oben einen LED-Strip und klicke \u25B6 Start.";
+function wizardIdleText(lang) {
+  return WIZARD_STRINGS[lang === "de" ? "de" : "en"].idle;
+}
 function hasSegmentCapability(device) {
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
   return caps.some(
@@ -43,23 +134,35 @@ class SegmentWizard {
     return this.session !== null;
   }
   /**
+   * Look up a localized string, resolving against the host's current language.
+   *
+   * @param key Lookup key into WIZARD_STRINGS
+   * @param params Optional placeholder values for `{name}` slots in the template
+   */
+  t(key, params) {
+    var _a, _b;
+    const lang = this.host.getLanguage() === "de" ? "de" : "en";
+    const template = (_b = (_a = WIZARD_STRINGS[lang][key]) != null ? _a : WIZARD_STRINGS.en[key]) != null ? _b : key;
+    return format(template, params);
+  }
+  /**
    * Human-readable status string for the admin UI (rendered via textSendTo).
    * Must stay a plain string — Admin renders it as-is into a read-only field.
    */
   getStatusText() {
     const s = this.session;
     if (!s) {
-      return WIZARD_IDLE_TEXT;
+      return this.t("idle");
     }
     const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "\u2014";
-    return `Ger\xE4t: ${s.name}
-\u25BA Segment ${s.current} leuchtet jetzt WEISS.
-Siehst du das Licht auf dem Strip?
-  \u2713 Ja, sichtbar   \u2192 weiter zum n\xE4chsten Segment
-  \u2717 Nein, dunkel   \u2192 L\xFCcke, weiter zum n\xE4chsten Segment
-  \u25A0 Fertig \u2013 Strip zu Ende \u2192 Ergebnis speichern
+    return `${this.t("deviceHeader")}: ${s.name}
+${this.t("segmentFlashing", { idx: s.current })}
+${this.t("canYouSeeStrip")}
+  ${this.t("btnYes")}
+  ${this.t("btnNo")}
+  ${this.t("btnDone")}
 
-Bisher als sichtbar markiert: [${visibleStr}]`;
+${this.t("seenSoFar", { list: visibleStr })}`;
   }
   /** Clear any pending idle-timer. Called from onUnload. */
   dispose() {
@@ -77,7 +180,7 @@ Bisher als sichtbar markiert: [${visibleStr}]`;
       return this.start(deviceKey);
     }
     if (!this.session) {
-      return { error: "Kein Wizard aktiv. Bitte zuerst 'Start' klicken." };
+      return { error: this.t("errNoWizard") };
     }
     if (action === "abort") {
       return this.abort();
@@ -88,7 +191,7 @@ Bisher als sichtbar markiert: [${visibleStr}]`;
     if (action === "yes" || action === "no") {
       return this.answer(action === "yes");
     }
-    return { error: `Unbekannte Aktion: ${action}` };
+    return { error: this.t("errUnknownAction", { action }) };
   }
   /**
    * Begin a new wizard session. Captures baseline and flashes segment 0.
@@ -98,16 +201,16 @@ Bisher als sichtbar markiert: [${visibleStr}]`;
   async start(deviceKey) {
     if (this.session) {
       return {
-        error: `Wizard bereits aktiv f\xFCr ${this.session.name}. Bitte zuerst abbrechen.`
+        error: this.t("errAlreadyActive", { name: this.session.name })
       };
     }
     const device = this.host.findDevice(deviceKey);
     if (!device) {
-      return { error: `Ger\xE4t nicht gefunden: ${deviceKey}` };
+      return { error: this.t("errDeviceNotFound", { key: deviceKey }) };
     }
     if (!hasSegmentCapability(device)) {
       return {
-        error: `${device.name} hat keine Segmente \u2014 Wizard nicht anwendbar.`
+        error: this.t("errNoSegments", { name: device.name })
       };
     }
     const baseline = await this.captureBaseline(device);
@@ -126,12 +229,12 @@ Bisher als sichtbar markiert: [${visibleStr}]`;
     await this.host.sendCommand(device, "brightness", 100);
     await this.flashSegment(device, 0);
     return {
-      message: `Wizard gestartet f\xFCr ${device.name}.
+      message: `${this.t("wizardStartedFor", { name: device.name })}
 
-\u25BA SEGMENT 0 leuchtet jetzt WEISS.
-Siehst du das Licht auf dem Strip?
-\u2192 Ja, sichtbar   oder   \u2192 Nein, dunkel   oder   \u2192 Fertig \u2013 Strip zu Ende`,
-      progress: `Segment 0`,
+${this.t("segmentFlashing", { idx: 0 })}
+${this.t("canYouSeeStrip")}
+${this.t("yesNoDoneLine")}`,
+      progress: this.t("progressSegment", { idx: 0 }),
       active: true
     };
   }
@@ -143,7 +246,7 @@ Siehst du das Licht auf dem Strip?
   async answer(wasVisible) {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     if (wasVisible) {
       session.visible.push(session.current);
@@ -158,17 +261,19 @@ Siehst du das Licht auf dem Strip?
     if (!device) {
       this.session = null;
       this.clearIdleTimer();
-      return { error: "Ger\xE4t w\xE4hrend des Wizards verschwunden" };
+      return { error: this.t("errDeviceGone") };
     }
     await this.flashSegment(device, session.current);
-    const lastNote = wasVisible ? `\u2713 Segment ${answeredIdx} als sichtbar markiert.` : `\u2717 Segment ${answeredIdx} als dunkel markiert (L\xFCcke).`;
+    const lastNote = this.t(wasVisible ? "markedVisible" : "markedDark", {
+      idx: answeredIdx
+    });
     return {
       message: `${lastNote}
 
-\u25BA SEGMENT ${session.current} leuchtet jetzt WEISS.
-Siehst du das Licht?
-\u2192 Ja, sichtbar   oder   \u2192 Nein, dunkel   oder   \u2192 Fertig \u2013 Strip zu Ende`,
-      progress: `Segment ${session.current}`,
+${this.t("segmentFlashing", { idx: session.current })}
+${this.t("canYouSeeShort")}
+${this.t("yesNoDoneLine")}`,
+      progress: this.t("progressSegment", { idx: session.current }),
       active: true
     };
   }
@@ -179,12 +284,10 @@ Siehst du das Licht?
   async done() {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     if (session.current === 0) {
-      return {
-        error: "Bitte zuerst mindestens eine Antwort geben (Ja sichtbar oder Nein dunkel)."
-      };
+      return { error: this.t("errAnswerFirst") };
     }
     return this.finish();
   }
@@ -192,7 +295,7 @@ Siehst du das Licht?
   async abort() {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     const device = this.host.findDevice(session.deviceKey);
     if (device) {
@@ -201,9 +304,9 @@ Siehst du das Licht?
     this.session = null;
     this.clearIdleTimer();
     return {
-      message: `Wizard abgebrochen.
-Der Strip wurde auf den vorherigen Zustand zur\xFCckgesetzt.
-Du kannst den Wizard jederzeit neu starten.`,
+      message: `${this.t("abortTitle")}
+${this.t("abortRestored")}
+${this.t("abortRestart")}`,
       done: true,
       aborted: true
     };
@@ -215,13 +318,13 @@ Du kannst den Wizard jederzeit neu starten.`,
   async finish() {
     const session = this.session;
     if (!session) {
-      return { error: "Kein Wizard aktiv" };
+      return { error: this.t("errNoWizardShort") };
     }
     const device = this.host.findDevice(session.deviceKey);
     if (!device) {
       this.session = null;
       this.clearIdleTimer();
-      return { error: "Ger\xE4t verschwunden" };
+      return { error: this.t("errDeviceGoneShort") };
     }
     const segmentCount = session.current;
     const visible = session.visible.slice().sort((a, b) => a - b);
@@ -234,19 +337,24 @@ Du kannst den Wizard jederzeit neu starten.`,
     };
     await this.host.applyWizardResult(device, result);
     await this.restoreBaseline(device, session.baseline);
+    const gapsSuffix = result.hasGaps ? this.t("logGapsSuffix", { list: manualList }) : this.t("logNoGapsSuffix");
     this.host.log.info(
-      `Segment-Wizard f\xFCr ${device.name}: ${segmentCount} Segmente erkannt${result.hasGaps ? `, L\xFCcken erkannt (manual_list="${manualList}")` : ", keine L\xFCcken"}`
+      this.t("logDetected", {
+        name: device.name,
+        count: segmentCount,
+        gaps: gapsSuffix
+      })
     );
     this.session = null;
     this.clearIdleTimer();
-    const summary = result.hasGaps ? `L\xFCcken-Liste: ${manualList} \u2014 Manual-Mode aktiv.` : `Keine L\xFCcken \u2014 Manual-Mode deaktiviert.`;
+    const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
     return {
-      message: `\u2713 FERTIG!
+      message: `${this.t("finishDone")}
 
-${segmentCount} Segmente erkannt.
+${this.t("finishCount", { count: segmentCount })}
 ${summary}
-State-Tree wurde neu gebaut.`,
-      progress: `${segmentCount} Segmente`,
+${this.t("finishTreeRebuilt")}`,
+      progress: this.t("progressCount", { count: segmentCount }),
       done: true,
       segmentCount,
       list: manualList,
@@ -260,12 +368,12 @@ State-Tree wurde neu gebaut.`,
       if (!this.session) {
         return;
       }
-      this.host.log.warn(
-        `Segment-Wizard f\xFCr ${this.session.name}: Idle-Timeout (5 Min), abgebrochen`
-      );
+      this.host.log.warn(this.t("logIdleTimeout", { name: this.session.name }));
       this.abort().catch((e) => {
         this.host.log.warn(
-          `Wizard-Abort nach Timeout fehlgeschlagen: ${e instanceof Error ? e.message : String(e)}`
+          this.t("logAbortFailed", {
+            msg: e instanceof Error ? e.message : String(e)
+          })
         );
         this.session = null;
       });
@@ -317,11 +425,11 @@ State-Tree wurde neu gebaut.`,
    * @param idx Segment to flash white (others go near-black)
    */
   async flashSegment(device, idx) {
-    const total = import_device_manager.SEGMENT_HARD_MAX + 1;
-    const atomic = await this.host.flashSegmentAtomic(device, total, idx);
+    const atomic = await this.host.flashSegmentAtomic(device, idx);
     if (atomic) {
       return;
     }
+    const total = import_device_manager.SEGMENT_HARD_MAX + 1;
     const others = Array.from({ length: total }, (_, i) => i).filter(
       (i) => i !== idx
     );
@@ -394,6 +502,6 @@ function compactIndices(sorted) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   SegmentWizard,
-  WIZARD_IDLE_TEXT
+  wizardIdleText
 });
 //# sourceMappingURL=segment-wizard.js.map
