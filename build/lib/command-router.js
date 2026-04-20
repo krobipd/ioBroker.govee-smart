@@ -557,7 +557,17 @@ class CommandRouter {
           const baseName = scene.name.replace(/-[A-Z]$/, "");
           const libEntry = (_b = device.sceneLibrary.find((s) => s.name === scene.name)) != null ? _b : device.sceneLibrary.find((s) => s.name === baseName);
           if (libEntry) {
-            let param = (_c = libEntry.scenceParam) != null ? _c : "";
+            const baseParam = (_c = libEntry.scenceParam) != null ? _c : "";
+            const hasSegments = typeof device.segmentCount === "number" && device.segmentCount > 0;
+            if (!hasSegments && baseParam.length > 0) {
+              this.log.debug(
+                `ptReal scene ${scene.name} skipped \u2014 ${device.sku} has no segments, falling through to Cloud`
+              );
+              this.sendCloudCommand(device, command, value).catch(() => {
+              });
+              return;
+            }
+            let param = baseParam;
             if (device.sceneSpeed !== void 0 && device.sceneSpeed > 0 && ((_d = libEntry.speedInfo) == null ? void 0 : _d.supSpeed) && libEntry.speedInfo.config) {
               param = (0, import_govee_lan_client.applySceneSpeed)(
                 param,

@@ -1,8 +1,21 @@
 {
     "common": {
         "name": "govee-smart",
-        "version": "1.9.1",
+        "version": "1.10.0",
         "news": {
+            "1.10.0": {
+                "en": "Two fixes around mode tracking. First, scenes with a scenceParam (the multi-packet A3 BLE payload that drives per-segment animation) are now skipped for devices without segments (e.g. H70B3 Curtain Lights, bulbs) and activated via the Govee Cloud instead — those devices silently drop the A3 packets, so the old ptReal path left the scene unplayed. Second, powering a device off now resets every mode dropdown (scene, DIY scene, Cloud/local snapshot, music) to \"---\", whether the off was triggered from ioBroker or from the Govee app — a device that is off cannot be \"playing Aurora-A\".",
+                "de": "Zwei Fixes rund um Mode-Tracking. Erstens: Szenen mit scenceParam (das Multi-Packet-A3-BLE-Format für Segment-Animationen) werden auf Geräten ohne Segmente (z.B. H70B3 Curtain Lights, Birnen) nicht mehr per ptReal versucht sondern direkt über die Govee Cloud aktiviert — diese Geräte verwerfen die A3-Pakete stumm, der alte ptReal-Pfad ließ die Szene damit ungespielt. Zweitens: Beim Ausschalten eines Geräts werden jetzt alle Mode-Dropdowns (Szene, DIY-Szene, Cloud-/lokaler Snapshot, Musik) auf \"---\" zurückgesetzt — egal ob die Power-off-Aktion von ioBroker oder aus der Govee App kam. Ein ausgeschaltetes Gerät kann nicht mehr \"Aurora-A spielen\".",
+                "ru": "Два исправления связанных с режимами. Сцены со scenceParam теперь используют Cloud-активацию на устройствах без сегментов (H70B3 и др.) — ptReal-пакеты эти устройства молча игнорировали. Выключение устройства теперь сбрасывает все mode-dropdowns (сцена, snapshot, music) на \"---\", независимо от источника выключения.",
+                "pt": "Duas correções em mode-tracking. Cenas com scenceParam agora usam ativação Cloud em dispositivos sem segmentos (H70B3 etc.) — os pacotes ptReal eram silenciosamente descartados. Desligar o dispositivo agora reseta todos os mode-dropdowns para \"---\", independente da origem.",
+                "nl": "Twee fixes voor mode-tracking. Scenes met scenceParam gebruiken nu cloud-activatie op apparaten zonder segmenten (H70B3 etc.) — die verwerpen de ptReal-pakketten stilletjes. Apparaat uitschakelen reset nu alle mode-dropdowns naar \"---\", ongeacht de bron.",
+                "fr": "Deux correctifs autour du tracking des modes. Les scènes avec scenceParam utilisent maintenant l’activation Cloud sur les appareils sans segments (H70B3 etc.) — ces appareils rejetaient silencieusement les paquets ptReal. Éteindre un appareil remet maintenant tous les mode-dropdowns à « --- », quelle que soit la source.",
+                "it": "Due fix sul mode-tracking. Scene con scenceParam ora usano attivazione Cloud sui dispositivi senza segmenti (H70B3 etc.) — quei dispositivi scartavano silenziosamente i pacchetti ptReal. Spegnere un dispositivo ora resetta tutti i mode-dropdown a \"---\", indipendentemente dall’origine.",
+                "es": "Dos correcciones en el mode-tracking. Las escenas con scenceParam ahora usan activación Cloud en dispositivos sin segmentos (H70B3 etc.) — esos dispositivos descartaban silenciosamente los paquetes ptReal. Apagar un dispositivo ahora resetea todos los mode-dropdowns a \"---\", independientemente del origen.",
+                "pl": "Dwie poprawki w mode-tracking. Sceny z scenceParam używają teraz aktywacji Cloud na urządzeniach bez segmentów (H70B3 itd.) — te urządzenia po cichu odrzucały pakiety ptReal. Wyłączenie urządzenia resetuje teraz wszystkie mode-dropdowns do \"---\", niezależnie od źródła.",
+                "uk": "Два виправлення в mode-tracking. Сцени з scenceParam тепер активуються через Cloud на пристроях без сегментів (H70B3 тощо) — ці пристрої мовчки відкидали ptReal-пакети. Вимкнення пристрою тепер скидає всі mode-dropdowns на \"---\", незалежно від джерела.",
+                "zh-cn": "两个 mode-tracking 修复。带 scenceParam 的场景现在在无段设备（H70B3 等）上通过 Cloud 激活 — 这些设备会默默丢弃 ptReal 包。关闭设备现在会将所有 mode-dropdown 重置为 \"---\"，无论来源。"
+            },
             "1.9.1": {
                 "en": "Hotfix — cloud-side scene/snapshot updates are now merged per list instead of all-or-nothing. Govee’s /device/scenes occasionally returns e.g. 149 scenes + 0 snapshots on the same device where a snapshot clearly exists; the old combined guard wiped the snapshots list in that case, breaking the cloud-snapshot dropdown with “invalid snapshot index” errors. Each of scenes, DIY scenes and snapshots is now guarded independently so a lucky list never clobbers an unlucky one.",
                 "de": "Hotfix — Cloud-Aktualisierungen für Szenen/Snapshots werden jetzt pro Liste gemerged statt alles-oder-nichts. Govees /device/scenes liefert gelegentlich z.B. 149 Szenen + 0 Snapshots obwohl ein Snapshot existiert; der alte kombinierte Guard hat die Snapshot-Liste in dem Fall geleert und damit das Cloud-Snapshot-Dropdown mit „invalid snapshot index“-Fehlern gebrochen. Szenen, DIY-Szenen und Snapshots werden jetzt unabhängig gegen leeres Cloud-Ergebnis geschützt.",
@@ -80,19 +93,6 @@
                 "pl": "Audyt: poprawka wyścigu ack przy cofnięciu manual_mode, przywrócona nazwa kanału info, tłumaczenia kreatora dla 9 języków. Refaktoryzacje, bez zmian zachowania.",
                 "uk": "Аудит: виправлення гонки ack при відкаті manual_mode, відновлено ім'я каналу info, переклади майстра для 9 мов. Рефакторинги, без зміни поведінки.",
                 "zh-cn": "审计：修复 manual_mode 回滚的 ack 竞态，恢复 info 通道显示名称，为 9 种管理界面语言添加向导翻译。重构，行为不变。"
-            },
-            "1.7.5": {
-                "en": "Fix the Wiki link at the top of the adapter settings — the Markdown in the previous staticText was not rendered as a clickable link. Replaced with two staticLink buttons side by side: \"Wiki (Deutsch)\" pointing to the Startseite and \"Wiki (English)\" pointing to the Home page. Consistent with the Ko-Fi/PayPal button pattern used in the other adapters.",
-                "de": "Wiki-Link oben in den Adapter-Einstellungen reparieren — das Markdown im vorherigen staticText wurde nicht als klickbarer Link gerendert. Jetzt zwei nebeneinander liegende staticLink-Buttons: \"Wiki (Deutsch)\" zeigt auf die Startseite und \"Wiki (English)\" auf die Home-Seite. Konsistent mit dem Ko-Fi/PayPal-Button-Muster der anderen Adapter.",
-                "ru": "Ссылка на вики вверху настроек адаптера исправлена — staticText с Markdown не рендерился как кликабельная ссылка. Теперь две кнопки staticLink рядом: \"Wiki (Deutsch)\" и \"Wiki (English)\".",
-                "pt": "Correção do link do Wiki no topo das configurações — o Markdown em staticText não era renderizado como link clicável. Agora dois botões staticLink lado a lado: \"Wiki (Deutsch)\" e \"Wiki (English)\".",
-                "nl": "Wiki-link bovenaan de adapterinstellingen gerepareerd — Markdown in staticText werd niet als klikbare link weergegeven. Nu twee staticLink-knoppen naast elkaar: \"Wiki (Deutsch)\" en \"Wiki (English)\".",
-                "fr": "Correction du lien Wiki en haut des paramètres de l'adaptateur — le Markdown dans staticText n'était pas rendu comme un lien cliquable. Maintenant deux boutons staticLink côte à côte : \"Wiki (Deutsch)\" et \"Wiki (English)\".",
-                "it": "Corretto il link al Wiki in cima alle impostazioni dell'adattatore — il Markdown in staticText non veniva reso come link cliccabile. Ora due pulsanti staticLink affiancati: \"Wiki (Deutsch)\" e \"Wiki (English)\".",
-                "es": "Corregido el enlace al Wiki en la parte superior de la configuración del adaptador — el Markdown en staticText no se renderizaba como enlace cliqueable. Ahora dos botones staticLink uno al lado del otro: \"Wiki (Deutsch)\" y \"Wiki (English)\".",
-                "pl": "Naprawiono link do Wiki u góry ustawień adaptera — Markdown w staticText nie był renderowany jako klikalny link. Teraz dwa przyciski staticLink obok siebie: \"Wiki (Deutsch)\" i \"Wiki (English)\".",
-                "uk": "Виправлено посилання на Wiki вгорі налаштувань адаптера — Markdown у staticText не рендерився як клікабельне посилання. Тепер дві кнопки staticLink поруч: \"Wiki (Deutsch)\" та \"Wiki (English)\".",
-                "zh-cn": "修复适配器设置顶部的 Wiki 链接 — staticText 中的 Markdown 未渲染为可点击链接。现在使用两个并排的 staticLink 按钮: \"Wiki (Deutsch)\" 和 \"Wiki (English)\"。"
             }
         },
         "titleLang": {

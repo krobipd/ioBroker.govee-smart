@@ -1,5 +1,8 @@
 # Older Changes
 
+## 1.7.5 (2026-04-19)
+- Fix Wiki link in adapter settings — Markdown in staticText wasn't rendered, replaced with two staticLink buttons (DE + EN)
+
 ## 1.7.4 (2026-04-19)
 - Add language-aware Wiki link at the top of the main configuration tab
 

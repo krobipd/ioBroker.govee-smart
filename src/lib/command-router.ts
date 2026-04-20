@@ -705,7 +705,27 @@ export class CommandRouter {
             device.sceneLibrary.find((s) => s.name === scene.name) ??
             device.sceneLibrary.find((s) => s.name === baseName);
           if (libEntry) {
-            let param = libEntry.scenceParam ?? "";
+            const baseParam = libEntry.scenceParam ?? "";
+            // Devices without segment hardware (e.g. H70B3 Curtain Lights)
+            // can't parse the A3-framed multi-packet ptReal protocol that
+            // `scenceParam` carries — those packets describe per-segment
+            // animation data. On such devices the packets are silently
+            // dropped: the scene activation never happens locally. Fall
+            // straight to Cloud activation for them so the scene still
+            // works. Simple scenes without scenceParam (older presets like
+            // "Valentine's Day") still take the ptReal path — the single
+            // activation packet is understood by every Govee light.
+            const hasSegments =
+              typeof device.segmentCount === "number" &&
+              device.segmentCount > 0;
+            if (!hasSegments && baseParam.length > 0) {
+              this.log.debug(
+                `ptReal scene ${scene.name} skipped — ${device.sku} has no segments, falling through to Cloud`,
+              );
+              this.sendCloudCommand(device, command, value).catch(() => {});
+              return;
+            }
+            let param = baseParam;
             if (
               device.sceneSpeed !== undefined &&
               device.sceneSpeed > 0 &&

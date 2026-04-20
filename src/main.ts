@@ -834,8 +834,15 @@ class GoveeAdapter extends utils.Adapter {
       await this.deviceManager.sendCommand(device, command, state.val);
       // Optimistic ack
       await this.setStateAsync(id, { val: state.val, ack: true });
-      // Reset related dropdowns when switching modes
-      await this.resetRelatedDropdowns(prefix, command);
+      // Reset related dropdowns when switching modes.
+      // Power-off is a special case — the device is off, so no mode is
+      // active anymore; reset every mode dropdown so the UI reflects the
+      // reality (scene/music/snapshot selections are now just history).
+      if (command === "power" && state.val === false) {
+        await this.resetModeDropdowns(prefix, "");
+      } else {
+        await this.resetRelatedDropdowns(prefix, command);
+      }
     } catch (err) {
       this.log.warn(
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`,
@@ -941,6 +948,14 @@ class GoveeAdapter extends utils.Adapter {
     // Update group reachability when member online status changes
     if (state.online !== undefined) {
       this.updateGroupReachability();
+    }
+
+    // Mirror power-off to mode-dropdown reset. Covers MQTT/LAN-initiated
+    // power changes (Govee app or physical remote) so the UI stays honest:
+    // a device that's off can't be "playing Aurora-A" anymore.
+    if (state.power === false && this.stateManager) {
+      const prefix = this.stateManager.devicePrefix(device);
+      this.resetModeDropdowns(prefix, "").catch(() => undefined);
     }
   }
 
@@ -1922,6 +1937,26 @@ class GoveeAdapter extends utils.Adapter {
     }
   }
 
+  /** Dropdowns whose value is a mode-selection — reset to "---" (0) when the mode stops. */
+  private static readonly MODE_DROPDOWNS = [
+    "scenes.light_scene",
+    "scenes.diy_scene",
+    "snapshots.snapshot_cloud",
+    "snapshots.snapshot_local",
+    "music.music_mode",
+  ];
+
+  /** Map command → its own dropdown path (excluded from reset when that mode is the one that was just activated). */
+  private static readonly COMMAND_DROPDOWN: Record<string, string> = {
+    lightScene: "scenes.light_scene",
+    diyScene: "scenes.diy_scene",
+    snapshot: "snapshots.snapshot_cloud",
+    snapshotLocal: "snapshots.snapshot_local",
+    music: "music.music_mode",
+    colorRgb: "",
+    colorTemperature: "",
+  };
+
   /**
    * Reset related dropdown states when switching between scenes/snapshots/colors.
    * Each mode-switch resets all OTHER mode dropdowns to "---" (0).
@@ -1933,41 +1968,36 @@ class GoveeAdapter extends utils.Adapter {
     prefix: string,
     activeCommand: string,
   ): Promise<void> {
-    const ALL_DROPDOWNS = [
-      "scenes.light_scene",
-      "scenes.diy_scene",
-      "snapshots.snapshot_cloud",
-      "snapshots.snapshot_local",
-      "music.music_mode",
-    ];
-
-    // Map command → its own dropdown path (excluded from reset)
-    const COMMAND_DROPDOWN: Record<string, string> = {
-      lightScene: "scenes.light_scene",
-      diyScene: "scenes.diy_scene",
-      snapshot: "snapshots.snapshot_cloud",
-      snapshotLocal: "snapshots.snapshot_local",
-      music: "music.music_mode",
-      colorRgb: "",
-      colorTemperature: "",
-    };
-
-    if (!(activeCommand in COMMAND_DROPDOWN)) {
+    if (!(activeCommand in GoveeAdapter.COMMAND_DROPDOWN)) {
       return;
     }
+    const ownDropdown = GoveeAdapter.COMMAND_DROPDOWN[activeCommand];
+    await this.resetModeDropdowns(prefix, ownDropdown);
+  }
 
-    const ownDropdown = COMMAND_DROPDOWN[activeCommand];
-
-    for (const dropdown of ALL_DROPDOWNS) {
-      if (dropdown === ownDropdown) {
-        continue;
-      }
-      const stateId = `${this.namespace}.${prefix}.${dropdown}`;
-      const current = await this.getStateAsync(stateId);
-      if (current?.val && current.val !== "0" && current.val !== 0) {
-        await this.setStateAsync(stateId, { val: "0", ack: true });
-      }
-    }
+  /**
+   * Reset every mode dropdown except `keep` (empty = reset all). Used both for
+   * mode-switches (keep the new mode's own dropdown) and for power-off
+   * (reset everything — a device that's off has no active mode).
+   *
+   * @param prefix Device state prefix
+   * @param keep   Dropdown path to leave untouched (e.g. "music.music_mode"), or "" to reset all
+   */
+  private async resetModeDropdowns(
+    prefix: string,
+    keep: string,
+  ): Promise<void> {
+    await Promise.all(
+      GoveeAdapter.MODE_DROPDOWNS.filter((d) => d !== keep).map(
+        async (dropdown) => {
+          const stateId = `${this.namespace}.${prefix}.${dropdown}`;
+          const current = await this.getStateAsync(stateId);
+          if (current?.val && current.val !== "0" && current.val !== 0) {
+            await this.setStateAsync(stateId, { val: "0", ack: true });
+          }
+        },
+      ),
+    );
   }
 }
 

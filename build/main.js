@@ -685,7 +685,11 @@ class GoveeAdapter extends utils.Adapter {
       }
       await this.deviceManager.sendCommand(device, command, state.val);
       await this.setStateAsync(id, { val: state.val, ack: true });
-      await this.resetRelatedDropdowns(prefix, command);
+      if (command === "power" && state.val === false) {
+        await this.resetModeDropdowns(prefix, "");
+      } else {
+        await this.resetRelatedDropdowns(prefix, command);
+      }
     } catch (err) {
       this.log.warn(
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -755,6 +759,10 @@ class GoveeAdapter extends utils.Adapter {
     this.updateConnectionState();
     if (state.online !== void 0) {
       this.updateGroupReachability();
+    }
+    if (state.power === false && this.stateManager) {
+      const prefix = this.stateManager.devicePrefix(device);
+      this.resetModeDropdowns(prefix, "").catch(() => void 0);
     }
   }
   /**
@@ -1544,6 +1552,24 @@ class GoveeAdapter extends utils.Adapter {
       this.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
     }
   }
+  /** Dropdowns whose value is a mode-selection — reset to "---" (0) when the mode stops. */
+  static MODE_DROPDOWNS = [
+    "scenes.light_scene",
+    "scenes.diy_scene",
+    "snapshots.snapshot_cloud",
+    "snapshots.snapshot_local",
+    "music.music_mode"
+  ];
+  /** Map command → its own dropdown path (excluded from reset when that mode is the one that was just activated). */
+  static COMMAND_DROPDOWN = {
+    lightScene: "scenes.light_scene",
+    diyScene: "scenes.diy_scene",
+    snapshot: "snapshots.snapshot_cloud",
+    snapshotLocal: "snapshots.snapshot_local",
+    music: "music.music_mode",
+    colorRgb: "",
+    colorTemperature: ""
+  };
   /**
    * Reset related dropdown states when switching between scenes/snapshots/colors.
    * Each mode-switch resets all OTHER mode dropdowns to "---" (0).
@@ -1552,36 +1578,32 @@ class GoveeAdapter extends utils.Adapter {
    * @param activeCommand The command that was just executed
    */
   async resetRelatedDropdowns(prefix, activeCommand) {
-    const ALL_DROPDOWNS = [
-      "scenes.light_scene",
-      "scenes.diy_scene",
-      "snapshots.snapshot_cloud",
-      "snapshots.snapshot_local",
-      "music.music_mode"
-    ];
-    const COMMAND_DROPDOWN = {
-      lightScene: "scenes.light_scene",
-      diyScene: "scenes.diy_scene",
-      snapshot: "snapshots.snapshot_cloud",
-      snapshotLocal: "snapshots.snapshot_local",
-      music: "music.music_mode",
-      colorRgb: "",
-      colorTemperature: ""
-    };
-    if (!(activeCommand in COMMAND_DROPDOWN)) {
+    if (!(activeCommand in GoveeAdapter.COMMAND_DROPDOWN)) {
       return;
     }
-    const ownDropdown = COMMAND_DROPDOWN[activeCommand];
-    for (const dropdown of ALL_DROPDOWNS) {
-      if (dropdown === ownDropdown) {
-        continue;
-      }
-      const stateId = `${this.namespace}.${prefix}.${dropdown}`;
-      const current = await this.getStateAsync(stateId);
-      if ((current == null ? void 0 : current.val) && current.val !== "0" && current.val !== 0) {
-        await this.setStateAsync(stateId, { val: "0", ack: true });
-      }
-    }
+    const ownDropdown = GoveeAdapter.COMMAND_DROPDOWN[activeCommand];
+    await this.resetModeDropdowns(prefix, ownDropdown);
+  }
+  /**
+   * Reset every mode dropdown except `keep` (empty = reset all). Used both for
+   * mode-switches (keep the new mode's own dropdown) and for power-off
+   * (reset everything — a device that's off has no active mode).
+   *
+   * @param prefix Device state prefix
+   * @param keep   Dropdown path to leave untouched (e.g. "music.music_mode"), or "" to reset all
+   */
+  async resetModeDropdowns(prefix, keep) {
+    await Promise.all(
+      GoveeAdapter.MODE_DROPDOWNS.filter((d) => d !== keep).map(
+        async (dropdown) => {
+          const stateId = `${this.namespace}.${prefix}.${dropdown}`;
+          const current = await this.getStateAsync(stateId);
+          if ((current == null ? void 0 : current.val) && current.val !== "0" && current.val !== 0) {
+            await this.setStateAsync(stateId, { val: "0", ack: true });
+          }
+        }
+      )
+    );
   }
 }
 if (require.main !== module) {

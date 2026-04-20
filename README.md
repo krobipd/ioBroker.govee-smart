@@ -97,6 +97,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### 1.10.0 (2026-04-20)
+- Scenes with a `scenceParam` (the multi-packet A3 BLE payload that drives per-segment animation) are now skipped on devices without segments and activated via the Govee Cloud instead. Curtain Lights (H70B3) and bulbs silently drop those A3 packets, which left complex scenes unplayed; the simple presets without `scenceParam` kept working. With this fix every scene reaches the device, at the cost of one Cloud call per scene change on non-segmented hardware.
+- Powering a device off now resets every mode dropdown (scene, DIY scene, Cloud/local snapshot, music) to "---", whether the off was triggered from ioBroker or from the Govee Home app. A device that is off cannot be "playing Aurora-A" — the UI now reflects that.
+
 ### 1.9.1 (2026-04-20)
 - Hotfix — Govee's `/device/scenes` endpoint occasionally returns e.g. 149 scenes + 0 snapshots on the same device where a snapshot clearly exists. The old combined guard (`if any of the three lists is non-empty, overwrite all three`) wiped the snapshot list in that case, and the cloud-snapshot dropdown then errored out with `invalid snapshot index 1` on click. Each of scenes, DIY scenes and snapshots is now guarded independently — a lucky list no longer clobbers an unlucky one. Applies to every device with cloud-side snapshots, not just the device where it first surfaced.
 
@@ -135,9 +139,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - info channel keeps its "Device Information" display name
 - Drop "~100 ms" latency claim from LAN section, reworded in all 11 languages
 - Internal: applyManualSegments helper, targeted state refresh on snapshot ops, dynamic_scene mapping cleanup, prefix-map cleanup on device removal, loadDeviceScenes dead-logic removed, MQTT/Cloud routing docstrings corrected
-
-### 1.7.5 (2026-04-19)
-- Fix Wiki link in adapter settings — Markdown in staticText wasn't rendered, replaced with two staticLink buttons (DE + EN)
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
