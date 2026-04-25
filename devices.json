@@ -1,6 +1,33 @@
 {
     "_comment": "Govee device support and quirk overrides. See Wiki for the rendered device list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested).",
     "devices": {
+        "H5051": {
+            "name": "Thermo-Hygrometer",
+            "type": "thermometer",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt — Platform-API liefert °F-Werte, App-API ist sauberer",
+            "quirks": {
+                "preferAppApi": true
+            }
+        },
+        "H5100": {
+            "name": "Thermo-Hygrometer",
+            "type": "thermometer",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt — Platform-API liefert °F-Werte, App-API ist sauberer",
+            "quirks": {
+                "preferAppApi": true
+            }
+        },
+        "H5103": {
+            "name": "Thermo-Hygrometer",
+            "type": "thermometer",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt — Platform-API liefert °F-Werte, App-API ist sauberer",
+            "quirks": {
+                "preferAppApi": true
+            }
+        },
         "H5179": {
             "name": "Wifi Thermometer",
             "type": "thermometer",
@@ -37,7 +64,20 @@
             "type": "light",
             "status": "seed",
             "quirks": {
-                "brokenPlatformApi": true
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
+            }
+        },
+        "H60A1": {
+            "name": "LED Bulb",
+            "type": "light",
+            "status": "seed",
+            "notes": "API claims 2000-9000K, real range narrower",
+            "quirks": {
+                "colorTempRange": {
+                    "min": 2200,
+                    "max": 6500
+                }
             }
         },
         "H6102": {
@@ -45,7 +85,17 @@
             "type": "light",
             "status": "seed",
             "quirks": {
-                "brokenPlatformApi": true
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
+            }
+        },
+        "H6119": {
+            "name": "LED Strip",
+            "type": "light",
+            "status": "seed",
+            "quirks": {
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
             }
         },
         "H612F": {
@@ -54,14 +104,6 @@
             "status": "verified",
             "since": "1.0.0",
             "tested": "2026-04-25 by krobi"
-        },
-        "H6119": {
-            "name": "LED Strip",
-            "type": "light",
-            "status": "seed",
-            "quirks": {
-                "brokenPlatformApi": true
-            }
         },
         "H6141": {
             "name": "LED Strip",
@@ -84,7 +126,8 @@
             "type": "light",
             "status": "seed",
             "quirks": {
-                "brokenPlatformApi": true
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
             }
         },
         "H617E": {
@@ -92,7 +135,8 @@
             "type": "light",
             "status": "seed",
             "quirks": {
-                "brokenPlatformApi": true
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
             }
         },
         "H617F": {
@@ -100,7 +144,8 @@
             "type": "light",
             "status": "seed",
             "quirks": {
-                "brokenPlatformApi": true
+                "brokenPlatformApi": true,
+                "skipLanDiscovery": true
             }
         },
         "H618A": {
@@ -132,18 +177,6 @@
             "tested": "2026-04-25 by krobi",
             "notes": "Cloud meldet weniger Segmente als real vorhanden — MQTT AA A5 lernt korrekten Wert über Cache (resolveSegmentCount, ab v1.7.0)"
         },
-        "H60A1": {
-            "name": "LED Bulb",
-            "type": "light",
-            "status": "seed",
-            "notes": "API claims 2000-9000K, real range narrower",
-            "quirks": {
-                "colorTempRange": {
-                    "min": 2200,
-                    "max": 6500
-                }
-            }
-        },
         "H70B3": {
             "name": "Curtain Lights",
             "type": "light",
@@ -167,11 +200,116 @@
             "tested": "2026-04-25 by krobi",
             "notes": "Cloud-API liefert widersprüchliche Segment-Counts pro Capability (segmentedBrightness=10, segmentedColorRgb=15) — resolveSegmentCount nimmt min (10, korrekt)"
         },
+        "H7130": {
+            "name": "Smart Space Heater",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7131": {
+            "name": "Smart Space Heater (mit Nachtlicht)",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee — Gerät hat zusätzlich RGB-Nachtlicht",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7132": {
+            "name": "Smart Space Heater",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7133": {
+            "name": "Smart Space Heater (mit Nachtlicht)",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee — Gerät hat zusätzlich RGB-Nachtlicht",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7134": {
+            "name": "Smart Space Heater (mit Nachtlicht)",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee — Gerät hat zusätzlich Color-Temp-Nachtlicht",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7135": {
+            "name": "Smart Space Heater",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H713A": {
+            "name": "Smart Space Heater",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H713B": {
+            "name": "Smart Space Heater",
+            "type": "heater",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
         "H7160": {
             "name": "Smart Space Heater",
             "type": "heater",
             "status": "seed",
             "notes": "Forum-Hinweis ohne Diagnostics — vermuteter brokenPlatformApi"
+        },
+        "H7170": {
+            "name": "Smart Kettle",
+            "type": "kettle",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7171": {
+            "name": "Smart Kettle (M1-M4)",
+            "type": "kettle",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee — Presets M1-M4",
+            "quirks": {
+                "expectEvents": true
+            }
+        },
+        "H7172": {
+            "name": "Smart Ice Maker",
+            "type": "ice_maker",
+            "status": "seed",
+            "notes": "Quelle govee2mqtt — keine OpenAPI-MQTT-Events, Status nur per Cloud-Poll (Issue #343)"
+        },
+        "H7173": {
+            "name": "Smart Kettle (Tea/Coffee/DIY)",
+            "type": "kettle",
+            "status": "seed",
+            "notes": "Quirk aus govee2mqtt + homebridge-govee — Presets Tea/Coffee/DIY",
+            "quirks": {
+                "expectEvents": true
+            }
         }
     }
 }
