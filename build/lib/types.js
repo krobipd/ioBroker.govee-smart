@@ -18,10 +18,13 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var types_exports = {};
 __export(types_exports, {
+  buildUniqueLabelMap: () => buildUniqueLabelMap,
   classifyError: () => classifyError,
+  disambiguateLabels: () => disambiguateLabels,
   hexToRgb: () => hexToRgb,
   normalizeDeviceId: () => normalizeDeviceId,
   parseSegmentList: () => parseSegmentList,
+  resolveStatesValue: () => resolveStatesValue,
   rgbIntToHex: () => rgbIntToHex,
   rgbToHex: () => rgbToHex
 });
@@ -141,12 +144,59 @@ function parseSegmentList(input, maxIndex) {
     error: null
   };
 }
+function disambiguateLabels(names) {
+  const counts = /* @__PURE__ */ new Map();
+  return names.map((name) => {
+    var _a;
+    const seen = (_a = counts.get(name)) != null ? _a : 0;
+    counts.set(name, seen + 1);
+    return seen === 0 ? name : `${name} (${seen + 1})`;
+  });
+}
+function buildUniqueLabelMap(items, zeroLabel = "---") {
+  const labels = disambiguateLabels(items.map((item) => item.name));
+  const result = { 0: zeroLabel };
+  labels.forEach((label, i) => {
+    result[String(i + 1)] = label;
+  });
+  return result;
+}
+function resolveStatesValue(input, statesMap) {
+  if (typeof input === "number" && Number.isFinite(input)) {
+    const key = String(input);
+    const canonical = statesMap[key];
+    if (canonical !== void 0) {
+      return { key, canonical };
+    }
+    return null;
+  }
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    const directLabel = statesMap[trimmed];
+    if (directLabel !== void 0) {
+      return { key: trimmed, canonical: directLabel };
+    }
+    const needle = trimmed.toLowerCase();
+    for (const [key, label] of Object.entries(statesMap)) {
+      if (typeof label === "string" && label.trim().toLowerCase() === needle) {
+        return { key, canonical: label };
+      }
+    }
+  }
+  return null;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  buildUniqueLabelMap,
   classifyError,
+  disambiguateLabels,
   hexToRgb,
   normalizeDeviceId,
   parseSegmentList,
+  resolveStatesValue,
   rgbIntToHex,
   rgbToHex
 });

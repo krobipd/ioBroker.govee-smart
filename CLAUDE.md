@@ -7,7 +7,7 @@
 
 **ioBroker Govee Smart Adapter** — Steuert Govee Smart Lights (LED-Strips, Lampen, Panels). LAN first, MQTT für Echtzeit-Status, Cloud nur wo nötig. Nur Lichter, keine Haushaltsgeräte.
 
-- **Version:** 1.8.0 (April 2026)
+- **Version:** 1.11.0 (April 2026)
 - **GitHub:** https://github.com/krobipd/ioBroker.govee-smart
 - **npm:** https://www.npmjs.com/package/iobroker.govee-smart
 - **Runtime-Deps:** `@iobroker/adapter-core`, `@iobroker/types`, `mqtt`, `node-forge`
@@ -217,6 +217,7 @@ Single Page, drei Sektionen:
 42. **Segment Detection Wizard (v1.7.0 redesign)** — jsonConfig `tabs`-Layout mit Tab "Segment-Erkennung". Der Wizard MISST die echte Strip-Länge unabhängig von Cloud (läuft bis zum Protokoll-Limit 55 oder bis User "Fertig – Strip zu Ende" klickt). Drei Action-Buttons: `yes`/`no`/`done`. `onMessage`-Handler routet `getSegmentDevices` / `segmentWizard` (start/yes/no/done/abort). In-Memory `SegmentWizardSession`, Baseline-Capture, flashSegment(idx) bright-white, 5-Min-Idle-Timeout, globaler Session-Lock. Ergebnis wird via `applyWizardResult`-Host-Callback angewendet: setzt `device.segmentCount`, setzt `manualMode` nur bei erkannten Lücken, persistiert Cache
 43. **Cloud-Retry-Loop (v1.6.0)** — `CloudLoadResult` union type (`ok`/`transient`/`rate-limited`/`auth-failed`). Bei Fail: `handleCloudFailure` entscheidet — Auth-Fail stoppt permanent, Rate-Limit wartet Retry-After, transient 5min. Retry ruft `retryCloudOnce` auf, "Govee Cloud connection restored"-Log bei Erfolg. Cloud-Init via Promise.race 60s-Timeout
 44. **Segment-Count Single-Source-of-Truth (v1.7.0)** — `resolveSegmentCount(device)` ist DIE eine Funktion für die Segmentzahl. Priorität: `device.segmentCount` (wenn gesetzt — aus Cache oder MQTT gelernt) → Min über positive `segment_color_setting`-Caps → 0. Warum Min: Govee meldet Brightness + ColorRgb separat, diese widersprechen sich (H70D1: 10 vs 15 echter Wert 10). MQTT AA A5 darf nach oben korrigieren; jede Änderung wird sofort im SKU-Cache persistiert (überlebt Restart). Cache persistiert auch `manualMode`+`manualSegments` — Cut-Strip-Einstellungen gehen nicht mehr verloren
+45. **Dropdown Dual-Write (v1.11.0)** — Alle Dropdown-States (light_scene, diy_scene, snapshot_cloud, snapshot_local, music_mode, scene) sind `type: "mixed"` mit eindeutiger `common.states`-Map (`buildUniqueLabelMap` mit `(2)`/`(3)`-Suffix bei Duplikaten). `onStateChange` ruft `resolveDropdownInput` als erste Stage — löst Number/Number-String/Klartext-String case-insensitive auf den kanonischen Key auf, ack mit canonical Key zurück. Ein Code-Pfad für alle Dropdowns, keine Sonderfälle. Ohne dieses Pattern wirft js-controller `expects type string but received number`-Warning bei Number-Schreibung und Klartext bleibt schlicht ohne Wirkung
 
 ## Logging-Philosophie (seit 0.9.4)
 
@@ -227,7 +228,7 @@ Single Page, drei Sektionen:
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
 - **MQTT:** Erstverbindung = info, Reconnect-Versuche = debug, Restored = info
 
-## Tests (473 custom + 57 package + integration)
+## Tests (507 custom + 57 package + integration)
 
 ```
 test/testCapabilityMapper.ts → Capability Mapping + Cloud State Value Mapping + Quirks + Groups + Drift (80)
@@ -308,13 +309,13 @@ test/testPackageFiles.ts     → @iobroker/testing (57)
 
 | Version | Highlights |
 |---------|------------|
+| 1.11.0 | Dropdown-Dual-Write: Scene/DIY/Snapshot/Music-Mode-States jetzt `type: "mixed"`, `onStateChange` löst Index als Number (`1`), Index als String (`"1"`) und Klartext-Name (`"Aurora"`, case-insensitive, getrimmt) gleichermaßen auf. Drei neue Helpers in `types.ts` (`disambiguateLabels`, `buildUniqueLabelMap`, `resolveStatesValue`) — derselbe Disambiguation-Pass beim Map-Bau und beim Reverse-Lookup garantiert Konsistenz auch bei Cloud-Duplikaten ("Movie", "Movie (2)"). Adapter ackt nach Aktivierung mit dem kanonischen Key zurück, Dropdown bleibt synchron unabhängig vom Schreibweg. js-controller-Warning "expects type string but received number" verschwindet |
+| 1.10.1 | Hotfix für Refresh-Button: `info.refresh_cloud_data` lief durch `cloudInitWithTimeout` → `loadFromCloud`, das pro Light auch `loadDeviceLibraries` (4 undokumentierte Calls + snapshot-BLE) triggerte. Libraries sind static pro SKU, mehrere Endpunkte liefern 403 → jeder Klick packte ~63 Calls in die Queue = 15 Min Backlog (minütliche POSTs an /device/scenes im Log). Neue Methode `DeviceManager.refreshSceneData()` macht nur 2 Calls/Light (scenes + diy-scenes), keine Libraries. Call-Count pro Klick: ~7 → 2 |
+| 1.10.0 | Szenen mit `scenceParam` (multi-packet A3-BLE) werden auf Geräten ohne Segmente (H70B3 Curtain Lights, Bulbs) via Cloud-Fallback aktiviert statt ptReal — Geräte ohne Segmente verwerfen A3 stumm. Plus: Power-off resettet alle Mode-Dropdowns auf "---" (egal ob ioBroker oder MQTT-Push), `MODE_DROPDOWNS`/`COMMAND_DROPDOWN` als static-Class-Members + `resetModeDropdowns(prefix, keep)` Helper |
+| 1.9.1 | Hotfix — per-list Guard in `loadDeviceScenes`. Govee's `/device/scenes` liefert inkonsistent (z.B. 149 scenes + 0 snapshots obwohl Snapshot existiert). Alter kombinierter Guard hat Snapshots gelöscht → "invalid snapshot index 1"-Fehler. Jeder der 3 Listen (scenes/diyScenes/snapshots) hat nun eigenen Guard |
+| 1.9.0 | **BREAKING** `snapshots.snapshot` → `snapshots.snapshot_cloud` (Klarheit neben snapshot_local/save/delete). Plus: `scenesChecked`-Gate raus — Cloud-Scenes+Snapshots werden bei jedem Start frisch geladen (neue App-Snapshots landen ohne Restart im Dropdown). Plus: `info.refresh_cloud_data` Button für on-demand Refresh ohne Restart. `common.desc` auf allen Snapshot-States |
 | 1.8.0 | Clean-up Release: Hot-Path-Schreibweise parallelisiert (updateDeviceState ohne getObject-Probe + Snapshot-Save mit Promise.all), cleanupAllChannelStates auf ein View statt vier, Rate-Limiter-Daily-Reset an UTC-Mitternacht, Wizard-Text vollständig lokalisiert (EN/DE) über system.config.language, govee-appliances-Erkennung für alle Instanzen (.0/.1/...), stabile MQTT-Session-UUID über Reconnects (AWS IoT kann Socket sauber übernehmen), Library-Fetches durch Rate-Limiter, Local-Snapshots mit fsync, Memory-Leak-Prevention (adapter-level Maps werden beim Device-Remove bereinigt), shared govee-constants.ts, crypto.randomUUID |
 | 1.7.8 | Audit-Follow-up: MQTT bearer-token wird jetzt bei jedem Reconnect-Login an api-client weitergegeben (bisher nur initial), LAN-devStatus-Poll entfällt bei aktiver MQTT-Verbindung, process.on unhandledRejection/uncaughtException-Handler als Last-Line-Defence. Plus Hygiene: seenDeviceIps-Eviction bei IP-Wechsel, stateCreationQueue beschränkt auf Startup, connected-states reset on unload, Diagnostics-Throttle 2s/Device |
-| 1.7.7 | Hotfix für Regression seit v1.7.0: loadFromCache-Merge unvollständig → Wizard-Segment-State ging bei jedem Restart verloren. Plus sku-cache save mit fsync gegen SIGKILL-Data-Loss |
-| 1.7.6 | Audit-Release: ack-Race bei manual_mode-Rollback, CHANNEL_NAMES.info wiederhergestellt, 9 Admin-Sprachen Wizard-Keys + Übersetzungs-Böcke, Latency-Copy raus. Refactors: applyManualSegments-Helper, targeted snapshot-refresh, dynamic_scene mapping cleanup, Map-Cleanup beim Device-Remove |
-| 1.7.5 | Wiki-Link oben im Main-Tab: `staticText` mit Markdown wurde von Admin nicht als klickbarer Link gerendert → ersetzt durch zwei nebeneinander liegende `staticLink`-Buttons "Wiki (Deutsch)" → `/wiki/Startseite` und "Wiki (English)" → `/wiki/Home`. Konsistent mit dem Ko-Fi/PayPal-Button-Muster |
-| 1.7.4 | Admin-UI: sprachabhängiger Wiki-Link oben im Main-Tab als `staticText` mit i18n-Markdown (`_docLink` vor `_lanHeader`). In 1.7.5 ersetzt, weil Markdown nicht gerendert wurde |
-| 1.7.3 | Latest-repo review compliance: `common.messagebox=true` wegen onMessage-Wizard, native `setTimeout`-Delays (150 ms für Color-Mode-Preamble) über Adapter-Timer-Wrapper (onUnload-safe) |
 
 ## Befehle
 

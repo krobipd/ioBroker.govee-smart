@@ -1,4 +1,5 @@
 import {
+  buildUniqueLabelMap,
   rgbToHex,
   type CloudCapability,
   type CloudStateCapability,
@@ -371,7 +372,7 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
     {
       id: "scene",
       name: "Scene",
-      type: "string",
+      type: "mixed",
       role: "text",
       write: true,
       states,
@@ -458,7 +459,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     states.push({
       id: "music_mode",
       name: "Music Mode",
-      type: "string",
+      type: "mixed",
       role: "text",
       write: true,
       states: modeStates,
@@ -730,17 +731,16 @@ export function buildDeviceStateDefs(
   applyQuirksToStates(device.sku, stateDefs);
 
   if (device.scenes.length > 0) {
-    const states: Record<string, string> = { 0: "---" };
-    device.scenes.forEach((s, i) => {
-      states[i + 1] = s.name;
-    });
     stateDefs.push({
       id: "light_scene",
       name: "Light Scene",
-      type: "string",
+      // mixed lets users write the index ("1"), the index as number (1),
+      // or the scene name ("Aurora") — the onStateChange handler resolves
+      // all three forms via the common.states map.
+      type: "mixed",
       role: "text",
       write: true,
-      states,
+      states: buildUniqueLabelMap(device.scenes),
       def: "0",
       capabilityType: "devices.capabilities.dynamic_scene",
       capabilityInstance: "lightScene",
@@ -785,17 +785,13 @@ export function buildDeviceStateDefs(
   }
 
   if (device.diyScenes.length > 0) {
-    const states: Record<string, string> = { 0: "---" };
-    device.diyScenes.forEach((s, i) => {
-      states[i + 1] = s.name;
-    });
     stateDefs.push({
       id: "diy_scene",
       name: "DIY Scene",
-      type: "string",
+      type: "mixed",
       role: "text",
       write: true,
-      states,
+      states: buildUniqueLabelMap(device.diyScenes),
       def: "0",
       capabilityType: "devices.capabilities.dynamic_scene",
       capabilityInstance: "diyScene",
@@ -804,18 +800,14 @@ export function buildDeviceStateDefs(
   }
 
   if (device.snapshots.length > 0) {
-    const states: Record<string, string> = { 0: "---" };
-    device.snapshots.forEach((s, i) => {
-      states[i + 1] = s.name;
-    });
     stateDefs.push({
       id: "snapshot_cloud",
       name: "Cloud Snapshot",
       desc: "Snapshots you saved in the Govee Home app. Selecting one replays that state on the device.",
-      type: "string",
+      type: "mixed",
       role: "text",
       write: true,
-      states,
+      states: buildUniqueLabelMap(device.snapshots),
       def: "0",
       capabilityType: "devices.capabilities.dynamic_scene",
       capabilityInstance: "snapshot",
@@ -824,20 +816,14 @@ export function buildDeviceStateDefs(
   }
 
   // Local snapshots
-  const localSnapStates: Record<string, string> = { 0: "---" };
-  if (localSnapshots) {
-    localSnapshots.forEach((s, i) => {
-      localSnapStates[i + 1] = s.name;
-    });
-  }
   stateDefs.push({
     id: "snapshot_local",
     name: "Local Snapshot",
     desc: "Snapshots saved by this adapter on the ioBroker server. Independent of the Govee Home app.",
-    type: "string",
+    type: "mixed",
     role: "text",
     write: true,
-    states: localSnapStates,
+    states: buildUniqueLabelMap(localSnapshots ?? []),
     def: "0",
     capabilityType: "local",
     capabilityInstance: "snapshotLocal",
@@ -973,17 +959,13 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
       controllable.every((m) => m.scenes.some((s) => s.name === name)),
     );
     if (commonNames.length > 0) {
-      const states: Record<string, string> = { 0: "---" };
-      commonNames.forEach((name, i) => {
-        states[i + 1] = name;
-      });
       stateDefs.push({
         id: "light_scene",
         name: "Light Scene",
-        type: "string",
+        type: "mixed",
         role: "text",
         write: true,
-        states,
+        states: buildUniqueLabelMap(commonNames.map((name) => ({ name }))),
         def: "0",
         capabilityType: "devices.capabilities.dynamic_scene",
         capabilityInstance: "lightScene",
@@ -999,17 +981,13 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
       controllable.every((m) => m.musicLibrary.some((ml) => ml.name === name)),
     );
     if (commonNames.length > 0) {
-      const states: Record<string, string> = { 0: "---" };
-      commonNames.forEach((name, i) => {
-        states[i + 1] = name;
-      });
       stateDefs.push({
         id: "music_mode",
         name: "Music Mode",
-        type: "string",
+        type: "mixed",
         role: "text",
         write: true,
-        states,
+        states: buildUniqueLabelMap(commonNames.map((name) => ({ name }))),
         def: "0",
         capabilityType: "devices.capabilities.music_setting",
         capabilityInstance: "musicMode",

@@ -33,6 +33,7 @@ import { StateManager } from "./lib/state-manager.js";
 import {
   hexToRgb,
   parseSegmentList,
+  resolveStatesValue,
   rgbIntToHex,
   rgbToHex,
   type AdapterConfig,
@@ -675,10 +676,24 @@ class GoveeAdapter extends utils.Adapter {
     const prefix = this.stateManager.devicePrefix(device);
     const stateSuffix = localId.slice(prefix.length + 1);
 
+    // Resolve dropdown input — accept Number, numeric String, or label
+    // (case-insensitive) against the state's common.states map. Returns
+    // the canonical key as String so the rest of the handler sees the
+    // same shape it always saw (e.g. "1"). Non-dropdown states are
+    // passed through unchanged.
+    const resolved = await this.resolveDropdownInput(id, state.val);
+    if (!resolved.ok) {
+      this.log.warn(
+        `Unknown dropdown value for ${id}: ${String(state.val)} — ignoring`,
+      );
+      return;
+    }
+    const val = resolved.val;
+
     // Group fan-out: route commands to each member device
     if (device.sku === "BaseGroup" && device.groupMembers) {
-      await this.handleGroupFanOut(device, stateSuffix, state.val);
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.handleGroupFanOut(device, stateSuffix, val);
+      await this.setStateAsync(id, { val, ack: true });
       if (
         stateSuffix === "scenes.light_scene" ||
         stateSuffix === "music.music_mode"
@@ -694,45 +709,45 @@ class GoveeAdapter extends utils.Adapter {
     // Handle local snapshot commands (no Cloud/MQTT needed)
     if (
       stateSuffix === "snapshots.snapshot_save" &&
-      typeof state.val === "string" &&
-      state.val.trim()
+      typeof val === "string" &&
+      val.trim()
     ) {
-      await this.handleSnapshotSave(device, state.val.trim());
+      await this.handleSnapshotSave(device, val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
     if (stateSuffix === "snapshots.snapshot_local") {
-      if (state.val !== "0" && state.val !== 0) {
-        await this.handleSnapshotRestore(device, state.val);
+      if (val !== "0" && val !== 0) {
+        await this.handleSnapshotRestore(device, val);
         await this.resetRelatedDropdowns(prefix, "snapshotLocal");
       }
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
     if (
       stateSuffix === "snapshots.snapshot_delete" &&
-      typeof state.val === "string" &&
-      state.val.trim()
+      typeof val === "string" &&
+      val.trim()
     ) {
-      this.handleSnapshotDelete(device, state.val.trim());
+      this.handleSnapshotDelete(device, val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
 
     // Manual segments toggle/list — handler owns the ack because a parse
-    // error rewrites manual_mode to false, and an outer ack with state.val
-    // would resurrect the rejected value.
+    // error rewrites manual_mode to false, and an outer ack with the
+    // raw value would resurrect the rejected entry.
     if (
       stateSuffix === "segments.manual_mode" ||
       stateSuffix === "segments.manual_list"
     ) {
-      await this.handleManualSegmentsChange(device, stateSuffix, state.val);
+      await this.handleManualSegmentsChange(device, stateSuffix, val);
       return;
     }
 
     // Diagnostics export button — throttled to 2 s per device so a repeated
     // or scripted trigger can't produce a burst of JSON serialisations.
-    if (stateSuffix === "info.diagnostics_export" && state.val) {
+    if (stateSuffix === "info.diagnostics_export" && val) {
       const deviceKey = `${device.sku}:${device.deviceId}`;
       const now = Date.now();
       const last = this.diagnosticsLastRun.get(deviceKey) ?? 0;
@@ -771,9 +786,9 @@ class GoveeAdapter extends utils.Adapter {
             device,
             capType,
             capInstance,
-            state.val,
+            val,
           );
-          await this.setStateAsync(id, { val: state.val, ack: true });
+          await this.setStateAsync(id, { val, ack: true });
         } catch (err) {
           this.log.warn(
             `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`,
@@ -790,22 +805,19 @@ class GoveeAdapter extends utils.Adapter {
       (command === "lightScene" ||
         command === "diyScene" ||
         command === "snapshot") &&
-      (state.val === "0" || state.val === 0)
+      (val === "0" || val === 0)
     ) {
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
 
     // Scene speed: store on device, applied on next scene activation
     if (command === "sceneSpeed") {
-      const level =
-        typeof state.val === "number"
-          ? state.val
-          : parseInt(String(state.val), 10);
+      const level = typeof val === "number" ? val : parseInt(String(val), 10);
       if (!isNaN(level)) {
         device.sceneSpeed = level;
       }
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
 
@@ -813,15 +825,12 @@ class GoveeAdapter extends utils.Adapter {
       // Music mode: combine all music states into one STRUCT command
       if (command === "music") {
         // music_mode "---" (value 0) — acknowledge without sending command
-        if (
-          stateSuffix === "music.music_mode" &&
-          (state.val === "0" || state.val === 0)
-        ) {
-          await this.setStateAsync(id, { val: state.val, ack: true });
+        if (stateSuffix === "music.music_mode" && (val === "0" || val === 0)) {
+          await this.setStateAsync(id, { val, ack: true });
           return;
         }
-        await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
-        await this.setStateAsync(id, { val: state.val, ack: true });
+        await this.sendMusicCommand(device, prefix, stateSuffix, val);
+        await this.setStateAsync(id, { val, ack: true });
         // Reset scene/snapshot dropdowns when activating music mode
         if (stateSuffix === "music.music_mode") {
           await this.resetRelatedDropdowns(prefix, "music");
@@ -829,14 +838,14 @@ class GoveeAdapter extends utils.Adapter {
         return;
       }
 
-      await this.deviceManager.sendCommand(device, command, state.val);
+      await this.deviceManager.sendCommand(device, command, val);
       // Optimistic ack
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       // Reset related dropdowns when switching modes.
       // Power-off is a special case — the device is off, so no mode is
       // active anymore; reset every mode dropdown so the UI reflects the
       // reality (scene/music/snapshot selections are now just history).
-      if (command === "power" && state.val === false) {
+      if (command === "power" && val === false) {
         await this.resetModeDropdowns(prefix, "");
       } else {
         await this.resetRelatedDropdowns(prefix, command);
@@ -846,6 +855,49 @@ class GoveeAdapter extends utils.Adapter {
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
+  }
+
+  /**
+   * Resolve a dropdown-state input value against the state's common.states
+   * map. Returns the canonical key (always String form) so a user can write
+   * either the index ("1"), the index as a number (1) or the label name
+   * ("Aurora", case-insensitive) — all three land at the same canonical
+   * value for the rest of the handler.
+   *
+   * Non-dropdown states (no common.states), reset sentinels (0/"0"/"") and
+   * non-string/number inputs are passed through unchanged. A dropdown input
+   * that doesn't match any key or label returns ok=false so the caller can
+   * warn and skip the command.
+   *
+   * @param id Full state id
+   * @param raw Raw input value as provided by the user/script
+   */
+  private async resolveDropdownInput(
+    id: string,
+    raw: ioBroker.StateValue,
+  ): Promise<{ val: ioBroker.StateValue; ok: boolean }> {
+    if (raw === null || raw === undefined) {
+      return { val: raw, ok: true };
+    }
+    // Reset sentinels — let the existing branch handle them.
+    if (raw === 0 || raw === "0" || raw === "") {
+      return { val: raw, ok: true };
+    }
+    // Only dropdown candidates have common.states; non-dropdown inputs
+    // can't be resolved here so they pass through.
+    if (typeof raw !== "number" && typeof raw !== "string") {
+      return { val: raw, ok: true };
+    }
+    const obj = await this.getObjectAsync(id);
+    const states = obj?.common?.states;
+    if (!states || typeof states !== "object") {
+      return { val: raw, ok: true };
+    }
+    const resolved = resolveStatesValue(raw, states as Record<string, string>);
+    if (resolved) {
+      return { val: resolved.key, ok: true };
+    }
+    return { val: raw, ok: false };
   }
 
   /**

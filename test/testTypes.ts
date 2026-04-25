@@ -1,5 +1,15 @@
 import { expect } from "chai";
-import { normalizeDeviceId, classifyError, rgbToHex, hexToRgb, rgbIntToHex, parseSegmentList } from "../src/lib/types";
+import {
+    normalizeDeviceId,
+    classifyError,
+    rgbToHex,
+    hexToRgb,
+    rgbIntToHex,
+    parseSegmentList,
+    disambiguateLabels,
+    buildUniqueLabelMap,
+    resolveStatesValue,
+} from "../src/lib/types";
 
 describe("Types utilities", () => {
     describe("normalizeDeviceId", () => {
@@ -282,6 +292,147 @@ describe("Types utilities", () => {
             const r = parseSegmentList("50", -1);
             expect(r.error).to.be.null;
             expect(r.indices).to.deep.equal([50]);
+        });
+    });
+
+    describe("disambiguateLabels", () => {
+        it("should pass through unique names unchanged", () => {
+            expect(disambiguateLabels(["Aurora", "Movie", "Sunset"]))
+                .to.deep.equal(["Aurora", "Movie", "Sunset"]);
+        });
+
+        it("should suffix duplicates with (2), (3), …", () => {
+            expect(disambiguateLabels(["Movie", "Aurora", "Movie", "Movie"]))
+                .to.deep.equal(["Movie", "Aurora", "Movie (2)", "Movie (3)"]);
+        });
+
+        it("should keep first occurrence of each name unchanged", () => {
+            expect(disambiguateLabels(["A", "B", "A", "B", "A"]))
+                .to.deep.equal(["A", "B", "A (2)", "B (2)", "A (3)"]);
+        });
+
+        it("should handle empty list", () => {
+            expect(disambiguateLabels([])).to.deep.equal([]);
+        });
+
+        it("should treat empty strings as duplicates after first", () => {
+            expect(disambiguateLabels(["", "x", ""])).to.deep.equal(["", "x", " (2)"]);
+        });
+    });
+
+    describe("buildUniqueLabelMap", () => {
+        it("should build a 0-based sentinel map for unique names", () => {
+            const result = buildUniqueLabelMap([
+                { name: "Aurora" },
+                { name: "Movie" },
+                { name: "Sunset" },
+            ]);
+            expect(result).to.deep.equal({ 0: "---", 1: "Aurora", 2: "Movie", 3: "Sunset" });
+        });
+
+        it("should disambiguate duplicates in the map values", () => {
+            const result = buildUniqueLabelMap([
+                { name: "Movie" },
+                { name: "Aurora" },
+                { name: "Movie" },
+            ]);
+            expect(result).to.deep.equal({ 0: "---", 1: "Movie", 2: "Aurora", 3: "Movie (2)" });
+        });
+
+        it("should accept a custom sentinel label", () => {
+            const result = buildUniqueLabelMap([{ name: "X" }], "off");
+            expect(result).to.deep.equal({ 0: "off", 1: "X" });
+        });
+
+        it("should produce just the sentinel for empty input", () => {
+            expect(buildUniqueLabelMap([])).to.deep.equal({ 0: "---" });
+        });
+
+        it("should accept any T extends {name: string}", () => {
+            const result = buildUniqueLabelMap([{ name: "Z", id: 42, extra: { foo: "bar" } }]);
+            expect(result[1]).to.equal("Z");
+        });
+    });
+
+    describe("resolveStatesValue", () => {
+        const sceneMap = { 0: "---", 1: "Aurora", 2: "Movie", 3: "Movie (2)" };
+        const modeMap = { 0: "---", spectrum: "Spectrum", rolling: "Rolling Tides" };
+
+        it("should resolve numeric input to its key", () => {
+            const r = resolveStatesValue(1, sceneMap);
+            expect(r).to.deep.equal({ key: "1", canonical: "Aurora" });
+        });
+
+        it("should resolve numeric-string input to its key", () => {
+            const r = resolveStatesValue("2", sceneMap);
+            expect(r).to.deep.equal({ key: "2", canonical: "Movie" });
+        });
+
+        it("should resolve label input case-insensitively", () => {
+            const r = resolveStatesValue("aurora", sceneMap);
+            expect(r).to.deep.equal({ key: "1", canonical: "Aurora" });
+        });
+
+        it("should resolve label input with surrounding whitespace", () => {
+            const r = resolveStatesValue("  AURORA  ", sceneMap);
+            expect(r).to.deep.equal({ key: "1", canonical: "Aurora" });
+        });
+
+        it("should match disambiguated label exactly", () => {
+            const r = resolveStatesValue("Movie (2)", sceneMap);
+            expect(r).to.deep.equal({ key: "3", canonical: "Movie (2)" });
+        });
+
+        it("should match the first occurrence when label is the original (non-suffixed) form", () => {
+            const r = resolveStatesValue("Movie", sceneMap);
+            expect(r).to.deep.equal({ key: "2", canonical: "Movie" });
+        });
+
+        it("should resolve string-keyed maps via direct key match", () => {
+            const r = resolveStatesValue("spectrum", modeMap);
+            expect(r).to.deep.equal({ key: "spectrum", canonical: "Spectrum" });
+        });
+
+        it("should resolve string-keyed maps via label match", () => {
+            const r = resolveStatesValue("rolling tides", modeMap);
+            expect(r).to.deep.equal({ key: "rolling", canonical: "Rolling Tides" });
+        });
+
+        it("should return null on unknown numeric index", () => {
+            expect(resolveStatesValue(99, sceneMap)).to.be.null;
+        });
+
+        it("should return null on unknown label", () => {
+            expect(resolveStatesValue("nonexistent", sceneMap)).to.be.null;
+        });
+
+        it("should return null on empty string", () => {
+            expect(resolveStatesValue("", sceneMap)).to.be.null;
+        });
+
+        it("should return null on non-finite number", () => {
+            expect(resolveStatesValue(NaN, sceneMap)).to.be.null;
+            expect(resolveStatesValue(Infinity, sceneMap)).to.be.null;
+        });
+
+        it("should return null on non-string/non-number input", () => {
+            expect(resolveStatesValue(null, sceneMap)).to.be.null;
+            expect(resolveStatesValue(undefined, sceneMap)).to.be.null;
+            expect(resolveStatesValue(true, sceneMap)).to.be.null;
+            expect(resolveStatesValue({}, sceneMap)).to.be.null;
+            expect(resolveStatesValue([], sceneMap)).to.be.null;
+        });
+
+        it("should resolve the sentinel '0' from numeric or string input", () => {
+            expect(resolveStatesValue(0, sceneMap)).to.deep.equal({ key: "0", canonical: "---" });
+            expect(resolveStatesValue("0", sceneMap)).to.deep.equal({ key: "0", canonical: "---" });
+        });
+
+        it("should ignore non-string label entries (drift safety)", () => {
+            // Drifted map where one value isn't a string — should not crash, just skip
+            const drifted = { 0: "---", 1: 42 as unknown as string };
+            expect(resolveStatesValue("42", drifted)).to.be.null;
+            expect(resolveStatesValue(1, drifted)).to.deep.equal({ key: "1", canonical: 42 as unknown as string });
         });
     });
 });

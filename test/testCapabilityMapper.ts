@@ -277,6 +277,8 @@ describe("CapabilityMapper", () => {
             // Mode dropdown
             expect(result[0].id).to.equal("music_mode");
             expect(result[0].role).to.equal("text");
+            // mixed lets users write the mode key ("5") or the label ("Energic")
+            expect(result[0].type).to.equal("mixed");
             expect(result[0].states).to.deep.include({ 5: "Energic", 3: "Rhythm", 6: "Spectrum" });
 
             // Sensitivity slider
@@ -579,6 +581,80 @@ describe("CapabilityMapper", () => {
         });
     });
 
+    describe("buildDeviceStateDefs dropdown contract (Blockly dual-write)", () => {
+        function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
+            return {
+                sku: "H61BE",
+                deviceId: "AABBCCDDEEFF0011",
+                name: "Test Light",
+                type: "devices.types.light",
+                lanIp: "192.168.1.100",
+                capabilities: [
+                    { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+                ],
+                scenes: [],
+                diyScenes: [],
+                snapshots: [],
+                sceneLibrary: [],
+                musicLibrary: [],
+                diyLibrary: [],
+                skuFeatures: null,
+                state: { online: true },
+                channels: { lan: true, mqtt: false, cloud: true },
+                ...overrides,
+            };
+        }
+
+        it("light_scene must be type:mixed with disambiguated labels", () => {
+            const device = makeDevice({
+                scenes: [
+                    { name: "Aurora", value: { id: 1 } },
+                    { name: "Movie", value: { id: 2 } },
+                    { name: "Movie", value: { id: 3 } },  // duplicate
+                ],
+            });
+            const defs = buildDeviceStateDefs(device);
+            const sceneDef = defs.find((d) => d.id === "light_scene");
+            expect(sceneDef).to.exist;
+            expect(sceneDef!.type).to.equal("mixed");
+            expect(sceneDef!.states).to.deep.equal({
+                0: "---",
+                1: "Aurora",
+                2: "Movie",
+                3: "Movie (2)",
+            });
+        });
+
+        it("diy_scene must be type:mixed", () => {
+            const device = makeDevice({
+                diyScenes: [{ name: "MyDIY", value: { id: 99 } }],
+            });
+            const defs = buildDeviceStateDefs(device);
+            const diyDef = defs.find((d) => d.id === "diy_scene");
+            expect(diyDef).to.exist;
+            expect(diyDef!.type).to.equal("mixed");
+        });
+
+        it("snapshot_cloud must be type:mixed", () => {
+            const device = makeDevice({
+                snapshots: [{ name: "My Snap", value: { id: 7 } }],
+            });
+            const defs = buildDeviceStateDefs(device);
+            const snapDef = defs.find((d) => d.id === "snapshot_cloud");
+            expect(snapDef).to.exist;
+            expect(snapDef!.type).to.equal("mixed");
+        });
+
+        it("snapshot_local must be type:mixed even with empty list", () => {
+            const device = makeDevice();
+            const defs = buildDeviceStateDefs(device, undefined);
+            const localDef = defs.find((d) => d.id === "snapshot_local");
+            expect(localDef).to.exist;
+            expect(localDef!.type).to.equal("mixed");
+            expect(localDef!.states).to.deep.equal({ 0: "---" });
+        });
+    });
+
     describe("buildDeviceStateDefs for groups", () => {
         function createMember(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
             return {
@@ -677,6 +753,9 @@ describe("CapabilityMapper", () => {
             expect(Object.values(sceneDef!.states!)).to.include("Rainbow");
             expect(Object.values(sceneDef!.states!)).to.include("Ocean");
             expect(Object.values(sceneDef!.states!)).to.not.include("Sunset");
+            // Dropdown writability: type must be "mixed" so users can write
+            // either the index ("1"/1) or the scene name from Blockly.
+            expect(sceneDef!.type).to.equal("mixed");
         });
 
         it("should compute music intersection across members", () => {

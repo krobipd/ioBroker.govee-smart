@@ -573,9 +573,17 @@ class GoveeAdapter extends utils.Adapter {
     }
     const prefix = this.stateManager.devicePrefix(device);
     const stateSuffix = localId.slice(prefix.length + 1);
+    const resolved = await this.resolveDropdownInput(id, state.val);
+    if (!resolved.ok) {
+      this.log.warn(
+        `Unknown dropdown value for ${id}: ${String(state.val)} \u2014 ignoring`
+      );
+      return;
+    }
+    const val = resolved.val;
     if (device.sku === "BaseGroup" && device.groupMembers) {
-      await this.handleGroupFanOut(device, stateSuffix, state.val);
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.handleGroupFanOut(device, stateSuffix, val);
+      await this.setStateAsync(id, { val, ack: true });
       if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
         await this.resetRelatedDropdowns(
           prefix,
@@ -584,29 +592,29 @@ class GoveeAdapter extends utils.Adapter {
       }
       return;
     }
-    if (stateSuffix === "snapshots.snapshot_save" && typeof state.val === "string" && state.val.trim()) {
-      await this.handleSnapshotSave(device, state.val.trim());
+    if (stateSuffix === "snapshots.snapshot_save" && typeof val === "string" && val.trim()) {
+      await this.handleSnapshotSave(device, val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
     if (stateSuffix === "snapshots.snapshot_local") {
-      if (state.val !== "0" && state.val !== 0) {
-        await this.handleSnapshotRestore(device, state.val);
+      if (val !== "0" && val !== 0) {
+        await this.handleSnapshotRestore(device, val);
         await this.resetRelatedDropdowns(prefix, "snapshotLocal");
       }
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
-    if (stateSuffix === "snapshots.snapshot_delete" && typeof state.val === "string" && state.val.trim()) {
-      this.handleSnapshotDelete(device, state.val.trim());
+    if (stateSuffix === "snapshots.snapshot_delete" && typeof val === "string" && val.trim()) {
+      this.handleSnapshotDelete(device, val.trim());
       await this.setStateAsync(id, { val: "", ack: true });
       return;
     }
     if (stateSuffix === "segments.manual_mode" || stateSuffix === "segments.manual_list") {
-      await this.handleManualSegmentsChange(device, stateSuffix, state.val);
+      await this.handleManualSegmentsChange(device, stateSuffix, val);
       return;
     }
-    if (stateSuffix === "info.diagnostics_export" && state.val) {
+    if (stateSuffix === "info.diagnostics_export" && val) {
       const deviceKey = `${device.sku}:${device.deviceId}`;
       const now = Date.now();
       const last = (_a = this.diagnosticsLastRun.get(deviceKey)) != null ? _a : 0;
@@ -642,9 +650,9 @@ class GoveeAdapter extends utils.Adapter {
             device,
             capType,
             capInstance,
-            state.val
+            val
           );
-          await this.setStateAsync(id, { val: state.val, ack: true });
+          await this.setStateAsync(id, { val, ack: true });
         } catch (err) {
           this.log.warn(
             `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`
@@ -655,34 +663,34 @@ class GoveeAdapter extends utils.Adapter {
       }
       return;
     }
-    if ((command === "lightScene" || command === "diyScene" || command === "snapshot") && (state.val === "0" || state.val === 0)) {
-      await this.setStateAsync(id, { val: state.val, ack: true });
+    if ((command === "lightScene" || command === "diyScene" || command === "snapshot") && (val === "0" || val === 0)) {
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
     if (command === "sceneSpeed") {
-      const level = typeof state.val === "number" ? state.val : parseInt(String(state.val), 10);
+      const level = typeof val === "number" ? val : parseInt(String(val), 10);
       if (!isNaN(level)) {
         device.sceneSpeed = level;
       }
-      await this.setStateAsync(id, { val: state.val, ack: true });
+      await this.setStateAsync(id, { val, ack: true });
       return;
     }
     try {
       if (command === "music") {
-        if (stateSuffix === "music.music_mode" && (state.val === "0" || state.val === 0)) {
-          await this.setStateAsync(id, { val: state.val, ack: true });
+        if (stateSuffix === "music.music_mode" && (val === "0" || val === 0)) {
+          await this.setStateAsync(id, { val, ack: true });
           return;
         }
-        await this.sendMusicCommand(device, prefix, stateSuffix, state.val);
-        await this.setStateAsync(id, { val: state.val, ack: true });
+        await this.sendMusicCommand(device, prefix, stateSuffix, val);
+        await this.setStateAsync(id, { val, ack: true });
         if (stateSuffix === "music.music_mode") {
           await this.resetRelatedDropdowns(prefix, "music");
         }
         return;
       }
-      await this.deviceManager.sendCommand(device, command, state.val);
-      await this.setStateAsync(id, { val: state.val, ack: true });
-      if (command === "power" && state.val === false) {
+      await this.deviceManager.sendCommand(device, command, val);
+      await this.setStateAsync(id, { val, ack: true });
+      if (command === "power" && val === false) {
         await this.resetModeDropdowns(prefix, "");
       } else {
         await this.resetRelatedDropdowns(prefix, command);
@@ -692,6 +700,43 @@ class GoveeAdapter extends utils.Adapter {
         `Command failed for ${device.name}: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+  }
+  /**
+   * Resolve a dropdown-state input value against the state's common.states
+   * map. Returns the canonical key (always String form) so a user can write
+   * either the index ("1"), the index as a number (1) or the label name
+   * ("Aurora", case-insensitive) — all three land at the same canonical
+   * value for the rest of the handler.
+   *
+   * Non-dropdown states (no common.states), reset sentinels (0/"0"/"") and
+   * non-string/number inputs are passed through unchanged. A dropdown input
+   * that doesn't match any key or label returns ok=false so the caller can
+   * warn and skip the command.
+   *
+   * @param id Full state id
+   * @param raw Raw input value as provided by the user/script
+   */
+  async resolveDropdownInput(id, raw) {
+    var _a;
+    if (raw === null || raw === void 0) {
+      return { val: raw, ok: true };
+    }
+    if (raw === 0 || raw === "0" || raw === "") {
+      return { val: raw, ok: true };
+    }
+    if (typeof raw !== "number" && typeof raw !== "string") {
+      return { val: raw, ok: true };
+    }
+    const obj = await this.getObjectAsync(id);
+    const states = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.states;
+    if (!states || typeof states !== "object") {
+      return { val: raw, ok: true };
+    }
+    const resolved = (0, import_types.resolveStatesValue)(raw, states);
+    if (resolved) {
+      return { val: resolved.key, ok: true };
+    }
+    return { val: raw, ok: false };
   }
   /**
    * Build and send a music_setting STRUCT command.

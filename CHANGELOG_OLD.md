@@ -1,5 +1,9 @@
 # Older Changes
 
+## 1.7.7 (2026-04-19)
+- Fix wizard result and MQTT-learned segment count lost on every restart — cache load didn't merge the segment fields into LAN-discovered devices
+- Cache write now fsyncs so a SIGKILL during adapter stop can't silently drop the save
+
 ## 1.7.6 (2026-04-19)
 - Fix manual_mode rollback on invalid manual_list no longer bounces the rejected value back into the state
 - Complete wizard translations in 9 admin languages (previously raw keys), worst machine-translation glitches hand-corrected

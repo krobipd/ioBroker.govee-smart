@@ -97,6 +97,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### 1.11.0 (2026-04-25)
+- Scene / DIY-scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS scripts: the index as a string (`"1"`), the index as a number (`1`), or the entry name (`"Aurora"`, case-insensitive, surrounding whitespace ignored). The state type changed from `string` to `mixed` so the js-controller no longer warns `expects type string but received number` when a script writes a numeric index.
+- Duplicate names from the cloud (Govee allows two scenes called "Movie") are now auto-disambiguated in the dropdown with `" (2)"`, `" (3)"` suffixes — the first occurrence keeps the original name, every label maps to exactly one index, and the reverse-lookup is deterministic.
+- After activation the adapter acks back the canonical key so the dropdown stays in sync regardless of how the user wrote the value — `setState(oid, "Aurora")` ends up showing "Aurora" in the dropdown just like `setState(oid, "1")` does.
+
 ### 1.10.1 (2026-04-20)
 - Fix — the `info.refresh_cloud_data` button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several of those endpoints return 403 for many accounts, so running them again on every refresh only produced a multi-minute rate-limiter backlog — visible in the log as minute-spaced POSTs to `/device/scenes` and `/device/diy-scenes` in the minutes after each click. The button now only re-fetches the scene/snapshot endpoint, which is where new Govee-app snapshots actually show up. Call count per click drops from ~7 to 2 per light device.
 
@@ -131,10 +136,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - LAN devStatus poll skipped when MQTT is connected (MQTT push is authoritative)
 - Added process-level unhandledRejection / uncaughtException handlers as a last line of defence
 - Minor hygiene — seenDeviceIps evicts old IPs on device IP change, stateCreationQueue bounded to startup, info.mqttConnected / info.cloudConnected reset on unload, diagnostics export throttled per device (2 s)
-
-### 1.7.7 (2026-04-19)
-- Fix wizard result and MQTT-learned segment count lost on every restart — cache load didn't merge the segment fields into LAN-discovered devices
-- Cache write now fsyncs so a SIGKILL during adapter stop can't silently drop the save
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 

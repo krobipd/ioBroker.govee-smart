@@ -576,6 +576,112 @@ export function parseSegmentList(
   };
 }
 
+/**
+ * Disambiguate a list of names by appending " (2)", " (3)" to repeats,
+ * preserving the order. The first occurrence keeps the original name.
+ *
+ * Used both when building common.states maps and when reverse-resolving
+ * a label back to an index — the SAME function on both sides guarantees
+ * the user-visible label and the lookup target stay in sync, even when
+ * the source list (cloud scenes etc.) contains duplicates.
+ *
+ * @param names Raw name list, possibly containing duplicates
+ */
+export function disambiguateLabels(names: string[]): string[] {
+  const counts = new Map<string, number>();
+  return names.map((name) => {
+    const seen = counts.get(name) ?? 0;
+    counts.set(name, seen + 1);
+    return seen === 0 ? name : `${name} (${seen + 1})`;
+  });
+}
+
+/**
+ * Build a `common.states` map from a list of named items, with index 0
+ * reserved for a sentinel entry (default "---" = no selection).
+ *
+ * Duplicate names are disambiguated via `disambiguateLabels`, so each
+ * value in the resulting map is unique and the reverse-lookup is
+ * deterministic.
+ *
+ * @param items Source list — each item must have a `name` field
+ * @param zeroLabel Label for index 0 (default "---" = no selection)
+ */
+export function buildUniqueLabelMap<T extends { name: string }>(
+  items: T[],
+  zeroLabel = "---",
+): Record<string, string> {
+  const labels = disambiguateLabels(items.map((item) => item.name));
+  const result: Record<string, string> = { 0: zeroLabel };
+  labels.forEach((label, i) => {
+    result[String(i + 1)] = label;
+  });
+  return result;
+}
+
+/**
+ * Result of resolving a state value against a `common.states` map.
+ * `key` is the matching map key (string form, as stored in the map),
+ * `canonical` is the matching label (the canonical, disambiguated form
+ * — what the dropdown displays).
+ */
+export interface ResolvedStatesValue {
+  /** The matching key from the states map, in string form */
+  key: string;
+  /** Canonical label as stored in the states map */
+  canonical: string;
+}
+
+/**
+ * Reverse-resolve a state value against a `common.states` map, accepting
+ * three input forms:
+ * - number `1`            → direct key lookup
+ * - string matching a key → direct key match (case-sensitive — keys
+ * are identifiers like "1" or "spectrum")
+ * - string matching a label → case-insensitive trim match against
+ * the map values
+ *
+ * Returns null when no match is found. The caller decides whether to
+ * warn, ack=false, or fall back to a default — this helper is pure.
+ *
+ * @param input User-supplied state value (number, string, or other)
+ * @param statesMap The state's `common.states` map (key → label)
+ */
+export function resolveStatesValue(
+  input: unknown,
+  statesMap: Record<string, string>,
+): ResolvedStatesValue | null {
+  if (typeof input === "number" && Number.isFinite(input)) {
+    const key = String(input);
+    const canonical = statesMap[key];
+    if (canonical !== undefined) {
+      return { key, canonical };
+    }
+    return null;
+  }
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (trimmed === "") {
+      return null;
+    }
+    // Direct key match — handles numeric-string keys ("1") and
+    // identifier-string keys ("spectrum") in one pass.
+    const directLabel = statesMap[trimmed];
+    if (directLabel !== undefined) {
+      return { key: trimmed, canonical: directLabel };
+    }
+    // Label match — case-insensitive, trim. Lets users write the
+    // human-readable name (e.g. "Aurora") regardless of casing.
+    const needle = trimmed.toLowerCase();
+    for (const [key, label] of Object.entries(statesMap)) {
+      if (typeof label === "string" && label.trim().toLowerCase() === needle) {
+        return { key, canonical: label };
+      }
+    }
+  }
+  return null;
+}
+
 /** Timer/callback interfaces for helper classes */
 export interface TimerAdapter {
   /** Create a repeating interval timer */
