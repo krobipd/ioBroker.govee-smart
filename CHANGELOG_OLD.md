@@ -1,5 +1,12 @@
 # Older Changes
 
+
+## 1.7.8 (2026-04-19)
+- Fix MQTT bearer-token went stale after reconnect — api-client is now refreshed on every fresh login
+- LAN devStatus poll skipped when MQTT is connected (MQTT push is authoritative)
+- Added process-level unhandledRejection / uncaughtException handlers as a last line of defence
+- Minor hygiene — seenDeviceIps evicts old IPs on device IP change, stateCreationQueue bounded to startup, info.mqttConnected / info.cloudConnected reset on unload, diagnostics export throttled per device (2 s)
+
 ## 1.7.7 (2026-04-19)
 - Fix wizard result and MQTT-learned segment count lost on every restart — cache load didn't merge the segment fields into LAN-discovered devices
 - Cache write now fsyncs so a SIGKILL during adapter stop can't silently drop the save

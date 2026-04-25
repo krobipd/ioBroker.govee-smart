@@ -103,6 +103,13 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### 2.0.0 (2026-04-26)
+- Major release — Govee appliances and sensors are now handled by this adapter alongside lights. Govee thermometers (e.g. H5179), heaters, kettles, ice makers and more are imported through the App API (sensor states) and the OpenAPI-MQTT push channel (appliance events).
+- The standalone `iobroker.govee-appliances` adapter is deprecated and rolls into here. The old adapter still runs but receives no further updates — install govee-smart 2.0.0+ and uninstall govee-appliances at your convenience.
+- New checkbox **"Enable experimental device support"** in the adapter config makes it easier to try unconfirmed models. The Wiki page [Devices](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) lists every supported SKU and its status (verified ✅ / user-confirmed 🟢 / experimental ⚪).
+- Devices catalog (`devices.json` in the repo root) tracks 36 SKUs at release time; the catalog is the single source of truth for the Wiki page and for runtime quirk-overrides like the per-SKU color-temperature ranges that Govee's API misreports.
+- New state `info.openapiMqttConnected` for the second MQTT channel that delivers appliance events. The existing `info.mqttConnected` keeps tracking AWS IoT MQTT for light status push.
+
 ### 1.11.0 (2026-04-25)
 - Scene / DIY-scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS scripts: the index as a string (`"1"`), the index as a number (`1`), or the entry name (`"Aurora"`, case-insensitive, surrounding whitespace ignored). The state type changed from `string` to `mixed` so the js-controller no longer warns `expects type string but received number` when a script writes a numeric index.
 - Duplicate names from the cloud (Govee allows two scenes called "Movie") are now auto-disambiguated in the dropdown with `" (2)"`, `" (3)"` suffixes — the first occurrence keeps the original name, every label maps to exactly one index, and the reverse-lookup is deterministic.
@@ -136,12 +143,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - MQTT client keeps a stable per-process session UUID across reconnects; AWS IoT can now take over cleanly from a lingering socket instead of refusing a new connection
 - Memory leak prevention — every adapter-level map (diagnostics throttle, state-channel map, device map) is now reaped when a device is removed so long-lived instances stay bounded
 - Internal — shared `govee-constants.ts` for Govee app-impersonation headers, `stateToCommand` collapsed to a lookup table, `crypto.randomUUID` replaces the legacy Math.random UUID, unused `total` parameter dropped from `flashSingleSegment`
-
-### 1.7.8 (2026-04-19)
-- Fix MQTT bearer-token went stale after reconnect — api-client is now refreshed on every fresh login
-- LAN devStatus poll skipped when MQTT is connected (MQTT push is authoritative)
-- Added process-level unhandledRejection / uncaughtException handlers as a last line of defence
-- Minor hygiene — seenDeviceIps evicts old IPs on device IP change, stateCreationQueue bounded to startup, info.mqttConnected / info.cloudConnected reset on unload, diagnostics export throttled per device (2 s)
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
