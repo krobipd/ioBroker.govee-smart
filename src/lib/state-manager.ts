@@ -1,5 +1,10 @@
 import type * as utils from "@iobroker/adapter-core";
 import type { StateDefinition } from "./capability-mapper.js";
+import {
+  GROUP_ICON,
+  iconForGoveeType,
+  shortenGoveeType,
+} from "./device-icons.js";
 import { resolveSegmentCount } from "./device-manager.js";
 import {
   normalizeDeviceId,
@@ -100,15 +105,17 @@ export class StateManager {
     const prefix = newPrefix;
     const isGroup = device.sku === "BaseGroup";
 
-    // Device object with online status indicator
-    // Groups use the general groups.info.online state instead of per-group online
+    // Device object with online status indicator + type-aware icon.
+    // Groups use the general groups.info.online state instead of per-group online.
     const onlineId = isGroup
       ? `${this.adapter.namespace}.groups.info.online`
       : `${this.adapter.namespace}.${prefix}.info.online`;
+    const icon = isGroup ? GROUP_ICON : iconForGoveeType(device.type);
     await this.adapter.extendObjectAsync(prefix, {
       type: "device",
       common: {
         name: device.name,
+        icon,
         statusStates: { onlineId },
       } as ioBroker.DeviceCommon,
       native: {
@@ -169,6 +176,16 @@ export class StateManager {
         "info.ip",
         false,
       );
+      // Device-type marker — short label like "light", "thermometer",
+      // "heater" (Govee API type without the "devices.types." prefix).
+      // Lets scripts filter `*.info.type === "light"` without parsing.
+      await this.ensureState(
+        `${prefix}.info.type`,
+        "Device Type",
+        "string",
+        "text",
+        false,
+      );
       await this.adapter.setStateAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true,
@@ -179,6 +196,10 @@ export class StateManager {
       });
       await this.adapter.setStateAsync(`${prefix}.info.ip`, {
         val: device.lanIp ?? "",
+        ack: true,
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.type`, {
+        val: shortenGoveeType(device.type),
         ack: true,
       });
     } else {

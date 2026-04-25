@@ -21,6 +21,7 @@ __export(state_manager_exports, {
   StateManager: () => StateManager
 });
 module.exports = __toCommonJS(state_manager_exports);
+var import_device_icons = require("./device-icons.js");
 var import_device_manager = require("./device-manager.js");
 var import_types = require("./types.js");
 function sanitize(str) {
@@ -83,10 +84,12 @@ class StateManager {
     const prefix = newPrefix;
     const isGroup = device.sku === "BaseGroup";
     const onlineId = isGroup ? `${this.adapter.namespace}.groups.info.online` : `${this.adapter.namespace}.${prefix}.info.online`;
+    const icon = isGroup ? import_device_icons.GROUP_ICON : (0, import_device_icons.iconForGoveeType)(device.type);
     await this.adapter.extendObjectAsync(prefix, {
       type: "device",
       common: {
         name: device.name,
+        icon,
         statusStates: { onlineId }
       },
       native: {
@@ -143,6 +146,13 @@ class StateManager {
         "info.ip",
         false
       );
+      await this.ensureState(
+        `${prefix}.info.type`,
+        "Device Type",
+        "string",
+        "text",
+        false
+      );
       await this.adapter.setStateAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true
@@ -153,6 +163,10 @@ class StateManager {
       });
       await this.adapter.setStateAsync(`${prefix}.info.ip`, {
         val: (_b = device.lanIp) != null ? _b : "",
+        ack: true
+      });
+      await this.adapter.setStateAsync(`${prefix}.info.type`, {
+        val: (0, import_device_icons.shortenGoveeType)(device.type),
         ack: true
       });
     } else {
