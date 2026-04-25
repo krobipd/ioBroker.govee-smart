@@ -11,9 +11,15 @@
 
 <img src="https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg" width="100" />
 
-Control [Govee](https://www.govee.com/) smart lights via three seamless channels: **LAN** (fastest, primary), **AWS IoT MQTT** (real-time status push), and **Cloud API v2** (scenes, segments, capabilities).
+Control [Govee](https://www.govee.com/) WiFi devices via three seamless channels: **LAN** (fastest, primary), **AWS IoT MQTT** (real-time status push), and **Cloud API v2** (scenes, segments, capabilities, control fallback).
 
-> **Lights only!** This adapter handles Govee LED strips, bulbs, and light panels. Heaters, humidifiers, fans, air purifiers, sensors, and other non-light devices are not supported — use [ioBroker.govee-appliances](https://github.com/krobipd/ioBroker.govee-appliances) for those.
+Es werden nur WiFi-Geräte unterstützt.
+Bluetooth-only Geräte werden nicht unterstützt.
+Govee-Light-Produkte ohne lokale API: Steuerung über die Cloud, kann langsam sein.
+
+Eine vollständige Liste mit Test-Status pro Modell findest du im Wiki:
+- [Geräte (Deutsch)](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete)
+- [Devices (English)](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices)
 
 ---
 
@@ -29,7 +35,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 | Scene library, speed slider, Cloud vs local snapshots | [Scenes and Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Scenes-and-Snapshots) | [Szenen und Snapshots](https://github.com/krobipd/ioBroker.govee-smart/wiki/Szenen-und-Snapshots) |
 | Group fan-out, capability intersection | [Groups](https://github.com/krobipd/ioBroker.govee-smart/wiki/Groups) | [Gruppen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Gruppen) |
 | Folder naming, startup, diagnostics, troubleshooting | [Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior) | [Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten) |
-| Built-in corrections, community-quirks.json, reporting | [Device Quirks](https://github.com/krobipd/ioBroker.govee-smart/wiki/Device-Quirks) | [Geräte-Korrekturen](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete-Korrekturen) |
+| Supported devices, status meanings, contributing yours | [Devices](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) | [Geräte](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete) |
 
 ---
 
@@ -44,7 +50,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 - Diagnostics export button per device — one-click JSON dump for bug reports
 - Groups with LAN fan-out
 - Graceful degradation — works LAN-only, each credential tier unlocks more
-- Rate-limited Cloud usage, coexists with ioBroker.govee-appliances
+- Rate-limited Cloud usage
 
 ---
 

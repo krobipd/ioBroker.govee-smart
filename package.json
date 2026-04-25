@@ -1,7 +1,7 @@
 {
   "name": "iobroker.govee-smart",
   "version": "1.11.0",
-  "description": "Control Govee smart lights (LED strips, bulbs, panels) via LAN, MQTT and Cloud \u2014 lights only, no appliances",
+  "description": "Control Govee WiFi devices via LAN, MQTT and Cloud.",
   "author": {
     "name": "krobi",
     "email": "krobi@power-dreams.com"
@@ -72,7 +72,8 @@
     "lint:fix": "eslint --fix",
     "translate": "translate-adapter",
     "release": "release-script",
-    "validate-devices": "tsc tools/validate-devices.ts --module commonjs --target es2020 --outDir build/tools --esModuleInterop --skipLibCheck && node build/tools/validate-devices.js"
+    "validate-devices": "tsc tools/validate-devices.ts --module commonjs --target es2020 --outDir build/tools --esModuleInterop --skipLibCheck && node build/tools/validate-devices.js",
+    "gen-wiki": "tsc tools/gen-wiki-devices.ts --module commonjs --target es2020 --outDir build/tools --esModuleInterop --skipLibCheck && node build/tools/gen-wiki-devices.js"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.govee-smart/issues"

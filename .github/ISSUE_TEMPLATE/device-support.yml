@@ -1,0 +1,81 @@
+name: Geräte-Support melden / Report device support
+description: Erfahrung mit einem bisher experimentellen oder nicht gelisteten Govee-Gerät teilen / Share experience with an experimental or unlisted Govee device
+title: "[Gerät] H???? — kurz beschreiben"
+labels: ["device-support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für deinen Bericht! Diese Vorlage hilft uns, dein Gerät auf 🟢 **User-bestätigt** oder ✅ **Voll getestet** zu promoten.
+
+        Thanks for the report! This template helps us promote your device to 🟢 **User-confirmed** or ✅ **Fully tested**.
+
+  - type: input
+    id: sku
+    attributes:
+      label: SKU / Modell
+      description: Steht auf dem Gerät und in der Govee Home App, z.B. `H7160`. / On the device and in the Govee Home app.
+      placeholder: H7160
+    validations:
+      required: true
+
+  - type: input
+    id: app-name
+    attributes:
+      label: Govee-App-Name
+      description: Wie heißt das Gerät in der Govee Home App? / How is it called in the Govee Home app?
+      placeholder: Smart Space Heater
+    validations:
+      required: true
+
+  - type: dropdown
+    id: status-current
+    attributes:
+      label: Aktueller Status im Wiki / Current Wiki status
+      options:
+        - "⚪ Experimentell / Experimental"
+        - "🟢 User-bestätigt / User-confirmed (Folge-Bestätigung)"
+        - "Nicht gelistet / Not listed yet"
+    validations:
+      required: true
+
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Was hast du probiert? Was funktioniert? Was nicht?
+      description: |
+        Konkret, kurz, ehrlich. Was geht? Was geht nicht? Hattest du Fehler im Adapter-Log?
+
+        Concrete, brief, honest. What works? What doesn't? Any errors in the adapter log?
+      placeholder: |
+        - Power on/off: funktioniert
+        - Mode wechseln: funktioniert
+        - Temperatur setzen: kein Effekt am Gerät
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics-Export (JSON)
+      description: |
+        Im Object-Browser auf `info.diagnostics_export` deines Geräts klicken, dann den Inhalt von `info.diagnostics_result` hier einfügen oder als Datei anhängen.
+
+        In the object browser click `info.diagnostics_export` of your device, then paste the contents of `info.diagnostics_result` here or attach as a file.
+      render: json
+    validations:
+      required: true
+
+  - type: input
+    id: adapter-version
+    attributes:
+      label: govee-smart Version
+      placeholder: "2.0.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Sonstiges (optional)
+      description: Firmware-Version, ungewöhnliche Setup-Details, weitere Beobachtungen / Firmware version, unusual setup, additional observations

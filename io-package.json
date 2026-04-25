@@ -109,17 +109,17 @@
             "zh-cn": "Govee Smart Lights"
         },
         "desc": {
-            "en": "Control Govee smart lights (LED strips, bulbs, panels) via LAN, MQTT and Cloud API — lights only, no appliances",
-            "de": "Govee Smart Lights (LED-Strips, Lampen, Panels) über LAN, MQTT und Cloud API steuern — nur Lichter, keine Haushaltsgeräte",
-            "ru": "Управление умными светильниками Govee (LED-ленты, лампы, панели) через LAN, MQTT и Cloud API — только свет, без бытовой техники",
-            "pt": "Controle luzes inteligentes Govee (fitas LED, lâmpadas, painéis) via LAN, MQTT e Cloud API — apenas luzes, sem eletrodomésticos",
-            "nl": "Bedien Govee slimme verlichting (LED-strips, lampen, panelen) via LAN, MQTT en Cloud API — alleen lampen, geen huishoudapparaten",
-            "fr": "Contrôlez les lumières intelligentes Govee (rubans LED, ampoules, panneaux) via LAN, MQTT et Cloud API — lumières uniquement, pas d'appareils ménagers",
-            "it": "Controlla le luci intelligenti Govee (strisce LED, lampadine, pannelli) tramite LAN, MQTT e Cloud API — solo luci, nessun elettrodomestico",
-            "es": "Controla las luces inteligentes Govee (tiras LED, bombillas, paneles) a través de LAN, MQTT y Cloud API — solo luces, sin electrodomésticos",
-            "pl": "Steruj inteligentnymi lampami Govee (taśmy LED, żarówki, panele) przez LAN, MQTT i Cloud API — tylko lampy, bez urządzeń domowych",
-            "uk": "Керуйте розумними світильниками Govee (LED-стрічки, лампи, панелі) через LAN, MQTT та Cloud API — лише світло, без побутової техніки",
-            "zh-cn": "通过LAN、MQTT和Cloud API控制Govee智能灯（LED灯带、灯泡、面板）— 仅灯具，不含家电"
+            "en": "Control Govee WiFi devices via LAN, MQTT and Cloud API.",
+            "de": "Govee WiFi-Geräte über LAN, MQTT und Cloud-API steuern.",
+            "ru": "Управление WiFi-устройствами Govee через LAN, MQTT и Cloud API.",
+            "pt": "Controle dispositivos Govee WiFi via LAN, MQTT e Cloud API.",
+            "nl": "Bedien Govee WiFi-apparaten via LAN, MQTT en Cloud API.",
+            "fr": "Contrôlez les appareils WiFi Govee via LAN, MQTT et Cloud API.",
+            "it": "Controlla i dispositivi WiFi Govee tramite LAN, MQTT e Cloud API.",
+            "es": "Controla los dispositivos WiFi de Govee mediante LAN, MQTT y Cloud API.",
+            "pl": "Steruj urządzeniami WiFi Govee przez LAN, MQTT i Cloud API.",
+            "uk": "Керування пристроями Govee WiFi через LAN, MQTT та Cloud API.",
+            "zh-cn": "通过 LAN、MQTT 和 Cloud API 控制 Govee WiFi 设备。"
         },
         "authors": [
             "krobi <krobi@power-dreams.com>"
