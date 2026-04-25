@@ -1,5 +1,5 @@
 import { expect } from "chai";
-import { applyQuirksToStates, buildDeviceStateDefs, getDefaultLanStates, mapCapabilities, mapCloudStateValue } from "../src/lib/capability-mapper";
+import { applyQuirksToStates, buildDeviceStateDefs, getDefaultLanStates, mapCapabilities, mapCloudStateValue, planCloudCapabilityWrites } from "../src/lib/capability-mapper";
 import { _resetDeviceRegistry, initDeviceRegistry } from "../src/lib/device-registry";
 import type { CloudCapability, CloudStateCapability, GoveeDevice } from "../src/lib/types";
 
@@ -1347,6 +1347,60 @@ describe("CapabilityMapper", () => {
                 const result = mapCloudStateValue(cap);
                 expect(result!.value).to.equal("#ff8000");
             });
+        });
+    });
+
+    describe("planCloudCapabilityWrites", () => {
+        const lanStateIds = new Set(["power", "brightness", "colorRgb", "colorTemperature"]);
+
+        it("returns the resolved (stateId, value) pairs for every decoded capability", () => {
+            const caps: CloudStateCapability[] = [
+                { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+                { type: "devices.capabilities.range", instance: "brightness", state: { value: 50 } },
+            ];
+            const result = planCloudCapabilityWrites(caps, false, lanStateIds);
+            expect(result).to.have.lengthOf(2);
+            expect(result[0]).to.deep.equal({ stateId: "power", value: true });
+            expect(result[1]).to.deep.equal({ stateId: "brightness", value: 50 });
+        });
+
+        it("skips LAN-shadowed states when the device has a LAN IP", () => {
+            const caps: CloudStateCapability[] = [
+                { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+                { type: "devices.capabilities.property", instance: "battery", state: { value: 75 } },
+            ];
+            const result = planCloudCapabilityWrites(caps, true, lanStateIds);
+            expect(result).to.have.lengthOf(1);
+            expect(result[0]).to.deep.equal({ stateId: "battery", value: 75 });
+        });
+
+        it("includes every state when the device has no LAN IP (sensors / appliances)", () => {
+            const caps: CloudStateCapability[] = [
+                { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+                { type: "devices.capabilities.range", instance: "brightness", state: { value: 50 } },
+                { type: "devices.capabilities.property", instance: "battery", state: { value: 75 } },
+            ];
+            const result = planCloudCapabilityWrites(caps, false, lanStateIds);
+            expect(result).to.have.lengthOf(3);
+        });
+
+        it("silently drops capabilities that mapCloudStateValue rejects", () => {
+            const caps: CloudStateCapability[] = [
+                { type: "devices.capabilities.unknown_type", instance: "foo", state: { value: 1 } },
+                { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+            ];
+            const result = planCloudCapabilityWrites(caps, false, lanStateIds);
+            expect(result).to.have.lengthOf(1);
+            expect(result[0].stateId).to.equal("power");
+        });
+
+        it("handles non-array input defensively", () => {
+            const result = planCloudCapabilityWrites(null as never, false, lanStateIds);
+            expect(result).to.deep.equal([]);
+        });
+
+        it("returns empty array for empty input", () => {
+            expect(planCloudCapabilityWrites([], false, lanStateIds)).to.deep.equal([]);
         });
     });
 });

@@ -127,7 +127,9 @@ class DeviceManager {
   onDeviceUpdate = null;
   onDeviceListChanged = null;
   onCloudCapabilities = null;
+  /** Per-source dedup so a Cloud NETWORK error doesn't shadow an App-API one. */
   lastErrorCategory = null;
+  lastAppApiErrorCategory = null;
   /**
    * @param log    ioBroker logger
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
@@ -989,6 +991,7 @@ class DeviceManager {
       segmentCount: cached.segmentCount,
       manualMode: cached.manualMode,
       manualSegments: cached.manualSegments,
+      sceneSpeed: cached.sceneSpeed,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false }
     };
@@ -1030,6 +1033,7 @@ class DeviceManager {
       segmentCount: typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : void 0,
       manualMode: device.manualMode ? true : void 0,
       manualSegments: device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice() : void 0,
+      sceneSpeed: typeof device.sceneSpeed === "number" && device.sceneSpeed > 0 ? device.sceneSpeed : void 0,
       cachedAt: Date.now()
     };
   }
@@ -1062,20 +1066,24 @@ class DeviceManager {
     if (!this.apiClient || !this.apiClient.hasBearerToken()) {
       return 0;
     }
+    if (!this.hasDeviceNeedingAppApi()) {
+      return 0;
+    }
     let entries;
     try {
       entries = await this.apiClient.fetchDeviceList();
     } catch (err) {
       const category = (0, import_types.classifyError)(err);
       const msg = `App API fetch failed: ${err instanceof Error ? err.message : String(err)}`;
-      if (category !== this.lastErrorCategory) {
-        this.lastErrorCategory = category;
+      if (category !== this.lastAppApiErrorCategory) {
+        this.lastAppApiErrorCategory = category;
         this.log.warn(msg);
       } else {
         this.log.debug(msg);
       }
       return 0;
     }
+    this.lastAppApiErrorCategory = null;
     let updated = 0;
     for (const entry of entries) {
       const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
@@ -1105,6 +1113,19 @@ class DeviceManager {
    */
   setOnCloudCapabilities(cb) {
     this.onCloudCapabilities = cb;
+  }
+  /**
+   * Whether at least one device in the registry would consume App-API
+   * readings (sensors, appliances). Used to skip the App-API poll on
+   * Lights-only installations.
+   */
+  hasDeviceNeedingAppApi() {
+    for (const dev of this.devices.values()) {
+      if (dev.type !== "devices.types.light" && dev.sku !== "BaseGroup") {
+        return true;
+      }
+    }
+    return false;
   }
   /**
    * Process a parsed OpenAPI-MQTT event by forwarding its capabilities

@@ -23,6 +23,7 @@ __export(command_router_exports, {
 module.exports = __toCommonJS(command_router_exports);
 var import_types = require("./types.js");
 var import_govee_lan_client = require("./govee-lan-client.js");
+const FORCE_COLOR_MODE_SETTLE_MS = 150;
 class CommandRouter {
   log;
   timers;
@@ -99,7 +100,7 @@ class CommandRouter {
     const { r, g, b } = current ? (0, import_types.hexToRgb)(current) : { r: 255, g: 255, b: 255 };
     this.lanClient.setColor(device.lanIp, r, g, b);
     await new Promise(
-      (resolve) => this.timers.setTimeout(() => resolve(), 150)
+      (resolve) => this.timers.setTimeout(() => resolve(), FORCE_COLOR_MODE_SETTLE_MS)
     );
   }
   /**

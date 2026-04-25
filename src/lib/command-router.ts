@@ -5,6 +5,14 @@ import { applySceneSpeed } from "./govee-lan-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
 
 /**
+ * Delay between switching the device into static-color mode and sending the
+ * follow-up segment commands. Empirically the firmware needs ~150 ms for the
+ * mode flip; shorter delays leave the device still in scene/music mode and the
+ * subsequent segment writes are silently dropped.
+ */
+const FORCE_COLOR_MODE_SETTLE_MS = 150;
+
+/**
  * Command router — routes device commands through the fastest available
  * channel: LAN → Cloud.
  */
@@ -103,7 +111,7 @@ export class CommandRouter {
     // if the adapter unloads mid-delay. Native setTimeout would leave a
     // pending handle that fires into a half-torn-down adapter.
     await new Promise<void>((resolve) =>
-      this.timers.setTimeout(() => resolve(), 150),
+      this.timers.setTimeout(() => resolve(), FORCE_COLOR_MODE_SETTLE_MS),
     );
   }
 

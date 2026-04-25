@@ -174,6 +174,148 @@
         "apiKey",
         "goveePassword"
     ],
+    "instanceObjects": [
+        {
+            "_id": "info",
+            "type": "channel",
+            "common": {
+                "name": {
+                    "en": "Information",
+                    "de": "Information",
+                    "ru": "Информация",
+                    "pt": "Informação",
+                    "nl": "Informatie",
+                    "fr": "Information",
+                    "it": "Informazioni",
+                    "es": "Información",
+                    "pl": "Informacja",
+                    "uk": "Інформація",
+                    "zh-cn": "信息"
+                }
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.connection",
+            "type": "state",
+            "common": {
+                "name": "Adapter connected",
+                "type": "boolean",
+                "role": "indicator.connected",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.mqttConnected",
+            "type": "state",
+            "common": {
+                "name": "MQTT connected",
+                "type": "boolean",
+                "role": "indicator.connected",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.cloudConnected",
+            "type": "state",
+            "common": {
+                "name": "Cloud API connected",
+                "type": "boolean",
+                "role": "indicator.connected",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.openapiMqttConnected",
+            "type": "state",
+            "common": {
+                "name": "Govee OpenAPI MQTT connected",
+                "desc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
+                "type": "boolean",
+                "role": "indicator.connected",
+                "read": true,
+                "write": false,
+                "def": false
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.wizardStatus",
+            "type": "state",
+            "common": {
+                "name": "Segment-Wizard status",
+                "type": "string",
+                "role": "text",
+                "read": true,
+                "write": false,
+                "def": ""
+            },
+            "native": {}
+        },
+        {
+            "_id": "info.refresh_cloud_data",
+            "type": "state",
+            "common": {
+                "name": "Refresh Cloud Data",
+                "desc": "Write true to re-fetch scenes, snapshots and device list from the Govee Cloud for all devices. Use this after creating a new snapshot in the Govee Home app to see it in the dropdown without restarting the adapter.",
+                "type": "boolean",
+                "role": "button",
+                "read": true,
+                "write": true,
+                "def": false
+            },
+            "native": {}
+        },
+        {
+            "_id": "devices",
+            "type": "folder",
+            "common": {
+                "name": {
+                    "en": "Devices",
+                    "de": "Geräte",
+                    "ru": "Устройства",
+                    "pt": "Dispositivos",
+                    "nl": "Apparaten",
+                    "fr": "Appareils",
+                    "it": "Dispositivi",
+                    "es": "Dispositivos",
+                    "pl": "Urządzenia",
+                    "uk": "Пристрої",
+                    "zh-cn": "设备"
+                }
+            },
+            "native": {}
+        },
+        {
+            "_id": "groups",
+            "type": "folder",
+            "common": {
+                "name": {
+                    "en": "Groups",
+                    "de": "Gruppen",
+                    "ru": "Группы",
+                    "pt": "Grupos",
+                    "nl": "Groepen",
+                    "fr": "Groupes",
+                    "it": "Gruppi",
+                    "es": "Grupos",
+                    "pl": "Grupy",
+                    "uk": "Групи",
+                    "zh-cn": "组"
+                }
+            },
+            "native": {}
+        }
+    ],
     "native": {
         "apiKey": "",
         "goveeEmail": "",

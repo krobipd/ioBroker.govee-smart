@@ -202,7 +202,9 @@ export class DeviceManager {
   private onCloudCapabilities:
     | ((device: GoveeDevice, caps: CloudStateCapability[]) => void)
     | null = null;
+  /** Per-source dedup so a Cloud NETWORK error doesn't shadow an App-API one. */
   private lastErrorCategory: ErrorCategory | null = null;
+  private lastAppApiErrorCategory: ErrorCategory | null = null;
 
   /**
    * @param log    ioBroker logger
@@ -1282,6 +1284,7 @@ export class DeviceManager {
       segmentCount: cached.segmentCount,
       manualMode: cached.manualMode,
       manualSegments: cached.manualSegments,
+      sceneSpeed: cached.sceneSpeed,
       state: { online: false },
       channels: { lan: false, mqtt: false, cloud: false },
     };
@@ -1333,6 +1336,10 @@ export class DeviceManager {
         device.manualSegments.length > 0
           ? device.manualSegments.slice()
           : undefined,
+      sceneSpeed:
+        typeof device.sceneSpeed === "number" && device.sceneSpeed > 0
+          ? device.sceneSpeed
+          : undefined,
       cachedAt: Date.now(),
     };
   }
@@ -1369,20 +1376,30 @@ export class DeviceManager {
     if (!this.apiClient || !this.apiClient.hasBearerToken()) {
       return 0;
     }
+    // Skip the entire round-trip when no device in the registry would
+    // actually consume App-API readings. The App API is only used for
+    // sensor and appliance state (thermometers, heaters, kettles, …);
+    // a Lights-only setup would otherwise burn one Govee call every 2
+    // minutes for nothing.
+    if (!this.hasDeviceNeedingAppApi()) {
+      return 0;
+    }
     let entries: AppDeviceEntry[];
     try {
       entries = await this.apiClient.fetchDeviceList();
     } catch (err) {
       const category = classifyError(err);
       const msg = `App API fetch failed: ${err instanceof Error ? err.message : String(err)}`;
-      if (category !== this.lastErrorCategory) {
-        this.lastErrorCategory = category;
+      if (category !== this.lastAppApiErrorCategory) {
+        this.lastAppApiErrorCategory = category;
         this.log.warn(msg);
       } else {
         this.log.debug(msg);
       }
       return 0;
     }
+    // Reset on success so the next failure warns again.
+    this.lastAppApiErrorCategory = null;
     let updated = 0;
     for (const entry of entries) {
       const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
@@ -1418,6 +1435,20 @@ export class DeviceManager {
     cb: ((device: GoveeDevice, caps: CloudStateCapability[]) => void) | null,
   ): void {
     this.onCloudCapabilities = cb;
+  }
+
+  /**
+   * Whether at least one device in the registry would consume App-API
+   * readings (sensors, appliances). Used to skip the App-API poll on
+   * Lights-only installations.
+   */
+  private hasDeviceNeedingAppApi(): boolean {
+    for (const dev of this.devices.values()) {
+      if (dev.type !== "devices.types.light" && dev.sku !== "BaseGroup") {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**

@@ -518,11 +518,11 @@ export function parseSegmentList(
 ): SegmentListParseResult {
   const HARD_MAX = 99; // Backstop, deckt alle realistischen Govee-Geräte
   if (typeof input !== "string") {
-    return { indices: [], error: "Input muss ein String sein" };
+    return { indices: [], error: "input must be a string" };
   }
   const trimmed = input.trim();
   if (trimmed === "") {
-    return { indices: [], error: "Liste ist leer" };
+    return { indices: [], error: "list is empty" };
   }
   const effectiveMax = Math.min(
     Number.isFinite(maxIndex) && maxIndex >= 0
@@ -544,14 +544,14 @@ export function parseSegmentList(
       if (start > end) {
         return {
           indices: [],
-          error: `Ungültiger Bereich "${part}" (Start > Ende)`,
+          error: `invalid range "${part}" (start > end)`,
         };
       }
       for (let i = start; i <= end; i++) {
         if (i < 0 || i > effectiveMax) {
           return {
             indices: [],
-            error: `Segment ${i} liegt außerhalb 0-${effectiveMax} für dieses Gerät`,
+            error: `segment ${i} is outside 0-${effectiveMax} for this device`,
           };
         }
         set.add(i);
@@ -561,20 +561,20 @@ export function parseSegmentList(
     if (!/^\d+$/.test(part)) {
       return {
         indices: [],
-        error: `Ungültiger Eintrag "${part}" (nur Zahlen und Ranges erlaubt)`,
+        error: `invalid entry "${part}" (only digits and ranges allowed)`,
       };
     }
     const idx = parseInt(part, 10);
     if (idx < 0 || idx > effectiveMax) {
       return {
         indices: [],
-        error: `Segment ${idx} liegt außerhalb 0-${effectiveMax} für dieses Gerät`,
+        error: `segment ${idx} is outside 0-${effectiveMax} for this device`,
       };
     }
     set.add(idx);
   }
   if (set.size === 0) {
-    return { indices: [], error: "Keine gültigen Indices in der Liste" };
+    return { indices: [], error: "no valid indices in list" };
   }
   return {
     indices: Array.from(set).sort((a, b) => a - b),

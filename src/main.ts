@@ -3,6 +3,7 @@ import {
   buildDeviceStateDefs,
   getDefaultLanStates,
   mapCloudStateValue,
+  planCloudCapabilityWrites,
 } from "./lib/capability-mapper.js";
 import { initDeviceRegistry } from "./lib/device-registry.js";
 import {
@@ -143,86 +144,9 @@ class GoveeAdapter extends utils.Adapter {
   private async onReady(): Promise<void> {
     const config = this.config as unknown as AdapterConfig;
 
-    // Ensure info.connection exists
-    await this.setObjectNotExistsAsync("info", {
-      type: "channel",
-      common: { name: "Information" },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.connection", {
-      type: "state",
-      common: {
-        name: "Connection status",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.mqttConnected", {
-      type: "state",
-      common: {
-        name: "MQTT connected",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.cloudConnected", {
-      type: "state",
-      common: {
-        name: "Cloud API connected",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.openapiMqttConnected", {
-      type: "state",
-      common: {
-        name: "Govee OpenAPI MQTT connected",
-        desc: "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false,
-      },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.wizardStatus", {
-      type: "state",
-      common: {
-        name: "Segment-Wizard status",
-        type: "string",
-        role: "text",
-        read: true,
-        write: false,
-        def: "",
-      },
-      native: {},
-    });
-    await this.setObjectNotExistsAsync("info.refresh_cloud_data", {
-      type: "state",
-      common: {
-        name: "Refresh Cloud Data",
-        desc: "Write true to re-fetch scenes, snapshots and device list from the Govee Cloud for all devices. Use this after creating a new snapshot in the Govee Home app to see it in the dropdown without restarting the adapter.",
-        type: "boolean",
-        role: "button",
-        read: true,
-        write: true,
-        def: false,
-      },
-      native: {},
-    });
+    // info channel + states are declared as instanceObjects in
+    // io-package.json, so js-controller materialises them on install /
+    // upgrade. We only initialise the runtime values here.
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
@@ -869,11 +793,13 @@ class GoveeAdapter extends utils.Adapter {
       return;
     }
 
-    // Scene speed: store on device, applied on next scene activation
+    // Scene speed: store on device, applied on next scene activation.
+    // Persist to SKU cache so the user's choice survives a restart.
     if (command === "sceneSpeed") {
       const level = typeof val === "number" ? val : parseInt(String(val), 10);
       if (!isNaN(level)) {
         device.sceneSpeed = level;
+        this.deviceManager?.persistDeviceToCache(device);
       }
       await this.setStateAsync(id, { val, ack: true });
       return;
@@ -1346,14 +1272,46 @@ class GoveeAdapter extends utils.Adapter {
    * Delete ioBroker objects for devices no longer present and drop the same
    * devices from adapter-level maps. Called after the initial-discovery
    * window and every time the device list changes so per-device state
-   * (diagnostics throttle, etc.) doesn't outlive the device in the tree.
+   * (diagnostics throttle, device-manager registry, diagnostics ring buffer)
+   * doesn't outlive the device in the tree.
    */
   private async reapStaleDevices(): Promise<void> {
     if (!this.stateManager || !this.deviceManager) {
       return;
     }
     const currentDevices = this.deviceManager.getDevices();
-    await this.stateManager.cleanupDevices(currentDevices);
+
+    // Snapshot prefix → {sku, deviceId} BEFORE cleanup so we can map the
+    // returned removed-prefix list back to the keys used by device-manager
+    // and diagnostics. State-manager only knows prefixes, the other two
+    // adapter-level maps are keyed by sku:deviceId.
+    const prefixToKey = new Map<string, { sku: string; deviceId: string }>();
+    for (const d of currentDevices) {
+      prefixToKey.set(this.stateManager.devicePrefix(d), {
+        sku: d.sku,
+        deviceId: d.deviceId,
+      });
+    }
+
+    const removedPrefixes =
+      await this.stateManager.cleanupDevices(currentDevices);
+
+    // Reap matching entries from device-manager.devices and the diagnostics
+    // ring buffer. Today this is largely defensive: device-manager.devices
+    // grows monotonically across the adapter lifetime (entries are only
+    // removed by an explicit removeDevice call, which the adapter does not
+    // currently invoke), so removedPrefixes mostly contains stale ioBroker
+    // objects that no longer have a live in-memory device. The wiring stays
+    // correct once a stale-pruning step is added — see issue tracker.
+    const diagnostics = this.deviceManager.getDiagnostics();
+    for (const prefix of removedPrefixes) {
+      const key = prefixToKey.get(prefix);
+      if (!key) {
+        continue;
+      }
+      this.deviceManager.removeDevice(key.sku, key.deviceId);
+      diagnostics.forget(key.deviceId);
+    }
 
     // Adapter-level maps are keyed by sku:deviceId. Drop any entry that
     // doesn't match a currently-known device so the maps stay bounded.
@@ -1534,28 +1492,21 @@ class GoveeAdapter extends utils.Adapter {
     }
     const lanStateIds = new Set(getDefaultLanStates().map((s) => s.id));
     const prefix = this.stateManager.devicePrefix(device);
-    const writes: Promise<unknown>[] = [];
-    for (const cap of caps) {
-      const mapped = mapCloudStateValue(cap);
-      if (!mapped) {
-        continue;
-      }
-      // Skip LAN-covered states for LAN-capable devices — same rule as
-      // the Cloud-poll path so LAN sub-second updates aren't overwritten.
-      if (device.lanIp && lanStateIds.has(mapped.stateId)) {
-        continue;
-      }
-      const statePath = this.stateManager.resolveStatePath(
+    const planned = planCloudCapabilityWrites(
+      caps,
+      Boolean(device.lanIp),
+      lanStateIds,
+    );
+    const writes = planned.map((mapped) => {
+      const statePath = this.stateManager!.resolveStatePath(
         prefix,
         mapped.stateId,
       );
-      writes.push(
-        this.setStateAsync(statePath, {
-          val: mapped.value,
-          ack: true,
-        }).catch(() => undefined),
-      );
-    }
+      return this.setStateAsync(statePath, {
+        val: mapped.value,
+        ack: true,
+      }).catch(() => undefined);
+    });
     await Promise.all(writes);
   }
 

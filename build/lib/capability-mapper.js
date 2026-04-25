@@ -22,7 +22,8 @@ __export(capability_mapper_exports, {
   buildDeviceStateDefs: () => buildDeviceStateDefs,
   getDefaultLanStates: () => getDefaultLanStates,
   mapCapabilities: () => mapCapabilities,
-  mapCloudStateValue: () => mapCloudStateValue
+  mapCloudStateValue: () => mapCloudStateValue,
+  planCloudCapabilityWrites: () => planCloudCapabilityWrites
 });
 module.exports = __toCommonJS(capability_mapper_exports);
 var import_types = require("./types.js");
@@ -660,6 +661,23 @@ function mapCloudStateValue(cap) {
       return null;
   }
 }
+function planCloudCapabilityWrites(caps, hasLanIp, lanStateIds) {
+  const writes = [];
+  if (!Array.isArray(caps)) {
+    return writes;
+  }
+  for (const cap of caps) {
+    const mapped = mapCloudStateValue(cap);
+    if (!mapped) {
+      continue;
+    }
+    if (hasLanIp && lanStateIds.has(mapped.stateId)) {
+      continue;
+    }
+    writes.push(mapped);
+  }
+  return writes;
+}
 function buildDeviceStateDefs(device, localSnapshots, memberDevices) {
   if (device.sku === "BaseGroup") {
     return buildGroupStateDefs(memberDevices || []);
@@ -905,6 +923,7 @@ function buildGroupStateDefs(members) {
   buildDeviceStateDefs,
   getDefaultLanStates,
   mapCapabilities,
-  mapCloudStateValue
+  mapCloudStateValue,
+  planCloudCapabilityWrites
 });
 //# sourceMappingURL=capability-mapper.js.map

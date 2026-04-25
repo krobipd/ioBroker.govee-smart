@@ -124,85 +124,6 @@ class GoveeAdapter extends utils.Adapter {
   async onReady() {
     var _a, _b, _c;
     const config = this.config;
-    await this.setObjectNotExistsAsync("info", {
-      type: "channel",
-      common: { name: "Information" },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.connection", {
-      type: "state",
-      common: {
-        name: "Connection status",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.mqttConnected", {
-      type: "state",
-      common: {
-        name: "MQTT connected",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.cloudConnected", {
-      type: "state",
-      common: {
-        name: "Cloud API connected",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.openapiMqttConnected", {
-      type: "state",
-      common: {
-        name: "Govee OpenAPI MQTT connected",
-        desc: "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
-        type: "boolean",
-        role: "indicator.connected",
-        read: true,
-        write: false,
-        def: false
-      },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.wizardStatus", {
-      type: "state",
-      common: {
-        name: "Segment-Wizard status",
-        type: "string",
-        role: "text",
-        read: true,
-        write: false,
-        def: ""
-      },
-      native: {}
-    });
-    await this.setObjectNotExistsAsync("info.refresh_cloud_data", {
-      type: "state",
-      common: {
-        name: "Refresh Cloud Data",
-        desc: "Write true to re-fetch scenes, snapshots and device list from the Govee Cloud for all devices. Use this after creating a new snapshot in the Govee Home app to see it in the dropdown without restarting the adapter.",
-        type: "boolean",
-        role: "button",
-        read: true,
-        write: true,
-        def: false
-      },
-      native: {}
-    });
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
@@ -611,7 +532,7 @@ class GoveeAdapter extends utils.Adapter {
    * @param state New state value
    */
   async onStateChange(id, state) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     if (!state || state.ack || !this.deviceManager || !this.stateManager) {
       return;
     }
@@ -728,6 +649,7 @@ class GoveeAdapter extends utils.Adapter {
       const level = typeof val === "number" ? val : parseInt(String(val), 10);
       if (!isNaN(level)) {
         device.sceneSpeed = level;
+        (_e = this.deviceManager) == null ? void 0 : _e.persistDeviceToCache(device);
       }
       await this.setStateAsync(id, { val, ack: true });
       return;
@@ -1078,14 +1000,31 @@ class GoveeAdapter extends utils.Adapter {
    * Delete ioBroker objects for devices no longer present and drop the same
    * devices from adapter-level maps. Called after the initial-discovery
    * window and every time the device list changes so per-device state
-   * (diagnostics throttle, etc.) doesn't outlive the device in the tree.
+   * (diagnostics throttle, device-manager registry, diagnostics ring buffer)
+   * doesn't outlive the device in the tree.
    */
   async reapStaleDevices() {
     if (!this.stateManager || !this.deviceManager) {
       return;
     }
     const currentDevices = this.deviceManager.getDevices();
-    await this.stateManager.cleanupDevices(currentDevices);
+    const prefixToKey = /* @__PURE__ */ new Map();
+    for (const d of currentDevices) {
+      prefixToKey.set(this.stateManager.devicePrefix(d), {
+        sku: d.sku,
+        deviceId: d.deviceId
+      });
+    }
+    const removedPrefixes = await this.stateManager.cleanupDevices(currentDevices);
+    const diagnostics = this.deviceManager.getDiagnostics();
+    for (const prefix of removedPrefixes) {
+      const key = prefixToKey.get(prefix);
+      if (!key) {
+        continue;
+      }
+      this.deviceManager.removeDevice(key.sku, key.deviceId);
+      diagnostics.forget(key.deviceId);
+    }
     const liveKeys = new Set(
       currentDevices.map((d) => `${d.sku}:${d.deviceId}`)
     );
@@ -1231,26 +1170,21 @@ class GoveeAdapter extends utils.Adapter {
     }
     const lanStateIds = new Set((0, import_capability_mapper.getDefaultLanStates)().map((s) => s.id));
     const prefix = this.stateManager.devicePrefix(device);
-    const writes = [];
-    for (const cap of caps) {
-      const mapped = (0, import_capability_mapper.mapCloudStateValue)(cap);
-      if (!mapped) {
-        continue;
-      }
-      if (device.lanIp && lanStateIds.has(mapped.stateId)) {
-        continue;
-      }
+    const planned = (0, import_capability_mapper.planCloudCapabilityWrites)(
+      caps,
+      Boolean(device.lanIp),
+      lanStateIds
+    );
+    const writes = planned.map((mapped) => {
       const statePath = this.stateManager.resolveStatePath(
         prefix,
         mapped.stateId
       );
-      writes.push(
-        this.setStateAsync(statePath, {
-          val: mapped.value,
-          ack: true
-        }).catch(() => void 0)
-      );
-    }
+      return this.setStateAsync(statePath, {
+        val: mapped.value,
+        ack: true
+      }).catch(() => void 0);
+    });
     await Promise.all(writes);
   }
   /**

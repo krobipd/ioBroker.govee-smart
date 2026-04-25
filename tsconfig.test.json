@@ -5,9 +5,9 @@
         "sourceMap": true,
         "declaration": false,
         "declarationMap": false,
-        "outDir": "./build",
+        "outDir": "./build-test",
         "rootDir": "."
     },
     "include": ["src/**/*.ts", "test/**/*.ts"],
-    "exclude": ["node_modules", "build"]
+    "exclude": ["node_modules", "build", "build-test"]
 }

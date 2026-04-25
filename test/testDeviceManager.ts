@@ -1978,6 +1978,10 @@ describe("DeviceManager — loadFromCache merge", () => {
                 device: "AABBCCDDEEFF0001",
                 sku: "H5179",
             } as LanDevice);
+            // pollAppApi gates on a non-light device type — flip the type
+            // since LAN-discovery defaults to "devices.types.light".
+            const devices = dm2.getDevices();
+            devices[0].type = "devices.types.thermometer";
             const seen: Array<{ device: GoveeDevice; caps: unknown[] }> = [];
             dm2.setOnCloudCapabilities((device, caps) => {
                 seen.push({ device, caps });

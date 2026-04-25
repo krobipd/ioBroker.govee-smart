@@ -37,36 +37,36 @@ The device list lives in [`devices.json`](./devices.json) at the repo root. One 
   "type": "heater",
   "status": "reported",
   "since": "2.1.0",
-  "tested": "2026-05-12 by your-handle",
-  "notes": "Power und Mode funktionieren, Temperatur-Setting noch unklar",
   "quirks": {
     "brokenPlatformApi": true
   }
 }
 ```
 
+Felder: `name`, `type`, `status` Pflicht; `since` (semver, ohne `v`-Prefix) und `quirks` optional. Schema-Quelle: [`devices.schema.json`](./devices.schema.json).
+
+Fields: `name`, `type`, `status` required; `since` (semver, no `v` prefix) and `quirks` optional. Schema source: [`devices.schema.json`](./devices.schema.json).
+
 ### Status-Schwellen / Status thresholds
 
-- `seed` — extern importiert (z.B. govee2mqtt), kein Erfahrungsbericht. Default deaktiviert.
-- `reported` — 1 verifizierter Erfahrungsbericht mit Diagnostics. Default aktiv.
-- `verified` — mehrere unabhängige verifizierte Erfahrungsberichte. Default aktiv.
+- `seed` — extern importiert (z.B. govee2mqtt), kein Erfahrungsbericht. Quirks werden nur scharf wenn der Adapter-Config-Schalter "Experimentelle Geräte-Unterstützung" aktiv ist.
+- `reported` — 1 verifizierter Erfahrungsbericht mit Diagnostics. Quirks aktiv.
+- `verified` — mehrere unabhängige verifizierte Erfahrungsberichte. Quirks aktiv.
 
 Promotion-Pfad: ⚪ → 🟢 → ✅. Linear, jede neue Bestätigung kann hochpromoten.
 
 ### Quirk-Felder / Quirk fields
 
+Aktuelle Quirk-Felder sind die einzigen die im Code etwas bewirken:
+
 | Feld | Wann verwenden |
 |---|---|
-| `colorTempRange: { min, max }` | API claims ein Range, real ist enger |
-| `brokenPlatformApi: true` | Cloud-Capabilities sind Müll, Adapter fällt auf LAN-Defaults zurück |
-| `preferAppApi: true` | OpenAPI v2 `/device/state` liefert leer (Sensoren wie H5179) |
-| `skipLanDiscovery: true` | Gerät hat kein LAN — Heater, Humidifier etc. |
-| `expectEvents: true` | Gerät pusht OpenAPI-MQTT Events (lackWater, iceFull, …) |
-| `powerValueWorkaround: true` | Power kommt als 1/0 statt true/false |
+| `colorTempRange: { min, max }` | API meldet einen Range, real ist enger (z.B. H6022, H60A1) |
+| `brokenPlatformApi: true` | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück |
 
-Wenn dein Gerät einen Quirk braucht der hier fehlt: PR gegen `devices.schema.json` + `device-registry.ts` + Issue beschreibt den Bedarf.
+Wenn dein Gerät einen Quirk braucht der hier fehlt: erst Issue mit Diagnostics-JSON aufmachen — wir entscheiden gemeinsam ob es ein neues Feld im Schema rechtfertigt oder im bestehenden Vokabular abgebildet werden kann. Schema-Erweiterungen kommen mit dem Code-Pfad der sie auswertet zusammen rein.
 
-If your device needs a quirk that's missing here: PR against `devices.schema.json` + `device-registry.ts` and an issue explaining the need.
+If your device needs a quirk that's missing here: open an issue with the diagnostics JSON first — we'll decide together whether it justifies a new schema field or fits the existing vocabulary. Schema extensions ship together with the code path that consumes them.
 
 ---
 

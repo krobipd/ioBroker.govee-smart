@@ -61,10 +61,11 @@
   "scripts": {
     "prebuild": "rimraf build",
     "build": "build-adapter ts",
+    "prebuild:test": "rimraf build-test",
     "build:test": "tsc -p tsconfig.test.json",
     "watch": "build-adapter ts --watch",
     "check": "tsc --noEmit",
-    "test:ts": "npm run build:test && mocha --exit \"build/test/test*.js\"",
+    "test:ts": "npm run build:test && mocha --exit \"build-test/test/test*.js\"",
     "test:package": "mocha test/package --exit",
     "test:integration": "mocha test/integration --exit",
     "test": "npm run build && npm run test:ts && npm run test:package",
@@ -72,8 +73,8 @@
     "lint:fix": "eslint --fix",
     "translate": "translate-adapter",
     "release": "release-script",
-    "validate-devices": "tsc tools/validate-devices.ts --module commonjs --target es2020 --outDir build/tools --esModuleInterop --skipLibCheck && node build/tools/validate-devices.js",
-    "gen-wiki": "tsc tools/gen-wiki-devices.ts --module commonjs --target es2020 --outDir build/tools --esModuleInterop --skipLibCheck && node build/tools/gen-wiki-devices.js"
+    "validate-devices": "tsc tools/validate-devices.ts --module commonjs --target es2020 --outDir build-test/tools --esModuleInterop --skipLibCheck && node build-test/tools/validate-devices.js",
+    "gen-wiki": "tsc tools/gen-wiki-devices.ts --module commonjs --target es2020 --outDir build-test/tools --esModuleInterop --skipLibCheck && node build-test/tools/gen-wiki-devices.js"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.govee-smart/issues"

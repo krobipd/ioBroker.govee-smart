@@ -24,6 +24,7 @@ export default [
             "tools/**",
             "*.config.mjs",
             "build",
+            "build-test",
             "admin",
             "node_modules",
             "**/adapter-config.d.ts",

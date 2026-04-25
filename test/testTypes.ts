@@ -273,7 +273,7 @@ describe("Types utilities", () => {
         it("should reject reversed range", () => {
             const r = parseSegmentList("9-0", 14);
             expect(r.error).to.not.be.null;
-            expect(r.error).to.include("Start");
+            expect(r.error).to.include("start");
         });
 
         it("should handle single index", () => {

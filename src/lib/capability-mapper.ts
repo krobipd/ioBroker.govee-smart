@@ -935,6 +935,46 @@ export function mapCloudStateValue(
 }
 
 /**
+ * Plan the per-state writes for a list of synthesised Cloud-state
+ * capabilities. Used by the App-API poll and the OpenAPI-MQTT event
+ * handler (both call into `applyCloudCapabilities` on the adapter side).
+ *
+ * Returns the resolved `(stateId, value)` pairs for capabilities that:
+ *   - decode via `mapCloudStateValue` to a non-null result, AND
+ *   - aren't shadowed by the LAN-state set when the device is LAN-capable
+ *     (lights with `lanIp` shouldn't have their LAN sub-second updates
+ *      overwritten by a Cloud-source value).
+ *
+ * Pure function — no adapter state, no I/O — so the LAN-shadow logic is
+ * unit-testable independent of the live state-write pipeline.
+ *
+ * @param caps Capabilities to consider
+ * @param hasLanIp Whether the target device has a known LAN IP
+ * @param lanStateIds Default-LAN state IDs that LAN delivers authoritatively
+ */
+export function planCloudCapabilityWrites(
+  caps: CloudStateCapability[],
+  hasLanIp: boolean,
+  lanStateIds: Set<string>,
+): CloudStateValue[] {
+  const writes: CloudStateValue[] = [];
+  if (!Array.isArray(caps)) {
+    return writes;
+  }
+  for (const cap of caps) {
+    const mapped = mapCloudStateValue(cap);
+    if (!mapped) {
+      continue;
+    }
+    if (hasLanIp && lanStateIds.has(mapped.stateId)) {
+      continue;
+    }
+    writes.push(mapped);
+  }
+  return writes;
+}
+
+/**
  * Build complete state definitions for a device.
  * Combines LAN defaults, Cloud capabilities, quirks, scenes, snapshots, and diagnostics.
  * For groups: computes capability intersection of member devices (no snapshots/diagnostics).

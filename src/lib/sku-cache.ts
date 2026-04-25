@@ -66,6 +66,11 @@ export interface CachedDeviceData {
   manualMode?: boolean;
   /** Physical indices when manualMode=true; undefined when contiguous. */
   manualSegments?: number[];
+  /**
+   * User-selected scene speed level (0-N). Persisted so the adapter
+   *  re-applies the same speed after a restart instead of resetting to 0.
+   */
+  sceneSpeed?: number;
 }
 
 /**
