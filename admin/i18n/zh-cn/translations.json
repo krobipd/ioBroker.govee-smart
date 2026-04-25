@@ -1,5 +1,6 @@
 {
     "aboutInfo": "该适配器是免费且开源的。如果您觉得有用，请考虑支持开发。",
+    "advancedHeader": "高级选项",
     "apiKeyLabel": "API密钥",
     "cloudHeader": "云API（可选）",
     "cloudInfo": "输入您的 Govee API 密钥以启用设备名称、场景和分段控制。在 Govee Home 应用程序中的帐户 > 设置 > 关于我们 > 申请 API 密钥下获取密钥。",
@@ -8,6 +9,9 @@
     "donateKofi": "支持 Ko-fi",
     "donatePaypal": "通过 PayPal 捐赠",
     "emailLabel": "电子邮件",
+    "experimentalQuirksInfo": "Govee 不断发布新型号。有些已在适配器代码中准备就绪，但尚未被任何测试者确认。此开关将其激活。具体是哪些设备，您的设备是否在其中，详情请见 Wiki。",
+    "experimentalQuirksLabel": "启用实验性设备支持",
+    "experimentalQuirksTooltip": "激活 devices.json 中状态为 ⚪ 实验性的设备。它们可能正常工作、返回错误值或什么都不做。Wiki 的 Devices 页面列出每个条目及其状态。",
     "lanHeader": "LAN 控制（始终有效）",
     "lanInfo": "会自动发现在 Govee Home 应用程序中启用 LAN 模式的设备。LAN 是最快的控制通道。",
     "mqttHeader": "Govee 帐户（可选）",

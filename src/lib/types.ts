@@ -8,6 +8,12 @@ export interface AdapterConfig {
   goveePassword: string;
   /** Network interface IP for LAN multicast (empty = all interfaces) */
   networkInterface: string;
+  /**
+   * Activate device entries with status `seed` from `devices.json`. Off by
+   * default — these devices are prepared in code but unconfirmed by any
+   * tester. The Wiki lists every device and its status.
+   */
+  experimentalQuirks: boolean;
 }
 
 /**

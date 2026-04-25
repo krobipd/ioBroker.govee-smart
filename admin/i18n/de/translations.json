@@ -1,5 +1,6 @@
 {
     "aboutInfo": "Dieser Adapter ist kostenlos und quelloffen. Wenn er dir nützlich ist, unterstütze gerne die Entwicklung.",
+    "advancedHeader": "Erweiterte Optionen",
     "apiKeyLabel": "API Key",
     "cloudHeader": "Cloud API (optional)",
     "cloudInfo": "Govee API-Key eingeben um Gerätenamen, Szenen und Segmentsteuerung zu aktivieren. Den Key gibt es in der Govee Home App unter Account > Einstellungen > Über uns > API-Key beantragen.",
@@ -8,6 +9,9 @@
     "donateKofi": "Unterstützen auf Ko-fi",
     "donatePaypal": "Spenden via PayPal",
     "emailLabel": "E-Mail",
+    "experimentalQuirksInfo": "Govee bringt regelmäßig neue Modelle. Manche sind im Adapter-Code schon vorbereitet, aber noch von keinem Tester bestätigt. Mit diesem Schalter werden sie aktiviert. Welche Geräte das sind und ob deins dabei ist, steht im Wiki.",
+    "experimentalQuirksLabel": "Experimentelle Geräte-Unterstützung aktivieren",
+    "experimentalQuirksTooltip": "Aktiviert Geräte mit Status ⚪ Experimentell aus devices.json. Diese können funktionieren, falsche Werte liefern oder gar nichts tun. Die Wiki-Seite Geräte listet jeden Eintrag und Status.",
     "lanHeader": "LAN-Steuerung (immer aktiv)",
     "lanInfo": "Geräte mit aktivierter LAN-Funktion in der Govee Home App werden automatisch gefunden. LAN ist der schnellste Steuerkanal.",
     "mqttHeader": "Govee Account (optional)",

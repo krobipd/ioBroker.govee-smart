@@ -1,5 +1,6 @@
 {
     "aboutInfo": "Ten adapter jest darmowy i open source. Jeśli uznasz to za przydatne, rozważ wsparcie rozwoju.",
+    "advancedHeader": "Opcje zaawansowane",
     "apiKeyLabel": "Klucz API",
     "cloudHeader": "Cloud API (opcjonalnie)",
     "cloudInfo": "Wprowadź klucz Govee API, aby włączyć nazwy urządzeń, sceny i kontrolę segmentów. Uzyskaj klucz w aplikacji Govee Home w obszarze Konto > Ustawienia > O nas > Złóż wniosek o klucz API.",
@@ -8,6 +9,9 @@
     "donateKofi": "Wsparcie dla Ko-fi",
     "donatePaypal": "Przekaż darowiznę za pośrednictwem PayPal",
     "emailLabel": "E-mail",
+    "experimentalQuirksInfo": "Govee regularnie wypuszcza nowe modele. Niektóre są już przygotowane w kodzie adaptera, ale jeszcze nie potwierdzone przez żadnego testera. Ten przełącznik je aktywuje. Które urządzenia to są i czy Twoje jest wśród nich, jest udokumentowane w Wiki.",
+    "experimentalQuirksLabel": "Włącz eksperymentalne wsparcie urządzeń",
+    "experimentalQuirksTooltip": "Aktywuje urządzenia ze statusem ⚪ Eksperymentalne z devices.json. Mogą działać, zwracać błędne wartości lub nie robić nic. Strona Wiki Devices wymienia każdy wpis i jego status.",
     "lanHeader": "Sterowanie LAN (zawsze aktywne)",
     "lanInfo": "Urządzenia z włączonym trybem LAN w aplikacji Govee Home są wykrywane automatycznie. LAN to najszybszy kanał sterowania.",
     "mqttHeader": "Konto Govee (opcjonalnie)",

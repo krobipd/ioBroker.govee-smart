@@ -178,6 +178,7 @@
         "apiKey": "",
         "goveeEmail": "",
         "goveePassword": "",
-        "networkInterface": "0.0.0.0"
+        "networkInterface": "0.0.0.0",
+        "experimentalQuirks": false
     }
 }

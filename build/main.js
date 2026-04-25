@@ -231,7 +231,7 @@ class GoveeAdapter extends utils.Adapter {
     this.deviceManager = new import_device_manager.DeviceManager(this.log, this);
     const dataDir = utils.getAbsoluteInstanceDataDir(this);
     (0, import_device_registry.initDeviceRegistry)({
-      experimental: false,
+      experimental: config.experimentalQuirks === true,
       log: this.log
     });
     this.skuCache = new import_sku_cache.SkuCache(dataDir, this.log);

@@ -16,7 +16,6 @@
             "name": "LED Bulb",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -27,14 +26,16 @@
             "status": "seed",
             "notes": "API claims 2000-9000K, real range narrower",
             "quirks": {
-                "colorTempRange": { "min": 2700, "max": 6500 }
+                "colorTempRange": {
+                    "min": 2700,
+                    "max": 6500
+                }
             }
         },
         "H6053": {
             "name": "LED Glide",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -43,7 +44,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -59,7 +59,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -68,7 +67,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -77,7 +75,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -86,7 +83,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -95,7 +91,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -104,7 +99,6 @@
             "name": "LED Strip",
             "type": "light",
             "status": "seed",
-            "notes": "Übernommen aus Pre-v2 BUILTIN_QUIRKS",
             "quirks": {
                 "brokenPlatformApi": true
             }
@@ -144,7 +138,10 @@
             "status": "seed",
             "notes": "API claims 2000-9000K, real range narrower",
             "quirks": {
-                "colorTempRange": { "min": 2200, "max": 6500 }
+                "colorTempRange": {
+                    "min": 2200,
+                    "max": 6500
+                }
             }
         },
         "H70B3": {

@@ -1,5 +1,6 @@
 {
     "aboutInfo": "Questo adattatore è gratuito e open source. Se lo trovi utile, considera di sostenere lo sviluppo.",
+    "advancedHeader": "Opzioni avanzate",
     "apiKeyLabel": "Chiave API",
     "cloudHeader": "API cloud (facoltativo)",
     "cloudInfo": "Inserisci la tua chiave API Govee per abilitare nomi di dispositivi, scene e controllo dei segmenti. Ottieni la tua chiave nell'app Govee Home in Account > Impostazioni > Chi siamo > Richiedi chiave API.",
@@ -8,6 +9,9 @@
     "donateKofi": "Supporto su Ko-fi",
     "donatePaypal": "Dona tramite PayPal",
     "emailLabel": "E-mail",
+    "experimentalQuirksInfo": "Govee rilascia regolarmente nuovi modelli. Alcuni sono già preparati nel codice dell'adattatore ma non ancora confermati da nessun tester. Questo interruttore li attiva. Quali dispositivi sono e se il tuo è tra questi è documentato nel Wiki.",
+    "experimentalQuirksLabel": "Attiva il supporto sperimentale dei dispositivi",
+    "experimentalQuirksTooltip": "Attiva i dispositivi con stato ⚪ Sperimentale da devices.json. Possono funzionare, restituire valori errati o non fare nulla. La pagina Wiki Devices elenca ogni voce e il suo stato.",
     "lanHeader": "Controllo LAN (sempre attivo)",
     "lanInfo": "I dispositivi con la modalità LAN abilitata nell'app Govee Home vengono rilevati automaticamente. La LAN è il canale di controllo più veloce.",
     "mqttHeader": "Conto Govee (facoltativo)",

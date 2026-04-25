@@ -259,9 +259,9 @@ class GoveeAdapter extends utils.Adapter {
 
     // Load device registry from devices.json in the adapter package root.
     // Status filter: verified+reported active by default; seed-status entries
-    // require the experimentalQuirks config toggle (Session 7).
+    // require the experimentalQuirks config toggle.
     initDeviceRegistry({
-      experimental: false,
+      experimental: config.experimentalQuirks === true,
       log: this.log,
     });
     this.skuCache = new SkuCache(dataDir, this.log);

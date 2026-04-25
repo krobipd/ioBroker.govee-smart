@@ -1,5 +1,6 @@
 {
     "aboutInfo": "Deze adapter is gratis en open source. Als u het nuttig vindt, overweeg dan om de ontwikkeling te ondersteunen.",
+    "advancedHeader": "Geavanceerde opties",
     "apiKeyLabel": "API-sleutel",
     "cloudHeader": "Cloud-API (optioneel)",
     "cloudInfo": "Voer uw Govee API-sleutel in om apparaatnamen, scènes en segmentcontrole in te schakelen. Haal uw sleutel op in de Govee Home-app onder Account > Instellingen > Over ons > API-sleutel aanvragen.",
@@ -8,6 +9,9 @@
     "donateKofi": "Ondersteuning op Ko-fi",
     "donatePaypal": "Doneer via PayPal",
     "emailLabel": "E-mail",
+    "experimentalQuirksInfo": "Govee brengt regelmatig nieuwe modellen uit. Sommige zijn al voorbereid in de adaptercode, maar nog niet bevestigd door een tester. Deze schakelaar activeert ze. Welke apparaten dit zijn en of jouw apparaat erbij hoort, staat in de Wiki.",
+    "experimentalQuirksLabel": "Experimentele apparaatondersteuning inschakelen",
+    "experimentalQuirksTooltip": "Activeert apparaten met status ⚪ Experimenteel uit devices.json. Ze kunnen werken, verkeerde waarden teruggeven of niets doen. De Wiki-pagina Devices vermeldt elke vermelding en de status.",
     "lanHeader": "LAN-controle (altijd actief)",
     "lanInfo": "Apparaten waarvoor de LAN-modus is ingeschakeld in de Govee Home-app worden automatisch gedetecteerd. LAN is het snelste besturingskanaal.",
     "mqttHeader": "Govee-account (optioneel)",

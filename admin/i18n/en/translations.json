@@ -27,5 +27,9 @@
     "wizardBtnAbort": "Abort",
     "wizardHelp": "How it works: the current segment flashes WHITE, all others stay dark. Click 'Yes, visible' or 'No, dark'. When you've reached the physical end of the strip, click 'Done – end of strip'. The wizard determines the real segment count and, if gaps were found, saves a manual_list automatically. Session auto-aborts after 5 minutes of inactivity.",
     "docLinkLabelDe": "Wiki (Deutsch)",
-    "docLinkLabelEn": "Wiki (English)"
+    "docLinkLabelEn": "Wiki (English)",
+    "advancedHeader": "Advanced options",
+    "experimentalQuirksLabel": "Enable experimental device support",
+    "experimentalQuirksTooltip": "Activates devices with status ⚪ Experimental from devices.json. They may work, return wrong values, or do nothing. The Wiki page Devices lists every entry and its status.",
+    "experimentalQuirksInfo": "Govee keeps releasing new models. Some are already prepared in the adapter code but not confirmed by any tester yet. This switch enables them. Which devices these are and whether yours is among them is documented in the Wiki."
 }
