@@ -29,6 +29,7 @@ var import_govee_api_client = require("./lib/govee-api-client.js");
 var import_govee_cloud_client = require("./lib/govee-cloud-client.js");
 var import_govee_lan_client = require("./lib/govee-lan-client.js");
 var import_govee_mqtt_client = require("./lib/govee-mqtt-client.js");
+var import_govee_openapi_mqtt_client = require("./lib/govee-openapi-mqtt-client.js");
 var import_local_snapshots = require("./lib/local-snapshots.js");
 var import_cloud_retry = require("./lib/cloud-retry.js");
 var import_rate_limiter = require("./lib/rate-limiter.js");
@@ -58,8 +59,11 @@ class GoveeAdapter extends utils.Adapter {
   stateManager = null;
   lanClient = null;
   mqttClient = null;
+  openapiMqttClient = null;
   cloudClient = null;
   rateLimiter = null;
+  /** Repeating timer for the App-API poll (sensor-state pull). */
+  appApiPollTimer;
   skuCache = null;
   localSnapshots = null;
   cloudWasConnected = false;
@@ -161,6 +165,19 @@ class GoveeAdapter extends utils.Adapter {
       },
       native: {}
     });
+    await this.setObjectNotExistsAsync("info.openapiMqttConnected", {
+      type: "state",
+      common: {
+        name: "Govee OpenAPI MQTT connected",
+        desc: "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
+        type: "boolean",
+        role: "indicator.connected",
+        read: true,
+        write: false,
+        def: false
+      },
+      native: {}
+    });
     await this.setObjectNotExistsAsync("info.wizardStatus", {
       type: "state",
       common: {
@@ -189,6 +206,10 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
+    await this.setStateAsync("info.openapiMqttConnected", {
+      val: false,
+      ack: true
+    });
     await this.setStateAsync("info.refresh_cloud_data", {
       val: false,
       ack: true
@@ -341,6 +362,13 @@ class GoveeAdapter extends utils.Adapter {
         (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().setApiResponse(deviceId, endpoint, body);
       });
       this.deviceManager.setCloudClient(this.cloudClient);
+      this.deviceManager.setOnCloudCapabilities((device, caps) => {
+        this.applyCloudCapabilities(device, caps).catch(
+          (e) => this.log.warn(
+            `applyCloudCapabilities failed for ${device.sku}: ${e instanceof Error ? e.message : String(e)}`
+          )
+        );
+      });
       this.rateLimiter = new import_rate_limiter.RateLimiter(
         this.log,
         this,
@@ -349,6 +377,35 @@ class GoveeAdapter extends utils.Adapter {
       );
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
+      this.openapiMqttClient = new import_govee_openapi_mqtt_client.GoveeOpenapiMqttClient(
+        config.apiKey,
+        this.log,
+        this
+      );
+      this.openapiMqttClient.connect(
+        (event) => {
+          var _a2;
+          return (_a2 = this.deviceManager) == null ? void 0 : _a2.handleOpenApiEvent(event);
+        },
+        (connected) => {
+          this.setStateAsync("info.openapiMqttConnected", {
+            val: connected,
+            ack: true
+          }).catch(() => {
+          });
+        }
+      );
+      this.appApiPollTimer = this.setInterval(
+        () => {
+          var _a2;
+          (_a2 = this.deviceManager) == null ? void 0 : _a2.pollAppApi().catch(
+            (e) => this.log.debug(
+              `pollAppApi failed: ${e instanceof Error ? e.message : String(e)}`
+            )
+          );
+        },
+        2 * 60 * 1e3
+      );
       if (!cachedOk) {
         const result = await this.cloudInitWithTimeout();
         this.cloudWasConnected = result.ok;
@@ -497,7 +554,7 @@ class GoveeAdapter extends utils.Adapter {
    * @param callback Completion callback
    */
   onUnload(callback) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     try {
       if (this.lanScanTimer) {
         this.clearTimeout(this.lanScanTimer);
@@ -508,11 +565,16 @@ class GoveeAdapter extends utils.Adapter {
       if (this.readyTimer) {
         this.clearTimeout(this.readyTimer);
       }
+      if (this.appApiPollTimer) {
+        this.clearInterval(this.appApiPollTimer);
+        this.appApiPollTimer = void 0;
+      }
       (_a = this.cloudRetry) == null ? void 0 : _a.dispose();
       (_b = this.segmentWizard) == null ? void 0 : _b.dispose();
       (_c = this.lanClient) == null ? void 0 : _c.stop();
       (_d = this.mqttClient) == null ? void 0 : _d.disconnect();
-      (_e = this.rateLimiter) == null ? void 0 : _e.stop();
+      (_e = this.openapiMqttClient) == null ? void 0 : _e.disconnect();
+      (_f = this.rateLimiter) == null ? void 0 : _f.stop();
       if (this.unhandledRejectionHandler) {
         process.off("unhandledRejection", this.unhandledRejectionHandler);
         this.unhandledRejectionHandler = null;
@@ -529,6 +591,11 @@ class GoveeAdapter extends utils.Adapter {
         () => {
         }
       );
+      this.setState("info.openapiMqttConnected", {
+        val: false,
+        ack: true
+      }).catch(() => {
+      });
       this.setState("info.cloudConnected", { val: false, ack: true }).catch(
         () => {
         }
@@ -1148,6 +1215,43 @@ class GoveeAdapter extends utils.Adapter {
     if (loaded > 0) {
       this.log.debug(`Cloud states loaded for ${loaded} devices`);
     }
+  }
+  /**
+   * Apply a list of synthesized Cloud-state capabilities to a single
+   * device — the App-API poll and OpenAPI-MQTT events both use this path
+   * so their values flow through the same `mapCloudStateValue` pipeline
+   * that polled Cloud states use.
+   *
+   * @param device Target Govee device
+   * @param caps Capabilities to apply
+   */
+  async applyCloudCapabilities(device, caps) {
+    if (!this.stateManager) {
+      return;
+    }
+    const lanStateIds = new Set((0, import_capability_mapper.getDefaultLanStates)().map((s) => s.id));
+    const prefix = this.stateManager.devicePrefix(device);
+    const writes = [];
+    for (const cap of caps) {
+      const mapped = (0, import_capability_mapper.mapCloudStateValue)(cap);
+      if (!mapped) {
+        continue;
+      }
+      if (device.lanIp && lanStateIds.has(mapped.stateId)) {
+        continue;
+      }
+      const statePath = this.stateManager.resolveStatePath(
+        prefix,
+        mapped.stateId
+      );
+      writes.push(
+        this.setStateAsync(statePath, {
+          val: mapped.value,
+          ack: true
+        }).catch(() => void 0)
+      );
+    }
+    await Promise.all(writes);
   }
   /**
    * Find device for a state ID

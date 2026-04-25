@@ -545,6 +545,32 @@ describe("StateManager", () => {
             const sm = new StateManager(adapter as never);
             expect(sm.resolveStatePath("devices.h6160_0011", "gradient_toggle")).to.equal("devices.h6160_0011.control.gradient_toggle");
         });
+
+        it("should route sensor states to sensor channel", async () => {
+            const { adapter } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "temperature", name: "Temperature", type: "number", role: "value.temperature", write: false, def: 0, unit: "°C", capabilityType: "property", capabilityInstance: "sensorTemperature", channel: "sensor" },
+                { id: "humidity", name: "Humidity", type: "number", role: "value.humidity", write: false, def: 0, unit: "%", capabilityType: "property", capabilityInstance: "sensorHumidity", channel: "sensor" },
+                { id: "battery", name: "Battery", type: "number", role: "value.battery", write: false, def: 0, unit: "%", capabilityType: "property", capabilityInstance: "battery", channel: "sensor" },
+            ]);
+            expect(sm.resolveStatePath("devices.h6160_0011", "temperature")).to.equal("devices.h6160_0011.sensor.temperature");
+            expect(sm.resolveStatePath("devices.h6160_0011", "humidity")).to.equal("devices.h6160_0011.sensor.humidity");
+            expect(sm.resolveStatePath("devices.h6160_0011", "battery")).to.equal("devices.h6160_0011.sensor.battery");
+        });
+
+        it("should route event states to events channel", async () => {
+            const { adapter } = createMockAdapter();
+            const sm = new StateManager(adapter as never);
+            const dev = createTestDevice();
+            await sm.createDeviceStates(dev, [
+                { id: "lack_water", name: "Lack of Water", type: "boolean", role: "indicator", write: false, def: false, capabilityType: "event", capabilityInstance: "lackWaterEvent", channel: "events" },
+                { id: "ice_full", name: "Ice Full", type: "boolean", role: "indicator", write: false, def: false, capabilityType: "event", capabilityInstance: "iceFullEvent", channel: "events" },
+            ]);
+            expect(sm.resolveStatePath("devices.h6160_0011", "lack_water")).to.equal("devices.h6160_0011.events.lack_water");
+            expect(sm.resolveStatePath("devices.h6160_0011", "ice_full")).to.equal("devices.h6160_0011.events.ice_full");
+        });
     });
 
     describe("updateDeviceState", () => {

@@ -27,12 +27,21 @@ var import_types = require("./types.js");
 function sanitize(str) {
   return str.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase();
 }
-const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
+const MANAGED_CHANNELS = [
+  "control",
+  "scenes",
+  "music",
+  "snapshots",
+  "sensor",
+  "events"
+];
 const CHANNEL_NAMES = {
   control: "Controls",
   scenes: "Scenes",
   music: "Music",
   snapshots: "Snapshots",
+  sensor: "Sensor Data",
+  events: "Events",
   info: "Device Information"
 };
 class StateManager {

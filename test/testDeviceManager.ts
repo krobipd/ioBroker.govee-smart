@@ -1,10 +1,12 @@
 import { expect } from "chai";
 import {
+    buildCapabilitiesFromAppEntry,
     DeviceManager,
     parseMqttSegmentData,
     resolveSegmentCount,
     SEGMENT_HARD_MAX,
 } from "../src/lib/device-manager";
+import type { AppDeviceEntry } from "../src/lib/govee-api-client";
 import { _resetDeviceRegistry, initDeviceRegistry } from "../src/lib/device-registry";
 import type { CloudCapability, GoveeDevice, LanDevice, MqttStatusUpdate } from "../src/lib/types";
 
@@ -1838,5 +1840,209 @@ describe("DeviceManager — loadFromCache merge", () => {
         expect(device.segmentCount).to.equal(undefined);
         expect(device.manualMode).to.equal(undefined);
         expect(device.manualSegments).to.equal(undefined);
+    });
+
+    describe("buildCapabilitiesFromAppEntry", () => {
+        it("synthesises sensor caps from a complete H5179 lastData payload", () => {
+            const entry: AppDeviceEntry = {
+                sku: "H5179",
+                device: "AA:BB:CC:DD:EE:FF",
+                deviceName: "Wohnzimmer",
+                lastData: {
+                    online: true,
+                    tem: 2370, // 23.70 °C
+                    hum: 4290, // 42.90 % RH
+                    lastTime: 1776704461000,
+                },
+                settings: {
+                    battery: 87,
+                },
+            };
+            const caps = buildCapabilitiesFromAppEntry(entry);
+            expect(caps).to.have.lengthOf(4);
+            expect(caps[0]).to.deep.equal({
+                type: "devices.capabilities.online",
+                instance: "online",
+                state: { value: true },
+            });
+            expect(caps[1]).to.deep.equal({
+                type: "devices.capabilities.property",
+                instance: "sensorTemperature",
+                state: { value: 23.7 },
+            });
+            expect(caps[2]).to.deep.equal({
+                type: "devices.capabilities.property",
+                instance: "sensorHumidity",
+                state: { value: 42.9 },
+            });
+            expect(caps[3]).to.deep.equal({
+                type: "devices.capabilities.property",
+                instance: "battery",
+                state: { value: 87 },
+            });
+        });
+
+        it("returns empty array when lastData is missing", () => {
+            const entry: AppDeviceEntry = {
+                sku: "H5179",
+                device: "AA:BB:CC:DD:EE:FF",
+                deviceName: "x",
+            };
+            expect(buildCapabilitiesFromAppEntry(entry)).to.deep.equal([]);
+        });
+
+        it("prefers lastData.battery over settings.battery", () => {
+            const entry: AppDeviceEntry = {
+                sku: "H5179",
+                device: "AA:BB:CC:DD:EE:FF",
+                deviceName: "x",
+                lastData: { battery: 50 },
+                settings: { battery: 99 },
+            };
+            const caps = buildCapabilitiesFromAppEntry(entry);
+            expect(caps).to.have.lengthOf(1);
+            expect(caps[0].state?.value).to.equal(50);
+        });
+
+        it("falls back to settings.battery when lastData has none", () => {
+            const entry: AppDeviceEntry = {
+                sku: "H5179",
+                device: "AA:BB:CC:DD:EE:FF",
+                deviceName: "x",
+                lastData: { tem: 2000 },
+                settings: { battery: 75 },
+            };
+            const caps = buildCapabilitiesFromAppEntry(entry);
+            const battery = caps.find((c) => c.instance === "battery");
+            expect(battery?.state?.value).to.equal(75);
+        });
+
+        it("ignores non-finite tem/hum values defensively", () => {
+            const entry: AppDeviceEntry = {
+                sku: "H5179",
+                device: "AA:BB:CC:DD:EE:FF",
+                deviceName: "x",
+                lastData: { tem: NaN, hum: Infinity, online: false },
+            };
+            const caps = buildCapabilitiesFromAppEntry(entry);
+            expect(caps).to.have.lengthOf(1);
+            expect(caps[0].instance).to.equal("online");
+        });
+    });
+
+    describe("pollAppApi", () => {
+        function makeApiMock(opts: {
+            hasBearer?: boolean;
+            entries?: AppDeviceEntry[];
+            throws?: boolean;
+        }): unknown {
+            return {
+                hasBearerToken: () => opts.hasBearer ?? true,
+                fetchDeviceList: async () => {
+                    if (opts.throws) {
+                        throw new Error("App API down");
+                    }
+                    return opts.entries ?? [];
+                },
+            };
+        }
+
+        it("returns 0 without an api client", async () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            expect(await dm2.pollAppApi()).to.equal(0);
+        });
+
+        it("returns 0 when bearer token missing", async () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            dm2.setApiClient(makeApiMock({ hasBearer: false }) as never);
+            expect(await dm2.pollAppApi()).to.equal(0);
+        });
+
+        it("ignores app entries for unknown devices", async () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            dm2.setApiClient(makeApiMock({
+                entries: [{
+                    sku: "H5179",
+                    device: "AA:BB:CC:DD:EE:FF",
+                    deviceName: "Unknown",
+                    lastData: { tem: 2000 },
+                }],
+            }) as never);
+            expect(await dm2.pollAppApi()).to.equal(0);
+        });
+
+        it("forwards synthetic caps for known devices via onCloudCapabilities", async () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            dm2.handleLanDiscovery({
+                ip: "192.168.1.50",
+                device: "AABBCCDDEEFF0001",
+                sku: "H5179",
+            } as LanDevice);
+            const seen: Array<{ device: GoveeDevice; caps: unknown[] }> = [];
+            dm2.setOnCloudCapabilities((device, caps) => {
+                seen.push({ device, caps });
+            });
+            dm2.setApiClient(makeApiMock({
+                entries: [{
+                    sku: "H5179",
+                    device: "AABBCCDDEEFF0001",
+                    deviceName: "Wohnzimmer",
+                    lastData: { online: true, tem: 2150, hum: 4500 },
+                }],
+            }) as never);
+            expect(await dm2.pollAppApi()).to.equal(1);
+            expect(seen).to.have.lengthOf(1);
+            expect(seen[0].caps).to.have.lengthOf(3);
+        });
+
+        it("returns 0 on fetch error and does not throw", async () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            dm2.setApiClient(makeApiMock({ throws: true }) as never);
+            expect(await dm2.pollAppApi()).to.equal(0);
+        });
+    });
+
+    describe("handleOpenApiEvent", () => {
+        it("ignores events for unknown devices", () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            let called = 0;
+            dm2.setOnCloudCapabilities(() => { called++; });
+            dm2.handleOpenApiEvent({
+                sku: "H5179",
+                device: "ZZ:ZZ:ZZ:ZZ:ZZ:ZZ",
+                capabilities: [{ type: "x", instance: "y", state: { value: 1 } }],
+            });
+            expect(called).to.equal(0);
+        });
+
+        it("forwards caps to onCloudCapabilities for known devices", () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            dm2.handleLanDiscovery({
+                ip: "192.168.1.51",
+                device: "AABBCCDDEEFF0002",
+                sku: "H5179",
+            } as LanDevice);
+            const seen: unknown[][] = [];
+            dm2.setOnCloudCapabilities((_, caps) => seen.push(caps));
+            dm2.handleOpenApiEvent({
+                sku: "H5179",
+                device: "AABBCCDDEEFF0002",
+                capabilities: [{ type: "devices.capabilities.event", instance: "lackWaterEvent", state: { value: true } }],
+            });
+            expect(seen).to.have.lengthOf(1);
+            expect((seen[0] as Array<{ instance: string }>)[0].instance).to.equal("lackWaterEvent");
+        });
+
+        it("ignores malformed input defensively", () => {
+            const dm2 = new DeviceManager(mockLog, mockTimers);
+            let called = 0;
+            dm2.setOnCloudCapabilities(() => { called++; });
+            // Empty, missing fields, non-array caps, empty caps
+            dm2.handleOpenApiEvent({} as never);
+            dm2.handleOpenApiEvent({ sku: 1 as never, device: "x", capabilities: [] });
+            dm2.handleOpenApiEvent({ sku: "H5179", device: "x", capabilities: null as never });
+            dm2.handleOpenApiEvent({ sku: "H5179", device: "x", capabilities: [] });
+            expect(called).to.equal(0);
+        });
     });
 });

@@ -1,7 +1,7 @@
 import { CommandRouter } from "./command-router.js";
 import { getDeviceQuirks } from "./device-registry.js";
 import { DiagnosticsCollector } from "./diagnostics.js";
-import type { GoveeApiClient } from "./govee-api-client.js";
+import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
 import type { GoveeLanClient } from "./govee-lan-client.js";
 import type { RateLimiter } from "./rate-limiter.js";
@@ -12,6 +12,7 @@ import {
   rgbToHex,
   type CloudDevice,
   type CloudLoadResult,
+  type CloudStateCapability,
   type DeviceState,
   type ErrorCategory,
   type GoveeDevice,
@@ -20,21 +21,6 @@ import {
   type TimerAdapter,
 } from "./types.js";
 import { HttpError } from "./http-client.js";
-
-/** Appliance device types — filtered out (handled by govee-appliances adapter) */
-const APPLIANCE_TYPES = new Set([
-  "devices.types.heater",
-  "devices.types.humidifier",
-  "devices.types.air_purifier",
-  "devices.types.fan",
-  "devices.types.dehumidifier",
-  "devices.types.thermometer",
-  "devices.types.sensor",
-  "devices.types.socket",
-  "devices.types.ice_maker",
-  "devices.types.aroma_diffuser",
-  "devices.types.kettle",
-]);
 
 /** Parsed per-segment data from MQTT BLE packets */
 export interface MqttSegmentData {
@@ -213,6 +199,9 @@ export class DeviceManager {
     | ((device: GoveeDevice, state: Partial<DeviceState>) => void)
     | null = null;
   private onDeviceListChanged: ((devices: GoveeDevice[]) => void) | null = null;
+  private onCloudCapabilities:
+    | ((device: GoveeDevice, caps: CloudStateCapability[]) => void)
+    | null = null;
   private lastErrorCategory: ErrorCategory | null = null;
 
   /**
@@ -564,10 +553,6 @@ export class DeviceManager {
     for (const cd of cloudDevices) {
       // Defensive guard against malformed cloud entries
       if (!cd || typeof cd.sku !== "string" || typeof cd.device !== "string") {
-        continue;
-      }
-      // Skip appliance types — handled by govee-appliances adapter
-      if (APPLIANCE_TYPES.has(cd.type)) {
         continue;
       }
       const existing = this.devices.get(this.deviceKey(cd.sku, cd.device));
@@ -1367,4 +1352,163 @@ export class DeviceManager {
   ): Record<string, unknown> {
     return this.diagnostics.generate(device, adapterVersion);
   }
+
+  /**
+   * Poll the undocumented app-API for sensor-like devices (H5179 et al.)
+   * where OpenAPI v2 `/device/state` returns empty. Each entry is converted
+   * to synthetic capabilities and routed back through the same callback as
+   * regular Cloud state, so the existing setState pipeline picks it up
+   * without a special-case branch.
+   *
+   * Bearer token comes from the MQTT login flow — without MQTT credentials
+   * (Email + Password) this is a no-op.
+   *
+   * @returns Number of devices that received an update
+   */
+  async pollAppApi(): Promise<number> {
+    if (!this.apiClient || !this.apiClient.hasBearerToken()) {
+      return 0;
+    }
+    let entries: AppDeviceEntry[];
+    try {
+      entries = await this.apiClient.fetchDeviceList();
+    } catch (err) {
+      const category = classifyError(err);
+      const msg = `App API fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+      if (category !== this.lastErrorCategory) {
+        this.lastErrorCategory = category;
+        this.log.warn(msg);
+      } else {
+        this.log.debug(msg);
+      }
+      return 0;
+    }
+    let updated = 0;
+    for (const entry of entries) {
+      const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
+      if (!device) {
+        continue;
+      }
+      const caps = buildCapabilitiesFromAppEntry(entry);
+      if (caps.length === 0) {
+        continue;
+      }
+      // Route synthetic capabilities through the existing
+      // onCloudCapabilities callback so main.ts's normal setState
+      // pipeline (mapCloudStateValue + setStateAsync) handles them.
+      this.onCloudCapabilities?.(device, caps);
+      this.diagnostics.setApiResponse(
+        device.deviceId,
+        "/device/rest/devices/v1/list",
+        entry,
+      );
+      updated++;
+    }
+    return updated;
+  }
+
+  /**
+   * Hook callback for sources that emit `CloudStateCapability[]` updates
+   * outside the normal Cloud-poll path (App-API, OpenAPI-MQTT). Caller is
+   * responsible for wiring it to the adapter-side state-write path.
+   *
+   * @param cb Callback receiving (device, caps)
+   */
+  setOnCloudCapabilities(
+    cb: ((device: GoveeDevice, caps: CloudStateCapability[]) => void) | null,
+  ): void {
+    this.onCloudCapabilities = cb;
+  }
+
+  /**
+   * Process a parsed OpenAPI-MQTT event by forwarding its capabilities
+   * through the same hook used by App-API polls. Called from the
+   * adapter-side OpenAPI-MQTT message handler.
+   *
+   * @param event Parsed event from the OpenAPI-MQTT broker
+   * @param event.sku Govee SKU (e.g. "H5179")
+   * @param event.device MAC-style device identifier
+   * @param event.capabilities Capability list synthesised from the broker payload
+   */
+  handleOpenApiEvent(event: {
+    sku: string;
+    device: string;
+    capabilities: CloudStateCapability[];
+  }): void {
+    if (
+      !event ||
+      typeof event.sku !== "string" ||
+      typeof event.device !== "string"
+    ) {
+      return;
+    }
+    if (!Array.isArray(event.capabilities) || event.capabilities.length === 0) {
+      return;
+    }
+    const device = this.devices.get(this.deviceKey(event.sku, event.device));
+    if (!device) {
+      return;
+    }
+    this.onCloudCapabilities?.(device, event.capabilities);
+  }
+}
+
+/**
+ * Convert an app-API device entry into a list of synthetic Cloud-state
+ * capabilities the existing `mapCloudStateValue` pipeline can consume.
+ *
+ * Govee stores temperature and humidity as integer hundredths of a unit
+ * (`tem: 2370` → 23.70 °C, `hum: 4290` → 42.90 % RH). Battery may live
+ * either at the lastData level or in deviceSettings — lastData wins
+ * because it's the more recent reading.
+ *
+ * @param entry One entry from `GoveeApiClient.fetchDeviceList()`
+ */
+export function buildCapabilitiesFromAppEntry(
+  entry: AppDeviceEntry,
+): CloudStateCapability[] {
+  const caps: CloudStateCapability[] = [];
+  const last = entry.lastData;
+  if (!last) {
+    return caps;
+  }
+  if (typeof last.online === "boolean") {
+    caps.push({
+      type: "devices.capabilities.online",
+      instance: "online",
+      state: { value: last.online },
+    });
+  }
+  if (typeof last.tem === "number" && Number.isFinite(last.tem)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "sensorTemperature",
+      state: { value: last.tem / 100 },
+    });
+  }
+  if (typeof last.hum === "number" && Number.isFinite(last.hum)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "sensorHumidity",
+      state: { value: last.hum / 100 },
+    });
+  }
+  if (typeof last.battery === "number" && Number.isFinite(last.battery)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "battery",
+      state: { value: last.battery },
+    });
+  } else if (
+    entry.settings &&
+    typeof entry.settings.battery === "number" &&
+    Number.isFinite(entry.settings.battery)
+  ) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "battery",
+      state: { value: entry.settings.battery },
+    });
+  }
+  return caps;
 }

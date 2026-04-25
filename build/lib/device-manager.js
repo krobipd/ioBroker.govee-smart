@@ -20,6 +20,7 @@ var device_manager_exports = {};
 __export(device_manager_exports, {
   DeviceManager: () => DeviceManager,
   SEGMENT_HARD_MAX: () => SEGMENT_HARD_MAX,
+  buildCapabilitiesFromAppEntry: () => buildCapabilitiesFromAppEntry,
   getEffectiveSegmentIndices: () => getEffectiveSegmentIndices,
   parseMqttSegmentData: () => parseMqttSegmentData,
   resolveSegmentCount: () => resolveSegmentCount
@@ -30,19 +31,6 @@ var import_device_registry = require("./device-registry.js");
 var import_diagnostics = require("./diagnostics.js");
 var import_types = require("./types.js");
 var import_http_client = require("./http-client.js");
-const APPLIANCE_TYPES = /* @__PURE__ */ new Set([
-  "devices.types.heater",
-  "devices.types.humidifier",
-  "devices.types.air_purifier",
-  "devices.types.fan",
-  "devices.types.dehumidifier",
-  "devices.types.thermometer",
-  "devices.types.sensor",
-  "devices.types.socket",
-  "devices.types.ice_maker",
-  "devices.types.aroma_diffuser",
-  "devices.types.kettle"
-]);
 function parseMqttSegmentData(commands) {
   if (!Array.isArray(commands)) {
     return [];
@@ -138,6 +126,7 @@ class DeviceManager {
   skuCache = null;
   onDeviceUpdate = null;
   onDeviceListChanged = null;
+  onCloudCapabilities = null;
   lastErrorCategory = null;
   /**
    * @param log    ioBroker logger
@@ -410,9 +399,6 @@ class DeviceManager {
     }
     for (const cd of cloudDevices) {
       if (!cd || typeof cd.sku !== "string" || typeof cd.device !== "string") {
-        continue;
-      }
-      if (APPLIANCE_TYPES.has(cd.type)) {
         continue;
       }
       const existing = this.devices.get(this.deviceKey(cd.sku, cd.device));
@@ -1059,11 +1045,139 @@ class DeviceManager {
   generateDiagnostics(device, adapterVersion) {
     return this.diagnostics.generate(device, adapterVersion);
   }
+  /**
+   * Poll the undocumented app-API for sensor-like devices (H5179 et al.)
+   * where OpenAPI v2 `/device/state` returns empty. Each entry is converted
+   * to synthetic capabilities and routed back through the same callback as
+   * regular Cloud state, so the existing setState pipeline picks it up
+   * without a special-case branch.
+   *
+   * Bearer token comes from the MQTT login flow — without MQTT credentials
+   * (Email + Password) this is a no-op.
+   *
+   * @returns Number of devices that received an update
+   */
+  async pollAppApi() {
+    var _a;
+    if (!this.apiClient || !this.apiClient.hasBearerToken()) {
+      return 0;
+    }
+    let entries;
+    try {
+      entries = await this.apiClient.fetchDeviceList();
+    } catch (err) {
+      const category = (0, import_types.classifyError)(err);
+      const msg = `App API fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+      if (category !== this.lastErrorCategory) {
+        this.lastErrorCategory = category;
+        this.log.warn(msg);
+      } else {
+        this.log.debug(msg);
+      }
+      return 0;
+    }
+    let updated = 0;
+    for (const entry of entries) {
+      const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
+      if (!device) {
+        continue;
+      }
+      const caps = buildCapabilitiesFromAppEntry(entry);
+      if (caps.length === 0) {
+        continue;
+      }
+      (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, caps);
+      this.diagnostics.setApiResponse(
+        device.deviceId,
+        "/device/rest/devices/v1/list",
+        entry
+      );
+      updated++;
+    }
+    return updated;
+  }
+  /**
+   * Hook callback for sources that emit `CloudStateCapability[]` updates
+   * outside the normal Cloud-poll path (App-API, OpenAPI-MQTT). Caller is
+   * responsible for wiring it to the adapter-side state-write path.
+   *
+   * @param cb Callback receiving (device, caps)
+   */
+  setOnCloudCapabilities(cb) {
+    this.onCloudCapabilities = cb;
+  }
+  /**
+   * Process a parsed OpenAPI-MQTT event by forwarding its capabilities
+   * through the same hook used by App-API polls. Called from the
+   * adapter-side OpenAPI-MQTT message handler.
+   *
+   * @param event Parsed event from the OpenAPI-MQTT broker
+   * @param event.sku Govee SKU (e.g. "H5179")
+   * @param event.device MAC-style device identifier
+   * @param event.capabilities Capability list synthesised from the broker payload
+   */
+  handleOpenApiEvent(event) {
+    var _a;
+    if (!event || typeof event.sku !== "string" || typeof event.device !== "string") {
+      return;
+    }
+    if (!Array.isArray(event.capabilities) || event.capabilities.length === 0) {
+      return;
+    }
+    const device = this.devices.get(this.deviceKey(event.sku, event.device));
+    if (!device) {
+      return;
+    }
+    (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, event.capabilities);
+  }
+}
+function buildCapabilitiesFromAppEntry(entry) {
+  const caps = [];
+  const last = entry.lastData;
+  if (!last) {
+    return caps;
+  }
+  if (typeof last.online === "boolean") {
+    caps.push({
+      type: "devices.capabilities.online",
+      instance: "online",
+      state: { value: last.online }
+    });
+  }
+  if (typeof last.tem === "number" && Number.isFinite(last.tem)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "sensorTemperature",
+      state: { value: last.tem / 100 }
+    });
+  }
+  if (typeof last.hum === "number" && Number.isFinite(last.hum)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "sensorHumidity",
+      state: { value: last.hum / 100 }
+    });
+  }
+  if (typeof last.battery === "number" && Number.isFinite(last.battery)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "battery",
+      state: { value: last.battery }
+    });
+  } else if (entry.settings && typeof entry.settings.battery === "number" && Number.isFinite(entry.settings.battery)) {
+    caps.push({
+      type: "devices.capabilities.property",
+      instance: "battery",
+      state: { value: entry.settings.battery }
+    });
+  }
+  return caps;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   DeviceManager,
   SEGMENT_HARD_MAX,
+  buildCapabilitiesFromAppEntry,
   getEffectiveSegmentIndices,
   parseMqttSegmentData,
   resolveSegmentCount

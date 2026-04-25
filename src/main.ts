@@ -14,6 +14,7 @@ import { GoveeApiClient } from "./lib/govee-api-client.js";
 import { GoveeCloudClient } from "./lib/govee-cloud-client.js";
 import { GoveeLanClient } from "./lib/govee-lan-client.js";
 import { GoveeMqttClient } from "./lib/govee-mqtt-client.js";
+import { GoveeOpenapiMqttClient } from "./lib/govee-openapi-mqtt-client.js";
 import {
   LocalSnapshotStore,
   type LocalSnapshot,
@@ -37,6 +38,7 @@ import {
   rgbToHex,
   type AdapterConfig,
   type CloudLoadResult,
+  type CloudStateCapability,
   type DeviceState,
   type GoveeDevice,
 } from "./lib/types.js";
@@ -75,8 +77,11 @@ class GoveeAdapter extends utils.Adapter {
   private stateManager: StateManager | null = null;
   private lanClient: GoveeLanClient | null = null;
   private mqttClient: GoveeMqttClient | null = null;
+  private openapiMqttClient: GoveeOpenapiMqttClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
+  /** Repeating timer for the App-API poll (sensor-state pull). */
+  private appApiPollTimer: ioBroker.Interval | undefined;
   private skuCache: SkuCache | null = null;
   private localSnapshots: LocalSnapshotStore | null = null;
   private cloudWasConnected = false;
@@ -180,6 +185,19 @@ class GoveeAdapter extends utils.Adapter {
       },
       native: {},
     });
+    await this.setObjectNotExistsAsync("info.openapiMqttConnected", {
+      type: "state",
+      common: {
+        name: "Govee OpenAPI MQTT connected",
+        desc: "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
+        type: "boolean",
+        role: "indicator.connected",
+        read: true,
+        write: false,
+        def: false,
+      },
+      native: {},
+    });
     await this.setObjectNotExistsAsync("info.wizardStatus", {
       type: "state",
       common: {
@@ -208,6 +226,10 @@ class GoveeAdapter extends utils.Adapter {
     await this.setStateAsync("info.connection", { val: false, ack: true });
     await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
     await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
+    await this.setStateAsync("info.openapiMqttConnected", {
+      val: false,
+      ack: true,
+    });
     await this.setStateAsync("info.refresh_cloud_data", {
       val: false,
       ack: true,
@@ -400,6 +422,17 @@ class GoveeAdapter extends utils.Adapter {
       });
       this.deviceManager.setCloudClient(this.cloudClient);
 
+      // Bridge synthetic capabilities (App-API, OpenAPI-MQTT events) into the
+      // same setState pipeline as polled Cloud state. Keeps mapCloudStateValue
+      // as the single source of truth for value coercion + state-id resolution.
+      this.deviceManager.setOnCloudCapabilities((device, caps) => {
+        this.applyCloudCapabilities(device, caps).catch((e) =>
+          this.log.warn(
+            `applyCloudCapabilities failed for ${device.sku}: ${e instanceof Error ? e.message : String(e)}`,
+          ),
+        );
+      });
+
       this.rateLimiter = new RateLimiter(
         this.log,
         this,
@@ -408,6 +441,41 @@ class GoveeAdapter extends utils.Adapter {
       );
       this.rateLimiter.start();
       this.deviceManager.setRateLimiter(this.rateLimiter);
+
+      // OpenAPI-MQTT — push channel for appliance/sensor events
+      // (lackWater, iceFull, bodyAppeared etc.). API key is enough; no
+      // separate credentials required. Connection runs in parallel to
+      // the AWS-IoT MQTT used for status push of regular devices.
+      this.openapiMqttClient = new GoveeOpenapiMqttClient(
+        config.apiKey,
+        this.log,
+        this,
+      );
+      this.openapiMqttClient.connect(
+        (event) => this.deviceManager?.handleOpenApiEvent(event),
+        (connected) => {
+          this.setStateAsync("info.openapiMqttConnected", {
+            val: connected,
+            ack: true,
+          }).catch(() => {});
+        },
+      );
+
+      // App-API poll — every 2 minutes, pulls state for sensors like H5179
+      // where OpenAPI v2 /device/state returns empty. Bearer token comes
+      // from the AWS-IoT MQTT login, so a no-op until that succeeds.
+      this.appApiPollTimer = this.setInterval(
+        () => {
+          this.deviceManager
+            ?.pollAppApi()
+            .catch((e) =>
+              this.log.debug(
+                `pollAppApi failed: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+            );
+        },
+        2 * 60 * 1000,
+      );
 
       if (!cachedOk) {
         // No cache — first start, fetch from Cloud with 60s hard-timeout.
@@ -588,10 +656,15 @@ class GoveeAdapter extends utils.Adapter {
       if (this.readyTimer) {
         this.clearTimeout(this.readyTimer);
       }
+      if (this.appApiPollTimer) {
+        this.clearInterval(this.appApiPollTimer);
+        this.appApiPollTimer = undefined;
+      }
       this.cloudRetry?.dispose();
       this.segmentWizard?.dispose();
       this.lanClient?.stop();
       this.mqttClient?.disconnect();
+      this.openapiMqttClient?.disconnect();
       this.rateLimiter?.stop();
       // Remove process-level handlers so an adapter restart doesn't stack them.
       if (this.unhandledRejectionHandler) {
@@ -610,6 +683,10 @@ class GoveeAdapter extends utils.Adapter {
       this.setState("info.mqttConnected", { val: false, ack: true }).catch(
         () => {},
       );
+      this.setState("info.openapiMqttConnected", {
+        val: false,
+        ack: true,
+      }).catch(() => {});
       this.setState("info.cloudConnected", { val: false, ack: true }).catch(
         () => {},
       );
@@ -1437,6 +1514,49 @@ class GoveeAdapter extends utils.Adapter {
     if (loaded > 0) {
       this.log.debug(`Cloud states loaded for ${loaded} devices`);
     }
+  }
+
+  /**
+   * Apply a list of synthesized Cloud-state capabilities to a single
+   * device — the App-API poll and OpenAPI-MQTT events both use this path
+   * so their values flow through the same `mapCloudStateValue` pipeline
+   * that polled Cloud states use.
+   *
+   * @param device Target Govee device
+   * @param caps Capabilities to apply
+   */
+  private async applyCloudCapabilities(
+    device: GoveeDevice,
+    caps: CloudStateCapability[],
+  ): Promise<void> {
+    if (!this.stateManager) {
+      return;
+    }
+    const lanStateIds = new Set(getDefaultLanStates().map((s) => s.id));
+    const prefix = this.stateManager.devicePrefix(device);
+    const writes: Promise<unknown>[] = [];
+    for (const cap of caps) {
+      const mapped = mapCloudStateValue(cap);
+      if (!mapped) {
+        continue;
+      }
+      // Skip LAN-covered states for LAN-capable devices — same rule as
+      // the Cloud-poll path so LAN sub-second updates aren't overwritten.
+      if (device.lanIp && lanStateIds.has(mapped.stateId)) {
+        continue;
+      }
+      const statePath = this.stateManager.resolveStatePath(
+        prefix,
+        mapped.stateId,
+      );
+      writes.push(
+        this.setStateAsync(statePath, {
+          val: mapped.value,
+          ack: true,
+        }).catch(() => undefined),
+      );
+    }
+    await Promise.all(writes);
   }
 
   /**

@@ -29,7 +29,14 @@ function sanitize(str: string): string {
  * ensureState instead of stateDefs. Cleaning `info` by stateDef-set would
  * delete the adapter-managed ones.
  */
-const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots"];
+const MANAGED_CHANNELS = [
+  "control",
+  "scenes",
+  "music",
+  "snapshots",
+  "sensor",
+  "events",
+];
 /**
  * Display names used when the channel object is (re-)created. `info` is
  * listed here even though it's not in MANAGED_CHANNELS — capability-mapper
@@ -42,6 +49,8 @@ const CHANNEL_NAMES: Record<string, string> = {
   scenes: "Scenes",
   music: "Music",
   snapshots: "Snapshots",
+  sensor: "Sensor Data",
+  events: "Events",
   info: "Device Information",
 };
 

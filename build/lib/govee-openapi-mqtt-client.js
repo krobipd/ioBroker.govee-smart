@@ -74,7 +74,7 @@ class GoveeOpenapiMqttClient {
       this.client = mqtt.connect(BROKER_URL, {
         username: this.apiKey,
         password: this.apiKey,
-        clientId: `iob_appliances_${Date.now().toString(36)}`,
+        clientId: `iob_govee_smart_${Date.now().toString(36)}`,
         protocolVersion: 4,
         keepalive: 60,
         reconnectPeriod: 0,
