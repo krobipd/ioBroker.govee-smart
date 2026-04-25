@@ -1,30 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
   <defs>
-    <linearGradient id="bulbGrad" x1="0" y1="0" x2="1" y2="1">
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#00C9FF"/>
       <stop offset="50%" stop-color="#6C63FF"/>
       <stop offset="100%" stop-color="#FF6584"/>
     </linearGradient>
-    <linearGradient id="baseGrad" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#555"/>
-      <stop offset="100%" stop-color="#333"/>
-    </linearGradient>
+    <radialGradient id="hubGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#6C63FF" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#6C63FF" stop-opacity="0"/>
+    </radialGradient>
   </defs>
   <!-- Background circle -->
   <circle cx="128" cy="128" r="120" fill="#1a1a2e"/>
-  <!-- Glow -->
-  <circle cx="128" cy="100" r="65" fill="url(#bulbGrad)" opacity="0.15"/>
-  <!-- Bulb body -->
-  <path d="M128 40 C88 40 60 72 60 105 C60 130 75 148 90 160 L90 180 L166 180 L166 160 C181 148 196 130 196 105 C196 72 168 40 128 40Z" fill="url(#bulbGrad)" stroke="none"/>
-  <!-- Bulb base -->
-  <rect x="90" y="180" width="76" height="8" rx="2" fill="url(#baseGrad)"/>
-  <rect x="94" y="192" width="68" height="8" rx="2" fill="url(#baseGrad)"/>
-  <rect x="98" y="204" width="60" height="8" rx="2" fill="url(#baseGrad)"/>
-  <path d="M104 212 L104 222 C104 228 112 234 128 234 C144 234 152 228 152 222 L152 212Z" fill="url(#baseGrad)"/>
-  <!-- Light rays -->
-  <line x1="128" y1="20" x2="128" y2="8" stroke="url(#bulbGrad)" stroke-width="4" stroke-linecap="round"/>
-  <line x1="60" y1="50" x2="50" y2="40" stroke="url(#bulbGrad)" stroke-width="4" stroke-linecap="round"/>
-  <line x1="196" y1="50" x2="206" y2="40" stroke="url(#bulbGrad)" stroke-width="4" stroke-linecap="round"/>
-  <line x1="35" y1="105" x2="22" y2="105" stroke="url(#bulbGrad)" stroke-width="4" stroke-linecap="round"/>
-  <line x1="221" y1="105" x2="234" y2="105" stroke="url(#bulbGrad)" stroke-width="4" stroke-linecap="round"/>
+  <!-- Soft outer glow -->
+  <circle cx="128" cy="128" r="100" fill="url(#hubGlow)"/>
+  <!-- Connecting strokes from hub to satellites -->
+  <g stroke="url(#grad)" stroke-width="3" stroke-linecap="round" opacity="0.55" fill="none">
+    <line x1="128" y1="128" x2="128" y2="56"/>
+    <line x1="128" y1="128" x2="60" y2="92"/>
+    <line x1="128" y1="128" x2="196" y2="92"/>
+    <line x1="128" y1="128" x2="74" y2="186"/>
+    <line x1="128" y1="128" x2="182" y2="186"/>
+  </g>
+  <!-- Satellite nodes -->
+  <g fill="url(#grad)">
+    <circle cx="128" cy="56" r="14"/>
+    <circle cx="60" cy="92" r="12"/>
+    <circle cx="196" cy="92" r="12"/>
+    <circle cx="74" cy="186" r="12"/>
+    <circle cx="182" cy="186" r="12"/>
+  </g>
+  <!-- Central hub: ring -->
+  <circle cx="128" cy="128" r="26" fill="url(#grad)"/>
+  <circle cx="128" cy="128" r="13" fill="#1a1a2e"/>
+  <circle cx="128" cy="128" r="6" fill="url(#grad)"/>
 </svg>
