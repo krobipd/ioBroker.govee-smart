@@ -25,6 +25,7 @@ coverage/
 
 # Packages
 *.tgz
+package/
 
 # Dev server
 .dev-server/

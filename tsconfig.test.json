@@ -2,11 +2,12 @@
     "extends": "./tsconfig.json",
     "compilerOptions": {
         "noEmit": false,
-        "sourceMap": true,
+        "outDir": "./build-test",
+        "rootDir": ".",
         "declaration": false,
         "declarationMap": false,
-        "outDir": "./build-test",
-        "rootDir": "."
+        "noUnusedLocals": false,
+        "noUnusedParameters": false
     },
     "include": ["src/**/*.ts", "test/**/*.ts"],
     "exclude": ["node_modules", "build", "build-test"]

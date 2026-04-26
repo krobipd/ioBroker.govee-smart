@@ -1,34 +1,33 @@
 # Older Changes
 
 ## 1.8.0 (2026-04-20)
-- Performance — `updateDeviceState` now fires every status write in parallel and drops the per-write object-existence probe; MQTT status pushes cost a fraction of what they used to on large device lists
-- Performance — `cleanupAllChannelStates` replaces its four per-device view queries with one broader view; device-list refresh scales with device count instead of 4 × device count
-- Performance — `handleSnapshotSave` reads device + per-segment state in parallel; saving a snapshot on a 20-segment strip no longer blocks on 40 sequential reads
-- Rate-limiter daily reset aligned to UTC midnight so the adapter's budget flips at the same instant Govee does — no more wasted quota when the adapter was started after midnight
-- Local snapshots now write with `fsync`, matching the SKU cache — SIGKILL during adapter stop no longer silently drops a just-saved snapshot
-- Library fetches (scene / music / DIY / SKU features) now go through the rate-limiter so a fresh install with many devices doesn't burst-call the undocumented `app2.govee.com` endpoints
-- Wizard text fully localised (EN / DE) and resolved against the Admin UI language from `system.config`; English is the fallback for other admin languages
-- govee-appliances coexistence covers every instance (`.0`, `.1`, …) not just `.0` — the shared-budget halving trips for any active sibling
-- MQTT client keeps a stable per-process session UUID across reconnects; AWS IoT can now take over cleanly from a lingering socket instead of refusing a new connection
-- Memory leak prevention — every adapter-level map (diagnostics throttle, state-channel map, device map) is now reaped when a device is removed so long-lived instances stay bounded
-- Internal — shared `govee-constants.ts` for Govee app-impersonation headers, `stateToCommand` collapsed to a lookup table, `crypto.randomUUID` replaces the legacy Math.random UUID, unused `total` parameter dropped from `flashSingleSegment`
+- Performance — status writes parallelised, per-write object probe dropped; MQTT pushes cost much less on large device lists.
+- Performance — `cleanupAllChannelStates` uses one broad view instead of four per-device queries.
+- Performance — `handleSnapshotSave` reads device + segment state in parallel.
+- Rate-limiter daily reset aligned to UTC midnight so the budget flips with Govee's clock.
+- Local snapshots write with `fsync` — SIGKILL during adapter stop no longer drops just-saved snapshots.
+- Library fetches go through the rate-limiter; fresh installs with many devices no longer burst-call `app2.govee.com`.
+- Wizard text fully localised (EN/DE) via `system.config.language`, English fallback for other admin languages.
+- govee-appliances coexistence detection covers all instances (`.0`, `.1`, …) not just `.0`.
+- MQTT client keeps a stable per-process session UUID across reconnects so AWS IoT can take over cleanly.
+- Memory-leak prevention — every adapter-level map is reaped on device removal.
+- Internal — shared `govee-constants.ts`, `stateToCommand` lookup table, `crypto.randomUUID` for sessions.
 
 ## 1.7.8 (2026-04-19)
-- Fix MQTT bearer-token went stale after reconnect — api-client is now refreshed on every fresh login
-- LAN devStatus poll skipped when MQTT is connected (MQTT push is authoritative)
-- Added process-level unhandledRejection / uncaughtException handlers as a last line of defence
-- Minor hygiene — seenDeviceIps evicts old IPs on device IP change, stateCreationQueue bounded to startup, info.mqttConnected / info.cloudConnected reset on unload, diagnostics export throttled per device (2 s)
+- Fix MQTT bearer-token going stale after reconnect — api-client refreshed on every fresh login.
+- LAN devStatus poll skipped when MQTT is connected (MQTT push is authoritative).
+- Process-level `unhandledRejection` / `uncaughtException` handlers as last line of defence.
+- Hygiene — `seenDeviceIps` evicts on IP change, `stateCreationQueue` bounded to startup, `info.*Connected` reset on unload, diagnostics export throttled 2s per device.
 
 ## 1.7.7 (2026-04-19)
-- Fix wizard result and MQTT-learned segment count lost on every restart — cache load didn't merge the segment fields into LAN-discovered devices
-- Cache write now fsyncs so a SIGKILL during adapter stop can't silently drop the save
+- Fix wizard result and MQTT-learned segment count lost on every restart — cache load now merges segment fields into LAN-discovered devices.
+- Cache writes use `fsync` to survive SIGKILL during adapter stop.
 
 ## 1.7.6 (2026-04-19)
-- Fix manual_mode rollback on invalid manual_list no longer bounces the rejected value back into the state
-- Complete wizard translations in 9 admin languages (previously raw keys), worst machine-translation glitches hand-corrected
-- info channel keeps its "Device Information" display name
-- Drop "~100 ms" latency claim from LAN section, reworded in all 11 languages
-- Internal: applyManualSegments helper, targeted state refresh on snapshot ops, dynamic_scene mapping cleanup, prefix-map cleanup on device removal, loadDeviceScenes dead-logic removed, MQTT/Cloud routing docstrings corrected
+- Fix manual_mode rollback on invalid manual_list no longer bounces the rejected value back into the state.
+- Wizard translations in 9 admin languages completed; machine-translation glitches hand-corrected.
+- `info` channel keeps its "Device Information" display name; "~100 ms" latency claim dropped from LAN section.
+- Internal cleanup — `applyManualSegments` helper, targeted state refresh on snapshot ops, prefix-map cleanup on device removal, dead `loadDeviceScenes` paths removed.
 
 ## 1.7.5 (2026-04-19)
 - Fix Wiki link in adapter settings — Markdown in staticText wasn't rendered, replaced with two staticLink buttons (DE + EN)
@@ -48,36 +47,36 @@
 - Side effect: automatic segment-count learning once you touch any segment control
 
 ## 1.7.0 (2026-04-19)
-- Reliable segment count via single source of truth — cache → MQTT-learned → min of Cloud-advertised, persists across restarts
-- Wizard redesign — three buttons (visible / dark / end-of-strip), measures real length up to Govee protocol limit 55, detects gaps automatically for cut strips
-- Wizard forces color mode before each flash so the white flash isn't silently ignored in Scene/Gradient/Music mode
-- Cut-strip settings (`manual_mode` + `manual_list`) are now part of the SKU cache, survive restarts
-- Cloud-internal contradictions resolved conservatively — take the smaller value, let MQTT correct upwards
+- Reliable segment count via single source of truth (cache → MQTT-learned → min of Cloud-advertised), persists across restarts.
+- Wizard redesigned — three buttons (visible/dark/end-of-strip), measures real length up to protocol limit 55, detects gaps for cut strips.
+- Wizard forces color mode before each flash so the flash isn't ignored in Scene/Gradient/Music mode.
+- Cut-strip settings (`manual_mode`, `manual_list`) are part of the SKU cache and survive restarts.
+- Cloud-internal contradictions resolved conservatively — take the smaller value, let MQTT correct upwards.
 
 ## 1.6.7 (2026-04-19)
-- Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so the new datapoints get created first (no more "State has no existing object" warnings). The next AA A5 push seconds later populates the fully-built tree.
+- Fix race when MQTT reveals more segments than Cloud — the discovery push skips the segment-state sync so new datapoints are created first; the next AA A5 push populates the tree.
 
 ## 1.6.6 (2026-04-19)
-- Fix under-reporting of segment count — when Govee Cloud advertises fewer segments than the strip physically has, MQTT `AA A5` packets reveal the real count, and the adapter now bumps `segmentCount` and rebuilds the state tree so datapoints appear for ALL segments (fixes 20 m strips where Cloud says 15 but physical is 20)
-- `parseMqttSegmentData` no longer caps output at Cloud's segmentCount; trailing all-zero padding slots are stripped so packet-padding is not mistaken for real segments
-- Wizard's flash dims segments 0-55 (Govee bitmask maximum) rather than only up to Cloud segmentCount, so under-reported strips cannot leave any residual lit segments during the wizard
-- `manual_list` validation accepts indices up to 55 instead of the Cloud-reported count, so users can declare more physical segments than the Cloud knows about
+- Fix under-reported segment count — adapter now bumps `segmentCount` from MQTT `AA A5` packets and rebuilds the state tree (fixes 20 m strips where Cloud says 15).
+- `parseMqttSegmentData` no longer caps output at Cloud's segmentCount; trailing all-zero padding slots are stripped.
+- Wizard flash dims segments 0-55 (Govee bitmask max) so under-reported strips leave no residual lit segments.
+- `manual_list` validation accepts indices up to 55, not just Cloud-reported count.
 
 ## 1.6.5 (2026-04-19)
-- Fix wizard flash — all three BLE packets (others-dim + target-color + target-brightness) are now bundled into one `ptReal` UDP datagram. Previously separate datagrams were dropped by the device under back-pressure, leading to "only some segments went dark" symptoms
-- Wizard now switches the strip ON and sets global brightness to 100 before the first flash, so the selected segment is visible regardless of the previous dim state (baseline is still captured and restored on abort/finish)
-- Live status box — new `info.wizardStatus` state, written on every wizard step; admin panel uses `type: "state"` to show the current segment, the total and the next action live (Admin 7.1+)
+- Fix wizard flash — all three BLE packets bundled into one `ptReal` UDP datagram (separate datagrams were dropped under back-pressure).
+- Wizard switches the strip ON + global brightness 100 before the first flash; baseline is captured and restored on abort/finish.
+- New `info.wizardStatus` state written on every wizard step; admin panel uses `type: "state"` for live progress (Admin 7.1+).
 
 ## 1.6.4 (2026-04-18)
-- Wizard UX rewrite — dropdown now shows only online devices, a persistent status box indicates which segment is currently being checked, and each button click triggers a multi-line info toast with clear Yes/No guidance
-- Status box uses `textSendTo` (refreshes when the device is re-selected); button responses use the `message` field so admin shows info toasts correctly (previously silent because of wrong field name)
+- Wizard UX rewrite — dropdown shows only online devices, persistent status box, multi-line info toasts with Yes/No guidance.
+- Status box via `textSendTo` (refreshes on device re-select); button responses use `message` field (previously silent because of wrong field name).
 
 ## 1.6.3 (2026-04-18)
-- Fix Segment Detection Wizard crash on Start — `parseSegmentBatch` now guards against non-string values; `flashSegment` routing accepts parsed objects directly (the `cmd.split is not a function` crash that produced the v1.6.2 restart loop)
-- Harden all async event handlers against unhandled rejections — `ready`/`stateChange`/`onMessage` now route errors via `.catch`; prevents SIGKILL-code-6 restart loops
-- Harden Cloud/API/MQTT/LAN boundary types — `Array.isArray` + `typeof` guards added across every external-data iteration, `rgbToHex` NaN/clamp, `hexToRgb` non-string safe, snapshot file path safe against non-string deviceId
-- Refactor segment-wizard and cloud-retry-loop into dedicated testable modules
-- 511 tests (was 427)
+- Fix Segment Detection Wizard crash on Start — `parseSegmentBatch` guards against non-string values; v1.6.2 restart-loop fixed.
+- Harden all async event handlers against unhandled rejections — `.catch` on `ready`/`stateChange`/`onMessage`.
+- Boundary-type hardening across Cloud/API/MQTT/LAN — `Array.isArray` + `typeof` guards, NaN/clamp on color helpers.
+- Extract segment-wizard and cloud-retry-loop into dedicated testable modules.
+- 511 tests (was 427).
 
 ## 1.6.2 (2026-04-18)
 - Fix jsonConfig schema warnings for Segment Detection Wizard — removed unsupported `button` property, aligned variant/color to admin schema (`primary`/`secondary`, `contained`/`outlined`), set `xs=12` for mobile layout
@@ -87,19 +86,19 @@
 - Fix LED strip dropdown showed as free-text input because `selectSendTo` expects the array directly, not wrapped in `{list: ...}`
 
 ## 1.6.0 (2026-04-18)
-- Add manual segment override for cut LED strips — declare which segment indices actually exist via `segments.manual_mode` + `segments.manual_list` (supports ranges like `"0-9"` or gaps like `"0-8,10-14"`)
-- Add Segment Detection Wizard in admin UI — flashes each segment bright white one-by-one and records which indices the user confirms visible, writes result as `manual_list`
-- Add Cloud-Retry-Loop with Rate-Limit handling — 429 responses honour `Retry-After`, auth-failures stop permanently, transient errors retry after 5 min
-- Add SKU-cache pruning — 14-day aging + `scenesChecked` flag + hard-filter of stale Cloud entries without capabilities
-- Extend startup grace period for MQTT+Cloud from 30s to 60s — covers normal MQTT reconnect-attempt timing
-- Fix `info.mqttConnected` state not updating on disconnect
-- 427 tests (was 399)
+- Manual segment override for cut LED strips — declare existing indices via `segments.manual_mode` + `segments.manual_list` (ranges, gaps).
+- Segment Detection Wizard in admin UI — flashes each segment, user confirms visibility, writes result as `manual_list`.
+- Cloud-Retry-Loop with rate-limit handling — `Retry-After` honoured, auth-failures stop permanently, transient errors retry after 5 min.
+- SKU-cache pruning — 14-day aging + `scenesChecked` flag + hard-filter of stale entries.
+- Startup grace period for MQTT+Cloud extended 30s → 60s.
+- Fix `info.mqttConnected` not updating on disconnect.
+- 427 tests (was 399).
 
 ## 1.5.2 (2026-04-17)
-- Harden all Cloud API boundaries against schema drift — `typeof`/`Array.isArray` guards and string coercion on every external field access (sku, device, capabilities, parameters, type, instance)
-- Type `CloudCapability.parameters` is now optional — API may omit it even when docs require it
-- `normalizeDeviceId` and cache file naming safe against non-string input
-- 45 new regression tests covering API drift scenarios (399 tests total)
+- Harden all Cloud API boundaries against schema drift — `typeof`/`Array.isArray` guards and string coercion on every external field access.
+- `CloudCapability.parameters` is optional now — API may omit it even when docs require it.
+- `normalizeDeviceId` and cache file naming safe against non-string input.
+- 45 new drift-regression tests (399 total).
 
 ## 1.5.1 (2026-04-15)
 - Fix device type matching — scenes only loaded via fallback because type comparison never matched Cloud API format

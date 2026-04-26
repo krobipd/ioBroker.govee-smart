@@ -1,326 +1,326 @@
 {
-    "common": {
-        "name": "govee-smart",
-        "version": "2.0.1",
-        "news": {
-            "2.0.1": {
-                "en": "Hotfixes from real-world v2.0.0 install. Sensor state IDs (battery, temperature, humidity, …) now route to sensor/ instead of control/, and the state objects are created lazily on first write — fixes the \"control.battery has no existing object\" warning. Snapshots and scenes are no longer attached to non-light devices like thermometers and heaters. The boot-time \"27 experimental device(s) detected\" log dump was replaced with a targeted, once-per-SKU nudge that only fires when a real device of an experimental SKU appears. The redundant \"OpenAPI MQTT connected for sensor events\" info line was dropped (the adapter-ready summary already covers it). The govee-appliances v0.1.0 deprecation tag now also has its GitHub release page.",
-                "de": "Hotfixes aus dem realen v2.0.0-Install. Sensor-State-IDs (battery, temperature, humidity, …) landen jetzt unter sensor/ statt control/, und die State-Objekte werden bei der ersten Schreibung lazy angelegt — fixt die Warnung „control.battery has no existing object\". Snapshots und Szenen werden nicht mehr an Nicht-Lights wie Thermometer oder Heizgeräte gehängt. Das Start-Log mit „27 experimentelle Geräte erkannt\" ist weg — stattdessen kommt ein gezielter Hinweis nur dann, wenn ein reales Gerät einer experimentellen SKU auftaucht. Die redundante „OpenAPI MQTT connected for sensor events\"-Info-Zeile fällt weg (der Adapter-Ready-Summary deckt sie). Der govee-appliances v0.1.0-Deprecation-Tag hat jetzt auch eine GitHub-Release-Seite.",
-                "ru": "Хотфиксы из реальной установки v2.0.0. Sensor-State-IDs (battery, temperature, humidity, …) теперь идут в sensor/ вместо control/, и State-объекты создаются лениво при первой записи — исправляет предупреждение «control.battery has no existing object». Snapshots и сцены больше не прикрепляются к не-Light устройствам. Spam-лог «27 experimental devices detected» заменён на целевое уведомление только при появлении реального устройства экспериментального SKU. Избыточная info-строка «OpenAPI MQTT connected for sensor events» убрана.",
-                "pt": "Correções de uma instalação real v2.0.0. IDs de state de sensor (battery, temperature, humidity, …) agora vão para sensor/ em vez de control/, e os objetos de state são criados lazily na primeira gravação — corrige o aviso «control.battery has no existing object». Snapshots e cenas não são mais anexados a dispositivos não-Light. O dump de log «27 experimental devices detected» foi substituído por uma notificação direcionada apenas quando um dispositivo real de SKU experimental aparece. A linha info redundante «OpenAPI MQTT connected for sensor events» foi removida.",
-                "nl": "Hotfixes uit een echte v2.0.0-installatie. Sensor-state-IDs (battery, temperature, humidity, …) gaan nu naar sensor/ in plaats van control/, en de state-objecten worden lazy aangemaakt bij de eerste schrijfactie — repareert de waarschuwing «control.battery has no existing object». Snapshots en scènes worden niet meer aan niet-Light apparaten gekoppeld. De boot-log dump «27 experimental devices detected» is vervangen door een gerichte melding alleen bij een echt apparaat van een experimentele SKU. De overbodige info-regel «OpenAPI MQTT connected for sensor events» is verwijderd.",
-                "fr": "Correctifs d'une installation v2.0.0 réelle. Les ID d'état de capteur (battery, temperature, humidity, …) vont maintenant vers sensor/ au lieu de control/, et les objets d'état sont créés paresseusement à la première écriture — corrige l'avertissement « control.battery has no existing object ». Les snapshots et scènes ne sont plus attachés aux appareils non-Light. Le dump de log « 27 experimental devices detected » a été remplacé par une notification ciblée uniquement quand un appareil réel d'un SKU expérimental apparaît. La ligne info redondante « OpenAPI MQTT connected for sensor events » a été supprimée.",
-                "it": "Correzioni da un'installazione v2.0.0 reale. Gli ID di state dei sensori (battery, temperature, humidity, …) ora vanno in sensor/ invece di control/, e gli oggetti di state vengono creati lazy alla prima scrittura — risolve l'avviso «control.battery has no existing object». Snapshot e scene non vengono più collegati a dispositivi non-Light. Il dump di log all'avvio «27 experimental devices detected» è stato sostituito con una notifica mirata solo quando appare un dispositivo reale di una SKU sperimentale. La riga info ridondante «OpenAPI MQTT connected for sensor events» è stata rimossa.",
-                "es": "Correcciones de una instalación v2.0.0 real. Los IDs de state de sensor (battery, temperature, humidity, …) ahora van a sensor/ en lugar de control/, y los objetos de state se crean perezosamente en la primera escritura — corrige la advertencia «control.battery has no existing object». Snapshots y escenas ya no se adjuntan a dispositivos no-Light. El volcado de log al inicio «27 experimental devices detected» fue reemplazado por una notificación dirigida solo cuando aparece un dispositivo real de un SKU experimental. La línea info redundante «OpenAPI MQTT connected for sensor events» fue eliminada.",
-                "pl": "Poprawki z prawdziwej instalacji v2.0.0. Sensor-state-ID (battery, temperature, humidity, …) trafiają teraz do sensor/ zamiast control/, a obiekty state są tworzone leniwie przy pierwszym zapisie — naprawia ostrzeżenie «control.battery has no existing object». Snapshoty i sceny nie są już dołączane do urządzeń nie-Light. Log startowy «27 experimental devices detected» został zastąpiony celowym powiadomieniem tylko gdy pojawia się prawdziwe urządzenie eksperymentalnego SKU. Zbędna linia info «OpenAPI MQTT connected for sensor events» została usunięta.",
-                "uk": "Хотфікси з реальної інсталяції v2.0.0. Sensor-state-ID (battery, temperature, humidity, …) тепер ідуть до sensor/ замість control/, а state-об'єкти створюються лінувато при першому записі — виправляє попередження «control.battery has no existing object». Снапшоти й сцени більше не прикріплюються до не-Light пристроїв. Запис при старті «27 experimental devices detected» замінено на цільове сповіщення лише коли з'являється реальний пристрій експериментального SKU. Зайвий info-рядок «OpenAPI MQTT connected for sensor events» прибрано.",
-                "zh-cn": "来自真实 v2.0.0 安装的热修复。传感器状态 ID (battery, temperature, humidity, …) 现在路由到 sensor/ 而不是 control/，并且状态对象在第一次写入时延迟创建——修复「control.battery has no existing object」警告。快照和场景不再附加到非灯设备。启动时的「27 experimental devices detected」日志转储已被替换为仅在出现真实实验性 SKU 设备时的定向通知。冗余的「OpenAPI MQTT connected for sensor events」信息行已删除。"
-            },
-            "2.0.0": {
-                "en": "Major release — Govee appliances and sensors are now handled by this adapter alongside lights. The standalone iobroker.govee-appliances adapter is deprecated and rolls into here. A new checkbox 'Enable experimental device support' in the config makes it easier to try unconfirmed models — the Wiki page Devices lists every supported SKU and its status. New info.openapiMqttConnected state for the second MQTT channel that delivers appliance events.",
-                "de": "Major Release — Govee Appliances und Sensoren laufen jetzt zusammen mit den Lights über diesen Adapter. Der separate iobroker.govee-appliances Adapter ist deprecated und wandert hier rein. Neuer Schalter 'Experimentelle Geräte-Unterstützung aktivieren' in der Config zum einfacheren Ausprobieren ungeprüfter Modelle — Wiki-Seite Geräte listet jedes unterstützte SKU mit Status. Neuer State info.openapiMqttConnected für den zweiten MQTT-Kanal mit Appliance-Events.",
-                "ru": "Мажорный релиз — приборы и датчики Govee теперь обрабатываются этим адаптером вместе с лампами. Отдельный адаптер iobroker.govee-appliances устарел и переезжает сюда. Новый переключатель 'Включить экспериментальную поддержку устройств' в настройках упрощает тестирование неподтверждённых моделей — страница Wiki Devices перечисляет каждый поддерживаемый SKU и его статус.",
-                "pt": "Lançamento principal — eletrodomésticos e sensores Govee agora são gerenciados por este adaptador junto com as luzes. O adaptador iobroker.govee-appliances autônomo está obsoleto e foi integrado aqui. Nova caixa de seleção 'Ativar suporte experimental a dispositivos' na configuração facilita testar modelos não confirmados — a página Wiki Devices lista todos os SKUs suportados e seu status.",
-                "nl": "Major release — Govee apparaten en sensoren worden nu door deze adapter samen met de lichten beheerd. De aparte iobroker.govee-appliances adapter is verouderd en is hierin opgenomen. Nieuw selectievakje 'Experimentele apparaatondersteuning inschakelen' in de configuratie maakt het eenvoudiger om onbevestigde modellen te proberen — de Wiki-pagina Devices vermeldt elke ondersteunde SKU en de status.",
-                "fr": "Version majeure — les appareils et capteurs Govee sont désormais gérés par cet adaptateur aux côtés des lumières. L'adaptateur iobroker.govee-appliances autonome est obsolète et fusionné ici. Une nouvelle case 'Activer la prise en charge expérimentale des appareils' dans la configuration facilite l'essai des modèles non confirmés — la page Wiki Devices liste chaque SKU pris en charge et son statut.",
-                "it": "Rilascio principale — gli elettrodomestici e i sensori Govee sono ora gestiti da questo adattatore insieme alle luci. L'adattatore iobroker.govee-appliances autonomo è obsoleto e si fonde qui. Nuova casella 'Attiva il supporto sperimentale dei dispositivi' nella configurazione facilita la prova di modelli non confermati — la pagina Wiki Devices elenca ogni SKU supportato e il suo stato.",
-                "es": "Versión principal — los electrodomésticos y sensores Govee ahora son manejados por este adaptador junto con las luces. El adaptador iobroker.govee-appliances independiente está obsoleto y se fusiona aquí. Nueva casilla 'Activar soporte experimental de dispositivos' en la configuración facilita probar modelos no confirmados — la página Wiki Devices lista cada SKU compatible y su estado.",
-                "pl": "Główne wydanie — urządzenia i czujniki Govee są teraz obsługiwane przez ten adapter razem z lampami. Samodzielny adapter iobroker.govee-appliances jest przestarzały i jest scalany tutaj. Nowe pole wyboru 'Włącz eksperymentalne wsparcie urządzeń' w konfiguracji ułatwia testowanie niepotwierdzonych modeli — strona Wiki Devices wymienia każdy obsługiwany SKU i jego status.",
-                "uk": "Великий випуск — пристрої та датчики Govee тепер обробляються цим адаптером разом із лампами. Окремий адаптер iobroker.govee-appliances застарілий і об'єднаний сюди. Новий перемикач 'Увімкнути експериментальну підтримку пристроїв' у конфігурації полегшує тестування непідтверджених моделей — сторінка Wiki Devices містить кожен підтримуваний SKU та його статус.",
-                "zh-cn": "主要版本 — Govee 电器和传感器现在由此适配器与灯具一起处理。独立的 iobroker.govee-appliances 适配器已弃用并合并到此处。配置中新增的'启用实验性设备支持'复选框使得测试未确认的型号更加容易 — Wiki 的 Devices 页面列出每个受支持的 SKU 及其状态。"
-            },
-            "1.11.0": {
-                "en": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "de": "Szenen- / DIY- / Snapshot- / Music-Mode-Dropdowns akzeptieren jetzt drei Schreibweisen aus Blockly und JavaScript: den Index als String (\"1\"), den Index als Zahl (1), oder den Klartext-Namen (\"Aurora\", Groß/Klein egal, Whitespace egal). Der State-Typ wurde von string auf mixed geändert, damit der js-controller bei numerischem Schreiben nicht mehr \"expects type string but received number\" warnt. Doppelte Cloud-Namen werden automatisch eindeutig gemacht über Suffixe \" (2)\", \" (3)\" — der erste Eintrag behält den Originalnamen, jedes Label landet in genau einem Index. Nach der Aktivierung ackt der Adapter den kanonischen Key zurück, damit das Dropdown unabhängig vom Schreibweg synchron bleibt.",
-                "ru": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "pt": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "nl": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "fr": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "it": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "es": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "pl": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "uk": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
-                "zh-cn": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value."
-            },
-            "1.10.1": {
-                "en": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "de": "Fix — der Knopf info.refresh_cloud_data hat bei jedem Klick alle Scene-/Music-/DIY-/SKU-Features-Bibliotheken pro Gerät neu abgefragt. Bibliotheken ändern sich pro SKU nie, mehrere Endpunkte liefern bei vielen Accounts 403 zurück, ergo baut sich nur ein mehrminütiger Rate-Limiter-Backlog auf (im Log sichtbar als minütliche POSTs an /device/scenes und /device/diy-scenes nach jedem Klick). Der Knopf lädt jetzt nur noch den Scenes-/Snapshot-Endpunkt nach, wo neue Govee-App-Snapshots tatsächlich auftauchen. Aufruf-Anzahl pro Klick sinkt von ~7 auf 2 pro Licht-Gerät.",
-                "ru": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "pt": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "nl": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "fr": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "it": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "es": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "pl": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "uk": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
-                "zh-cn": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device."
-            },
-            "1.10.0": {
-                "en": "Two fixes around mode tracking. First, scenes with a scenceParam (the multi-packet A3 BLE payload that drives per-segment animation) are now skipped for devices without segments (e.g. H70B3 Curtain Lights, bulbs) and activated via the Govee Cloud instead — those devices silently drop the A3 packets, so the old ptReal path left the scene unplayed. Second, powering a device off now resets every mode dropdown (scene, DIY scene, Cloud/local snapshot, music) to \"---\", whether the off was triggered from ioBroker or from the Govee app — a device that is off cannot be \"playing Aurora-A\".",
-                "de": "Zwei Fixes rund um Mode-Tracking. Erstens: Szenen mit scenceParam (das Multi-Packet-A3-BLE-Format für Segment-Animationen) werden auf Geräten ohne Segmente (z.B. H70B3 Curtain Lights, Birnen) nicht mehr per ptReal versucht sondern direkt über die Govee Cloud aktiviert — diese Geräte verwerfen die A3-Pakete stumm, der alte ptReal-Pfad ließ die Szene damit ungespielt. Zweitens: Beim Ausschalten eines Geräts werden jetzt alle Mode-Dropdowns (Szene, DIY-Szene, Cloud-/lokaler Snapshot, Musik) auf \"---\" zurückgesetzt — egal ob die Power-off-Aktion von ioBroker oder aus der Govee App kam. Ein ausgeschaltetes Gerät kann nicht mehr \"Aurora-A spielen\".",
-                "ru": "Два исправления связанных с режимами. Сцены со scenceParam теперь используют Cloud-активацию на устройствах без сегментов (H70B3 и др.) — ptReal-пакеты эти устройства молча игнорировали. Выключение устройства теперь сбрасывает все mode-dropdowns (сцена, snapshot, music) на \"---\", независимо от источника выключения.",
-                "pt": "Duas correções em mode-tracking. Cenas com scenceParam agora usam ativação Cloud em dispositivos sem segmentos (H70B3 etc.) — os pacotes ptReal eram silenciosamente descartados. Desligar o dispositivo agora reseta todos os mode-dropdowns para \"---\", independente da origem.",
-                "nl": "Twee fixes voor mode-tracking. Scenes met scenceParam gebruiken nu cloud-activatie op apparaten zonder segmenten (H70B3 etc.) — die verwerpen de ptReal-pakketten stilletjes. Apparaat uitschakelen reset nu alle mode-dropdowns naar \"---\", ongeacht de bron.",
-                "fr": "Deux correctifs autour du tracking des modes. Les scènes avec scenceParam utilisent maintenant l’activation Cloud sur les appareils sans segments (H70B3 etc.) — ces appareils rejetaient silencieusement les paquets ptReal. Éteindre un appareil remet maintenant tous les mode-dropdowns à « --- », quelle que soit la source.",
-                "it": "Due fix sul mode-tracking. Scene con scenceParam ora usano attivazione Cloud sui dispositivi senza segmenti (H70B3 etc.) — quei dispositivi scartavano silenziosamente i pacchetti ptReal. Spegnere un dispositivo ora resetta tutti i mode-dropdown a \"---\", indipendentemente dall’origine.",
-                "es": "Dos correcciones en el mode-tracking. Las escenas con scenceParam ahora usan activación Cloud en dispositivos sin segmentos (H70B3 etc.) — esos dispositivos descartaban silenciosamente los paquetes ptReal. Apagar un dispositivo ahora resetea todos los mode-dropdowns a \"---\", independientemente del origen.",
-                "pl": "Dwie poprawki w mode-tracking. Sceny z scenceParam używają teraz aktywacji Cloud na urządzeniach bez segmentów (H70B3 itd.) — te urządzenia po cichu odrzucały pakiety ptReal. Wyłączenie urządzenia resetuje teraz wszystkie mode-dropdowns do \"---\", niezależnie od źródła.",
-                "uk": "Два виправлення в mode-tracking. Сцени з scenceParam тепер активуються через Cloud на пристроях без сегментів (H70B3 тощо) — ці пристрої мовчки відкидали ptReal-пакети. Вимкнення пристрою тепер скидає всі mode-dropdowns на \"---\", незалежно від джерела.",
-                "zh-cn": "两个 mode-tracking 修复。带 scenceParam 的场景现在在无段设备（H70B3 等）上通过 Cloud 激活 — 这些设备会默默丢弃 ptReal 包。关闭设备现在会将所有 mode-dropdown 重置为 \"---\"，无论来源。"
-            },
-            "1.9.1": {
-                "en": "Hotfix — cloud-side scene/snapshot updates are now merged per list instead of all-or-nothing. Govee’s /device/scenes occasionally returns e.g. 149 scenes + 0 snapshots on the same device where a snapshot clearly exists; the old combined guard wiped the snapshots list in that case, breaking the cloud-snapshot dropdown with “invalid snapshot index” errors. Each of scenes, DIY scenes and snapshots is now guarded independently so a lucky list never clobbers an unlucky one.",
-                "de": "Hotfix — Cloud-Aktualisierungen für Szenen/Snapshots werden jetzt pro Liste gemerged statt alles-oder-nichts. Govees /device/scenes liefert gelegentlich z.B. 149 Szenen + 0 Snapshots obwohl ein Snapshot existiert; der alte kombinierte Guard hat die Snapshot-Liste in dem Fall geleert und damit das Cloud-Snapshot-Dropdown mit „invalid snapshot index“-Fehlern gebrochen. Szenen, DIY-Szenen und Snapshots werden jetzt unabhängig gegen leeres Cloud-Ergebnis geschützt.",
-                "ru": "Хотфикс — обновление сцен/снапшотов из облака теперь мержится по отдельным спискам, а не всё сразу. Govee иногда возвращает сцены + 0 снапшотов там где снапшот реально существует; старая логика стирала список снапшотов, ломая dropdown с ошибкой \"invalid snapshot index\". Списки теперь защищены независимо.",
-                "pt": "Hotfix — atualizações cloud de cenas/snapshots agora são mescladas por lista. Govee às vezes retorna cenas + 0 snapshots quando o snapshot existe; o guard antigo apagava a lista de snapshots, causando erros \"invalid snapshot index\" no dropdown. Agora cada lista é protegida separadamente.",
-                "nl": "Hotfix — cloud-updates van scenes/snapshots worden nu per lijst samengevoegd. Govee retourneert soms scenes + 0 snapshots terwijl de snapshot bestaat; de oude guard wiste de snapshot-lijst in dat geval, waardoor het dropdown brak met \"invalid snapshot index\". Elke lijst wordt nu afzonderlijk beschermd.",
-                "fr": "Hotfix — les mises à jour cloud des scènes/snapshots sont maintenant fusionnées par liste. Govee renvoie parfois des scènes + 0 snapshot alors que le snapshot existe ; l’ancien guard effaçait la liste des snapshots, cassant le dropdown avec l’erreur « invalid snapshot index ». Chaque liste est maintenant protégée séparément.",
-                "it": "Hotfix — gli aggiornamenti cloud di scene/snapshot ora vengono uniti per lista. Govee talvolta restituisce scene + 0 snapshot quando lo snapshot esiste; il vecchio guard cancellava la lista degli snapshot, rompendo il dropdown con errori \"invalid snapshot index\". Ora ogni lista è protetta separatamente.",
-                "es": "Hotfix — las actualizaciones cloud de escenas/snapshots ahora se fusionan por lista. Govee a veces devuelve escenas + 0 snapshots cuando el snapshot existe; el guard antiguo borraba la lista de snapshots, rompiendo el dropdown con errores \"invalid snapshot index\". Cada lista ahora está protegida por separado.",
-                "pl": "Hotfix — aktualizacje cloud scen/snapshotów są teraz mergeowane osobno dla każdej listy. Govee czasem zwraca sceny + 0 snapshotów gdy snapshot istnieje; stary guard czyścił listę snapshotów, psując dropdown z błędem \"invalid snapshot index\". Każda lista jest teraz chroniona osobno.",
-                "uk": "Хотфікс — оновлення сцен/снепшотів з клауду тепер мержаться посписочно. Govee іноді повертає сцени + 0 снепшотів коли снепшот існує; старий guard стирав список снепшотів, ламаючи dropdown з помилкою \"invalid snapshot index\". Кожен список тепер захищено окремо.",
-                "zh-cn": "热修复 — 云端场景/快照更新现在按列表分别合并。Govee 有时返回场景 + 0 快照（快照实际存在），旧的 guard 会清空快照列表，导致 dropdown 出现 \"invalid snapshot index\" 错误。每个列表现在独立保护。"
-            },
-            "1.9.0": {
-                "en": "BREAKING: the cloud-snapshot dropdown has been renamed from snapshots.snapshot to snapshots.snapshot_cloud — update your scripts if they reference the old id. Plus: scene and snapshot data are now re-fetched from the Govee Cloud on every adapter start (a new snapshot you created in the Govee Home app now appears after restart) and a new info.refresh_cloud_data button lets you trigger the same refresh without a restart. Every snapshot state now carries a clear description telling you whether it is the Cloud or the Local kind.",
-                "de": "BREAKING: der Cloud-Snapshot-Datenpunkt heißt jetzt snapshots.snapshot_cloud statt snapshots.snapshot — Skripte mit der alten ID anpassen. Außerdem: Szenen- und Snapshot-Daten werden bei jedem Adapter-Start frisch aus der Govee Cloud geholt (ein neuer Snapshot aus der Govee Home App ist nach einem Restart sichtbar), plus neuer Button info.refresh_cloud_data für den manuellen Refresh ohne Restart. Alle vier Snapshot-States haben jetzt eine Beschreibung die Cloud vs. Lokal klar benennt.",
-                "ru": "BREAKING: состояние snapshots.snapshot переименовано в snapshots.snapshot_cloud. Сценарии и снапшоты обновляются из Govee Cloud при каждом запуске. Новая кнопка info.refresh_cloud_data для ручного обновления. У всех состояний снапшотов теперь понятное описание.",
-                "pt": "BREAKING: snapshots.snapshot renomeado para snapshots.snapshot_cloud. Cenas e snapshots agora são atualizados da Govee Cloud a cada inicialização. Novo botão info.refresh_cloud_data para refresh manual. Descrições claras em todos os estados de snapshot.",
-                "nl": "BREAKING: snapshots.snapshot hernoemd naar snapshots.snapshot_cloud. Scenes en snapshots worden bij elke adapterstart vers opgehaald uit de Govee Cloud. Nieuwe knop info.refresh_cloud_data voor handmatige refresh. Duidelijke beschrijvingen bij alle snapshot-states.",
-                "fr": "BREAKING : snapshots.snapshot renommé en snapshots.snapshot_cloud. Les scènes et snapshots sont maintenant rechargés depuis le Cloud Govee à chaque démarrage. Nouveau bouton info.refresh_cloud_data pour un refresh manuel. Descriptions claires sur tous les states snapshot.",
-                "it": "BREAKING: snapshots.snapshot rinominato in snapshots.snapshot_cloud. Scene e snapshot ora vengono ricaricati dal Cloud Govee ad ogni avvio. Nuovo pulsante info.refresh_cloud_data per refresh manuale. Descrizioni chiare su tutti gli state degli snapshot.",
-                "es": "BREAKING: snapshots.snapshot renombrado a snapshots.snapshot_cloud. Escenas y snapshots se recargan desde Govee Cloud en cada inicio. Nuevo botón info.refresh_cloud_data para refresh manual. Descripciones claras en todos los states de snapshot.",
-                "pl": "BREAKING: snapshots.snapshot przemianowany na snapshots.snapshot_cloud. Sceny i snapshoty są odświeżane z Govee Cloud przy każdym starcie. Nowy przycisk info.refresh_cloud_data do ręcznego odświeżenia. Jasne opisy przy wszystkich stanach snapshot.",
-                "uk": "BREAKING: snapshots.snapshot перейменовано на snapshots.snapshot_cloud. Сцени та снепшоти оновлюються з Govee Cloud при кожному запуску. Нова кнопка info.refresh_cloud_data для ручного оновлення. Чіткі описи в усіх snapshot-states.",
-                "zh-cn": "BREAKING: snapshots.snapshot 重命名为 snapshots.snapshot_cloud。场景和快照在每次适配器启动时从 Govee Cloud 刷新。新的 info.refresh_cloud_data 按钮用于手动刷新。所有快照状态都有清晰的描述。"
-            }
-        },
-        "titleLang": {
-            "en": "Govee Smart",
-            "de": "Govee Smart",
-            "ru": "Govee Smart",
-            "pt": "Govee Smart",
-            "nl": "Govee Smart",
-            "fr": "Govee Smart",
-            "it": "Govee Smart",
-            "es": "Govee Smart",
-            "pl": "Govee Smart",
-            "uk": "Govee Smart",
-            "zh-cn": "Govee Smart"
-        },
-        "desc": {
-            "en": "Control Govee WiFi devices via LAN, MQTT and Cloud API.",
-            "de": "Govee WiFi-Geräte über LAN, MQTT und Cloud-API steuern.",
-            "ru": "Управление WiFi-устройствами Govee через LAN, MQTT и Cloud API.",
-            "pt": "Controle dispositivos Govee WiFi via LAN, MQTT e Cloud API.",
-            "nl": "Bedien Govee WiFi-apparaten via LAN, MQTT en Cloud API.",
-            "fr": "Contrôlez les appareils WiFi Govee via LAN, MQTT et Cloud API.",
-            "it": "Controlla i dispositivi WiFi Govee tramite LAN, MQTT e Cloud API.",
-            "es": "Controla los dispositivos WiFi de Govee mediante LAN, MQTT y Cloud API.",
-            "pl": "Steruj urządzeniami WiFi Govee przez LAN, MQTT i Cloud API.",
-            "uk": "Керування пристроями Govee WiFi через LAN, MQTT та Cloud API.",
-            "zh-cn": "通过 LAN、MQTT 和 Cloud API 控制 Govee WiFi 设备。"
-        },
-        "authors": [
-            "krobi <krobi@power-dreams.com>"
-        ],
-        "licenseInformation": {
-            "license": "MIT",
-            "type": "free"
-        },
-        "platform": "Javascript/Node.js",
-        "icon": "govee-smart.svg",
-        "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg",
-        "readme": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/README.md",
-        "enabled": true,
-        "tier": 3,
-        "loglevel": "info",
-        "mode": "daemon",
-        "messagebox": true,
-        "keywords": [
-            "govee",
-            "lights",
-            "led",
-            "lan",
-            "mqtt",
-            "ble"
-        ],
-        "type": "lighting",
-        "compact": true,
-        "connectionType": "local",
-        "dataSource": "push",
-        "adminUI": {
-            "config": "json"
-        },
-        "supportedMessages": {
-            "stopInstance": true
-        },
-        "dependencies": [
-            {
-                "js-controller": ">=7.0.0"
-            }
-        ],
-        "globalDependencies": [
-            {
-                "admin": ">=7.6.20"
-            }
-        ]
+  "common": {
+    "name": "govee-smart",
+    "version": "2.0.1",
+    "news": {
+      "2.0.1": {
+        "en": "Hotfixes from real-world v2.0.0 install. Sensor state IDs (battery, temperature, humidity, …) now route to sensor/ instead of control/, and the state objects are created lazily on first write — fixes the \"control.battery has no existing object\" warning. Snapshots and scenes are no longer attached to non-light devices like thermometers and heaters. The boot-time \"27 experimental device(s) detected\" log dump was replaced with a targeted, once-per-SKU nudge that only fires when a real device of an experimental SKU appears. The redundant \"OpenAPI MQTT connected for sensor events\" info line was dropped (the adapter-ready summary already covers it). The govee-appliances v0.1.0 deprecation tag now also has its GitHub release page.",
+        "de": "Hotfixes aus dem realen v2.0.0-Install. Sensor-State-IDs (battery, temperature, humidity, …) landen jetzt unter sensor/ statt control/, und die State-Objekte werden bei der ersten Schreibung lazy angelegt — fixt die Warnung „control.battery has no existing object\". Snapshots und Szenen werden nicht mehr an Nicht-Lights wie Thermometer oder Heizgeräte gehängt. Das Start-Log mit „27 experimentelle Geräte erkannt\" ist weg — stattdessen kommt ein gezielter Hinweis nur dann, wenn ein reales Gerät einer experimentellen SKU auftaucht. Die redundante „OpenAPI MQTT connected for sensor events\"-Info-Zeile fällt weg (der Adapter-Ready-Summary deckt sie). Der govee-appliances v0.1.0-Deprecation-Tag hat jetzt auch eine GitHub-Release-Seite.",
+        "ru": "Хотфиксы из реальной установки v2.0.0. Sensor-State-IDs (battery, temperature, humidity, …) теперь идут в sensor/ вместо control/, и State-объекты создаются лениво при первой записи — исправляет предупреждение «control.battery has no existing object». Snapshots и сцены больше не прикрепляются к не-Light устройствам. Spam-лог «27 experimental devices detected» заменён на целевое уведомление только при появлении реального устройства экспериментального SKU. Избыточная info-строка «OpenAPI MQTT connected for sensor events» убрана.",
+        "pt": "Correções de uma instalação real v2.0.0. IDs de state de sensor (battery, temperature, humidity, …) agora vão para sensor/ em vez de control/, e os objetos de state são criados lazily na primeira gravação — corrige o aviso «control.battery has no existing object». Snapshots e cenas não são mais anexados a dispositivos não-Light. O dump de log «27 experimental devices detected» foi substituído por uma notificação direcionada apenas quando um dispositivo real de SKU experimental aparece. A linha info redundante «OpenAPI MQTT connected for sensor events» foi removida.",
+        "nl": "Hotfixes uit een echte v2.0.0-installatie. Sensor-state-IDs (battery, temperature, humidity, …) gaan nu naar sensor/ in plaats van control/, en de state-objecten worden lazy aangemaakt bij de eerste schrijfactie — repareert de waarschuwing «control.battery has no existing object». Snapshots en scènes worden niet meer aan niet-Light apparaten gekoppeld. De boot-log dump «27 experimental devices detected» is vervangen door een gerichte melding alleen bij een echt apparaat van een experimentele SKU. De overbodige info-regel «OpenAPI MQTT connected for sensor events» is verwijderd.",
+        "fr": "Correctifs d'une installation v2.0.0 réelle. Les ID d'état de capteur (battery, temperature, humidity, …) vont maintenant vers sensor/ au lieu de control/, et les objets d'état sont créés paresseusement à la première écriture — corrige l'avertissement « control.battery has no existing object ». Les snapshots et scènes ne sont plus attachés aux appareils non-Light. Le dump de log « 27 experimental devices detected » a été remplacé par une notification ciblée uniquement quand un appareil réel d'un SKU expérimental apparaît. La ligne info redondante « OpenAPI MQTT connected for sensor events » a été supprimée.",
+        "it": "Correzioni da un'installazione v2.0.0 reale. Gli ID di state dei sensori (battery, temperature, humidity, …) ora vanno in sensor/ invece di control/, e gli oggetti di state vengono creati lazy alla prima scrittura — risolve l'avviso «control.battery has no existing object». Snapshot e scene non vengono più collegati a dispositivi non-Light. Il dump di log all'avvio «27 experimental devices detected» è stato sostituito con una notifica mirata solo quando appare un dispositivo reale di una SKU sperimentale. La riga info ridondante «OpenAPI MQTT connected for sensor events» è stata rimossa.",
+        "es": "Correcciones de una instalación v2.0.0 real. Los IDs de state de sensor (battery, temperature, humidity, …) ahora van a sensor/ en lugar de control/, y los objetos de state se crean perezosamente en la primera escritura — corrige la advertencia «control.battery has no existing object». Snapshots y escenas ya no se adjuntan a dispositivos no-Light. El volcado de log al inicio «27 experimental devices detected» fue reemplazado por una notificación dirigida solo cuando aparece un dispositivo real de un SKU experimental. La línea info redundante «OpenAPI MQTT connected for sensor events» fue eliminada.",
+        "pl": "Poprawki z prawdziwej instalacji v2.0.0. Sensor-state-ID (battery, temperature, humidity, …) trafiają teraz do sensor/ zamiast control/, a obiekty state są tworzone leniwie przy pierwszym zapisie — naprawia ostrzeżenie «control.battery has no existing object». Snapshoty i sceny nie są już dołączane do urządzeń nie-Light. Log startowy «27 experimental devices detected» został zastąpiony celowym powiadomieniem tylko gdy pojawia się prawdziwe urządzenie eksperymentalnego SKU. Zbędna linia info «OpenAPI MQTT connected for sensor events» została usunięta.",
+        "uk": "Хотфікси з реальної інсталяції v2.0.0. Sensor-state-ID (battery, temperature, humidity, …) тепер ідуть до sensor/ замість control/, а state-об'єкти створюються лінувато при першому записі — виправляє попередження «control.battery has no existing object». Снапшоти й сцени більше не прикріплюються до не-Light пристроїв. Запис при старті «27 experimental devices detected» замінено на цільове сповіщення лише коли з'являється реальний пристрій експериментального SKU. Зайвий info-рядок «OpenAPI MQTT connected for sensor events» прибрано.",
+        "zh-cn": "来自真实 v2.0.0 安装的热修复。传感器状态 ID (battery, temperature, humidity, …) 现在路由到 sensor/ 而不是 control/，并且状态对象在第一次写入时延迟创建——修复「control.battery has no existing object」警告。快照和场景不再附加到非灯设备。启动时的「27 experimental devices detected」日志转储已被替换为仅在出现真实实验性 SKU 设备时的定向通知。冗余的「OpenAPI MQTT connected for sensor events」信息行已删除。"
+      },
+      "2.0.0": {
+        "en": "Major release — Govee appliances and sensors are now handled by this adapter alongside lights. The standalone iobroker.govee-appliances adapter is deprecated and rolls into here. A new checkbox 'Enable experimental device support' in the config makes it easier to try unconfirmed models — the Wiki page Devices lists every supported SKU and its status. New info.openapiMqttConnected state for the second MQTT channel that delivers appliance events.",
+        "de": "Major Release — Govee Appliances und Sensoren laufen jetzt zusammen mit den Lights über diesen Adapter. Der separate iobroker.govee-appliances Adapter ist deprecated und wandert hier rein. Neuer Schalter 'Experimentelle Geräte-Unterstützung aktivieren' in der Config zum einfacheren Ausprobieren ungeprüfter Modelle — Wiki-Seite Geräte listet jedes unterstützte SKU mit Status. Neuer State info.openapiMqttConnected für den zweiten MQTT-Kanal mit Appliance-Events.",
+        "ru": "Мажорный релиз — приборы и датчики Govee теперь обрабатываются этим адаптером вместе с лампами. Отдельный адаптер iobroker.govee-appliances устарел и переезжает сюда. Новый переключатель 'Включить экспериментальную поддержку устройств' в настройках упрощает тестирование неподтверждённых моделей — страница Wiki Devices перечисляет каждый поддерживаемый SKU и его статус.",
+        "pt": "Lançamento principal — eletrodomésticos e sensores Govee agora são gerenciados por este adaptador junto com as luzes. O adaptador iobroker.govee-appliances autônomo está obsoleto e foi integrado aqui. Nova caixa de seleção 'Ativar suporte experimental a dispositivos' na configuração facilita testar modelos não confirmados — a página Wiki Devices lista todos os SKUs suportados e seu status.",
+        "nl": "Major release — Govee apparaten en sensoren worden nu door deze adapter samen met de lichten beheerd. De aparte iobroker.govee-appliances adapter is verouderd en is hierin opgenomen. Nieuw selectievakje 'Experimentele apparaatondersteuning inschakelen' in de configuratie maakt het eenvoudiger om onbevestigde modellen te proberen — de Wiki-pagina Devices vermeldt elke ondersteunde SKU en de status.",
+        "fr": "Version majeure — les appareils et capteurs Govee sont désormais gérés par cet adaptateur aux côtés des lumières. L'adaptateur iobroker.govee-appliances autonome est obsolète et fusionné ici. Une nouvelle case 'Activer la prise en charge expérimentale des appareils' dans la configuration facilite l'essai des modèles non confirmés — la page Wiki Devices liste chaque SKU pris en charge et son statut.",
+        "it": "Rilascio principale — gli elettrodomestici e i sensori Govee sono ora gestiti da questo adattatore insieme alle luci. L'adattatore iobroker.govee-appliances autonomo è obsoleto e si fonde qui. Nuova casella 'Attiva il supporto sperimentale dei dispositivi' nella configurazione facilita la prova di modelli non confermati — la pagina Wiki Devices elenca ogni SKU supportato e il suo stato.",
+        "es": "Versión principal — los electrodomésticos y sensores Govee ahora son manejados por este adaptador junto con las luces. El adaptador iobroker.govee-appliances independiente está obsoleto y se fusiona aquí. Nueva casilla 'Activar soporte experimental de dispositivos' en la configuración facilita probar modelos no confirmados — la página Wiki Devices lista cada SKU compatible y su estado.",
+        "pl": "Główne wydanie — urządzenia i czujniki Govee są teraz obsługiwane przez ten adapter razem z lampami. Samodzielny adapter iobroker.govee-appliances jest przestarzały i jest scalany tutaj. Nowe pole wyboru 'Włącz eksperymentalne wsparcie urządzeń' w konfiguracji ułatwia testowanie niepotwierdzonych modeli — strona Wiki Devices wymienia każdy obsługiwany SKU i jego status.",
+        "uk": "Великий випуск — пристрої та датчики Govee тепер обробляються цим адаптером разом із лампами. Окремий адаптер iobroker.govee-appliances застарілий і об'єднаний сюди. Новий перемикач 'Увімкнути експериментальну підтримку пристроїв' у конфігурації полегшує тестування непідтверджених моделей — сторінка Wiki Devices містить кожен підтримуваний SKU та його статус.",
+        "zh-cn": "主要版本 — Govee 电器和传感器现在由此适配器与灯具一起处理。独立的 iobroker.govee-appliances 适配器已弃用并合并到此处。配置中新增的'启用实验性设备支持'复选框使得测试未确认的型号更加容易 — Wiki 的 Devices 页面列出每个受支持的 SKU 及其状态。"
+      },
+      "1.11.0": {
+        "en": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "de": "Szenen- / DIY- / Snapshot- / Music-Mode-Dropdowns akzeptieren jetzt drei Schreibweisen aus Blockly und JavaScript: den Index als String (\"1\"), den Index als Zahl (1), oder den Klartext-Namen (\"Aurora\", Groß/Klein egal, Whitespace egal). Der State-Typ wurde von string auf mixed geändert, damit der js-controller bei numerischem Schreiben nicht mehr \"expects type string but received number\" warnt. Doppelte Cloud-Namen werden automatisch eindeutig gemacht über Suffixe \" (2)\", \" (3)\" — der erste Eintrag behält den Originalnamen, jedes Label landet in genau einem Index. Nach der Aktivierung ackt der Adapter den kanonischen Key zurück, damit das Dropdown unabhängig vom Schreibweg synchron bleibt.",
+        "ru": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "pt": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "nl": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "fr": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "it": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "es": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "pl": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "uk": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value.",
+        "zh-cn": "Scene / DIY scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS: the index as a string (\"1\"), the index as a number (1), or the entry name (\"Aurora\", case-insensitive, trimmed). The state type changed from string to mixed so the js-controller no longer warns \"expects type string but received number\" when a script writes a numeric index. Duplicate entry names from the cloud are auto-disambiguated with \" (2)\", \" (3)\" suffixes so each label maps to exactly one index — first occurrence keeps the original name. After activation the adapter acks back the canonical key, so the dropdown stays in sync regardless of how the user wrote the value."
+      },
+      "1.10.1": {
+        "en": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "de": "Fix — der Knopf info.refresh_cloud_data hat bei jedem Klick alle Scene-/Music-/DIY-/SKU-Features-Bibliotheken pro Gerät neu abgefragt. Bibliotheken ändern sich pro SKU nie, mehrere Endpunkte liefern bei vielen Accounts 403 zurück, ergo baut sich nur ein mehrminütiger Rate-Limiter-Backlog auf (im Log sichtbar als minütliche POSTs an /device/scenes und /device/diy-scenes nach jedem Klick). Der Knopf lädt jetzt nur noch den Scenes-/Snapshot-Endpunkt nach, wo neue Govee-App-Snapshots tatsächlich auftauchen. Aufruf-Anzahl pro Klick sinkt von ~7 auf 2 pro Licht-Gerät.",
+        "ru": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "pt": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "nl": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "fr": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "it": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "es": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "pl": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "uk": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device.",
+        "zh-cn": "Fix — the info.refresh_cloud_data button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several endpoints 403 for many accounts, so this only produced a multi-minute rate-limiter backlog (minute-spaced POSTs to /device/scenes and /device/diy-scenes after a click). The button now only re-runs the scene/snapshot endpoint, which is what new Govee-app snapshots actually show up on. Call count per click drops from ~7 to 2 per light device."
+      },
+      "1.10.0": {
+        "en": "Two fixes around mode tracking. First, scenes with a scenceParam (the multi-packet A3 BLE payload that drives per-segment animation) are now skipped for devices without segments (e.g. H70B3 Curtain Lights, bulbs) and activated via the Govee Cloud instead — those devices silently drop the A3 packets, so the old ptReal path left the scene unplayed. Second, powering a device off now resets every mode dropdown (scene, DIY scene, Cloud/local snapshot, music) to \"---\", whether the off was triggered from ioBroker or from the Govee app — a device that is off cannot be \"playing Aurora-A\".",
+        "de": "Zwei Fixes rund um Mode-Tracking. Erstens: Szenen mit scenceParam (das Multi-Packet-A3-BLE-Format für Segment-Animationen) werden auf Geräten ohne Segmente (z.B. H70B3 Curtain Lights, Birnen) nicht mehr per ptReal versucht sondern direkt über die Govee Cloud aktiviert — diese Geräte verwerfen die A3-Pakete stumm, der alte ptReal-Pfad ließ die Szene damit ungespielt. Zweitens: Beim Ausschalten eines Geräts werden jetzt alle Mode-Dropdowns (Szene, DIY-Szene, Cloud-/lokaler Snapshot, Musik) auf \"---\" zurückgesetzt — egal ob die Power-off-Aktion von ioBroker oder aus der Govee App kam. Ein ausgeschaltetes Gerät kann nicht mehr \"Aurora-A spielen\".",
+        "ru": "Два исправления связанных с режимами. Сцены со scenceParam теперь используют Cloud-активацию на устройствах без сегментов (H70B3 и др.) — ptReal-пакеты эти устройства молча игнорировали. Выключение устройства теперь сбрасывает все mode-dropdowns (сцена, snapshot, music) на \"---\", независимо от источника выключения.",
+        "pt": "Duas correções em mode-tracking. Cenas com scenceParam agora usam ativação Cloud em dispositivos sem segmentos (H70B3 etc.) — os pacotes ptReal eram silenciosamente descartados. Desligar o dispositivo agora reseta todos os mode-dropdowns para \"---\", independente da origem.",
+        "nl": "Twee fixes voor mode-tracking. Scenes met scenceParam gebruiken nu cloud-activatie op apparaten zonder segmenten (H70B3 etc.) — die verwerpen de ptReal-pakketten stilletjes. Apparaat uitschakelen reset nu alle mode-dropdowns naar \"---\", ongeacht de bron.",
+        "fr": "Deux correctifs autour du tracking des modes. Les scènes avec scenceParam utilisent maintenant l’activation Cloud sur les appareils sans segments (H70B3 etc.) — ces appareils rejetaient silencieusement les paquets ptReal. Éteindre un appareil remet maintenant tous les mode-dropdowns à « --- », quelle que soit la source.",
+        "it": "Due fix sul mode-tracking. Scene con scenceParam ora usano attivazione Cloud sui dispositivi senza segmenti (H70B3 etc.) — quei dispositivi scartavano silenziosamente i pacchetti ptReal. Spegnere un dispositivo ora resetta tutti i mode-dropdown a \"---\", indipendentemente dall’origine.",
+        "es": "Dos correcciones en el mode-tracking. Las escenas con scenceParam ahora usan activación Cloud en dispositivos sin segmentos (H70B3 etc.) — esos dispositivos descartaban silenciosamente los paquetes ptReal. Apagar un dispositivo ahora resetea todos los mode-dropdowns a \"---\", independientemente del origen.",
+        "pl": "Dwie poprawki w mode-tracking. Sceny z scenceParam używają teraz aktywacji Cloud na urządzeniach bez segmentów (H70B3 itd.) — te urządzenia po cichu odrzucały pakiety ptReal. Wyłączenie urządzenia resetuje teraz wszystkie mode-dropdowns do \"---\", niezależnie od źródła.",
+        "uk": "Два виправлення в mode-tracking. Сцени з scenceParam тепер активуються через Cloud на пристроях без сегментів (H70B3 тощо) — ці пристрої мовчки відкидали ptReal-пакети. Вимкнення пристрою тепер скидає всі mode-dropdowns на \"---\", незалежно від джерела.",
+        "zh-cn": "两个 mode-tracking 修复。带 scenceParam 的场景现在在无段设备（H70B3 等）上通过 Cloud 激活 — 这些设备会默默丢弃 ptReal 包。关闭设备现在会将所有 mode-dropdown 重置为 \"---\"，无论来源。"
+      },
+      "1.9.1": {
+        "en": "Hotfix — cloud-side scene/snapshot updates are now merged per list instead of all-or-nothing. Govee’s /device/scenes occasionally returns e.g. 149 scenes + 0 snapshots on the same device where a snapshot clearly exists; the old combined guard wiped the snapshots list in that case, breaking the cloud-snapshot dropdown with “invalid snapshot index” errors. Each of scenes, DIY scenes and snapshots is now guarded independently so a lucky list never clobbers an unlucky one.",
+        "de": "Hotfix — Cloud-Aktualisierungen für Szenen/Snapshots werden jetzt pro Liste gemerged statt alles-oder-nichts. Govees /device/scenes liefert gelegentlich z.B. 149 Szenen + 0 Snapshots obwohl ein Snapshot existiert; der alte kombinierte Guard hat die Snapshot-Liste in dem Fall geleert und damit das Cloud-Snapshot-Dropdown mit „invalid snapshot index“-Fehlern gebrochen. Szenen, DIY-Szenen und Snapshots werden jetzt unabhängig gegen leeres Cloud-Ergebnis geschützt.",
+        "ru": "Хотфикс — обновление сцен/снапшотов из облака теперь мержится по отдельным спискам, а не всё сразу. Govee иногда возвращает сцены + 0 снапшотов там где снапшот реально существует; старая логика стирала список снапшотов, ломая dropdown с ошибкой \"invalid snapshot index\". Списки теперь защищены независимо.",
+        "pt": "Hotfix — atualizações cloud de cenas/snapshots agora são mescladas por lista. Govee às vezes retorna cenas + 0 snapshots quando o snapshot existe; o guard antigo apagava a lista de snapshots, causando erros \"invalid snapshot index\" no dropdown. Agora cada lista é protegida separadamente.",
+        "nl": "Hotfix — cloud-updates van scenes/snapshots worden nu per lijst samengevoegd. Govee retourneert soms scenes + 0 snapshots terwijl de snapshot bestaat; de oude guard wiste de snapshot-lijst in dat geval, waardoor het dropdown brak met \"invalid snapshot index\". Elke lijst wordt nu afzonderlijk beschermd.",
+        "fr": "Hotfix — les mises à jour cloud des scènes/snapshots sont maintenant fusionnées par liste. Govee renvoie parfois des scènes + 0 snapshot alors que le snapshot existe ; l’ancien guard effaçait la liste des snapshots, cassant le dropdown avec l’erreur « invalid snapshot index ». Chaque liste est maintenant protégée séparément.",
+        "it": "Hotfix — gli aggiornamenti cloud di scene/snapshot ora vengono uniti per lista. Govee talvolta restituisce scene + 0 snapshot quando lo snapshot esiste; il vecchio guard cancellava la lista degli snapshot, rompendo il dropdown con errori \"invalid snapshot index\". Ora ogni lista è protetta separatamente.",
+        "es": "Hotfix — las actualizaciones cloud de escenas/snapshots ahora se fusionan por lista. Govee a veces devuelve escenas + 0 snapshots cuando el snapshot existe; el guard antiguo borraba la lista de snapshots, rompiendo el dropdown con errores \"invalid snapshot index\". Cada lista ahora está protegida por separado.",
+        "pl": "Hotfix — aktualizacje cloud scen/snapshotów są teraz mergeowane osobno dla każdej listy. Govee czasem zwraca sceny + 0 snapshotów gdy snapshot istnieje; stary guard czyścił listę snapshotów, psując dropdown z błędem \"invalid snapshot index\". Każda lista jest teraz chroniona osobno.",
+        "uk": "Хотфікс — оновлення сцен/снепшотів з клауду тепер мержаться посписочно. Govee іноді повертає сцени + 0 снепшотів коли снепшот існує; старий guard стирав список снепшотів, ламаючи dropdown з помилкою \"invalid snapshot index\". Кожен список тепер захищено окремо.",
+        "zh-cn": "热修复 — 云端场景/快照更新现在按列表分别合并。Govee 有时返回场景 + 0 快照（快照实际存在），旧的 guard 会清空快照列表，导致 dropdown 出现 \"invalid snapshot index\" 错误。每个列表现在独立保护。"
+      },
+      "1.9.0": {
+        "en": "BREAKING: the cloud-snapshot dropdown has been renamed from snapshots.snapshot to snapshots.snapshot_cloud — update your scripts if they reference the old id. Plus: scene and snapshot data are now re-fetched from the Govee Cloud on every adapter start (a new snapshot you created in the Govee Home app now appears after restart) and a new info.refresh_cloud_data button lets you trigger the same refresh without a restart. Every snapshot state now carries a clear description telling you whether it is the Cloud or the Local kind.",
+        "de": "BREAKING: der Cloud-Snapshot-Datenpunkt heißt jetzt snapshots.snapshot_cloud statt snapshots.snapshot — Skripte mit der alten ID anpassen. Außerdem: Szenen- und Snapshot-Daten werden bei jedem Adapter-Start frisch aus der Govee Cloud geholt (ein neuer Snapshot aus der Govee Home App ist nach einem Restart sichtbar), plus neuer Button info.refresh_cloud_data für den manuellen Refresh ohne Restart. Alle vier Snapshot-States haben jetzt eine Beschreibung die Cloud vs. Lokal klar benennt.",
+        "ru": "BREAKING: состояние snapshots.snapshot переименовано в snapshots.snapshot_cloud. Сценарии и снапшоты обновляются из Govee Cloud при каждом запуске. Новая кнопка info.refresh_cloud_data для ручного обновления. У всех состояний снапшотов теперь понятное описание.",
+        "pt": "BREAKING: snapshots.snapshot renomeado para snapshots.snapshot_cloud. Cenas e snapshots agora são atualizados da Govee Cloud a cada inicialização. Novo botão info.refresh_cloud_data para refresh manual. Descrições claras em todos os estados de snapshot.",
+        "nl": "BREAKING: snapshots.snapshot hernoemd naar snapshots.snapshot_cloud. Scenes en snapshots worden bij elke adapterstart vers opgehaald uit de Govee Cloud. Nieuwe knop info.refresh_cloud_data voor handmatige refresh. Duidelijke beschrijvingen bij alle snapshot-states.",
+        "fr": "BREAKING : snapshots.snapshot renommé en snapshots.snapshot_cloud. Les scènes et snapshots sont maintenant rechargés depuis le Cloud Govee à chaque démarrage. Nouveau bouton info.refresh_cloud_data pour un refresh manuel. Descriptions claires sur tous les states snapshot.",
+        "it": "BREAKING: snapshots.snapshot rinominato in snapshots.snapshot_cloud. Scene e snapshot ora vengono ricaricati dal Cloud Govee ad ogni avvio. Nuovo pulsante info.refresh_cloud_data per refresh manuale. Descrizioni chiare su tutti gli state degli snapshot.",
+        "es": "BREAKING: snapshots.snapshot renombrado a snapshots.snapshot_cloud. Escenas y snapshots se recargan desde Govee Cloud en cada inicio. Nuevo botón info.refresh_cloud_data para refresh manual. Descripciones claras en todos los states de snapshot.",
+        "pl": "BREAKING: snapshots.snapshot przemianowany na snapshots.snapshot_cloud. Sceny i snapshoty są odświeżane z Govee Cloud przy każdym starcie. Nowy przycisk info.refresh_cloud_data do ręcznego odświeżenia. Jasne opisy przy wszystkich stanach snapshot.",
+        "uk": "BREAKING: snapshots.snapshot перейменовано на snapshots.snapshot_cloud. Сцени та снепшоти оновлюються з Govee Cloud при кожному запуску. Нова кнопка info.refresh_cloud_data для ручного оновлення. Чіткі описи в усіх snapshot-states.",
+        "zh-cn": "BREAKING: snapshots.snapshot 重命名为 snapshots.snapshot_cloud。场景和快照在每次适配器启动时从 Govee Cloud 刷新。新的 info.refresh_cloud_data 按钮用于手动刷新。所有快照状态都有清晰的描述。"
+      }
     },
-    "encryptedNative": [
-        "apiKey",
-        "goveePassword"
+    "titleLang": {
+      "en": "Govee Smart",
+      "de": "Govee Smart",
+      "ru": "Govee Smart",
+      "pt": "Govee Smart",
+      "nl": "Govee Smart",
+      "fr": "Govee Smart",
+      "it": "Govee Smart",
+      "es": "Govee Smart",
+      "pl": "Govee Smart",
+      "uk": "Govee Smart",
+      "zh-cn": "Govee Smart"
+    },
+    "desc": {
+      "en": "Control Govee WiFi devices via LAN, MQTT and Cloud API.",
+      "de": "Govee WiFi-Geräte über LAN, MQTT und Cloud-API steuern.",
+      "ru": "Управление WiFi-устройствами Govee через LAN, MQTT и Cloud API.",
+      "pt": "Controle dispositivos Govee WiFi via LAN, MQTT e Cloud API.",
+      "nl": "Bedien Govee WiFi-apparaten via LAN, MQTT en Cloud API.",
+      "fr": "Contrôlez les appareils WiFi Govee via LAN, MQTT et Cloud API.",
+      "it": "Controlla i dispositivi WiFi Govee tramite LAN, MQTT e Cloud API.",
+      "es": "Controla los dispositivos WiFi de Govee mediante LAN, MQTT y Cloud API.",
+      "pl": "Steruj urządzeniami WiFi Govee przez LAN, MQTT i Cloud API.",
+      "uk": "Керування пристроями Govee WiFi через LAN, MQTT та Cloud API.",
+      "zh-cn": "通过 LAN、MQTT 和 Cloud API 控制 Govee WiFi 设备。"
+    },
+    "authors": [
+      "krobi <krobi@power-dreams.com>"
     ],
-    "protectedNative": [
-        "apiKey",
-        "goveePassword"
+    "licenseInformation": {
+      "license": "MIT",
+      "type": "free"
+    },
+    "platform": "Javascript/Node.js",
+    "icon": "govee-smart.svg",
+    "extIcon": "https://raw.githubusercontent.com/krobipd/ioBroker.govee-smart/main/admin/govee-smart.svg",
+    "readme": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/README.md",
+    "enabled": true,
+    "tier": 3,
+    "loglevel": "info",
+    "mode": "daemon",
+    "messagebox": true,
+    "keywords": [
+      "govee",
+      "lights",
+      "led",
+      "lan",
+      "mqtt",
+      "ble"
     ],
-    "instanceObjects": [
-        {
-            "_id": "info",
-            "type": "channel",
-            "common": {
-                "name": {
-                    "en": "Information",
-                    "de": "Information",
-                    "ru": "Информация",
-                    "pt": "Informação",
-                    "nl": "Informatie",
-                    "fr": "Information",
-                    "it": "Informazioni",
-                    "es": "Información",
-                    "pl": "Informacja",
-                    "uk": "Інформація",
-                    "zh-cn": "信息"
-                }
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.connection",
-            "type": "state",
-            "common": {
-                "name": "Adapter connected",
-                "type": "boolean",
-                "role": "indicator.connected",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.mqttConnected",
-            "type": "state",
-            "common": {
-                "name": "MQTT connected",
-                "type": "boolean",
-                "role": "indicator.connected",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.cloudConnected",
-            "type": "state",
-            "common": {
-                "name": "Cloud API connected",
-                "type": "boolean",
-                "role": "indicator.connected",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.openapiMqttConnected",
-            "type": "state",
-            "common": {
-                "name": "Govee OpenAPI MQTT connected",
-                "desc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
-                "type": "boolean",
-                "role": "indicator.connected",
-                "read": true,
-                "write": false,
-                "def": false
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.wizardStatus",
-            "type": "state",
-            "common": {
-                "name": "Segment-Wizard status",
-                "type": "string",
-                "role": "text",
-                "read": true,
-                "write": false,
-                "def": ""
-            },
-            "native": {}
-        },
-        {
-            "_id": "info.refresh_cloud_data",
-            "type": "state",
-            "common": {
-                "name": "Refresh Cloud Data",
-                "desc": "Write true to re-fetch scenes, snapshots and device list from the Govee Cloud for all devices. Use this after creating a new snapshot in the Govee Home app to see it in the dropdown without restarting the adapter.",
-                "type": "boolean",
-                "role": "button",
-                "read": true,
-                "write": true,
-                "def": false
-            },
-            "native": {}
-        },
-        {
-            "_id": "devices",
-            "type": "folder",
-            "common": {
-                "name": {
-                    "en": "Devices",
-                    "de": "Geräte",
-                    "ru": "Устройства",
-                    "pt": "Dispositivos",
-                    "nl": "Apparaten",
-                    "fr": "Appareils",
-                    "it": "Dispositivi",
-                    "es": "Dispositivos",
-                    "pl": "Urządzenia",
-                    "uk": "Пристрої",
-                    "zh-cn": "设备"
-                }
-            },
-            "native": {}
-        },
-        {
-            "_id": "groups",
-            "type": "folder",
-            "common": {
-                "name": {
-                    "en": "Groups",
-                    "de": "Gruppen",
-                    "ru": "Группы",
-                    "pt": "Grupos",
-                    "nl": "Groepen",
-                    "fr": "Groupes",
-                    "it": "Gruppi",
-                    "es": "Grupos",
-                    "pl": "Grupy",
-                    "uk": "Групи",
-                    "zh-cn": "组"
-                }
-            },
-            "native": {}
+    "type": "lighting",
+    "compact": true,
+    "connectionType": "local",
+    "dataSource": "push",
+    "adminUI": {
+      "config": "json"
+    },
+    "supportedMessages": {
+      "stopInstance": true
+    },
+    "dependencies": [
+      {
+        "js-controller": ">=7.0.23"
+      }
+    ],
+    "globalDependencies": [
+      {
+        "admin": ">=7.6.17"
+      }
+    ]
+  },
+  "encryptedNative": [
+    "apiKey",
+    "goveePassword"
+  ],
+  "protectedNative": [
+    "apiKey",
+    "goveePassword"
+  ],
+  "instanceObjects": [
+    {
+      "_id": "info",
+      "type": "channel",
+      "common": {
+        "name": {
+          "en": "Information",
+          "de": "Information",
+          "ru": "Информация",
+          "pt": "Informação",
+          "nl": "Informatie",
+          "fr": "Information",
+          "it": "Informazioni",
+          "es": "Información",
+          "pl": "Informacja",
+          "uk": "Інформація",
+          "zh-cn": "信息"
         }
-    ],
-    "native": {
-        "apiKey": "",
-        "goveeEmail": "",
-        "goveePassword": "",
-        "networkInterface": "0.0.0.0",
-        "experimentalQuirks": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.connection",
+      "type": "state",
+      "common": {
+        "name": "Adapter connected",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.mqttConnected",
+      "type": "state",
+      "common": {
+        "name": "MQTT connected",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.cloudConnected",
+      "type": "state",
+      "common": {
+        "name": "Cloud API connected",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.openapiMqttConnected",
+      "type": "state",
+      "common": {
+        "name": "Govee OpenAPI MQTT connected",
+        "desc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
+        "type": "boolean",
+        "role": "indicator.connected",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.wizardStatus",
+      "type": "state",
+      "common": {
+        "name": "Segment-Wizard status",
+        "type": "string",
+        "role": "text",
+        "read": true,
+        "write": false,
+        "def": ""
+      },
+      "native": {}
+    },
+    {
+      "_id": "info.refresh_cloud_data",
+      "type": "state",
+      "common": {
+        "name": "Refresh Cloud Data",
+        "desc": "Write true to re-fetch scenes, snapshots and device list from the Govee Cloud for all devices. Use this after creating a new snapshot in the Govee Home app to see it in the dropdown without restarting the adapter.",
+        "type": "boolean",
+        "role": "button",
+        "read": true,
+        "write": true,
+        "def": false
+      },
+      "native": {}
+    },
+    {
+      "_id": "devices",
+      "type": "folder",
+      "common": {
+        "name": {
+          "en": "Devices",
+          "de": "Geräte",
+          "ru": "Устройства",
+          "pt": "Dispositivos",
+          "nl": "Apparaten",
+          "fr": "Appareils",
+          "it": "Dispositivi",
+          "es": "Dispositivos",
+          "pl": "Urządzenia",
+          "uk": "Пристрої",
+          "zh-cn": "设备"
+        }
+      },
+      "native": {}
+    },
+    {
+      "_id": "groups",
+      "type": "folder",
+      "common": {
+        "name": {
+          "en": "Groups",
+          "de": "Gruppen",
+          "ru": "Группы",
+          "pt": "Grupos",
+          "nl": "Groepen",
+          "fr": "Groupes",
+          "it": "Gruppi",
+          "es": "Grupos",
+          "pl": "Grupy",
+          "uk": "Групи",
+          "zh-cn": "组"
+        }
+      },
+      "native": {}
     }
+  ],
+  "native": {
+    "apiKey": "",
+    "goveeEmail": "",
+    "goveePassword": "",
+    "networkInterface": "0.0.0.0",
+    "experimentalQuirks": false
+  }
 }

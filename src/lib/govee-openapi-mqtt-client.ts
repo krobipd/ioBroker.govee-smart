@@ -1,3 +1,4 @@
+import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import {
   classifyError,
@@ -31,6 +32,14 @@ export class GoveeOpenapiMqttClient {
   private readonly apiKey: string;
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
+  /**
+   * Stable client ID for the lifetime of the adapter instance. Generated once
+   * in the constructor so reconnects keep the same identity — Govee's broker
+   * can then take over the previous socket cleanly instead of rejecting the
+   * new connection as a duplicate. Reusing Date.now() per connect() created a
+   * fresh ID on every reconnect.
+   */
+  private readonly sessionUuid: string = crypto.randomUUID();
   private client: mqtt.MqttClient | null = null;
   private topic: string;
   private reconnectTimer: ioBroker.Timeout | undefined = undefined;
@@ -73,7 +82,7 @@ export class GoveeOpenapiMqttClient {
       this.client = mqtt.connect(BROKER_URL, {
         username: this.apiKey,
         password: this.apiKey,
-        clientId: `iob_govee_smart_${Date.now().toString(36)}`,
+        clientId: `iob_govee_smart_${this.sessionUuid}`,
         protocolVersion: 4,
         keepalive: 60,
         reconnectPeriod: 0,

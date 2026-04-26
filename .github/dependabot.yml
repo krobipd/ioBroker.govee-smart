@@ -11,6 +11,9 @@ updates:
       interval: 'weekly'
       day: 'wednesday'
     open-pull-requests-limit: 15
+    assignees:
+      - 'krobipd'
+    versioning-strategy: 'increase'
     cooldown:
       default-days: 7
 
@@ -20,3 +23,5 @@ updates:
       interval: 'weekly'
       day: 'wednesday'
     open-pull-requests-limit: 15
+    assignees:
+      - 'krobipd'

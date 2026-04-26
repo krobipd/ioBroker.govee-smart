@@ -61,7 +61,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 ## Requirements
 
 - Node.js >= 20
-- ioBroker js-controller >= 7.0.0
+- ioBroker js-controller >= 7.0.23
 - ioBroker Admin >= 7.6.20
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
@@ -107,40 +107,46 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### **WORK IN PROGRESS**
+- OpenAPI MQTT now keeps a stable client ID across reconnects (was `Date.now`-based, which Govee's broker treats as new connections).
+- Stop shipping the `manual-review` release-script plugin and the redundant `@iobroker/types` runtime dep — adapter-only consequences.
+- Bump min js-controller to `>=7.0.23` (matches latest-repo recommendation).
+- Audit-driven boilerplate sync with the other krobi adapters (`.vscode` json5 schemas, dependabot assignees + github-actions ecosystem, `tsconfig.test` looser test rules).
+- Repo hygiene: ignore `package/` (npm-pack artefact).
+
 ### 2.0.1 (2026-04-26)
-- Hotfixes from a real-world v2.0.0 install on a setup with H5179 thermometers, heaters and lights.
-- Sensor state IDs (`battery`, `temperature`, `humidity`, `co2`, `online`) now route to `sensor/` instead of `control/`. Event IDs (`lackWater`, `iceFull`, `bodyAppeared`, `dirtDetected`) route to `events/`. The state objects are created lazily on the first write — fixes the `info: control.battery has no existing object` warning that appeared the first time the App-API poll delivered sensor data.
-- Snapshots and scenes are no longer attached to non-light devices. Thermometers, heaters and kettles previously got `snapshot_local` / `snapshot_save` / `snapshot_delete` regardless — now those state defs are gated behind `device.type === "devices.types.light"`.
-- The boot-time `N experimental device(s) detected: H5051, H5100, …` log dump is gone. The adapter only nudges you when a real device of an experimental SKU actually shows up on LAN or Cloud — once per adapter lifetime, per SKU.
-- Routine `OpenAPI MQTT connected for sensor events` info line dropped. The adapter-ready summary covers it; the recovery log on reconnect (`OpenAPI MQTT connection restored`) is kept.
+- Sensor states route to `sensor/`, event states to `events/` (was `control/` for both); state objects are created lazily on first write to avoid `no existing object` warnings.
+- Snapshots and scenes only attach to lights now; thermometers, heaters and kettles no longer get `snapshot_local` / `snapshot_save` / `snapshot_delete`.
+- No more boot-time `N experimental device(s) detected` log dump — only triggers when an experimental SKU actually shows up, once per lifetime per SKU.
+- Routine `OpenAPI MQTT connected for sensor events` info line removed; reconnect-recovery log kept.
 
 ### 2.0.0 (2026-04-26)
-- Major release — Govee appliances and sensors are now handled by this adapter alongside lights. Govee thermometers (e.g. H5179), heaters, kettles, ice makers and more are imported through the App API (sensor states) and the OpenAPI-MQTT push channel (appliance events).
-- The standalone `iobroker.govee-appliances` adapter is deprecated and rolls into here. The old adapter still runs but receives no further updates — install govee-smart 2.0.0+ and uninstall govee-appliances at your convenience.
-- New checkbox **"Enable experimental device support"** in the adapter config makes it easier to try unconfirmed models. The Wiki page [Devices](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) lists every supported SKU and its status (verified ✅ / user-confirmed 🟢 / experimental ⚪).
-- Devices catalog (`devices.json` in the repo root) tracks 36 SKUs at release time; the catalog is the single source of truth for the Wiki page and for runtime quirk-overrides like the per-SKU color-temperature ranges that Govee's API misreports.
-- New state `info.openapiMqttConnected` for the second MQTT channel that delivers appliance events. The existing `info.mqttConnected` keeps tracking AWS IoT MQTT for light status push.
+- Major release — Govee appliances and sensors (thermometers like H5179, heaters, kettles, ice makers) are now handled here alongside lights, via the App API and OpenAPI-MQTT push channel.
+- The standalone `iobroker.govee-appliances` adapter is deprecated and rolls into here. Install govee-smart 2.0.0+ and uninstall govee-appliances when convenient.
+- New **"Enable experimental device support"** checkbox in the adapter config. The Wiki [Devices](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) page lists every SKU and its status.
+- `devices.json` in the repo root tracks 36 SKUs and is the single source of truth for the Wiki and for runtime quirk overrides.
+- New state `info.openapiMqttConnected` for the OpenAPI-MQTT channel; `info.mqttConnected` keeps tracking AWS IoT MQTT for lights.
 
 ### 1.11.0 (2026-04-25)
-- Scene / DIY-scene / snapshot / music-mode dropdowns now accept three input forms from Blockly and JS scripts: the index as a string (`"1"`), the index as a number (`1`), or the entry name (`"Aurora"`, case-insensitive, surrounding whitespace ignored). The state type changed from `string` to `mixed` so the js-controller no longer warns `expects type string but received number` when a script writes a numeric index.
-- Duplicate names from the cloud (Govee allows two scenes called "Movie") are now auto-disambiguated in the dropdown with `" (2)"`, `" (3)"` suffixes — the first occurrence keeps the original name, every label maps to exactly one index, and the reverse-lookup is deterministic.
-- After activation the adapter acks back the canonical key so the dropdown stays in sync regardless of how the user wrote the value — `setState(oid, "Aurora")` ends up showing "Aurora" in the dropdown just like `setState(oid, "1")` does.
+- Scene / DIY-scene / snapshot / music-mode dropdowns now accept index-as-number, index-as-string and the entry name (case-insensitive). The state type is `mixed` — no more `expects type string but received number` warning when scripts write a numeric index.
+- Duplicate scene names from the cloud are auto-disambiguated with `" (2)"`, `" (3)"` suffixes; reverse-lookup is deterministic.
+- The adapter acks back the canonical key after activation, so the dropdown stays in sync regardless of how the value was written.
 
 ### 1.10.1 (2026-04-20)
-- Fix — the `info.refresh_cloud_data` button was re-fetching every device's scene / music / DIY / SKU-features libraries on each click. Libraries never change for a given SKU, and several of those endpoints return 403 for many accounts, so running them again on every refresh only produced a multi-minute rate-limiter backlog — visible in the log as minute-spaced POSTs to `/device/scenes` and `/device/diy-scenes` in the minutes after each click. The button now only re-fetches the scene/snapshot endpoint, which is where new Govee-app snapshots actually show up. Call count per click drops from ~7 to 2 per light device.
+- Refresh button no longer re-fetches static SKU libraries (scene/music/DIY/features) — call count drops from ~7 to 2 per device per click. The endpoints returned 403 for many accounts and just produced minute-long rate-limiter backlogs.
 
 ### 1.10.0 (2026-04-20)
-- Scenes with a `scenceParam` (the multi-packet A3 BLE payload that drives per-segment animation) are now skipped on devices without segments and activated via the Govee Cloud instead. Curtain Lights (H70B3) and bulbs silently drop those A3 packets, which left complex scenes unplayed; the simple presets without `scenceParam` kept working. With this fix every scene reaches the device, at the cost of one Cloud call per scene change on non-segmented hardware.
-- Powering a device off now resets every mode dropdown (scene, DIY scene, Cloud/local snapshot, music) to "---", whether the off was triggered from ioBroker or from the Govee Home app. A device that is off cannot be "playing Aurora-A" — the UI now reflects that.
+- Multi-packet A3 BLE scenes (`scenceParam`) are now activated via Cloud on devices without segments; bulbs and Curtain Lights silently dropped those packets before, so complex scenes never played.
+- Powering a device off now resets every mode dropdown to `"---"` — both ioBroker and Govee-app initiated off events.
 
 ### 1.9.1 (2026-04-20)
-- Hotfix — Govee's `/device/scenes` endpoint occasionally returns e.g. 149 scenes + 0 snapshots on the same device where a snapshot clearly exists. The old combined guard (`if any of the three lists is non-empty, overwrite all three`) wiped the snapshot list in that case, and the cloud-snapshot dropdown then errored out with `invalid snapshot index 1` on click. Each of scenes, DIY scenes and snapshots is now guarded independently — a lucky list no longer clobbers an unlucky one. Applies to every device with cloud-side snapshots, not just the device where it first surfaced.
+- Each Cloud list (scenes / DIY / snapshots) is now guarded independently. Govee's `/device/scenes` sometimes returns e.g. 149 scenes + 0 snapshots when a snapshot clearly exists; the old combined guard then wiped existing snapshots and the dropdown errored on click.
 
 ### 1.9.0 (2026-04-20)
-- **BREAKING** — the cloud-snapshot dropdown has been renamed from `snapshots.snapshot` to `snapshots.snapshot_cloud`. The new id is unambiguous next to `snapshots.snapshot_local`, `snapshots.snapshot_save` and `snapshots.snapshot_delete`. If your scripts or VIS widgets reference the old id, update them to the new one. The old state is simply removed on first start — nothing is migrated because the value (a dropdown index) is set again on the next selection anyway.
-- Fix — scenes and snapshots are now re-fetched from the Govee Cloud on every adapter start. Previously, once `scenesChecked` was set on the cache, the adapter skipped the Cloud round-trip even when you had created a new snapshot in the Govee Home app, so new snapshots only appeared after wiping the cache. This was a genuine bug. Scene data is essentially static, but snapshots are user content — refreshing is cheap (one call per light device per startup) and much less surprising.
-- New — `info.refresh_cloud_data` button at adapter level. Write `true` to trigger the same fresh fetch without restarting the adapter. Useful when you just created a snapshot in the Govee Home app and want to pick it in ioBroker right now.
-- All four snapshot states (`snapshot_cloud`, `snapshot_local`, `snapshot_save`, `snapshot_delete`) now carry a `common.desc` text that makes it clear in the object browser which is the Govee-app kind and which is the ioBroker kind.
+- **BREAKING** — `snapshots.snapshot` renamed to `snapshots.snapshot_cloud` (clearer alongside `snapshot_local` / `snapshot_save` / `snapshot_delete`). Update scripts and VIS widgets; old state is removed on first start.
+- Fix — scenes and snapshots are re-fetched from the Cloud on every adapter start. Previously a stale `scenesChecked` flag could hide new Govee-app snapshots until the cache was wiped.
+- New — `info.refresh_cloud_data` button to trigger the same fresh fetch without restarting the adapter.
+- All four snapshot states carry a `common.desc` so the object browser distinguishes Govee-app from ioBroker snapshots.
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
