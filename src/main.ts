@@ -1477,6 +1477,17 @@ class GoveeAdapter extends utils.Adapter {
       Boolean(device.lanIp),
       lanStateIds,
     );
+    // App-API and OpenAPI-MQTT deliver state IDs (battery, temperature,
+    // humidity, lackWater, …) that the Cloud-capability pipeline doesn't
+    // declare for sensor/appliance SKUs — the state objects therefore
+    // don't exist yet on first write. ensureSyntheticStateObject creates
+    // them lazily with the right channel + role + unit.
+    for (const mapped of planned) {
+      await this.stateManager.ensureSyntheticStateObject(
+        prefix,
+        mapped.stateId,
+      );
+    }
     const writes = planned.map((mapped) => {
       const statePath = this.stateManager!.resolveStatePath(
         prefix,

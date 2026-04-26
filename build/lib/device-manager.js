@@ -121,6 +121,8 @@ class DeviceManager {
   devices = /* @__PURE__ */ new Map();
   commandRouter;
   diagnostics;
+  /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
+  nudgedSeedSkus = /* @__PURE__ */ new Set();
   cloudClient = null;
   apiClient = null;
   skuCache = null;
@@ -403,6 +405,7 @@ class DeviceManager {
         this.devices.set(this.deviceKey(cd.sku, cd.device), device);
         changed = true;
         this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
+        this.maybeNudgeSeedSku(cd.sku, cd.deviceName);
       }
       const quirks = (0, import_device_registry.getDeviceQuirks)(cd.sku);
       if (quirks == null ? void 0 : quirks.brokenPlatformApi) {
@@ -727,8 +730,32 @@ class DeviceManager {
       };
       this.devices.set(this.deviceKey(lanDevice.sku, lanDevice.device), device);
       this.log.debug(`LAN: New device ${lanDevice.sku} at ${lanDevice.ip}`);
+      this.maybeNudgeSeedSku(lanDevice.sku, device.name);
       (_b = this.onDeviceListChanged) == null ? void 0 : _b.call(this, this.getDevices());
     }
+  }
+  /**
+   * If the SKU is recognised as `seed` in `devices.json` and the user
+   * hasn't enabled the experimental toggle, log an info-level nudge
+   * pointing at the adapter config — but only once per adapter lifetime
+   * per SKU, so it doesn't spam the log when the device reconnects.
+   *
+   * @param sku Govee SKU
+   * @param displayName Device name as shown in Govee Home
+   */
+  maybeNudgeSeedSku(sku, displayName) {
+    const upper = (typeof sku === "string" ? sku : "").toUpperCase();
+    if (!upper || this.nudgedSeedSkus.has(upper)) {
+      return;
+    }
+    if (!(0, import_device_registry.isSeedAndDormant)(upper)) {
+      return;
+    }
+    this.nudgedSeedSkus.add(upper);
+    const label = displayName ? `${displayName} (${upper})` : upper;
+    this.log.info(
+      `Device ${label} is marked experimental and not yet confirmed by a tester. The adapter handles it generically; per-SKU corrections are gated behind the adapter-config switch "Experimentelle Ger\xE4te-Unterst\xFCtzung aktivieren".`
+    );
   }
   /**
    * Handle MQTT status update — update device state.

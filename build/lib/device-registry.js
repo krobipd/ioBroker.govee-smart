@@ -32,7 +32,8 @@ __export(device_registry_exports, {
   _resetDeviceRegistry: () => _resetDeviceRegistry,
   applyColorTempQuirk: () => applyColorTempQuirk,
   getDeviceQuirks: () => getDeviceQuirks,
-  initDeviceRegistry: () => initDeviceRegistry
+  initDeviceRegistry: () => initDeviceRegistry,
+  isSeedAndDormant: () => isSeedAndDormant
 });
 module.exports = __toCommonJS(device_registry_exports);
 var fs = __toESM(require("node:fs"));
@@ -100,7 +101,7 @@ class DeviceRegistry {
    * @param parsed Pre-parsed devices.json content
    */
   ingest(parsed) {
-    var _a, _b, _c;
+    var _a, _b;
     if (!(parsed == null ? void 0 : parsed.devices) || typeof parsed.devices !== "object") {
       (_a = this.log) == null ? void 0 : _a.warn(`device-registry: 'devices' object missing or invalid`);
       return;
@@ -124,12 +125,26 @@ class DeviceRegistry {
     (_b = this.log) == null ? void 0 : _b.debug(
       `device-registry: ${this.entries.size} entries loaded, ${active} active quirks, ${skipped} seed entries skipped`
     );
-    if (skipped > 0 && !this.experimental) {
-      const seedSkus = [...this.entries.entries()].filter(([, e]) => e.status === "seed").map(([sku]) => sku).sort();
-      (_c = this.log) == null ? void 0 : _c.info(
-        `${skipped} experimental device(s) detected but not active: ${seedSkus.join(", ")}. Enable via adapter config "Experimentelle Ger\xE4te-Unterst\xFCtzung aktivieren".`
-      );
+  }
+  /**
+   * Whether the given SKU exists as a `seed` entry in the catalog and
+   * the experimental toggle is OFF — i.e. the adapter recognises this
+   * device but the per-SKU quirk corrections aren't active. The device
+   * manager calls this when a real device shows up so the user gets a
+   * targeted* nudge ("you have an H7160, enable the toggle"), not a
+   * blanket dump of every seed entry in the catalog.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  isSeedAndDormant(sku) {
+    var _a;
+    if (this.experimental) {
+      return false;
     }
+    if (!sku || typeof sku !== "string") {
+      return false;
+    }
+    return ((_a = this.entries.get(sku.toUpperCase())) == null ? void 0 : _a.status) === "seed";
   }
   /**
    * Quirks for a SKU. Returns undefined if SKU is unknown OR if it's a
@@ -208,12 +223,17 @@ function applyColorTempQuirk(sku, min, max) {
   var _a;
   return (_a = singleton == null ? void 0 : singleton.applyColorTempQuirk(sku, min, max)) != null ? _a : { min, max };
 }
+function isSeedAndDormant(sku) {
+  var _a;
+  return (_a = singleton == null ? void 0 : singleton.isSeedAndDormant(sku)) != null ? _a : false;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   DeviceRegistry,
   _resetDeviceRegistry,
   applyColorTempQuirk,
   getDeviceQuirks,
-  initDeviceRegistry
+  initDeviceRegistry,
+  isSeedAndDormant
 });
 //# sourceMappingURL=device-registry.js.map

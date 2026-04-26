@@ -1172,6 +1172,12 @@ class GoveeAdapter extends utils.Adapter {
       Boolean(device.lanIp),
       lanStateIds
     );
+    for (const mapped of planned) {
+      await this.stateManager.ensureSyntheticStateObject(
+        prefix,
+        mapped.stateId
+      );
+    }
     const writes = planned.map((mapped) => {
       const statePath = this.stateManager.resolveStatePath(
         prefix,

@@ -87,8 +87,6 @@ class GoveeOpenapiMqttClient {
         if (this.lastErrorCategory) {
           this.log.info("OpenAPI MQTT connection restored");
           this.lastErrorCategory = null;
-        } else {
-          this.log.info("OpenAPI MQTT connected for sensor events");
         }
         (_a = this.client) == null ? void 0 : _a.subscribe(this.topic, { qos: 0 }, (err) => {
           var _a2;

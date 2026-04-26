@@ -1010,7 +1010,12 @@ export function buildDeviceStateDefs(
 
   applyQuirksToStates(device.sku, stateDefs);
 
-  if (device.scenes.length > 0) {
+  // Light-only state defs — scenes / snapshots / music / scene_speed only
+  // make sense for lights. Sensors and appliances would otherwise see
+  // empty snapshot dropdowns and a useless save/delete button pair.
+  const isLight = device.type === "devices.types.light";
+
+  if (isLight && device.scenes.length > 0) {
     stateDefs.push({
       id: "light_scene",
       name: "Light Scene",
@@ -1048,7 +1053,7 @@ export function buildDeviceStateDefs(
     }
     return max;
   }, -1);
-  if (maxSpeedLevel > 0) {
+  if (isLight && maxSpeedLevel > 0) {
     stateDefs.push({
       id: "scene_speed",
       name: "Scene Speed",
@@ -1064,7 +1069,7 @@ export function buildDeviceStateDefs(
     });
   }
 
-  if (device.diyScenes.length > 0) {
+  if (isLight && device.diyScenes.length > 0) {
     stateDefs.push({
       id: "diy_scene",
       name: "DIY Scene",
@@ -1079,7 +1084,7 @@ export function buildDeviceStateDefs(
     });
   }
 
-  if (device.snapshots.length > 0) {
+  if (isLight && device.snapshots.length > 0) {
     stateDefs.push({
       id: "snapshot_cloud",
       name: "Cloud Snapshot",
@@ -1095,44 +1100,47 @@ export function buildDeviceStateDefs(
     });
   }
 
-  // Local snapshots
-  stateDefs.push({
-    id: "snapshot_local",
-    name: "Local Snapshot",
-    desc: "Snapshots saved by this adapter on the ioBroker server. Independent of the Govee Home app.",
-    type: "mixed",
-    role: "text",
-    write: true,
-    states: buildUniqueLabelMap(localSnapshots ?? []),
-    def: "0",
-    capabilityType: "local",
-    capabilityInstance: "snapshotLocal",
-    channel: "snapshots",
-  });
-  stateDefs.push({
-    id: "snapshot_save",
-    name: "Save Local Snapshot",
-    desc: "Write a name to save the current device state (power, brightness, colour, per-segment colours) as a new local snapshot.",
-    type: "string",
-    role: "text",
-    write: true,
-    def: "",
-    capabilityType: "local",
-    capabilityInstance: "snapshotSave",
-    channel: "snapshots",
-  });
-  stateDefs.push({
-    id: "snapshot_delete",
-    name: "Delete Local Snapshot",
-    desc: "Write a local snapshot name to delete it. Does not affect Govee Home app snapshots.",
-    type: "string",
-    role: "text",
-    write: true,
-    def: "",
-    capabilityType: "local",
-    capabilityInstance: "snapshotDelete",
-    channel: "snapshots",
-  });
+  // Local snapshots — light-only feature (capture+restore RGB/segments;
+  // makes no sense for thermometer/heater/kettle).
+  if (isLight) {
+    stateDefs.push({
+      id: "snapshot_local",
+      name: "Local Snapshot",
+      desc: "Snapshots saved by this adapter on the ioBroker server. Independent of the Govee Home app.",
+      type: "mixed",
+      role: "text",
+      write: true,
+      states: buildUniqueLabelMap(localSnapshots ?? []),
+      def: "0",
+      capabilityType: "local",
+      capabilityInstance: "snapshotLocal",
+      channel: "snapshots",
+    });
+    stateDefs.push({
+      id: "snapshot_save",
+      name: "Save Local Snapshot",
+      desc: "Write a name to save the current device state (power, brightness, colour, per-segment colours) as a new local snapshot.",
+      type: "string",
+      role: "text",
+      write: true,
+      def: "",
+      capabilityType: "local",
+      capabilityInstance: "snapshotSave",
+      channel: "snapshots",
+    });
+    stateDefs.push({
+      id: "snapshot_delete",
+      name: "Delete Local Snapshot",
+      desc: "Write a local snapshot name to delete it. Does not affect Govee Home app snapshots.",
+      type: "string",
+      role: "text",
+      write: true,
+      def: "",
+      capabilityType: "local",
+      capabilityInstance: "snapshotDelete",
+      channel: "snapshots",
+    });
+  }
 
   // Diagnostics — under info/ because it exports ALL device data, not just snapshots
   stateDefs.push({

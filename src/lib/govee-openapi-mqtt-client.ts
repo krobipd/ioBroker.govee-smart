@@ -84,10 +84,12 @@ export class GoveeOpenapiMqttClient {
         this.reconnectAttempts = 0;
         this.connectFailCount = 0;
         if (this.lastErrorCategory) {
+          // Only log on transition out of an error state — the routine
+          // first-connect message is redundant with the adapter-level
+          // "Govee adapter ready — N devices, M groups (channels: …)"
+          // line and was just noise.
           this.log.info("OpenAPI MQTT connection restored");
           this.lastErrorCategory = null;
-        } else {
-          this.log.info("OpenAPI MQTT connected for sensor events");
         }
 
         this.client?.subscribe(this.topic, { qos: 0 }, (err) => {

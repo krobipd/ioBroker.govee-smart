@@ -1,5 +1,5 @@
 import { CommandRouter } from "./command-router.js";
-import { getDeviceQuirks } from "./device-registry.js";
+import { getDeviceQuirks, isSeedAndDormant } from "./device-registry.js";
 import { DiagnosticsCollector } from "./diagnostics.js";
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client.js";
 import type { GoveeCloudClient } from "./govee-cloud-client.js";
@@ -192,6 +192,8 @@ export class DeviceManager {
   private readonly devices = new Map<string, GoveeDevice>();
   private readonly commandRouter: CommandRouter;
   private readonly diagnostics: DiagnosticsCollector;
+  /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
+  private readonly nudgedSeedSkus = new Set<string>();
   private cloudClient: GoveeCloudClient | null = null;
   private apiClient: GoveeApiClient | null = null;
   private skuCache: SkuCache | null = null;
@@ -558,6 +560,7 @@ export class DeviceManager {
         this.devices.set(this.deviceKey(cd.sku, cd.device), device);
         changed = true;
         this.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
+        this.maybeNudgeSeedSku(cd.sku, cd.deviceName);
       }
 
       const quirks = getDeviceQuirks(cd.sku);
@@ -951,8 +954,36 @@ export class DeviceManager {
       };
       this.devices.set(this.deviceKey(lanDevice.sku, lanDevice.device), device);
       this.log.debug(`LAN: New device ${lanDevice.sku} at ${lanDevice.ip}`);
+      this.maybeNudgeSeedSku(lanDevice.sku, device.name);
       this.onDeviceListChanged?.(this.getDevices());
     }
+  }
+
+  /**
+   * If the SKU is recognised as `seed` in `devices.json` and the user
+   * hasn't enabled the experimental toggle, log an info-level nudge
+   * pointing at the adapter config — but only once per adapter lifetime
+   * per SKU, so it doesn't spam the log when the device reconnects.
+   *
+   * @param sku Govee SKU
+   * @param displayName Device name as shown in Govee Home
+   */
+  private maybeNudgeSeedSku(
+    sku: string,
+    displayName: string | undefined,
+  ): void {
+    const upper = (typeof sku === "string" ? sku : "").toUpperCase();
+    if (!upper || this.nudgedSeedSkus.has(upper)) {
+      return;
+    }
+    if (!isSeedAndDormant(upper)) {
+      return;
+    }
+    this.nudgedSeedSkus.add(upper);
+    const label = displayName ? `${displayName} (${upper})` : upper;
+    this.log.info(
+      `Device ${label} is marked experimental and not yet confirmed by a tester. The adapter handles it generically; per-SKU corrections are gated behind the adapter-config switch "Experimentelle Geräte-Unterstützung aktivieren".`,
+    );
   }
 
   /**

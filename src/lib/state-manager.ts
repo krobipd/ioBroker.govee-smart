@@ -54,6 +54,108 @@ const CHANNEL_NAMES: Record<string, string> = {
   info: "Device Information",
 };
 
+/**
+ * Synthetic capabilities written by the App-API poll and OpenAPI-MQTT
+ * handler arrive as `(stateId, value)` pairs without a channel hint —
+ * `mapCloudStateValue` returns only what the Govee response carries.
+ *
+ * For lights the LAN/Cloud-state pipeline pre-populates `stateChannelMap`
+ * via `createDeviceStates`, so `resolveStatePath` finds the channel.
+ * For thermometer/appliance state IDs that are *only* delivered via the
+ * App-API path (battery, temperature, humidity, CO₂, lackWater, …) the map
+ * is empty and the lookup would default to "control" — visibly wrong:
+ * `info: control.battery has no existing object`.
+ *
+ * This routing table assigns those IDs to their semantic channel without
+ * needing a separate `createDeviceStates` pass for sensor-only devices.
+ * Keep IDs lowercase; resolveStatePath calls this on the raw stateId.
+ */
+const SENSOR_STATE_IDS = new Set([
+  "temperature",
+  "humidity",
+  "battery",
+  "co2",
+  "carbondioxide",
+  "online",
+]);
+const EVENT_STATE_IDS = new Set([
+  "lackwater",
+  "lackwaterevent",
+  "icefull",
+  "icefullevent",
+  "bodyappeared",
+  "dirtdetected",
+]);
+
+/**
+ * Best-effort channel routing for state IDs that don't have a
+ * stateChannelMap entry yet (e.g. App-API synthetic caps before the device
+ * has gone through createDeviceStates). Empty input falls back to the safe
+ * default "control".
+ *
+ * @param stateId The raw state ID (e.g. "battery", "lackWater")
+ */
+function inferChannelFromStateId(stateId: string): string {
+  const normalised = stateId.toLowerCase();
+  if (SENSOR_STATE_IDS.has(normalised)) {
+    return "sensor";
+  }
+  if (EVENT_STATE_IDS.has(normalised)) {
+    return "events";
+  }
+  return "control";
+}
+
+/** Per-stateId metadata for synthetic states (App-API/OpenAPI-MQTT pipe). */
+interface SyntheticStateMeta {
+  type: "boolean" | "number";
+  role: string;
+  unit?: string;
+  name: string;
+}
+const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
+  temperature: {
+    type: "number",
+    role: "value.temperature",
+    unit: "°C",
+    name: "Temperature",
+  },
+  humidity: {
+    type: "number",
+    role: "value.humidity",
+    unit: "%",
+    name: "Humidity",
+  },
+  battery: {
+    type: "number",
+    role: "value.battery",
+    unit: "%",
+    name: "Battery",
+  },
+  co2: { type: "number", role: "value.co2", unit: "ppm", name: "CO₂" },
+  carbondioxide: {
+    type: "number",
+    role: "value.co2",
+    unit: "ppm",
+    name: "CO₂",
+  },
+  online: { type: "boolean", role: "indicator.connected", name: "Online" },
+  lackwater: {
+    type: "boolean",
+    role: "indicator.alarm",
+    name: "Lack of Water",
+  },
+  lackwaterevent: {
+    type: "boolean",
+    role: "indicator.alarm",
+    name: "Lack of Water",
+  },
+  icefull: { type: "boolean", role: "indicator", name: "Ice Bucket Full" },
+  icefullevent: { type: "boolean", role: "indicator", name: "Ice Bucket Full" },
+  bodyappeared: { type: "boolean", role: "indicator", name: "Body Detected" },
+  dirtdetected: { type: "boolean", role: "indicator", name: "Dirt Detected" },
+};
+
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
@@ -76,8 +178,60 @@ export class StateManager {
    */
   resolveStatePath(prefix: string, stateId: string): string {
     const channel =
-      this.stateChannelMap.get(`${prefix}.${stateId}`) ?? "control";
+      this.stateChannelMap.get(`${prefix}.${stateId}`) ??
+      inferChannelFromStateId(stateId);
     return `${prefix}.${channel}.${stateId}`;
+  }
+
+  /**
+   * Lazily create the channel + state object for synthetic state IDs the
+   * App-API poll and OpenAPI-MQTT pipeline write. Cloud-capability defs
+   * for sensor SKUs (e.g. H5179) are often empty in OpenAPI v2, so the
+   * usual `createDeviceStates` pass would not declare battery / temperature
+   * / events.* — without this helper the first write logs
+   * `info: <id> has no existing object`.
+   *
+   * Idempotent: skips when the meta table doesn't know the stateId, and
+   * `setObjectNotExistsAsync` is itself a no-op for existing objects.
+   *
+   * @param prefix Device prefix (e.g. "devices.h5179_aabb")
+   * @param stateId State ID without channel (e.g. "battery")
+   */
+  async ensureSyntheticStateObject(
+    prefix: string,
+    stateId: string,
+  ): Promise<void> {
+    const meta = SYNTHETIC_STATE_META[stateId.toLowerCase()];
+    if (!meta) {
+      return;
+    }
+    const channel = inferChannelFromStateId(stateId);
+    // Channel object first — sensors land in the new sensor/ subtree, events
+    // in events/. Without an extendObject the channel parent stays missing
+    // and Admin shows the state directly under the device root.
+    await this.adapter
+      .extendObjectAsync(`${prefix}.${channel}`, {
+        type: "channel",
+        common: { name: CHANNEL_NAMES[channel] ?? channel },
+        native: {},
+      })
+      .catch(() => undefined);
+    await this.adapter
+      .setObjectNotExistsAsync(`${prefix}.${channel}.${stateId}`, {
+        type: "state",
+        common: {
+          name: meta.name,
+          type: meta.type,
+          role: meta.role,
+          read: true,
+          write: false,
+          ...(meta.unit !== undefined ? { unit: meta.unit } : {}),
+          def: meta.type === "boolean" ? false : 0,
+        },
+        native: {},
+      })
+      .catch(() => undefined);
+    this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
   }
 
   /**

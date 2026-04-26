@@ -44,6 +44,74 @@ const CHANNEL_NAMES = {
   events: "Events",
   info: "Device Information"
 };
+const SENSOR_STATE_IDS = /* @__PURE__ */ new Set([
+  "temperature",
+  "humidity",
+  "battery",
+  "co2",
+  "carbondioxide",
+  "online"
+]);
+const EVENT_STATE_IDS = /* @__PURE__ */ new Set([
+  "lackwater",
+  "lackwaterevent",
+  "icefull",
+  "icefullevent",
+  "bodyappeared",
+  "dirtdetected"
+]);
+function inferChannelFromStateId(stateId) {
+  const normalised = stateId.toLowerCase();
+  if (SENSOR_STATE_IDS.has(normalised)) {
+    return "sensor";
+  }
+  if (EVENT_STATE_IDS.has(normalised)) {
+    return "events";
+  }
+  return "control";
+}
+const SYNTHETIC_STATE_META = {
+  temperature: {
+    type: "number",
+    role: "value.temperature",
+    unit: "\xB0C",
+    name: "Temperature"
+  },
+  humidity: {
+    type: "number",
+    role: "value.humidity",
+    unit: "%",
+    name: "Humidity"
+  },
+  battery: {
+    type: "number",
+    role: "value.battery",
+    unit: "%",
+    name: "Battery"
+  },
+  co2: { type: "number", role: "value.co2", unit: "ppm", name: "CO\u2082" },
+  carbondioxide: {
+    type: "number",
+    role: "value.co2",
+    unit: "ppm",
+    name: "CO\u2082"
+  },
+  online: { type: "boolean", role: "indicator.connected", name: "Online" },
+  lackwater: {
+    type: "boolean",
+    role: "indicator.alarm",
+    name: "Lack of Water"
+  },
+  lackwaterevent: {
+    type: "boolean",
+    role: "indicator.alarm",
+    name: "Lack of Water"
+  },
+  icefull: { type: "boolean", role: "indicator", name: "Ice Bucket Full" },
+  icefullevent: { type: "boolean", role: "indicator", name: "Ice Bucket Full" },
+  bodyappeared: { type: "boolean", role: "indicator", name: "Body Detected" },
+  dirtdetected: { type: "boolean", role: "indicator", name: "Dirt Detected" }
+};
 class StateManager {
   adapter;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
@@ -63,8 +131,49 @@ class StateManager {
    */
   resolveStatePath(prefix, stateId) {
     var _a;
-    const channel = (_a = this.stateChannelMap.get(`${prefix}.${stateId}`)) != null ? _a : "control";
+    const channel = (_a = this.stateChannelMap.get(`${prefix}.${stateId}`)) != null ? _a : inferChannelFromStateId(stateId);
     return `${prefix}.${channel}.${stateId}`;
+  }
+  /**
+   * Lazily create the channel + state object for synthetic state IDs the
+   * App-API poll and OpenAPI-MQTT pipeline write. Cloud-capability defs
+   * for sensor SKUs (e.g. H5179) are often empty in OpenAPI v2, so the
+   * usual `createDeviceStates` pass would not declare battery / temperature
+   * / events.* — without this helper the first write logs
+   * `info: <id> has no existing object`.
+   *
+   * Idempotent: skips when the meta table doesn't know the stateId, and
+   * `setObjectNotExistsAsync` is itself a no-op for existing objects.
+   *
+   * @param prefix Device prefix (e.g. "devices.h5179_aabb")
+   * @param stateId State ID without channel (e.g. "battery")
+   */
+  async ensureSyntheticStateObject(prefix, stateId) {
+    var _a;
+    const meta = SYNTHETIC_STATE_META[stateId.toLowerCase()];
+    if (!meta) {
+      return;
+    }
+    const channel = inferChannelFromStateId(stateId);
+    await this.adapter.extendObjectAsync(`${prefix}.${channel}`, {
+      type: "channel",
+      common: { name: (_a = CHANNEL_NAMES[channel]) != null ? _a : channel },
+      native: {}
+    }).catch(() => void 0);
+    await this.adapter.setObjectNotExistsAsync(`${prefix}.${channel}.${stateId}`, {
+      type: "state",
+      common: {
+        name: meta.name,
+        type: meta.type,
+        role: meta.role,
+        read: true,
+        write: false,
+        ...meta.unit !== void 0 ? { unit: meta.unit } : {},
+        def: meta.type === "boolean" ? false : 0
+      },
+      native: {}
+    }).catch(() => void 0);
+    this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
   }
   /**
    * Create device object and all states from capability definitions.

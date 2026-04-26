@@ -186,15 +186,32 @@ export class DeviceRegistry {
     this.log?.debug(
       `device-registry: ${this.entries.size} entries loaded, ${active} active quirks, ${skipped} seed entries skipped`,
     );
-    if (skipped > 0 && !this.experimental) {
-      const seedSkus = [...this.entries.entries()]
-        .filter(([, e]) => e.status === "seed")
-        .map(([sku]) => sku)
-        .sort();
-      this.log?.info(
-        `${skipped} experimental device(s) detected but not active: ${seedSkus.join(", ")}. Enable via adapter config "Experimentelle Geräte-Unterstützung aktivieren".`,
-      );
+    // The boot-time seed-list dump was removed: it logged every seed SKU in
+    // the catalog regardless of whether the user owned any of them, so a
+    // typical Lights-only setup got 27 SKUs in their face for nothing.
+    // The targeted nudge — "your H7160 is here, flip the toggle" — now
+    // happens later in `noteSeedDeviceDetected()`, called by the device
+    // manager when a real device of that SKU appears.
+  }
+
+  /**
+   * Whether the given SKU exists as a `seed` entry in the catalog and
+   * the experimental toggle is OFF — i.e. the adapter recognises this
+   * device but the per-SKU quirk corrections aren't active. The device
+   * manager calls this when a real device shows up so the user gets a
+   * targeted* nudge ("you have an H7160, enable the toggle"), not a
+   * blanket dump of every seed entry in the catalog.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  isSeedAndDormant(sku: string): boolean {
+    if (this.experimental) {
+      return false;
     }
+    if (!sku || typeof sku !== "string") {
+      return false;
+    }
+    return this.entries.get(sku.toUpperCase())?.status === "seed";
   }
 
   /**
@@ -322,4 +339,15 @@ export function applyColorTempQuirk(
   max: number,
 ): { min: number; max: number } {
   return singleton?.applyColorTempQuirk(sku, min, max) ?? { min, max };
+}
+
+/**
+ * Stateless check whether a SKU is recognised as `seed` and the toggle is
+ * off — used by the device manager to nudge the user only for SKUs that
+ * actually show up at runtime.
+ *
+ * @param sku Govee SKU (case-insensitive)
+ */
+export function isSeedAndDormant(sku: string): boolean {
+  return singleton?.isSeedAndDormant(sku) ?? false;
 }
