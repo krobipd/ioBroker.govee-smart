@@ -1,5 +1,17 @@
 # Older Changes
 
+## 1.8.0 (2026-04-20)
+- Performance — `updateDeviceState` now fires every status write in parallel and drops the per-write object-existence probe; MQTT status pushes cost a fraction of what they used to on large device lists
+- Performance — `cleanupAllChannelStates` replaces its four per-device view queries with one broader view; device-list refresh scales with device count instead of 4 × device count
+- Performance — `handleSnapshotSave` reads device + per-segment state in parallel; saving a snapshot on a 20-segment strip no longer blocks on 40 sequential reads
+- Rate-limiter daily reset aligned to UTC midnight so the adapter's budget flips at the same instant Govee does — no more wasted quota when the adapter was started after midnight
+- Local snapshots now write with `fsync`, matching the SKU cache — SIGKILL during adapter stop no longer silently drops a just-saved snapshot
+- Library fetches (scene / music / DIY / SKU features) now go through the rate-limiter so a fresh install with many devices doesn't burst-call the undocumented `app2.govee.com` endpoints
+- Wizard text fully localised (EN / DE) and resolved against the Admin UI language from `system.config`; English is the fallback for other admin languages
+- govee-appliances coexistence covers every instance (`.0`, `.1`, …) not just `.0` — the shared-budget halving trips for any active sibling
+- MQTT client keeps a stable per-process session UUID across reconnects; AWS IoT can now take over cleanly from a lingering socket instead of refusing a new connection
+- Memory leak prevention — every adapter-level map (diagnostics throttle, state-channel map, device map) is now reaped when a device is removed so long-lived instances stay bounded
+- Internal — shared `govee-constants.ts` for Govee app-impersonation headers, `stateToCommand` collapsed to a lookup table, `crypto.randomUUID` replaces the legacy Math.random UUID, unused `total` parameter dropped from `flashSingleSegment`
 
 ## 1.7.8 (2026-04-19)
 - Fix MQTT bearer-token went stale after reconnect — api-client is now refreshed on every fresh login

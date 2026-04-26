@@ -107,6 +107,13 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ## Changelog
 
+### 2.0.1 (2026-04-26)
+- Hotfixes from a real-world v2.0.0 install on a setup with H5179 thermometers, heaters and lights.
+- Sensor state IDs (`battery`, `temperature`, `humidity`, `co2`, `online`) now route to `sensor/` instead of `control/`. Event IDs (`lackWater`, `iceFull`, `bodyAppeared`, `dirtDetected`) route to `events/`. The state objects are created lazily on the first write — fixes the `info: control.battery has no existing object` warning that appeared the first time the App-API poll delivered sensor data.
+- Snapshots and scenes are no longer attached to non-light devices. Thermometers, heaters and kettles previously got `snapshot_local` / `snapshot_save` / `snapshot_delete` regardless — now those state defs are gated behind `device.type === "devices.types.light"`.
+- The boot-time `N experimental device(s) detected: H5051, H5100, …` log dump is gone. The adapter only nudges you when a real device of an experimental SKU actually shows up on LAN or Cloud — once per adapter lifetime, per SKU.
+- Routine `OpenAPI MQTT connected for sensor events` info line dropped. The adapter-ready summary covers it; the recovery log on reconnect (`OpenAPI MQTT connection restored`) is kept.
+
 ### 2.0.0 (2026-04-26)
 - Major release — Govee appliances and sensors are now handled by this adapter alongside lights. Govee thermometers (e.g. H5179), heaters, kettles, ice makers and more are imported through the App API (sensor states) and the OpenAPI-MQTT push channel (appliance events).
 - The standalone `iobroker.govee-appliances` adapter is deprecated and rolls into here. The old adapter still runs but receives no further updates — install govee-smart 2.0.0+ and uninstall govee-appliances at your convenience.
@@ -134,19 +141,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fix — scenes and snapshots are now re-fetched from the Govee Cloud on every adapter start. Previously, once `scenesChecked` was set on the cache, the adapter skipped the Cloud round-trip even when you had created a new snapshot in the Govee Home app, so new snapshots only appeared after wiping the cache. This was a genuine bug. Scene data is essentially static, but snapshots are user content — refreshing is cheap (one call per light device per startup) and much less surprising.
 - New — `info.refresh_cloud_data` button at adapter level. Write `true` to trigger the same fresh fetch without restarting the adapter. Useful when you just created a snapshot in the Govee Home app and want to pick it in ioBroker right now.
 - All four snapshot states (`snapshot_cloud`, `snapshot_local`, `snapshot_save`, `snapshot_delete`) now carry a `common.desc` text that makes it clear in the object browser which is the Govee-app kind and which is the ioBroker kind.
-
-### 1.8.0 (2026-04-20)
-- Performance — `updateDeviceState` now fires every status write in parallel and drops the per-write object-existence probe; MQTT status pushes cost a fraction of what they used to on large device lists
-- Performance — `cleanupAllChannelStates` replaces its four per-device view queries with one broader view; device-list refresh scales with device count instead of 4 × device count
-- Performance — `handleSnapshotSave` reads device + per-segment state in parallel; saving a snapshot on a 20-segment strip no longer blocks on 40 sequential reads
-- Rate-limiter daily reset aligned to UTC midnight so the adapter's budget flips at the same instant Govee does — no more wasted quota when the adapter was started after midnight
-- Local snapshots now write with `fsync`, matching the SKU cache — SIGKILL during adapter stop no longer silently drops a just-saved snapshot
-- Library fetches (scene / music / DIY / SKU features) now go through the rate-limiter so a fresh install with many devices doesn't burst-call the undocumented `app2.govee.com` endpoints
-- Wizard text fully localised (EN / DE) and resolved against the Admin UI language from `system.config`; English is the fallback for other admin languages
-- govee-appliances coexistence covers every instance (`.0`, `.1`, …) not just `.0` — the shared-budget halving trips for any active sibling
-- MQTT client keeps a stable per-process session UUID across reconnects; AWS IoT can now take over cleanly from a lingering socket instead of refusing a new connection
-- Memory leak prevention — every adapter-level map (diagnostics throttle, state-channel map, device map) is now reaped when a device is removed so long-lived instances stay bounded
-- Internal — shared `govee-constants.ts` for Govee app-impersonation headers, `stateToCommand` collapsed to a lookup table, `crypto.randomUUID` replaces the legacy Math.random UUID, unused `total` parameter dropped from `flashSingleSegment`
 
 Older entries have been moved to [CHANGELOG_OLD.md](CHANGELOG_OLD.md).
 
