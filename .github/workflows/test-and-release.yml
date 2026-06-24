@@ -30,7 +30,7 @@ jobs:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Verify io-package.json against ioBroker stable repository
         run: |
           set -euo pipefail
@@ -98,7 +98,7 @@ jobs:
     needs: [check-and-lint]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v6
         with:
           node-version: "24.x"
@@ -109,7 +109,7 @@ jobs:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Lint workflow YAML files (actionlint)
         uses: reviewdog/action-actionlint@v1
         with:
