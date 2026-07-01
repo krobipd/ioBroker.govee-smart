@@ -569,6 +569,82 @@ describe("GoveeMqttClient", () => {
     });
   });
 
+  // The connect→subscribe happy path was previously unreachable in tests (the
+  // node-forge P12 parse gates it). Drive login + getIotKey to success, bypass
+  // the forge parse, and inject a fake mqtt client so the connect handler runs —
+  // proving the M3 backoff-reset timing symmetrically with the openapi client.
+  describe("connect → subscribe backoff timing (M3)", () => {
+    function driveToConnected(subscribeErr: Error | null): {
+      client: GoveeMqttClient;
+      emitConnect: () => void;
+      isEnded: () => boolean;
+    } {
+      const fake = makeFakeHttps((_opts, idx) =>
+        idx === 0
+          ? { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } }
+          : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
+      );
+      const handlers: Record<string, Array<(...a: unknown[]) => void>> = {};
+      let ended = false;
+      const fakeMqtt = {
+        on(ev: string, cb: (...a: unknown[]) => void) {
+          (handlers[ev] ??= []).push(cb);
+          return fakeMqtt;
+        },
+        subscribe(_t: string, _o: unknown, cb: (e: Error | null) => void) {
+          cb(subscribeErr);
+        },
+        end() {
+          ended = true;
+        },
+        removeAllListeners() {
+          for (const k of Object.keys(handlers)) delete handlers[k];
+        },
+      };
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => fakeMqtt) as never);
+      // Bypass the node-forge PKCS12 parse — not what this test exercises.
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      return { client, emitConnect: () => (handlers.connect ?? []).forEach(h => h()), isEnded: () => ended };
+    }
+
+    it("keeps the backoff counter on a post-CONNACK subscribe failure — no tight relogin loop (M3)", async () => {
+      const h = driveToConnected(new Error("policy denied"));
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      // Pretend we have already been backing off (3 prior attempts).
+      (h.client as unknown as { reconnectAttempts: number }).reconnectAttempts = 3;
+      h.emitConnect(); // CONNACK → subscribe fails → force close
+      // The CONNACK alone must NOT reset the backoff — only a full subscribe
+      // success does. Otherwise a persistent subscribe failure relogs every
+      // ~5-10 s and self-inflicts a Govee rate-limit / account lock.
+      expect((h.client as unknown as { reconnectAttempts: number }).reconnectAttempts).toBe(3);
+      expect(h.isEnded()).toBe(true); // forced close so the close-handler can reconnect
+      h.client.disconnect();
+    });
+
+    it("resets the backoff and reports connected only after a successful subscribe (M3)", async () => {
+      const h = driveToConnected(null); // subscribe succeeds
+      let connFlag: boolean | null = null;
+      await h.client.connect(
+        () => {},
+        c => {
+          connFlag = c;
+        },
+      );
+      (h.client as unknown as { reconnectAttempts: number }).reconnectAttempts = 3;
+      h.emitConnect(); // CONNACK → subscribe OK → onSubscribed resets + onConnection(true)
+      expect((h.client as unknown as { reconnectAttempts: number }).reconnectAttempts).toBe(0);
+      expect(connFlag).toBe(true);
+      h.client.disconnect();
+    });
+  });
+
   describe("handleMessage (status push parsing)", () => {
     function makeClient() {
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, mockTimers);
