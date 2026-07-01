@@ -122,18 +122,17 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: the optional Govee account email field no longer shows a "valid email" error when left empty — LAN-only and API-key-only setups no longer see a false validation error.
 - Fixed: per-segment colour and brightness now have a default value instead of reading as null before the first change, and the "Segment Count" label is now translated in all languages.
 - Fixed: sensor readings (temperature/humidity/battery/CO₂) now default to 0 instead of null in visualizations before the first reading arrives.
-- Fixed: cloud device-state refreshes no longer log a "has no existing object" warning for the action-only snapshot dropdown.
 - Fixed: device groups no longer expose a meaningless "verified" trust-tier datapoint (the trust tier only applies to real devices, not groups).
 - Fixed: several admin translations — the "manual segment list" hint was untranslated in 10 languages, and the wizard "aborted"/"state tree rebuilt" messages were fixed in 5 languages.
-- Fixed: cleaner shutdown/restart — the adapter no longer opens a cloud connection, logs a stray "connection restored", or emits an unhandled error after it has been told to stop.
-- Fixed: a malformed rate-limit response from Govee (Retry-After of 0) no longer causes rapid back-to-back cloud retries; the retry now waits at least 5 seconds.
+- Fixed: cleaner shutdown/restart — the adapter no longer opens a cloud connection or reports a stray error after it has been told to stop.
+- Fixed: a broken rate-limit reply from Govee no longer causes rapid repeated retries — the adapter now waits at least 5 seconds before trying again.
 - Fixed: the adapter logs "ready" as soon as the sensor push (cloud-events) channel connects, instead of possibly waiting up to a minute for the safety timer.
-- Fixed: under heavy cloud load a fresh control command (power/brightness) is no longer dropped in favour of queued scene loads — the lowest-priority queued call is evicted instead.
-- Fixed: a LAN light's control channel is no longer removed (which would orphan its power/colour states) when only its cloud-owned control states are cleaned up.
+- Fixed: under heavy cloud load a fresh control command (power/brightness) is no longer dropped in favour of queued scene activations.
+- Fixed: a LAN light no longer loses its power and colour controls during an internal cloud-state cleanup.
 - Added: device catalog entries for the H5109 Pool Thermometer and H1630 Lantern Floor Lamp (user-reported) — they are now recognised instead of logging a "not supported" warning.
 - Fixed: a sensor sending fresh readings now shows `info.online = true` even when Govee's cloud wrongly reports it offline (e.g. gateway thermometers) — online is derived from data freshness.
 - Fixed: temperature-only sensors no longer keep a phantom `sensor_humidity` datapoint stuck at 0 — a device with no humidity sensor drops it, while a real thermo-hygrometer keeps its humidity.
-- Fixed: MQTT verification / login problems are no longer logged twice — they now appear once via the actionable-problems notification instead of a duplicate warning.
+- Fixed: MQTT verification / login problems are no longer logged twice — they now appear once as a single notification instead of a duplicate warning.
 - Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" and stops the retry loop, instead of a generic error and retrying a bad key forever.
 
 ### 2.16.2 (2026-06-16) — stable
