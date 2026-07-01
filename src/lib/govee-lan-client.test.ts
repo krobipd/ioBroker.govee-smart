@@ -236,6 +236,15 @@ describe("buildDiyPackets", () => {
       expect(buf[19]).toBe(xor);
     }
   });
+
+  it("preserves the A1-02 prefix on the continuation line (M1: no off-by-one)", () => {
+    const bigParam = Buffer.alloc(30, 0xcd).toString("base64"); // >15 bytes → forces a continuation line
+    const packets = buildDiyPackets(bigParam);
+    // packets = [data0, data1(continuation), activation]. The continuation line
+    // must start A1 02 FF — the off-by-one clobbered the mandatory 0x02.
+    const cont = Buffer.from(packets[1], "base64");
+    expect([cont[0], cont[1], cont[2]]).toEqual([0xa1, 0x02, 0xff]);
+  });
 });
 
 describe("buildSegmentBitmask", () => {

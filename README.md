@@ -103,6 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Security: LAN device discovery is hardened against a misbehaving or hostile device on your network — implausibly large device identifiers are ignored and the number of new LAN devices is capped, preventing runaway memory/CPU use.
 - Fixed: a device you delete from your Govee account is now removed from the adapter on the next cloud refresh (e.g. after a restart), instead of lingering as a phantom device for up to two weeks.
 - New: a "Manually sync devices" button (`info.manual_sync_devices`) — set it to true to sync the device list with your Govee account on demand (pull in new devices, drop deleted ones) without restarting the adapter.
+- Fixed: multi-colour DIY scenes activated locally (LAN/ptReal) now build a valid packet — an off-by-one corrupted the terminator on scenes with longer data, so they could silently fail to load.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

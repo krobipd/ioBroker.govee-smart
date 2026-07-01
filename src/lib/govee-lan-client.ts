@@ -862,7 +862,7 @@ export function buildDiyPackets(scenceParam: string): string[] {
       if (rawData.length % 19 === 0) {
         numLines++;
         rawData.push(0xa1, 0x02);
-        lastLineMarker = rawData.length - 1;
+        lastLineMarker = rawData.length;
         rawData.push(numLines);
       }
       rawData.push(b);
