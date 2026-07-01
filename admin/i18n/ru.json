@@ -126,6 +126,7 @@
   "scene": "Сцена",
   "sceneSpeed": "Скорость сцены",
   "seenSoFar": "Отмечено как видимое на данный момент: [{list}]",
+  "segmentCount": "Количество сегментов",
   "segmentFlashing": "► Сегмент {idx} теперь горит БЕЛЫМ.",
   "segmentWizardDeviceOption": "%s (%s, в настоящее время сегментов %s)",
   "supportHeader": "Поддерживать",

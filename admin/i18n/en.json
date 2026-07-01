@@ -126,6 +126,7 @@
   "scene": "Scene",
   "sceneSpeed": "Scene Speed",
   "seenSoFar": "Marked visible so far: [{list}]",
+  "segmentCount": "Segment Count",
   "segmentFlashing": "► Segment {idx} is now lit WHITE.",
   "segmentWizardDeviceOption": "%s (%s, currently %s segments)",
   "supportHeader": "Support",

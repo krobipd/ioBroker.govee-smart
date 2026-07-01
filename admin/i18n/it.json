@@ -126,6 +126,7 @@
   "scene": "Scena",
   "sceneSpeed": "Velocità scena",
   "seenSoFar": "Contrassegnato come visibile finora: [{list}]",
+  "segmentCount": "Numero di segmenti",
   "segmentFlashing": "► Il segmento {idx} ora è illuminato in BIANCO.",
   "segmentWizardDeviceOption": "%s (%s, attualmente %s segmenti)",
   "supportHeader": "Supporto",

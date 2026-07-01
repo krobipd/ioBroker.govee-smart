@@ -126,6 +126,7 @@
   "scene": "Сцена",
   "sceneSpeed": "Швидкість сцени",
   "seenSoFar": "Позначено як видимий: [{list}]",
+  "segmentCount": "Кількість сегментів",
   "segmentFlashing": "► Сегмент {idx} тепер світиться БІЛИМ.",
   "segmentWizardDeviceOption": "%s (%s, наразі %s сегментів)",
   "supportHeader": "Підтримка",

@@ -126,6 +126,7 @@
   "scene": "Escena",
   "sceneSpeed": "Velocidad de escena",
   "seenSoFar": "Marcado visible hasta el momento: [{list}]",
+  "segmentCount": "Número de segmentos",
   "segmentFlashing": "► El segmento {idx} ahora está iluminado en BLANCO.",
   "segmentWizardDeviceOption": "%s (%s, actualmente %s segmentos)",
   "supportHeader": "Apoyo",

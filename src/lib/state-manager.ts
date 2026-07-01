@@ -661,7 +661,7 @@ export class StateManager {
         : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
 
-    await this.ensureState(`${prefix}.segments.count`, "Segment Count", "number", "value", false);
+    await this.ensureState(`${prefix}.segments.count`, tName("segmentCount"), "number", "value", false);
     await this.adapter.setStateAsync(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true,
@@ -741,6 +741,7 @@ export class StateManager {
             role: "level.color.rgb",
             read: true,
             write: true,
+            def: "#000000", // avoid null in vis until the first write (LAN-only tier) — B6
           },
           native: {},
         },
@@ -760,6 +761,7 @@ export class StateManager {
             min: 0,
             max: 100,
             unit: "%",
+            def: 0, // avoid null in vis until the first write (LAN-only tier) — B6
           },
           native: {},
         },
@@ -1157,7 +1159,7 @@ export class StateManager {
    */
   private async ensureState(
     id: string,
-    name: string,
+    name: ioBroker.StringOrTranslated,
     type: ioBroker.CommonType,
     role: string,
     write: boolean,

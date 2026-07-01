@@ -126,6 +126,7 @@
   "scene": "Szene",
   "sceneSpeed": "Szenen-Geschwindigkeit",
   "seenSoFar": "Bisher als sichtbar markiert: [{list}]",
+  "segmentCount": "Segment-Anzahl",
   "segmentFlashing": "► Segment {idx} leuchtet jetzt WEISS.",
   "segmentWizardDeviceOption": "%s (%s, bisher %s Segmente)",
   "supportHeader": "Unterstützung",

@@ -126,6 +126,7 @@
   "scene": "场景",
   "sceneSpeed": "场景速度",
   "seenSoFar": "到目前为止标记为可见：[{list}]",
+  "segmentCount": "分段数量",
   "segmentFlashing": "► 段 {idx} 现在呈白色亮起。",
   "segmentWizardDeviceOption": "%s（%s，当前有 %s 个段）",
   "supportHeader": "支持",

@@ -126,6 +126,7 @@
   "scene": "Scène",
   "sceneSpeed": "Scènesnelheid",
   "seenSoFar": "Tot nu toe als zichtbaar gemarkeerd: [{list}]",
+  "segmentCount": "Aantal segmenten",
   "segmentFlashing": "► Segment {idx} is nu WIT verlicht.",
   "segmentWizardDeviceOption": "%s (%s, momenteel %s segmenten)",
   "supportHeader": "Steun",

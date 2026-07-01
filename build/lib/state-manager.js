@@ -529,7 +529,7 @@ class StateManager {
     device.segmentCount = segmentCount;
     const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
-    await this.ensureState(`${prefix}.segments.count`, "Segment Count", "number", "value", false);
+    await this.ensureState(`${prefix}.segments.count`, (0, import_i18n.tName)("segmentCount"), "number", "value", false);
     await this.adapter.setStateAsync(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true
@@ -597,7 +597,9 @@ class StateManager {
             type: "string",
             role: "level.color.rgb",
             read: true,
-            write: true
+            write: true,
+            def: "#000000"
+            // avoid null in vis until the first write (LAN-only tier) — B6
           },
           native: {}
         },
@@ -615,7 +617,9 @@ class StateManager {
             write: true,
             min: 0,
             max: 100,
-            unit: "%"
+            unit: "%",
+            def: 0
+            // avoid null in vis until the first write (LAN-only tier) — B6
           },
           native: {}
         },

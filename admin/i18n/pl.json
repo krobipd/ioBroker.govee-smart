@@ -126,6 +126,7 @@
   "scene": "Scena",
   "sceneSpeed": "Prędkość sceny",
   "seenSoFar": "Oznaczono jako widoczne do tej pory: [{list}]",
+  "segmentCount": "Liczba segmentów",
   "segmentFlashing": "► Segment {idx} świeci się teraz na BIAŁO.",
   "segmentWizardDeviceOption": "%s (%s, obecnie %s segmentów)",
   "supportHeader": "Wsparcie",
