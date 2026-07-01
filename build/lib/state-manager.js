@@ -921,9 +921,8 @@ class StateManager {
         this.stateChannelMap.delete(key);
       }
     }
-    const stalePrefixFull = `${this.adapter.namespace}.${prefix}.`;
     for (const id of this.ensuredStates) {
-      if (id === `${this.adapter.namespace}.${prefix}` || id.startsWith(stalePrefixFull)) {
+      if (id === prefix || id.startsWith(stalePrefix)) {
         this.ensuredStates.delete(id);
       }
     }

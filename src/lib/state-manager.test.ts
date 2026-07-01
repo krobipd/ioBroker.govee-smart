@@ -169,6 +169,18 @@ function basicControlDefs(): StateDefinition[] {
 }
 
 describe("StateManager", () => {
+  describe("forgetPrefix", () => {
+    it("clears the namespace-less ensureState cache so a re-pair recreates info states (M4)", () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      (sm as any).ensuredStates.add("devices.h6160_0011.info.name");
+      (sm as any).ensuredStates.add("devices.h6160_0011.control.power");
+      (sm as any).ensuredStates.add("devices.other_9999.info.name"); // unrelated → survives
+      (sm as any).forgetPrefix("devices.h6160_0011");
+      expect(Array.from((sm as any).ensuredStates as Set<string>)).toEqual(["devices.other_9999.info.name"]);
+    });
+  });
+
   describe("devicePrefix", () => {
     it("should generate prefix from SKU + last 4 hex chars of device ID", () => {
       const { adapter } = createMockAdapter();

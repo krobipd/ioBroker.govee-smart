@@ -1121,9 +1121,11 @@ export class StateManager {
     // Drop ensureState cache for this device too — a re-pair must run the
     // full extendObjectAsync path again so the new device's name/type get
     // applied (cache hit would skip the round-trip and keep stale common.*).
-    const stalePrefixFull = `${this.adapter.namespace}.${prefix}.`;
+    // ensureState stores namespace-less ids (extendObjectAsync takes a relative
+    // id), so match the same way as stateChannelMap above — the old namespaced
+    // match never fired, so re-paired devices skipped info-state creation (M4).
     for (const id of this.ensuredStates) {
-      if (id === `${this.adapter.namespace}.${prefix}` || id.startsWith(stalePrefixFull)) {
+      if (id === prefix || id.startsWith(stalePrefix)) {
         this.ensuredStates.delete(id);
       }
     }
