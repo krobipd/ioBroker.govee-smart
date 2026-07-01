@@ -4,41 +4,36 @@
 # Reference: https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      day: "wednesday"
-      timezone: "Europe/Berlin"
+      interval: 'weekly'
+      day: 'wednesday'
+      timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
     assignees:
-      - "krobipd"
-    versioning-strategy: "increase"
+      - 'krobipd'
+    versioning-strategy: 'increase'
     cooldown:
       default-days: 7
     ignore:
-      # @types/node must track engines.node (>=20). Block major bumps so
-      # type defs cannot drift ahead of the supported runtime range.
-      - dependency-name: "@types/node"
-        update-types: ["version-update:semver-major"]
-      # typescript pinned to ~6.0.x because @iobroker/eslint-config@2 ships
-      # typescript-eslint@8 which requires TS <6.1.0. Bump only when eslint-config
-      # adds TS 6.1+ support.
-      - dependency-name: "typescript"
-        update-types: ["version-update:semver-major"]
-      # eslint pinned to v9 because @iobroker/eslint-config@2 expects v9 API.
-      - dependency-name: "eslint"
-        update-types: ["version-update:semver-major"]
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: 'eslint'
+        update-types:
+          - 'version-update:semver-major'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      day: "wednesday"
-      timezone: "Europe/Berlin"
+      interval: 'weekly'
+      day: 'wednesday'
+      timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
     assignees:
-      - "krobipd"
-    # No ignore-list for actions: every update (incl. major bumps) is applied
-    # automatically. The compatibility gate is CI — a bump is only merged if the
-    # PR stays green (automerge: minor/patch; pre-release.py: majors after test).
+      - 'krobipd'
