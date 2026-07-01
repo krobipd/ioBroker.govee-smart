@@ -56,7 +56,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 ## Requirements
 
 - Node.js >= 22
-- ioBroker js-controller >= 7.1.2
+- ioBroker js-controller >= 7.2.2
 - ioBroker Admin >= 7.8.23
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
@@ -150,7 +150,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Lights and appliances without a local connection can now be controlled through the Cloud and report their correct online status; devices that support local control keep using it first.
 - When account verification, the Cloud API key or the Govee password needs your attention, the adapter now flags it once clearly and as an ioBroker notification instead of repeating the same error.
 - Added many more supported device models to the catalog, including Curtain Lights v1 and v2, the TV Backlight 3 Pro and the DreamView T1.
-- Requires ioBroker js-controller 7.1.2 or newer.
+- Requires ioBroker js-controller 7.2.2 or newer.
 
 ### 2.15.0 (2026-06-07)
 
