@@ -110,6 +110,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: on lamps whose music modes start at zero (e.g. H612F, H61D5, H70B3, H70C5) the first music mode was unreachable and the "off/---" entry was missing — `music_mode` is now a clean index-based dropdown like every other selector. **Breaking on those devices:** the `music_mode` numbers shift by one (an "off" entry is added at 0), so scripts that write a fixed number there may need adjusting.
 - Fixed: cloud snapshots whose value is a plain number are no longer dropped from the snapshot dropdown, and an entry with an empty value no longer shows up as a phantom option.
 - Fixed: clearing the preset-scene selector no longer fires a spurious empty scene command.
+- Fixed: DIY scenes you create in the Govee app now show up in the DIY dropdown after a reload, instead of only on the very first load.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

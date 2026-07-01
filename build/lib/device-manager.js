@@ -523,11 +523,13 @@ class DeviceManager {
     this.diagnostics.addLog(cd.device, "debug", `loadDeviceScenes called for ${cd.sku}`);
     let scenesCallSucceeded = false;
     let snapsFromScenesCall = [];
+    let diyFromScenesCall = [];
     const loadScenes = async () => {
       try {
         const { lightScenes, diyScenes, snapshots } = await this.cloudClient.getScenes(cd.sku, cd.device);
         scenesCallSucceeded = true;
         snapsFromScenesCall = snapshots;
+        diyFromScenesCall = diyScenes;
         if (lightScenes.length > 0) {
           device.scenes = lightScenes;
         }
@@ -540,7 +542,7 @@ class DeviceManager {
       }
     };
     await this.commandRouter.executeRateLimited(loadScenes, 2);
-    if (device.diyScenes.length === 0) {
+    if (diyFromScenesCall.length === 0) {
       const loadDiy = async () => {
         try {
           const diy = await this.cloudClient.getDiyScenes(cd.sku, cd.device);

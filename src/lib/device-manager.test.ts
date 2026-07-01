@@ -2621,6 +2621,35 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     expect(device.snapshots.map(s => s.name)).toEqual(["OldSnap", "NewlyAdded"]);
   });
 
+  it("re-queries the dedicated DIY endpoint even when the DIY cache is non-empty (L2)", async () => {
+    // Pattern 54: the DIY-endpoint fallback used to be gated on an empty DIY
+    // cache, so a DIY scene the user creates in the Govee app after the first
+    // load never surfaced. It must re-query whenever /device/scenes carries no
+    // DIY, exactly like the snapshot fallback above.
+    const device = createTestDevice({ diyScenes: [{ name: "OldDIY", value: { id: 100, paramId: "old" } }] });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+    let diyCalls = 0;
+    dm.setCloudClient({
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => {
+        diyCalls += 1;
+        return Promise.resolve([{ name: "NewDIY", value: { id: 200, paramId: "new" } }]);
+      },
+    } as any);
+    const cd = {
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      deviceName: "Test Light",
+      type: "devices.types.light",
+      capabilities: lightCapabilities(),
+    };
+
+    await (dm as any).loadDeviceScenes(device, cd);
+
+    expect(diyCalls).toBe(1);
+    expect(device.diyScenes).toEqual([{ name: "NewDIY", value: { id: 200, paramId: "new" } }]);
+  });
+
   it("preserves cached snapshots when /device/scenes is empty AND /user/devices has no snapshot capability", async () => {
     // Regression guard: a flaky Cloud response (no snapshot cap returned)
     // must NOT wipe the user's known-good snapshot list. Worse than the

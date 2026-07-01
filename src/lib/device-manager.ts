@@ -629,11 +629,13 @@ export class DeviceManager {
     // (Issue #13, tukey42, v2.6.7).
     let scenesCallSucceeded = false;
     let snapsFromScenesCall: CloudScene[] = [];
+    let diyFromScenesCall: CloudScene[] = [];
     const loadScenes = async (): Promise<void> => {
       try {
         const { lightScenes, diyScenes, snapshots } = await this.cloudClient!.getScenes(cd.sku, cd.device);
         scenesCallSucceeded = true;
         snapsFromScenesCall = snapshots;
+        diyFromScenesCall = diyScenes;
         if (lightScenes.length > 0) {
           device.scenes = lightScenes;
         }
@@ -647,8 +649,13 @@ export class DeviceManager {
     };
     await this.commandRouter.executeRateLimited(loadScenes, 2);
 
-    // DIY scenes from dedicated endpoint
-    if (device.diyScenes.length === 0) {
+    // DIY scenes from the dedicated endpoint. Gate on whether THIS /device/scenes
+    // call carried DIY scenes — NOT on an empty cache. The old `diyScenes.length
+    // === 0` gate froze the list after the first population, so DIY scenes the
+    // user created in the app later never surfaced (Pattern 54, same class as the
+    // snapshot bug below). getDiyScenes only overwrites on a non-empty result, so
+    // a transient empty keeps the cache.
+    if (diyFromScenesCall.length === 0) {
       const loadDiy = async (): Promise<void> => {
         try {
           const diy = await this.cloudClient!.getDiyScenes(cd.sku, cd.device);
