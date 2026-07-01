@@ -820,9 +820,11 @@ export interface ResolvedStatesValue {
 export function resolveStatesValue(input: unknown, statesMap: Record<string, string>): ResolvedStatesValue | null {
   if (typeof input === "number" && Number.isFinite(input)) {
     const key = String(input);
-    const canonical = statesMap[key];
-    if (canonical !== undefined) {
-      return { key, canonical };
+    // Own-property guard so a value/key can never resolve against an inherited
+    // Object.prototype member (SEC-GC2). String(number) can't be "__proto__" etc.,
+    // but keep it symmetric with the string branch below.
+    if (Object.prototype.hasOwnProperty.call(statesMap, key)) {
+      return { key, canonical: statesMap[key] };
     }
     return null;
   }
@@ -832,10 +834,11 @@ export function resolveStatesValue(input: unknown, statesMap: Record<string, str
       return null;
     }
     // Direct key match — handles numeric-string keys ("1") and
-    // identifier-string keys ("spectrum") in one pass.
-    const directLabel = statesMap[trimmed];
-    if (directLabel !== undefined) {
-      return { key: trimmed, canonical: directLabel };
+    // identifier-string keys ("spectrum") in one pass. Own-property guard so a
+    // dropdown input of "__proto__" / "toString" / "constructor" can't match an
+    // inherited prototype member and falsely resolve ok=true (SEC-GC2).
+    if (Object.prototype.hasOwnProperty.call(statesMap, trimmed)) {
+      return { key: trimmed, canonical: statesMap[trimmed] };
     }
     // Label match — case-insensitive, trim. Lets users write the
     // human-readable name (e.g. "Aurora") regardless of casing.

@@ -406,6 +406,14 @@ describe("Types utilities", () => {
       expect(r).toEqual({ key: "rolling", canonical: "Rolling Tides" });
     });
 
+    it("does not resolve inherited prototype members (__proto__ / toString / constructor) (SEC-GC2)", () => {
+      // Direct key lookup used to hit Object.prototype members, falsely returning
+      // a non-null result (canonical = a function) for a non-existent state.
+      for (const evil of ["__proto__", "toString", "constructor", "hasOwnProperty", "valueOf"]) {
+        expect(resolveStatesValue(evil, sceneMap)).toBeNull();
+      }
+    });
+
     it("should return null on unknown numeric index", () => {
       expect(resolveStatesValue(99, sceneMap)).toBeNull();
     });

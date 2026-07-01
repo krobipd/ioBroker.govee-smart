@@ -245,9 +245,8 @@ function buildUniqueLabelMap(items, zeroLabel = "---") {
 function resolveStatesValue(input, statesMap) {
   if (typeof input === "number" && Number.isFinite(input)) {
     const key = String(input);
-    const canonical = statesMap[key];
-    if (canonical !== void 0) {
-      return { key, canonical };
+    if (Object.prototype.hasOwnProperty.call(statesMap, key)) {
+      return { key, canonical: statesMap[key] };
     }
     return null;
   }
@@ -256,9 +255,8 @@ function resolveStatesValue(input, statesMap) {
     if (trimmed === "") {
       return null;
     }
-    const directLabel = statesMap[trimmed];
-    if (directLabel !== void 0) {
-      return { key: trimmed, canonical: directLabel };
+    if (Object.prototype.hasOwnProperty.call(statesMap, trimmed)) {
+      return { key: trimmed, canonical: statesMap[trimmed] };
     }
     const needle = trimmed.toLowerCase();
     for (const [key, label] of Object.entries(statesMap)) {
