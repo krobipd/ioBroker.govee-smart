@@ -340,12 +340,24 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // so they don't keep a stale token after a long-delay reconnect.
       this.onToken?.(this._bearerToken);
 
+      // Bail if the adapter unloaded while login was in flight — otherwise we'd
+      // keep going and open a live TLS socket after onUnload (L12).
+      if (this.disposed) {
+        return;
+      }
+
       // Step 2: Get IoT credentials
       const iotResp = await this.getIotKey();
       if (!iotResp.data?.endpoint) {
         throw new Error("IoT key response missing endpoint/certificate data");
       }
       const { endpoint, p12, p12Pass } = iotResp.data;
+
+      // Same guard before the socket actually opens — getIotKey is another await
+      // during which onUnload can fire (L12).
+      if (this.disposed) {
+        return;
+      }
 
       // Step 3: Extract key + cert from P12
       const { key, cert, ca } = this.extractCertsFromP12(p12, p12Pass);

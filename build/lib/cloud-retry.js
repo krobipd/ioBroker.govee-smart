@@ -109,6 +109,9 @@ class CloudRetryLoop {
       return;
     }
     const result = await this.host.loadFromCloud();
+    if (this.stopped) {
+      return;
+    }
     if (result.ok) {
       this.connected = true;
       this.host.log.info("Govee Cloud connection restored");

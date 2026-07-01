@@ -106,7 +106,7 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
           if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
             const color = parseInt(session.baseline.colorRgb.slice(1), 16);
             const brightness = (_b = session.baseline.brightness) != null ? _b : 100;
-            void this.host.restoreStripAtomic(device, total, color, brightness);
+            void this.host.restoreStripAtomic(device, total, color, brightness).catch(() => void 0);
           }
         } catch {
         }

@@ -128,6 +128,11 @@ export class CloudRetryLoop {
       return;
     }
     const result = await this.host.loadFromCloud();
+    if (this.stopped) {
+      // dispose() ran while loadFromCloud was in flight — don't log "restored"
+      // or fire onCloudRestored after unload (L13).
+      return;
+    }
     if (result.ok) {
       this.connected = true;
       this.host.log.info("Govee Cloud connection restored");

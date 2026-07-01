@@ -284,11 +284,17 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       this.accountId = String(accIdRaw);
       this.accountTopic = topicRaw;
       (_e = this.onToken) == null ? void 0 : _e.call(this, this._bearerToken);
+      if (this.disposed) {
+        return;
+      }
       const iotResp = await this.getIotKey();
       if (!((_f = iotResp.data) == null ? void 0 : _f.endpoint)) {
         throw new Error("IoT key response missing endpoint/certificate data");
       }
       const { endpoint, p12, p12Pass } = iotResp.data;
+      if (this.disposed) {
+        return;
+      }
       const { key, cert, ca } = this.extractCertsFromP12(p12, p12Pass);
       const ttlSec = (_h = (_g = loginResp.client.token_expire_cycle) != null ? _g : loginResp.client.tokenExpireCycle) != null ? _h : 3600;
       const expiresAt = Date.now() + ttlSec * 1e3;

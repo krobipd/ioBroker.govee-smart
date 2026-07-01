@@ -229,6 +229,21 @@ describe("CloudRetryLoop", () => {
       expect(info.some(l => l.msg.includes("restored"))).toBe(true);
     });
 
+    it("does not log 'restored' or fire onCloudRestored when disposed mid-load (L13)", async () => {
+      queueResults(host, { ok: true });
+      const origLoad = host.loadFromCloud.bind(host);
+      host.loadFromCloud = async () => {
+        loop.dispose(); // adapter unloaded while the load was in flight
+        return origLoad();
+      };
+      loop.handleResult({ ok: false, reason: "transient" });
+      host.fireLatestTimer();
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(host.restoredCalls).toBe(0);
+      expect(host.logs.filter(l => l.level === "info").some(l => l.msg.includes("restored"))).toBe(false);
+    });
+
     it("should re-arm when the retry still fails", async () => {
       queueResults(host, { ok: false, reason: "transient" }, { ok: true });
       loop.handleResult({ ok: false, reason: "transient" });

@@ -215,7 +215,10 @@ export class SegmentWizard {
           if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
             const color = parseInt(session.baseline.colorRgb.slice(1), 16);
             const brightness = session.baseline.brightness ?? 100;
-            void this.host.restoreStripAtomic(device, total, color, brightness);
+            // Fire-and-forget on teardown — the surrounding try/catch only
+            // catches synchronous throws, so swallow the promise rejection too
+            // to avoid an unhandled rejection during unload (L14).
+            void this.host.restoreStripAtomic(device, total, color, brightness).catch(() => undefined);
           }
         } catch {
           // Last-mile error during teardown — nothing useful left to log.

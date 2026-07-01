@@ -643,6 +643,33 @@ describe("GoveeMqttClient", () => {
       expect(connFlag).toBe(true);
       h.client.disconnect();
     });
+
+    it("does not open a TLS socket when the adapter unloads mid-login (L12)", async () => {
+      let mqttConnectCalls = 0;
+      let disposeOnLogin: (() => void) | null = null;
+      const fake = makeFakeHttps((_opts, idx) => {
+        if (idx === 0) {
+          disposeOnLogin?.(); // adapter unloaded while login was resolving
+          return { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } };
+        }
+        return { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } };
+      });
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => {
+        mqttConnectCalls += 1;
+        return { on: () => undefined, subscribe: () => undefined, end: () => undefined } as never;
+      }) as never);
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      disposeOnLogin = () => client.disconnect();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect(mqttConnectCalls).toBe(0); // disposed guard bailed before the socket opened
+    });
   });
 
   describe("handleMessage (status push parsing)", () => {
