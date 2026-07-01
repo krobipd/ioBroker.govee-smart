@@ -108,6 +108,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: if a Govee push/cloud-events connection connects but then can't subscribe (a rare server-side hiccup), the adapter no longer reconnects every few seconds — the retry now backs off normally, avoiding a self-inflicted rate-limit.
 - Fixed: the admin "Test login" button now waits for the real MQTT connection before reporting — valid Govee account credentials no longer show a false "MQTT not up, restart the adapter" message.
 - Fixed: on lamps whose music modes start at zero (e.g. H612F, H61D5, H70B3, H70C5) the first music mode was unreachable and the "off/---" entry was missing — `music_mode` is now a clean index-based dropdown like every other selector. **Breaking on those devices:** the `music_mode` numbers shift by one (an "off" entry is added at 0), so scripts that write a fixed number there may need adjusting.
+- Fixed: cloud snapshots whose value is a plain number are no longer dropped from the snapshot dropdown, and an entry with an empty value no longer shows up as a phantom option.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

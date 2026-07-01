@@ -31,7 +31,11 @@ function nextRequestId(prefix) {
 }
 function mapSceneOptions(opts) {
   return (Array.isArray(opts) ? opts : []).filter(
-    (o) => !!o && typeof o.name === "string" && typeof o.value === "object"
+    // `typeof null === "object"` — the old object-only guard let null-valued
+    // options through as phantom entries AND dropped the integer values that
+    // snapshots use (CloudScene.value is `Record | number`). Accept object OR
+    // number, reject null/undefined (L7).
+    (o) => !!o && typeof o.name === "string" && o.value != null && (typeof o.value === "object" || typeof o.value === "number")
   ).map((o) => ({ name: o.name, value: o.value }));
 }
 class GoveeCloudClient {

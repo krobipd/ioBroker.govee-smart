@@ -295,6 +295,28 @@ describe("GoveeCloudClient", () => {
       expect(result.diyScenes).toEqual([]);
       expect(result.snapshots).toEqual([]);
     });
+
+    it("keeps integer-valued snapshot options and rejects null-valued phantoms (L7)", async () => {
+      const fake = makeFakeHttps(() => ({
+        payload: {
+          capabilities: [
+            {
+              type: "devices.capabilities.dynamic_scene",
+              instance: "snapshot",
+              parameters: {
+                options: [
+                  { name: "IntSnap", value: 7 }, // snapshots use integer values — must be KEPT
+                  { name: "Phantom", value: null }, // typeof null === "object" slipped through — must be REJECTED
+                ],
+              },
+            },
+          ],
+        },
+      }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      const result = await client.getScenes("H6160", "AABB");
+      expect(result.snapshots).toEqual([{ name: "IntSnap", value: 7 }]);
+    });
   });
 
   describe("getDiyScenes", () => {
