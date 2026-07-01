@@ -38,6 +38,7 @@ interface Rig {
   lanMusic: Array<{ ip: string; mode: number; r: number; g: number; b: number }>;
   objects: Map<string, unknown>;
   states: Map<string, ioBroker.StateValue>;
+  syncCalls: number[];
   setSendFailure(fn: () => Error | null): void;
 }
 
@@ -53,6 +54,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   const manualApplied: Array<{ mode: boolean; indices?: number[] }> = [];
   const persisted: GoveeDevice[] = [];
   const lanMusic: Array<{ ip: string; mode: number; r: number; g: number; b: number }> = [];
+  const syncCalls: number[] = [];
   const objects = new Map<string, unknown>();
   const states = new Map<string, ioBroker.StateValue>();
   let sendFailure: () => Error | null = () => null;
@@ -114,6 +116,9 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     applyManualSegments: async (_device, mode, indices) => {
       manualApplied.push({ mode, indices });
     },
+    syncDevicesManually: async () => {
+      syncCalls.push(1);
+    },
   };
   return {
     adapter,
@@ -130,6 +135,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     lanMusic,
     objects,
     states,
+    syncCalls,
     setSendFailure: fn => {
       sendFailure = fn;
     },
@@ -433,6 +439,21 @@ describe("onStateChange — music routing branch", () => {
     expect((rig.capCommands[0].value as { sensitivity: number }).sensitivity).toBe(80);
     // sensitivity is a tweak, not a mode switch — no dropdown reset
     expect(rig.acks.find(a => a.id === id("scenes.light_scene"))).toBeUndefined();
+  });
+});
+
+describe("onStateChange — manual device sync button (BUG-1)", () => {
+  it("syncs devices and resets the button on write true", async () => {
+    const rig = makeRig([device]);
+    await onStateChange(rig.adapter, `${NS}.info.manual_sync_devices`, { val: true, ack: false } as ioBroker.State);
+    expect(rig.syncCalls).toEqual([1]);
+    expect(rig.acks).toContainEqual({ id: `${NS}.info.manual_sync_devices`, val: false });
+  });
+
+  it("ignores an ack'd echo (no sync)", async () => {
+    const rig = makeRig([device]);
+    await onStateChange(rig.adapter, `${NS}.info.manual_sync_devices`, { val: true, ack: true } as ioBroker.State);
+    expect(rig.syncCalls).toEqual([]);
   });
 });
 

@@ -159,6 +159,7 @@ class GoveeAdapter extends utils.Adapter {
     try {
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
+      await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
           "Credentials encryption migration: stored values look corrupted \u2014 please re-enter API key, Govee password and verification code in the adapter settings (one-time after upgrade to v2.11.0)."
@@ -714,6 +715,19 @@ class GoveeAdapter extends utils.Adapter {
   /** Public delegate — connection-state handler exports the real implementation. */
   reapStaleDevices() {
     return connectionState.reapStaleDevices(this);
+  }
+  /**
+   * Manual "sync devices" button (info.manual_sync_devices): pull the fresh
+   * Govee account device list and reconcile it — new devices are onboarded,
+   * devices deleted from the account are removed — without a restart. Existing
+   * devices' scene/snapshot data is untouched (use the per-device refresh).
+   */
+  async syncDevicesManually() {
+    if (!this.deviceManager) {
+      return;
+    }
+    await this.deviceManager.loadFromCloud();
+    await this.reapStaleDevices();
   }
   /**
    * Map a state suffix to a command name — public delegate for handler modules,

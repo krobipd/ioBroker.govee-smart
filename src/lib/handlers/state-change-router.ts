@@ -32,6 +32,8 @@ export interface StateChangeRouterAdapter {
   loadCloudStates(): Promise<void>;
   /** Owned by main.ts — central entry point for manual-segment updates. */
   applyManualSegments(device: GoveeDevice, mode: boolean, indices?: number[]): Promise<void>;
+  /** Owned by main.ts — manual "sync devices" button: reload account list + reconcile. */
+  syncDevicesManually?(): Promise<void>;
 }
 
 /**
@@ -258,6 +260,19 @@ export async function onStateChange(
   }
 
   const localId = id.replace(`${adapter.namespace}.`, "");
+
+  // Adapter-level "manually sync devices" button — pull the fresh account
+  // device list and reconcile (add new / remove deleted) without a restart.
+  // Not a devices.*/groups.* path, so handle it before that gate.
+  if (localId === "info.manual_sync_devices") {
+    if (state.val) {
+      adapter.log.info("Manual device sync requested — refreshing the device list from your Govee account");
+      await adapter.syncDevicesManually?.();
+    }
+    await adapter.setStateAsync(id, { val: false, ack: true });
+    return;
+  }
+
   if (!localId.startsWith("devices.") && !localId.startsWith("groups.")) {
     adapter.log.debug(`onStateChange ignored ${id}: not a devices.* / groups.* path`);
     return;

@@ -150,7 +150,7 @@ async function handleGenericCapabilityCommand(adapter, device, id, stateSuffix, 
   }
 }
 async function onStateChange(adapter, id, state) {
-  var _a;
+  var _a, _b;
   if (!state || state.ack) {
     return;
   }
@@ -163,6 +163,14 @@ async function onStateChange(adapter, id, state) {
     return;
   }
   const localId = id.replace(`${adapter.namespace}.`, "");
+  if (localId === "info.manual_sync_devices") {
+    if (state.val) {
+      adapter.log.info("Manual device sync requested \u2014 refreshing the device list from your Govee account");
+      await ((_a = adapter.syncDevicesManually) == null ? void 0 : _a.call(adapter));
+    }
+    await adapter.setStateAsync(id, { val: false, ack: true });
+    return;
+  }
   if (!localId.startsWith("devices.") && !localId.startsWith("groups.")) {
     adapter.log.debug(`onStateChange ignored ${id}: not a devices.* / groups.* path`);
     return;
@@ -259,7 +267,7 @@ async function onStateChange(adapter, id, state) {
     const level = typeof val === "number" ? val : parseInt(String(val), 10);
     if (!isNaN(level)) {
       device.sceneSpeed = level;
-      (_a = adapter.deviceManager) == null ? void 0 : _a.persistDeviceToCache(device);
+      (_b = adapter.deviceManager) == null ? void 0 : _b.persistDeviceToCache(device);
     }
     await adapter.setStateAsync(id, { val, ack: true });
     return;

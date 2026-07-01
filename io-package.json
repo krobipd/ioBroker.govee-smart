@@ -383,6 +383,32 @@
       "native": {}
     },
     {
+      "_id": "info.manual_sync_devices",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Manually sync devices",
+          "de": "Geräte manuell synchronisieren",
+          "ru": "Синхронизировать устройства вручную",
+          "pt": "Sincronizar dispositivos manualmente",
+          "nl": "Apparaten handmatig synchroniseren",
+          "fr": "Synchroniser les appareils manuellement",
+          "it": "Sincronizza dispositivi manualmente",
+          "es": "Sincronizar dispositivos manualmente",
+          "pl": "Ręcznie synchronizuj urządzenia",
+          "uk": "Синхронізувати пристрої вручну",
+          "zh-cn": "手动同步设备"
+        },
+        "type": "boolean",
+        "role": "button",
+        "read": true,
+        "write": true,
+        "def": false,
+        "desc": "Write true to sync the device list with your Govee account now: adds newly added devices and removes ones you deleted from the account. No restart needed. Scenes/snapshots of existing devices are not re-fetched (use the per-device Refresh for that)."
+      },
+      "native": {}
+    },
+    {
       "_id": "devices",
       "type": "folder",
       "common": {

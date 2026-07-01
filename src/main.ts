@@ -163,6 +163,11 @@ class GoveeAdapter extends utils.Adapter {
       await I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
 
+      // One-shot cleanup: the global info.refresh_cloud_data button was removed
+      // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
+      // info.manual_sync_devices (BUG-1). Drop the dead orphan.
+      await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
+
       // v2.11.0 credential-encryption migration check: if encryptedNative was
       // added retroactively, js-controller still decrypts existing plaintext
       // values via the legacy XOR fallback — the adapter sees garbage that
@@ -873,6 +878,20 @@ class GoveeAdapter extends utils.Adapter {
   /** Public delegate — connection-state handler exports the real implementation. */
   public reapStaleDevices(): Promise<void> {
     return connectionState.reapStaleDevices(this);
+  }
+
+  /**
+   * Manual "sync devices" button (info.manual_sync_devices): pull the fresh
+   * Govee account device list and reconcile it — new devices are onboarded,
+   * devices deleted from the account are removed — without a restart. Existing
+   * devices' scene/snapshot data is untouched (use the per-device refresh).
+   */
+  public async syncDevicesManually(): Promise<void> {
+    if (!this.deviceManager) {
+      return;
+    }
+    await this.deviceManager.loadFromCloud();
+    await this.reapStaleDevices();
   }
 
   /**
