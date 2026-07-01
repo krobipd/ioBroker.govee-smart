@@ -326,26 +326,16 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       const msg = `MQTT connection failed: ${(0, import_types.errMessage)(err)}`;
       (_j = this.onConnection) == null ? void 0 : _j.call(this, false);
       if (category === "VERIFICATION_PENDING") {
-        const isNew = this.lastErrorCategory !== category;
         this.lastErrorCategory = category;
-        if (isNew) {
-          this.log.warn(`MQTT not connected: Govee asked for verification \u2014 request a code in adapter settings`);
-        } else {
-          this.log.debug("MQTT verification still pending (Govee returned 454 again)");
-        }
+        this.log.debug("MQTT verification pending (Govee returned 454)");
         if (this.onVerificationFailed) {
           this.onVerificationFailed("pending");
         }
         return;
       }
       if (category === "VERIFICATION_FAILED") {
-        const isNew = this.lastErrorCategory !== category;
         this.lastErrorCategory = category;
-        if (isNew) {
-          this.log.warn(`MQTT not connected: verification code rejected \u2014 request a fresh code`);
-        } else {
-          this.log.debug("MQTT verification code rejected again (Govee returned 455)");
-        }
+        this.log.debug("MQTT verification code rejected (Govee returned 455)");
         if (this.onVerificationFailed) {
           this.onVerificationFailed("failed");
         }
@@ -354,7 +344,7 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       if (category === "AUTH") {
         this.authFailCount++;
         if (this.authFailCount >= import_timing_constants.MQTT_MAX_AUTH_FAILURES) {
-          this.log.warn(`MQTT not connected: login rejected \u2014 check email/password`);
+          this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts \u2014 check email/password`);
           (_k = this.onAuthFailed) == null ? void 0 : _k.call(this);
           return;
         }

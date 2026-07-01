@@ -414,27 +414,22 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // Dedup: only warn on the FIRST occurrence of this category (per
       // adapter lifetime). Subsequent reconnect attempts that hit the
       // same 454 are demoted to debug.
+      // Verification/auth are actionable and surfaced once, user-facing, via the
+      // actionable-problems registry (main.ts onVerificationFailed/onAuthFailed
+      // callbacks below). Keep only a debug trail here so the user doesn't see
+      // the same problem twice — once as this warn and once as the registry
+      // warn + notification (C8).
       if (category === "VERIFICATION_PENDING") {
-        const isNew = this.lastErrorCategory !== category;
         this.lastErrorCategory = category;
-        if (isNew) {
-          this.log.warn(`MQTT not connected: Govee asked for verification — request a code in adapter settings`);
-        } else {
-          this.log.debug("MQTT verification still pending (Govee returned 454 again)");
-        }
+        this.log.debug("MQTT verification pending (Govee returned 454)");
         if (this.onVerificationFailed) {
           this.onVerificationFailed("pending");
         }
         return;
       }
       if (category === "VERIFICATION_FAILED") {
-        const isNew = this.lastErrorCategory !== category;
         this.lastErrorCategory = category;
-        if (isNew) {
-          this.log.warn(`MQTT not connected: verification code rejected — request a fresh code`);
-        } else {
-          this.log.debug("MQTT verification code rejected again (Govee returned 455)");
-        }
+        this.log.debug("MQTT verification code rejected (Govee returned 455)");
         if (this.onVerificationFailed) {
           this.onVerificationFailed("failed");
         }
@@ -445,7 +440,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       if (category === "AUTH") {
         this.authFailCount++;
         if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
-          this.log.warn(`MQTT not connected: login rejected — check email/password`);
+          // Actionable — surfaced once via the registry (onAuthFailed → main.ts); debug-only here (C8).
+          this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts — check email/password`);
           this.onAuthFailed?.();
           return;
         }
