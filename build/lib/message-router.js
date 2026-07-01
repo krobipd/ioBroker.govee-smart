@@ -27,9 +27,13 @@ var import_i18n = require("./i18n");
 class MessageRouter {
   /**
    * @param host Adapter dependencies via the host interface
+   * @param probeConnectTimeoutMs How long the "Test login" probe waits for the
+   *   MQTT connect edge after login succeeds (default {@link MQTT_PROBE_CONNECT_MS};
+   *   tests inject a small value)
    */
-  constructor(host) {
+  constructor(host, probeConnectTimeoutMs = import_timing_constants.MQTT_PROBE_CONNECT_MS) {
     this.host = host;
+    this.probeConnectTimeoutMs = probeConnectTimeoutMs;
   }
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
   lastVerificationRequestMs = 0;
@@ -107,16 +111,28 @@ class MessageRouter {
       this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient();
       probe.setVerificationCode((_a = config.mqttVerificationCode) != null ? _a : "");
+      let probeTimer;
       try {
-        let connected = false;
+        let signalConnected = () => {
+        };
+        const connectedEdge = new Promise((resolve) => {
+          signalConnected = resolve;
+        });
         await probe.connect(
           () => {
           },
           (isConnected) => {
-            connected = isConnected;
+            if (isConnected) {
+              signalConnected(true);
+            }
           }
         );
-        probe.disconnect();
+        const connected = await Promise.race([
+          connectedEdge,
+          new Promise((resolve) => {
+            probeTimer = setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
+          })
+        ]);
         return {
           result: connected ? (0, import_i18n.resolveLabel)("mqttAuthLoginOk") : (0, import_i18n.resolveLabel)("mqttAuthLoginNoMqtt")
         };
@@ -141,6 +157,11 @@ class MessageRouter {
           return { result: (0, import_i18n.resolveLabel)("mqttAuthAccountLocked") };
         }
         return { result: (0, import_i18n.resolveLabel)("mqttAuthLoginFailed", msg) };
+      } finally {
+        if (probeTimer) {
+          clearTimeout(probeTimer);
+        }
+        probe.disconnect();
       }
     }
     if (action === "requestCode") {

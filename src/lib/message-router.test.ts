@@ -39,12 +39,14 @@ interface FakeProbeOpts {
   connectError?: Error;
   /** Throw this from probe.requestVerificationCode. */
   requestError?: Error;
+  /** Called whenever probe.disconnect() runs — lets a test assert disposal. */
+  onDisconnect?: () => void;
 }
 
 function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
   const probe = {
     setVerificationCode: (_code: string) => {},
-    disconnect: () => {},
+    disconnect: () => opts.onDisconnect?.(),
     requestVerificationCode: async (): Promise<void> => {
       if (opts.requestError) {
         throw opts.requestError;
@@ -54,9 +56,13 @@ function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
       if (opts.connectError) {
         throw opts.connectError;
       }
-      // Simulate the "connect" event firing during connect()
+      // The real client resolves connect() after the login + cert handshake and
+      // only issues the MQTT connect — the "connected" edge (onConnection(true))
+      // arrives asynchronously AFTER this resolves, via the mqtt "connect" event
+      // → subscribe. Model that timing so a probe that reads `connected`
+      // synchronously right after connect() sees false (the M2 bug).
       if (opts.connected) {
-        onConnection(true);
+        setTimeout(() => onConnection(true), 0);
       }
     },
   } as unknown as GoveeMqttClient;
@@ -156,6 +162,38 @@ describe("MessageRouter", () => {
       expect(responses).toHaveLength(1);
       const r = responses[0].data as { result: string };
       expect(r.result).toContain("Login successful");
+    });
+
+    it("reports 'MQTT not up' when login succeeds but the connect edge never arrives (M2 timeout)", async () => {
+      // connected:false → connect() resolves, onConnection(true) never fires →
+      // the bounded probe timeout decides. Short timeout injected for the test.
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: false }) });
+      const router = new MessageRouter(host, 20);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 60));
+      expect(responses).toHaveLength(1);
+      const r = responses[0].data as { result: string };
+      expect(r.result).toContain("MQTT connection is not up");
+    });
+
+    it("disposes the probe on the timeout path — no socket leak (M2)", async () => {
+      let disconnects = 0;
+      const probe = makeProbe({ connected: false, onDisconnect: () => (disconnects += 1) });
+      const { host } = makeHost({ probe });
+      const router = new MessageRouter(host, 20);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 60));
+      expect(disconnects).toBe(1);
+    });
+
+    it("disposes the probe on the error path too — no socket leak (M2)", async () => {
+      let disconnects = 0;
+      const probe = makeProbe({ connectError: new Error("Login failed: bad"), onDisconnect: () => (disconnects += 1) });
+      const { host } = makeHost({ probe });
+      const router = new MessageRouter(host, 20);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 30));
+      expect(disconnects).toBe(1);
     });
 
     it("returns 2FA hint on Verification required error", async () => {

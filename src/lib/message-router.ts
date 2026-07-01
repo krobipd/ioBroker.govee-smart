@@ -1,6 +1,6 @@
 import { errMessage } from "./types";
 import type { GoveeMqttClient } from "./govee-mqtt-client";
-import { VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
+import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import { resolveLabel } from "./i18n";
 
 /**
@@ -40,8 +40,14 @@ export class MessageRouter {
 
   /**
    * @param host Adapter dependencies via the host interface
+   * @param probeConnectTimeoutMs How long the "Test login" probe waits for the
+   *   MQTT connect edge after login succeeds (default {@link MQTT_PROBE_CONNECT_MS};
+   *   tests inject a small value)
    */
-  constructor(private readonly host: MessageRouterHost) {}
+  constructor(
+    private readonly host: MessageRouterHost,
+    private readonly probeConnectTimeoutMs: number = MQTT_PROBE_CONNECT_MS,
+  ) {}
 
   /**
    * Sync entry-point — registered as `this.on("message", ...)`. Wraps the
@@ -117,15 +123,35 @@ export class MessageRouter {
       this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient();
       probe.setVerificationCode(config.mqttVerificationCode ?? "");
+      let probeTimer: ReturnType<typeof setTimeout> | undefined;
       try {
-        let connected = false;
+        // The "connected" edge (onConnection(true)) arrives asynchronously AFTER
+        // connect() resolves — connect() only does the login + cert handshake and
+        // then issues the MQTT connect. Set up the capture promise BEFORE calling
+        // connect() so the edge can't be missed (M2: the old code read a flag
+        // synchronously right after connect() and always reported "MQTT not up").
+        let signalConnected: (v: boolean) => void = () => {};
+        const connectedEdge = new Promise<boolean>(resolve => {
+          signalConnected = resolve;
+        });
+        // connect() rejects on login/credential failure → classified below.
         await probe.connect(
           () => {},
           isConnected => {
-            connected = isConnected;
+            if (isConnected) {
+              signalConnected(true);
+            }
           },
         );
-        probe.disconnect();
+        // Login + cert OK. Wait a bounded time for the MQTT socket to actually
+        // connect + subscribe; a timeout means "credentials fine, MQTT not up".
+        // The timeout also guarantees the admin sendTo never hangs on the probe.
+        const connected = await Promise.race([
+          connectedEdge,
+          new Promise<boolean>(resolve => {
+            probeTimer = setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
+          }),
+        ]);
         return {
           result: connected ? resolveLabel("mqttAuthLoginOk") : resolveLabel("mqttAuthLoginNoMqtt"),
         };
@@ -150,6 +176,14 @@ export class MessageRouter {
           return { result: resolveLabel("mqttAuthAccountLocked") };
         }
         return { result: resolveLabel("mqttAuthLoginFailed", msg) };
+      } finally {
+        // Dispose on every path — success, timeout, and error — so the probe's
+        // MQTT socket + reconnect timer never leak (the old code disconnected
+        // only on the success path).
+        if (probeTimer) {
+          clearTimeout(probeTimer);
+        }
+        probe.disconnect();
       }
     }
     if (action === "requestCode") {

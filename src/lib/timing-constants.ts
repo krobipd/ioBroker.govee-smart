@@ -31,6 +31,14 @@ export const READY_TIMEOUT_MS = 60_000;
 /** Minimum gap between two `mqttAuth: requestCode` calls (30 s). */
 export const VERIFICATION_REQUEST_THROTTLE_MS = 30_000;
 
+/**
+ * How long the admin "Test login" probe waits for the MQTT socket to actually
+ * connect + subscribe AFTER the login/cert handshake already succeeded (10 s).
+ * A timeout means "credentials fine, MQTT not up" — it also guarantees the
+ * admin sendTo never hangs waiting on the probe.
+ */
+export const MQTT_PROBE_CONNECT_MS = 10_000;
+
 /** Initial wait for the first LAN-scan replies before flipping lanScanDone (3 s). */
 export const LAN_SCAN_INITIAL_WAIT_MS = 3_000;
 
