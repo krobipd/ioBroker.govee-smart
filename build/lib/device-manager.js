@@ -1009,7 +1009,7 @@ class DeviceManager {
     if (segData.length === 0) {
       return;
     }
-    const maxSeen = Math.max(...segData.map((s) => s.index)) + 1;
+    const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = (_a = device.segmentCount) != null ? _a : 0;
     if (maxSeen > import_lookups.SEGMENT_HARD_MAX) {
       this.log.debug(`${device.name}: ignoring segmentCount=${maxSeen} (above protocol limit ${import_lookups.SEGMENT_HARD_MAX})`);

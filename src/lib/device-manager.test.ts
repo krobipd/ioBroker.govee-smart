@@ -1638,6 +1638,21 @@ describe("DeviceManager", () => {
       expect(result[7]).toEqual({ index: 7, brightness: 20, r: 100, g: 110, b: 120 });
     });
 
+    it("dedupes/caps packets so a flood can't explode the segments list (SEC-GC1)", () => {
+      const nz: [number, number, number, number] = [100, 10, 20, 30]; // non-zero → not trailing-trimmed
+      const dup = buildAaA5Packet(1, [nz, nz, nz, nz]);
+      const flood = Array.from({ length: 5000 }, () => dup); // 5000 duplicate packet-1's
+      const result = parseMqttSegmentData(flood);
+      expect(result.length).toBeLessThanOrEqual(20); // deduped, not 5000×4
+      expect(result).toHaveLength(4); // one packet-1 = 4 segments
+    });
+
+    it("still parses all 5 distinct packets after the dedupe/cap (SEC-GC1 no regression)", () => {
+      const nz: [number, number, number, number] = [50, 1, 2, 3];
+      const msg = [1, 2, 3, 4, 5].map(n => buildAaA5Packet(n, [nz, nz, nz, nz]));
+      expect(parseMqttSegmentData(msg)).toHaveLength(20);
+    });
+
     it("should trim trailing all-zero padding slots from the final packet", () => {
       // Packet with 2 real segments + 2 padding slots (Govee often pads
       // a short final packet to 4 slots with zero bytes). The parser

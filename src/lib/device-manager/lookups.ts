@@ -36,8 +36,19 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
   }
 
   const segments: MqttSegmentData[] = [];
+  // There are only 5 valid AA-A5 packet numbers (1-5 → segment indices 0-19).
+  // Dedupe by packet number and bound the scan so a malicious broker can't send
+  // a huge `op.command` array of duplicate/valid packets and blow the segments
+  // list up into ~80k setState writes / a Math.max(...spread) RangeError (SEC-GC1).
+  const seenPackets = new Set<number>();
+  const MAX_SCAN = 512;
+  let scanned = 0;
 
   for (const cmd of commands) {
+    if (seenPackets.size >= 5 || scanned >= MAX_SCAN) {
+      break;
+    }
+    scanned++;
     if (typeof cmd !== "string") {
       continue;
     }
@@ -61,6 +72,10 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
     if (packetNum < 1 || packetNum > 5) {
       continue;
     }
+    if (seenPackets.has(packetNum)) {
+      continue; // one packet per number — a repeat is corrupt/malicious (SEC-GC1)
+    }
+    seenPackets.add(packetNum);
 
     const baseIndex = (packetNum - 1) * 4;
     for (let slot = 0; slot < 4; slot++) {

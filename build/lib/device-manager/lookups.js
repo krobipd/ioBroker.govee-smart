@@ -35,7 +35,14 @@ function parseMqttSegmentData(commands) {
     return [];
   }
   const segments = [];
+  const seenPackets = /* @__PURE__ */ new Set();
+  const MAX_SCAN = 512;
+  let scanned = 0;
   for (const cmd of commands) {
+    if (seenPackets.size >= 5 || scanned >= MAX_SCAN) {
+      break;
+    }
+    scanned++;
     if (typeof cmd !== "string") {
       continue;
     }
@@ -54,6 +61,10 @@ function parseMqttSegmentData(commands) {
     if (packetNum < 1 || packetNum > 5) {
       continue;
     }
+    if (seenPackets.has(packetNum)) {
+      continue;
+    }
+    seenPackets.add(packetNum);
     const baseIndex = (packetNum - 1) * 4;
     for (let slot = 0; slot < 4; slot++) {
       const segIdx = baseIndex + slot;

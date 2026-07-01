@@ -1188,7 +1188,10 @@ export class DeviceManager {
     if (segData.length === 0) {
       return;
     }
-    const maxSeen = Math.max(...segData.map(s => s.index)) + 1;
+    // reduce() rather than Math.max(...spread) so a large segData can never blow
+    // the call stack with a huge argument spread (SEC-GC1 defence-in-depth;
+    // parseMqttSegmentData already caps it to ≤20).
+    const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = device.segmentCount ?? 0;
     // L6 — plausibility cap: SEGMENT_HARD_MAX (55) is the Govee protocol upper
     // limit. Values above it only come from broken/spoofed packets.
