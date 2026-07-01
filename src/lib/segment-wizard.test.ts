@@ -230,6 +230,17 @@ describe("SegmentWizard", () => {
       expect(host.calls[1].value).toBe(100);
     });
 
+    it("rejects a concurrent second start() before the first finishes capturing (L6)", async () => {
+      // onMessage is fire-and-forget, so two start() calls can overlap. The
+      // session slot must be reserved synchronously — before captureBaseline's
+      // await — or both slip past the guard and open a double session.
+      const p1 = wizard.start(key); // in flight (not awaited) — captures baseline
+      const r2 = await wizard.start(key); // second start while the first is capturing
+      await p1;
+      expect(r2.error).toBeDefined();
+      expect(r2.active).not.toBe(true);
+    });
+
     it("should open a session and flash segment 0 over the FULL protocol range", async () => {
       const r = await wizard.start(key);
       expect(r.error).toBeUndefined();

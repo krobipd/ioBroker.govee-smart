@@ -148,6 +148,7 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
    * @param deviceKey Target device key
    */
   async start(deviceKey) {
+    var _a, _b;
     if (this.session) {
       return {
         error: this.t("errAlreadyActive", { name: this.session.name })
@@ -162,8 +163,7 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
         error: this.t("errNoSegments", { name: device.name })
       };
     }
-    const baseline = await this.captureBaseline(device);
-    this.session = {
+    const session = {
       deviceKey,
       sku: device.sku,
       name: device.name,
@@ -171,8 +171,13 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
       total: import_lookups.SEGMENT_COUNT_MAX,
       visible: [],
       startedAt: Date.now(),
-      baseline
+      baseline: { segmentColors: [] }
     };
+    this.session = session;
+    session.baseline = await this.captureBaseline(device);
+    if (this.session !== session) {
+      return { error: this.t("errAlreadyActive", { name: (_b = (_a = this.session) == null ? void 0 : _a.name) != null ? _b : device.name }) };
+    }
     this.scheduleIdleTimeout();
     await this.host.sendCommand(device, "power", true);
     await this.host.sendCommand(device, "brightness", 100);

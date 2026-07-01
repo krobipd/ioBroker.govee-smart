@@ -275,9 +275,11 @@ export class SegmentWizard {
       };
     }
 
-    const baseline = await this.captureBaseline(device);
-
-    this.session = {
+    // Reserve the session slot SYNCHRONOUSLY — before the first `await`
+    // (captureBaseline) — so a second start() from the fire-and-forget onMessage
+    // path can't slip past the `this.session` guard above while the baseline is
+    // still being captured and open a double session (TOCTOU, L6).
+    const session: SegmentWizardSession = {
       deviceKey,
       sku: device.sku,
       name: device.name,
@@ -285,8 +287,15 @@ export class SegmentWizard {
       total: SEGMENT_COUNT_MAX,
       visible: [],
       startedAt: Date.now(),
-      baseline,
+      baseline: { segmentColors: [] },
     };
+    this.session = session;
+
+    session.baseline = await this.captureBaseline(device);
+    if (this.session !== session) {
+      // Aborted / replaced while we were capturing — don't stomp the newer state.
+      return { error: this.t("errAlreadyActive", { name: this.session?.name ?? device.name }) };
+    }
     this.scheduleIdleTimeout();
     // Make sure the strip is ON and at full global brightness before we
     // start flashing segments — otherwise a user with their strip dimmed to
