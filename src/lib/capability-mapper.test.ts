@@ -765,6 +765,40 @@ describe("CapabilityMapper", () => {
       expect(diy?.stateId).toBe("diy_scene");
     });
 
+    it("decodes a work_mode cloud state — STRUCT and direct number (L28)", () => {
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { value: { workMode: 3 } },
+        } as CloudStateCapability),
+      ).toEqual({ stateId: "work_mode", value: 3 });
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { value: 2 },
+        } as CloudStateCapability),
+      ).toEqual({ stateId: "work_mode", value: 2 });
+    });
+
+    it("decodes a temperature_setting cloud state — STRUCT and direct number (L28)", () => {
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.temperature_setting",
+          instance: "targetTemperature",
+          state: { value: { targetTemperature: 22 } },
+        } as CloudStateCapability),
+      ).toEqual({ stateId: "target_temperature", value: 22 });
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.temperature_setting",
+          instance: "targetTemperature",
+          state: { value: 18 },
+        } as CloudStateCapability),
+      ).toEqual({ stateId: "target_temperature", value: 18 });
+    });
+
     it("should map colorRgb integer to hex string", () => {
       const cap: CloudStateCapability = {
         type: "devices.capabilities.color_setting",

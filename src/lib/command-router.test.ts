@@ -175,19 +175,29 @@ describe("CommandRouter", () => {
       expect(cloud.calls[0].value).toBe(1);
     });
 
-    it("debug-logs without warn when Cloud client not yet ready (init-race)", async () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+    it("debug-logs without warn when Cloud client not yet ready (init-race) — L23", async () => {
+      const warns: string[] = [];
+      const debugs: string[] = [];
+      const log = {
+        ...mockLog,
+        warn: (m: string) => warns.push(m),
+        debug: (m: string) => debugs.push(m),
+      } as unknown as ioBroker.Logger;
+      const router = new CommandRouter(log, noopTimers);
       // No lanClient, no cloudClient — but channel says cloud:true (init-race)
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
       await router.sendCommand(device, "power", true);
-      // No throw — false alarm dropped at debug level
+      expect(warns).toHaveLength(0); // init-race false alarm must NOT warn
+      expect(debugs.some(d => /not ready/i.test(d))).toBe(true);
     });
 
-    it("warns when no channel available at all", async () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+    it("warns when no channel available at all (L23)", async () => {
+      const warns: string[] = [];
+      const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      const router = new CommandRouter(log, noopTimers);
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: false } });
       await router.sendCommand(device, "power", true);
-      // No throw — warn fired but no exception bubbles
+      expect(warns.some(w => /no channel/i.test(w))).toBe(true);
     });
   });
 
@@ -443,11 +453,13 @@ describe("CommandRouter", () => {
       expect(cloud.calls[0].value).toEqual({ v: 1 });
     });
 
-    it("no-op when Cloud not configured", async () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+    it("no-op (debug, no cloud call) when Cloud not configured (L23)", async () => {
+      const debugs: string[] = [];
+      const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as unknown as ioBroker.Logger;
+      const router = new CommandRouter(log, noopTimers);
       const device = makeDevice({ channels: { lan: true, mqtt: false, cloud: false } });
       await router.sendCapabilityCommand(device, "devices.capabilities.toggle", "any", true);
-      // Just verifies no throw
+      expect(debugs.some(d => /cloud not available/i.test(d))).toBe(true);
     });
   });
 
@@ -652,15 +664,17 @@ describe("CommandRouter", () => {
       expect(lan.calls[0].method).toBe("setPower");
     });
 
-    it("dedup-map: repeated override-cloud-missing logs only once at warn level", async () => {
+    it("dedup-map: repeated override-cloud-missing logs only once at warn level (L23)", async () => {
+      const warns: string[] = [];
+      const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
       initDeviceRegistry({ data: TEST_CATALOG as never });
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(log, noopTimers);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
-      // Three rapid commands in same category — first warn, rest debug.
+      // Three rapid commands in same category — first warns, the rest are debug.
       await router.sendCommand(device, "snapshot", "1");
       await router.sendCommand(device, "snapshot", "1");
       await router.sendCommand(device, "snapshot", "1");
-      // No throw, dedup behavior verified by code path (logDedup tested separately)
+      expect(warns).toHaveLength(1); // deduped — only the first occurrence warns
     });
   });
 

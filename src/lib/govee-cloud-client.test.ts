@@ -41,8 +41,10 @@ describe("GoveeCloudClient", () => {
       expect(client.getFailureReason()).toBeNull();
     });
 
-    it("should return AUTH message after a 401 response", async () => {
-      const fake = makeFakeHttps(() => new HttpError("Unauthorized", 401, {}));
+    it("should return AUTH message after a 401 response (via the 401 status, not the message — L26)", async () => {
+      // Message deliberately does NOT contain "auth" so this exercises the 401
+      // status-code classification, not an accidental substring match.
+      const fake = makeFakeHttps(() => new HttpError("Access denied", 401, {}));
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       try {
         await client.getDevices();
@@ -85,7 +87,7 @@ describe("GoveeCloudClient", () => {
       let callIdx = 0;
       const fake = makeFakeHttps(() => {
         if (callIdx++ === 0) {
-          return new HttpError("Unauthorized", 401, {});
+          return new HttpError("Access denied", 401, {}); // 401 via status, not an "auth" substring (L26)
         }
         return { data: [] };
       });

@@ -261,6 +261,10 @@ class GoveeCloudClient {
         const retryAfter = String((_a = err.headers["retry-after"]) != null ? _a : "unknown");
         throw new import_http_client.HttpError(`Rate limited \u2014 retry after ${retryAfter}s`, 429, err.headers);
       }
+      if (err instanceof import_http_client.HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
+        this.lastErrorCategory = "AUTH";
+        throw err;
+      }
       this.lastErrorCategory = (0, import_types.classifyError)(err);
       throw err;
     }

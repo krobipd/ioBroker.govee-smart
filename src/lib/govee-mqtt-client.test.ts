@@ -416,16 +416,15 @@ describe("GoveeMqttClient", () => {
   });
 
   describe("setPersistedCredentials — tryPersistedReuse skip-login behaviour", () => {
-    it("should skip fresh login when persisted credentials are still inside TTL", async () => {
+    it("falls back to a fresh login when the persisted p12 is broken even if the token TTL is valid (L25)", async () => {
       let httpCalls = 0;
       const fake = makeFakeHttps(() => {
         httpCalls++;
         return {};
       });
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
-      // Fake-creds with TTL 1h in the future + invalid p12 (extractCertsFromP12 throws,
-      // tryPersistedReuse returns false — fresh login happens). For the „TTL-still-valid
-      // but p12-broken" case we want: no `https.request` until the p12 fails AND fresh login starts.
+      // TTL 1h in the future BUT an invalid p12 — extractCertsFromP12 throws, so
+      // tryPersistedReuse fails and a fresh login must happen (httpCalls > 0).
       client.setPersistedCredentials({
         bearerToken: "stale-tok",
         iotEndpoint: "iot.example.com",
@@ -439,8 +438,44 @@ describe("GoveeMqttClient", () => {
         () => {},
         () => {},
       );
-      // p12 was unusable → fresh login attempted → httpCalls > 0
       expect(httpCalls).toBeGreaterThan(0);
+    });
+
+    it("actually skips the fresh login (no HTTP) when persisted creds are valid + inside TTL (L25)", async () => {
+      let httpCalls = 0;
+      const fake = makeFakeHttps(() => {
+        httpCalls++;
+        return {};
+      });
+      const fakeMqtt = {
+        on: () => fakeMqtt,
+        subscribe: (_t: string, _o: unknown, cb: (e: Error | null) => void) => cb(null),
+        end: () => undefined,
+        removeAllListeners: () => undefined,
+      };
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => fakeMqtt) as never);
+      // Valid p12 (bypass forge) + valid TTL → tryPersistedReuse succeeds → the
+      // MQTT socket is opened from the cache with NO login/getIotKey HTTP.
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      client.setPersistedCredentials({
+        bearerToken: "tok",
+        iotEndpoint: "iot.example.com",
+        p12Cert: "AAA=",
+        p12Pass: "x",
+        accountId: "acc",
+        accountTopic: "GA/topic",
+        tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect(httpCalls).toBe(0); // persisted reuse skipped the fresh login entirely
+      client.disconnect();
     });
 
     it("should NOT skip login when persisted token is already expired", async () => {
