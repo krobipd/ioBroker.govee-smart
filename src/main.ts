@@ -604,7 +604,10 @@ class GoveeAdapter extends utils.Adapter {
             cloudRetryHandler.handleCloudFailure(this, result);
           }
         } else {
-          this.log.info(`Using cached device data — no Cloud calls needed`);
+          // device-manager already logged "Loaded N device(s) from cache" at
+          // info — keep this one on debug so a cache-only start isn't announced
+          // twice (C9).
+          this.log.debug(`Using cached device data — no Cloud calls needed`);
           this.cloudWasConnected = true;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(true);
           this.setStateAsync("info.cloudConnected", {

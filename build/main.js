@@ -490,7 +490,7 @@ class GoveeAdapter extends utils.Adapter {
             cloudRetryHandler.handleCloudFailure(this, result);
           }
         } else {
-          this.log.info(`Using cached device data \u2014 no Cloud calls needed`);
+          this.log.debug(`Using cached device data \u2014 no Cloud calls needed`);
           this.cloudWasConnected = true;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(true);
           this.setStateAsync("info.cloudConnected", {

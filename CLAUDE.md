@@ -299,7 +299,7 @@ Single Page, drei Sektionen:
 ## Logging-Philosophie (seit 0.9.4)
 
 - **Startup:** `Starting with channels: LAN, Cloud, MQTT — please wait...`
-- **Ready:** Summary mit Per-Device-Details (LAN IP, Kanäle, Szenen-Anzahl)
+- **Ready:** Channel-Status-Summary (`LAN ✓  Cloud REST ✓  Lights Push ✓  Sensor Push ✓`), jedes `✗` gefolgt von einer WARN mit konkretem Grund. **Bewusst KEINE** Per-Device-Counts/Online-Summary hier — bei Ready-Zeit sind LAN-Scan + MQTT-Push noch am Settlen, ein „X online, Y offline" zeigt oft Lichter fälschlich offline. Per-Device-Status (Online/IP/Kanäle) lebt im State-Tree, wo er akkurat bleibt (`logDeviceSummary`)
 - **Keine Redundanz:** Jede Info nur einmal (im Ready-Summary)
 - **debug:** Routine (LAN scan, Discovery, Cache, State-Ops) — kein "LAN scan sent", keine "Default xxx" Zeilen
 - **info:** Nur Start, Verbindungen, Ready-Summary, Snapshot-Ops
