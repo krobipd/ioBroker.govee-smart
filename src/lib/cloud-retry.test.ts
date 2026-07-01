@@ -137,6 +137,13 @@ describe("CloudRetryLoop", () => {
       expect(host.lastWarn()).toContain("30s");
     });
 
+    it("floors a zero / malformed Retry-After so it can't tight-loop (L5)", () => {
+      loop.handleResult({ ok: false, reason: "rate-limited", retryAfterMs: 0 });
+      expect(host.timers).toHaveLength(1);
+      expect(host.timers[0].ms).toBe(5_000); // floored to MIN_RATE_LIMIT_RETRY_MS, not 0
+      expect(host.lastWarn()).toContain("5s");
+    });
+
     it("should not double-schedule when called twice", () => {
       loop.handleResult({
         ok: false,

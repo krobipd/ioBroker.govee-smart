@@ -1,5 +1,5 @@
 import { errMessage, type CloudLoadResult } from "./types";
-import { TRANSIENT_RETRY_MS } from "./timing-constants";
+import { MIN_RATE_LIMIT_RETRY_MS, TRANSIENT_RETRY_MS } from "./timing-constants";
 
 /**
  * Dependencies the retry loop needs. Extracting this interface decouples the
@@ -91,12 +91,14 @@ export class CloudRetryLoop {
           `Govee Cloud: authentication failed — check API-Key in adapter settings. Not retrying automatically.`,
         );
         return;
-      case "rate-limited":
-        this.host.log.warn(
-          `Govee Cloud: rate-limited — pausing for ${Math.round(result.retryAfterMs / 1000)}s before retry`,
-        );
-        this.schedule(result.retryAfterMs);
+      case "rate-limited": {
+        // Floor the server's Retry-After so a 0 / malformed value can't turn
+        // into an immediate-retry tight loop that hammers the Cloud (L5).
+        const pauseMs = Math.max(result.retryAfterMs, MIN_RATE_LIMIT_RETRY_MS);
+        this.host.log.warn(`Govee Cloud: rate-limited — pausing for ${Math.round(pauseMs / 1000)}s before retry`);
+        this.schedule(pauseMs);
         return;
+      }
       case "transient":
       default:
         this.schedule(TRANSIENT_RETRY_MS);

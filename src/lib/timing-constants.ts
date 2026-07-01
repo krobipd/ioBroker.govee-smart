@@ -28,6 +28,13 @@ export const APP_API_INITIAL_DELAY_MS = 5_000;
 /** Hard timeout for cloud initialisation (60 s). */
 export const READY_TIMEOUT_MS = 60_000;
 
+/**
+ * Floor for a rate-limit retry pause (5 s). A malformed/zero server `Retry-After`
+ * must not collapse into an immediate-retry tight loop that hammers the Cloud
+ * (Govee allows 10 requests/min) — clamp the server value up to this minimum.
+ */
+export const MIN_RATE_LIMIT_RETRY_MS = 5_000;
+
 /** Minimum gap between two `mqttAuth: requestCode` calls (30 s). */
 export const VERIFICATION_REQUEST_THROTTLE_MS = 30_000;
 

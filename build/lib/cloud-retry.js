@@ -74,12 +74,12 @@ class CloudRetryLoop {
           `Govee Cloud: authentication failed \u2014 check API-Key in adapter settings. Not retrying automatically.`
         );
         return;
-      case "rate-limited":
-        this.host.log.warn(
-          `Govee Cloud: rate-limited \u2014 pausing for ${Math.round(result.retryAfterMs / 1e3)}s before retry`
-        );
-        this.schedule(result.retryAfterMs);
+      case "rate-limited": {
+        const pauseMs = Math.max(result.retryAfterMs, import_timing_constants.MIN_RATE_LIMIT_RETRY_MS);
+        this.host.log.warn(`Govee Cloud: rate-limited \u2014 pausing for ${Math.round(pauseMs / 1e3)}s before retry`);
+        this.schedule(pauseMs);
         return;
+      }
       case "transient":
       default:
         this.schedule(import_timing_constants.TRANSIENT_RETRY_MS);
