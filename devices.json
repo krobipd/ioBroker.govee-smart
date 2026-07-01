@@ -19,11 +19,23 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H5109": {
+      "name": "Pool Thermometer",
+      "type": "thermometer",
+      "status": "reported",
+      "since": "2.17.0"
+    },
     "H5179": {
       "name": "Wifi Thermometer",
       "type": "thermometer",
       "status": "verified",
       "since": "2.0.0"
+    },
+    "H1630": {
+      "name": "Lantern Floor Lamp",
+      "type": "light",
+      "status": "reported",
+      "since": "2.17.0"
     },
     "H6003": {
       "name": "LED Bulb",
