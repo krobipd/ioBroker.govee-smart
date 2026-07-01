@@ -94,6 +94,18 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       expect(restored.groupMembers).toBe(undefined);
     });
 
+    it("does NOT persist 'lastLanReplyAt' to cache (live LAN-freshness timestamp) — L11", () => {
+      const original = { ...makeFullDevice(), lastLanReplyAt: 1_700_000_000_000 };
+      const cached = goveeDeviceToCached(original);
+      expect(cached).not.toHaveProperty("lastLanReplyAt");
+    });
+
+    it("restored device cannot carry a forged lastLanReplyAt from a tampered cache (L11)", () => {
+      const cached = { ...goveeDeviceToCached(makeFullDevice()), lastLanReplyAt: 1_700_000_000_000 };
+      const restored = cachedToGoveeDevice(cached as never);
+      expect(restored.lastLanReplyAt).toBe(undefined);
+    });
+
     it("restored device cannot carry a forged lanIp from a tampered cache entry", () => {
       const cached = goveeDeviceToCached(makeFullDevice());
       // Tamper with the cache as if a malicious or stale write injected lanIp.

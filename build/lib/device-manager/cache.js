@@ -45,6 +45,7 @@ function cachedToGoveeDevice(cached) {
     channels: _channels,
     lanIp: _lanIp,
     groupMembers: _groupMembers,
+    lastLanReplyAt: _lastLanReplyAt,
     ...rest
   } = cached;
   return {
@@ -54,7 +55,14 @@ function cachedToGoveeDevice(cached) {
   };
 }
 function goveeDeviceToCached(device) {
-  const { state: _state, channels: _channels, lanIp: _lanIp, groupMembers: _groupMembers, ...cacheable } = device;
+  const {
+    state: _state,
+    channels: _channels,
+    lanIp: _lanIp,
+    groupMembers: _groupMembers,
+    lastLanReplyAt: _lastLanReplyAt,
+    ...cacheable
+  } = device;
   return {
     ...normalize(cacheable),
     cachedAt: Date.now()

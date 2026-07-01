@@ -58,8 +58,10 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     channels: _channels,
     lanIp: _lanIp,
     groupMembers: _groupMembers,
+    lastLanReplyAt: _lastLanReplyAt,
     ...rest
-  } = cached as CachedDeviceData & Partial<Pick<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers">>;
+  } = cached as CachedDeviceData &
+    Partial<Pick<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt">>;
   return {
     ...rest,
     state: { online: false },
@@ -78,7 +80,16 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
  */
 export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
   // Strip runtime-only fields. Everything else flows into the cache.
-  const { state: _state, channels: _channels, lanIp: _lanIp, groupMembers: _groupMembers, ...cacheable } = device;
+  // lastLanReplyAt is a live LAN-freshness timestamp — it must never be
+  // persisted (a stale value would survive a restart and skew online logic) (L11).
+  const {
+    state: _state,
+    channels: _channels,
+    lanIp: _lanIp,
+    groupMembers: _groupMembers,
+    lastLanReplyAt: _lastLanReplyAt,
+    ...cacheable
+  } = device;
   return {
     ...normalize(cacheable),
     cachedAt: Date.now(),
@@ -96,7 +107,7 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
  * `lanIp` / `groupMembers` here). Returns the same shape minus the dropped
  * keys.
  */
-function normalize<T extends Omit<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers">>(
+function normalize<T extends Omit<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt">>(
   d: T,
 ): Omit<CachedDeviceData, "cachedAt"> {
   const segmentCount = typeof d.segmentCount === "number" && d.segmentCount > 0 ? d.segmentCount : undefined;

@@ -535,6 +535,13 @@ class GoveeAdapter extends utils.Adapter {
               val: connected,
               ack: true,
             }).catch(() => {});
+            if (connected) {
+              // Cloud-events (Sensor Push) is a Ready precondition — re-check so
+              // the adapter logs "ready" as soon as it connects instead of
+              // waiting on the 60 s safety timer (L10). Mirrors the AWS-IoT
+              // onConnection callback above.
+              connectionState.checkAllReady(this);
+            }
           },
           // v2.9.1 — raw payload hook. Cloud-events MQTT topic is account-wide
           // (`GA/<apiKey>`), payload carries `sku`/`device`. Parse here so the

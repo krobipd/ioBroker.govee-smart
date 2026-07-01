@@ -440,6 +440,9 @@ class GoveeAdapter extends utils.Adapter {
               ack: true
             }).catch(() => {
             });
+            if (connected) {
+              connectionState.checkAllReady(this);
+            }
           },
           // v2.9.1 — raw payload hook. Cloud-events MQTT topic is account-wide
           // (`GA/<apiKey>`), payload carries `sku`/`device`. Parse here so the
