@@ -8,6 +8,7 @@ import {
   type CloudStateCapability,
   type TimerAdapter,
   errMessage,
+  maskSecret,
 } from "./types";
 
 const BROKER_URL = "mqtts://mqtt.openapi.govee.com:8883";
@@ -41,6 +42,8 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
    */
   private readonly sessionUuid: string = crypto.randomUUID();
   private topic: string;
+  /** Masked form of {@link topic} for logging — never exposes the raw API key (H1). */
+  private readonly topicLabel: string;
   /** Consecutive connect/auth failures — caps reconnect via reconnectExhausted(). */
   private connectFailCount = 0;
   private onEvent: OpenApiEventCallback | null = null;
@@ -59,6 +62,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
     super(log, timers);
     this.apiKey = apiKey;
     this.topic = `GA/${apiKey}`;
+    this.topicLabel = `GA/${maskSecret(apiKey)}`;
   }
 
   /** Stop reconnecting once the API key has been rejected too many times. */
@@ -103,20 +107,21 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         this.connectFailCount = 0;
         if (this.lastErrorCategory) {
           this.log.info(
-            `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topic}`,
+            `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`,
           );
           this.lastErrorCategory = null;
         } else {
-          this.log.debug(`Cloud-events connected: broker=${BROKER_URL} clientId=${clientId} topic=${this.topic}`);
+          this.log.debug(`Cloud-events connected: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`);
         }
 
         this.subscribeOrForceClose(
           this.topic,
           () => {
-            this.log.debug(`Cloud-events subscribed to event topic: topic=${this.topic} qos=0`);
+            this.log.debug(`Cloud-events subscribed to event topic: topic=${this.topicLabel} qos=0`);
             this.onConnection?.(true);
           },
-          msg => this.log.warn(`Cloud-events subscribe failed: topic=${this.topic} err="${msg}" — forcing reconnect`),
+          msg =>
+            this.log.warn(`Cloud-events subscribe failed: topic=${this.topicLabel} err="${msg}" — forcing reconnect`),
         );
       });
 

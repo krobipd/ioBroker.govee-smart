@@ -478,6 +478,22 @@ export function errMessage(e: unknown): string {
 }
 
 /**
+ * Mask a secret for safe logging. Reveals only a short leading fragment so a
+ * log line stays recognizable without exposing the value. Credential-bearing
+ * strings (API key topic, tokens) must pass through this before they ever
+ * reach a log line — a raw secret in a log the user later pastes publicly is a
+ * real exposure (H1).
+ *
+ * @param secret The sensitive string to mask
+ */
+export function maskSecret(secret: string): string {
+  if (typeof secret !== "string" || secret.length <= 4) {
+    return "***";
+  }
+  return `${secret.slice(0, 4)}***`;
+}
+
+/**
  * Parse JSON without throwing. Returns null on parse failure or non-string
  * input. Caller decides how to handle null (skip, fallback, log).
  *

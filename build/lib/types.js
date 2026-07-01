@@ -27,6 +27,7 @@ __export(types_exports, {
   errMessage: () => errMessage,
   hexToRgb: () => hexToRgb,
   logDedup: () => logDedup,
+  maskSecret: () => maskSecret,
   normalizeDeviceId: () => normalizeDeviceId,
   parseSegmentList: () => parseSegmentList,
   resolveStatesValue: () => resolveStatesValue,
@@ -77,6 +78,12 @@ function errMessage(e) {
     return e.message;
   }
   return String(e);
+}
+function maskSecret(secret) {
+  if (typeof secret !== "string" || secret.length <= 4) {
+    return "***";
+  }
+  return `${secret.slice(0, 4)}***`;
 }
 function safeJsonParse(raw) {
   if (typeof raw !== "string" || raw.length === 0) {
@@ -266,6 +273,7 @@ function resolveStatesValue(input, statesMap) {
   errMessage,
   hexToRgb,
   logDedup,
+  maskSecret,
   normalizeDeviceId,
   parseSegmentList,
   resolveStatesValue,

@@ -9,6 +9,7 @@ import {
   buildUniqueLabelMap,
   resolveStatesValue,
   errMessage,
+  maskSecret,
   safeJsonParse,
   coerceFiniteNumber,
   coerceBool,
@@ -432,6 +433,18 @@ describe("Types utilities", () => {
       const drifted = { 0: "---", 1: 42 as unknown as string };
       expect(resolveStatesValue("42", drifted)).toBeNull();
       expect(resolveStatesValue(1, drifted)).toEqual({ key: "1", canonical: 42 as unknown as string });
+    });
+  });
+
+  describe("maskSecret", () => {
+    it("reveals only a short prefix and never the full secret", () => {
+      expect(maskSecret("3f2a9c10-dead-beef-cafe")).toBe("3f2a***");
+      expect(maskSecret("3f2a9c10-dead-beef-cafe")).not.toContain("dead");
+    });
+
+    it("fully masks empty or too-short input", () => {
+      expect(maskSecret("")).toBe("***");
+      expect(maskSecret("abcd")).toBe("***");
     });
   });
 

@@ -208,6 +208,32 @@ describe("GoveeOpenapiMqttClient", () => {
       t.scheduled[0](); // stale timer fires
       expect(mqttMock.clients).toHaveLength(1); // no second connect — disposed guard held
     });
+
+    it("masks the API key in topic= log lines — the raw key never reaches the log (H1)", () => {
+      const apiKey = "3f2a9c10-dead-beef-cafe-0123456789ab";
+      const logged: string[] = [];
+      const capturingLog = {
+        debug: (m: string) => logged.push(String(m)),
+        info: (m: string) => logged.push(String(m)),
+        warn: (m: string) => logged.push(String(m)),
+        error: () => {},
+        silly: () => {},
+        level: "debug",
+      } as unknown as ioBroker.Logger;
+      const t = makeCapturingTimers();
+      const client = new GoveeOpenapiMqttClient(apiKey, capturingLog, t.timers);
+      // Force the INFO "connection restored" path (line ~106) — the default-loglevel leak.
+      (client as unknown as { lastErrorCategory: string | null }).lastErrorCategory = "NETWORK";
+      client.connect(
+        () => {},
+        () => {},
+      );
+      mqttMock.clients[0].emit("connect");
+      const all = logged.join("\n");
+      expect(all).toContain("Cloud-events connection restored"); // we exercised the info line
+      expect(all).not.toContain(apiKey); // the raw key must never appear in any log line
+      client.disconnect();
+    });
   });
 
   describe("handleMessage (event parsing)", () => {
