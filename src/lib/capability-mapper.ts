@@ -1101,8 +1101,8 @@ export function buildLanStateDefs(device: GoveeDevice, log: ioBroker.Logger): St
  *
  * @param tierDef Initial value for the diag.tier state
  */
-function buildDiagStateDefs(tierDef: string): StateDefinition[] {
-  return [
+function buildDiagStateDefs(tierDef: string | null): StateDefinition[] {
+  const defs: StateDefinition[] = [
     {
       id: "export",
       name: tName("exportDiagnostics"),
@@ -1125,7 +1125,12 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
       capabilityInstance: "diagnosticsResult",
       channel: "diag",
     },
-    {
+  ];
+  // The trust tier is a per-SKU catalog attribute — meaningless for a BaseGroup
+  // (not a real device), which used to show a hard-coded "verified". Groups pass
+  // null and get no tier state at all (B4).
+  if (tierDef !== null) {
+    defs.push({
       id: "tier",
       name: tName("deviceTier"),
       type: "string",
@@ -1141,8 +1146,9 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
       capabilityType: "local",
       capabilityInstance: "diagnosticsTier",
       channel: "diag",
-    },
-  ];
+    });
+  }
+  return defs;
 }
 
 /**
@@ -1452,7 +1458,7 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
   // v2.9.1 — BaseGroups get the same three diag states. Tier defaults to
   // "verified" because BaseGroup isn't a real SKU and has no quirks entry —
   // the diag-button just renders consistently.
-  stateDefs.push(...buildDiagStateDefs("verified"));
+  stateDefs.push(...buildDiagStateDefs(null));
 
   return stateDefs;
 }

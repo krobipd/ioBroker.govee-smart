@@ -746,7 +746,7 @@ function buildLanStateDefs(device, log) {
   return stateDefs;
 }
 function buildDiagStateDefs(tierDef) {
-  return [
+  const defs = [
     {
       id: "export",
       name: (0, import_i18n.tName)("exportDiagnostics"),
@@ -768,8 +768,10 @@ function buildDiagStateDefs(tierDef) {
       capabilityType: "local",
       capabilityInstance: "diagnosticsResult",
       channel: "diag"
-    },
-    {
+    }
+  ];
+  if (tierDef !== null) {
+    defs.push({
       id: "tier",
       name: (0, import_i18n.tName)("deviceTier"),
       type: "string",
@@ -785,8 +787,9 @@ function buildDiagStateDefs(tierDef) {
       capabilityType: "local",
       capabilityInstance: "diagnosticsTier",
       channel: "diag"
-    }
-  ];
+    });
+  }
+  return defs;
 }
 function buildCloudStateDefs(device, log, localSnapshots, memberDevices) {
   if (device.sku === "BaseGroup") {
@@ -983,7 +986,7 @@ function buildGroupStateDefs(members) {
       });
     }
   }
-  stateDefs.push(...buildDiagStateDefs("verified"));
+  stateDefs.push(...buildDiagStateDefs(null));
   return stateDefs;
 }
 // Annotate the CommonJS export names for ESM import in node:

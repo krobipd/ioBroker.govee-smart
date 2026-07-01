@@ -1347,11 +1347,13 @@ describe("CapabilityMapper", () => {
       expect(ids).not.toContain("snapshot_save");
       expect(ids).not.toContain("snapshot_delete");
       expect(ids).not.toContain("snapshot");
-      // v2.9.1 — BaseGroups now get diag.export/result/tier so users can
-      // export group-specific issues ("fan-out doesn't reach member X").
+      // v2.9.1 — BaseGroups get diag.export/result so users can export
+      // group-specific issues ("fan-out doesn't reach member X")…
       expect(ids).toContain("export");
       expect(ids).toContain("result");
-      expect(ids).toContain("tier");
+      // …but NOT diag.tier: the trust tier is a per-SKU catalog attribute and a
+      // BaseGroup is not a real device (it used to show a hard-coded "verified") — B4.
+      expect(ids).not.toContain("tier");
     });
 
     it("should compute scene intersection across members", () => {
