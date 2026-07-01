@@ -1064,8 +1064,13 @@ export class StateManager {
       }
       // In the control channel, LAN-default ids belong to the LAN phase —
       // Cloud cleanup must not touch them. Other MANAGED_CHANNELS are
-      // wholly Cloud territory.
+      // wholly Cloud territory. Count them as seen-but-not-deleted survivors so
+      // the "empty channel" removal below doesn't delete the control channel
+      // object out from under its surviving LAN states (L9).
       if (channel === "control" && LAN_STATE_IDS.has(stateId)) {
+        const survivors = totalsPerChannel.get(channel) ?? { seen: 0, deleted: 0 };
+        survivors.seen++;
+        totalsPerChannel.set(channel, survivors);
         continue;
       }
       const totals = totalsPerChannel.get(channel) ?? { seen: 0, deleted: 0 };

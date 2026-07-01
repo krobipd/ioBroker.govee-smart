@@ -844,7 +844,7 @@ class StateManager {
    * @param cloudStateDefs Current Cloud-phase state definitions (non-segment)
    */
   async cleanupCloudOwnedStates(prefix, cloudStateDefs) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const expectedByChannel = /* @__PURE__ */ new Map();
     for (const def of cloudStateDefs) {
       const channel = (_a = def.channel) != null ? _a : "control";
@@ -874,11 +874,14 @@ class StateManager {
         continue;
       }
       if (channel === "control" && import_capability_mapper.LAN_STATE_IDS.has(stateId)) {
+        const survivors = (_b = totalsPerChannel.get(channel)) != null ? _b : { seen: 0, deleted: 0 };
+        survivors.seen++;
+        totalsPerChannel.set(channel, survivors);
         continue;
       }
-      const totals = (_b = totalsPerChannel.get(channel)) != null ? _b : { seen: 0, deleted: 0 };
+      const totals = (_c = totalsPerChannel.get(channel)) != null ? _c : { seen: 0, deleted: 0 };
       totals.seen++;
-      const validIds = (_c = expectedByChannel.get(channel)) != null ? _c : /* @__PURE__ */ new Set();
+      const validIds = (_d = expectedByChannel.get(channel)) != null ? _d : /* @__PURE__ */ new Set();
       if (!validIds.has(stateId)) {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         this.adapter.log.debug(`Removing stale state: ${localId}`);

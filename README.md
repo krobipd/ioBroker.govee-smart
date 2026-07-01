@@ -126,6 +126,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a malformed rate-limit response from Govee (Retry-After of 0) no longer causes rapid back-to-back cloud retries; the retry now waits at least 5 seconds.
 - Fixed: the adapter logs "ready" as soon as the sensor push (cloud-events) channel connects, instead of possibly waiting up to a minute for the safety timer.
 - Fixed: under heavy cloud load a fresh control command (power/brightness) is no longer dropped in favour of queued scene loads — the lowest-priority queued call is evicted instead.
+- Fixed: a LAN light's control channel is no longer removed (which would orphan its power/colour states) when only its cloud-owned control states are cleaned up.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

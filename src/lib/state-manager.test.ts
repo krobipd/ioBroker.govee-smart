@@ -181,6 +181,23 @@ describe("StateManager", () => {
     });
   });
 
+  describe("cleanupCloudOwnedStates", () => {
+    it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const prefix = "devices.h6160_0011";
+      objects.set(`${prefix}.control`, { type: "channel" });
+      objects.set(`${prefix}.control.colorRgb`, { type: "state" }); // LAN — skipped by cloud cleanup
+      objects.set(`${prefix}.control.power`, { type: "state" }); // LAN — skipped
+      objects.set(`${prefix}.control.gradient_toggle`, { type: "state" }); // cloud-owned, now stale
+      // Empty cloudStateDefs → gradient_toggle is stale (removed); colorRgb/power are LAN survivors.
+      await sm.cleanupCloudOwnedStates(prefix, []);
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).toContain(`${prefix}.control.gradient_toggle`); // stale cloud state removed
+      expect(deleted).not.toContain(`${prefix}.control`); // channel object preserved (LAN states live)
+    });
+  });
+
   describe("devicePrefix", () => {
     it("should generate prefix from SKU + last 4 hex chars of device ID", () => {
       const { adapter } = createMockAdapter();
