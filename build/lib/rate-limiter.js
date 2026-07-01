@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var rate_limiter_exports = {};
 __export(rate_limiter_exports, {
+  MAX_QUEUE_LENGTH: () => MAX_QUEUE_LENGTH,
   RateLimiter: () => RateLimiter
 });
 module.exports = __toCommonJS(rate_limiter_exports);
@@ -121,14 +122,18 @@ class RateLimiter {
    */
   enqueue(execute, priority = 1) {
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
-      const msg = `Rate limiter queue full (${MAX_QUEUE_LENGTH}) \u2014 dropping new Cloud call (priority ${priority})`;
-      if (this.warnedQueueFull) {
-        this.log.debug(msg);
-      } else {
-        this.warnedQueueFull = true;
-        this.log.warn(msg);
+      const tail = this.queue[this.queue.length - 1];
+      if (!tail || tail.priority <= priority) {
+        const msg = `Rate limiter queue full (${MAX_QUEUE_LENGTH}) \u2014 dropping new Cloud call (priority ${priority})`;
+        if (this.warnedQueueFull) {
+          this.log.debug(msg);
+        } else {
+          this.warnedQueueFull = true;
+          this.log.warn(msg);
+        }
+        return;
       }
-      return;
+      this.queue.pop();
     }
     this.queue.push({ execute, priority });
     this.queue.sort((a, b) => a.priority - b.priority);
@@ -190,6 +195,7 @@ class RateLimiter {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  MAX_QUEUE_LENGTH,
   RateLimiter
 });
 //# sourceMappingURL=rate-limiter.js.map

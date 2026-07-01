@@ -1,4 +1,4 @@
-import { RateLimiter } from "./rate-limiter";
+import { MAX_QUEUE_LENGTH, RateLimiter } from "./rate-limiter";
 
 const mockLog: ioBroker.Logger = {
   debug: () => {},
@@ -124,6 +124,27 @@ describe("RateLimiter", () => {
     expect(queue[0].priority).toBe(0);
     expect(queue[1].priority).toBe(1);
     expect(queue[2].priority).toBe(2);
+  });
+
+  it("evicts the lowest-priority queued call for a higher-priority one when full (L15)", () => {
+    const rl = new RateLimiter(mockLog, mockTimers, 0, 100_000); // minute limit 0 → all queue
+    for (let i = 0; i < MAX_QUEUE_LENGTH; i++) {
+      rl.enqueue(async () => {}, 2); // fill with low-priority (scene) calls
+    }
+    const queue = (rl as any).queue as Array<{ priority: number }>;
+    expect(queue).toHaveLength(MAX_QUEUE_LENGTH);
+    expect(queue.every(e => e.priority === 2)).toBe(true);
+
+    // A fresh high-priority (0 = control) call must get in, evicting a prio-2 tail.
+    rl.enqueue(async () => {}, 0);
+    expect(queue).toHaveLength(MAX_QUEUE_LENGTH); // still capped
+    expect(queue[0].priority).toBe(0); // high-priority call is at the head
+    expect(queue.filter(e => e.priority === 2)).toHaveLength(MAX_QUEUE_LENGTH - 1); // one evicted
+
+    // A fresh low-priority (2) call when full is still dropped (doesn't outrank the tail).
+    rl.enqueue(async () => {}, 2);
+    expect(queue).toHaveLength(MAX_QUEUE_LENGTH);
+    expect(queue.filter(e => e.priority === 0)).toHaveLength(1); // unchanged
   });
 
   it("should clear queue on stop", () => {

@@ -15,7 +15,7 @@ interface QueuedCall {
  * every legitimate burst (startup scene-loads for dozens of devices) by a
  * wide margin — beyond that the calls are stale by the time they'd run.
  */
-const MAX_QUEUE_LENGTH = 200;
+export const MAX_QUEUE_LENGTH = 200;
 
 /**
  * Rate limiter for Govee Cloud API calls.
@@ -137,14 +137,22 @@ export class RateLimiter {
    */
   enqueue(execute: () => Promise<void>, priority = 1): void {
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
-      const msg = `Rate limiter queue full (${MAX_QUEUE_LENGTH}) — dropping new Cloud call (priority ${priority})`;
-      if (this.warnedQueueFull) {
-        this.log.debug(msg);
-      } else {
-        this.warnedQueueFull = true;
-        this.log.warn(msg);
+      // Queue full. The queue is sorted ascending, so the tail is the
+      // lowest-priority call. Evict it in favour of the new call when the new
+      // one outranks it — otherwise a fresh control command (prio 0) would be
+      // dropped while stale scene loads (prio 2) keep their slots (L15).
+      const tail = this.queue[this.queue.length - 1];
+      if (!tail || tail.priority <= priority) {
+        const msg = `Rate limiter queue full (${MAX_QUEUE_LENGTH}) — dropping new Cloud call (priority ${priority})`;
+        if (this.warnedQueueFull) {
+          this.log.debug(msg);
+        } else {
+          this.warnedQueueFull = true;
+          this.log.warn(msg);
+        }
+        return;
       }
-      return;
+      this.queue.pop(); // evict the lowest-priority queued call to make room
     }
     this.queue.push({ execute, priority });
     // Sort by priority (lower first)
