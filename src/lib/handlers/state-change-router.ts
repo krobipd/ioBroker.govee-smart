@@ -139,6 +139,17 @@ export async function sendMusicCommand(
   }
 
   if (device.lanIp && adapter.lanClient) {
+    // The local music packet (33 05 01 <mode> [rgb]) carries no sensitivity /
+    // auto-color fields, so those changes can't be applied over LAN. Warn
+    // instead of silently re-sending just the mode and acking "ok" (A3) — the
+    // music mode itself still works over LAN.
+    if (changedSuffix === "music.music_sensitivity" || changedSuffix === "music.music_auto_color") {
+      adapter.log.warn(
+        `${device.name} (${device.sku}): music sensitivity / auto-color can't be set over the local API — ` +
+          `only the music mode applies for LAN-controlled lights.`,
+      );
+      return;
+    }
     let r = 0,
       g = 0,
       b = 0;

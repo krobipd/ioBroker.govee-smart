@@ -98,6 +98,12 @@ async function sendMusicCommand(adapter, device, prefix, changedSuffix, newValue
     return;
   }
   if (device.lanIp && adapter.lanClient) {
+    if (changedSuffix === "music.music_sensitivity" || changedSuffix === "music.music_auto_color") {
+      adapter.log.warn(
+        `${device.name} (${device.sku}): music sensitivity / auto-color can't be set over the local API \u2014 only the music mode applies for LAN-controlled lights.`
+      );
+      return;
+    }
     let r = 0, g = 0, b = 0;
     if (musicMode === 1 || musicMode === 2) {
       const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.colorRgb`);

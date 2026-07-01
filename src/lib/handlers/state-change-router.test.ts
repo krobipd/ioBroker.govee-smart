@@ -488,6 +488,17 @@ describe("sendMusicCommand", () => {
     expect(rig.capCommands).toHaveLength(0);
     expect(rig.lanMusic).toHaveLength(0);
   });
+
+  it("warns instead of silently dropping LAN music sensitivity / auto-color (A3)", async () => {
+    // The local music packet carries no sensitivity/auto-color, so changing them
+    // on a LAN device used to re-send just the mode and ack "ok" silently.
+    const lanDev = musicDevice([1, 2, 3]); // has lanIp (default) → LAN music path
+    const rig = makeRig([lanDev]);
+    rig.states.set(`${NS}.${PREFIX}.music.music_mode`, 1); // a mode is selected
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_sensitivity", 80);
+    expect(rig.lanMusic).toHaveLength(0); // no pointless mode re-send
+    expect(rig.warns.some(w => w.toLowerCase().includes("sensitivity"))).toBe(true);
+  });
 });
 
 describe("onStateChange — music routing branch", () => {

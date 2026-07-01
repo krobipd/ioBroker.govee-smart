@@ -113,6 +113,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: DIY scenes you create in the Govee app now show up in the DIY dropdown after a reload, instead of only on the very first load.
 - Fixed: a malformed `segments.command` (e.g. `;` instead of `:`) now logs a clear warning with the expected syntax instead of being silently ignored.
 - Fixed: a command to a group with no reachable members (or where every member fails) is no longer falsely reported as successful — it now warns and leaves the state un-acknowledged, like a single device.
+- Fixed: changing music sensitivity or auto-color on a LAN-controlled light now warns that the local API can't set them (only the music mode applies), instead of silently doing nothing.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.
