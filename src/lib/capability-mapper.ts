@@ -2,6 +2,7 @@ import {
   buildUniqueLabelMap,
   errMessage,
   rgbToHex,
+  type CapabilityOption,
   type CloudCapability,
   type CloudStateCapability,
   type GoveeDevice,
@@ -690,6 +691,28 @@ function mapEvent(cap: CloudCapability): StateDefinition[] {
  *
  * @param cap Cloud music_setting capability
  */
+/**
+ * Ordered list of valid music-mode options from a music_setting capability.
+ * Both the dropdown builder ({@link mapMusicSetting}) and the send path
+ * (`sendMusicCommand` in state-change-router) resolve music modes through THIS
+ * function, so the index→value mapping can never drift between what the user
+ * selects and what is sent to the device.
+ *
+ * @param cap A music_setting capability
+ * @returns The `musicMode` field's options (string name only), in API order
+ */
+export function getMusicModeOptions(cap: CloudCapability): CapabilityOption[] {
+  const fields = cap.parameters?.fields;
+  if (!Array.isArray(fields)) {
+    return [];
+  }
+  const modeField = fields.find(f => f && typeof f.fieldName === "string" && f.fieldName === "musicMode");
+  if (!modeField?.options || !Array.isArray(modeField.options)) {
+    return [];
+  }
+  return modeField.options.filter(o => !!o && typeof o.name === "string");
+}
+
 function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
   const fields = cap.parameters?.fields;
   if (!Array.isArray(fields) || fields.length === 0) {
@@ -699,23 +722,21 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
 
   const states: StateDefinition[] = [];
 
-  // Mode dropdown — only if API provides actual mode options
-  const modeField = fields.find(f => f && typeof f.fieldName === "string" && f.fieldName === "musicMode");
-  if (modeField?.options && Array.isArray(modeField.options) && modeField.options.length > 0) {
-    const modeStates: Record<string, string> = { 0: "---" };
-    for (const opt of modeField.options) {
-      if (!opt || typeof opt.name !== "string") {
-        continue;
-      }
-      modeStates[safeStringify(opt.value)] = opt.name;
-    }
+  // Mode dropdown — only if API provides actual mode options. Index-based
+  // (0 = "---" sentinel), consistent with every other dropdown; the device
+  // value for index N is modeOptions[N-1].value, resolved at send time through
+  // the SAME getMusicModeOptions() list so build and send never drift. The old
+  // value-keyed scheme collided with the sentinel on 0-based SKUs, making the
+  // first music mode unreachable (A1).
+  const modeOptions = getMusicModeOptions(cap);
+  if (modeOptions.length > 0) {
     states.push({
       id: "music_mode",
       name: tName("musicMode"),
       type: "mixed",
       role: "state",
       write: true,
-      states: modeStates,
+      states: buildUniqueLabelMap(modeOptions),
       def: "0",
       capabilityType: cap.type,
       capabilityInstance: cap.instance,

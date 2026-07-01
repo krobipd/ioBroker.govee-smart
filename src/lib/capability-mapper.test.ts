@@ -369,9 +369,13 @@ describe("CapabilityMapper", () => {
       // Mode dropdown
       expect(result[0].id).toBe("music_mode");
       expect(result[0].role).toBe("state");
-      // mixed lets users write the mode key ("5") or the label ("Energic")
+      // mixed lets users write the index ("1") or the label ("Energic")
       expect(result[0].type).toBe("mixed");
-      expect(result[0].states).toMatchObject({ 5: "Energic", 3: "Rhythm", 6: "Spectrum" });
+      // Index-based (0 = "---" sentinel), decoupled from the device value:
+      // 1→Energic(value 5), 2→Rhythm(value 3), 3→Spectrum(value 6). The send
+      // path resolves the index back through getMusicModeOptions, so even these
+      // non-contiguous values map correctly (A1).
+      expect(result[0].states).toMatchObject({ 0: "---", 1: "Energic", 2: "Rhythm", 3: "Spectrum" });
 
       // Sensitivity slider
       expect(result[1].id).toBe("music_sensitivity");
@@ -382,6 +386,36 @@ describe("CapabilityMapper", () => {
       // Auto color toggle
       expect(result[2].id).toBe("music_auto_color");
       expect(result[2].type).toBe("boolean");
+    });
+
+    it("music_setting: 0-based option values keep the '---' sentinel (A1)", () => {
+      // h612f-class SKU: options start at value 0. The old value-keyed scheme
+      // let the value-0 option overwrite modeStates["0"] = "---", so the sentinel
+      // vanished and the first mode was unreachable. Index-based keeps 0 = "---"
+      // and exposes every mode at 1..N.
+      const caps: CloudCapability[] = [
+        {
+          type: "devices.capabilities.music_setting",
+          instance: "musicMode",
+          parameters: {
+            dataType: "STRUCT",
+            fields: [
+              {
+                fieldName: "musicMode",
+                dataType: "ENUM",
+                options: [
+                  { name: "Rhythm", value: 0 },
+                  { name: "Sprouting", value: 1 },
+                  { name: "Shiny", value: 2 },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+      const mode = mapCapabilities(caps).find(r => r.id === "music_mode");
+      expect(mode?.states).toEqual({ 0: "---", 1: "Rhythm", 2: "Sprouting", 3: "Shiny" });
+      expect(mode?.def).toBe("0");
     });
 
     it("should fall back to mixed work_mode state when STRUCT has no fields", () => {

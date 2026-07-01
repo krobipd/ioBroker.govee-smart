@@ -23,6 +23,7 @@ __export(capability_mapper_exports, {
   buildCloudStateDefs: () => buildCloudStateDefs,
   buildLanStateDefs: () => buildLanStateDefs,
   getDefaultLanStates: () => getDefaultLanStates,
+  getMusicModeOptions: () => getMusicModeOptions,
   hasDynamicSceneCapability: () => hasDynamicSceneCapability,
   mapCapabilities: () => mapCapabilities,
   mapCloudStateValue: () => mapCloudStateValue,
@@ -496,6 +497,18 @@ function mapEvent(cap) {
     }
   ];
 }
+function getMusicModeOptions(cap) {
+  var _a;
+  const fields = (_a = cap.parameters) == null ? void 0 : _a.fields;
+  if (!Array.isArray(fields)) {
+    return [];
+  }
+  const modeField = fields.find((f) => f && typeof f.fieldName === "string" && f.fieldName === "musicMode");
+  if (!(modeField == null ? void 0 : modeField.options) || !Array.isArray(modeField.options)) {
+    return [];
+  }
+  return modeField.options.filter((o) => !!o && typeof o.name === "string");
+}
 function mapMusicSetting(cap) {
   var _a;
   const fields = (_a = cap.parameters) == null ? void 0 : _a.fields;
@@ -503,22 +516,15 @@ function mapMusicSetting(cap) {
     return [];
   }
   const states = [];
-  const modeField = fields.find((f) => f && typeof f.fieldName === "string" && f.fieldName === "musicMode");
-  if ((modeField == null ? void 0 : modeField.options) && Array.isArray(modeField.options) && modeField.options.length > 0) {
-    const modeStates = { 0: "---" };
-    for (const opt of modeField.options) {
-      if (!opt || typeof opt.name !== "string") {
-        continue;
-      }
-      modeStates[safeStringify(opt.value)] = opt.name;
-    }
+  const modeOptions = getMusicModeOptions(cap);
+  if (modeOptions.length > 0) {
     states.push({
       id: "music_mode",
       name: (0, import_i18n.tName)("musicMode"),
       type: "mixed",
       role: "state",
       write: true,
-      states: modeStates,
+      states: (0, import_types.buildUniqueLabelMap)(modeOptions),
       def: "0",
       capabilityType: cap.type,
       capabilityInstance: cap.instance
@@ -984,6 +990,7 @@ function buildGroupStateDefs(members) {
   buildCloudStateDefs,
   buildLanStateDefs,
   getDefaultLanStates,
+  getMusicModeOptions,
   hasDynamicSceneCapability,
   mapCapabilities,
   mapCloudStateValue,

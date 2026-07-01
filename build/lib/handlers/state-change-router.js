@@ -36,6 +36,7 @@ __export(state_change_router_exports, {
   sendMusicCommand: () => sendMusicCommand
 });
 module.exports = __toCommonJS(state_change_router_exports);
+var import_capability_mapper = require("../capability-mapper");
 var import_device_manager = require("../device-manager");
 var import_govee_constants = require("../govee-constants");
 var import_types = require("../types");
@@ -82,11 +83,18 @@ async function sendMusicCommand(adapter, device, prefix, changedSuffix, newValue
   const modeState = await adapter.getStateAsync(`${musicBase}.music_mode`);
   const sensState = await adapter.getStateAsync(`${musicBase}.music_sensitivity`);
   const autoState = await adapter.getStateAsync(`${musicBase}.music_auto_color`);
-  const musicMode = changedSuffix === "music.music_mode" ? parseInt(String(newValue), 10) : parseInt(String((_a = modeState == null ? void 0 : modeState.val) != null ? _a : 0), 10);
+  const selectedIndex = changedSuffix === "music.music_mode" ? parseInt(String(newValue), 10) : parseInt(String((_a = modeState == null ? void 0 : modeState.val) != null ? _a : 0), 10);
   const sensitivity = changedSuffix === "music.music_sensitivity" ? newValue : (_b = sensState == null ? void 0 : sensState.val) != null ? _b : 100;
   const autoColor = changedSuffix === "music.music_auto_color" ? newValue ? 1 : 0 : (autoState == null ? void 0 : autoState.val) ? 1 : 0;
-  if (!musicMode || musicMode === 0) {
+  if (!Number.isFinite(selectedIndex) || selectedIndex <= 0) {
     adapter.log.debug("Music mode not selected, skipping command");
+    return;
+  }
+  const musicCap = device.capabilities.find((c) => c.type === import_govee_constants.GOVEE_CAP_TYPE.MUSIC_SETTING && c.instance === "musicMode");
+  const chosen = musicCap ? (0, import_capability_mapper.getMusicModeOptions)(musicCap)[selectedIndex - 1] : void 0;
+  const musicMode = chosen ? Number(chosen.value) : NaN;
+  if (!Number.isFinite(musicMode)) {
+    adapter.log.debug(`Music mode index ${selectedIndex} has no matching numeric option, skipping command`);
     return;
   }
   if (device.lanIp && adapter.lanClient) {

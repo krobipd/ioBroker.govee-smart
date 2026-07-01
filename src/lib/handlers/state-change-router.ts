@@ -1,3 +1,4 @@
+import { getMusicModeOptions } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { SEGMENT_HARD_MAX } from "../device-manager";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -112,14 +113,28 @@ export async function sendMusicCommand(
   const sensState = await adapter.getStateAsync(`${musicBase}.music_sensitivity`);
   const autoState = await adapter.getStateAsync(`${musicBase}.music_auto_color`);
 
-  const musicMode =
+  const selectedIndex =
     changedSuffix === "music.music_mode" ? parseInt(String(newValue), 10) : parseInt(String(modeState?.val ?? 0), 10);
   const sensitivity =
     changedSuffix === "music.music_sensitivity" ? (newValue as number) : ((sensState?.val as number) ?? 100);
   const autoColor = changedSuffix === "music.music_auto_color" ? (newValue ? 1 : 0) : autoState?.val ? 1 : 0;
 
-  if (!musicMode || musicMode === 0) {
+  // Index 0 = the "---" sentinel = nothing selected. Gate the skip on the
+  // INDEX, not the resolved device value: on a 0-based SKU index 1 resolves to
+  // device value 0 (a real mode) which must NOT be swallowed here (A1).
+  if (!Number.isFinite(selectedIndex) || selectedIndex <= 0) {
     adapter.log.debug("Music mode not selected, skipping command");
+    return;
+  }
+
+  // Resolve the dropdown index to the device's actual mode value through the
+  // SAME option list the dropdown was built from (getMusicModeOptions), so the
+  // index→value mapping can't drift: index N → options[N-1].value.
+  const musicCap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.MUSIC_SETTING && c.instance === "musicMode");
+  const chosen = musicCap ? getMusicModeOptions(musicCap)[selectedIndex - 1] : undefined;
+  const musicMode = chosen ? Number(chosen.value) : NaN;
+  if (!Number.isFinite(musicMode)) {
+    adapter.log.debug(`Music mode index ${selectedIndex} has no matching numeric option, skipping command`);
     return;
   }
 
@@ -127,6 +142,8 @@ export async function sendMusicCommand(
     let r = 0,
       g = 0,
       b = 0;
+    // A2 (separate finding): this 1/2 sub-mode gate is SKU-specific; it now
+    // reads the RESOLVED device value so A1 doesn't regress it.
     if (musicMode === 1 || musicMode === 2) {
       const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.colorRgb`);
       if (colorState?.val && typeof colorState.val === "string") {

@@ -20,6 +20,7 @@ import {
 } from "./state-change-router";
 import type { GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../test-helpers";
+import { GOVEE_CAP_TYPE } from "../govee-constants";
 
 const NS = "govee-smart.0";
 
@@ -149,6 +150,30 @@ function write(rig: Rig, fullId: string, val: ioBroker.StateValue): Promise<void
 const device = createTestDevice(); // sku H6160 → prefix devices.h6160_0011
 const PREFIX = `devices.h6160_0011`;
 const id = (suffix: string): string => `${NS}.${PREFIX}.${suffix}`;
+
+// A music_setting capability advertising the given per-mode device values in
+// order. The dropdown is index-based (0 = "---" sentinel), so state index N
+// maps to values[N-1] — the value actually sent to the device.
+function musicSettingCap(values: number[]): GoveeDevice["capabilities"][number] {
+  return {
+    type: GOVEE_CAP_TYPE.MUSIC_SETTING,
+    instance: "musicMode",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        { fieldName: "musicMode", options: values.map((v, i) => ({ name: `Mode${i}`, value: v })) },
+        { fieldName: "sensitivity", range: { min: 0, max: 100, precision: 1 } },
+        { fieldName: "autoColor" },
+      ],
+    },
+  };
+}
+
+// Test device that also advertises music modes (the default light caps lack them).
+function musicDevice(values: number[], overrides: Partial<GoveeDevice> = {}): GoveeDevice {
+  const base = createTestDevice(overrides);
+  return { ...base, capabilities: [...base.capabilities, musicSettingCap(values)] };
+}
 
 describe("findDeviceForState", () => {
   it("resolves a state path to its owning device via prefix match", () => {
@@ -392,27 +417,60 @@ describe("sendMusicCommand", () => {
   });
 
   it("LAN device + color mode (1/2): reads control.colorRgb and sends the mode over LAN", async () => {
-    const rig = makeRig([device]);
+    const lanDev = musicDevice([1, 2, 3]); // 1-based → index 1 → device value 1
+    const rig = makeRig([lanDev]);
     rig.states.set(id("control.colorRgb"), "#ff8000");
-    await sendMusicCommand(rig.adapter, device, PREFIX, "music.music_mode", 1);
-    expect(rig.lanMusic).toEqual([{ ip: device.lanIp, mode: 1, r: 255, g: 128, b: 0 }]);
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1);
+    expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, r: 255, g: 128, b: 0 }]);
     expect(rig.capCommands).toHaveLength(0); // LAN handled it — no Cloud call
   });
 
   it("cloud-only device: combines mode + sibling sensitivity/autoColor into ONE STRUCT call", async () => {
-    const cloudDev = createTestDevice({ deviceId: "CC:01", lanIp: undefined });
+    const cloudDev = musicDevice([1, 2, 3, 4, 5, 6], { deviceId: "CC:01", lanIp: undefined });
     const rig = makeRig([cloudDev]);
     rig.states.set(`${NS}.${PREFIX}.music.music_sensitivity`, 60);
     rig.states.set(`${NS}.${PREFIX}.music.music_auto_color`, true);
+    // 1-based SKU: dropdown index 5 → options[4].value = 5 (unchanged behaviour).
     await sendMusicCommand(rig.adapter, cloudDev, PREFIX, "music.music_mode", 5);
     expect(rig.capCommands).toHaveLength(1);
     expect(rig.capCommands[0].value).toEqual({ musicMode: 5, sensitivity: 60, autoColor: 1 });
+  });
+
+  it("0-based SKU: dropdown index 1 sends device value 0 — the first mode is reachable (A1)", async () => {
+    // h612f-class: options start at value 0. Old code keyed the dropdown by the
+    // device value, so value 0 collided with the "---" sentinel/skip and the
+    // first mode was unreachable. Index-based: index 1 → options[0].value = 0,
+    // and the skip is gated on the INDEX (0), not the resolved value.
+    const dev = musicDevice([0, 1, 2], { deviceId: "MM:00", lanIp: undefined });
+    const rig = makeRig([dev]);
+    rig.states.set(`${NS}.${PREFIX}.music.music_sensitivity`, 50);
+    rig.states.set(`${NS}.${PREFIX}.music.music_auto_color`, false);
+    await sendMusicCommand(rig.adapter, dev, PREFIX, "music.music_mode", 1);
+    expect(rig.capCommands).toHaveLength(1);
+    expect(rig.capCommands[0].value).toEqual({ musicMode: 0, sensitivity: 50, autoColor: 0 });
+  });
+
+  it("0-based SKU: index 3 maps to the last device value 2 (A1 round-trip)", async () => {
+    const dev = musicDevice([0, 1, 2], { deviceId: "MM:01", lanIp: undefined });
+    const rig = makeRig([dev]);
+    rig.states.set(`${NS}.${PREFIX}.music.music_sensitivity`, 70);
+    rig.states.set(`${NS}.${PREFIX}.music.music_auto_color`, true);
+    await sendMusicCommand(rig.adapter, dev, PREFIX, "music.music_mode", 3);
+    expect(rig.capCommands[0].value).toEqual({ musicMode: 2, sensitivity: 70, autoColor: 1 });
+  });
+
+  it("index past the option list is ignored (no command)", async () => {
+    const dev = musicDevice([0, 1, 2], { deviceId: "MM:02", lanIp: undefined });
+    const rig = makeRig([dev]);
+    await sendMusicCommand(rig.adapter, dev, PREFIX, "music.music_mode", 9);
+    expect(rig.capCommands).toHaveLength(0);
+    expect(rig.lanMusic).toHaveLength(0);
   });
 });
 
 describe("onStateChange — music routing branch", () => {
   it("music_mode write sends the music command, acks, and resets the OTHER mode dropdowns", async () => {
-    const rig = makeRig([device]);
+    const rig = makeRig([musicDevice([1, 2, 3])]);
     rig.states.set(id("control.colorRgb"), "#ff0000");
     rig.states.set(id("scenes.light_scene"), "2"); // active scene to be reset
     await write(rig, id("music.music_mode"), 1);
@@ -430,9 +488,9 @@ describe("onStateChange — music routing branch", () => {
   });
 
   it("music_sensitivity routes through the shared music command without resetting dropdowns", async () => {
-    const cloudDev = createTestDevice({ deviceId: "CC:02", lanIp: undefined });
+    const cloudDev = musicDevice([1, 2, 3, 4, 5, 6], { deviceId: "CC:02", lanIp: undefined });
     const rig = makeRig([cloudDev]);
-    rig.states.set(`${NS}.${PREFIX}.music.music_mode`, 5);
+    rig.states.set(`${NS}.${PREFIX}.music.music_mode`, 5); // stored index 5 → device value 5
     rig.states.set(id("scenes.light_scene"), "2");
     await write(rig, id("music.music_sensitivity"), 80);
     expect(rig.capCommands).toHaveLength(1);
