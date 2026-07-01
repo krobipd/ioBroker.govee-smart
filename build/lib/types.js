@@ -220,11 +220,18 @@ function parseSegmentList(input, maxIndex) {
 }
 function disambiguateLabels(names) {
   const counts = /* @__PURE__ */ new Map();
+  const used = /* @__PURE__ */ new Set();
   return names.map((name) => {
     var _a;
-    const seen = (_a = counts.get(name)) != null ? _a : 0;
-    counts.set(name, seen + 1);
-    return seen === 0 ? name : `${name} (${seen + 1})`;
+    let n = (_a = counts.get(name)) != null ? _a : 0;
+    let label = n === 0 ? name : `${name} (${n + 1})`;
+    while (used.has(label)) {
+      n += 1;
+      label = `${name} (${n + 1})`;
+    }
+    counts.set(name, n + 1);
+    used.add(label);
+    return label;
   });
 }
 function buildUniqueLabelMap(items, zeroLabel = "---") {

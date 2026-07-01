@@ -36,7 +36,6 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
   }
 
   const segments: MqttSegmentData[] = [];
-  let highestPacket = 0;
 
   for (const cmd of commands) {
     if (typeof cmd !== "string") {
@@ -61,9 +60,6 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
     const packetNum = bytes[2];
     if (packetNum < 1 || packetNum > 5) {
       continue;
-    }
-    if (packetNum > highestPacket) {
-      highestPacket = packetNum;
     }
 
     const baseIndex = (packetNum - 1) * 4;

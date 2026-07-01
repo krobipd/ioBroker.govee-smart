@@ -517,9 +517,10 @@ export class CommandRouter {
       };
       await this.executeRateLimited(execute);
     }
-
-    // Update individual segment states to stay in sync
-    this.onSegmentBatchUpdate?.(device, parsed);
+    // NOTE: no onSegmentBatchUpdate here — dispatchSegmentBatch (the only caller)
+    // already emits it once for both the LAN and Cloud paths, before dispatch.
+    // Emitting again here double-fired it on the Cloud path (idempotent, but
+    // redundant) (I2).
   }
 
   /**

@@ -751,10 +751,21 @@ export function parseSegmentList(input: string, maxIndex: number): SegmentListPa
  */
 export function disambiguateLabels(names: string[]): string[] {
   const counts = new Map<string, number>();
+  const used = new Set<string>();
   return names.map(name => {
-    const seen = counts.get(name) ?? 0;
-    counts.set(name, seen + 1);
-    return seen === 0 ? name : `${name} (${seen + 1})`;
+    let n = counts.get(name) ?? 0;
+    let label = n === 0 ? name : `${name} (${n + 1})`;
+    // Guard against colliding with a name the input already carried in
+    // "(N)"-suffixed form (e.g. ["Aurora","Aurora","Aurora (2)"]) — keep bumping
+    // the counter until the label is actually unique so the reverse-lookup stays
+    // deterministic (I4).
+    while (used.has(label)) {
+      n += 1;
+      label = `${name} (${n + 1})`;
+    }
+    counts.set(name, n + 1);
+    used.add(label);
+    return label;
   });
 }
 

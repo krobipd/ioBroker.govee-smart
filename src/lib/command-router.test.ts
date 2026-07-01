@@ -234,6 +234,19 @@ describe("CommandRouter", () => {
       expect(lan.calls).toHaveLength(0); // nothing sent
       expect(warns.some(w => w.includes("segment command") && w.includes("1-15;#ffca91"))).toBe(true);
     });
+
+    it("emits onSegmentBatchUpdate exactly once on the Cloud path (I2)", async () => {
+      const cloud = makeCloudStub();
+      const router = new CommandRouter(mockLog, noopTimers);
+      router.setCloudClient(cloud.client);
+      let emits = 0;
+      router.onSegmentBatchUpdate = () => {
+        emits += 1;
+      };
+      const dev = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true }, segmentCount: 8 });
+      await router.sendCommand(dev, "segmentBatch", "0-2:#ff0000:50");
+      expect(emits).toBe(1); // dispatchSegmentBatch emits once; sendSegmentBatchParsed no longer re-fires
+    });
   });
 
   describe("parseSegmentBatch", () => {

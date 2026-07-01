@@ -266,9 +266,10 @@ describe("Types utilities", () => {
       expect(r.error).toContain("0-14");
     });
 
-    it("should reject indices above hard backstop 99", () => {
-      const r = parseSegmentList("0,100", 200); // maxIndex=200, but 100 > 99 backstop
-      expect(r.error).not.toBeNull();
+    it("clamps to the hard backstop SEGMENT_HARD_MAX (55): accepts 55, rejects 56 (I3)", () => {
+      // A large maxIndex must not let indices past the protocol limit through.
+      expect(parseSegmentList("55", 200).error).toBeNull(); // 55 == effectiveMax → accepted
+      expect(parseSegmentList("56", 200).error).not.toBeNull(); // 56 > 55 → rejected
     });
 
     it("should reject non-numeric tokens", () => {
@@ -294,10 +295,9 @@ describe("Types utilities", () => {
       expect(r.indices).toEqual([]);
     });
 
-    it("should use hard backstop 99 when maxIndex is invalid", () => {
-      const r = parseSegmentList("50", -1);
-      expect(r.error).toBeNull();
-      expect(r.indices).toEqual([50]);
+    it("falls back to the hard backstop 55 when maxIndex is invalid (I3)", () => {
+      expect(parseSegmentList("55", -1).error).toBeNull(); // effectiveMax = 55
+      expect(parseSegmentList("56", -1).error).not.toBeNull(); // 56 > 55 → rejected
     });
   });
 
@@ -321,6 +321,14 @@ describe("Types utilities", () => {
 
     it("should handle empty list", () => {
       expect(disambiguateLabels([])).toEqual([]);
+    });
+
+    it("does not collide with an input that already carries a (N) suffix (I4)", () => {
+      // Old code produced two "Aurora (2)" entries here; the reverse-lookup then
+      // maps two dropdown keys to the same label. Each output must be unique.
+      const out = disambiguateLabels(["Aurora", "Aurora", "Aurora (2)"]);
+      expect(out).toEqual(["Aurora", "Aurora (2)", "Aurora (2) (2)"]);
+      expect(new Set(out).size).toBe(out.length); // all unique
     });
 
     it("should treat empty strings as duplicates after first", () => {

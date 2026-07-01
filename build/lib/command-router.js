@@ -402,7 +402,6 @@ class CommandRouter {
    * @param parsed Pre-parsed batch data (null = invalid command)
    */
   async sendSegmentBatchParsed(device, commandStr, parsed) {
-    var _a;
     if (!this.cloudClient) {
       return;
     }
@@ -440,7 +439,6 @@ class CommandRouter {
       };
       await this.executeRateLimited(execute);
     }
-    (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);
   }
   /**
    * Parse batch segment command string.
