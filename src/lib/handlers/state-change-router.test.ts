@@ -487,6 +487,19 @@ describe("onStateChange — music routing branch", () => {
     expect(rig.acks).toContainEqual({ id: id("music.music_mode"), val: 0 });
   });
 
+  it("control.scene reset (0) acks WITHOUT firing a spurious preset-scene command (L4)", async () => {
+    const rig = makeRig([device]);
+    await write(rig, id("control.scene"), 0);
+    expect(rig.commands.find(c => c.command === "scene")).toBeUndefined();
+    expect(rig.acks).toContainEqual({ id: id("control.scene"), val: 0 });
+  });
+
+  it("control.scene deselect (empty) acks WITHOUT firing a command (L4)", async () => {
+    const rig = makeRig([device]);
+    await write(rig, id("control.scene"), "");
+    expect(rig.commands.find(c => c.command === "scene")).toBeUndefined();
+  });
+
   it("music_sensitivity routes through the shared music command without resetting dropdowns", async () => {
     const cloudDev = musicDevice([1, 2, 3, 4, 5, 6], { deviceId: "CC:02", lanIp: undefined });
     const rig = makeRig([cloudDev]);

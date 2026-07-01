@@ -267,7 +267,7 @@ async function onStateChange(adapter, id, state) {
     await handleGenericCapabilityCommand(adapter, device, id, stateSuffix, val);
     return;
   }
-  if ((command === "lightScene" || command === "diyScene" || command === "snapshot") && (val === "0" || val === 0)) {
+  if ((command === "lightScene" || command === "diyScene" || command === "snapshot" || command === "scene") && (val === "0" || val === 0 || val === "")) {
     await adapter.setStateAsync(id, { val, ack: true });
     return;
   }

@@ -403,8 +403,14 @@ export async function onStateChange(
     return;
   }
 
-  // Dropdown reset to "---" (value 0) — acknowledge without sending command
-  if ((command === "lightScene" || command === "diyScene" || command === "snapshot") && (val === "0" || val === 0)) {
+  // Dropdown reset to the "no selection" sentinel — acknowledge without firing
+  // a command. lightScene/diyScene/snapshot use 0 = "---"; the preset-scene
+  // dropdown (control.scene) uses "" (its def). Writing that sentinel to
+  // control.scene used to fall through to a spurious preset-scene command (L4).
+  if (
+    (command === "lightScene" || command === "diyScene" || command === "snapshot" || command === "scene") &&
+    (val === "0" || val === 0 || val === "")
+  ) {
     await adapter.setStateAsync(id, { val, ack: true });
     return;
   }
