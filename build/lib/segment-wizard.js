@@ -386,24 +386,22 @@ ${this.t("finishTreeRebuilt")}`,
    */
   async restoreBaseline(device, baseline) {
     var _a, _b;
-    if (!baseline.colorRgb || !/^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb)) {
-      return;
-    }
     const total = (_a = device.segmentCount) != null ? _a : 0;
-    if (total <= 0) {
-      return;
+    if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
+      const color = parseInt(baseline.colorRgb.slice(1), 16);
+      const brightness = (_b = baseline.brightness) != null ? _b : 100;
+      const atomic = await this.host.restoreStripAtomic(device, total, color, brightness);
+      if (!atomic) {
+        await this.host.sendCommand(device, "segmentBatch", {
+          segments: Array.from({ length: total }, (_, i) => i),
+          color,
+          brightness
+        });
+      }
     }
-    const color = parseInt(baseline.colorRgb.slice(1), 16);
-    const brightness = (_b = baseline.brightness) != null ? _b : 100;
-    const atomic = await this.host.restoreStripAtomic(device, total, color, brightness);
-    if (atomic) {
-      return;
+    if (baseline.power === false) {
+      await this.host.sendCommand(device, "power", false);
     }
-    await this.host.sendCommand(device, "segmentBatch", {
-      segments: Array.from({ length: total }, (_, i) => i),
-      color,
-      brightness
-    });
   }
 }
 function compactIndices(sorted) {

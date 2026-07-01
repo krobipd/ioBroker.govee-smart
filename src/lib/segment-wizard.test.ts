@@ -472,6 +472,19 @@ describe("SegmentWizard", () => {
       await wizard.abort();
       expect(host.calls).toHaveLength(0);
     });
+
+    it("restores the original power state — turns the strip back off if it was off (L8)", async () => {
+      // The wizard forces the strip ON to flash segments; a device that was OFF
+      // beforehand must be turned back off on restore. The baseline is captured
+      // BEFORE start() powers it on, so power=false is what we recorded.
+      host.states.set(`${host.namespace}.${host.devicePrefix(device)}.control.power`, false);
+      await wizard.start(key);
+      host.calls.length = 0;
+      await wizard.abort();
+      const powerCall = host.calls.find(c => c.command === "power");
+      expect(powerCall).toBeDefined();
+      expect(powerCall!.value).toBe(false);
+    });
   });
 
   describe("runStep dispatch", () => {
