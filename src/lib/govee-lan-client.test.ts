@@ -423,10 +423,17 @@ describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
     return { client, discovered, statuses, feed };
   }
 
-  it("parses a scan response into a discovered LanDevice", () => {
+  it("parses a scan response into a discovered LanDevice (ip taken from the UDP source)", () => {
     const { discovered, feed } = makeClient();
-    feed({ msg: { cmd: "scan", data: { ip: "192.168.1.50", device: "AA:BB", sku: "H61BE" } } });
+    feed({ msg: { cmd: "scan", data: { ip: "192.168.1.50", device: "AA:BB", sku: "H61BE" } } }, "192.168.1.50");
     expect(discovered).toEqual([{ ip: "192.168.1.50", device: "AA:BB", sku: "H61BE" }]);
+  });
+
+  it("uses the UDP source IP for a scan reply, ignoring an attacker-claimed payload ip (SEC-M1)", () => {
+    const { discovered, feed } = makeClient();
+    // data.ip is attacker-controllable; the real device IP is where the packet came from.
+    feed({ msg: { cmd: "scan", data: { ip: "10.6.6.6", device: "AA:BB", sku: "H61BE" } } }, "192.168.1.77");
+    expect(discovered).toEqual([{ ip: "192.168.1.77", device: "AA:BB", sku: "H61BE" }]);
   });
 
   it("ignores a scan response missing a required field (untrusted wire data)", () => {
@@ -469,10 +476,11 @@ describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
     expect(fired).toBe(0);
   });
 
-  it("evicts the stale IP entry when the same device reappears at a new IP", () => {
+  it("evicts the stale IP entry when the same device reappears at a new (source) IP", () => {
     const { client, feed } = makeClient();
-    feed({ msg: { cmd: "scan", data: { ip: "192.168.1.50", device: "AA:BB", sku: "H61BE" } } });
-    feed({ msg: { cmd: "scan", data: { ip: "192.168.1.99", device: "AA:BB", sku: "H61BE" } } });
+    // The binding IP is the UDP source (SEC-M1), so a device "moving" is a new sourceIp.
+    feed({ msg: { cmd: "scan", data: { ip: "unused", device: "AA:BB", sku: "H61BE" } } }, "192.168.1.50");
+    feed({ msg: { cmd: "scan", data: { ip: "unused", device: "AA:BB", sku: "H61BE" } } }, "192.168.1.99");
     const seen = (client as any).seenDeviceIps as Set<string>;
     expect(seen.has("AA:BB:192.168.1.99")).toBe(true);
     expect(seen.has("AA:BB:192.168.1.50")).toBe(false); // stale entry evicted

@@ -637,7 +637,7 @@ export class GoveeLanClient {
         rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload : {};
 
       if (cmd === "scan") {
-        this.handleScanResponse(payload);
+        this.handleScanResponse(payload, sourceIp);
       } else if (cmd === "devStatus") {
         this.handleStatusResponse(payload, sourceIp);
       }
@@ -647,11 +647,15 @@ export class GoveeLanClient {
   }
 
   /**
-   * Handle scan response — new device found
+   * Handle scan response — new device found. The device's IP is taken from the
+   * UDP source address, NOT the attacker-controllable `data.ip` payload field
+   * (SEC-M1) — otherwise a spoofed scan reply could redirect a device's
+   * outbound commands to an attacker-chosen IP.
    *
    * @param data Parsed scan response payload
+   * @param sourceIp Source IP from the UDP rinfo — the authentic device address
    */
-  private handleScanResponse(data: Record<string, unknown>): void {
+  private handleScanResponse(data: Record<string, unknown>, sourceIp: string): void {
     // Defensive type checks — LAN payload comes over the wire, treat as untrusted
     if (
       typeof data.ip !== "string" ||
@@ -665,7 +669,9 @@ export class GoveeLanClient {
     }
 
     const lanDevice: LanDevice = {
-      ip: data.ip,
+      // data.ip is validated above as part of a well-formed reply but is NOT
+      // trusted for the binding — the authentic address is the UDP source.
+      ip: sourceIp,
       device: data.device,
       sku: data.sku,
     };
