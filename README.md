@@ -105,6 +105,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - New: a "Manually sync devices" button (`info.manual_sync_devices`) — set it to true to sync the device list with your Govee account on demand (pull in new devices, drop deleted ones) without restarting the adapter.
 - Fixed: multi-colour DIY scenes activated locally (LAN/ptReal) now build a valid packet — an off-by-one corrupted the terminator on scenes with longer data, so they could silently fail to load.
 - Fixed: after you remove a device and add it again, its info states (name, model, …) are recreated correctly instead of leaving "has no existing object" warnings until the next restart.
+- Fixed: if a Govee push/cloud-events connection connects but then can't subscribe (a rare server-side hiccup), the adapter no longer reconnects every few seconds — the retry now backs off normally, avoiding a self-inflicted rate-limit.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

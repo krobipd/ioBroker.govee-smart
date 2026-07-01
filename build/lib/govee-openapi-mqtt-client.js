@@ -103,20 +103,21 @@ class GoveeOpenapiMqttClient extends import_reconnecting_mqtt_client.Reconnectin
       const clientId = `iob_govee_smart_${this.sessionUuid}`;
       this.log.debug(`Cloud-events connecting: broker=${BROKER_URL} clientId=${clientId} authMode=apiKey`);
       this.client.on("connect", () => {
-        this.reconnectAttempts = 0;
-        this.connectFailCount = 0;
-        if (this.lastErrorCategory) {
-          this.log.info(
-            `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`
-          );
-          this.lastErrorCategory = null;
-        } else {
-          this.log.debug(`Cloud-events connected: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`);
-        }
+        this.log.debug(
+          `Cloud-events connected (CONNACK): broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`
+        );
         this.subscribeOrForceClose(
           this.topic,
           () => {
             var _a;
+            this.reconnectAttempts = 0;
+            this.connectFailCount = 0;
+            if (this.lastErrorCategory) {
+              this.log.info(
+                `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`
+              );
+              this.lastErrorCategory = null;
+            }
             this.log.debug(`Cloud-events subscribed to event topic: topic=${this.topicLabel} qos=0`);
             (_a = this.onConnection) == null ? void 0 : _a.call(this, true);
           },

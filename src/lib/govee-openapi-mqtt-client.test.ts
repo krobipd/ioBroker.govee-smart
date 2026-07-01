@@ -180,6 +180,24 @@ describe("GoveeOpenapiMqttClient", () => {
       client.disconnect();
     });
 
+    it("keeps the backoff counter on a post-CONNACK subscribe failure — no tight relogin loop (M3)", () => {
+      mqttMock.setSubscribeBehavior(cb => cb(new Error("policy denied")));
+      const t = makeCapturingTimers();
+      const client = new GoveeOpenapiMqttClient("key", mockLog, t.timers);
+      client.connect(
+        () => {},
+        () => {},
+      );
+      // Pretend we have already been backing off (3 prior attempts).
+      (client as unknown as { reconnectAttempts: number }).reconnectAttempts = 3;
+      mqttMock.clients[0].emit("connect"); // CONNACK → subscribe fails → force close
+      // The CONNACK alone must NOT reset the backoff — only a full subscribe
+      // success (onSubscribed) does. Otherwise a persistent subscribe failure
+      // relogs every ~5-10 s and self-inflicts a Govee rate-limit.
+      expect((client as unknown as { reconnectAttempts: number }).reconnectAttempts).toBe(3);
+      client.disconnect();
+    });
+
     it("re-enters connect() when the backoff timer fires after a close", () => {
       const t = makeCapturingTimers();
       const client = new GoveeOpenapiMqttClient("key", mockLog, t.timers);

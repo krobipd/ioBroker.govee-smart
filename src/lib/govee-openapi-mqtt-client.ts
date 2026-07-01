@@ -103,20 +103,25 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
       const clientId = `iob_govee_smart_${this.sessionUuid}`;
       this.log.debug(`Cloud-events connecting: broker=${BROKER_URL} clientId=${clientId} authMode=apiKey`);
       this.client.on("connect", () => {
-        this.reconnectAttempts = 0;
-        this.connectFailCount = 0;
-        if (this.lastErrorCategory) {
-          this.log.info(
-            `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`,
-          );
-          this.lastErrorCategory = null;
-        } else {
-          this.log.debug(`Cloud-events connected: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`);
-        }
+        // CONNACK only — do NOT reset the backoff/fail counters or clear the
+        // error category yet. A persistent post-CONNACK subscribe failure must
+        // let the backoff climb toward its cap instead of a tight ~5-10s
+        // relogin loop (M3). Success handling lives in onSubscribed below.
+        this.log.debug(
+          `Cloud-events connected (CONNACK): broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`,
+        );
 
         this.subscribeOrForceClose(
           this.topic,
           () => {
+            this.reconnectAttempts = 0;
+            this.connectFailCount = 0;
+            if (this.lastErrorCategory) {
+              this.log.info(
+                `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`,
+              );
+              this.lastErrorCategory = null;
+            }
             this.log.debug(`Cloud-events subscribed to event topic: topic=${this.topicLabel} qos=0`);
             this.onConnection?.(true);
           },

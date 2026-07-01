@@ -590,23 +590,23 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this.client.on("connect", () => {
       const wasCached = this.persistedAttemptInFlight;
       this.persistedAttemptInFlight = false;
-      this.reconnectAttempts = 0;
-      this.authFailCount = 0;
       const broker = this.persisted?.iotEndpoint ?? "?";
       const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
       const authMode = wasCached ? "cached" : "fresh";
-      if (this.lastErrorCategory) {
-        this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
-        this.lastErrorCategory = null;
-      } else {
-        // Initial connect is implicit in the ready-message ("channels:
-        // LAN+Cloud+MQTT+..."), so this stays debug — only the recovery
-        // path above earns an info-level event.
-        this.log.debug(`MQTT connected: broker=${broker} clientId=${clientId} authMode=${authMode}`);
-      }
+      // CONNACK only — do NOT reset the backoff/fail counters or clear the
+      // error category yet. A persistent post-CONNACK subscribe failure must
+      // let the backoff climb toward its cap instead of a tight ~5-10s relogin
+      // loop (M3). Success handling lives in the onSubscribed callback below.
+      this.log.debug(`MQTT connected (CONNACK): broker=${broker} clientId=${clientId} authMode=${authMode}`);
       this.subscribeOrForceClose(
         this.accountTopic,
         () => {
+          this.reconnectAttempts = 0;
+          this.authFailCount = 0;
+          if (this.lastErrorCategory) {
+            this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
+            this.lastErrorCategory = null;
+          }
           this.log.debug(`MQTT subscribed to account topic: topic=${this.accountTopic} qos=0`);
           this.onConnection?.(true);
         },

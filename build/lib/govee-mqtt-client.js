@@ -488,21 +488,20 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       var _a, _b;
       const wasCached = this.persistedAttemptInFlight;
       this.persistedAttemptInFlight = false;
-      this.reconnectAttempts = 0;
-      this.authFailCount = 0;
       const broker = (_b = (_a = this.persisted) == null ? void 0 : _a.iotEndpoint) != null ? _b : "?";
       const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
       const authMode = wasCached ? "cached" : "fresh";
-      if (this.lastErrorCategory) {
-        this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
-        this.lastErrorCategory = null;
-      } else {
-        this.log.debug(`MQTT connected: broker=${broker} clientId=${clientId} authMode=${authMode}`);
-      }
+      this.log.debug(`MQTT connected (CONNACK): broker=${broker} clientId=${clientId} authMode=${authMode}`);
       this.subscribeOrForceClose(
         this.accountTopic,
         () => {
           var _a2;
+          this.reconnectAttempts = 0;
+          this.authFailCount = 0;
+          if (this.lastErrorCategory) {
+            this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
+            this.lastErrorCategory = null;
+          }
           this.log.debug(`MQTT subscribed to account topic: topic=${this.accountTopic} qos=0`);
           (_a2 = this.onConnection) == null ? void 0 : _a2.call(this, true);
         },
