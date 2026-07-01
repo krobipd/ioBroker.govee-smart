@@ -371,6 +371,22 @@ class DeviceManager {
           }
         }
       }
+      if (cloudDevices.length > 0) {
+        const ownedKeys = new Set(cloudDevices.map((cd) => this.deviceKey(cd.sku, cd.device)));
+        const removed = [];
+        for (const device of this.devices.values()) {
+          if (device.sku === "BaseGroup" || device.channels.lan || !device.channels.cloud) {
+            continue;
+          }
+          if (!ownedKeys.has(this.deviceKey(device.sku, device.deviceId))) {
+            removed.push(device);
+          }
+        }
+        for (const device of removed) {
+          this.log.info(`Removed device ${device.name} (${device.sku}) \u2014 no longer in your Govee account`);
+          this.removeDevice(device.sku, device.deviceId);
+        }
+      }
       if (this.skuCache && cloudDevices.length > 0) {
         this.skuCache.pruneStale(14);
       }

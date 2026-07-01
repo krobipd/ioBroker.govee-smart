@@ -492,6 +492,40 @@ describe("DeviceManager", () => {
       expect(tracker.calls[0].args[4]).toBe(1); // power on = 1
     });
 
+    it("removes a cloud-only device no longer in the account, keeps LAN-present ones (BUG-1 reconcile)", async () => {
+      const deleted = createTestDevice({
+        sku: "H5179",
+        deviceId: "DEADBEEF01",
+        name: "Sold Thermo",
+        lanIp: undefined,
+        capabilities: [],
+        channels: { lan: false, mqtt: false, cloud: true },
+      });
+      const lanKept = createTestDevice({
+        sku: "H6160",
+        deviceId: "AABBCCDDEEFF0011",
+        channels: { lan: true, mqtt: false, cloud: true },
+      });
+      (dm as any).devices.set("H5179_deadbeef01", deleted);
+      (dm as any).devices.set("H6160_aabbccddeeff0011", lanKept);
+      dm.setCloudClient({
+        getDevices: () =>
+          Promise.resolve([
+            {
+              sku: "H5100",
+              device: "PRESENT0001",
+              deviceName: "Present Sensor",
+              type: "devices.types.thermometer",
+              capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature" }],
+            },
+          ]),
+      } as any);
+      await dm.loadFromCloud();
+      const ids = dm.getDevices().map(d => d.deviceId);
+      expect(ids).not.toContain("DEADBEEF01"); // cloud-only, account-deleted → removed
+      expect(ids).toContain("AABBCCDDEEFF0011"); // LAN-present → kept (LAN-first)
+    });
+
     it("should route lightScene via ptReal when scene is in library", async () => {
       const tracker = createCallTracker();
       const mockLan = {

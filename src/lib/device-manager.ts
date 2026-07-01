@@ -439,6 +439,30 @@ export class DeviceManager {
         }
       }
 
+      // Reconcile account membership (BUG-1): Govee's /user/devices returns
+      // devices deleted from the account capability-less, so they drop out
+      // after the hard-filter. A cloud-only device (never seen on LAN) that is
+      // no longer in the fresh list has been removed from the account — drop
+      // it, instead of letting the cache rehydrate it forever. Guards: only on
+      // a plausible non-empty response; never a LAN-present device (LAN-first);
+      // never a capability-bearing device (that's just offline — keep it).
+      if (cloudDevices.length > 0) {
+        const ownedKeys = new Set(cloudDevices.map(cd => this.deviceKey(cd.sku, cd.device)));
+        const removed: GoveeDevice[] = [];
+        for (const device of this.devices.values()) {
+          if (device.sku === "BaseGroup" || device.channels.lan || !device.channels.cloud) {
+            continue;
+          }
+          if (!ownedKeys.has(this.deviceKey(device.sku, device.deviceId))) {
+            removed.push(device);
+          }
+        }
+        for (const device of removed) {
+          this.log.info(`Removed device ${device.name} (${device.sku}) — no longer in your Govee account`);
+          this.removeDevice(device.sku, device.deviceId);
+        }
+      }
+
       // Step 3: Prune stale cache entries (only after successful Cloud-load
       // with a plausible response — never prune on Cloud failure or empty list)
       if (this.skuCache && cloudDevices.length > 0) {
