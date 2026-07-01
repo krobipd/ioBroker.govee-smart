@@ -422,14 +422,10 @@ export class SegmentWizard {
     await this.host.applyWizardResult(device, result);
     await this.restoreBaseline(device, session.baseline);
 
-    const gapsSuffix = result.hasGaps ? this.t("logGapsSuffix", { list: manualList }) : this.t("logNoGapsSuffix");
-    this.host.log.info(
-      this.t("logDetected", {
-        name: device.name,
-        count: segmentCount,
-        gaps: gapsSuffix,
-      }),
-    );
+    // Logs are English regardless of admin language (system-language rule); the
+    // user-facing `message`/`progress` below stay localized (C6).
+    const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${manualList}")` : ", no gaps";
+    this.host.log.info(`Segment wizard for ${device.name}: ${segmentCount} segments detected${gapsSuffix}`);
 
     this.session = null;
     this.clearIdleTimer();
@@ -456,7 +452,7 @@ export class SegmentWizard {
       if (!this.session) {
         return;
       }
-      this.host.log.warn(this.t("logIdleTimeout", { name: this.session.name }));
+      this.host.log.warn(`Segment wizard for ${this.session.name}: idle timeout (5 min), aborted`);
       this.abort().catch(e => {
         this.host.log.warn(
           this.t("logAbortFailed", {
