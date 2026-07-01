@@ -47,6 +47,7 @@ const MULTICAST_ADDR = "239.255.255.250";
 const SCAN_PORT = 4001;
 const LISTEN_PORT = 4002;
 const COMMAND_PORT = 4003;
+const MAX_DISTINCT_LAN_DEVICES = 512;
 class GoveeLanClient {
   scanSocket = null;
   listenSocket = null;
@@ -77,6 +78,8 @@ class GoveeLanClient {
   onStatusRecord = null;
   onScanRecord = null;
   seenDeviceIps = /* @__PURE__ */ new Set();
+  /** Warn-once latch when the LAN discovery cap is hit (SEC-H2). */
+  lanFloodWarned = false;
   /**
    * Per-IP timestamp of the last command we sent (ptReal/setScene/etc).
    * Used to annotate incoming LAN-status responses with the Δt — gives an
@@ -566,6 +569,9 @@ class GoveeLanClient {
     if (typeof data.ip !== "string" || typeof data.device !== "string" || typeof data.sku !== "string" || !data.ip || !data.device || !data.sku) {
       return;
     }
+    if (data.device.length > 64 || data.sku.length > 24) {
+      return;
+    }
     const lanDevice = {
       // data.ip is validated above as part of a well-formed reply but is NOT
       // trusted for the binding — the authentic address is the UDP source.
@@ -575,6 +581,15 @@ class GoveeLanClient {
     };
     const key = `${lanDevice.device}:${lanDevice.ip}`;
     if (!this.seenDeviceIps.has(key)) {
+      if (this.seenDeviceIps.size >= MAX_DISTINCT_LAN_DEVICES) {
+        if (!this.lanFloodWarned) {
+          this.lanFloodWarned = true;
+          this.log.warn(
+            `LAN discovery cap reached (${MAX_DISTINCT_LAN_DEVICES}) \u2014 ignoring further new devices; check for a misbehaving or hostile device on your network`
+          );
+        }
+        return;
+      }
       const staleSuffix = `${lanDevice.device}:`;
       for (const existing of this.seenDeviceIps) {
         if (existing.startsWith(staleSuffix) && existing !== key) {

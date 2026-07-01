@@ -100,6 +100,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Security: the diagnostics export (the JSON you paste into a GitHub issue) no longer contains device or gateway secrets — a gateway `secretCode` and push topic are now masked, while normal device metadata is kept.
 - Security: a spoofed LAN discovery reply can no longer redirect a device's commands to another IP — the device address is now taken from the real network source, not the packet's self-reported address.
 - Robustness: the Admin "Test login" button is now rate-limited, so repeated clicks can no longer trigger a burst of Govee logins that could get your account temporarily locked.
+- Security: LAN device discovery is hardened against a misbehaving or hostile device on your network — implausibly large device identifiers are ignored and the number of new LAN devices is capped, preventing runaway memory/CPU use.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

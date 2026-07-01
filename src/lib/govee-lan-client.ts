@@ -11,6 +11,8 @@ const MULTICAST_ADDR = "239.255.255.250";
 const SCAN_PORT = 4001;
 const LISTEN_PORT = 4002;
 const COMMAND_PORT = 4003;
+/** Cap on distinct LAN device identities we track/create — bounds a spoofed-discovery flood (SEC-H2). */
+const MAX_DISTINCT_LAN_DEVICES = 512;
 
 /** Callback for discovered LAN devices */
 export type LanDiscoveryCallback = (device: LanDevice) => void;
@@ -75,6 +77,8 @@ export class GoveeLanClient {
   private onStatusRecord: LanStatusRecordCallback | null = null;
   private onScanRecord: LanScanRecordCallback | null = null;
   private readonly seenDeviceIps = new Set<string>();
+  /** Warn-once latch when the LAN discovery cap is hit (SEC-H2). */
+  private lanFloodWarned = false;
   /**
    * Per-IP timestamp of the last command we sent (ptReal/setScene/etc).
    * Used to annotate incoming LAN-status responses with the Δt — gives an
@@ -668,6 +672,12 @@ export class GoveeLanClient {
       return;
     }
 
+    // Length bounds — a spoofed-discovery flood could carry absurdly padded
+    // device/sku strings; a real Govee deviceId is <=47 chars, a SKU <=~8 (SEC-H2).
+    if (data.device.length > 64 || data.sku.length > 24) {
+      return;
+    }
+
     const lanDevice: LanDevice = {
       // data.ip is validated above as part of a well-formed reply but is NOT
       // trusted for the binding — the authentic address is the UDP source.
@@ -678,6 +688,18 @@ export class GoveeLanClient {
 
     const key = `${lanDevice.device}:${lanDevice.ip}`;
     if (!this.seenDeviceIps.has(key)) {
+      // Cap distinct LAN identities so a spoofed-discovery flood can't grow the
+      // set (and the downstream device map) without bound (SEC-H2). Known
+      // devices always pass; only brand-new identities beyond the cap drop.
+      if (this.seenDeviceIps.size >= MAX_DISTINCT_LAN_DEVICES) {
+        if (!this.lanFloodWarned) {
+          this.lanFloodWarned = true;
+          this.log.warn(
+            `LAN discovery cap reached (${MAX_DISTINCT_LAN_DEVICES}) — ignoring further new devices; check for a misbehaving or hostile device on your network`,
+          );
+        }
+        return;
+      }
       // Evict any stale entries for the same device at different IPs so the
       // set stays bounded by the actual number of devices, not the full
       // history of IPs they ever had.

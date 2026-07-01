@@ -436,6 +436,23 @@ describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
     expect(discovered).toEqual([{ ip: "192.168.1.77", device: "AA:BB", sku: "H61BE" }]);
   });
 
+  it("rejects a scan reply with an absurdly long device or sku (flood padding) (SEC-H2)", () => {
+    const { discovered, feed } = makeClient();
+    feed({ msg: { cmd: "scan", data: { ip: "x", device: "A".repeat(100), sku: "H61BE" } } }, "10.0.0.1");
+    feed({ msg: { cmd: "scan", data: { ip: "x", device: "AA:BB", sku: "H".repeat(50) } } }, "10.0.0.1");
+    expect(discovered).toHaveLength(0);
+  });
+
+  it("caps distinct LAN identities so a spoofed-discovery flood can't grow unbounded (SEC-H2)", () => {
+    const { client, discovered, feed } = makeClient();
+    for (let i = 0; i < 600; i++) {
+      feed({ msg: { cmd: "scan", data: { ip: "x", device: `AA:BB:${i}`, sku: "H61BE" } } }, "10.0.0.1");
+    }
+    const seen = (client as any).seenDeviceIps as Set<string>;
+    expect(seen.size).toBeLessThanOrEqual(512);
+    expect(discovered.length).toBeLessThanOrEqual(512);
+  });
+
   it("ignores a scan response missing a required field (untrusted wire data)", () => {
     const { discovered, feed } = makeClient();
     feed({ msg: { cmd: "scan", data: { ip: "192.168.1.50", device: "AA:BB" } } }); // no sku
