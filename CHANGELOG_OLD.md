@@ -1,4 +1,8 @@
 # Older Changes
+## 2.14.1 (2026-06-05)
+
+- Corrected the ioBroker role of the scene, mode and snapshot selector states (no change to how they work)
+
 ## 2.14.0 (2026-06-04)
 
 - The segment-detection wizard and the Cloud login test now show their messages in all admin languages instead of falling back to English or German.

@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.16.2",
+    "version": "2.17.0",
     "news": {
-      "NEXT": {
+      "2.17.0": {
         "en": "Breaking: the colour datapoints are renamed to snake_case (control.color_rgb / control.color_temperature) — update your scripts. Plus security hardening and sensor online + humidity fixes.",
         "de": "Breaking: die Farb-Datenpunkte heißen jetzt snake_case (control.color_rgb / control.color_temperature) — Skripte anpassen. Dazu Sicherheits-Härtung und Fixes für Sensor-Online + Feuchte.",
         "es": "Cambio importante: los datapoints de color pasan a snake_case (control.color_rgb / control.color_temperature) — actualiza tus scripts. Además refuerzo de seguridad y arreglos de sensores.",
