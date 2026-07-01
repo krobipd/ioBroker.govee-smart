@@ -424,7 +424,8 @@ class DeviceManager {
         };
       }
       const category = (0, import_types.classifyError)(err);
-      if (category === "AUTH") {
+      const authByStatus = err instanceof import_http_client.HttpError && (err.statusCode === 401 || err.statusCode === 403);
+      if (authByStatus || category === "AUTH") {
         return {
           ok: false,
           reason: "auth-failed",

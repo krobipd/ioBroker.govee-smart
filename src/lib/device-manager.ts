@@ -510,9 +510,14 @@ export class DeviceManager {
         };
       }
 
-      // Auth failure: API key wrong or revoked — NO retry
+      // Auth failure: API key wrong or revoked — NO retry. Classify 401/403 by
+      // status code too, not just classifyError's message match, so a body
+      // without "auth"/"unauthorized" (e.g. "Access denied") doesn't fall
+      // through to a "transient" retry loop on a permanently-bad key (same class
+      // as the L26 cloud-client fix).
       const category = classifyError(err);
-      if (category === "AUTH") {
+      const authByStatus = err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403);
+      if (authByStatus || category === "AUTH") {
         return {
           ok: false,
           reason: "auth-failed",

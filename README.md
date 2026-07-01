@@ -129,7 +129,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a LAN light's control channel is no longer removed (which would orphan its power/colour states) when only its cloud-owned control states are cleaned up.
 - Added: device catalog entries for the H5109 Pool Thermometer and H1630 Lantern Floor Lamp (user-reported) — they are now recognised instead of logging a "not supported" warning.
 - Fixed: MQTT verification / login problems are no longer logged twice — they now appear once via the actionable-problems notification instead of a duplicate warning.
-- Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" instead of sometimes showing a generic "Cloud request failed", regardless of the exact server message.
+- Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" and stops the device-list retry loop, instead of sometimes showing a generic "Cloud request failed" and retrying a permanently-bad key every few minutes — regardless of the exact server message.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

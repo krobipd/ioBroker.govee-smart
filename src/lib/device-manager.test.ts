@@ -526,6 +526,34 @@ describe("DeviceManager", () => {
       expect(ids).toContain("AABBCCDDEEFF0011"); // LAN-present → kept (LAN-first)
     });
 
+    it("loadFromCloud classifies a 429 as rate-limited with the Retry-After delay (L29)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      dm2.setCloudClient({
+        getDevices: () => Promise.reject(new HttpError("Rate limited", 429, { "retry-after": "30" })),
+      } as any);
+      expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "rate-limited", retryAfterMs: 30000 });
+    });
+
+    it("loadFromCloud classifies a 401 with a non-'auth' body as auth-failed — no retry loop on a bad key (L29)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      dm2.setCloudClient({ getDevices: () => Promise.reject(new HttpError("Access denied", 401, {})) } as any);
+      expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
+    });
+
+    it("loadFromCloud classifies a generic network error as transient (L29)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      dm2.setCloudClient({ getDevices: () => Promise.reject(new Error("network boom")) } as any);
+      expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "transient" });
+    });
+
+    it("loadGroupMembers returns false without an api client / without a bearer token (L29)", async () => {
+      const noClient = new DeviceManager(mockLog, mockTimers);
+      expect(await noClient.loadGroupMembers()).toBe(false);
+      const noBearer = new DeviceManager(mockLog, mockTimers);
+      noBearer.setApiClient({ hasBearerToken: () => false } as any);
+      expect(await noBearer.loadGroupMembers()).toBe(false);
+    });
+
     it("should route lightScene via ptReal when scene is in library", async () => {
       const tracker = createCallTracker();
       const mockLan = {
@@ -2289,21 +2317,25 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(await dm2.pollAppApi()).toBe(0);
     });
 
-    it("ignores app entries for unknown devices", async () => {
+    it("ignores app entries for unknown devices even when known devices exist (L24)", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers);
+      // A KNOWN device so the registry isn't empty — the unknown entry must be
+      // ignored on identity, not via an empty-registry early return.
+      dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" } as LanDevice);
+      dm2.getDevices()[0].type = "devices.types.thermometer"; // pollAppApi gates on non-light
       dm2.setApiClient(
         makeApiMock({
           entries: [
             {
               sku: "H5179",
-              device: "AA:BB:CC:DD:EE:FF",
+              device: "AA:BB:CC:DD:EE:FF", // different id → unknown
               deviceName: "Unknown",
               lastData: { tem: 2000 },
             },
           ],
         }) as never,
       );
-      expect(await dm2.pollAppApi()).toBe(0);
+      expect(await dm2.pollAppApi()).toBe(0); // unknown entry ignored despite a known device present
     });
 
     it("forwards synthetic caps for known devices via onCloudCapabilities", async () => {
