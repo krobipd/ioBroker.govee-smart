@@ -496,6 +496,40 @@ describe("SegmentWizard", () => {
       expect(powerCall).toBeDefined();
       expect(powerCall!.value).toBe(false);
     });
+
+    it("restores the captured per-segment gradient instead of flattening it to one colour (L8)", async () => {
+      const prefix = host.devicePrefix(device);
+      // A real 3-zone gradient in the per-segment state, distinct from the uniform control colour.
+      ["#ff0000", "#ff0000", "#00ff00", "#00ff00", "#0000ff"].forEach((c, i) => {
+        host.states.set(`${host.namespace}.${prefix}.segments.${i}.color`, c);
+        host.states.set(`${host.namespace}.${prefix}.segments.${i}.brightness`, 60);
+      });
+      await wizard.start(key);
+      host.calls.length = 0; // drop the flash calls — keep only the restore
+      await wizard.abort();
+      const batches = host
+        .segmentBatchCalls()
+        .map(c => c.value as { segments: number[]; color: number; brightness: number });
+      // Grouped by (colour,brightness): 3 zones → 3 batches, gradient preserved.
+      expect(batches).toContainEqual({ segments: [0, 1], color: 0xff0000, brightness: 60 });
+      expect(batches).toContainEqual({ segments: [2, 3], color: 0x00ff00, brightness: 60 });
+      expect(batches).toContainEqual({ segments: [4], color: 0x0000ff, brightness: 60 });
+      // Never flattened to the uniform control colour (#ff6600).
+      expect(batches.some(b => b.color === 0xff6600)).toBe(false);
+    });
+
+    it("still uses the uniform colour when the captured segments are all identical (no false gradient)", async () => {
+      // seedBaseline already sets every segment to #112233 — a uniform strip
+      // must restore via the single control colour, not a per-segment replay.
+      await wizard.start(key);
+      host.calls.length = 0;
+      await wizard.abort();
+      const batches = host
+        .segmentBatchCalls()
+        .map(c => c.value as { segments: number[]; color: number; brightness: number });
+      expect(batches).toHaveLength(1);
+      expect(batches[0].color).toBe(0xff6600); // control.colorRgb, not the segment colour
+    });
   });
 
   describe("runStep dispatch", () => {

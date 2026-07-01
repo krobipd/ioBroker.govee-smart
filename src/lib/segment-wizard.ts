@@ -533,7 +533,17 @@ export class SegmentWizard {
    */
   private async restoreBaseline(device: GoveeDevice, baseline: SegmentWizardSession["baseline"]): Promise<void> {
     const total = device.segmentCount ?? 0;
-    if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
+    const segs = baseline.segmentColors;
+    // Prefer the real per-segment gradient when one was genuinely captured: a
+    // FULL set of segments (matching the current count) carrying ≥2 distinct
+    // (colour, brightness) tuples. A strip that was never in gradient/colour
+    // mode has no reliable per-segment state — its segments read the def and
+    // collapse to a single tuple, so we fall back to the uniform colorRgb
+    // instead of painting the def across the whole strip (L8, gradient part).
+    const distinctTuples = new Set(segs.map(s => `${s.color}:${s.brightness}`)).size;
+    if (total > 0 && segs.length === total && distinctTuples >= 2) {
+      await this.restoreSegmentGradient(device, segs);
+    } else if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
       const color = parseInt(baseline.colorRgb.slice(1), 16);
       const brightness = baseline.brightness ?? 100;
       const atomic = await this.host.restoreStripAtomic(device, total, color, brightness);
@@ -550,6 +560,37 @@ export class SegmentWizard {
     // must be turned back off, otherwise the wizard silently leaves it on (L8).
     if (baseline.power === false) {
       await this.host.sendCommand(device, "power", false);
+    }
+  }
+
+  /**
+   * Restore a captured per-segment gradient — one segmentBatch per distinct
+   * (colour, brightness) group, so a 3-zone gradient replays in 3 batches
+   * instead of segmentCount sequential writes. Mirrors
+   * SnapshotHandler.restoreSegments (the local-snapshot restore path).
+   *
+   * @param device Target device
+   * @param segmentColors Captured per-segment colour + brightness
+   */
+  private async restoreSegmentGradient(
+    device: GoveeDevice,
+    segmentColors: { idx: number; color: string; brightness: number }[],
+  ): Promise<void> {
+    const groups = new Map<string, { segments: number[]; color: number; brightness: number }>();
+    for (const seg of segmentColors) {
+      const hex = /^#?[0-9a-fA-F]{6}$/.test(seg.color) ? seg.color : "#000000";
+      const color = parseInt(hex.replace("#", ""), 16);
+      const brightness = typeof seg.brightness === "number" ? seg.brightness : 100;
+      const key = `${color}:${brightness}`;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.segments.push(seg.idx);
+      } else {
+        groups.set(key, { segments: [seg.idx], color, brightness });
+      }
+    }
+    for (const group of groups.values()) {
+      await this.host.sendCommand(device, "segmentBatch", group);
     }
   }
 }
