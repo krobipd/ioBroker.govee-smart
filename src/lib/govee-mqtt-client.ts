@@ -492,6 +492,14 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param topic   AWS-IoT topic the message arrived on
    */
   private handleMessage(payload: Buffer, topic: string): void {
+    // SEC-I2: bound the message size before parsing. TLS is CA-pinned, so this
+    // needs a compromised/rogue broker, but dropping a multi-MB payload before
+    // JSON.parse + downstream expansion is cheap defence-in-depth (real
+    // status/op messages are a few KB; complements the SEC-GC1 segment cap).
+    if (payload.length > 64 * 1024) {
+      this.log.debug(`Dropping oversized MQTT message (${payload.length} bytes) from topic ${topic}`);
+      return;
+    }
     const rawText = payload.toString();
     try {
       const raw = JSON.parse(rawText) as Record<string, unknown>;

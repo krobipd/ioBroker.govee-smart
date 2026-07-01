@@ -389,6 +389,10 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
    */
   handleMessage(payload, topic) {
     var _a;
+    if (payload.length > 64 * 1024) {
+      this.log.debug(`Dropping oversized MQTT message (${payload.length} bytes) from topic ${topic}`);
+      return;
+    }
     const rawText = payload.toString();
     try {
       const raw = JSON.parse(rawText);

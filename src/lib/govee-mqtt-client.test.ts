@@ -691,6 +691,13 @@ describe("GoveeMqttClient", () => {
       expect(statuses).toEqual([{ sku: "H61BE", device: "AA:BB", state: { onOff: 1 }, op: { command: [] } }]);
     });
 
+    it("drops an oversized message before parsing it (SEC-I2)", () => {
+      const { statuses, feed } = makeClient();
+      // A valid-looking status, padded past the 64 KB guard.
+      feed({ sku: "H61BE", device: "AA:BB", state: { onOff: 1 }, op: { command: [] }, _pad: "x".repeat(70 * 1024) });
+      expect(statuses).toHaveLength(0); // dropped before JSON.parse — no status update
+    });
+
     it("forwards each op.command hex string to onPacket with the raw envelope", () => {
       const { packets, feed } = makeClient();
       const msg = { sku: "H61BE", device: "AA:BB", op: { command: ["aa01", "bb02"] } };
