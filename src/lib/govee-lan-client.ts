@@ -478,17 +478,18 @@ export class GoveeLanClient {
   }
 
   /**
-   * Set music mode via ptReal BLE-passthrough.
-   * Sub-modes 1 (Spectrum) and 2 (Rolling) use RGB color.
+   * Set music mode via ptReal BLE-passthrough. Whether RGB is sent is decided
+   * by the caller via the mode NAME (Spectrum/Rolling), not the value.
    *
    * @param ip Device IP address
-   * @param subMode Music sub-mode (0-3)
-   * @param r Red channel 0-255 (used by modes 1, 2)
+   * @param subMode Music sub-mode value (raw capability value)
+   * @param includeRgb Whether this mode carries a custom RGB colour (Spectrum/Rolling)
+   * @param r Red channel 0-255 (used when includeRgb)
    * @param g Green channel 0-255
    * @param b Blue channel 0-255
    */
-  setMusicMode(ip: string, subMode: number, r = 0, g = 0, b = 0): void {
-    this.sendPtReal(ip, [buildMusicModePacket(subMode, r, g, b)]);
+  setMusicMode(ip: string, subMode: number, includeRgb: boolean, r = 0, g = 0, b = 0): void {
+    this.sendPtReal(ip, [buildMusicModePacket(subMode, includeRgb, r, g, b)]);
   }
 
   /**
@@ -891,17 +892,24 @@ export function buildGradientPacket(on: boolean): string {
 }
 
 /**
- * Build a Base64-encoded BLE packet for music mode via ptReal.
- * Sub-modes 1 (Spectrum) and 2 (Rolling) include RGB color.
+ * Build a Base64-encoded BLE packet for music mode via ptReal
+ * (`33 05 01 <mode> [R G B]`).
  *
- * @param subMode Music sub-mode (0=Energic, 1=Spectrum, 2=Rolling, 3=Rhythm)
+ * Whether RGB is appended is decided by the CALLER (via {@link
+ * musicModeNameUsesRgb} on the mode name), not by the sub-mode value here:
+ * Govee's music-mode values are SKU-specific, so a value-based gate would
+ * append RGB on the wrong mode for a SKU whose Spectrum/Rolling isn't at the
+ * usual value 1/2 (A1 proved mode values vary across the fleet).
+ *
+ * @param subMode Music sub-mode value sent to the device (raw capability value)
+ * @param includeRgb Whether this mode carries a custom RGB colour (Spectrum/Rolling)
  * @param r Red channel 0-255
  * @param g Green channel 0-255
  * @param b Blue channel 0-255
  */
-export function buildMusicModePacket(subMode: number, r = 0, g = 0, b = 0): string {
+export function buildMusicModePacket(subMode: number, includeRgb: boolean, r = 0, g = 0, b = 0): string {
   const data = [0x33, 0x05, 0x01, subMode & 0xff];
-  if (subMode === 1 || subMode === 2) {
+  if (includeRgb) {
     data.push(r & 0xff, g & 0xff, b & 0xff);
   }
   return Buffer.from(finishPacket(data)).toString("base64");

@@ -15,6 +15,7 @@ import {
   LAN_STATE_IDS,
   mapCapabilities as mapCapabilitiesRaw,
   mapCloudStateValue,
+  musicModeNameUsesRgb,
   planCloudCapabilityWrites,
   type StateDefinition,
 } from "./capability-mapper";
@@ -1953,5 +1954,25 @@ describe("CapabilityMapper", () => {
         }
       }
     });
+  });
+});
+
+describe("musicModeNameUsesRgb (A2 — colour modes keyed on name, not value)", () => {
+  it("returns true for Spectrum and Rolling, case-insensitive + trimmed", () => {
+    expect(musicModeNameUsesRgb("Spectrum")).toBe(true);
+    expect(musicModeNameUsesRgb("Rolling")).toBe(true);
+    expect(musicModeNameUsesRgb("spectrum")).toBe(true);
+    expect(musicModeNameUsesRgb("  ROLLING  ")).toBe(true);
+  });
+
+  it("returns false for auto-colour modes and unknown/exotic modes (safe default = no RGB)", () => {
+    for (const n of ["Energic", "Energetic", "Rhythm", "Sprouting", "Shiny", "", "Spectrums"]) {
+      expect(musicModeNameUsesRgb(n)).toBe(false);
+    }
+  });
+
+  it("returns false for a non-string name (defensive)", () => {
+    expect(musicModeNameUsesRgb(undefined)).toBe(false);
+    expect(musicModeNameUsesRgb(123 as unknown as string)).toBe(false);
   });
 });

@@ -36,7 +36,7 @@ interface Rig {
   loadCloudStatesCalls: number[];
   manualApplied: Array<{ mode: boolean; indices?: number[] }>;
   persisted: GoveeDevice[];
-  lanMusic: Array<{ ip: string; mode: number; r: number; g: number; b: number }>;
+  lanMusic: Array<{ ip: string; mode: number; includeRgb: boolean; r: number; g: number; b: number }>;
   objects: Map<string, unknown>;
   states: Map<string, ioBroker.StateValue>;
   syncCalls: number[];
@@ -55,7 +55,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   const loadCloudStatesCalls: number[] = [];
   const manualApplied: Array<{ mode: boolean; indices?: number[] }> = [];
   const persisted: GoveeDevice[] = [];
-  const lanMusic: Array<{ ip: string; mode: number; r: number; g: number; b: number }> = [];
+  const lanMusic: Array<{ ip: string; mode: number; includeRgb: boolean; r: number; g: number; b: number }> = [];
   const syncCalls: number[] = [];
   const objects = new Map<string, unknown>();
   const states = new Map<string, ioBroker.StateValue>();
@@ -107,8 +107,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       },
     } as never,
     lanClient: {
-      setMusicMode: (ip: string, mode: number, r: number, g: number, b: number) =>
-        lanMusic.push({ ip, mode, r, g, b }),
+      setMusicMode: (ip: string, mode: number, includeRgb: boolean, r: number, g: number, b: number) =>
+        lanMusic.push({ ip, mode, includeRgb, r, g, b }),
     } as never,
     diagnosticsLastRun: new Map<string, number>(),
     getStateAsync: async id => (states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
@@ -181,6 +181,25 @@ function musicSettingCap(values: number[]): GoveeDevice["capabilities"][number] 
 function musicDevice(values: number[], overrides: Partial<GoveeDevice> = {}): GoveeDevice {
   const base = createTestDevice(overrides);
   return { ...base, capabilities: [...base.capabilities, musicSettingCap(values)] };
+}
+
+// Music device with NAMED modes (Spectrum/Rolling/Energic/…) so the name-based
+// RGB gate (A2) can be exercised independently of the numeric mode value.
+function musicDeviceNamed(modes: { name: string; value: number }[], overrides: Partial<GoveeDevice> = {}): GoveeDevice {
+  const base = createTestDevice(overrides);
+  const cap = {
+    type: GOVEE_CAP_TYPE.MUSIC_SETTING,
+    instance: "musicMode",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        { fieldName: "musicMode", options: modes },
+        { fieldName: "sensitivity", range: { min: 0, max: 100, precision: 1 } },
+        { fieldName: "autoColor" },
+      ],
+    },
+  } as GoveeDevice["capabilities"][number];
+  return { ...base, capabilities: [...base.capabilities, cap] };
 }
 
 describe("findDeviceForState", () => {
@@ -438,13 +457,31 @@ describe("sendMusicCommand", () => {
     expect(rig.capCommands).toHaveLength(0);
   });
 
-  it("LAN device + color mode (1/2): reads control.colorRgb and sends the mode over LAN", async () => {
-    const lanDev = musicDevice([1, 2, 3]); // 1-based → index 1 → device value 1
+  it("LAN device + Spectrum: reads control.colorRgb and sends the mode + RGB over LAN", async () => {
+    const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
     const rig = makeRig([lanDev]);
     rig.states.set(id("control.colorRgb"), "#ff8000");
-    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1);
-    expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, r: 255, g: 128, b: 0 }]);
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Spectrum
+    expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, includeRgb: true, r: 255, g: 128, b: 0 }]);
     expect(rig.capCommands).toHaveLength(0); // LAN handled it — no Cloud call
+  });
+
+  it("LAN + Spectrum at a NON-standard value still sends RGB — name-keyed, not value-keyed (A2)", async () => {
+    // A SKU whose Spectrum is at value 6 (not 1): the old value gate (1||2)
+    // withheld its colour; the name gate sends it.
+    const lanDev = musicDeviceNamed([{ name: "Energic", value: 5 }, { name: "Spectrum", value: 6 }]);
+    const rig = makeRig([lanDev]);
+    rig.states.set(id("control.colorRgb"), "#00ff00");
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 2); // index 2 → Spectrum(value 6)
+    expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 6, includeRgb: true, r: 0, g: 255, b: 0 }]);
+  });
+
+  it("LAN + a non-colour mode (Energic) sends no RGB even at value 1 (no value-based leak, A2)", async () => {
+    const lanDev = musicDeviceNamed([{ name: "Energic", value: 1 }, { name: "Rhythm", value: 2 }]);
+    const rig = makeRig([lanDev]);
+    rig.states.set(id("control.colorRgb"), "#ff0000");
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Energic(value 1)
+    expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, includeRgb: false, r: 0, g: 0, b: 0 }]);
   });
 
   it("cloud-only device: combines mode + sibling sensitivity/autoColor into ONE STRUCT call", async () => {

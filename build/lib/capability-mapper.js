@@ -27,6 +27,7 @@ __export(capability_mapper_exports, {
   hasDynamicSceneCapability: () => hasDynamicSceneCapability,
   mapCapabilities: () => mapCapabilities,
   mapCloudStateValue: () => mapCloudStateValue,
+  musicModeNameUsesRgb: () => musicModeNameUsesRgb,
   planCloudCapabilityWrites: () => planCloudCapabilityWrites
 });
 module.exports = __toCommonJS(capability_mapper_exports);
@@ -498,6 +499,13 @@ function mapEvent(cap) {
       channel: "events"
     }
   ];
+}
+function musicModeNameUsesRgb(name) {
+  if (typeof name !== "string") {
+    return false;
+  }
+  const n = name.trim().toLowerCase();
+  return n === "spectrum" || n === "rolling";
 }
 function getMusicModeOptions(cap) {
   var _a;
@@ -1002,6 +1010,7 @@ function buildGroupStateDefs(members) {
   hasDynamicSceneCapability,
   mapCapabilities,
   mapCloudStateValue,
+  musicModeNameUsesRgb,
   planCloudCapabilityWrites
 });
 //# sourceMappingURL=capability-mapper.js.map

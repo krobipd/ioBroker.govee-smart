@@ -406,17 +406,18 @@ class GoveeLanClient {
     this.sendPtReal(ip, packets);
   }
   /**
-   * Set music mode via ptReal BLE-passthrough.
-   * Sub-modes 1 (Spectrum) and 2 (Rolling) use RGB color.
+   * Set music mode via ptReal BLE-passthrough. Whether RGB is sent is decided
+   * by the caller via the mode NAME (Spectrum/Rolling), not the value.
    *
    * @param ip Device IP address
-   * @param subMode Music sub-mode (0-3)
-   * @param r Red channel 0-255 (used by modes 1, 2)
+   * @param subMode Music sub-mode value (raw capability value)
+   * @param includeRgb Whether this mode carries a custom RGB colour (Spectrum/Rolling)
+   * @param r Red channel 0-255 (used when includeRgb)
    * @param g Green channel 0-255
    * @param b Blue channel 0-255
    */
-  setMusicMode(ip, subMode, r = 0, g = 0, b = 0) {
-    this.sendPtReal(ip, [buildMusicModePacket(subMode, r, g, b)]);
+  setMusicMode(ip, subMode, includeRgb, r = 0, g = 0, b = 0) {
+    this.sendPtReal(ip, [buildMusicModePacket(subMode, includeRgb, r, g, b)]);
   }
   /**
    * Set segment color via ptReal BLE-passthrough (command 33 05 15 01).
@@ -712,9 +713,9 @@ function buildDiyPackets(scenceParam) {
 function buildGradientPacket(on) {
   return Buffer.from(finishPacket([51, 20, on ? 1 : 0])).toString("base64");
 }
-function buildMusicModePacket(subMode, r = 0, g = 0, b = 0) {
+function buildMusicModePacket(subMode, includeRgb, r = 0, g = 0, b = 0) {
   const data = [51, 5, 1, subMode & 255];
-  if (subMode === 1 || subMode === 2) {
+  if (includeRgb) {
     data.push(r & 255, g & 255, b & 255);
   }
   return Buffer.from(finishPacket(data)).toString("base64");

@@ -1,4 +1,4 @@
-import { getMusicModeOptions } from "../capability-mapper";
+import { getMusicModeOptions, musicModeNameUsesRgb } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { SEGMENT_HARD_MAX } from "../device-manager";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -153,15 +153,23 @@ export async function sendMusicCommand(
     let r = 0,
       g = 0,
       b = 0;
-    // A2 (separate finding): this 1/2 sub-mode gate is SKU-specific; it now
-    // reads the RESOLVED device value so A1 doesn't regress it.
-    if (musicMode === 1 || musicMode === 2) {
+    // A2: which modes carry a custom RGB colour is keyed on the mode NAME
+    // (Spectrum/Rolling), not the numeric value — Govee's music-mode values are
+    // SKU-specific (A1: 0-based vs 1-based SKUs), so a value gate appended RGB
+    // on the wrong mode for a non-standard-value SKU.
+    const includeRgb = musicModeNameUsesRgb(chosen?.name);
+    if (includeRgb) {
       const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.colorRgb`);
       if (colorState?.val && typeof colorState.val === "string") {
         ({ r, g, b } = hexToRgb(colorState.val));
       }
     }
-    adapter.lanClient.setMusicMode(device.lanIp, musicMode, r, g, b);
+    // NOTE (A2 residual): the sub-mode BYTE is the raw capability value, which
+    // equals the ptReal sub-mode on every SKU seen so far (0-3). A SKU that
+    // reports music-mode values outside that range is untested — the byte may
+    // then be wrong and needs hardware validation. The RGB gate above is
+    // already name-correct regardless of the numbering.
+    adapter.lanClient.setMusicMode(device.lanIp, musicMode, includeRgb, r, g, b);
     return;
   }
 

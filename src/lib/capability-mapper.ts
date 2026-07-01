@@ -693,6 +693,28 @@ function mapEvent(cap: CloudCapability): StateDefinition[] {
  * @param cap Cloud music_setting capability
  */
 /**
+ * Whether a music mode carries a custom RGB colour in the ptReal LAN packet
+ * (`33 05 01 <mode> R G B`). Spectrum + Rolling are colour-reactive; Energic,
+ * Rhythm and any other mode use the device's own auto-colours.
+ *
+ * Keyed on the mode NAME, not its numeric value: Govee's music-mode values are
+ * SKU-specific (the fleet has 0-based and 1-based SKUs — see A1), so a
+ * value-based gate would append/withhold RGB on the wrong mode for a SKU whose
+ * Spectrum/Rolling isn't at value 1/2. An unknown mode name (e.g. "Sprouting")
+ * returns false — the safe default is to send no RGB rather than push bytes a
+ * mode may not expect.
+ *
+ * @param name Music mode name from the capability option
+ */
+export function musicModeNameUsesRgb(name: string | undefined): boolean {
+  if (typeof name !== "string") {
+    return false;
+  }
+  const n = name.trim().toLowerCase();
+  return n === "spectrum" || n === "rolling";
+}
+
+/**
  * Ordered list of valid music-mode options from a music_setting capability.
  * Both the dropdown builder ({@link mapMusicSetting}) and the send path
  * (`sendMusicCommand` in state-change-router) resolve music modes through THIS

@@ -105,13 +105,14 @@ async function sendMusicCommand(adapter, device, prefix, changedSuffix, newValue
       return;
     }
     let r = 0, g = 0, b = 0;
-    if (musicMode === 1 || musicMode === 2) {
+    const includeRgb = (0, import_capability_mapper.musicModeNameUsesRgb)(chosen == null ? void 0 : chosen.name);
+    if (includeRgb) {
       const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.colorRgb`);
       if ((colorState == null ? void 0 : colorState.val) && typeof colorState.val === "string") {
         ({ r, g, b } = (0, import_types.hexToRgb)(colorState.val));
       }
     }
-    adapter.lanClient.setMusicMode(device.lanIp, musicMode, r, g, b);
+    adapter.lanClient.setMusicMode(device.lanIp, musicMode, includeRgb, r, g, b);
     return;
   }
   const structValue = {

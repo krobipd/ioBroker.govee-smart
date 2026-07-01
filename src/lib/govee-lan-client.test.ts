@@ -157,8 +157,11 @@ describe("buildGradientPacket", () => {
 });
 
 describe("buildMusicModePacket", () => {
+  // Standard layout stays byte-identical: Spectrum/Rolling append RGB
+  // (includeRgb=true), Energic/Rhythm don't (includeRgb=false). This is the
+  // A2 no-regression proof — the caller passes includeRgb via the mode NAME.
   it("should build Energic mode (0) without RGB", () => {
-    const buf = Buffer.from(buildMusicModePacket(0), "base64");
+    const buf = Buffer.from(buildMusicModePacket(0, false), "base64");
     expect(buf).toHaveLength(20);
     expect(buf[0]).toBe(0x33);
     expect(buf[1]).toBe(0x05);
@@ -170,7 +173,7 @@ describe("buildMusicModePacket", () => {
   });
 
   it("should build Spectrum mode (1) with RGB", () => {
-    const buf = Buffer.from(buildMusicModePacket(1, 0xff, 0x80, 0x00), "base64");
+    const buf = Buffer.from(buildMusicModePacket(1, true, 0xff, 0x80, 0x00), "base64");
     expect(buf[3]).toBe(0x01);
     expect(buf[4]).toBe(0xff);
     expect(buf[5]).toBe(0x80);
@@ -178,7 +181,7 @@ describe("buildMusicModePacket", () => {
   });
 
   it("should build Rolling mode (2) with RGB", () => {
-    const buf = Buffer.from(buildMusicModePacket(2, 0x10, 0x20, 0x30), "base64");
+    const buf = Buffer.from(buildMusicModePacket(2, true, 0x10, 0x20, 0x30), "base64");
     expect(buf[3]).toBe(0x02);
     expect(buf[4]).toBe(0x10);
     expect(buf[5]).toBe(0x20);
@@ -186,13 +189,28 @@ describe("buildMusicModePacket", () => {
   });
 
   it("should build Rhythm mode (3) without RGB", () => {
-    const buf = Buffer.from(buildMusicModePacket(3, 0xff, 0xff, 0xff), "base64");
+    const buf = Buffer.from(buildMusicModePacket(3, false, 0xff, 0xff, 0xff), "base64");
     expect(buf[3]).toBe(0x03);
     expect(buf[4]).toBe(0x00);
   });
 
+  it("gates RGB on includeRgb, not the sub-mode value (A2): a non-standard mode value still gets RGB", () => {
+    // A SKU whose Spectrum is at value 6 must still receive its colour.
+    const buf = Buffer.from(buildMusicModePacket(6, true, 0x11, 0x22, 0x33), "base64");
+    expect(buf[3]).toBe(0x06);
+    expect(buf[4]).toBe(0x11);
+    expect(buf[5]).toBe(0x22);
+    expect(buf[6]).toBe(0x33);
+  });
+
+  it("withholds RGB when includeRgb is false even for value 1 (no value-based leak)", () => {
+    const buf = Buffer.from(buildMusicModePacket(1, false, 0xff, 0xff, 0xff), "base64");
+    expect(buf[3]).toBe(0x01);
+    expect(buf[4]).toBe(0x00); // no RGB appended
+  });
+
   it("should have valid XOR checksum", () => {
-    const buf = Buffer.from(buildMusicModePacket(1, 255, 0, 128), "base64");
+    const buf = Buffer.from(buildMusicModePacket(1, true, 255, 0, 128), "base64");
     let xor = 0;
     for (let i = 0; i < 19; i++) {
       xor ^= buf[i];
