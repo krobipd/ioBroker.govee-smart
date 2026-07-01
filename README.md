@@ -117,6 +117,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: an out-of-range segment range in `segments.command` (e.g. `0-2000000000`) is now clamped to the protocol limit instead of briefly freezing the adapter while it expands the range.
 - Fixed: the segment-detection wizard now turns the light back off when it finishes or is aborted if the light was off before — it no longer leaves a light on that you had switched off.
 - Fixed: starting the segment-detection wizard twice in quick succession can no longer open two overlapping sessions.
+- Fixed: the optional Govee account email field no longer shows a "valid email" error when left empty — LAN-only and API-key-only setups no longer see a false validation error.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

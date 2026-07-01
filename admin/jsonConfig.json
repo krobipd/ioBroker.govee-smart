@@ -119,7 +119,7 @@
           "md": 4,
           "lg": 4,
           "xl": 4,
-          "validator": "data.goveeEmail.includes('@')",
+          "validator": "!data.goveeEmail || data.goveeEmail.includes('@')",
           "validatorErrorText": "validatorEmailError"
         },
         "goveePassword": {
