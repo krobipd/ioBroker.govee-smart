@@ -216,6 +216,18 @@ describe("MessageRouter", () => {
       const r = responses[0].data as { result: string };
       expect(r.result).toContain("Email + password");
     });
+
+    it("throttles a rapid second test within the 30s window (SEC-I1)", async () => {
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(responses).toHaveLength(2);
+      const second = responses[1].data as { result: string };
+      expect(second.result).toContain("Please wait");
+    });
   });
 
   describe("mqttAuth — requestCode action", () => {

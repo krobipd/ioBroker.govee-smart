@@ -35,6 +35,8 @@ export interface MessageRouterHost {
 export class MessageRouter {
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
   private lastVerificationRequestMs = 0;
+  /** Separate throttle for the `test` action so it doesn't share the requestCode window (SEC-I1). */
+  private lastTestRequestMs = 0;
 
   /**
    * @param host Adapter dependencies via the host interface
@@ -107,6 +109,12 @@ export class MessageRouter {
       return { result: resolveLabel("mqttAuthNeedCredentials") };
     }
     if (action === "test") {
+      const now = Date.now();
+      if (now - this.lastTestRequestMs < VERIFICATION_REQUEST_THROTTLE_MS) {
+        const remainingSec = Math.ceil((VERIFICATION_REQUEST_THROTTLE_MS - (now - this.lastTestRequestMs)) / 1000);
+        return { result: resolveLabel("mqttAuthThrottled", remainingSec) };
+      }
+      this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient();
       probe.setVerificationCode(config.mqttVerificationCode ?? "");
       try {

@@ -33,6 +33,8 @@ class MessageRouter {
   }
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
   lastVerificationRequestMs = 0;
+  /** Separate throttle for the `test` action so it doesn't share the requestCode window (SEC-I1). */
+  lastTestRequestMs = 0;
   /**
    * Sync entry-point — registered as `this.on("message", ...)`. Wraps the
    * async handler in a catch so unhandled rejections can't crash the adapter.
@@ -97,6 +99,12 @@ class MessageRouter {
       return { result: (0, import_i18n.resolveLabel)("mqttAuthNeedCredentials") };
     }
     if (action === "test") {
+      const now = Date.now();
+      if (now - this.lastTestRequestMs < import_timing_constants.VERIFICATION_REQUEST_THROTTLE_MS) {
+        const remainingSec = Math.ceil((import_timing_constants.VERIFICATION_REQUEST_THROTTLE_MS - (now - this.lastTestRequestMs)) / 1e3);
+        return { result: (0, import_i18n.resolveLabel)("mqttAuthThrottled", remainingSec) };
+      }
+      this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient();
       probe.setVerificationCode((_a = config.mqttVerificationCode) != null ? _a : "");
       try {
