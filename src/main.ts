@@ -637,7 +637,7 @@ class GoveeAdapter extends utils.Adapter {
       // through a Cloud-phase) on prior versions had scenes/music/snapshots
       // states briefly created then orphaned. Wipe those leftovers now.
       // Idempotent — second run does nothing, the LAN_STATE_IDS skip in
-      // cleanupCloudOwnedStates protects power/brightness/colorRgb/colorTemperature.
+      // cleanupCloudOwnedStates protects power/brightness/color_rgb/color_temperature.
       if (this.stateManager && this.deviceManager) {
         for (const device of this.deviceManager.getDevices()) {
           if (device.lanIp && device.capabilities.length === 0) {
@@ -649,6 +649,17 @@ class GoveeAdapter extends utils.Adapter {
               `Migrated v2.8.0: removed legacy cloud-owned states for ${device.name} (pure-LAN, no API key)`,
             );
           }
+        }
+
+        // B2 one-shot migration: the control colour states were renamed from
+        // camelCase (control.colorRgb / control.colorTemperature) to snake_case
+        // (control.color_rgb / control.color_temperature). Delete the old
+        // objects on upgraded installs so they don't linger as dead duplicates.
+        // Idempotent + existence-checked; covers devices AND groups.
+        for (const device of this.deviceManager.getDevices()) {
+          await this.stateManager.migrateLegacyColorStateIds(device).catch(e => {
+            this.log.debug(`B2 colour-state migration failed for ${device.name}: ${errMessage(e)}`);
+          });
         }
       }
 

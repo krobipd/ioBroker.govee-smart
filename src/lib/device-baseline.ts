@@ -52,8 +52,8 @@ export async function readDeviceBaseline(
   const [power, brightness, colorRgb, colorTemperature, ...segValues] = await Promise.all([
     surface.getState(`${ns}.${prefix}.control.power`).then(s => s?.val),
     surface.getState(`${ns}.${prefix}.control.brightness`).then(s => s?.val),
-    surface.getState(`${ns}.${prefix}.control.colorRgb`).then(s => s?.val),
-    surface.getState(`${ns}.${prefix}.control.colorTemperature`).then(s => s?.val),
+    surface.getState(`${ns}.${prefix}.control.color_rgb`).then(s => s?.val),
+    surface.getState(`${ns}.${prefix}.control.color_temperature`).then(s => s?.val),
     ...segIds.map(id => surface.getState(id).then(s => s?.val)),
   ]);
   const segments: DeviceBaseline["segments"] = [];

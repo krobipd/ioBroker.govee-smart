@@ -521,6 +521,11 @@ class GoveeAdapter extends utils.Adapter {
             );
           }
         }
+        for (const device of this.deviceManager.getDevices()) {
+          await this.stateManager.migrateLegacyColorStateIds(device).catch((e) => {
+            this.log.debug(`B2 colour-state migration failed for ${device.name}: ${(0, import_types.errMessage)(e)}`);
+          });
+        }
       }
       this.statesReady = true;
       await this.subscribeStatesAsync("devices.*");

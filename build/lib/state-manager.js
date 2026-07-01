@@ -219,6 +219,23 @@ class StateManager {
     }
   }
   /**
+   * B2 hard-cut migration: the LAN control colour states were renamed from
+   * camelCase (`control.colorRgb` / `control.colorTemperature`) to snake_case
+   * (`control.color_rgb` / `control.color_temperature`) for a consistent
+   * state-tree spelling. Delete the old objects on upgraded installs so they
+   * don't linger as dead duplicates next to the freshly-created snake_case
+   * states. Existence-checked + idempotent (a no-op once migrated / on fresh
+   * installs); works for devices AND groups (both carry these control states).
+   * Users must update scripts that referenced the old ids.
+   *
+   * @param device Govee device or group
+   */
+  async migrateLegacyColorStateIds(device) {
+    const prefix = this.devicePrefix(device);
+    await this.safeDeleteState(`${prefix}.control.colorRgb`);
+    await this.safeDeleteState(`${prefix}.control.colorTemperature`);
+  }
+  /**
    * Resolve full state path for a given device prefix and state ID.
    * Routes the state to the correct channel (control, scenes, music, snapshots).
    *
@@ -727,10 +744,10 @@ class StateManager {
       set(`${prefix}.control.brightness`, state.brightness);
     }
     if (state.colorRgb !== void 0) {
-      set(`${prefix}.control.colorRgb`, state.colorRgb);
+      set(`${prefix}.control.color_rgb`, state.colorRgb);
     }
     if (state.colorTemperature !== void 0) {
-      set(`${prefix}.control.colorTemperature`, state.colorTemperature);
+      set(`${prefix}.control.color_temperature`, state.colorTemperature);
     }
     if (state.scene !== void 0) {
       set(`${prefix}.control.scene`, state.scene);

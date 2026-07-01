@@ -129,7 +129,7 @@ describe("CapabilityMapper", () => {
 
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("colorRgb");
+      expect(result[0].id).toBe("color_rgb");
       expect(result[0].type).toBe("string");
       expect(result[0].role).toBe("level.color.rgb");
     });
@@ -145,7 +145,7 @@ describe("CapabilityMapper", () => {
 
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("colorTemperature");
+      expect(result[0].id).toBe("color_temperature");
       expect(result[0].min).toBe(2000);
       expect(result[0].max).toBe(9000);
       expect(result[0].unit).toBe("K");
@@ -242,7 +242,7 @@ describe("CapabilityMapper", () => {
 
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(4);
-      expect(result.map(r => r.id)).toEqual(["power", "brightness", "colorRgb", "colorTemperature"]);
+      expect(result.map(r => r.id)).toEqual(["power", "brightness", "color_rgb", "color_temperature"]);
     });
   });
 
@@ -250,7 +250,7 @@ describe("CapabilityMapper", () => {
     it("should return power, brightness, colorRgb, colorTemperature", () => {
       const defs = getDefaultLanStates();
       expect(defs).toHaveLength(4);
-      expect(defs.map(d => d.id)).toEqual(["power", "brightness", "colorRgb", "colorTemperature"]);
+      expect(defs.map(d => d.id)).toEqual(["power", "brightness", "color_rgb", "color_temperature"]);
     });
 
     it("should have correct types and roles", () => {
@@ -266,11 +266,11 @@ describe("CapabilityMapper", () => {
       expect(brightness.min).toBe(0);
       expect(brightness.max).toBe(100);
 
-      const color = defs.find(d => d.id === "colorRgb")!;
+      const color = defs.find(d => d.id === "color_rgb")!;
       expect(color.type).toBe("string");
       expect(color.role).toBe("level.color.rgb");
 
-      const temp = defs.find(d => d.id === "colorTemperature")!;
+      const temp = defs.find(d => d.id === "color_temperature")!;
       expect(temp.type).toBe("number");
       expect(temp.min).toBe(2000);
       expect(temp.max).toBe(9000);
@@ -807,7 +807,7 @@ describe("CapabilityMapper", () => {
         state: { value: 0xff8000 }, // orange
       };
       const result = mapCloudStateValue(cap);
-      expect(result!.stateId).toBe("colorRgb");
+      expect(result!.stateId).toBe("color_rgb");
       expect(result!.value).toBe("#ff8000");
     });
 
@@ -838,7 +838,7 @@ describe("CapabilityMapper", () => {
         state: { value: 4000 },
       };
       const result = mapCloudStateValue(cap);
-      expect(result!.stateId).toBe("colorTemperature");
+      expect(result!.stateId).toBe("color_temperature");
       expect(result!.value).toBe(4000);
     });
 
@@ -962,7 +962,7 @@ describe("CapabilityMapper", () => {
     it("should correct colorTemperature range for known SKU", () => {
       const states = getDefaultLanStates();
       applyQuirksToStates("H60A1", states);
-      const ct = states.find(s => s.id === "colorTemperature");
+      const ct = states.find(s => s.id === "color_temperature");
       expect(ct).toBeDefined();
       expect(ct!.min).toBe(2200);
       expect(ct!.max).toBe(6500);
@@ -972,7 +972,7 @@ describe("CapabilityMapper", () => {
     it("should not change colorTemperature range for unknown SKU", () => {
       const states = getDefaultLanStates();
       applyQuirksToStates("H9999", states);
-      const ct = states.find(s => s.id === "colorTemperature");
+      const ct = states.find(s => s.id === "color_temperature");
       expect(ct!.min).toBe(2000);
       expect(ct!.max).toBe(9000);
     });
@@ -1095,7 +1095,7 @@ describe("CapabilityMapper", () => {
 
     it("cloud-only light (no lanIp): control states come through buildCloudStateDefs", () => {
       const defs = buildCloudStateDefs(baseLight());
-      for (const id of ["power", "brightness", "colorRgb", "colorTemperature"]) {
+      for (const id of ["power", "brightness", "color_rgb", "color_temperature"]) {
         const def = defs.find(d => d.id === id);
         expect(def, `cloud-only light must expose control.${id}`).toBeDefined();
         expect(def?.write, `control.${id} must be writable`).toBe(true);
@@ -1109,7 +1109,7 @@ describe("CapabilityMapper", () => {
 
     it("LAN-capable light (has lanIp): LAN phase owns control, cloud excludes them", () => {
       const defs = buildCloudStateDefs(baseLight({ lanIp: "192.168.1.50" }));
-      for (const id of ["power", "brightness", "colorRgb", "colorTemperature"]) {
+      for (const id of ["power", "brightness", "color_rgb", "color_temperature"]) {
         expect(defs.find(d => d.id === id), `LAN light: cloud must not duplicate control.${id}`).toBeUndefined();
       }
     });
@@ -1368,8 +1368,8 @@ describe("CapabilityMapper", () => {
       const ids = result.map(d => d.id);
       expect(ids).toContain("power");
       expect(ids).toContain("brightness");
-      expect(ids).toContain("colorRgb");
-      expect(ids).toContain("colorTemperature");
+      expect(ids).toContain("color_rgb");
+      expect(ids).toContain("color_temperature");
     });
 
     it("should not include local snapshots for groups but DOES include diag states (v2.9.1)", () => {
@@ -1463,8 +1463,8 @@ describe("CapabilityMapper", () => {
       const ids = result.map(d => d.id);
       expect(ids).toContain("power");
       expect(ids).toContain("brightness");
-      expect(ids).not.toContain("colorRgb");
-      expect(ids).not.toContain("colorTemperature");
+      expect(ids).not.toContain("color_rgb");
+      expect(ids).not.toContain("color_temperature");
     });
 
     it("should skip unreachable members (no LAN, no Cloud)", () => {
@@ -1773,7 +1773,7 @@ describe("CapabilityMapper", () => {
   });
 
   describe("planCloudCapabilityWrites", () => {
-    const lanStateIds = new Set(["power", "brightness", "colorRgb", "colorTemperature"]);
+    const lanStateIds = new Set(["power", "brightness", "color_rgb", "color_temperature"]);
 
     it("returns the resolved (stateId, value) pairs for every decoded capability", () => {
       const caps: CloudStateCapability[] = [
@@ -1890,6 +1890,29 @@ describe("CapabilityMapper", () => {
       }
       // Sanity: cap-derived non-LAN states (gradient_toggle) DO make it through
       expect(cloudDefs.some(d => d.id === "gradient_toggle")).toBe(true);
+      // B2 coupling: the LAN device must NOT get a cloud colour duplicate — the
+      // colour caps have to be shadowed away entirely (not just "not a
+      // LAN_STATE_IDS member", which a drifted id would falsely satisfy).
+      expect(cloudDefs.some(d => d.id === "color_rgb" || d.id === "color_temperature")).toBe(false);
+    });
+
+    it("Invariant 3: mapColorSetting ids for cloud colour caps are all LAN-owned (B2 shadowing)", () => {
+      // The colour states are LAN-default. mapColorSetting must emit the SAME
+      // ids LAN_STATE_IDS carries (color_rgb / color_temperature) — else a LAN
+      // device gets BOTH the LAN colour state and an un-shadowed cloud duplicate.
+      const colorCaps: CloudCapability[] = [
+        { type: "devices.capabilities.color_setting", instance: "colorRgb", parameters: { dataType: "INTEGER" } },
+        {
+          type: "devices.capabilities.color_setting",
+          instance: "colorTemperatureK",
+          parameters: { dataType: "INTEGER", range: { min: 2000, max: 9000, precision: 1 } },
+        },
+      ];
+      const ids = mapCapabilities(colorCaps).map(d => d.id);
+      expect(ids).toEqual(["color_rgb", "color_temperature"]);
+      for (const cid of ids) {
+        expect(LAN_STATE_IDS.has(cid), `mapColorSetting id ${cid} not shadowed by LAN_STATE_IDS`).toBe(true);
+      }
     });
   });
 

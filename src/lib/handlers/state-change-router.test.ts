@@ -457,10 +457,10 @@ describe("sendMusicCommand", () => {
     expect(rig.capCommands).toHaveLength(0);
   });
 
-  it("LAN device + Spectrum: reads control.colorRgb and sends the mode + RGB over LAN", async () => {
+  it("LAN device + Spectrum: reads control.color_rgb and sends the mode + RGB over LAN", async () => {
     const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
     const rig = makeRig([lanDev]);
-    rig.states.set(id("control.colorRgb"), "#ff8000");
+    rig.states.set(id("control.color_rgb"), "#ff8000");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Spectrum
     expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, includeRgb: true, r: 255, g: 128, b: 0 }]);
     expect(rig.capCommands).toHaveLength(0); // LAN handled it — no Cloud call
@@ -471,7 +471,7 @@ describe("sendMusicCommand", () => {
     // withheld its colour; the name gate sends it.
     const lanDev = musicDeviceNamed([{ name: "Energic", value: 5 }, { name: "Spectrum", value: 6 }]);
     const rig = makeRig([lanDev]);
-    rig.states.set(id("control.colorRgb"), "#00ff00");
+    rig.states.set(id("control.color_rgb"), "#00ff00");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 2); // index 2 → Spectrum(value 6)
     expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 6, includeRgb: true, r: 0, g: 255, b: 0 }]);
   });
@@ -479,7 +479,7 @@ describe("sendMusicCommand", () => {
   it("LAN + a non-colour mode (Energic) sends no RGB even at value 1 (no value-based leak, A2)", async () => {
     const lanDev = musicDeviceNamed([{ name: "Energic", value: 1 }, { name: "Rhythm", value: 2 }]);
     const rig = makeRig([lanDev]);
-    rig.states.set(id("control.colorRgb"), "#ff0000");
+    rig.states.set(id("control.color_rgb"), "#ff0000");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Energic(value 1)
     expect(rig.lanMusic).toEqual([{ ip: lanDev.lanIp, mode: 1, includeRgb: false, r: 0, g: 0, b: 0 }]);
   });
@@ -541,7 +541,7 @@ describe("sendMusicCommand", () => {
 describe("onStateChange — music routing branch", () => {
   it("music_mode write sends the music command, acks, and resets the OTHER mode dropdowns", async () => {
     const rig = makeRig([musicDevice([1, 2, 3])]);
-    rig.states.set(id("control.colorRgb"), "#ff0000");
+    rig.states.set(id("control.color_rgb"), "#ff0000");
     rig.states.set(id("scenes.light_scene"), "2"); // active scene to be reset
     await write(rig, id("music.music_mode"), 1);
     expect(rig.lanMusic).toHaveLength(1); // LAN device → setMusicMode path

@@ -186,7 +186,7 @@ export function hasDynamicSceneCapability(
  * Adding a new LAN-default state means: extend this set AND add the entry in getDefaultLanStates.
  * The capability-tag-invariant test enforces both stay in lock-step.
  */
-export const LAN_STATE_IDS: ReadonlySet<string> = new Set(["power", "brightness", "colorRgb", "colorTemperature"]);
+export const LAN_STATE_IDS: ReadonlySet<string> = new Set(["power", "brightness", "color_rgb", "color_temperature"]);
 
 /**
  * Default state definitions for LAN-only devices (no Cloud capabilities).
@@ -221,7 +221,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       capabilityInstance: "brightness",
     },
     {
-      id: "colorRgb",
+      id: "color_rgb",
       name: tName("colorRgb"),
       type: "string",
       role: "level.color.rgb",
@@ -231,7 +231,7 @@ export function getDefaultLanStates(): StateDefinition[] {
       capabilityInstance: "colorRgb",
     },
     {
-      id: "colorTemperature",
+      id: "color_temperature",
       name: tName("colorTemperature"),
       type: "number",
       role: "level.color.temperature",
@@ -388,7 +388,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
   if (cap.instance === "colorRgb") {
     return [
       {
-        id: "colorRgb",
+        id: "color_rgb",
         name: tName("colorRgb"),
         type: "string",
         role: "level.color.rgb",
@@ -404,7 +404,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
     const range = cap.parameters?.range;
     return [
       {
-        id: "colorTemperature",
+        id: "color_temperature",
         name: tName("colorTemperature"),
         type: "number",
         role: "level.color.temperature",
@@ -816,11 +816,11 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
  */
 export function applyQuirksToStates(sku: string, states: StateDefinition[], log: ioBroker.Logger): StateDefinition[] {
   for (const state of states) {
-    if (state.id === "colorTemperature" && state.min != null && state.max != null) {
+    if (state.id === "color_temperature" && state.min != null && state.max != null) {
       const corrected = applyColorTempQuirk(sku, state.min, state.max);
       if (corrected.min !== state.min || corrected.max !== state.max) {
         log.debug(
-          `Quirk applied for ${sku}: colorTemperature range ${state.min}-${state.max}K → ${corrected.min}-${corrected.max}K`,
+          `Quirk applied for ${sku}: color_temperature range ${state.min}-${state.max}K → ${corrected.min}-${corrected.max}K`,
         );
       }
       state.min = corrected.min;
@@ -920,7 +920,7 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       if (cap.instance === "colorRgb") {
         const num = coerceNum(raw) ?? 0;
         return {
-          stateId: "colorRgb",
+          stateId: "color_rgb",
           value: rgbToHex((num >> 16) & 0xff, (num >> 8) & 0xff, num & 0xff),
         };
       }
@@ -929,7 +929,7 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
         if (n === null) {
           return null;
         }
-        return { stateId: "colorTemperature", value: n };
+        return { stateId: "color_temperature", value: n };
       }
       return null;
 

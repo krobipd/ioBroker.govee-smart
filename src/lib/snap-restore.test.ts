@@ -92,8 +92,8 @@ describe("SnapshotHandler", () => {
         initialState: {
           "govee-smart.0.devices.h6160_dead.control.power": { val: true, ack: true } as ioBroker.State,
           "govee-smart.0.devices.h6160_dead.control.brightness": { val: 80, ack: true } as ioBroker.State,
-          "govee-smart.0.devices.h6160_dead.control.colorRgb": { val: "#ff0000", ack: true } as ioBroker.State,
-          "govee-smart.0.devices.h6160_dead.control.colorTemperature": { val: 0, ack: true } as ioBroker.State,
+          "govee-smart.0.devices.h6160_dead.control.color_rgb": { val: "#ff0000", ack: true } as ioBroker.State,
+          "govee-smart.0.devices.h6160_dead.control.color_temperature": { val: 0, ack: true } as ioBroker.State,
           "govee-smart.0.devices.h6160_dead.segments.0.color": { val: "#aabbcc", ack: true } as ioBroker.State,
           "govee-smart.0.devices.h6160_dead.segments.0.brightness": { val: 50, ack: true } as ioBroker.State,
           "govee-smart.0.devices.h6160_dead.segments.1.color": { val: "#112233", ack: true } as ioBroker.State,

@@ -159,7 +159,7 @@ export async function sendMusicCommand(
     // on the wrong mode for a non-standard-value SKU.
     const includeRgb = musicModeNameUsesRgb(chosen?.name);
     if (includeRgb) {
-      const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.colorRgb`);
+      const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.color_rgb`);
       if (colorState?.val && typeof colorState.val === "string") {
         ({ r, g, b } = hexToRgb(colorState.val));
       }

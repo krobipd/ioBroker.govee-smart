@@ -176,7 +176,7 @@ function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
 function seedBaseline(host: TestHost, prefix: string, segs: number): void {
   host.states.set(`${host.namespace}.${prefix}.control.power`, true);
   host.states.set(`${host.namespace}.${prefix}.control.brightness`, 75);
-  host.states.set(`${host.namespace}.${prefix}.control.colorRgb`, "#ff6600");
+  host.states.set(`${host.namespace}.${prefix}.control.color_rgb`, "#ff6600");
   for (let i = 0; i < segs; i++) {
     host.states.set(`${host.namespace}.${prefix}.segments.${i}.color`, "#112233");
     host.states.set(`${host.namespace}.${prefix}.segments.${i}.brightness`, 50);
@@ -477,7 +477,7 @@ describe("SegmentWizard", () => {
     });
 
     it("should skip restore when baseline color is missing", async () => {
-      host.states.delete(`${host.namespace}.${host.devicePrefix(device)}.control.colorRgb`);
+      host.states.delete(`${host.namespace}.${host.devicePrefix(device)}.control.color_rgb`);
       await wizard.start(key);
       host.calls.length = 0;
       await wizard.abort();
@@ -528,7 +528,7 @@ describe("SegmentWizard", () => {
         .segmentBatchCalls()
         .map(c => c.value as { segments: number[]; color: number; brightness: number });
       expect(batches).toHaveLength(1);
-      expect(batches[0].color).toBe(0xff6600); // control.colorRgb, not the segment colour
+      expect(batches[0].color).toBe(0xff6600); // control.color_rgb, not the segment colour
     });
   });
 

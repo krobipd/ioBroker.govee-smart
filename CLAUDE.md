@@ -17,7 +17,7 @@
 
 ## KRITISCH: LAN-first für Lights ist unantastbar!
 
-- **LAN-States für Lights (power, brightness, colorRgb, colorTemperature) dürfen NIE von Cloud überschrieben werden**
+- **LAN-States für Lights (power, brightness, color_rgb, color_temperature) dürfen NIE von Cloud überschrieben werden** (State-IDs snake_case seit B2; die Cloud-Capability-Instances heißen weiter `colorRgb`/`colorTemperatureK`)
 - State-Definitionen: LAN-fähige Geräte → immer `getDefaultLanStates()` als Basis
 - State-Werte: `loadCloudStates()` (main.ts:1340) filtert LAN-State-IDs für LAN-fähige Geräte (`if (device.lanIp && lanStateIds.has(...)) continue;`)
 - `applyOnlineCap` (device-manager.ts:1490) macht Multi-Source-Online-Merge mit `lastSeenOnNetwork`-Tracking — robust gegen LAN/MQTT/Cloud-Widersprüche
@@ -31,8 +31,8 @@
 | --------------------- | ------- | ------------ | ------------ | ---------- | ------- |
 | power on/off          | primär  | —            | —            | Notfall¹   | —       |
 | brightness            | primär  | —            | —            | Notfall¹   | —       |
-| colorRgb              | primär  | —            | —            | Notfall¹   | —       |
-| colorTemperature      | primär  | —            | —            | Notfall¹   | —       |
+| color_rgb             | primär  | —            | —            | Notfall¹   | —       |
+| color_temperature     | primär  | —            | —            | Notfall¹   | —       |
 | Segment-Color         | primär  | —            | —            | Notfall¹   | —       |
 | Segment-Brightness    | primär  | —            | —            | Notfall¹   | —       |
 | Segment-Batch         | primär  | —            | —            | Notfall¹   | —       |
@@ -144,7 +144,7 @@ govee-smart.0.
 │       ├── info.name / .model / .serial / .online / .ip
 │       ├── info.diagnostics_export   (Button: Diagnostik-JSON exportieren)
 │       ├── info.diagnostics_result   (String: Diagnostik-JSON Ausgabe, read-only)
-│       ├── control.power / .brightness / .colorRgb / .colorTemperature
+│       ├── control.power / .brightness / .color_rgb / .color_temperature
 │       ├── control.gradient_toggle   (Boolean: Gradient ein/aus)
 │       ├── scenes.light_scene        (Dropdown: Szenen vom Gerät, lokal via ptReal)
 │       ├── scenes.diy_scene          (Dropdown: User-DIY-Szenen, lokal via ptReal)
@@ -159,7 +159,7 @@ govee-smart.0.
     ├── info.online                  (Cloud-Verbindungsstatus, allgemein für alle Gruppen)
     └── basegroup_1311.
         ├── info.name / .members / .membersUnreachable (dynamisch)
-        ├── control.power / .brightness / .colorRgb / .colorTemperature (Fan-Out → LAN)
+        ├── control.power / .brightness / .color_rgb / .color_temperature (Fan-Out → LAN)
         ├── scenes.light_scene       (Fan-Out → ptReal, Name-basiertes Matching)
         └── music.music_mode         (Fan-Out → ptReal, Name-basiertes Matching)
 ```

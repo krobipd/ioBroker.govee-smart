@@ -96,7 +96,7 @@ function hasDynamicSceneCapability(capabilities, instance) {
     (cap) => typeof (cap == null ? void 0 : cap.type) === "string" && typeof (cap == null ? void 0 : cap.instance) === "string" && (cap.type === import_govee_constants.GOVEE_CAP_TYPE.DYNAMIC_SCENE || cap.type === "dynamic_scene") && cap.instance === instance
   );
 }
-const LAN_STATE_IDS = /* @__PURE__ */ new Set(["power", "brightness", "colorRgb", "colorTemperature"]);
+const LAN_STATE_IDS = /* @__PURE__ */ new Set(["power", "brightness", "color_rgb", "color_temperature"]);
 function getDefaultLanStates() {
   return [
     {
@@ -123,7 +123,7 @@ function getDefaultLanStates() {
       capabilityInstance: "brightness"
     },
     {
-      id: "colorRgb",
+      id: "color_rgb",
       name: (0, import_i18n.tName)("colorRgb"),
       type: "string",
       role: "level.color.rgb",
@@ -133,7 +133,7 @@ function getDefaultLanStates() {
       capabilityInstance: "colorRgb"
     },
     {
-      id: "colorTemperature",
+      id: "color_temperature",
       name: (0, import_i18n.tName)("colorTemperature"),
       type: "number",
       role: "level.color.temperature",
@@ -254,7 +254,7 @@ function mapColorSetting(cap) {
   if (cap.instance === "colorRgb") {
     return [
       {
-        id: "colorRgb",
+        id: "color_rgb",
         name: (0, import_i18n.tName)("colorRgb"),
         type: "string",
         role: "level.color.rgb",
@@ -269,7 +269,7 @@ function mapColorSetting(cap) {
     const range = (_a = cap.parameters) == null ? void 0 : _a.range;
     return [
       {
-        id: "colorTemperature",
+        id: "color_temperature",
         name: (0, import_i18n.tName)("colorTemperature"),
         type: "number",
         role: "level.color.temperature",
@@ -576,11 +576,11 @@ function mapMusicSetting(cap) {
 }
 function applyQuirksToStates(sku, states, log) {
   for (const state of states) {
-    if (state.id === "colorTemperature" && state.min != null && state.max != null) {
+    if (state.id === "color_temperature" && state.min != null && state.max != null) {
       const corrected = (0, import_device_registry.applyColorTempQuirk)(sku, state.min, state.max);
       if (corrected.min !== state.min || corrected.max !== state.max) {
         log.debug(
-          `Quirk applied for ${sku}: colorTemperature range ${state.min}-${state.max}K \u2192 ${corrected.min}-${corrected.max}K`
+          `Quirk applied for ${sku}: color_temperature range ${state.min}-${state.max}K \u2192 ${corrected.min}-${corrected.max}K`
         );
       }
       state.min = corrected.min;
@@ -633,7 +633,7 @@ function mapCloudStateValue(cap) {
       if (cap.instance === "colorRgb") {
         const num = (_b = coerceNum(raw)) != null ? _b : 0;
         return {
-          stateId: "colorRgb",
+          stateId: "color_rgb",
           value: (0, import_types.rgbToHex)(num >> 16 & 255, num >> 8 & 255, num & 255)
         };
       }
@@ -642,7 +642,7 @@ function mapCloudStateValue(cap) {
         if (n === null) {
           return null;
         }
-        return { stateId: "colorTemperature", value: n };
+        return { stateId: "color_temperature", value: n };
       }
       return null;
     case "toggle":

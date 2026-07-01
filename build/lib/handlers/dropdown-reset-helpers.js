@@ -29,8 +29,8 @@ module.exports = __toCommonJS(dropdown_reset_helpers_exports);
 const STATE_TO_COMMAND = {
   "control.power": "power",
   "control.brightness": "brightness",
-  "control.colorRgb": "colorRgb",
-  "control.colorTemperature": "colorTemperature",
+  "control.color_rgb": "colorRgb",
+  "control.color_temperature": "colorTemperature",
   "control.scene": "scene",
   "control.gradient_toggle": "gradientToggle",
   "scenes.light_scene": "lightScene",

@@ -223,6 +223,38 @@ describe("StateManager", () => {
     });
   });
 
+  describe("migrateLegacyColorStateIds (B2 hard-cut)", () => {
+    it("deletes the legacy camelCase colour objects for a device (existence-checked)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const device = createTestDevice();
+      const prefix = sm.devicePrefix(device);
+      objects.set(`${prefix}.control.colorRgb`, { type: "state" });
+      objects.set(`${prefix}.control.colorTemperature`, { type: "state" });
+
+      await sm.migrateLegacyColorStateIds(device);
+      expect(objects.has(`${prefix}.control.colorRgb`)).toBe(false);
+      expect(objects.has(`${prefix}.control.colorTemperature`)).toBe(false);
+    });
+
+    it("covers group prefixes too — groups carry fan-out colour states", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const group = createTestDevice({ sku: "BaseGroup", deviceId: "1311" });
+      const prefix = sm.devicePrefix(group); // groups.basegroup_...
+      objects.set(`${prefix}.control.colorRgb`, { type: "state" });
+      await sm.migrateLegacyColorStateIds(group);
+      expect(objects.has(`${prefix}.control.colorRgb`)).toBe(false);
+    });
+
+    it("is a no-op on fresh installs (no legacy camelCase objects)", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.migrateLegacyColorStateIds(createTestDevice());
+      expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
+    });
+  });
+
   describe("devicePrefix", () => {
     it("should generate prefix from SKU + last 4 hex chars of device ID", () => {
       const { adapter } = createMockAdapter();

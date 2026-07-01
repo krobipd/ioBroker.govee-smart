@@ -233,6 +233,6 @@ describe("onGroupMembersReady (phase 3)", () => {
     await Promise.all(rig.queue);
     // Both members are LAN-capable → the group gets the LAN-default control set.
     const ids = rig.cloudDefs[0].map(d => d.id);
-    expect(ids).toEqual(expect.arrayContaining(["power", "brightness", "colorRgb", "colorTemperature"]));
+    expect(ids).toEqual(expect.arrayContaining(["power", "brightness", "color_rgb", "color_temperature"]));
   });
 });
