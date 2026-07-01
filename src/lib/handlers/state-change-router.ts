@@ -241,9 +241,7 @@ export async function handleGenericCapabilityCommand(
     return;
   }
   const obj = (await adapter.getObjectAsync(id)) as
-    | { native?: { capabilityType?: unknown; capabilityInstance?: unknown } }
-    | null
-    | undefined;
+    { native?: { capabilityType?: unknown; capabilityInstance?: unknown } } | null | undefined;
   const capType = obj?.native?.capabilityType;
   const capInstance = obj?.native?.capabilityInstance;
   if (typeof capType === "string" && typeof capInstance === "string") {

@@ -1285,8 +1285,7 @@ export class DeviceManager {
    */
   set onSegmentBatchUpdate(
     callback:
-      | ((device: GoveeDevice, batch: { segments: number[]; color?: number; brightness?: number }) => void)
-      | undefined,
+      ((device: GoveeDevice, batch: { segments: number[]; color?: number; brightness?: number }) => void) | undefined,
   ) {
     this.commandRouter.onSegmentBatchUpdate = callback;
   }
