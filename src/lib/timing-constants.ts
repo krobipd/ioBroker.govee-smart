@@ -23,6 +23,25 @@ export const APP_API_POLL_INTERVAL_MS = 2 * 60 * 1000;
  */
 export const APP_API_INITIAL_DELAY_MS = 5_000;
 
+/**
+ * Multiplier on a sensor's `uploadRate` (minutes) to derive its "still online"
+ * data-freshness window. 3× tolerates two missed uploads before a sensor is
+ * flagged offline. Some Govee gateway sensors (e.g. H5109 behind an H5042)
+ * report `lastData.online:false` while readings keep flowing — deriving online
+ * from Govee's own reading timestamp (`lastData.lastTime`) is the reliable
+ * signal, mirroring the Lights 90 s-LAN-freshness idea for a data channel.
+ */
+export const SENSOR_ONLINE_FRESHNESS_MULTIPLIER = 3;
+
+/** Floor for the sensor data-freshness window (15 min) — fast-uploading sensors. */
+export const SENSOR_ONLINE_FRESHNESS_MIN_MS = 15 * 60 * 1000;
+
+/** Cap for the sensor data-freshness window (90 min) — slow-uploading sensors. */
+export const SENSOR_ONLINE_FRESHNESS_MAX_MS = 90 * 60 * 1000;
+
+/** Default sensor data-freshness window when `uploadRate` is unknown (30 min). */
+export const SENSOR_ONLINE_FRESHNESS_DEFAULT_MS = 30 * 60 * 1000;
+
 // === Adapter lifecycle ===
 
 /** Hard timeout for cloud initialisation (60 s). */

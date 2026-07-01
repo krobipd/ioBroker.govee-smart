@@ -20,10 +20,22 @@ var mapping_exports = {};
 __export(mapping_exports, {
   buildCapabilitiesFromAppEntry: () => buildCapabilitiesFromAppEntry,
   cloudDeviceToGoveeDevice: () => cloudDeviceToGoveeDevice,
-  filterCloudDevicesWithCapabilities: () => filterCloudDevicesWithCapabilities
+  filterCloudDevicesWithCapabilities: () => filterCloudDevicesWithCapabilities,
+  isSensorDataFresh: () => isSensorDataFresh
 });
 module.exports = __toCommonJS(mapping_exports);
 var import_govee_constants = require("../govee-constants");
+var import_timing_constants = require("../timing-constants");
+function isSensorDataFresh(lastTime, uploadRateMinutes, now) {
+  if (typeof lastTime !== "number" || !Number.isFinite(lastTime)) {
+    return false;
+  }
+  const windowMs = typeof uploadRateMinutes === "number" && Number.isFinite(uploadRateMinutes) && uploadRateMinutes > 0 ? Math.min(
+    Math.max(uploadRateMinutes * 6e4 * import_timing_constants.SENSOR_ONLINE_FRESHNESS_MULTIPLIER, import_timing_constants.SENSOR_ONLINE_FRESHNESS_MIN_MS),
+    import_timing_constants.SENSOR_ONLINE_FRESHNESS_MAX_MS
+  ) : import_timing_constants.SENSOR_ONLINE_FRESHNESS_DEFAULT_MS;
+  return Math.abs(now - lastTime) < windowMs;
+}
 function cloudDeviceToGoveeDevice(cd) {
   return {
     sku: cd.sku,
@@ -47,17 +59,19 @@ function filterCloudDevicesWithCapabilities(raw) {
     (cd) => cd && typeof cd.sku === "string" && typeof cd.device === "string" && Array.isArray(cd.capabilities) && cd.capabilities.length > 0
   ) : [];
 }
-function buildCapabilitiesFromAppEntry(entry) {
+function buildCapabilitiesFromAppEntry(entry, now = Date.now()) {
+  var _a;
   const caps = [];
   const last = entry.lastData;
   if (!last) {
     return caps;
   }
   if (typeof last.online === "boolean") {
+    const online = last.online || isSensorDataFresh(last.lastTime, (_a = entry.settings) == null ? void 0 : _a.uploadRate, now);
     caps.push({
       type: import_govee_constants.GOVEE_CAP_TYPE.ONLINE,
       instance: "online",
-      state: { value: last.online }
+      state: { value: online }
     });
   }
   if (typeof last.tem === "number" && Number.isFinite(last.tem)) {
@@ -93,6 +107,7 @@ function buildCapabilitiesFromAppEntry(entry) {
 0 && (module.exports = {
   buildCapabilitiesFromAppEntry,
   cloudDeviceToGoveeDevice,
-  filterCloudDevicesWithCapabilities
+  filterCloudDevicesWithCapabilities,
+  isSensorDataFresh
 });
 //# sourceMappingURL=mapping.js.map

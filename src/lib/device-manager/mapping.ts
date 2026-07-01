@@ -1,6 +1,42 @@
 import type { AppDeviceEntry } from "../govee-api-client";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
+import {
+  SENSOR_ONLINE_FRESHNESS_DEFAULT_MS,
+  SENSOR_ONLINE_FRESHNESS_MAX_MS,
+  SENSOR_ONLINE_FRESHNESS_MIN_MS,
+  SENSOR_ONLINE_FRESHNESS_MULTIPLIER,
+} from "../timing-constants";
 import type { CloudDevice, CloudStateCapability, GoveeDevice } from "../types";
+
+/**
+ * Whether a sensor's last reading is recent enough to treat the device as
+ * online, independent of Govee's (sometimes stuck-false) `lastData.online`
+ * flag. The window scales with the sensor's own `uploadRate` (minutes) so a
+ * fast sensor flips offline quickly and a slow one isn't falsely flapped;
+ * `|now - lastTime|` also tolerates minor server/local clock skew while
+ * rejecting a garbage far-future timestamp.
+ *
+ * @param lastTime Govee reading timestamp (ms epoch) from `lastData.lastTime`
+ * @param uploadRateMinutes Sensor upload interval from `settings.uploadRate`
+ * @param now Current time (ms epoch); injectable for tests
+ */
+export function isSensorDataFresh(
+  lastTime: number | undefined,
+  uploadRateMinutes: number | undefined,
+  now: number,
+): boolean {
+  if (typeof lastTime !== "number" || !Number.isFinite(lastTime)) {
+    return false;
+  }
+  const windowMs =
+    typeof uploadRateMinutes === "number" && Number.isFinite(uploadRateMinutes) && uploadRateMinutes > 0
+      ? Math.min(
+          Math.max(uploadRateMinutes * 60_000 * SENSOR_ONLINE_FRESHNESS_MULTIPLIER, SENSOR_ONLINE_FRESHNESS_MIN_MS),
+          SENSOR_ONLINE_FRESHNESS_MAX_MS,
+        )
+      : SENSOR_ONLINE_FRESHNESS_DEFAULT_MS;
+  return Math.abs(now - lastTime) < windowMs;
+}
 
 /**
  * Convert Cloud device to internal device model.
@@ -55,18 +91,23 @@ export function filterCloudDevicesWithCapabilities(raw: CloudDevice[]): CloudDev
  * that Cloud-driven devices produce.
  *
  * @param entry App-API device entry from the recent-data endpoint
+ * @param now Current time (ms epoch) for the data-freshness online derivation; injectable for tests
  */
-export function buildCapabilitiesFromAppEntry(entry: AppDeviceEntry): CloudStateCapability[] {
+export function buildCapabilitiesFromAppEntry(entry: AppDeviceEntry, now: number = Date.now()): CloudStateCapability[] {
   const caps: CloudStateCapability[] = [];
   const last = entry.lastData;
   if (!last) {
     return caps;
   }
   if (typeof last.online === "boolean") {
+    // Govee's gateway sensors (H5109 behind an H5042) leave `online:false`
+    // stuck while readings keep flowing — trust a fresh reading timestamp over
+    // the flag, but only ever ADD online-ness (never override a genuine `true`).
+    const online = last.online || isSensorDataFresh(last.lastTime, entry.settings?.uploadRate, now);
     caps.push({
       type: GOVEE_CAP_TYPE.ONLINE,
       instance: "online",
-      state: { value: last.online },
+      state: { value: online },
     });
   }
   if (typeof last.tem === "number" && Number.isFinite(last.tem)) {

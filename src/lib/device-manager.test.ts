@@ -2291,6 +2291,49 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(caps).toHaveLength(1);
       expect(caps[0].instance).toBe("online");
     });
+
+    it("derives online=true from fresh readings even when Govee reports online:false (ISSUE-2 / H5109)", () => {
+      const now = 1_800_000_000_000;
+      const entry: AppDeviceEntry = {
+        sku: "H5109",
+        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceName: "Pool",
+        // Govee's gateway sensors report online:false while readings keep flowing.
+        lastData: { online: false, tem: 3197, lastTime: now - 5 * 60 * 1000 },
+        settings: { uploadRate: 10 }, // 10-min upload → 30-min freshness window
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, now);
+      const onlineCap = caps.find(c => c.instance === "online");
+      expect(onlineCap?.state?.value).toBe(true);
+    });
+
+    it("keeps online=false when the last reading is stale (past the freshness window)", () => {
+      const now = 1_800_000_000_000;
+      const entry: AppDeviceEntry = {
+        sku: "H5109",
+        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceName: "Pool",
+        lastData: { online: false, tem: 3197, lastTime: now - 60 * 60 * 1000 }, // 60 min ago
+        settings: { uploadRate: 10 },
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, now);
+      const onlineCap = caps.find(c => c.instance === "online");
+      expect(onlineCap?.state?.value).toBe(false);
+    });
+
+    it("does not fabricate online-ness without a reading timestamp", () => {
+      const now = 1_800_000_000_000;
+      const entry: AppDeviceEntry = {
+        sku: "H5109",
+        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceName: "Pool",
+        lastData: { online: false, tem: 3197 }, // no lastTime
+        settings: { uploadRate: 10 },
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, now);
+      const onlineCap = caps.find(c => c.instance === "online");
+      expect(onlineCap?.state?.value).toBe(false);
+    });
   });
 
   describe("pollAppApi", () => {
@@ -2368,6 +2411,60 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(await dm2.pollAppApi()).toBe(1);
       expect(seen).toHaveLength(1);
       expect(seen[0].caps).toHaveLength(3);
+    });
+
+    it("flips a sensor to info.online via data-freshness even when Govee reports offline (ISSUE-2)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      dm2.handleLanDiscovery({ ip: "192.168.1.51", device: "AABBCCDDEEFF1109", sku: "H5109" } as LanDevice);
+      const dev = dm2.getDevices()[0];
+      dev.type = "devices.types.thermometer";
+      dev.state.online = false; // currently flagged offline (the bug)
+      const updates: Array<Partial<DeviceState>> = [];
+      dm2.setCallbacks({
+        onUpdate: (_d, patch) => updates.push(patch),
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      dm2.setApiClient(
+        makeApiMock({
+          entries: [
+            {
+              sku: "H5109",
+              device: "AABBCCDDEEFF1109",
+              deviceName: "Pool",
+              lastData: { online: false, tem: 3197, lastTime: Date.now() - 5 * 60 * 1000 },
+              settings: { uploadRate: 10 },
+            },
+          ],
+        }) as never,
+      );
+      expect(await dm2.pollAppApi()).toBe(1);
+      expect(dev.state.online).toBe(true); // final info.online through applyOnlineCap
+      expect(updates.some(u => u.online === true)).toBe(true); // propagated to main → info.online
+    });
+
+    it("keeps a sensor offline when its last reading is stale (ISSUE-2 negative)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      dm2.handleLanDiscovery({ ip: "192.168.1.52", device: "AABBCCDDEEFF110A", sku: "H5109" } as LanDevice);
+      const dev = dm2.getDevices()[0];
+      dev.type = "devices.types.thermometer";
+      dev.state.online = true; // currently online
+      dm2.setApiClient(
+        makeApiMock({
+          entries: [
+            {
+              sku: "H5109",
+              device: "AABBCCDDEEFF110A",
+              deviceName: "Pool",
+              lastData: { online: false, tem: 3197, lastTime: Date.now() - 60 * 60 * 1000 },
+              settings: { uploadRate: 10 },
+            },
+          ],
+        }) as never,
+      );
+      expect(await dm2.pollAppApi()).toBe(1);
+      expect(dev.state.online).toBe(false); // stale readings → genuinely offline
     });
 
     it("returns 0 on fetch error and does not throw", async () => {
