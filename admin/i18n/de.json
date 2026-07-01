@@ -86,7 +86,7 @@
   "logGapsSuffix": ", Lücken erkannt (manual_list=\"{list}\")",
   "logIdleTimeout": "Segment-Assistent für {name}: Idle-Timeout (5 Min), abgebrochen",
   "logNoGapsSuffix": ", keine Lücken",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "Indizes und Bereiche durch Kommas getrennt, z. B. „0-9\" oder „0-8,10-14\" (nur wenn manual_mode=true)",
   "manualSegmentList": "Manuelle Segmentliste",
   "manualSegmentsActive": "Manuelle Segmente aktiv",
   "manualSegmentsDesc": "Manuelle Segmentliste aktivieren (z.B. für gekürzte LED-Strips mit weniger physischen Segmenten als gemeldet)",

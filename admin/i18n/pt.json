@@ -86,7 +86,7 @@
   "logGapsSuffix": ", lacunas detectadas (manual_list=\"{list}\")",
   "logIdleTimeout": "Assistente de segmento para {name}: tempo limite de inatividade (5 min), abortado",
   "logNoGapsSuffix": ", sem lacunas",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "Índices e intervalos separados por vírgulas, ex. \"0-9\" ou \"0-8,10-14\" (apenas se manual_mode=true)",
   "manualSegmentList": "Lista de segmentos manuais",
   "manualSegmentsActive": "Segmentos manuais ativos",
   "manualSegmentsDesc": "Ativar lista manual de segmentos (p.ex. para LED-strips cortadas com menos segmentos físicos do que reportado)",

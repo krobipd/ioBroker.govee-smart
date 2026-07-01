@@ -121,6 +121,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: per-segment colour and brightness now have a default value instead of reading as null in visualizations before the first change, and the "Segment Count" label is now translated in all admin languages.
 - Fixed: cloud device-state refreshes no longer log a "has no existing object" warning for the action-only snapshot dropdown.
 - Fixed: device groups no longer expose a meaningless "verified" trust-tier datapoint (the trust tier only applies to real devices, not groups).
+- Fixed: several admin translations — the "manual segment list" hint was untranslated in 10 languages, and the wizard "aborted"/"state tree rebuilt" messages were mistranslated in Dutch, Polish, Spanish, Ukrainian and Chinese.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

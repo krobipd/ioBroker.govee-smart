@@ -1,7 +1,7 @@
 {
   "abortRestart": "Możesz ponownie uruchomić kreatora w dowolnym momencie.",
   "abortRestored": "Pasek został przywrócony do poprzedniego stanu.",
-  "abortTitle": "Czarodziej przerwany.",
+  "abortTitle": "Kreator przerwany.",
   "aboutInfo": "Ten adapter jest darmowy i open source. Jeśli uznasz to za przydatne, rozważ wsparcie rozwoju.",
   "advancedHeader": "Opcje zaawansowane",
   "apiKeyLabel": "Klucz API",
@@ -86,7 +86,7 @@
   "logGapsSuffix": ", wykryto luki (manual_list=\"{list}\")",
   "logIdleTimeout": "Kreator segmentów dla {name}: przekroczenie limitu czasu bezczynności (5 min), przerwane",
   "logNoGapsSuffix": ", brak luk",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "Indeksy i zakresy oddzielone przecinkami, np. \"0-9\" lub \"0-8,10-14\" (tylko jeśli manual_mode=true)",
   "manualSegmentList": "Lista ręcznych segmentów",
   "manualSegmentsActive": "Ręczne segmenty aktywne",
   "manualSegmentsDesc": "Włącz ręczną listę segmentów (np. dla skróconych LED-strips z mniejszą liczbą fizycznych segmentów)",

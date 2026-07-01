@@ -86,7 +86,7 @@
   "logGapsSuffix": ", gaps detected (manual_list=\"{list}\")",
   "logIdleTimeout": "Segment wizard for {name}: idle timeout (5 min), aborted",
   "logNoGapsSuffix": ", no gaps",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "Indices and ranges separated by commas, e.g. \"0-9\" or \"0-8,10-14\" (only if manual_mode=true)",
   "manualSegmentList": "Manual Segment List",
   "manualSegmentsActive": "Manual Segments Active",
   "manualSegmentsDesc": "Enable manual segment list (e.g. for cut LED strips with fewer physical segments than reported)",

@@ -1,7 +1,7 @@
 {
   "abortRestart": "您可以随时重新启动向导。",
   "abortRestored": "该地带已恢复到之前的状态。",
-  "abortTitle": "向导失败了。",
+  "abortTitle": "向导已中止。",
   "aboutInfo": "该适配器是免费且开源的。如果您觉得有用，请考虑支持开发。",
   "advancedHeader": "高级选项",
   "apiKeyLabel": "API密钥",
@@ -86,7 +86,7 @@
   "logGapsSuffix": "，检测到间隙（manual_list=\"{list}\"）",
   "logIdleTimeout": "{name} 的分段向导：空闲超时（5 分钟），已中止",
   "logNoGapsSuffix": "，无间隙",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "以逗号分隔的索引和范围，例如 \"0-9\" 或 \"0-8,10-14\"（仅当 manual_mode=true 时）",
   "manualSegmentList": "手动分段列表",
   "manualSegmentsActive": "手动分段已启用",
   "manualSegmentsDesc": "启用手动分段列表（例如剪短的 LED 灯带，物理分段数少于报告值）",

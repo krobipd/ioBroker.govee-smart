@@ -86,7 +86,7 @@
   "logGapsSuffix": ", обнаружены пробелы (manual_list=\"{list}\")",
   "logIdleTimeout": "Мастер сегментирования для {name}: тайм-аут простоя (5 минут), прервано",
   "logNoGapsSuffix": ", без пробелов",
-  "manualListDesc": "manualListDesc",
+  "manualListDesc": "Индексы и диапазоны через запятую, напр. «0-9» или «0-8,10-14» (только если manual_mode=true)",
   "manualSegmentList": "Список ручных сегментов",
   "manualSegmentsActive": "Ручные сегменты активны",
   "manualSegmentsDesc": "Включить ручной список сегментов (например, для обрезанных LED-strip с меньшим числом физических сегментов)",
