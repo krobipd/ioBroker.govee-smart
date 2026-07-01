@@ -25,6 +25,7 @@ var import_types = require("./types");
 var import_govee_lan_client = require("./govee-lan-client");
 var import_device_registry = require("./device-registry");
 var import_govee_constants = require("./govee-constants");
+var import_lookups = require("./device-manager/lookups");
 var import_timing_constants = require("./timing-constants");
 class CommandRouter {
   log;
@@ -469,7 +470,7 @@ class CommandRouter {
         const rangeMatch = /^(\d+)-(\d+)$/.exec(part.trim());
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10);
-          const end = parseInt(rangeMatch[2], 10);
+          const end = Math.min(parseInt(rangeMatch[2], 10), import_lookups.SEGMENT_HARD_MAX);
           for (let i = start; i <= end; i++) {
             if (isValid(i)) {
               segments.push(i);

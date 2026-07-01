@@ -5,6 +5,7 @@ import { applySceneSpeed } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
 import { getDeviceQuirks, type ConfigurableOverrideCommand, type TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 
 /**
@@ -568,7 +569,12 @@ export class CommandRouter {
         const rangeMatch = /^(\d+)-(\d+)$/.exec(part.trim());
         if (rangeMatch) {
           const start = parseInt(rangeMatch[1], 10);
-          const end = parseInt(rangeMatch[2], 10);
+          // Clamp the upper bound to the protocol limit BEFORE the loop. Any
+          // index past SEGMENT_HARD_MAX is never valid, so without the clamp a
+          // pathological range like "0-2000000000" would spin the loop billions
+          // of times (isValid only filters what gets pushed, not the iteration)
+          // and block the event loop (L1 / SEC-L1). Admin-only, but a real hang.
+          const end = Math.min(parseInt(rangeMatch[2], 10), SEGMENT_HARD_MAX);
           for (let i = start; i <= end; i++) {
             if (isValid(i)) {
               segments.push(i);

@@ -243,6 +243,17 @@ describe("CommandRouter", () => {
       expect(result).toEqual({ segments: [0, 1, 2, 3, 4, 5], color: 0xff0000, brightness: 50 });
     });
 
+    it("clamps a pathological range so it can't block the event loop (L1/SEC-L1)", () => {
+      const router = new CommandRouter(mockLog, noopTimers);
+      const device = makeDevice({ segmentCount: 8 });
+      const started = Date.now();
+      const result = router.parseSegmentBatch(device, "0-2000000000:#ff0000:50");
+      // Only real segments survive isValid; the huge end is clamped, not iterated.
+      expect(result?.segments).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
+      // Without the SEGMENT_HARD_MAX clamp the loop runs ~2e9 times (many seconds).
+      expect(Date.now() - started).toBeLessThan(1000);
+    });
+
     it("parses comma-list (0,3,7:#00ff00:100)", () => {
       const router = new CommandRouter(mockLog, noopTimers);
       const result = router.parseSegmentBatch(makeDevice(), "0,3,7:#00ff00:100");
