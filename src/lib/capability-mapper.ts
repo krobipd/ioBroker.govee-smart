@@ -13,7 +13,7 @@ import { resolveLabel, tDesc, tName } from "./i18n";
 
 /** ioBroker state definition derived from a Govee capability */
 export interface StateDefinition {
-  /** State ID suffix (e.g. "power", "brightness", "colorRgb") */
+  /** State ID suffix (e.g. "power", "brightness", "color_rgb") */
   id: string;
   /**
    * Display name. Plain string for capability-derived names (e.g. from
