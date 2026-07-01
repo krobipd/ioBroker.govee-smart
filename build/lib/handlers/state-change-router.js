@@ -201,14 +201,16 @@ async function onStateChange(adapter, id, state) {
   }
   const val = resolved.val;
   if (device.sku === "BaseGroup" && device.groupMembers) {
-    await adapter.groupFanout.fanOut(device, stateSuffix, val);
-    await adapter.setStateAsync(id, { val, ack: true });
-    if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
-      await dropdownReset.resetRelatedDropdowns(
-        adapter,
-        prefix,
-        stateSuffix === "scenes.light_scene" ? "lightScene" : "music"
-      );
+    const reached = await adapter.groupFanout.fanOut(device, stateSuffix, val);
+    if (reached) {
+      await adapter.setStateAsync(id, { val, ack: true });
+      if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
+        await dropdownReset.resetRelatedDropdowns(
+          adapter,
+          prefix,
+          stateSuffix === "scenes.light_scene" ? "lightScene" : "music"
+        );
+      }
     }
     return;
   }

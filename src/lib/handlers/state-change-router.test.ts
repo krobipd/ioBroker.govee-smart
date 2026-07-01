@@ -41,6 +41,7 @@ interface Rig {
   states: Map<string, ioBroker.StateValue>;
   syncCalls: number[];
   setSendFailure(fn: () => Error | null): void;
+  setFanOutResult(v: boolean): void;
 }
 
 function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}): Rig {
@@ -59,6 +60,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   const objects = new Map<string, unknown>();
   const states = new Map<string, ioBroker.StateValue>();
   let sendFailure: () => Error | null = () => null;
+  let fanOutResult = true; // group fan-out reached a member (ack-worthy) by default
 
   const adapter: StateChangeRouterAdapter = {
     log: {
@@ -99,7 +101,10 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       delete: async (_d: GoveeDevice, name: string) => snapshotCalls.push(`delete:${name}`),
     } as never,
     groupFanout: {
-      fanOut: async (_g: GoveeDevice, suffix: string, value: unknown) => fanOuts.push({ suffix, value }),
+      fanOut: async (_g: GoveeDevice, suffix: string, value: unknown): Promise<boolean> => {
+        fanOuts.push({ suffix, value });
+        return fanOutResult;
+      },
     } as never,
     lanClient: {
       setMusicMode: (ip: string, mode: number, r: number, g: number, b: number) =>
@@ -139,6 +144,9 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     syncCalls,
     setSendFailure: fn => {
       sendFailure = fn;
+    },
+    setFanOutResult: v => {
+      fanOutResult = v;
     },
   };
 }
@@ -308,6 +316,20 @@ describe("onStateChange — group fan-out", () => {
     expect(rig.fanOuts).toEqual([{ suffix: "control.power", value: true }]);
     expect(rig.acks).toContainEqual({ id: groupId, val: true });
     expect(rig.commands).toHaveLength(0); // fan-out owns member dispatch
+  });
+
+  it("does NOT ack a group command when the fan-out reached no member (L3/A6)", async () => {
+    const group = createTestDevice({
+      sku: "BaseGroup",
+      deviceId: "1311",
+      groupMembers: [{ sku: device.sku, deviceId: device.deviceId }],
+    });
+    const rig = makeRig([group, device]);
+    rig.setFanOutResult(false); // no reachable member / every member send failed
+    const groupId = `${NS}.groups.basegroup_1311.control.power`;
+    await write(rig, groupId, true);
+    expect(rig.fanOuts).toHaveLength(1); // fan-out was attempted
+    expect(rig.acks.find(a => a.id === groupId)).toBeUndefined(); // but NOT falsely acked
   });
 });
 

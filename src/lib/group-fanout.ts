@@ -82,24 +82,27 @@ export class GroupFanoutHandler {
    * @param stateSuffix State suffix (e.g. "control.power" or "scenes.light_scene")
    * @param value Command value
    */
-  async fanOut(group: GoveeDevice, stateSuffix: string, value: ioBroker.StateValue): Promise<void> {
+  async fanOut(group: GoveeDevice, stateSuffix: string, value: ioBroker.StateValue): Promise<boolean> {
     if (!group.groupMembers) {
-      return;
+      return false;
+    }
+    const command = this.host.stateToCommand(stateSuffix);
+    if (!command) {
+      return false;
+    }
+    // Dropdown reset — no command needed, but a legit no-op the caller should ack.
+    if ((command === "lightScene" || command === "music") && (value === "0" || value === 0)) {
+      return true;
     }
     const devices = this.host.getDevices();
     const members = this.resolveMembers(group, devices).filter(d => d.state.online);
     if (members.length === 0) {
-      this.host.log.debug(`Group "${group.name}": no reachable members for fan-out`);
-      return;
+      // Used to return silently while the caller acked "success" (L3/A6). Signal
+      // failure so the caller withholds the ack, and warn once so the user knows.
+      this.warnGroupOnce(group, "no reachable members for fan-out — command not sent");
+      return false;
     }
-    const command = this.host.stateToCommand(stateSuffix);
-    if (!command) {
-      return;
-    }
-    // Dropdown reset — no command needed
-    if ((command === "lightScene" || command === "music") && (value === "0" || value === 0)) {
-      return;
-    }
+    let succeeded = 0;
     for (const member of members) {
       try {
         if (command === "lightScene") {
@@ -109,9 +112,36 @@ export class GroupFanoutHandler {
         } else {
           await this.host.sendCommand(member, command, value);
         }
+        succeeded += 1;
       } catch (err) {
         this.host.log.debug(`Group fan-out to ${member.name}: ${errMessage(err)}`);
       }
+    }
+    if (succeeded === 0) {
+      this.warnGroupOnce(group, `all ${members.length} member command(s) failed — command not sent`);
+      return false;
+    }
+    this.warnedGroups.delete(group.deviceId); // recovered → re-arm the warn-once
+    return true;
+  }
+
+  /** Groups already warned about (unreachable / all-failed) — warn once, then debug. */
+  private readonly warnedGroups = new Set<string>();
+
+  /**
+   * Warn once per group about a failed fan-out, then demote repeats to debug
+   * until the group recovers (a successful fan-out re-arms it).
+   *
+   * @param group The group whose fan-out failed
+   * @param reason Human-readable reason appended to the log line
+   */
+  private warnGroupOnce(group: GoveeDevice, reason: string): void {
+    const msg = `Group "${group.name}": ${reason}`;
+    if (this.warnedGroups.has(group.deviceId)) {
+      this.host.log.debug(msg);
+    } else {
+      this.warnedGroups.add(group.deviceId);
+      this.host.log.warn(msg);
     }
   }
 

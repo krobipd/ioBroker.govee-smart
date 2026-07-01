@@ -320,16 +320,21 @@ export async function onStateChange(
   }
   const val = resolved.val;
 
-  // Group fan-out: route commands to each member device
+  // Group fan-out: route commands to each member device. Only ack when the
+  // fan-out actually reached a member — a group with no reachable members (or
+  // where every member send failed) must NOT report success (L3/A6); fanOut
+  // has already warned in that case.
   if (device.sku === "BaseGroup" && device.groupMembers) {
-    await adapter.groupFanout!.fanOut(device, stateSuffix, val);
-    await adapter.setStateAsync(id, { val, ack: true });
-    if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
-      await dropdownReset.resetRelatedDropdowns(
-        adapter,
-        prefix,
-        stateSuffix === "scenes.light_scene" ? "lightScene" : "music",
-      );
+    const reached = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
+    if (reached) {
+      await adapter.setStateAsync(id, { val, ack: true });
+      if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
+        await dropdownReset.resetRelatedDropdowns(
+          adapter,
+          prefix,
+          stateSuffix === "scenes.light_scene" ? "lightScene" : "music",
+        );
+      }
     }
     return;
   }

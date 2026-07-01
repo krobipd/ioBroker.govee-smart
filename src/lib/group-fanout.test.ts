@@ -163,6 +163,58 @@ describe("GroupFanoutHandler", () => {
     });
   });
 
+  describe("fanOut — result signals ack-worthiness (L3/A6)", () => {
+    it("returns false and warns once when no members are reachable", async () => {
+      const warns: string[] = [];
+      const m1 = makeMember({ state: { online: false } });
+      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
+      const { host } = makeHost({ devices: [m1] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      const handler = new GroupFanoutHandler(host);
+      const result = await handler.fanOut(group, "control.power", true);
+      expect(result).toBe(false); // caller must NOT ack "success"
+      expect(warns).toHaveLength(1);
+    });
+
+    it("returns false and warns when every member command throws", async () => {
+      const warns: string[] = [];
+      const m1 = makeMember({ deviceId: "AA:01" });
+      const m2 = makeMember({ deviceId: "AA:02" });
+      const group = makeGroup([
+        { sku: m1.sku, deviceId: m1.deviceId },
+        { sku: m2.sku, deviceId: m2.deviceId },
+      ]);
+      const { host } = makeHost({ devices: [m1, m2] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      host.sendCommand = async () => {
+        throw new Error("unreachable");
+      };
+      const handler = new GroupFanoutHandler(host);
+      const result = await handler.fanOut(group, "control.power", true);
+      expect(result).toBe(false);
+      expect(warns).toHaveLength(1);
+    });
+
+    it("returns true when at least one member command succeeds", async () => {
+      const m1 = makeMember({ deviceId: "AA:01" });
+      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
+      const { host } = makeHost({ devices: [m1] });
+      const handler = new GroupFanoutHandler(host);
+      const result = await handler.fanOut(group, "control.power", true);
+      expect(result).toBe(true);
+    });
+
+    it("returns true on a dropdown reset (value 0) — a legit no-op", async () => {
+      const m1 = makeMember({ deviceId: "AA:01" });
+      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
+      const { host, commands } = makeHost({ devices: [m1] });
+      const handler = new GroupFanoutHandler(host);
+      const result = await handler.fanOut(group, "scenes.light_scene", 0);
+      expect(result).toBe(true);
+      expect(commands).toHaveLength(0);
+    });
+  });
+
   describe("fanOut — scene matching by name", () => {
     it("looks up the group dropdown name and resolves to the per-member scene index", async () => {
       const memberA = makeMember({

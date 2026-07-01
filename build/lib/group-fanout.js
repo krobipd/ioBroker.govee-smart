@@ -59,21 +59,22 @@ class GroupFanoutHandler {
    */
   async fanOut(group, stateSuffix, value) {
     if (!group.groupMembers) {
-      return;
+      return false;
+    }
+    const command = this.host.stateToCommand(stateSuffix);
+    if (!command) {
+      return false;
+    }
+    if ((command === "lightScene" || command === "music") && (value === "0" || value === 0)) {
+      return true;
     }
     const devices = this.host.getDevices();
     const members = this.resolveMembers(group, devices).filter((d) => d.state.online);
     if (members.length === 0) {
-      this.host.log.debug(`Group "${group.name}": no reachable members for fan-out`);
-      return;
+      this.warnGroupOnce(group, "no reachable members for fan-out \u2014 command not sent");
+      return false;
     }
-    const command = this.host.stateToCommand(stateSuffix);
-    if (!command) {
-      return;
-    }
-    if ((command === "lightScene" || command === "music") && (value === "0" || value === 0)) {
-      return;
-    }
+    let succeeded = 0;
     for (const member of members) {
       try {
         if (command === "lightScene") {
@@ -83,9 +84,34 @@ class GroupFanoutHandler {
         } else {
           await this.host.sendCommand(member, command, value);
         }
+        succeeded += 1;
       } catch (err) {
         this.host.log.debug(`Group fan-out to ${member.name}: ${(0, import_types.errMessage)(err)}`);
       }
+    }
+    if (succeeded === 0) {
+      this.warnGroupOnce(group, `all ${members.length} member command(s) failed \u2014 command not sent`);
+      return false;
+    }
+    this.warnedGroups.delete(group.deviceId);
+    return true;
+  }
+  /** Groups already warned about (unreachable / all-failed) — warn once, then debug. */
+  warnedGroups = /* @__PURE__ */ new Set();
+  /**
+   * Warn once per group about a failed fan-out, then demote repeats to debug
+   * until the group recovers (a successful fan-out re-arms it).
+   *
+   * @param group The group whose fan-out failed
+   * @param reason Human-readable reason appended to the log line
+   */
+  warnGroupOnce(group, reason) {
+    const msg = `Group "${group.name}": ${reason}`;
+    if (this.warnedGroups.has(group.deviceId)) {
+      this.host.log.debug(msg);
+    } else {
+      this.warnedGroups.add(group.deviceId);
+      this.host.log.warn(msg);
     }
   }
   /**
