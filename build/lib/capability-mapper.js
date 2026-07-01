@@ -646,6 +646,9 @@ function mapCloudStateValue(cap) {
       }
       return null;
     case "dynamic_scene":
+      if (cap.instance === "snapshot") {
+        return null;
+      }
       return {
         stateId: sanitizeId(cap.instance),
         value: safeStringify(raw)

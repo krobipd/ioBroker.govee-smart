@@ -738,6 +738,33 @@ describe("CapabilityMapper", () => {
       expect(result!.value).toBe(false);
     });
 
+    it("skips the action-only snapshot dynamic_scene state (no phantom write) — B12", () => {
+      // snapshot has no persistent "current snapshot" status and its real state
+      // id is snapshot_cloud (not "snapshot"), so writing here only produced a
+      // "has no existing object" warning. It must decode to null.
+      const cap: CloudStateCapability = {
+        type: "devices.capabilities.dynamic_scene",
+        instance: "snapshot",
+        state: { value: 5 },
+      };
+      expect(mapCloudStateValue(cap)).toBeNull();
+    });
+
+    it("maps lightScene/diyScene dynamic_scene to their real snake_case state ids", () => {
+      const ls = mapCloudStateValue({
+        type: "devices.capabilities.dynamic_scene",
+        instance: "lightScene",
+        state: { value: 3 },
+      } as CloudStateCapability);
+      expect(ls?.stateId).toBe("light_scene"); // matches SCENE_DROPDOWN_RULES + the real state
+      const diy = mapCloudStateValue({
+        type: "devices.capabilities.dynamic_scene",
+        instance: "diyScene",
+        state: { value: 2 },
+      } as CloudStateCapability);
+      expect(diy?.stateId).toBe("diy_scene");
+    });
+
     it("should map colorRgb integer to hex string", () => {
       const cap: CloudStateCapability = {
         type: "devices.capabilities.color_setting",

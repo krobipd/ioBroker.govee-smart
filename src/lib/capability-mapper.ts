@@ -923,6 +923,15 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       return null;
 
     case "dynamic_scene":
+      // snapshot is an action-only dropdown (activate a saved snapshot) — there
+      // is no persistent "current snapshot" status, and its real state id is
+      // snapshot_cloud (not "snapshot"), so a cloud-state write here only
+      // produced a "has no existing object" warning (B12). Skip it. lightScene /
+      // diyScene DO have a meaningful active value and sanitizeId maps them to
+      // light_scene / diy_scene, which match their real states.
+      if (cap.instance === "snapshot") {
+        return null;
+      }
       return {
         stateId: sanitizeId(cap.instance),
         value: safeStringify(raw),
