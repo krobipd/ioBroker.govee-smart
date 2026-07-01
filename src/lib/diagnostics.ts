@@ -119,6 +119,51 @@ const MAX_LAN_SENDS = 30;
 const MAX_BODY_BYTES = 65_536;
 
 /**
+ * Object keys whose values are secrets and must never reach the diagnostics
+ * export — the adapter asks users to paste that JSON into public GitHub
+ * issues. Matched case-insensitively. `topic` covers the gateway push topic
+ * (`GD/<hash>`); non-secret device metadata (bleName, MAC address) is kept.
+ */
+const SENSITIVE_KEYS = new Set([
+  "secretcode",
+  "secret",
+  "token",
+  "password",
+  "passwd",
+  "apikey",
+  "api_key",
+  "bearer",
+  "topic",
+]);
+
+/**
+ * Recursively replace the values of {@link SENSITIVE_KEYS} with `"***"` on an
+ * already-cloned structure (mutates in place). Keys come from JSON.parse'd
+ * data, so a literal `__proto__` own-property assignment is harmless (own
+ * property, not the prototype).
+ *
+ * @param value A freshly-cloned value that is safe to mutate
+ */
+function redactSecretsInPlace(value: unknown): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      redactSecretsInPlace(item);
+    }
+    return;
+  }
+  if (value && typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    for (const key of Object.keys(obj)) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+        obj[key] = "***";
+      } else {
+        redactSecretsInPlace(obj[key]);
+      }
+    }
+  }
+}
+
+/**
  * Provider callback shape — see {@link RuntimeStateSnapshot}. Returning
  * `undefined` is fine, generate() just omits the field then.
  */
@@ -374,13 +419,20 @@ export class DiagnosticsCollector {
   private cloneAndCap(body: unknown): unknown {
     try {
       const serialised = JSON.stringify(body);
-      if (typeof serialised === "string" && serialised.length > MAX_BODY_BYTES) {
-        return `<truncated ${serialised.length}b: ${serialised.slice(0, MAX_BODY_BYTES)}…>`;
+      if (typeof serialised !== "string") {
+        return body;
       }
-      if (typeof serialised === "string") {
-        return JSON.parse(serialised) as unknown;
+      // Deep-clone, then strip credentials so secrets (e.g. a gateway
+      // `secretCode`) never reach the diagnostics export — which the adapter
+      // asks the user to paste publicly (SEC-ISSUE1). Redact before the size
+      // cap so a truncated body is masked too.
+      const clone = JSON.parse(serialised) as unknown;
+      redactSecretsInPlace(clone);
+      const capped = JSON.stringify(clone);
+      if (typeof capped === "string" && capped.length > MAX_BODY_BYTES) {
+        return `<truncated ${capped.length}b: ${capped.slice(0, MAX_BODY_BYTES)}…>`;
       }
-      return body;
+      return clone;
     } catch {
       return String(body);
     }

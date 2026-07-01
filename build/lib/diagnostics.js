@@ -29,6 +29,35 @@ const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
 const MAX_BODY_BYTES = 65536;
+const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
+  "secretcode",
+  "secret",
+  "token",
+  "password",
+  "passwd",
+  "apikey",
+  "api_key",
+  "bearer",
+  "topic"
+]);
+function redactSecretsInPlace(value) {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      redactSecretsInPlace(item);
+    }
+    return;
+  }
+  if (value && typeof value === "object") {
+    const obj = value;
+    for (const key of Object.keys(obj)) {
+      if (SENSITIVE_KEYS.has(key.toLowerCase())) {
+        obj[key] = "***";
+      } else {
+        redactSecretsInPlace(obj[key]);
+      }
+    }
+  }
+}
 function pushBounded(arr, entry, max) {
   arr.push(entry);
   if (arr.length > max) {
@@ -234,13 +263,16 @@ class DiagnosticsCollector {
   cloneAndCap(body) {
     try {
       const serialised = JSON.stringify(body);
-      if (typeof serialised === "string" && serialised.length > MAX_BODY_BYTES) {
-        return `<truncated ${serialised.length}b: ${serialised.slice(0, MAX_BODY_BYTES)}\u2026>`;
+      if (typeof serialised !== "string") {
+        return body;
       }
-      if (typeof serialised === "string") {
-        return JSON.parse(serialised);
+      const clone = JSON.parse(serialised);
+      redactSecretsInPlace(clone);
+      const capped = JSON.stringify(clone);
+      if (typeof capped === "string" && capped.length > MAX_BODY_BYTES) {
+        return `<truncated ${capped.length}b: ${capped.slice(0, MAX_BODY_BYTES)}\u2026>`;
       }
-      return body;
+      return clone;
     } catch {
       return String(body);
     }

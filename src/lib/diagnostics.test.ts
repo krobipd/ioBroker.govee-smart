@@ -111,6 +111,26 @@ describe("DiagnosticsCollector", () => {
       expect(entry.statusCode).toBe(200);
     });
 
+    it("redacts secretCode and topic from recorded API responses so they never reach the diag export (SEC-ISSUE1)", () => {
+      const c = new DiagnosticsCollector();
+      c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
+        sku: "H5109",
+        settings: {
+          battery: 100,
+          gatewayInfo: { secretCode: "VYb5QvZVkjE=", topic: "GD/f501fb9140eaf7", bleName: "ihoment_H5042_3795" },
+        },
+      });
+      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const json = JSON.stringify(result);
+      expect(json).not.toContain("VYb5QvZVkjE="); // gateway secret must be masked
+      expect(json).not.toContain("GD/f501fb"); // gateway push topic must be masked
+      expect(json).toContain("ihoment_H5042_3795"); // non-secret device metadata is kept
+      const entry = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/device/rest/devices/v1/list"][0];
+      const gw = (entry.body as { settings: { gatewayInfo: Record<string, unknown> } }).settings.gatewayInfo;
+      expect(gw.secretCode).toBe("***");
+      expect(gw.bleName).toBe("ihoment_H5042_3795");
+    });
+
     it("keeps multiple slots per endpoint (no overwrite)", () => {
       const c = new DiagnosticsCollector();
       c.recordApiSuccess("dev1", "/api/state", { v: 1 });
