@@ -55,6 +55,18 @@ describe("stateToCommand", () => {
     expect(stateToCommand("music.music_sensitivity")).toBe("music");
     expect(stateToCommand("music.music_auto_color")).toBe("music");
   });
+
+  it("maps the snake_case colour state ids to their (camelCase) command tokens (B2 write path)", () => {
+    // The user writes the renamed control.color_rgb / control.color_temperature
+    // states; the internal command token stays camelCase (it mirrors the cloud
+    // capability instance it targets). This is the guarantee the rename didn't
+    // orphan the control path.
+    expect(stateToCommand("control.color_rgb")).toBe("colorRgb");
+    expect(stateToCommand("control.color_temperature")).toBe("colorTemperature");
+    // The old camelCase suffixes no longer resolve (hard-cut).
+    expect(stateToCommand("control.colorRgb")).toBeNull();
+    expect(stateToCommand("control.colorTemperature")).toBeNull();
+  });
 });
 
 describe("table invariants", () => {
