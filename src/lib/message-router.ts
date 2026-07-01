@@ -22,6 +22,10 @@ export interface MessageRouterHost {
   getSegmentDeviceList: () => Array<{ value: string; label: string }>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
   runWizardStep: (action: string, deviceKey: string) => Promise<Record<string, unknown>>;
+  /** Adapter-managed setTimeout (cleaned up on unload) for the bounded probe wait. */
+  setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
+  /** Adapter-managed clearTimeout counterpart. */
+  clearTimeout: (handle: ioBroker.Timeout | undefined) => void;
 }
 
 /**
@@ -123,7 +127,7 @@ export class MessageRouter {
       this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient();
       probe.setVerificationCode(config.mqttVerificationCode ?? "");
-      let probeTimer: ReturnType<typeof setTimeout> | undefined;
+      let probeTimer: ioBroker.Timeout | undefined;
       try {
         // The "connected" edge (onConnection(true)) arrives asynchronously AFTER
         // connect() resolves — connect() only does the login + cert handshake and
@@ -149,7 +153,7 @@ export class MessageRouter {
         const connected = await Promise.race([
           connectedEdge,
           new Promise<boolean>(resolve => {
-            probeTimer = setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
+            probeTimer = this.host.setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
           }),
         ]);
         return {
@@ -181,7 +185,7 @@ export class MessageRouter {
         // MQTT socket + reconnect timer never leak (the old code disconnected
         // only on the success path).
         if (probeTimer) {
-          clearTimeout(probeTimer);
+          this.host.clearTimeout(probeTimer);
         }
         probe.disconnect();
       }

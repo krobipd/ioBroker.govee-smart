@@ -96,45 +96,45 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 -->
 ### **WORK IN PROGRESS**
 
-- **Breaking: the colour datapoints were renamed to snake_case for a consistent state tree** — `control.colorRgb` → `control.color_rgb` and `control.colorTemperature` → `control.color_temperature` (on devices **and** groups). The old camelCase datapoints are removed automatically on upgrade. **Update any scripts, visualizations or logic that write or read these two states.**
+- **Breaking:** colour datapoints renamed to snake_case — `colorRgb`→`color_rgb`, `colorTemperature`→`color_temperature` (devices + groups). Removed on upgrade — update your scripts.
 - Security: the Govee Cloud API key can no longer leak into the ioBroker log — it was written in plaintext on the cloud-events connection and is now masked.
-- Security: the diagnostics export (the JSON you paste into a GitHub issue) no longer contains device or gateway secrets — a gateway `secretCode` and push topic are now masked, while normal device metadata is kept.
-- Security: a spoofed LAN discovery reply can no longer redirect a device's commands to another IP — the device address is now taken from the real network source, not the packet's self-reported address.
+- Security: the diagnostics export (the JSON you paste into a GitHub issue) no longer contains device or gateway secrets — a gateway `secretCode` and push topic are now masked.
+- Security: a spoofed LAN discovery reply can no longer redirect a device's commands to another IP — the device address is taken from the real network source, not the packet.
 - Robustness: the Admin "Test login" button is now rate-limited, so repeated clicks can no longer trigger a burst of Govee logins that could get your account temporarily locked.
-- Security: LAN device discovery is hardened against a misbehaving or hostile device on your network — implausibly large device identifiers are ignored and the number of new LAN devices is capped, preventing runaway memory/CPU use.
+- Security: LAN device discovery is hardened against a hostile device — implausibly large device identifiers are ignored and the number of new LAN devices is capped.
 - Fixed: a device you delete from your Govee account is now removed from the adapter on the next cloud refresh (e.g. after a restart), instead of lingering as a phantom device for up to two weeks.
-- New: a "Manually sync devices" button (`info.manual_sync_devices`) — set it to true to sync the device list with your Govee account on demand (pull in new devices, drop deleted ones) without restarting the adapter.
-- Fixed: multi-colour DIY scenes activated locally (LAN/ptReal) now build a valid packet — an off-by-one corrupted the terminator on scenes with longer data, so they could silently fail to load.
+- New: a "Manually sync devices" button (`info.manual_sync_devices`) — set it to true to sync the device list with your Govee account on demand (add new, drop deleted) without a restart.
+- Fixed: multi-colour DIY scenes activated over the local network now load correctly — longer scenes could previously be corrupted and silently fail to apply.
 - Fixed: after you remove a device and add it again, its info states (name, model, …) are recreated correctly instead of leaving "has no existing object" warnings until the next restart.
-- Fixed: if a Govee push/cloud-events connection connects but then can't subscribe (a rare server-side hiccup), the adapter no longer reconnects every few seconds — the retry now backs off normally, avoiding a self-inflicted rate-limit.
+- Fixed: if a Govee push/cloud-events connection connects but can't subscribe (a rare server hiccup), the adapter no longer reconnects every few seconds — the retry now backs off normally.
 - Fixed: the admin "Test login" button now waits for the real MQTT connection before reporting — valid Govee account credentials no longer show a false "MQTT not up, restart the adapter" message.
-- Fixed: on lamps whose music modes start at zero (e.g. H612F, H61D5, H70B3, H70C5) the first music mode was unreachable and the "off/---" entry was missing — `music_mode` is now a clean index-based dropdown like every other selector. **Breaking on those devices:** the `music_mode` numbers shift by one (an "off" entry is added at 0), so scripts that write a fixed number there may need adjusting.
+- Fixed: on lamps whose music modes start at zero (e.g. H612F) the first mode was unreachable and "off" missing — `music_mode` is now index-based. **Breaking:** numbers shift by one, adjust scripts.
 - Fixed: cloud snapshots whose value is a plain number are no longer dropped from the snapshot dropdown, and an entry with an empty value no longer shows up as a phantom option.
 - Fixed: clearing the preset-scene selector no longer fires a spurious empty scene command.
 - Fixed: DIY scenes you create in the Govee app now show up in the DIY dropdown after a reload, instead of only on the very first load.
 - Fixed: a malformed `segments.command` (e.g. `;` instead of `:`) now logs a clear warning with the expected syntax instead of being silently ignored.
-- Fixed: a command to a group with no reachable members (or where every member fails) is no longer falsely reported as successful — it now warns and leaves the state un-acknowledged, like a single device.
+- Fixed: a command to a group with no reachable members (or where every member fails) is no longer reported as successful — it warns and leaves the state un-acknowledged, like a single device.
 - Fixed: changing music sensitivity or auto-color on a LAN-controlled light now warns that the local API can't set them (only the music mode applies), instead of silently doing nothing.
 - Fixed: an out-of-range segment range in `segments.command` (e.g. `0-2000000000`) is now clamped to the protocol limit instead of briefly freezing the adapter while it expands the range.
 - Fixed: the segment-detection wizard now turns the light back off when it finishes or is aborted if the light was off before — it no longer leaves a light on that you had switched off.
 - Fixed: the segment-detection wizard now restores your strip's original per-segment gradient on finish/abort instead of flattening it to a single colour — a uniformly-coloured strip is unaffected.
 - Fixed: starting the segment-detection wizard twice in quick succession can no longer open two overlapping sessions.
 - Fixed: the optional Govee account email field no longer shows a "valid email" error when left empty — LAN-only and API-key-only setups no longer see a false validation error.
-- Fixed: per-segment colour and brightness now have a default value instead of reading as null in visualizations before the first change, and the "Segment Count" label is now translated in all admin languages.
+- Fixed: per-segment colour and brightness now have a default value instead of reading as null before the first change, and the "Segment Count" label is now translated in all languages.
 - Fixed: sensor readings (temperature/humidity/battery/CO₂) now default to 0 instead of null in visualizations before the first reading arrives.
 - Fixed: cloud device-state refreshes no longer log a "has no existing object" warning for the action-only snapshot dropdown.
 - Fixed: device groups no longer expose a meaningless "verified" trust-tier datapoint (the trust tier only applies to real devices, not groups).
-- Fixed: several admin translations — the "manual segment list" hint was untranslated in 10 languages, and the wizard "aborted"/"state tree rebuilt" messages were mistranslated in Dutch, Polish, Spanish, Ukrainian and Chinese.
+- Fixed: several admin translations — the "manual segment list" hint was untranslated in 10 languages, and the wizard "aborted"/"state tree rebuilt" messages were fixed in 5 languages.
 - Fixed: cleaner shutdown/restart — the adapter no longer opens a cloud connection, logs a stray "connection restored", or emits an unhandled error after it has been told to stop.
 - Fixed: a malformed rate-limit response from Govee (Retry-After of 0) no longer causes rapid back-to-back cloud retries; the retry now waits at least 5 seconds.
 - Fixed: the adapter logs "ready" as soon as the sensor push (cloud-events) channel connects, instead of possibly waiting up to a minute for the safety timer.
 - Fixed: under heavy cloud load a fresh control command (power/brightness) is no longer dropped in favour of queued scene loads — the lowest-priority queued call is evicted instead.
 - Fixed: a LAN light's control channel is no longer removed (which would orphan its power/colour states) when only its cloud-owned control states are cleaned up.
 - Added: device catalog entries for the H5109 Pool Thermometer and H1630 Lantern Floor Lamp (user-reported) — they are now recognised instead of logging a "not supported" warning.
-- Fixed: a sensor that keeps sending fresh readings now shows `info.online = true` even when Govee's cloud wrongly reports it offline (seen on gateway thermometers like the H5109) — online is now derived from reading freshness.
-- Fixed: temperature-only sensors (e.g. the H5109) no longer keep a phantom `sensor_humidity` datapoint stuck at 0 — a device with no humidity sensor drops the empty humidity state, while a real thermo-hygrometer keeps its humidity.
+- Fixed: a sensor sending fresh readings now shows `info.online = true` even when Govee's cloud wrongly reports it offline (e.g. gateway thermometers) — online is derived from data freshness.
+- Fixed: temperature-only sensors no longer keep a phantom `sensor_humidity` datapoint stuck at 0 — a device with no humidity sensor drops it, while a real thermo-hygrometer keeps its humidity.
 - Fixed: MQTT verification / login problems are no longer logged twice — they now appear once via the actionable-problems notification instead of a duplicate warning.
-- Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" and stops the device-list retry loop, instead of sometimes showing a generic "Cloud request failed" and retrying a permanently-bad key every few minutes — regardless of the exact server message.
+- Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" and stops the retry loop, instead of a generic error and retrying a bad key forever.
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.

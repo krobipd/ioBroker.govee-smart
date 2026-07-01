@@ -93,6 +93,8 @@ function makeHost(opts: {
     createMqttProbeClient: () => opts.probe ?? makeProbe({ connected: false }),
     getSegmentDeviceList: () => opts.segmentDevices ?? [],
     runWizardStep: () => Promise.resolve(opts.wizardResponse ?? { ok: true }),
+    setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms) as unknown as ioBroker.Timeout,
+    clearTimeout: handle => globalThis.clearTimeout(handle as unknown as ReturnType<typeof globalThis.setTimeout>),
   };
   return { host, responses };
 }

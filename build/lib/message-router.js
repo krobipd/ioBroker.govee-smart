@@ -130,7 +130,7 @@ class MessageRouter {
         const connected = await Promise.race([
           connectedEdge,
           new Promise((resolve) => {
-            probeTimer = setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
+            probeTimer = this.host.setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
           })
         ]);
         return {
@@ -159,7 +159,7 @@ class MessageRouter {
         return { result: (0, import_i18n.resolveLabel)("mqttAuthLoginFailed", msg) };
       } finally {
         if (probeTimer) {
-          clearTimeout(probeTimer);
+          this.host.clearTimeout(probeTimer);
         }
         probe.disconnect();
       }

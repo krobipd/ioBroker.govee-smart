@@ -812,7 +812,9 @@ class GoveeAdapter extends utils.Adapter {
           label: (0, import_i18n.resolveLabel)("segmentWizardDeviceOption", d.name, d.sku, (0, import_device_manager.resolveSegmentCount)(d))
         }));
       },
-      runWizardStep: (action, deviceKey) => wizardHandler.runWizardStep(this, action, deviceKey)
+      runWizardStep: (action, deviceKey) => wizardHandler.runWizardStep(this, action, deviceKey),
+      setTimeout: (cb, ms) => this.setTimeout(cb, ms),
+      clearTimeout: (handle) => this.clearTimeout(handle)
     };
   }
   /**

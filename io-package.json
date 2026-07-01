@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.16.2",
     "news": {
+      "NEXT": {
+        "en": "Breaking: the colour datapoints are renamed to snake_case (control.color_rgb / control.color_temperature) — update your scripts. Plus security hardening and sensor online + humidity fixes.",
+        "de": "Breaking: die Farb-Datenpunkte heißen jetzt snake_case (control.color_rgb / control.color_temperature) — Skripte anpassen. Dazu Sicherheits-Härtung und Fixes für Sensor-Online + Feuchte.",
+        "es": "Cambio importante: los datapoints de color pasan a snake_case (control.color_rgb / control.color_temperature) — actualiza tus scripts. Además refuerzo de seguridad y arreglos de sensores.",
+        "fr": "Changement cassant : les datapoints de couleur passent en snake_case (control.color_rgb / control.color_temperature) — mettez à jour vos scripts. Plus sécurité renforcée et corrections capteurs.",
+        "it": "Modifica importante: i datapoint colore passano a snake_case (control.color_rgb / control.color_temperature) — aggiorna i tuoi script. Più sicurezza rafforzata e correzioni sensori.",
+        "nl": "Ingrijpend: de kleur-datapunten worden snake_case (control.color_rgb / control.color_temperature) — pas je scripts aan. Plus beveiligingsversterking en fixes voor sensor-online + vochtigheid.",
+        "pl": "Zmiana łamiąca: punkty danych koloru zmieniają się na snake_case (control.color_rgb / control.color_temperature) — zaktualizuj skrypty. Plus wzmocnienie bezpieczeństwa i poprawki czujników.",
+        "pt": "Alteração importante: os datapoints de cor passam a snake_case (control.color_rgb / control.color_temperature) — atualize os seus scripts. Mais reforço de segurança e correções de sensores.",
+        "ru": "Важное изменение: датапоинты цвета переименованы в snake_case (control.color_rgb / control.color_temperature) — обновите скрипты. Плюс усиление безопасности и исправления датчиков.",
+        "uk": "Важлива зміна: датапоінти кольору перейменовано на snake_case (control.color_rgb / control.color_temperature) — оновіть скрипти. Плюс посилення безпеки та виправлення датчиків.",
+        "zh-cn": "重大变更：颜色数据点改为下划线命名 (control.color_rgb / control.color_temperature) — 请更新脚本。另有安全加固及传感器在线状态和湿度修复。"
+      },
       "2.16.2": {
         "en": "On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.",
         "de": "Auf Hosts mit mehreren Netzwerkschnittstellen nutzt die LAN-Erkennung jetzt die gewählte Schnittstelle für ausgehenden Verkehr und verpasst so keine Geräte mehr durch Scannen über die falsche.",
@@ -80,19 +93,6 @@
         "pl": "Komunikaty kreatora i testu logowania do chmury teraz we wszystkich językach panelu admina. Lampy tylko-LAN zapisują jasność, kolor i stan tylko przy realnej zmianie — czystsza historia.",
         "uk": "Повідомлення майстра та тесту входу в хмару тепер усіма мовами адмінки. Лампи лише-LAN зберігають яскравість, колір і стан лише при реальній зміні — чистіша історія.",
         "zh-cn": "向导和云登录测试的消息现在以所有管理界面语言显示。仅局域网的灯具仅在亮度、颜色和状态实际变化时才保存，使历史记录更整洁。"
-      },
-      "2.13.4": {
-        "en": "Changelog rewritten in user-centric style across all versions.",
-        "de": "Changelog in benutzerfreundlichem Stil über alle Versionen umgeschrieben.",
-        "ru": "Журнал изменений переписан в пользовательском стиле для всех версий.",
-        "pt": "Changelog reescrito em estilo orientado ao utilizador em todas as versões.",
-        "nl": "Changelog herschreven in gebruikersgerichte stijl voor alle versies.",
-        "fr": "Journal des modifications réécrit dans un style orienté utilisateur pour toutes les versions.",
-        "it": "Changelog riscritto in stile orientato all'utente per tutte le versioni.",
-        "es": "Registro de cambios reescrito en estilo orientado al usuario en todas las versiones.",
-        "pl": "Dziennik zmian przepisany w stylu zorientowanym na użytkownika we wszystkich wersjach.",
-        "uk": "Журнал змін переписано у стилі, орієнтованому на користувача, для всіх версій.",
-        "zh-cn": "更新日志在所有版本中以面向用户的风格重写。"
       }
     },
     "plugins": {
@@ -401,7 +401,7 @@
         },
         "type": "boolean",
         "role": "button",
-        "read": true,
+        "read": false,
         "write": true,
         "def": false,
         "desc": "Write true to sync the device list with your Govee account now: adds newly added devices and removes ones you deleted from the account. No restart needed. Scenes/snapshots of existing devices are not re-fetched (use the per-device Refresh for that)."

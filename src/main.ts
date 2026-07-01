@@ -993,6 +993,8 @@ class GoveeAdapter extends utils.Adapter {
           }));
       },
       runWizardStep: (action, deviceKey) => wizardHandler.runWizardStep(this, action, deviceKey),
+      setTimeout: (cb, ms) => this.setTimeout(cb, ms),
+      clearTimeout: handle => this.clearTimeout(handle),
     };
   }
 
