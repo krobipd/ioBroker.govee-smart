@@ -18,8 +18,8 @@ The device list lives in [`devices.json`](./devices.json) at the repo root. One 
 
 1. **Diagnostics exportieren / Export diagnostics**
    - Adapter installieren, dein Gerät erkennen lassen
-   - Object-Browser öffnen, beim Gerät auf `info.diagnostics_export` klicken
-   - Inhalt von `info.diagnostics_result` kopieren
+   - Object-Browser öffnen, beim Gerät `diag.export` auf `true` setzen
+   - Inhalt von `diag.result` kopieren
 
 2. **Issue oder PR / Issue or PR**
    - **Issue** (einfacher, empfohlen wenn du nicht mit GitHub arbeitest): über das [device-support Template](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=device-support.yml). Wir tragen den Eintrag selbst ein.
@@ -32,8 +32,8 @@ The device list lives in [`devices.json`](./devices.json) at the repo root. One 
 ### Beispiel-Eintrag / Example entry
 
 ```json
-"H7160": {
-  "name": "Smart Space Heater",
+"HXXXX": {
+  "name": "Example Space Heater",
   "type": "heater",
   "status": "reported",
   "since": "2.1.0",
@@ -42,6 +42,8 @@ The device list lives in [`devices.json`](./devices.json) at the repo root. One 
   }
 }
 ```
+
+(`HXXXX` is a placeholder — use your device's real SKU. This example is illustrative and intentionally not a real catalog entry.)
 
 Felder: `name`, `type`, `status` Pflicht; `since` (semver, ohne `v`-Prefix) und `quirks` optional. Schema-Quelle: [`devices.schema.json`](./devices.schema.json).
 
@@ -59,10 +61,11 @@ Promotion-Pfad: ⚪ → 🟢 → ✅. Linear, jede neue Bestätigung kann hochpr
 
 Aktuelle Quirk-Felder sind die einzigen die im Code etwas bewirken:
 
-| Feld                           | Wann verwenden                                                               |
-| ------------------------------ | ---------------------------------------------------------------------------- |
-| `colorTempRange: { min, max }` | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                   |
-| `brokenPlatformApi: true`      | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück |
+| Feld                                          | Wann verwenden                                                                                                    |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `colorTempRange: { min, max }`                | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                        |
+| `brokenPlatformApi: true`                     | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                      |
+| `transportOverrides: { <command>: "cloud"\|"lan" }` | Bestimmten Transport pro Operation erzwingen (z.B. Pixel-Matrix-SKUs deren LAN-Bridge Scene-Frames verwirft — H70B3, H70C5) |
 
 Wenn dein Gerät einen Quirk braucht der hier fehlt: erst Issue mit Diagnostics-JSON aufmachen — wir entscheiden gemeinsam ob es ein neues Feld im Schema rechtfertigt oder im bestehenden Vokabular abgebildet werden kann. Schema-Erweiterungen kommen mit dem Code-Pfad der sie auswertet zusammen rein.
 
@@ -92,9 +95,9 @@ Issue with:
 
 ## Code contributions
 
-PRs gegen `main` (für 1.x-Hotfixes) bzw. `v2-prep` (für v2-Arbeit) sind willkommen. Vor dem PR:
+PRs gegen `main` sind willkommen. Vor dem PR:
 
-PRs against `main` (for 1.x hotfixes) or `v2-prep` (for v2 work) are welcome. Before opening:
+PRs against `main` are welcome. Before opening:
 
 ```bash
 npm run build

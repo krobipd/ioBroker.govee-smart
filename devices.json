@@ -1,5 +1,5 @@
 {
-  "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi).",
+  "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi, transportOverrides).",
   "devices": {
     "H5051": {
       "name": "Thermo-Hygrometer",

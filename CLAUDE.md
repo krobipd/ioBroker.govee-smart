@@ -41,7 +41,7 @@
 | Scene-Aktivierung     | primär  | —            | —            | backup     | —       |
 | DIY-Scene-Aktivierung | primär  | —            | —            | backup     | —       |
 | Snapshot-Aktivierung  | primär  | —            | —            | backup     | —       |
-| Gradient-Toggle       | —       | —            | —            | primär     | —       |
+| Gradient-Toggle       | primär  | —            | —            | Notfall¹   | —       |
 | Generic Capability    | —       | —            | —            | primär     | —       |
 
 ¹ **Notfall-Fallback** — nur wenn lokale API nicht aktiviert (lanIp === null). 5-10s Latenz pro Call, 10/min Rate-Limit. Adapter warnt beim Start ("LAN ✗") mit Anleitung zur LAN-Aktivierung.
