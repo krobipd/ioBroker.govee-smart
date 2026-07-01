@@ -222,6 +222,18 @@ describe("CommandRouter", () => {
       await router.sendCommand(makeDevice(), "segmentColor:-1", "#FF0000");
       expect(lan.calls).toHaveLength(0);
     });
+
+    it("warns instead of silently swallowing a malformed segment batch command (A4)", async () => {
+      const warns: string[] = [];
+      const capturingLog = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      const lan = makeLanStub();
+      const router = new CommandRouter(capturingLog, noopTimers);
+      router.setLanClient(lan.client);
+      // ';' where a ':' is required — parseSegmentBatch returns null (live: h61d5).
+      await router.sendCommand(makeDevice(), "segmentBatch", "1-15;#ffca91");
+      expect(lan.calls).toHaveLength(0); // nothing sent
+      expect(warns.some(w => w.includes("segment command") && w.includes("1-15;#ffca91"))).toBe(true);
+    });
   });
 
   describe("parseSegmentBatch", () => {

@@ -316,6 +316,11 @@ class CommandRouter {
     var _a;
     const parsed = typeof value === "string" ? this.parseSegmentBatch(device, value) : this.coerceParsedBatch(value);
     if (!parsed) {
+      if (typeof value === "string") {
+        this.log.warn(
+          `${device.name} (${device.sku}): could not parse segment command "${value}" \u2014 expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`
+        );
+      }
       return;
     }
     (_a = this.onSegmentBatchUpdate) == null ? void 0 : _a.call(this, device, parsed);

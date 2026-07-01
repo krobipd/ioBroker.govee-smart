@@ -359,6 +359,15 @@ export class CommandRouter {
     // sendCommand() already returned on a skip decision — `decision` is lan|cloud.
     const parsed = typeof value === "string" ? this.parseSegmentBatch(device, value) : this.coerceParsedBatch(value);
     if (!parsed) {
+      // A malformed string (wrong separator, bad range, …) used to be swallowed
+      // silently while the state still acked "ok" — the user got no feedback
+      // (A4, live: h61d5 "1-15;#ffca91"). Warn with the offending value + syntax.
+      if (typeof value === "string") {
+        this.log.warn(
+          `${device.name} (${device.sku}): could not parse segment command "${value}" — ` +
+            `expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`,
+        );
+      }
       return;
     }
     this.onSegmentBatchUpdate?.(device, parsed);
