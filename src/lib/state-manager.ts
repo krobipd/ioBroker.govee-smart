@@ -154,6 +154,11 @@ export class StateManager {
    * cache entries.
    */
   private readonly ensuredStates = new Set<string>();
+  /**
+   * "prefix.stateId" keys already handled by {@link removeSyntheticStateOnce} —
+   * bounds the phantom-state cleanup to one existence-check per adapter run.
+   */
+  private readonly cleanedSyntheticStates = new Set<string>();
 
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter: utils.AdapterInstance) {
@@ -200,6 +205,27 @@ export class StateManager {
     }
     await this.adapter.delStateAsync(id).catch(() => undefined);
     await this.adapter.delObjectAsync(id).catch(() => undefined);
+  }
+
+  /**
+   * Remove a synthetic App-API/OpenAPI-MQTT sensor state (e.g. a phantom
+   * `sensor_humidity` on a temp-only thermometer) at most once per adapter run.
+   * These states are created ad-hoc by the App-API pipe and are NOT covered by
+   * any def-driven cleanup, so a datapoint that should no longer exist (Govee's
+   * `hum:0` sentinel on a device without a humidity capability, #31) would
+   * otherwise linger forever. Existence-checked via {@link safeDeleteState}, so
+   * it's a silent no-op on installs that never had the state.
+   *
+   * @param prefix Device object ID prefix
+   * @param stateId Synthetic state ID (e.g. "sensor_humidity")
+   */
+  async removeSyntheticStateOnce(prefix: string, stateId: string): Promise<void> {
+    const key = `${prefix}.${stateId}`;
+    if (this.cleanedSyntheticStates.has(key)) {
+      return;
+    }
+    this.cleanedSyntheticStates.add(key);
+    await this.safeDeleteState(this.resolveStatePath(prefix, stateId));
   }
 
   /**

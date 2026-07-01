@@ -2334,6 +2334,42 @@ describe("DeviceManager — loadFromCache merge", () => {
       const onlineCap = caps.find(c => c.instance === "online");
       expect(onlineCap?.state?.value).toBe(false);
     });
+
+    it("suppresses a phantom humidity cap for a temp-only sensor (hum:0, no humidity capability) — #31", () => {
+      const entry: AppDeviceEntry = {
+        sku: "H5109",
+        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceName: "Pool",
+        lastData: { tem: 3197, hum: 0, battery: 100 }, // hum:0 = Govee's "no humidity sensor" sentinel
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, 1_800_000_000_000, /* hasHumidityCapability */ false);
+      expect(caps.find(c => c.instance === "sensorHumidity")).toBeUndefined();
+      // temperature + battery must still come through
+      expect(caps.find(c => c.instance === "sensorTemperature")).toBeDefined();
+      expect(caps.find(c => c.instance === "battery")).toBeDefined();
+    });
+
+    it("keeps humidity for a real hygrometer even at a transient 0 reading (has humidity capability)", () => {
+      const entry: AppDeviceEntry = {
+        sku: "H5179",
+        device: "AA:BB:CC:DD:EE:FF",
+        deviceName: "x",
+        lastData: { tem: 2000, hum: 0 },
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, 1_800_000_000_000, /* hasHumidityCapability */ true);
+      expect(caps.find(c => c.instance === "sensorHumidity")?.state?.value).toBe(0);
+    });
+
+    it("keeps a non-zero humidity reading even without a declared capability (defensive)", () => {
+      const entry: AppDeviceEntry = {
+        sku: "H5179",
+        device: "AA:BB:CC:DD:EE:FF",
+        deviceName: "x",
+        lastData: { hum: 4500 }, // 45 %
+      };
+      const caps = buildCapabilitiesFromAppEntry(entry, 1_800_000_000_000, false);
+      expect(caps.find(c => c.instance === "sensorHumidity")?.state?.value).toBe(45);
+    });
   });
 
   describe("pollAppApi", () => {

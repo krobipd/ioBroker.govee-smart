@@ -17,6 +17,7 @@ interface TestRig {
   adapter: CloudStateLoaderAdapter;
   writes: Array<{ id: string; val: unknown }>;
   ensured: string[];
+  removed: Array<{ prefix: string; stateId: string }>;
   failures: Array<{ deviceId: string; endpoint: string }>;
   setDeviceState(fn: (sku: string, deviceId: string) => Promise<CloudStateCapability[]>): void;
 }
@@ -24,6 +25,7 @@ interface TestRig {
 function makeRig(devices: GoveeDevice[]): TestRig {
   const writes: Array<{ id: string; val: unknown }> = [];
   const ensured: string[] = [];
+  const removed: Array<{ prefix: string; stateId: string }> = [];
   const failures: Array<{ deviceId: string; endpoint: string }> = [];
   let getDeviceState: (sku: string, deviceId: string) => Promise<CloudStateCapability[]> = async () => [];
 
@@ -44,6 +46,9 @@ function makeRig(devices: GoveeDevice[]): TestRig {
       ensureSyntheticStateObject: async (_prefix: string, stateId: string) => {
         ensured.push(stateId);
       },
+      removeSyntheticStateOnce: async (prefix: string, stateId: string) => {
+        removed.push({ prefix, stateId });
+      },
     } as never,
     setStateAsync: async (id, state) => {
       writes.push({ id, val: (state as { val: unknown }).val });
@@ -53,6 +58,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
     adapter,
     writes,
     ensured,
+    removed,
     failures,
     setDeviceState: fn => {
       getDeviceState = fn;
@@ -157,5 +163,50 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     const rig = makeRig([sensor]);
     (rig.adapter as { stateManager: unknown }).stateManager = null;
     await expect(applyCloudCapabilities(rig.adapter, sensor, [batteryCap])).resolves.toBeUndefined();
+  });
+
+  const tempCap: CloudStateCapability = {
+    type: "devices.capabilities.property",
+    instance: "sensorTemperature",
+    state: { value: 21.5 },
+  };
+
+  it("removes the phantom sensor_humidity orphan for a temp-only thermometer (temperature but no humidity cap) — #31", async () => {
+    const tempOnly = createTestDevice({
+      deviceId: "AA:09",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+      capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature" }],
+    });
+    const rig = makeRig([tempOnly]);
+    await applyCloudCapabilities(rig.adapter, tempOnly, [tempCap]);
+    expect(rig.removed).toContainEqual(expect.objectContaining({ stateId: "sensor_humidity" }));
+  });
+
+  it("does NOT remove humidity for a real thermo-hygrometer (declares sensorHumidity)", async () => {
+    const hygrometer = createTestDevice({
+      deviceId: "AA:0A",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+      capabilities: [
+        { type: "devices.capabilities.property", instance: "sensorTemperature" },
+        { type: "devices.capabilities.property", instance: "sensorHumidity" },
+      ],
+    });
+    const rig = makeRig([hygrometer]);
+    await applyCloudCapabilities(rig.adapter, hygrometer, [tempCap]);
+    expect(rig.removed).toHaveLength(0);
+  });
+
+  it("does NOT touch humidity for a device without a temperature sensor (e.g. an appliance)", async () => {
+    const appliance = createTestDevice({
+      deviceId: "AA:0B",
+      type: "devices.types.heater",
+      lanIp: undefined,
+      capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+    });
+    const rig = makeRig([appliance]);
+    await applyCloudCapabilities(rig.adapter, appliance, [powerCap]);
+    expect(rig.removed).toHaveLength(0);
   });
 });

@@ -130,6 +130,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a LAN light's control channel is no longer removed (which would orphan its power/colour states) when only its cloud-owned control states are cleaned up.
 - Added: device catalog entries for the H5109 Pool Thermometer and H1630 Lantern Floor Lamp (user-reported) — they are now recognised instead of logging a "not supported" warning.
 - Fixed: a sensor that keeps sending fresh readings now shows `info.online = true` even when Govee's cloud wrongly reports it offline (seen on gateway thermometers like the H5109) — online is now derived from reading freshness.
+- Fixed: temperature-only sensors (e.g. the H5109) no longer keep a phantom `sensor_humidity` datapoint stuck at 0 — a device with no humidity sensor drops the empty humidity state, while a real thermo-hygrometer keeps its humidity.
 - Fixed: MQTT verification / login problems are no longer logged twice — they now appear once via the actionable-problems notification instead of a duplicate warning.
 - Fixed: a rejected Govee API key (HTTP 401/403) is now always reported as "API key rejected — check Govee API key" and stops the device-list retry loop, instead of sometimes showing a generic "Cloud request failed" and retrying a permanently-bad key every few minutes — regardless of the exact server message.
 

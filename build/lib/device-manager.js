@@ -1191,7 +1191,8 @@ class DeviceManager {
           if (!device) {
             return false;
           }
-          const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry);
+          const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
+          const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry, Date.now(), hasHumidityCap);
           if (caps.length === 0) {
             return false;
           }

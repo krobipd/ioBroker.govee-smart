@@ -198,6 +198,31 @@ describe("StateManager", () => {
     });
   });
 
+  describe("removeSyntheticStateOnce", () => {
+    it("deletes an existing phantom sensor_humidity object exactly once (#31)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const path = "devices.h5109_1a.sensor.sensor_humidity"; // inferChannelFromStateId → "sensor"
+      objects.set(path, { type: "state", common: {}, native: {} } as never);
+
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      expect(objects.has(path)).toBe(false); // datapoint actually disappears
+      expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
+
+      // Once-guard: a repeat call skips even the existence-check (no per-poll round-trip)
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      expect(calls.filter(c => c.method === "getObjectAsync" && c.args[0] === path)).toHaveLength(1);
+      expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
+    });
+
+    it("is a silent no-op when the state never existed (fresh install)", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
+    });
+  });
+
   describe("devicePrefix", () => {
     it("should generate prefix from SKU + last 4 hex chars of device ID", () => {
       const { adapter } = createMockAdapter();

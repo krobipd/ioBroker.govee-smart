@@ -92,8 +92,15 @@ export function filterCloudDevicesWithCapabilities(raw: CloudDevice[]): CloudDev
  *
  * @param entry App-API device entry from the recent-data endpoint
  * @param now Current time (ms epoch) for the data-freshness online derivation; injectable for tests
+ * @param hasHumidityCapability Whether the device declares a `sensorHumidity` cloud capability — Govee
+ *   returns `hum:0` as a "no humidity sensor" sentinel for temp-only devices (e.g. H5109), which would
+ *   otherwise create a permanent phantom `sensor_humidity=0` datapoint (#31 inspee)
  */
-export function buildCapabilitiesFromAppEntry(entry: AppDeviceEntry, now: number = Date.now()): CloudStateCapability[] {
+export function buildCapabilitiesFromAppEntry(
+  entry: AppDeviceEntry,
+  now: number = Date.now(),
+  hasHumidityCapability = true,
+): CloudStateCapability[] {
   const caps: CloudStateCapability[] = [];
   const last = entry.lastData;
   if (!last) {
@@ -117,7 +124,11 @@ export function buildCapabilitiesFromAppEntry(entry: AppDeviceEntry, now: number
       state: { value: last.tem / 100 },
     });
   }
-  if (typeof last.hum === "number" && Number.isFinite(last.hum)) {
+  // Skip the "no humidity sensor" sentinel (hum:0 on a device without a
+  // declared humidity capability) so temp-only sensors don't grow a phantom
+  // `sensor_humidity=0` datapoint. A real, non-zero reading is always kept,
+  // and a real hygrometer (capability present) keeps humidity even at 0 %.
+  if (typeof last.hum === "number" && Number.isFinite(last.hum) && (last.hum !== 0 || hasHumidityCapability)) {
     caps.push({
       type: GOVEE_CAP_TYPE.PROPERTY,
       instance: "sensorHumidity",

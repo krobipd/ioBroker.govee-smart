@@ -59,7 +59,7 @@ function filterCloudDevicesWithCapabilities(raw) {
     (cd) => cd && typeof cd.sku === "string" && typeof cd.device === "string" && Array.isArray(cd.capabilities) && cd.capabilities.length > 0
   ) : [];
 }
-function buildCapabilitiesFromAppEntry(entry, now = Date.now()) {
+function buildCapabilitiesFromAppEntry(entry, now = Date.now(), hasHumidityCapability = true) {
   var _a;
   const caps = [];
   const last = entry.lastData;
@@ -81,7 +81,7 @@ function buildCapabilitiesFromAppEntry(entry, now = Date.now()) {
       state: { value: last.tem / 100 }
     });
   }
-  if (typeof last.hum === "number" && Number.isFinite(last.hum)) {
+  if (typeof last.hum === "number" && Number.isFinite(last.hum) && (last.hum !== 0 || hasHumidityCapability)) {
     caps.push({
       type: import_govee_constants.GOVEE_CAP_TYPE.PROPERTY,
       instance: "sensorHumidity",

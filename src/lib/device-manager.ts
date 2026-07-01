@@ -1434,7 +1434,8 @@ export class DeviceManager {
           if (!device) {
             return false;
           }
-          const caps = buildCapabilitiesFromAppEntryHelper(entry);
+          const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
+          const caps = buildCapabilitiesFromAppEntryHelper(entry, Date.now(), hasHumidityCap);
           if (caps.length === 0) {
             return false;
           }
