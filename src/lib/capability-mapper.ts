@@ -490,6 +490,7 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
       role,
       write: false,
       unit: normalizeUnit(cap.parameters?.unit) ?? unit,
+      def: 0, // avoid null in vis until the first sensor reading (consistency — B11)
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
       channel: "sensor",

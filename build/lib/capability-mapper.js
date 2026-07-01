@@ -337,6 +337,8 @@ function mapProperty(cap) {
       role,
       write: false,
       unit: (_b = normalizeUnit((_a = cap.parameters) == null ? void 0 : _a.unit)) != null ? _b : unit,
+      def: 0,
+      // avoid null in vis until the first sensor reading (consistency — B11)
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
       channel: "sensor"

@@ -119,6 +119,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: starting the segment-detection wizard twice in quick succession can no longer open two overlapping sessions.
 - Fixed: the optional Govee account email field no longer shows a "valid email" error when left empty — LAN-only and API-key-only setups no longer see a false validation error.
 - Fixed: per-segment colour and brightness now have a default value instead of reading as null in visualizations before the first change, and the "Segment Count" label is now translated in all admin languages.
+- Fixed: sensor readings (temperature/humidity/battery/CO₂) now default to 0 instead of null in visualizations before the first reading arrives.
 - Fixed: cloud device-state refreshes no longer log a "has no existing object" warning for the action-only snapshot dropdown.
 - Fixed: device groups no longer expose a meaningless "verified" trust-tier datapoint (the trust tier only applies to real devices, not groups).
 - Fixed: several admin translations — the "manual segment list" hint was untranslated in 10 languages, and the wizard "aborted"/"state tree rebuilt" messages were mistranslated in Dutch, Polish, Spanish, Ukrainian and Chinese.
