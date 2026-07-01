@@ -9,7 +9,7 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
-      day: 'wednesday'
+      day: 'tuesday'
       timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
     assignees:
@@ -32,7 +32,7 @@ updates:
     directory: '/'
     schedule:
       interval: 'weekly'
-      day: 'wednesday'
+      day: 'tuesday'
       timezone: 'Europe/Berlin'
     open-pull-requests-limit: 15
     assignees:
