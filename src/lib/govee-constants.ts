@@ -9,21 +9,17 @@
 
 import { v5 as uuidv5, NIL as UUID_NIL } from "uuid";
 
-/** Govee Cloud API capability type strings (`capability.type`). */
+/**
+ * Govee Cloud API `capability.type` strings that the adapter references by
+ * name. Only the types matched symbolically live here; the rest (on_off, range,
+ * color_setting, toggle, mode, …) are compared as string literals or short
+ * suffixes at their use sites (e.g. `capMatchesControl` in types.ts).
+ */
 export const GOVEE_CAP_TYPE = {
-  ON_OFF: "devices.capabilities.on_off",
-  RANGE: "devices.capabilities.range",
-  COLOR_SETTING: "devices.capabilities.color_setting",
-  SEGMENT_COLOR_SETTING: "devices.capabilities.segment_color_setting",
   DYNAMIC_SCENE: "devices.capabilities.dynamic_scene",
   PROPERTY: "devices.capabilities.property",
-  TOGGLE: "devices.capabilities.toggle",
   MUSIC_SETTING: "devices.capabilities.music_setting",
-  MODE: "devices.capabilities.mode",
   ONLINE: "devices.capabilities.online",
-  WORK_MODE: "devices.capabilities.work_mode",
-  TEMPERATURE_SETTING: "devices.capabilities.temperature_setting",
-  EVENT: "devices.capabilities.event",
 } as const;
 
 /** Govee Cloud API device type strings (`device.type`). */

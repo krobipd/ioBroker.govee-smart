@@ -494,23 +494,6 @@ export function maskSecret(secret: string): string {
 }
 
 /**
- * Parse JSON without throwing. Returns null on parse failure or non-string
- * input. Caller decides how to handle null (skip, fallback, log).
- *
- * @param raw Raw JSON string
- */
-export function safeJsonParse<T>(raw: unknown): T | null {
-  if (typeof raw !== "string" || raw.length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * Coerce an unknown value to a finite number. Returns null for NaN, Infinity,
  * non-numeric strings, objects, etc. Use at API boundaries where external
  * payloads might send numbers as strings, or send malformed values.
@@ -527,31 +510,6 @@ export function coerceFiniteNumber(raw: unknown): number | null {
   if (typeof raw === "string" && raw.trim().length > 0) {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-
-/**
- * Coerce an unknown value to a boolean. Accepts native bool, 0/1 numbers,
- * and the strings "true"/"false"/"0"/"1". Returns null for everything else.
- *
- * @param raw Unknown input
- */
-export function coerceBool(raw: unknown): boolean | null {
-  if (typeof raw === "boolean") {
-    return raw;
-  }
-  if (raw === 0 || raw === 1) {
-    return raw === 1;
-  }
-  if (typeof raw === "string") {
-    const s = raw.trim().toLowerCase();
-    if (s === "true" || s === "1") {
-      return true;
-    }
-    if (s === "false" || s === "0") {
-      return false;
-    }
   }
   return null;
 }

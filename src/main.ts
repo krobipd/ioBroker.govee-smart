@@ -34,7 +34,7 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { errMessage, rgbIntToHex, rgbToHex, type CloudStateCapability, type GoveeDevice } from "./lib/types";
+import { errMessage, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
 import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
@@ -931,16 +931,6 @@ class GoveeAdapter extends utils.Adapter {
   /** Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface. */
   public loadCloudStates(): Promise<void> {
     return cloudStateLoader.loadCloudStates(this);
-  }
-
-  /**
-   * Public for OpenAPI-MQTT + App-API pipelines feeding sensor/appliance state.
-   *
-   * @param device Target device
-   * @param caps Cloud-state capabilities
-   */
-  public applyCloudCapabilities(device: GoveeDevice, caps: CloudStateCapability[]): Promise<void> {
-    return cloudStateLoader.applyCloudCapabilities(this, device, caps);
   }
 
   /**

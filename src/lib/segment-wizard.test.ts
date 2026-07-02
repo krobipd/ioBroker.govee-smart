@@ -202,7 +202,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.start("H9999:NOPE");
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("not found");
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
     it("should refuse when device has no segment capability", async () => {
@@ -210,7 +210,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.start(key);
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("no segments");
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
     it("should start even when device.segmentCount=0 (first-measurement case)", async () => {
@@ -246,7 +246,7 @@ describe("SegmentWizard", () => {
       expect(r.error).toBeUndefined();
       expect(r.active).toBe(true);
       expect(r.progress).toBe("Segment 0");
-      expect(wizard.isActive()).toBe(true);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
 
       // Two segmentBatch calls: others→dim, target→bright.
       // "others" must now cover 1..SEGMENT_HARD_MAX (not just 1..4),
@@ -295,7 +295,7 @@ describe("SegmentWizard", () => {
       const second = await wizard.start(key);
       expect(typeof second.error).toBe("string");
       expect(second.error).toContain("already active");
-      expect(wizard.isActive()).toBe(true);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
     });
 
     it("should schedule an idle timeout of 5 minutes", async () => {
@@ -339,7 +339,7 @@ describe("SegmentWizard", () => {
         const r = await wizard.answer(true);
         expect(r.active).toBe(true);
       }
-      expect(wizard.isActive()).toBe(true);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
     });
 
     it("should auto-finish when the protocol limit is reached", async () => {
@@ -349,7 +349,7 @@ describe("SegmentWizard", () => {
         final = await wizard.answer(true);
       }
       expect((final as { done?: boolean }).done).toBe(true);
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
   });
 
@@ -365,7 +365,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.done();
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("at least once first");
-      expect(wizard.isActive()).toBe(true);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
     });
 
     it("should finalize with contiguous result (all visible, no gaps)", async () => {
@@ -438,7 +438,7 @@ describe("SegmentWizard", () => {
       await wizard.start(key);
       await wizard.answer(true);
       await wizard.done();
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
   });
 
@@ -471,7 +471,7 @@ describe("SegmentWizard", () => {
     it("should release the session lock", async () => {
       await wizard.start(key);
       await wizard.abort();
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
       const again = await wizard.start(key);
       expect(again.active).toBe(true);
     });
@@ -570,10 +570,10 @@ describe("SegmentWizard", () => {
   describe("idle timeout", () => {
     it("should abort the session when the timer fires", async () => {
       await wizard.start(key);
-      expect(wizard.isActive()).toBe(true);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
       host.fireLatestTimer();
       await new Promise(resolve => setImmediate(resolve));
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
       const warns = host.logs.filter(l => l.level === "warn");
       expect(warns.some(l => l.msg.toLowerCase().includes("idle timeout"))).toBe(true);
     });
@@ -601,7 +601,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.answer(true);
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("disappeared");
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
     it("should handle device missing at done", async () => {
@@ -611,7 +611,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.done();
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("disappeared");
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
   });
 
@@ -619,7 +619,7 @@ describe("SegmentWizard", () => {
     it("should cancel pending timer and drop session", async () => {
       await wizard.start(key);
       wizard.dispose();
-      expect(wizard.isActive()).toBe(false);
+      expect(wizard.getSessionSnapshot()).toBeNull();
       expect(host.clearedTimers).toBeGreaterThan(0);
     });
 

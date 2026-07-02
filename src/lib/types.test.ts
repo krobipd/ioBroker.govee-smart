@@ -10,9 +10,7 @@ import {
   resolveStatesValue,
   errMessage,
   maskSecret,
-  safeJsonParse,
   coerceFiniteNumber,
-  coerceBool,
   logDedup,
   type ErrorCategory,
 } from "./types";
@@ -482,29 +480,6 @@ describe("Types utilities", () => {
     });
   });
 
-  describe("safeJsonParse", () => {
-    it("should parse valid JSON", () => {
-      expect(safeJsonParse<{ a: number }>('{"a":1}')).toEqual({ a: 1 });
-      expect(safeJsonParse<number[]>("[1,2,3]")).toEqual([1, 2, 3]);
-    });
-
-    it("should return null for invalid JSON", () => {
-      expect(safeJsonParse("not json")).toBeNull();
-      expect(safeJsonParse("{")).toBeNull();
-    });
-
-    it("should return null for non-string input", () => {
-      expect(safeJsonParse(42)).toBeNull();
-      expect(safeJsonParse(null)).toBeNull();
-      expect(safeJsonParse(undefined)).toBeNull();
-      expect(safeJsonParse({})).toBeNull();
-    });
-
-    it("should return null for empty string", () => {
-      expect(safeJsonParse("")).toBeNull();
-    });
-  });
-
   describe("coerceFiniteNumber", () => {
     it("should accept finite numbers", () => {
       expect(coerceFiniteNumber(0)).toBe(0);
@@ -537,44 +512,6 @@ describe("Types utilities", () => {
       expect(coerceFiniteNumber(true)).toBeNull();
       expect(coerceFiniteNumber({})).toBeNull();
       expect(coerceFiniteNumber([])).toBeNull();
-    });
-  });
-
-  describe("coerceBool", () => {
-    it("should accept native booleans", () => {
-      expect(coerceBool(true)).toBe(true);
-      expect(coerceBool(false)).toBe(false);
-    });
-
-    it("should accept 0/1 numbers", () => {
-      expect(coerceBool(1)).toBe(true);
-      expect(coerceBool(0)).toBe(false);
-    });
-
-    it("should reject other numbers", () => {
-      expect(coerceBool(2)).toBeNull();
-      expect(coerceBool(-1)).toBeNull();
-    });
-
-    it('should accept "true"/"false"/"0"/"1" strings (case-insensitive)', () => {
-      expect(coerceBool("true")).toBe(true);
-      expect(coerceBool("TRUE")).toBe(true);
-      expect(coerceBool("1")).toBe(true);
-      expect(coerceBool("false")).toBe(false);
-      expect(coerceBool("False")).toBe(false);
-      expect(coerceBool("0")).toBe(false);
-    });
-
-    it("should reject other strings", () => {
-      expect(coerceBool("yes")).toBeNull();
-      expect(coerceBool("no")).toBeNull();
-      expect(coerceBool("")).toBeNull();
-    });
-
-    it("should reject other types", () => {
-      expect(coerceBool(null)).toBeNull();
-      expect(coerceBool(undefined)).toBeNull();
-      expect(coerceBool({})).toBeNull();
     });
   });
 

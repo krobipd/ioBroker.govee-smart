@@ -143,11 +143,6 @@ export class SegmentWizard {
   /** @param host Host interface wired up to the adapter. */
   constructor(private readonly host: WizardHost) {}
 
-  /** Currently active? Exposed for diagnostics/tests. */
-  public isActive(): boolean {
-    return this.session !== null;
-  }
-
   /**
    * Snapshot the active session — used by the diag-export runtime-state
    * provider. Returns null when no session is in flight. Plain object so

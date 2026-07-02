@@ -200,26 +200,6 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
-  describe("forget / clear", () => {
-    it("forget(deviceId) drops only that device's buffers", () => {
-      const c = new DiagnosticsCollector();
-      c.addLog("dev1", "info", "a");
-      c.addLog("dev2", "info", "b");
-      c.forget("dev1");
-      expect(c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0").recentLogs).toEqual([]);
-      expect((c.generate(makeDevice({ deviceId: "dev2" }), "2.0.0").recentLogs as Array<unknown>).length).toBe(1);
-    });
-
-    it("clear() empties all buffers", () => {
-      const c = new DiagnosticsCollector();
-      c.addLog("dev1", "info", "a");
-      c.addMqttPacket("dev2", "topic", "hex");
-      c.clear();
-      expect(c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0").recentLogs).toEqual([]);
-      expect(c.generate(makeDevice({ deviceId: "dev2" }), "2.0.0").lastMqttPackets).toEqual([]);
-    });
-  });
-
   describe("generate — output shape", () => {
     beforeEach(() => {
       initDeviceRegistry({
