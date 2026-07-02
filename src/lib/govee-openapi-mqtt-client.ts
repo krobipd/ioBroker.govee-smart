@@ -189,6 +189,15 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
    * @param payload Raw MQTT message buffer
    */
   private handleMessage(payload: Buffer): void {
+    // SEC-I2: bound the message size before parsing — mirrors the AWS-IoT MQTT
+    // client (govee-mqtt-client.ts). TLS is CA-pinned, so this needs a rogue or
+    // compromised broker, but dropping a multi-MB payload before it reaches
+    // onRaw + JSON.parse + downstream cap-expansion is cheap defence-in-depth
+    // (real Cloud-events messages are a few KB).
+    if (payload.length > 64 * 1024) {
+      this.log.debug(`Cloud-events: dropping oversized MQTT message (${payload.length} bytes)`);
+      return;
+    }
     try {
       const rawStr = payload.toString();
 

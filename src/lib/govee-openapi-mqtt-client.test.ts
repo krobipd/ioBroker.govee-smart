@@ -296,5 +296,18 @@ describe("GoveeOpenapiMqttClient", () => {
       expect(raws).toEqual(["{ bad json"]);
       expect(events).toBe(0);
     });
+
+    it("drops an oversized message before forwarding raw or parsing (SEC-I2 payload cap)", () => {
+      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers as never);
+      const raws: string[] = [];
+      let events = 0;
+      (client as any).onRaw = (r: string) => raws.push(r);
+      (client as any).onEvent = () => events++;
+      // 64 KB + 1 byte — over the cap. Must be dropped before onRaw + JSON.parse,
+      // so (unlike the unparseable case above) the raw is NOT forwarded.
+      (client as any).handleMessage(Buffer.alloc(64 * 1024 + 1, 0x61));
+      expect(raws).toEqual([]);
+      expect(events).toBe(0);
+    });
   });
 });
