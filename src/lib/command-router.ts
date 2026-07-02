@@ -1,4 +1,4 @@
-import { hexToRgb, logDedup, type ErrorCategory, type GoveeDevice, type TimerAdapter } from "./types";
+import { capMatchesControl, hexToRgb, logDedup, type ErrorCategory, type GoveeDevice, type TimerAdapter } from "./types";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
@@ -736,16 +736,13 @@ export class CommandRouter {
         continue;
       }
       const shortType = cap.type.replace("devices.capabilities.", "");
-      if (command === "power" && shortType === "on_off") {
-        return cap;
-      }
-      if (command === "brightness" && shortType === "range" && cap.instance.toLowerCase().includes("brightness")) {
-        return cap;
-      }
-      if (command === "colorRgb" && shortType === "color_setting" && cap.instance === "colorRgb") {
-        return cap;
-      }
-      if (command === "colorTemperature" && shortType === "color_setting" && cap.instance.includes("colorTem")) {
+      if (
+        (command === "power" ||
+          command === "brightness" ||
+          command === "colorRgb" ||
+          command === "colorTemperature") &&
+        capMatchesControl(cap, command)
+      ) {
         return cap;
       }
       if (command === "scene" && shortType === "mode" && cap.instance === "presetScene") {

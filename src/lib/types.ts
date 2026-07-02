@@ -886,3 +886,40 @@ export interface TimerAdapter {
   /** Async delay that gets cancelled on adapter unload */
   delay: (ms: number) => Promise<void>;
 }
+
+/** The four basic control kinds, spelled as their camelCase cloud instance. */
+export type ControlKind = "power" | "brightness" | "colorRgb" | "colorTemperature";
+
+/**
+ * Canonical predicate: does a raw Govee capability match a basic control kind?
+ * Single source of truth for the group-intersection check (capability-mapper
+ * `memberHasControlState`, keyed on snake_case state-ids) and command routing
+ * (`CommandRouter.findCapabilityForCommand`, keyed on camelCase command tokens).
+ * A duplicated copy of this shape-match drifted at the B2 rename and broke
+ * cloud-only group colour control — lives here (types.ts has no adapter-core/i18n
+ * imports) so both callers share one copy. Exact `shortType` match (not
+ * `endsWith`) → `segment_color_setting` never counts as a colour cap.
+ *
+ * @param cap Raw capability (type/instance may be non-string / missing)
+ * @param kind Control kind to test for
+ */
+export function capMatchesControl(
+  cap: { type?: unknown; instance?: unknown } | null | undefined,
+  kind: ControlKind,
+): boolean {
+  if (!cap || typeof cap.type !== "string" || typeof cap.instance !== "string") {
+    return false;
+  }
+  const shortType = cap.type.replace("devices.capabilities.", "");
+  const inst = cap.instance;
+  switch (kind) {
+    case "power":
+      return shortType === "on_off";
+    case "brightness":
+      return shortType === "range" && inst.toLowerCase().includes("brightness");
+    case "colorRgb":
+      return shortType === "color_setting" && inst === "colorRgb";
+    case "colorTemperature":
+      return shortType === "color_setting" && inst.includes("colorTem");
+  }
+}

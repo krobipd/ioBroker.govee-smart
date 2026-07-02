@@ -1467,6 +1467,34 @@ describe("CapabilityMapper", () => {
       expect(ids).not.toContain("color_temperature");
     });
 
+    it("should keep color_rgb/color_temperature in the group intersection for a cloud-only member WITH a colour cap (B2 snake_case regression)", () => {
+      // C.1: memberHasControlState is keyed on the snake_case state-id (ld.id),
+      // not the camelCase cloud instance. A cloud-only member that legitimately
+      // exposes colorRgb/colorTemperatureK caps must keep control.color_rgb /
+      // control.color_temperature in the fan-out intersection.
+      const m1 = createMember({
+        lanIp: undefined,
+        capabilities: [
+          { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+          { type: "devices.capabilities.range", instance: "brightness", parameters: { dataType: "INTEGER" } },
+          { type: "devices.capabilities.color_setting", instance: "colorRgb", parameters: { dataType: "INTEGER" } },
+          {
+            type: "devices.capabilities.color_setting",
+            instance: "colorTemperatureK",
+            parameters: { dataType: "INTEGER" },
+          },
+        ],
+        channels: { lan: false, mqtt: false, cloud: true },
+      });
+      const group = createGroup();
+      const result = buildAllStateDefsForTest(group, undefined, [m1]);
+      const ids = result.map(d => d.id);
+      expect(ids).toContain("power");
+      expect(ids).toContain("brightness");
+      expect(ids).toContain("color_rgb");
+      expect(ids).toContain("color_temperature");
+    });
+
     it("should skip unreachable members (no LAN, no Cloud)", () => {
       const m1 = createMember({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: false } });
       const group = createGroup();

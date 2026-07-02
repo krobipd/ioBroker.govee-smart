@@ -1,10 +1,12 @@
 import {
   buildUniqueLabelMap,
+  capMatchesControl,
   errMessage,
   rgbToHex,
   type CapabilityOption,
   type CloudCapability,
   type CloudStateCapability,
+  type ControlKind,
   type GoveeDevice,
 } from "./types";
 import { applyColorTempQuirk, getDeviceQuirks } from "./device-registry";
@@ -1369,6 +1371,14 @@ export function buildCloudStateDefs(
   return stateDefs;
 }
 
+/** Maps the snake_case LAN control state-id (getDefaultLanStates ids) to its cloud-instance kind. */
+const CONTROL_STATE_ID_TO_KIND: Record<string, ControlKind> = {
+  power: "power",
+  brightness: "brightness",
+  color_rgb: "colorRgb",
+  color_temperature: "colorTemperature",
+};
+
 /**
  * Check if a member device supports a given control state.
  * LAN-capable devices support all basic controls.
@@ -1380,40 +1390,12 @@ function memberHasControlState(member: GoveeDevice, stateId: string): boolean {
   if (member.lanIp) {
     return true;
   }
-  const caps = Array.isArray(member.capabilities) ? member.capabilities : [];
-  switch (stateId) {
-    case "power":
-      return caps.some(c => c && typeof c.type === "string" && c.type.endsWith("on_off"));
-    case "brightness":
-      return caps.some(
-        c =>
-          c &&
-          typeof c.type === "string" &&
-          typeof c.instance === "string" &&
-          c.type.endsWith("range") &&
-          c.instance === "brightness",
-      );
-    case "colorRgb":
-      return caps.some(
-        c =>
-          c &&
-          typeof c.type === "string" &&
-          typeof c.instance === "string" &&
-          c.type.endsWith("color_setting") &&
-          c.instance === "colorRgb",
-      );
-    case "colorTemperature":
-      return caps.some(
-        c =>
-          c &&
-          typeof c.type === "string" &&
-          typeof c.instance === "string" &&
-          c.type.endsWith("color_setting") &&
-          (c.instance === "colorTem" || c.instance === "colorTemperatureK"),
-      );
-    default:
-      return false;
+  const kind = CONTROL_STATE_ID_TO_KIND[stateId];
+  if (!kind) {
+    return false;
   }
+  const caps = Array.isArray(member.capabilities) ? member.capabilities : [];
+  return caps.some(c => capMatchesControl(c, kind));
 }
 
 /**
