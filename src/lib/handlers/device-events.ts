@@ -45,7 +45,11 @@ export function onDeviceStateUpdate<
     groupFanoutHandler.GroupFanoutHandlerAdapter &
     dropdownReset.GroupStateHelpersAdapter,
 >(adapter: T, device: GoveeDevice, state: Partial<DeviceState>): void {
-  if (adapter.stateManager) {
+  // Package A: don't mirror values before the initial object-creation batch has
+  // finished — a fast LAN devStatus can otherwise write control.color_rgb before
+  // createLanStates declared the object ("has no existing object"). Mirrors the
+  // trackStateCreation gate; the next LAN poll / MQTT push re-delivers the value.
+  if (adapter.statesReady && adapter.stateManager) {
     adapter.stateManager.updateDeviceState(device, state).catch(() => {});
   }
   connectionState.updateConnectionState(adapter);

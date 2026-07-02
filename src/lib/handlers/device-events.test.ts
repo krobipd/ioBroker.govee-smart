@@ -113,28 +113,28 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
 describe("onDeviceStateUpdate", () => {
   it("mirrors the patch into the state manager", () => {
     const device = createTestDevice();
-    const rig = makeRig({ devices: [device] });
+    const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { brightness: 50 });
     expect(rig.updates).toEqual([{ brightness: 50 }]);
   });
 
   it("an online flip on a Light triggers the fast syncInfoOnline path (<1s recovery, not the 20s timer)", () => {
     const device = createTestDevice(); // type light
-    const rig = makeRig({ devices: [device] });
+    const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { online: true });
     expect(rig.calls).toContain("syncInfoOnline");
   });
 
   it("non-Light online updates do NOT call syncInfoOnline (applyOnlineCap → updateDeviceState owns it)", () => {
     const sensor = createTestDevice({ type: "devices.types.thermometer" });
-    const rig = makeRig({ devices: [sensor] });
+    const rig = makeRig({ devices: [sensor], statesReady: true });
     onDeviceStateUpdate(rig.adapter, sensor, { online: true });
     expect(rig.calls).not.toContain("syncInfoOnline");
   });
 
   it("power-off resets the mode dropdowns — a device that is off cannot be 'playing Aurora'", async () => {
     const device = createTestDevice();
-    const rig = makeRig({ devices: [device] });
+    const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { power: false });
     await new Promise(r => setImmediate(r));
     expect(rig.dropdownResets.some(id => id.endsWith("scenes.light_scene"))).toBe(true);
@@ -142,7 +142,7 @@ describe("onDeviceStateUpdate", () => {
 
   it("L11: a numeric 0 from the MQTT boundary counts as power-off too", async () => {
     const device = createTestDevice();
-    const rig = makeRig({ devices: [device] });
+    const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { power: 0 as unknown as boolean });
     await new Promise(r => setImmediate(r));
     expect(rig.dropdownResets.length).toBeGreaterThan(0);
@@ -150,10 +150,20 @@ describe("onDeviceStateUpdate", () => {
 
   it("power-on does NOT reset dropdowns", async () => {
     const device = createTestDevice();
-    const rig = makeRig({ devices: [device] });
+    const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { power: true });
     await new Promise(r => setImmediate(r));
     expect(rig.dropdownResets).toHaveLength(0);
+  });
+
+  it("ignores value updates before statesReady — avoids the color_rgb start-race", () => {
+    // A fast LAN devStatus arriving before createLanStates has drained the queue
+    // must not write control.color_rgb onto a not-yet-created object. The next
+    // poll/push re-delivers the value.
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onDeviceStateUpdate(rig.adapter, device, { brightness: 50 });
+    expect(rig.updates).toEqual([]);
   });
 });
 
