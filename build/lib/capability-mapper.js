@@ -19,6 +19,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var capability_mapper_exports = {};
 __export(capability_mapper_exports, {
   LAN_STATE_IDS: () => LAN_STATE_IDS,
+  SENSOR_ROLE_UNIT: () => SENSOR_ROLE_UNIT,
   applyQuirksToStates: () => applyQuirksToStates,
   buildCloudStateDefs: () => buildCloudStateDefs,
   buildLanStateDefs: () => buildLanStateDefs,
@@ -312,23 +313,25 @@ function mapMode(cap) {
     }
   ];
 }
+const SENSOR_ROLE_UNIT = {
+  temperature: { role: "value.temperature", unit: "\xB0C" },
+  humidity: { role: "value.humidity", unit: "%" },
+  battery: { role: "value.battery", unit: "%" },
+  co2: { role: "value.co2", unit: "ppm" }
+};
 function mapProperty(cap) {
   var _a, _b;
   const instance = cap.instance.toLowerCase();
   let role = "value";
   let unit;
   if (instance.includes("temperature")) {
-    role = "value.temperature";
-    unit = "\xB0C";
+    ({ role, unit } = SENSOR_ROLE_UNIT.temperature);
   } else if (instance.includes("humidity")) {
-    role = "value.humidity";
-    unit = "%";
+    ({ role, unit } = SENSOR_ROLE_UNIT.humidity);
   } else if (instance.includes("battery")) {
-    role = "value.battery";
-    unit = "%";
+    ({ role, unit } = SENSOR_ROLE_UNIT.battery);
   } else if (instance.includes("co2") || instance.includes("carbondioxide")) {
-    role = "value.co2";
-    unit = "ppm";
+    ({ role, unit } = SENSOR_ROLE_UNIT.co2);
   }
   return [
     {
@@ -995,6 +998,7 @@ function buildGroupStateDefs(members) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   LAN_STATE_IDS,
+  SENSOR_ROLE_UNIT,
   applyQuirksToStates,
   buildCloudStateDefs,
   buildLanStateDefs,

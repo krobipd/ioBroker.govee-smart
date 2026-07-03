@@ -94,7 +94,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.18.2 (2026-07-03)
 
 - Internal refactoring. No user-facing changes.
 
@@ -149,12 +149,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ### 2.16.2 (2026-06-16) — stable
 - On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.
-
-### 2.16.1 (2026-06-11)
-
-- Running in compact mode no longer intercepts errors from other adapters in the same process — error reporting stays correctly attributed per adapter.
-- Cloud commands issued during a long rate-limit window no longer pile up without limit; stale queued calls are dropped with a single warning.
-- Device info entries (name, model, IP address) no longer rewrite their timestamps on every refresh — state history stays clean.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

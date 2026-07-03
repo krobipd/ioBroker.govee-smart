@@ -1,4 +1,10 @@
 # Older Changes
+## 2.16.1 (2026-06-11)
+
+- Running in compact mode no longer intercepts errors from other adapters in the same process — error reporting stays correctly attributed per adapter.
+- Cloud commands issued during a long rate-limit window no longer pile up without limit; stale queued calls are dropped with a single warning.
+- Device info entries (name, model, IP address) no longer rewrite their timestamps on every refresh — state history stays clean.
+
 ## 2.16.0 (2026-06-09)
 
 - Lights and appliances without a local connection can now be controlled through the Cloud and report their correct online status; devices that support local control keep using it first.

@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.18.1",
+    "version": "2.18.2",
     "news": {
-      "NEXT": {
+      "2.18.2": {
         "en": "Internal refactoring. No user-facing changes.",
         "de": "Interne Überarbeitung. Keine für Nutzer sichtbaren Änderungen.",
         "ru": "Внутренний рефакторинг. Никаких изменений для пользователя.",

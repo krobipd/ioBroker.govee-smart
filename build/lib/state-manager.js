@@ -38,12 +38,19 @@ const CHANNEL_NAMES = {
   info: "Device Information",
   diag: "Diagnostics"
 };
+const numSensor = (kind, nameKey) => ({
+  type: "number",
+  role: import_capability_mapper.SENSOR_ROLE_UNIT[kind].role,
+  unit: import_capability_mapper.SENSOR_ROLE_UNIT[kind].unit,
+  nameKey,
+  channel: "sensor"
+});
 const SYNTHETIC_STATE_META = {
-  temperature: { type: "number", role: "value.temperature", unit: "\xB0C", nameKey: "temperature", channel: "sensor" },
-  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
-  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
-  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
-  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  temperature: numSensor("temperature", "temperature"),
+  humidity: numSensor("humidity", "humidity"),
+  battery: numSensor("battery", "battery"),
+  co2: numSensor("co2", "co2"),
+  carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
   lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
@@ -51,15 +58,9 @@ const SYNTHETIC_STATE_META = {
   icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
   bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
   dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
-  sensor_temperature: {
-    type: "number",
-    role: "value.temperature",
-    unit: "\xB0C",
-    nameKey: "temperature",
-    channel: "sensor"
-  },
-  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
-  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  sensor_temperature: numSensor("temperature", "temperature"),
+  sensor_humidity: numSensor("humidity", "humidity"),
+  sensor_battery: numSensor("battery", "battery"),
   lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
