@@ -587,6 +587,32 @@ describe("DeviceManager", () => {
       expect(await noBearer.loadGroupMembers()).toBe(false);
     });
 
+    it("removes a BaseGroup deleted from the account after the debounce (non-empty group list)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      const deletedGroup = createTestDevice({
+        sku: "BaseGroup",
+        deviceId: "9001",
+        name: "Old Group",
+        lanIp: undefined,
+        channels: { lan: false, mqtt: false, cloud: false },
+      });
+      (dm2 as any).devices.set((dm2 as any).deviceKey("BaseGroup", "9001"), deletedGroup);
+      dm2.accountReconcileEnabled = true;
+      // Group list is non-empty (a different group still exists) but the deleted
+      // group is absent → reconcilable via the group authority, evicted after N.
+      dm2.setApiClient({
+        hasBearerToken: () => true,
+        fetchGroupMembers: async () => [{ groupId: 8888, devices: [] }],
+      } as any);
+
+      await dm2.loadGroupMembers(); // pass 1 → miss 1, kept
+      expect(dm2.getDevices().map(d => d.deviceId)).toContain("9001");
+      expect(deletedGroup.accountMissCount).toBe(1);
+
+      await dm2.loadGroupMembers(); // pass 2 → miss 2 → evicted
+      expect(dm2.getDevices().map(d => d.deviceId)).not.toContain("9001");
+    });
+
     it("should route lightScene via ptReal when scene is in library", async () => {
       const tracker = createCallTracker();
       const mockLan = {

@@ -22,6 +22,7 @@ import {
   reconcileAccountMembership,
   type ReconcileSource,
   type ReconcileSources,
+  type SourceKind,
 } from "./device-manager/reconciler";
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
@@ -104,6 +105,7 @@ export class DeviceManager {
    */
   private lastCloudList: ReconcileSource | null = null;
   private lastAppList: ReconcileSource | null = null;
+  private lastGroupList: ReconcileSource | null = null;
   /**
    * Gate for the account-reconcile — main flips this true once the initial LAN
    * scan is done, so a cache-restored LAN device isn't counted as an account
@@ -317,24 +319,27 @@ export class DeviceManager {
    * LAN-reachable, atomically across all three stores (in-memory map,
    * SKU-cache file, ioBroker objects). Gated until the initial LAN scan is
    * done. Decision logic lives in the pure {@link reconcileAccountMembership}.
+   *
+   * @param refreshedSource
    */
-  private runAccountReconcile(): void {
+  private runAccountReconcile(refreshedSource: SourceKind): void {
     if (!this.accountReconcileEnabled) {
       return;
     }
     const sources: ReconcileSources = {
       cloud: this.lastCloudList ?? ABSENT_SOURCE,
       app: this.lastAppList ?? ABSENT_SOURCE,
-      group: ABSENT_SOURCE,
+      group: this.lastGroupList ?? ABSENT_SOURCE,
     };
     // Nothing successfully queried yet → nothing to judge.
-    if (!sources.cloud.ok && !sources.app.ok) {
+    if (!sources.cloud.ok && !sources.app.ok && !sources.group.ok) {
       return;
     }
     const toEvict = reconcileAccountMembership({
       sources,
       devices: this.devices.values(),
       keyOf: (sku, id) => this.deviceKey(sku, id),
+      refreshedSource,
     });
     if (toEvict.length === 0) {
       return;
@@ -515,7 +520,7 @@ export class DeviceManager {
         ok: cloudDevices.length > 0,
         keys: new Set(cloudDevices.map(cd => this.deviceKey(cd.sku, cd.device))),
       };
-      this.runAccountReconcile();
+      this.runAccountReconcile("cloud");
 
       // Step 3: Prune stale cache entries (only after successful Cloud-load
       // with a plausible response — never prune on Cloud failure or empty list)
@@ -935,6 +940,13 @@ export class DeviceManager {
     const ep = "/bff-app/v1/exec-plat/home";
     try {
       const apiGroups = await this.apiClient.fetchGroupMembers();
+      // Snapshot the group list as the third reconcile source. Non-empty guard
+      // (like the device sources): an empty response is treated as not-ok, so a
+      // transient empty never evicts a still-existing group.
+      this.lastGroupList = {
+        ok: apiGroups.length > 0,
+        keys: new Set(apiGroups.map(g => this.deviceKey("BaseGroup", String(g.groupId)))),
+      };
       // v2.9.1 — record per-group response in apiHistory of each BaseGroup
       // device. The fetch is account-wide so we tag every group's deviceId.
       for (const group of this.devices.values()) {
@@ -990,10 +1002,15 @@ export class DeviceManager {
           this.onGroupMembersReady?.(group, allDevices);
         }
       }
+      // Reconcile now that the group list is fresh — a BaseGroup absent from a
+      // non-empty group response is a candidate for removal after the debounce.
+      this.runAccountReconcile("group");
       // Reset dedup on success so a future failure warns again.
       this.lastGroupMembersErrorCategory = null;
       return changed;
     } catch (e) {
+      // A failed group fetch is not authoritative — never reconcile groups on it.
+      this.lastGroupList = { ok: false, keys: new Set() };
       // v2.9.1 — record failure on every BaseGroup so the diag JSON shows
       // why group fan-out doesn't work without needing the adapter log.
       const status = this.extractStatus(e);
@@ -1522,7 +1539,7 @@ export class DeviceManager {
     const updated = results.filter(Boolean).length;
     // Reconcile now that the (complete) App-API account list is fresh — this is
     // what surfaces a sold sensor (absent here) for removal after the debounce.
-    this.runAccountReconcile();
+    this.runAccountReconcile("app");
     return updated;
   }
 

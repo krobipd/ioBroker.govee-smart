@@ -39,22 +39,24 @@ export function isSensorType(type: string): boolean {
   return type === GOVEE_DEVICE_TYPE.THERMOMETER || type === GOVEE_DEVICE_TYPE.SENSOR;
 }
 
+/** Which of the three account sources a device belongs to. */
+export type SourceKind = "cloud" | "app" | "group";
+
 /**
- * The one source that authoritatively lists a device's type. A device is only
- * a removal candidate when THIS source was successfully queried and the device
- * is absent from it — so an unrelated source can never drive a false eviction
- * (a light is never removed on the strength of the App-API list, which may not
- * carry lights at all; a sensor is never removed on a Cloud list that never
- * lists sensors).
+ * The source that authoritatively lists a device's type. A device is only a
+ * removal candidate when THIS source refreshed AND was successfully queried AND
+ * the device is absent from it — so an unrelated source can never drive a false
+ * eviction (a light is never removed on the strength of the App-API list, which
+ * may not carry lights at all; a sensor is never removed on a Cloud list that
+ * never lists sensors).
  *
  * @param device Device to classify
- * @param sources The pass's three sources
  */
-function authoritativeSource(device: GoveeDevice, sources: ReconcileSources): ReconcileSource {
+export function authoritativeKind(device: GoveeDevice): SourceKind {
   if (device.sku === "BaseGroup") {
-    return sources.group;
+    return "group";
   }
-  return isSensorType(device.type) ? sources.app : sources.cloud;
+  return isSensorType(device.type) ? "app" : "cloud";
 }
 
 /** Input to {@link reconcileAccountMembership}. */
@@ -65,6 +67,13 @@ export interface ReconcileInput {
   devices: Iterable<GoveeDevice>;
   /** Stable per-device key — MUST be the same fn the source keys were built with. */
   keyOf: (sku: string, deviceId: string) => string;
+  /**
+   * Which source refreshed this pass. Only devices whose authoritative source
+   * is this one may have their miss counter incremented — so re-running the
+   * reconcile from another trigger (reusing the other sources' stale snapshots)
+   * never double-counts the debounce. Presence still resets from ANY source.
+   */
+  refreshedSource: SourceKind;
   /** Consecutive misses required before eviction (default {@link DEFAULT_EVICT_THRESHOLD}). */
   evictThreshold?: number;
 }
@@ -89,7 +98,7 @@ export interface ReconcileInput {
  * @returns The devices that crossed the eviction threshold this pass
  */
 export function reconcileAccountMembership(input: ReconcileInput): GoveeDevice[] {
-  const { sources, devices, keyOf } = input;
+  const { sources, devices, keyOf, refreshedSource } = input;
   const threshold = input.evictThreshold ?? DEFAULT_EVICT_THRESHOLD;
   const toEvict: GoveeDevice[] = [];
   for (const device of devices) {
@@ -109,10 +118,13 @@ export function reconcileAccountMembership(input: ReconcileInput): GoveeDevice[]
       device.accountMissCount = 0;
       continue;
     }
-    // Absent from every ok source. Only meaningful if the source that WOULD
-    // list this device's type was actually queried — otherwise we cannot judge
-    // (e.g. sensors with no App-API credentials) and must keep it untouched.
-    if (!authoritativeSource(device, sources).ok) {
+    // Absent from every ok source. Increment ONLY when the source that just
+    // refreshed is the one that authoritatively lists this device's type AND it
+    // was successfully queried — so a second trigger reusing another source's
+    // stale snapshot cannot double-count the debounce, and a source we could
+    // not query (e.g. no App-API credentials) never removes anything.
+    const kind = authoritativeKind(device);
+    if (kind !== refreshedSource || !sources[kind].ok) {
       continue;
     }
     device.accountMissCount = (device.accountMissCount ?? 0) + 1;

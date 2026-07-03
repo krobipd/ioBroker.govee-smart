@@ -2,10 +2,12 @@ import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { GoveeDevice } from "../types";
 import {
   ABSENT_SOURCE,
+  authoritativeKind,
   isSensorType,
   reconcileAccountMembership,
   type ReconcileSource,
   type ReconcileSources,
+  type SourceKind,
 } from "./reconciler";
 
 const keyOf = (sku: string, id: string): string => `${sku}:${id}`;
@@ -34,32 +36,31 @@ function sources(over: Partial<ReconcileSources> = {}): ReconcileSources {
   return { cloud: ABSENT_SOURCE, app: ABSENT_SOURCE, group: ABSENT_SOURCE, ...over };
 }
 
-/** Evict in one call by pre-loading the miss counter to threshold-1. */
-function reconcileOnce(devices: GoveeDevice[], s: ReconcileSources, threshold = 2): GoveeDevice[] {
-  return reconcileAccountMembership({ sources: s, devices, keyOf, evictThreshold: threshold });
+function reconcile(devices: GoveeDevice[], s: ReconcileSources, refreshedSource: SourceKind, threshold = 2): GoveeDevice[] {
+  return reconcileAccountMembership({ sources: s, devices, keyOf, refreshedSource, evictThreshold: threshold });
 }
 
 describe("reconcileAccountMembership", () => {
   describe("guard: a failed / empty source never removes a device", () => {
     it("keeps a cloud-only light when the cloud source is not ok (failed/empty fetch)", () => {
       const light = mk({ sku: "H61BE", deviceId: "AA", accountMissCount: 5 });
-      const evicted = reconcileOnce([light], sources({ cloud: src(false, []) }));
+      const evicted = reconcile([light], sources({ cloud: src(false, []) }), "cloud");
       expect(evicted).toEqual([]);
-      // not-ok authoritative source → counter left untouched, never incremented
-      expect(light.accountMissCount).toBe(5);
+      expect(light.accountMissCount).toBe(5); // not-ok authoritative source → untouched
     });
 
     it("keeps every device when no source was queried at all", () => {
       const light = mk({ sku: "H61BE", deviceId: "AA" });
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER });
-      expect(reconcileOnce([light, sensor], sources())).toEqual([]);
+      expect(reconcile([light, sensor], sources(), "cloud")).toEqual([]);
+      expect(reconcile([light, sensor], sources(), "app")).toEqual([]);
     });
   });
 
   describe("guard: positive membership keeps + resets", () => {
     it("resets the miss counter when a light reappears in the cloud list", () => {
       const light = mk({ sku: "H61BE", deviceId: "AA", accountMissCount: 1 });
-      const evicted = reconcileOnce([light], sources({ cloud: src(true, ["H61BE:AA"]) }));
+      const evicted = reconcile([light], sources({ cloud: src(true, ["H61BE:AA"]) }), "cloud");
       expect(evicted).toEqual([]);
       expect(light.accountMissCount).toBe(0);
     });
@@ -72,7 +73,7 @@ describe("reconcileAccountMembership", () => {
         state: { online: false },
         accountMissCount: 1,
       });
-      const evicted = reconcileOnce([sensor], sources({ app: src(true, ["H5179:BB"]) }));
+      const evicted = reconcile([sensor], sources({ app: src(true, ["H5179:BB"]) }), "app");
       expect(evicted).toEqual([]);
       expect(sensor.accountMissCount).toBe(0);
     });
@@ -87,34 +88,46 @@ describe("reconcileAccountMembership", () => {
         channels: { lan: true, mqtt: false, cloud: false },
         accountMissCount: 9,
       });
-      const evicted = reconcileOnce([light], sources({ cloud: src(true, ["OTHER:ZZ"]) }));
+      const evicted = reconcile([light], sources({ cloud: src(true, ["OTHER:ZZ"]) }), "cloud");
       expect(evicted).toEqual([]);
       expect(light.accountMissCount).toBe(0);
     });
   });
 
   describe("guard: type-aware authority (the advisor blocker)", () => {
-    it("does NOT remove a cloud-only light when only the App-API list is ok (light absent there)", () => {
-      // cloud failed → cloud.ok=false; app ok but carries no lights. A light's
-      // authoritative source is cloud, so app-absence must not delete it.
+    it("does NOT touch a cloud-only light on an APP refresh when only the App list is ok", () => {
+      // Cloud failed (cloud.ok=false); an App poll ran (app.ok) but carries no
+      // lights. A light's authority is cloud, so an app refresh must not touch it.
       const light = mk({ sku: "H61BE", deviceId: "AA", accountMissCount: 1 });
-      const evicted = reconcileOnce([light], sources({ cloud: src(false, []), app: src(true, ["H5179:BB"]) }));
+      const evicted = reconcile([light], sources({ cloud: src(false, []), app: src(true, ["H5179:BB"]) }), "app");
       expect(evicted).toEqual([]);
-      expect(light.accountMissCount).toBe(1); // unchanged — cloud not queried
+      expect(light.accountMissCount).toBe(1); // unchanged — app is not authoritative for lights
     });
 
-    it("does NOT remove a sensor when only the cloud list is ok (cloud never lists sensors)", () => {
+    it("does NOT touch a sensor on a CLOUD refresh (cloud never lists sensors)", () => {
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.SENSOR, accountMissCount: 1 });
-      const evicted = reconcileOnce([sensor], sources({ cloud: src(true, ["H61BE:AA"]), app: src(false, []) }));
+      const evicted = reconcile([sensor], sources({ cloud: src(true, ["H61BE:AA"]), app: src(false, []) }), "cloud");
       expect(evicted).toEqual([]);
       expect(sensor.accountMissCount).toBe(1);
+    });
+  });
+
+  describe("guard: no double-count across triggers", () => {
+    it("does not increment a sensor on a cloud refresh even with a stale ok App snapshot", () => {
+      // App snapshot is ok + missing the sensor (from a prior poll), but THIS
+      // pass is a cloud refresh — the sensor must not be counted here.
+      const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER, accountMissCount: 1 });
+      const s = sources({ cloud: src(true, ["OTHER:ZZ"]), app: src(true, ["OTHER:YY"]) });
+      const evicted = reconcile([sensor], s, "cloud");
+      expect(evicted).toEqual([]);
+      expect(sensor.accountMissCount).toBe(1); // only an app refresh may bump it
     });
   });
 
   describe("guard: union ownership (belt-and-suspenders)", () => {
     it("keeps a light that shows up in the App list even though absent from the cloud list", () => {
       const light = mk({ sku: "H61BE", deviceId: "AA", accountMissCount: 1 });
-      const evicted = reconcileOnce([light], sources({ cloud: src(true, []), app: src(true, ["H61BE:AA"]) }));
+      const evicted = reconcile([light], sources({ cloud: src(true, []), app: src(true, ["H61BE:AA"]) }), "cloud");
       expect(evicted).toEqual([]);
       expect(light.accountMissCount).toBe(0);
     });
@@ -123,7 +136,7 @@ describe("reconcileAccountMembership", () => {
   describe("debounce: consecutive misses before eviction", () => {
     it("increments but does not evict on the first miss", () => {
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER });
-      const evicted = reconcileOnce([sensor], sources({ app: src(true, ["OTHER:ZZ"]) }));
+      const evicted = reconcile([sensor], sources({ app: src(true, ["OTHER:ZZ"]) }), "app");
       expect(evicted).toEqual([]);
       expect(sensor.accountMissCount).toBe(1);
     });
@@ -131,8 +144,8 @@ describe("reconcileAccountMembership", () => {
     it("evicts on the second consecutive miss (default threshold 2)", () => {
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER });
       const s = sources({ app: src(true, ["OTHER:ZZ"]) });
-      expect(reconcileOnce([sensor], s)).toEqual([]); // 0 → 1
-      const evicted = reconcileOnce([sensor], s); // 1 → 2 → evict
+      expect(reconcile([sensor], s, "app")).toEqual([]); // 0 → 1
+      const evicted = reconcile([sensor], s, "app"); // 1 → 2 → evict
       expect(evicted).toEqual([sensor]);
       expect(sensor.accountMissCount).toBe(2);
     });
@@ -141,9 +154,9 @@ describe("reconcileAccountMembership", () => {
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER });
       const absent = sources({ app: src(true, ["OTHER:ZZ"]) });
       const present = sources({ app: src(true, ["H5179:BB"]) });
-      reconcileOnce([sensor], absent); // → 1
-      reconcileOnce([sensor], present); // → 0 (reappeared)
-      const evicted = reconcileOnce([sensor], absent); // → 1, still not evicted
+      reconcile([sensor], absent, "app"); // → 1
+      reconcile([sensor], present, "app"); // → 0 (reappeared)
+      const evicted = reconcile([sensor], absent, "app"); // → 1, still not evicted
       expect(evicted).toEqual([]);
       expect(sensor.accountMissCount).toBe(1);
     });
@@ -151,15 +164,14 @@ describe("reconcileAccountMembership", () => {
     it("honours a custom threshold of 3", () => {
       const sensor = mk({ sku: "H5179", deviceId: "BB", type: GOVEE_DEVICE_TYPE.THERMOMETER });
       const s = sources({ app: src(true, ["OTHER:ZZ"]) });
-      expect(reconcileAccountMembership({ sources: s, devices: [sensor], keyOf, evictThreshold: 3 })).toEqual([]);
-      expect(reconcileAccountMembership({ sources: s, devices: [sensor], keyOf, evictThreshold: 3 })).toEqual([]);
-      expect(reconcileAccountMembership({ sources: s, devices: [sensor], keyOf, evictThreshold: 3 })).toEqual([sensor]);
+      expect(reconcile([sensor], s, "app", 3)).toEqual([]);
+      expect(reconcile([sensor], s, "app", 3)).toEqual([]);
+      expect(reconcile([sensor], s, "app", 3)).toEqual([sensor]);
     });
   });
 
   describe("the reported bug: sold H5179 sensor is removed", () => {
     it("evicts a cache-restored sensor no longer in the account after the debounce", () => {
-      // cache-restored → channels all false, no LAN. Owner has Email+PW → app.ok.
       const h5179 = mk({
         sku: "H5179",
         deviceId: "CC:DD",
@@ -169,7 +181,7 @@ describe("reconcileAccountMembership", () => {
       const active = mk({ sku: "H61BE", deviceId: "EE", channels: { lan: true, mqtt: false, cloud: false } });
       const ownedSensor = mk({ sku: "H5075", deviceId: "FF", type: GOVEE_DEVICE_TYPE.THERMOMETER });
       const s = sources({ cloud: src(true, ["H61BE:EE"]), app: src(true, ["H5075:FF"]) });
-      const evicted = reconcileOnce([h5179, active, ownedSensor], s);
+      const evicted = reconcile([h5179, active, ownedSensor], s, "app");
       expect(evicted).toEqual([h5179]); // gone
       expect(active.accountMissCount).toBe(0); // LAN light kept
       expect(ownedSensor.accountMissCount).toBe(0); // owned sensor kept
@@ -179,25 +191,31 @@ describe("reconcileAccountMembership", () => {
   describe("groups", () => {
     it("never evicts a BaseGroup when the group source is absent (deferred group reconcile)", () => {
       const group = mk({ sku: "BaseGroup", deviceId: "1311", accountMissCount: 9 });
-      const evicted = reconcileOnce([group], sources({ cloud: src(true, []), app: src(true, []) }));
+      const evicted = reconcile([group], sources({ cloud: src(true, []), app: src(true, []) }), "cloud");
       expect(evicted).toEqual([]);
       expect(group.accountMissCount).toBe(9); // group source not ok → untouched
     });
 
     it("evicts a BaseGroup absent from an ok group source after the debounce", () => {
       const group = mk({ sku: "BaseGroup", deviceId: "1311", accountMissCount: 1 });
-      const evicted = reconcileOnce([group], sources({ group: src(true, ["BaseGroup:9999"]) }));
+      const evicted = reconcile([group], sources({ group: src(true, ["BaseGroup:9999"]) }), "group");
       expect(evicted).toEqual([group]);
     });
   });
 
-  describe("isSensorType", () => {
-    it("classifies thermometer + sensor as sensor types, everything else as cloud", () => {
+  describe("classification helpers", () => {
+    it("isSensorType — thermometer + sensor are sensors, the rest are not", () => {
       expect(isSensorType(GOVEE_DEVICE_TYPE.THERMOMETER)).toBe(true);
       expect(isSensorType(GOVEE_DEVICE_TYPE.SENSOR)).toBe(true);
       expect(isSensorType(GOVEE_DEVICE_TYPE.LIGHT)).toBe(false);
       expect(isSensorType(GOVEE_DEVICE_TYPE.HEATER)).toBe(false);
-      expect(isSensorType(GOVEE_DEVICE_TYPE.HUMIDIFIER)).toBe(false);
+    });
+
+    it("authoritativeKind — group for BaseGroup, app for sensors, cloud otherwise", () => {
+      expect(authoritativeKind(mk({ sku: "BaseGroup", deviceId: "1" }))).toBe("group");
+      expect(authoritativeKind(mk({ sku: "H5179", deviceId: "1", type: GOVEE_DEVICE_TYPE.THERMOMETER }))).toBe("app");
+      expect(authoritativeKind(mk({ sku: "H61BE", deviceId: "1" }))).toBe("cloud");
+      expect(authoritativeKind(mk({ sku: "H7130", deviceId: "1", type: GOVEE_DEVICE_TYPE.HEATER }))).toBe("cloud");
     });
   });
 });
