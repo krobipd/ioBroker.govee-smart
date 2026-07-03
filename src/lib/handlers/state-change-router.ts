@@ -7,7 +7,6 @@ import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
 import { errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
-import * as cloudRetryHandler from "./cloud-retry-handler";
 import * as diagnosticsHandler from "./diagnostics-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
 
@@ -386,7 +385,9 @@ export async function onStateChange(
       try {
         const changed = await adapter.deviceManager.refreshSceneDataForDevice(device.deviceId);
         if (changed) {
-          await cloudRetryHandler.reloadCloudStates(adapter);
+          // Rebuild the Cloud-state tree so the fresh snapshot_cloud / scene
+          // dropdown options propagate to the ioBroker objects.
+          await adapter.loadCloudStates();
         }
       } catch (e) {
         adapter.log.warn(`Refresh cloud data for ${device.name} failed: ${errMessage(e)}`);

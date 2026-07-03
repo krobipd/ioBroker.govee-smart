@@ -402,7 +402,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
     ];
   }
 
-  if (cap.instance === "colorTemperatureK" || cap.instance.includes("colorTem")) {
+  if (cap.instance.includes("colorTem")) {
     const range = cap.parameters?.range;
     return [
       {

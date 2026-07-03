@@ -733,12 +733,10 @@ class GoveeAdapter extends utils.Adapter {
 
       // Check if all channels are ready — may already be true if MQTT connected fast
       connectionState.checkAllReady(this);
-      // Safety timeout: log ready even if a channel takes too long.
-      // 60s deckt normalen MQTT-Connect + 1 Reconnect-Attempt ab.
+      // Safety timeout: log ready anyway even if a channel takes too long.
+      // READY_SAFETY_TIMEOUT_MS covers a normal MQTT connect + 1 reconnect.
       this.readyTimer = this.setTimeout(() => {
         if (!this.readyLogged) {
-          // Safety timeout: log ready anyway even if a channel takes too long.
-          // READY_TIMEOUT_MS covers a normal MQTT connect + 1 reconnect.
           this.readyLogged = true;
           connectionState.logDeviceSummary(this);
         }

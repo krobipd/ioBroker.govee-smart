@@ -392,7 +392,8 @@ export class DeviceManager {
     for (const device of this.devices.values()) {
       cacheHelpers.populateScenesFromLibrary(this, device);
     }
-    return cached.length > 0;
+    // Always true here — the empty-cache case returned false at the top.
+    return true;
   }
 
   /**
@@ -1494,49 +1495,37 @@ export class DeviceManager {
       ok: entries.length > 0,
       keys: new Set(entries.map(e => this.deviceKey(e.sku, e.device))),
     };
-    // Process all entries in parallel — each entry only touches its own
-    // device (no shared mutation), and the downstream callbacks (onCloud-
-    // Capabilities → main.applyCloudCapabilities → setState queue)
-    // are async-safe. Sequential `for` blocked the App-API tick on a slow
-    // setState round-trip per device.
-    // Wrap each per-entry block in `Promise.resolve` so the iterable is a
-    // true Thenable — synchronous returns confuse `await Promise.all`'s
-    // type-checker (await-thenable lint rule) even though the runtime would
-    // accept them. No-op at runtime, makes the intent explicit and lints
-    // without `require-await`.
-    const results = await Promise.all(
-      entries.map(entry =>
-        Promise.resolve().then(() => {
-          const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
-          if (!device) {
-            return false;
-          }
-          const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
-          const caps = buildCapabilitiesFromAppEntryHelper(entry, Date.now(), hasHumidityCap);
-          if (caps.length === 0) {
-            return false;
-          }
-          this.onCloudCapabilities?.(device, caps);
-          // mapSingleCapability returns null for the synthetic `online` cap
-          // (online is a device-level property, not a regular state), so
-          // onCloudCapabilities never reaches info.online via the capability
-          // pipeline. Pluck it out and apply it directly — otherwise sensor
-          // SKUs like H5179 stay at info.online=false forever even while
-          // their readings keep updating.
-          // Cloud-only lights (no local API, lanIp === null) have no LAN
-          // reachability signal, so the cloud online cap is their only truth —
-          // apply it like sensors/appliances. LAN-capable lights stay excluded:
-          // their info.online is LAN-driven, and Govee's Cloud cache lags real
-          // LAN reachability (2× false-positive `true` during 2026-05-13).
-          if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
-            this.applyOnlineCap(device, caps);
-          }
-          this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
-          return true;
-        }),
-      ),
-    );
-    const updated = results.filter(Boolean).length;
+    // Apply each entry in a plain loop — the per-entry work only touches its own
+    // device and the downstream onCloudCapabilities callback is fire-and-forget
+    // (it enqueues its own setState work), so there is nothing to parallelise.
+    let updated = 0;
+    for (const entry of entries) {
+      const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
+      if (!device) {
+        continue;
+      }
+      const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
+      const caps = buildCapabilitiesFromAppEntryHelper(entry, Date.now(), hasHumidityCap);
+      if (caps.length === 0) {
+        continue;
+      }
+      this.onCloudCapabilities?.(device, caps);
+      // mapSingleCapability returns null for the synthetic `online` cap (online
+      // is a device-level property, not a regular state), so onCloudCapabilities
+      // never reaches info.online via the capability pipeline. Pluck it out and
+      // apply it directly — otherwise sensor SKUs like H5179 stay at
+      // info.online=false forever even while their readings keep updating.
+      // Cloud-only lights (no local API, lanIp === null) have no LAN reachability
+      // signal, so the cloud online cap is their only truth — apply it like
+      // sensors/appliances. LAN-capable lights stay excluded: their info.online
+      // is LAN-driven, and Govee's Cloud cache lags real LAN reachability (2×
+      // false-positive `true` during 2026-05-13).
+      if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
+        this.applyOnlineCap(device, caps);
+      }
+      this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
+      updated++;
+    }
     // Reconcile now that the (complete) App-API account list is fresh — this is
     // what surfaces a sold sensor (absent here) for removal after the debounce.
     this.runAccountReconcile("app");

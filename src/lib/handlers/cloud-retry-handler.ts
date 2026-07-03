@@ -104,13 +104,3 @@ export function handleCloudFailure(adapter: CloudRetryHandlerAdapter, result: Cl
   }
   ensureCloudRetry(adapter).handleResult(result);
 }
-
-/**
- * Reload the Cloud-state-tree — used by the per-device refresh button after
- * a successful `refreshSceneDataForDevice`, so the new states (e.g. fresh
- * snapshot_cloud dropdown options) propagate to ioBroker objects.
- *
- */
-export async function reloadCloudStates(adapter: { loadCloudStates(): Promise<void> }): Promise<void> {
-  await adapter.loadCloudStates();
-}
