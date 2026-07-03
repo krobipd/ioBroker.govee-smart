@@ -21,8 +21,7 @@ __export(cloud_retry_handler_exports, {
   buildCloudRetryHost: () => buildCloudRetryHost,
   cloudInitWithTimeout: () => cloudInitWithTimeout,
   ensureCloudRetry: () => ensureCloudRetry,
-  handleCloudFailure: () => handleCloudFailure,
-  reloadCloudStates: () => reloadCloudStates
+  handleCloudFailure: () => handleCloudFailure
 });
 module.exports = __toCommonJS(cloud_retry_handler_exports);
 var import_cloud_retry = require("../cloud-retry");
@@ -60,7 +59,7 @@ function buildCloudRetryHost(adapter) {
       var _a;
       adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected \u2014 API key accepted");
       adapter.cloudWasConnected = true;
-      adapter.setStateAsync("info.cloudConnected", { val: true, ack: true }).catch(() => {
+      adapter.setState("info.cloudConnected", { val: true, ack: true }).catch(() => {
       });
       (_a = adapter.stateManager) == null ? void 0 : _a.updateGroupsOnline(true).catch(() => {
       });
@@ -85,15 +84,11 @@ function handleCloudFailure(adapter, result) {
   }
   ensureCloudRetry(adapter).handleResult(result);
 }
-async function reloadCloudStates(adapter) {
-  await adapter.loadCloudStates();
-}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   buildCloudRetryHost,
   cloudInitWithTimeout,
   ensureCloudRetry,
-  handleCloudFailure,
-  reloadCloudStates
+  handleCloudFailure
 });
 //# sourceMappingURL=cloud-retry-handler.js.map

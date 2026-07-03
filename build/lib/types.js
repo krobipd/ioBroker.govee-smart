@@ -19,9 +19,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var types_exports = {};
 __export(types_exports, {
   buildUniqueLabelMap: () => buildUniqueLabelMap,
+  capMatchesControl: () => capMatchesControl,
   clampByte: () => clampByte,
   classifyError: () => classifyError,
-  coerceBool: () => coerceBool,
   coerceFiniteNumber: () => coerceFiniteNumber,
   disambiguateLabels: () => disambiguateLabels,
   errMessage: () => errMessage,
@@ -32,8 +32,7 @@ __export(types_exports, {
   parseSegmentList: () => parseSegmentList,
   resolveStatesValue: () => resolveStatesValue,
   rgbIntToHex: () => rgbIntToHex,
-  rgbToHex: () => rgbToHex,
-  safeJsonParse: () => safeJsonParse
+  rgbToHex: () => rgbToHex
 });
 module.exports = __toCommonJS(types_exports);
 function normalizeDeviceId(id) {
@@ -85,16 +84,6 @@ function maskSecret(secret) {
   }
   return `${secret.slice(0, 4)}***`;
 }
-function safeJsonParse(raw) {
-  if (typeof raw !== "string" || raw.length === 0) {
-    return null;
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
-}
 function coerceFiniteNumber(raw) {
   if (typeof raw === "number") {
     return Number.isFinite(raw) ? raw : null;
@@ -102,24 +91,6 @@ function coerceFiniteNumber(raw) {
   if (typeof raw === "string" && raw.trim().length > 0) {
     const n = Number(raw);
     return Number.isFinite(n) ? n : null;
-  }
-  return null;
-}
-function coerceBool(raw) {
-  if (typeof raw === "boolean") {
-    return raw;
-  }
-  if (raw === 0 || raw === 1) {
-    return raw === 1;
-  }
-  if (typeof raw === "string") {
-    const s = raw.trim().toLowerCase();
-    if (s === "true" || s === "1") {
-      return true;
-    }
-    if (s === "false" || s === "0") {
-      return false;
-    }
   }
   return null;
 }
@@ -267,12 +238,29 @@ function resolveStatesValue(input, statesMap) {
   }
   return null;
 }
+function capMatchesControl(cap, kind) {
+  if (!cap || typeof cap.type !== "string" || typeof cap.instance !== "string") {
+    return false;
+  }
+  const shortType = cap.type.replace("devices.capabilities.", "");
+  const inst = cap.instance;
+  switch (kind) {
+    case "power":
+      return shortType === "on_off";
+    case "brightness":
+      return shortType === "range" && inst.toLowerCase().includes("brightness");
+    case "colorRgb":
+      return shortType === "color_setting" && inst === "colorRgb";
+    case "colorTemperature":
+      return shortType === "color_setting" && inst.includes("colorTem");
+  }
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   buildUniqueLabelMap,
+  capMatchesControl,
   clampByte,
   classifyError,
-  coerceBool,
   coerceFiniteNumber,
   disambiguateLabels,
   errMessage,
@@ -283,7 +271,6 @@ function resolveStatesValue(input, statesMap) {
   parseSegmentList,
   resolveStatesValue,
   rgbIntToHex,
-  rgbToHex,
-  safeJsonParse
+  rgbToHex
 });
 //# sourceMappingURL=types.js.map

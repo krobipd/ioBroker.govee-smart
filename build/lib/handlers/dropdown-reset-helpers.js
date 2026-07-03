@@ -86,7 +86,7 @@ async function resetModeDropdowns(adapter, prefix, keep) {
       const stateId = `${adapter.namespace}.${prefix}.${dropdown}`;
       const current = await adapter.getStateAsync(stateId);
       if ((current == null ? void 0 : current.val) && current.val !== "0" && current.val !== 0) {
-        await adapter.setStateAsync(stateId, { val: "0", ack: true });
+        await adapter.setState(stateId, { val: "0", ack: true });
       }
     })
   );

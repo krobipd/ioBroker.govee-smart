@@ -30,17 +30,17 @@ async function handleDiagnosticsExport(adapter, deviceManager, lastRun, device, 
   const last = (_a = lastRun.get(deviceKey)) != null ? _a : 0;
   if (now - last < import_timing_constants.DIAGNOSTICS_EXPORT_THROTTLE_MS) {
     adapter.log.debug(`Diagnostics export throttled for ${device.name} \u2014 last run ${now - last}ms ago`);
-    await adapter.setStateAsync(triggerStateId, { val: false, ack: true });
+    await adapter.setState(triggerStateId, { val: false, ack: true });
     return;
   }
   lastRun.set(deviceKey, now);
   const diag = deviceManager.generateDiagnostics(device, (_b = adapter.version) != null ? _b : "unknown");
   const resultId = `${adapter.namespace}.${prefix}.diag.result`;
-  await adapter.setStateAsync(resultId, {
+  await adapter.setState(resultId, {
     val: JSON.stringify(diag, null, 2),
     ack: true
   });
-  await adapter.setStateAsync(triggerStateId, { val: false, ack: true });
+  await adapter.setState(triggerStateId, { val: false, ack: true });
   adapter.log.info(`Diagnostics exported for ${device.name} (${device.sku})`);
 }
 // Annotate the CommonJS export names for ESM import in node:

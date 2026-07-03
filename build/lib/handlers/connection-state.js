@@ -19,9 +19,9 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var connection_state_exports = {};
 __export(connection_state_exports, {
   checkAllReady: () => checkAllReady,
-  checkAppVersionDrift: () => checkAppVersionDrift,
   logDeviceSummary: () => logDeviceSummary,
   reapStaleDevices: () => reapStaleDevices,
+  refreshLiveAppVersion: () => refreshLiveAppVersion,
   updateConnectionState: () => updateConnectionState
 });
 module.exports = __toCommonJS(connection_state_exports);
@@ -40,7 +40,7 @@ function updateConnectionState(adapter) {
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {
     adapter.lastConnectionState = connected;
-    adapter.setStateAsync("info.connection", { val: connected, ack: true }).catch(() => {
+    adapter.setState("info.connection", { val: connected, ack: true }).catch(() => {
     });
   }
   const cs = adapter.channelStatus;
@@ -59,8 +59,8 @@ function updateConnectionState(adapter) {
     }
   }
 }
-async function checkAppVersionDrift(adapter) {
-  var _a, _b, _c, _d, _e, _f, _g;
+async function refreshLiveAppVersion(adapter) {
+  var _a, _b, _c;
   try {
     const result = await (0, import_http_client.httpsRequest)({
       method: "GET",
@@ -72,26 +72,10 @@ async function checkAppVersionDrift(adapter) {
     if (typeof liveVersion !== "string" || liveVersion.length === 0) {
       return;
     }
-    const localParts = import_govee_constants.GOVEE_APP_VERSION.split(".").map(Number);
-    const liveParts = liveVersion.split(".").map(Number);
-    const localMajor = (_d = localParts[0]) != null ? _d : 0;
-    const localMinor = (_e = localParts[1]) != null ? _e : 0;
-    const liveMajor = (_f = liveParts[0]) != null ? _f : 0;
-    const liveMinor = (_g = liveParts[1]) != null ? _g : 0;
-    const liveTotal = liveMajor * 100 + liveMinor;
-    const localTotal = localMajor * 100 + localMinor;
-    const driftMinor = liveTotal - localTotal;
-    const driftMessage = driftMinor === 0 ? `current (live=${liveVersion}, local=${import_govee_constants.GOVEE_APP_VERSION})` : driftMinor <= 2 ? `minor drift (live=${liveVersion}, local=${import_govee_constants.GOVEE_APP_VERSION})` : `STALE (live=${liveVersion}, local=${import_govee_constants.GOVEE_APP_VERSION}) \u2014 bump GOVEE_APP_VERSION`;
-    await adapter.setStateAsync("info.appVersionDrift", { val: driftMessage, ack: true }).catch(() => void 0);
-    if (driftMinor > 2) {
-      adapter.log.warn(
-        `Govee app version drift: live ${liveVersion} vs local ${import_govee_constants.GOVEE_APP_VERSION} \u2014 undocumented endpoints may start failing. Run sync-govee-app-version.py + release a new adapter version.`
-      );
-    } else {
-      adapter.log.debug(`App version: ${driftMessage}`);
-    }
+    (0, import_govee_constants.setAppVersion)(liveVersion);
+    adapter.log.debug(`Govee app version: using ${(0, import_govee_constants.getAppVersion)()} (bundled fallback ${import_govee_constants.GOVEE_APP_VERSION})`);
   } catch (e) {
-    adapter.log.debug(`App version check failed: ${(0, import_types.errMessage)(e)}`);
+    adapter.log.debug(`App version lookup failed, keeping ${(0, import_govee_constants.getAppVersion)()}: ${(0, import_types.errMessage)(e)}`);
   }
 }
 async function reapStaleDevices(adapter) {
@@ -175,9 +159,9 @@ function logDeviceSummary(adapter) {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   checkAllReady,
-  checkAppVersionDrift,
   logDeviceSummary,
   reapStaleDevices,
+  refreshLiveAppVersion,
   updateConnectionState
 });
 //# sourceMappingURL=connection-state.js.map

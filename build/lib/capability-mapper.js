@@ -265,7 +265,7 @@ function mapColorSetting(cap) {
       }
     ];
   }
-  if (cap.instance === "colorTemperatureK" || cap.instance.includes("colorTem")) {
+  if (cap.instance.includes("colorTem")) {
     const range = (_a = cap.parameters) == null ? void 0 : _a.range;
     return [
       {
@@ -925,29 +925,22 @@ function buildCloudStateDefs(device, log, localSnapshots, memberDevices) {
   stateDefs.push(...buildDiagStateDefs("unknown"));
   return stateDefs;
 }
+const CONTROL_STATE_ID_TO_KIND = {
+  power: "power",
+  brightness: "brightness",
+  color_rgb: "colorRgb",
+  color_temperature: "colorTemperature"
+};
 function memberHasControlState(member, stateId) {
   if (member.lanIp) {
     return true;
   }
-  const caps = Array.isArray(member.capabilities) ? member.capabilities : [];
-  switch (stateId) {
-    case "power":
-      return caps.some((c) => c && typeof c.type === "string" && c.type.endsWith("on_off"));
-    case "brightness":
-      return caps.some(
-        (c) => c && typeof c.type === "string" && typeof c.instance === "string" && c.type.endsWith("range") && c.instance === "brightness"
-      );
-    case "colorRgb":
-      return caps.some(
-        (c) => c && typeof c.type === "string" && typeof c.instance === "string" && c.type.endsWith("color_setting") && c.instance === "colorRgb"
-      );
-    case "colorTemperature":
-      return caps.some(
-        (c) => c && typeof c.type === "string" && typeof c.instance === "string" && c.type.endsWith("color_setting") && (c.instance === "colorTem" || c.instance === "colorTemperatureK")
-      );
-    default:
-      return false;
+  const kind = CONTROL_STATE_ID_TO_KIND[stateId];
+  if (!kind) {
+    return false;
   }
+  const caps = Array.isArray(member.capabilities) ? member.capabilities : [];
+  return caps.some((c) => (0, import_types.capMatchesControl)(c, kind));
 }
 function buildGroupStateDefs(members) {
   const controllable = members.filter((m) => m.lanIp || m.channels.cloud);

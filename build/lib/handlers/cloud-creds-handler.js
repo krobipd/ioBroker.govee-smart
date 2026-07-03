@@ -20,8 +20,8 @@ var cloud_creds_handler_exports = {};
 __export(cloud_creds_handler_exports, {
   cleanupLegacyMqttNativeOnce: () => cleanupLegacyMqttNativeOnce,
   clearVerificationCodeSetting: () => clearVerificationCodeSetting,
-  loadPersistedCredsFromState: () => loadPersistedCredsFromState,
-  persistCredsToState: () => persistCredsToState
+  loadPersistedCreds: () => loadPersistedCreds,
+  persistCreds: () => persistCreds
 });
 module.exports = __toCommonJS(cloud_creds_handler_exports);
 var import_types = require("../types");
@@ -40,13 +40,12 @@ async function clearVerificationCodeSetting(adapter) {
     adapter.log.warn(`Could not clear mqttVerificationCode: ${(0, import_types.errMessage)(e)}`);
   }
 }
-async function loadPersistedCredsFromState(adapter) {
+const CREDENTIALS_FILE = "mqtt.json";
+function credentialsMeta(adapter) {
+  return `${adapter.namespace}.credentials`;
+}
+function parsePersistedBlob(adapter, raw) {
   try {
-    const s = await adapter.getStateAsync("info.mqttCredentials");
-    const raw = typeof (s == null ? void 0 : s.val) === "string" ? s.val : "";
-    if (!raw) {
-      return null;
-    }
     const obj = JSON.parse(raw);
     const safeStr = (v) => typeof v === "string" ? v : "";
     const bearerToken = adapter.decrypt(safeStr(obj.bearerToken));
@@ -64,7 +63,31 @@ async function loadPersistedCredsFromState(adapter) {
     return null;
   }
 }
-async function persistCredsToState(adapter, creds) {
+async function loadPersistedCreds(adapter) {
+  try {
+    const { file } = await adapter.readFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE);
+    const raw = typeof file === "string" ? file : file.toString("utf-8");
+    const creds = raw ? parsePersistedBlob(adapter, raw) : null;
+    if (creds) {
+      return creds;
+    }
+  } catch {
+  }
+  try {
+    const s = await adapter.getStateAsync("info.mqttCredentials");
+    const raw = typeof (s == null ? void 0 : s.val) === "string" ? s.val : "";
+    if (!raw) {
+      return null;
+    }
+    await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, raw);
+    await adapter.delObjectAsync("info.mqttCredentials").catch(() => void 0);
+    adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
+    return parsePersistedBlob(adapter, raw);
+  } catch {
+    return null;
+  }
+}
+async function persistCreds(adapter, creds) {
   const blob = JSON.stringify({
     bearerToken: adapter.encrypt(creds.bearerToken),
     iotEndpoint: creds.iotEndpoint,
@@ -74,7 +97,7 @@ async function persistCredsToState(adapter, creds) {
     accountTopic: creds.accountTopic,
     tokenExpiresAt: creds.tokenExpiresAt
   });
-  await adapter.setStateAsync("info.mqttCredentials", { val: blob, ack: true });
+  await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, blob);
 }
 async function cleanupLegacyMqttNativeOnce(adapter) {
   var _a;
@@ -108,7 +131,7 @@ async function cleanupLegacyMqttNativeOnce(adapter) {
 0 && (module.exports = {
   cleanupLegacyMqttNativeOnce,
   clearVerificationCodeSetting,
-  loadPersistedCredsFromState,
-  persistCredsToState
+  loadPersistedCreds,
+  persistCreds
 });
 //# sourceMappingURL=cloud-creds-handler.js.map

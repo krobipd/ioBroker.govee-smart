@@ -46,6 +46,7 @@ var import_lookups = require("./device-manager/lookups");
 var import_mapping = require("./device-manager/mapping");
 var cacheHelpers = __toESM(require("./device-manager/cache"));
 var cloudMergeHelpers = __toESM(require("./device-manager/cloud-merge"));
+var import_reconciler = require("./device-manager/reconciler");
 var import_types = require("./types");
 var import_http_client = require("./http-client");
 var import_lookups2 = require("./device-manager/lookups");
@@ -82,6 +83,28 @@ class DeviceManager {
   lastAppApiErrorCategory = null;
   /** Dedup tracker for `loadGroupMembers` errors — first warn per category, rest debug. */
   lastGroupMembersErrorCategory = null;
+  // === Account reconcile (auto-remove devices no longer in the Govee account) ===
+  /**
+   * Latest snapshot of each account-membership source, `null` until that source
+   * has been fetched at least once this session. Fed to the reconciler whenever
+   * either source refreshes (end of loadFromCloud / pollAppApi).
+   */
+  lastCloudList = null;
+  lastAppList = null;
+  lastGroupList = null;
+  /**
+   * Gate for the account-reconcile — main flips this true once the initial LAN
+   * scan is done, so a cache-restored LAN device isn't counted as an account
+   * miss before `channels.lan` has been set (advisor guard).
+   */
+  accountReconcileEnabled = false;
+  /**
+   * Fired after devices were evicted from the account so the adapter runs the
+   * object cleanup (reapStaleDevices → cleanupDevices + diagnostics prune). An
+   * App-API-poll-driven eviction never fires onCloudDataReady, so the cleanup
+   * must be triggered explicitly.
+   */
+  onDevicesRemoved = null;
   /**
    * @param log    ioBroker logger
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
@@ -247,6 +270,46 @@ class DeviceManager {
     return dev.deviceId;
   }
   /**
+   * Central account-membership reconcile — runs after either source refreshes
+   * (loadFromCloud / pollAppApi). Removes devices that persisted missing from
+   * their authoritative account list across the debounce window AND are not
+   * LAN-reachable, atomically across all three stores (in-memory map,
+   * SKU-cache file, ioBroker objects). Gated until the initial LAN scan is
+   * done. Decision logic lives in the pure {@link reconcileAccountMembership}.
+   *
+   * @param refreshedSource Which source list just refreshed (cloud / app / group) — only devices whose authoritative source matches get their absence advanced this pass
+   */
+  runAccountReconcile(refreshedSource) {
+    var _a, _b, _c, _d, _e;
+    if (!this.accountReconcileEnabled) {
+      return;
+    }
+    const sources = {
+      cloud: (_a = this.lastCloudList) != null ? _a : import_reconciler.ABSENT_SOURCE,
+      app: (_b = this.lastAppList) != null ? _b : import_reconciler.ABSENT_SOURCE,
+      group: (_c = this.lastGroupList) != null ? _c : import_reconciler.ABSENT_SOURCE
+    };
+    if (!sources.cloud.ok && !sources.app.ok && !sources.group.ok) {
+      return;
+    }
+    const toEvict = (0, import_reconciler.reconcileAccountMembership)({
+      sources,
+      devices: this.devices.values(),
+      keyOf: (sku, id) => this.deviceKey(sku, id),
+      refreshedSource
+    });
+    if (toEvict.length === 0) {
+      return;
+    }
+    for (const device of toEvict) {
+      this.log.info(`Removed device ${device.name} (${device.sku}) \u2014 no longer in your Govee account`);
+      this.removeDevice(device.sku, device.deviceId);
+      (_d = this.skuCache) == null ? void 0 : _d.evictDevice(device.sku, device.deviceId);
+    }
+    this.saveDevicesToCache();
+    (_e = this.onDevicesRemoved) == null ? void 0 : _e.call(this);
+  }
+  /**
    * Load devices from local SKU cache.
    * Returns true if any devices were loaded (= Cloud not needed).
    */
@@ -273,7 +336,7 @@ class DeviceManager {
     for (const device of this.devices.values()) {
       cacheHelpers.populateScenesFromLibrary(this, device);
     }
-    return cached.length > 0;
+    return true;
   }
   /**
    * Apply a single cached entry: merge into LAN-discovered device if present,
@@ -371,22 +434,11 @@ class DeviceManager {
           }
         }
       }
-      if (cloudDevices.length > 0) {
-        const ownedKeys = new Set(cloudDevices.map((cd) => this.deviceKey(cd.sku, cd.device)));
-        const removed = [];
-        for (const device of this.devices.values()) {
-          if (device.sku === "BaseGroup" || device.channels.lan || !device.channels.cloud) {
-            continue;
-          }
-          if (!ownedKeys.has(this.deviceKey(device.sku, device.deviceId))) {
-            removed.push(device);
-          }
-        }
-        for (const device of removed) {
-          this.log.info(`Removed device ${device.name} (${device.sku}) \u2014 no longer in your Govee account`);
-          this.removeDevice(device.sku, device.deviceId);
-        }
-      }
+      this.lastCloudList = {
+        ok: cloudDevices.length > 0,
+        keys: new Set(cloudDevices.map((cd) => this.deviceKey(cd.sku, cd.device)))
+      };
+      this.runAccountReconcile("cloud");
       if (this.skuCache && cloudDevices.length > 0) {
         this.skuCache.pruneStale(14);
       }
@@ -578,6 +630,51 @@ class DeviceManager {
     return device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0;
   }
   /**
+   * Fetch one undocumented-API library (scene / music / DIY) into its device
+   * field, rate-limited. Only fetches when forced or the field is still empty;
+   * records the raw array in the diag buffer (incl. scenceParam Base64 + config
+   * JSON) so a byte-level "why won't this activate on SKU X?" diagnosis works
+   * from the diag JSON alone. Returns true if the device changed.
+   *
+   * @param device Target device
+   * @param sku Product model (for the endpoint + log line)
+   * @param runLimited Rate-limited slot runner from loadDeviceLibraries
+   * @param hasBearer Whether a bearer token is present (for the failure log)
+   * @param cfg Per-library specifics — force flag, current field, endpoint,
+   *   labels, and the fetch + assign closures
+   * @param cfg.force Refetch even when the field already holds data
+   * @param cfg.current The device field being populated — skipped when non-empty unless forced
+   * @param cfg.ep API endpoint path, recorded in the diag buffer and failure log
+   * @param cfg.label Human-readable library name for the debug count line
+   * @param cfg.noun Plural noun for the count line (e.g. "scenes")
+   * @param cfg.failLabel Library label passed to the undocumented-API failure log
+   * @param cfg.fetch Closure that performs the actual API fetch
+   * @param cfg.assign Closure that stores the fetched array on the device
+   */
+  async loadLibrary(device, sku, runLimited, hasBearer, cfg) {
+    if (!(cfg.force || cfg.current.length === 0)) {
+      return false;
+    }
+    let changed = false;
+    await runLimited(async () => {
+      try {
+        const lib = await cfg.fetch();
+        this.diagnostics.recordApiSuccess(device.deviceId, cfg.ep, lib);
+        this.log.debug(
+          `${cfg.label} for ${sku}: ${lib.length} ${cfg.noun}${lib.length === 0 ? " \u2014 empty (Govee returned no data for this SKU)" : ""}`
+        );
+        if (lib.length > 0) {
+          cfg.assign(lib);
+          changed = true;
+        }
+      } catch (e) {
+        this.diagnostics.recordApiFailure(device.deviceId, cfg.ep, e, this.extractStatus(e));
+        this.logUndocApiFailure(sku, cfg.failLabel, cfg.ep, hasBearer, e);
+      }
+    });
+    return changed;
+  }
+  /**
    * Load scene/music/DIY libraries and SKU features from undocumented API.
    *
    * Each fetch runs through the rate-limiter so a fresh install with 10
@@ -602,62 +699,47 @@ class DeviceManager {
       await this.commandRouter.executeRateLimited(fn, 2);
     };
     const hasBearer = this.apiClient.hasBearerToken();
-    if (force || device.sceneLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/light-effect-libraries?sku=${sku}`;
-        try {
-          const lib = await this.apiClient.fetchSceneLibrary(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `Scene library for ${sku}: ${lib.length} scene(s)${lib.length === 0 ? " \u2014 empty (Govee returned no data for this SKU)" : ""}`
-          );
-          if (lib.length > 0) {
-            device.sceneLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "scene library", ep, hasBearer, e);
-        }
-      });
+    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
+      force,
+      current: device.sceneLibrary,
+      ep: `/light-effect-libraries?sku=${sku}`,
+      label: "Scene library",
+      noun: "scene(s)",
+      failLabel: "scene library",
+      fetch: () => this.apiClient.fetchSceneLibrary(sku),
+      assign: (lib) => {
+        device.sceneLibrary = lib;
+      }
+    })) {
+      changed = true;
     }
-    if (force || device.musicLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/light-effect-libraries-music?sku=${sku}`;
-        try {
-          const lib = await this.apiClient.fetchMusicLibrary(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `Music library for ${sku}: ${lib.length} mode(s)${lib.length === 0 ? " \u2014 empty (Govee returned no data for this SKU)" : ""}`
-          );
-          if (lib.length > 0) {
-            device.musicLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "music library", ep, hasBearer, e);
-        }
-      });
+    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
+      force,
+      current: device.musicLibrary,
+      ep: `/light-effect-libraries-music?sku=${sku}`,
+      label: "Music library",
+      noun: "mode(s)",
+      failLabel: "music library",
+      fetch: () => this.apiClient.fetchMusicLibrary(sku),
+      assign: (lib) => {
+        device.musicLibrary = lib;
+      }
+    })) {
+      changed = true;
     }
-    if (force || device.diyLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/diy-effect-libraries?sku=${sku}`;
-        try {
-          const lib = await this.apiClient.fetchDiyLibrary(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `DIY library for ${sku}: ${lib.length} effect(s)${lib.length === 0 ? " \u2014 empty (Govee returned no data for this SKU)" : ""}`
-          );
-          if (lib.length > 0) {
-            device.diyLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "DIY library", ep, hasBearer, e);
-        }
-      });
+    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
+      force,
+      current: device.diyLibrary,
+      ep: `/diy-effect-libraries?sku=${sku}`,
+      label: "DIY library",
+      noun: "effect(s)",
+      failLabel: "DIY library",
+      fetch: () => this.apiClient.fetchDiyLibrary(sku),
+      assign: (lib) => {
+        device.diyLibrary = lib;
+      }
+    })) {
+      changed = true;
     }
     if (force || !device.skuFeatures) {
       await runLimited(async () => {
@@ -721,6 +803,10 @@ class DeviceManager {
     const ep = "/bff-app/v1/exec-plat/home";
     try {
       const apiGroups = await this.apiClient.fetchGroupMembers();
+      this.lastGroupList = {
+        ok: apiGroups.length > 0,
+        keys: new Set(apiGroups.map((g) => this.deviceKey("BaseGroup", String(g.groupId))))
+      };
       for (const group of this.devices.values()) {
         if (group.sku === "BaseGroup") {
           const apiGroup = apiGroups.find((g) => String(g.groupId) === group.deviceId);
@@ -765,9 +851,11 @@ class DeviceManager {
           (_a = this.onGroupMembersReady) == null ? void 0 : _a.call(this, group, allDevices);
         }
       }
+      this.runAccountReconcile("group");
       this.lastGroupMembersErrorCategory = null;
       return changed;
     } catch (e) {
+      this.lastGroupList = { ok: false, keys: /* @__PURE__ */ new Set() };
       const status = this.extractStatus(e);
       for (const group of this.devices.values()) {
         if (group.sku === "BaseGroup") {
@@ -1162,6 +1250,7 @@ class DeviceManager {
    * @returns Number of devices that received an update
    */
   async pollAppApi() {
+    var _a;
     if (!this.apiClient || !this.apiClient.hasBearerToken()) {
       return 0;
     }
@@ -1183,29 +1272,28 @@ class DeviceManager {
       return 0;
     }
     this.lastAppApiErrorCategory = null;
-    const results = await Promise.all(
-      entries.map(
-        (entry) => Promise.resolve().then(() => {
-          var _a;
-          const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
-          if (!device) {
-            return false;
-          }
-          const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
-          const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry, Date.now(), hasHumidityCap);
-          if (caps.length === 0) {
-            return false;
-          }
-          (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, caps);
-          if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
-            this.applyOnlineCap(device, caps);
-          }
-          this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
-          return true;
-        })
-      )
-    );
-    return results.filter(Boolean).length;
+    this.lastAppList = {
+      ok: entries.length > 0,
+      keys: new Set(entries.map((e) => this.deviceKey(e.sku, e.device)))
+    };
+    let updated = 0;
+    for (const entry of entries) {
+      const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
+      if (!device) {
+        continue;
+      }
+      const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
+      const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry, Date.now(), hasHumidityCap);
+      if (caps.length === 0) {
+        continue;
+      }
+      (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, caps);
+      this.maybeApplyCloudOnline(device, caps);
+      this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
+      updated++;
+    }
+    this.runAccountReconcile("app");
+    return updated;
   }
   /**
    * Pull the `devices.capabilities.online` entry (if any) out of a
@@ -1221,6 +1309,20 @@ class DeviceManager {
    */
   applyOnlineCap(device, caps) {
     cloudMergeHelpers.applyOnlineCap(this, device, caps);
+  }
+  /**
+   * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
+   * reachability signal: sensors, appliances, and cloud-only lights (no local
+   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
+   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   *
+   * @param device Target device
+   * @param caps Capability list carrying the online flag
+   */
+  maybeApplyCloudOnline(device, caps) {
+    if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
+      this.applyOnlineCap(device, caps);
+    }
   }
   /**
    * Hook callback for sources that emit `CloudStateCapability[]` updates
@@ -1278,9 +1380,7 @@ class DeviceManager {
       `OpenAPI-MQTT event for ${device.sku}: ${event.capabilities.length} cap(s) [${capSummary}]`
     );
     (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, event.capabilities);
-    if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
-      this.applyOnlineCap(device, event.capabilities);
-    }
+    this.maybeApplyCloudOnline(device, event.capabilities);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

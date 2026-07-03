@@ -23,25 +23,19 @@ __export(govee_constants_exports, {
   GOVEE_CAP_TYPE: () => GOVEE_CAP_TYPE,
   GOVEE_CLIENT_TYPE: () => GOVEE_CLIENT_TYPE,
   GOVEE_DEVICE_TYPE: () => GOVEE_DEVICE_TYPE,
-  GOVEE_USER_AGENT: () => GOVEE_USER_AGENT,
-  deriveGoveeClientId: () => deriveGoveeClientId
+  buildGoveeAppHeaders: () => buildGoveeAppHeaders,
+  deriveGoveeClientId: () => deriveGoveeClientId,
+  getAppVersion: () => getAppVersion,
+  goveeUserAgent: () => goveeUserAgent,
+  setAppVersion: () => setAppVersion
 });
 module.exports = __toCommonJS(govee_constants_exports);
 var import_uuid = require("uuid");
 const GOVEE_CAP_TYPE = {
-  ON_OFF: "devices.capabilities.on_off",
-  RANGE: "devices.capabilities.range",
-  COLOR_SETTING: "devices.capabilities.color_setting",
-  SEGMENT_COLOR_SETTING: "devices.capabilities.segment_color_setting",
   DYNAMIC_SCENE: "devices.capabilities.dynamic_scene",
   PROPERTY: "devices.capabilities.property",
-  TOGGLE: "devices.capabilities.toggle",
   MUSIC_SETTING: "devices.capabilities.music_setting",
-  MODE: "devices.capabilities.mode",
-  ONLINE: "devices.capabilities.online",
-  WORK_MODE: "devices.capabilities.work_mode",
-  TEMPERATURE_SETTING: "devices.capabilities.temperature_setting",
-  EVENT: "devices.capabilities.event"
+  ONLINE: "devices.capabilities.online"
 };
 const GOVEE_DEVICE_TYPE = {
   LIGHT: "devices.types.light",
@@ -59,7 +53,34 @@ const GOVEE_DEVICE_TYPE = {
 };
 const GOVEE_APP_VERSION = "7.5.20";
 const GOVEE_CLIENT_TYPE = "1";
-const GOVEE_USER_AGENT = `GoveeHome/${GOVEE_APP_VERSION} (com.ihoment.GoVeeSensor; build:8; iOS 26.5.0) Alamofire/5.11.0`;
+let currentAppVersion = GOVEE_APP_VERSION;
+function getAppVersion() {
+  return currentAppVersion;
+}
+function setAppVersion(version) {
+  if (typeof version === "string" && /^\d+(\.\d+)+$/.test(version)) {
+    currentAppVersion = version;
+  }
+}
+function goveeUserAgent() {
+  return `GoveeHome/${currentAppVersion} (com.ihoment.GoVeeSensor; build:8; iOS 26.5.0) Alamofire/5.11.0`;
+}
+function buildGoveeAppHeaders(clientId, opts = {}) {
+  const headers = {
+    appVersion: currentAppVersion,
+    clientId,
+    clientType: GOVEE_CLIENT_TYPE,
+    "User-Agent": goveeUserAgent()
+  };
+  if (opts.withTimestamp) {
+    headers.iotVersion = "0";
+    headers.timestamp = String(Date.now());
+  }
+  if (opts.bearer) {
+    headers.Authorization = `Bearer ${opts.bearer}`;
+  }
+  return headers;
+}
 const GOVEE_APP_BASE_URL = "https://app2.govee.com";
 function deriveGoveeClientId(email) {
   const seed = (email != null ? email : "").trim().toLowerCase() || "anonymous";
@@ -72,7 +93,10 @@ function deriveGoveeClientId(email) {
   GOVEE_CAP_TYPE,
   GOVEE_CLIENT_TYPE,
   GOVEE_DEVICE_TYPE,
-  GOVEE_USER_AGENT,
-  deriveGoveeClientId
+  buildGoveeAppHeaders,
+  deriveGoveeClientId,
+  getAppVersion,
+  goveeUserAgent,
+  setAppVersion
 });
 //# sourceMappingURL=govee-constants.js.map

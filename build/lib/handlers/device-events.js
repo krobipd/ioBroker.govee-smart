@@ -42,7 +42,7 @@ var connectionState = __toESM(require("./connection-state"));
 var groupFanoutHandler = __toESM(require("./group-fanout-handler"));
 var dropdownReset = __toESM(require("./dropdown-reset-helpers"));
 function onDeviceStateUpdate(adapter, device, state) {
-  if (adapter.stateManager) {
+  if (adapter.statesReady && adapter.stateManager) {
     adapter.stateManager.updateDeviceState(device, state).catch(() => {
     });
   }

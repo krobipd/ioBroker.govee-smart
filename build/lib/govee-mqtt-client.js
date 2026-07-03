@@ -623,14 +623,7 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
     const result = await this.httpsRequestImpl({
       method: "POST",
       url: LOGIN_URL,
-      headers: {
-        appVersion: import_govee_constants.GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: import_govee_constants.GOVEE_CLIENT_TYPE,
-        iotVersion: "0",
-        timestamp: String(Date.now()),
-        "User-Agent": import_govee_constants.GOVEE_USER_AGENT
-      },
+      headers: (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { withTimestamp: true }),
       body
     });
     if (!result.value) {
@@ -667,14 +660,7 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
     await this.httpsRequestImpl({
       method: "POST",
       url,
-      headers: {
-        appVersion: import_govee_constants.GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: import_govee_constants.GOVEE_CLIENT_TYPE,
-        iotVersion: "0",
-        timestamp: String(Date.now()),
-        "User-Agent": import_govee_constants.GOVEE_USER_AGENT
-      },
+      headers: (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { withTimestamp: true }),
       body: {
         type: 8,
         email: this.email
@@ -686,13 +672,7 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
     const result = await this.httpsRequestImpl({
       method: "GET",
       url: IOT_KEY_URL,
-      headers: {
-        Authorization: `Bearer ${this._bearerToken}`,
-        appVersion: import_govee_constants.GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: import_govee_constants.GOVEE_CLIENT_TYPE,
-        "User-Agent": import_govee_constants.GOVEE_USER_AGENT
-      }
+      headers: (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { bearer: this._bearerToken })
     });
     if (!result.value) {
       throw new Error(

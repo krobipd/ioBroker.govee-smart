@@ -90,7 +90,7 @@ async function runWizardStep(adapter, action, deviceKey) {
   }
   const response = await adapter.segmentWizard.runStep(action, deviceKey);
   const statusText = adapter.segmentWizard.getStatusText();
-  await adapter.setStateAsync("info.wizardStatus", {
+  await adapter.setState("info.wizardStatus", {
     val: statusText,
     ack: true
   });

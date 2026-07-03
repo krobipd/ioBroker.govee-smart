@@ -55,6 +55,9 @@ var import_sku_cache = require("./lib/sku-cache");
 var import_state_manager = require("./lib/state-manager");
 var import_types = require("./lib/types");
 var import_timing_constants = require("./lib/timing-constants");
+function physicalSegmentCap(device) {
+  return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+}
 class GoveeAdapter extends utils.Adapter {
   /** Public for handler modules (state-change-router, group-fanout, wizard, snapshot, diagnostics). */
   deviceManager = null;
@@ -83,7 +86,7 @@ class GoveeAdapter extends utils.Adapter {
   cloudInitTimer;
   /**
    * Last info.connection value — cached so not every device update issues an
-   * unnecessary setStateAsync (H4).
+   * unnecessary setState (H4).
    */
   /** Public for handler modules (connection-state). */
   lastConnectionState = null;
@@ -139,12 +142,10 @@ class GoveeAdapter extends utils.Adapter {
   /**
    * Set true at the start of onUnload — async paths (onStateChange,
    * applyCloudCapabilities, retrySceneData, …) check this between awaits
-   * and bail before further setStateAsync against a torn-down adapter.
+   * and bail before further setState against a torn-down adapter.
    */
   /** Public for handler modules (state-change-router). */
   unloading = false;
-  /** Initial app-version-check timer (2 min after start) — kept so onUnload can clear it. */
-  appVersionInitialTimer;
   /** @param options Adapter options */
   constructor(options = {}) {
     super({ ...options, name: "govee-smart" });
@@ -159,6 +160,7 @@ class GoveeAdapter extends utils.Adapter {
     try {
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
+      void connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
@@ -180,14 +182,14 @@ class GoveeAdapter extends utils.Adapter {
           (e) => this.log.debug(`Could not raise notification: ${(0, import_types.errMessage)(e)}`)
         )
       });
-      await this.setStateAsync("info.connection", { val: false, ack: true });
-      await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
-      await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
-      await this.setStateAsync("info.openapiMqttConnected", {
+      await this.setState("info.connection", { val: false, ack: true });
+      await this.setState("info.mqttConnected", { val: false, ack: true });
+      await this.setState("info.cloudConnected", { val: false, ack: true });
+      await this.setState("info.openapiMqttConnected", {
         val: false,
         ack: true
       });
-      await this.setStateAsync("info.wizardStatus", {
+      await this.setState("info.wizardStatus", {
         val: (0, import_segment_wizard.wizardIdleText)(),
         ack: true
       });
@@ -239,28 +241,31 @@ class GoveeAdapter extends utils.Adapter {
         onCloudDataReady: (device, allDevices) => deviceEvents.onCloudDataReady(this, device, allDevices),
         onGroupMembersReady: (group, allDevices) => deviceEvents.onGroupMembersReady(this, group, allDevices)
       });
+      this.deviceManager.onDevicesRemoved = () => {
+        void this.reapStaleDevices().catch((e) => this.log.debug(`Post-eviction cleanup failed: ${(0, import_types.errMessage)(e)}`));
+      };
       this.deviceManager.onLanIpChanged = (device, ip) => {
         const prefix = this.stateManager.devicePrefix(device);
-        this.setStateAsync(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {
+        this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {
         });
       };
       this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
         const prefix = this.stateManager.devicePrefix(device);
-        const cap = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+        const cap = physicalSegmentCap(device);
         for (const idx of batch.segments) {
           if (cap === 0 || idx >= cap) {
             continue;
           }
           if (batch.color !== void 0) {
             const hex = (0, import_types.rgbIntToHex)(batch.color);
-            this.setStateAsync(`${prefix}.segments.${idx}.color`, {
+            this.setState(`${prefix}.segments.${idx}.color`, {
               val: hex,
               ack: true
             }).catch(() => {
             });
           }
           if (batch.brightness !== void 0) {
-            this.setStateAsync(`${prefix}.segments.${idx}.brightness`, {
+            this.setState(`${prefix}.segments.${idx}.brightness`, {
               val: batch.brightness,
               ack: true
             }).catch(() => {
@@ -270,17 +275,17 @@ class GoveeAdapter extends utils.Adapter {
       };
       this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
         const prefix = this.stateManager.devicePrefix(device);
-        const cap = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+        const cap = physicalSegmentCap(device);
         for (const seg of segments) {
           if (cap === 0 || seg.index >= cap) {
             continue;
           }
-          this.setStateAsync(`${prefix}.segments.${seg.index}.color`, {
+          this.setState(`${prefix}.segments.${seg.index}.color`, {
             val: (0, import_types.rgbToHex)(seg.r, seg.g, seg.b),
             ack: true
           }).catch(() => {
           });
-          this.setStateAsync(`${prefix}.segments.${seg.index}.brightness`, {
+          this.setState(`${prefix}.segments.${seg.index}.brightness`, {
             val: seg.brightness,
             ack: true
           }).catch(() => {
@@ -343,6 +348,9 @@ class GoveeAdapter extends utils.Adapter {
       );
       this.lanScanTimer = this.setTimeout(() => {
         this.lanScanDone = true;
+        if (this.deviceManager) {
+          this.deviceManager.accountReconcileEnabled = true;
+        }
         connectionState.checkAllReady(this);
       }, import_timing_constants.LAN_SCAN_INITIAL_WAIT_MS);
       if (config.goveeEmail && config.goveePassword) {
@@ -382,19 +390,19 @@ class GoveeAdapter extends utils.Adapter {
           });
         });
         await cloudCreds.cleanupLegacyMqttNativeOnce(this);
-        const cachedCreds = await cloudCreds.loadPersistedCredsFromState(this);
+        const cachedCreds = await cloudCreds.loadPersistedCreds(this);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
         this.mqttClient.setOnCredentialsRefresh((creds) => {
-          cloudCreds.persistCredsToState(this, creds).catch((e) => {
+          cloudCreds.persistCreds(this, creds).catch((e) => {
             this.log.warn(`Could not persist MQTT credentials: ${(0, import_types.errMessage)(e)}`);
           });
         });
         await this.mqttClient.connect(
           (update) => this.deviceManager.handleMqttStatus(update),
           (connected) => {
-            this.setStateAsync("info.mqttConnected", {
+            this.setState("info.mqttConnected", {
               val: connected,
               ack: true
             }).catch(() => {
@@ -435,7 +443,7 @@ class GoveeAdapter extends utils.Adapter {
             return (_a2 = this.deviceManager) == null ? void 0 : _a2.handleOpenApiEvent(event);
           },
           (connected) => {
-            this.setStateAsync("info.openapiMqttConnected", {
+            this.setState("info.openapiMqttConnected", {
               val: connected,
               ack: true
             }).catch(() => {
@@ -477,7 +485,7 @@ class GoveeAdapter extends utils.Adapter {
           const result = await cloudRetryHandler.cloudInitWithTimeout(this);
           this.cloudWasConnected = result.ok;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(result.ok);
-          this.setStateAsync("info.cloudConnected", {
+          this.setState("info.cloudConnected", {
             val: result.ok,
             ack: true
           }).catch(() => {
@@ -493,7 +501,7 @@ class GoveeAdapter extends utils.Adapter {
           this.log.debug(`Using cached device data \u2014 no Cloud calls needed`);
           this.cloudWasConnected = true;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(true);
-          this.setStateAsync("info.cloudConnected", {
+          this.setState("info.cloudConnected", {
             val: true,
             ack: true
           }).catch(() => {
@@ -551,15 +559,8 @@ class GoveeAdapter extends utils.Adapter {
         })();
       }, import_timing_constants.ONLINE_SYNC_INTERVAL_MS);
       this.appVersionCheckTimer = this.setInterval(() => {
-        connectionState.checkAppVersionDrift(this).catch((e) => this.log.debug(`App version check error: ${(0, import_types.errMessage)(e)}`));
+        connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       }, import_timing_constants.APP_VERSION_CHECK_INTERVAL_MS);
-      this.appVersionInitialTimer = this.setTimeout(() => {
-        this.appVersionInitialTimer = void 0;
-        if (this.unloading) {
-          return;
-        }
-        connectionState.checkAppVersionDrift(this).catch((e) => this.log.debug(`App version check error: ${(0, import_types.errMessage)(e)}`));
-      }, import_timing_constants.APP_VERSION_INITIAL_DELAY_MS);
       connectionState.updateConnectionState(this);
       connectionState.checkAllReady(this);
       this.readyTimer = this.setTimeout(() => {
@@ -673,10 +674,6 @@ class GoveeAdapter extends utils.Adapter {
         this.clearInterval(this.appVersionCheckTimer);
         this.appVersionCheckTimer = void 0;
       }
-      if (this.appVersionInitialTimer) {
-        this.clearTimeout(this.appVersionInitialTimer);
-        this.appVersionInitialTimer = void 0;
-      }
       (_a = this.cloudRetry) == null ? void 0 : _a.dispose();
       (_b = this.segmentWizard) == null ? void 0 : _b.dispose();
       (_c = this.lanClient) == null ? void 0 : _c.stop();
@@ -752,15 +749,6 @@ class GoveeAdapter extends utils.Adapter {
   /** Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface. */
   loadCloudStates() {
     return cloudStateLoader.loadCloudStates(this);
-  }
-  /**
-   * Public for OpenAPI-MQTT + App-API pipelines feeding sensor/appliance state.
-   *
-   * @param device Target device
-   * @param caps Cloud-state capabilities
-   */
-  applyCloudCapabilities(device, caps) {
-    return cloudStateLoader.applyCloudCapabilities(this, device, caps);
   }
   /**
    * Central entry point for manual-segment updates (public for the wizard +

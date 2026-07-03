@@ -38,68 +38,39 @@ const CHANNEL_NAMES = {
   info: "Device Information",
   diag: "Diagnostics"
 };
-const SENSOR_STATE_IDS = /* @__PURE__ */ new Set([
-  // raw forms
-  "temperature",
-  "humidity",
-  "battery",
-  "co2",
-  "carbondioxide",
-  "online",
-  // sanitizeId(instance) forms
-  "sensor_temperature",
-  "sensor_humidity",
-  "sensor_battery"
-]);
-const EVENT_STATE_IDS = /* @__PURE__ */ new Set([
-  // raw forms (no underscore separator)
-  "lackwater",
-  "lackwaterevent",
-  "icefull",
-  "icefullevent",
-  "bodyappeared",
-  "dirtdetected",
-  // sanitizeId(instance) forms (camelCase → snake_case)
-  "lack_water",
-  "lack_water_event",
-  "ice_full",
-  "ice_full_event",
-  "body_appeared",
-  "dirt_detected"
-]);
-function inferChannelFromStateId(stateId) {
-  const normalised = stateId.toLowerCase();
-  if (SENSOR_STATE_IDS.has(normalised)) {
-    return "sensor";
-  }
-  if (EVENT_STATE_IDS.has(normalised)) {
-    return "events";
-  }
-  return "control";
-}
 const SYNTHETIC_STATE_META = {
-  temperature: { type: "number", role: "value.temperature", unit: "\xB0C", nameKey: "temperature" },
-  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity" },
-  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery" },
-  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2" },
-  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2" },
-  online: { type: "boolean", role: "indicator.connected", nameKey: "online" },
-  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected" },
-  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected" },
-  sensor_temperature: { type: "number", role: "value.temperature", unit: "\xB0C", nameKey: "temperature" },
-  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity" },
-  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery" },
-  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected" },
-  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected" }
+  temperature: { type: "number", role: "value.temperature", unit: "\xB0C", nameKey: "temperature", channel: "sensor" },
+  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
+  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
+  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
+  sensor_temperature: {
+    type: "number",
+    role: "value.temperature",
+    unit: "\xB0C",
+    nameKey: "temperature",
+    channel: "sensor"
+  },
+  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
+  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" }
 };
+function inferChannelFromStateId(stateId) {
+  var _a, _b;
+  return (_b = (_a = SYNTHETIC_STATE_META[stateId.toLowerCase()]) == null ? void 0 : _a.channel) != null ? _b : "control";
+}
 class StateManager {
   adapter;
   /** Maps deviceKey (sku_deviceId) → current object prefix */
@@ -108,7 +79,7 @@ class StateManager {
   stateChannelMap = /* @__PURE__ */ new Map();
   /**
    * Cache of state IDs already created via {@link ensureState} — skips the
-   * `extendObjectAsync` round-trip on the hot path. Refreshed on
+   * `extendObject` round-trip on the hot path. Refreshed on
    * {@link removeDevice}/{@link forgetPrefix} so a re-pair doesn't reuse stale
    * cache entries.
    */
@@ -126,7 +97,7 @@ class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * `extendObjectAsync` deep-merges and CANNOT replace an object-value with a
+   * `extendObject` deep-merges and CANNOT replace an object-value with a
    * string. Only a full `setObjectAsync` replaces. Same fix-pattern as
    * hassemu v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown). Admin
    * renders states-values as React children — a translation object triggers
@@ -150,7 +121,7 @@ class StateManager {
     if (!buggy) {
       return;
     }
-    await this.adapter.extendObjectAsync(id, { common: { states: fresh } }).catch(() => void 0);
+    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(() => void 0);
   }
   /**
    * @param id Voller State-Pfad (`devices.X.info.Y`)
@@ -198,7 +169,7 @@ class StateManager {
       return;
     }
     const prefix = this.devicePrefix(device);
-    await this.adapter.setStateAsync(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => void 0);
+    await this.adapter.setState(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => void 0);
   }
   /**
    * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
@@ -268,7 +239,7 @@ class StateManager {
       return;
     }
     const channel = inferChannelFromStateId(stateId);
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.${channel}`,
       {
         type: "channel",
@@ -277,7 +248,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     ).catch(() => void 0);
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.${channel}.${stateId}`,
       {
         type: "state",
@@ -303,7 +274,7 @@ class StateManager {
    * of legacy device-level info states.
    *
    * Idempotent. Called from every phase callback (LAN-Phase + Cloud-Phase
-   * + Group-Phase) — extendObjectAsync de-duplicates so the cost is small.
+   * + Group-Phase) — extendObject de-duplicates so the cost is small.
    *
    * Never deletes states from MANAGED_CHANNELS. The info channel is not in
    * MANAGED_CHANNELS, so cleanup never touches its content.
@@ -330,7 +301,7 @@ class StateManager {
     const isGroup = device.sku === "BaseGroup";
     const onlineId = isGroup ? `${this.adapter.namespace}.groups.info.online` : `${this.adapter.namespace}.${prefix}.info.online`;
     const icon = isGroup ? import_device_icons.GROUP_ICON : (0, import_device_icons.iconForGoveeType)(device.type);
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       prefix,
       {
         type: "device",
@@ -346,7 +317,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.info`,
       {
         type: "channel",
@@ -458,7 +429,7 @@ class StateManager {
   /**
    * Shared inner loop — group stateDefs by channel, create the channel
    * object once, then create each state. Called from createLanStates and
-   * createCloudStates. Idempotent (extendObjectAsync).
+   * createCloudStates. Idempotent (extendObject).
    *
    * @param prefix Device prefix (e.g. "devices.h6172_abcd")
    * @param stateDefs State definitions to write
@@ -479,7 +450,7 @@ class StateManager {
       `createStates [${logTag}] ${prefix}: ${stateDefs.length} states in ${channelGroups.size} channel(s)`
     );
     for (const [channel, defs] of channelGroups) {
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.${channel}`,
         {
           type: "channel",
@@ -514,7 +485,7 @@ class StateManager {
         if (def.desc) {
           common.desc = def.desc;
         }
-        await this.adapter.extendObjectAsync(
+        await this.adapter.extendObject(
           `${prefix}.${channel}.${def.id}`,
           {
             type: "state",
@@ -532,7 +503,7 @@ class StateManager {
         if (def.def !== void 0) {
           const current = await this.adapter.getStateAsync(`${prefix}.${channel}.${def.id}`);
           if (!current || current.val === null || current.val === void 0) {
-            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
+            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true
             });
@@ -540,7 +511,7 @@ class StateManager {
             this.adapter.log.debug(
               `Resetting stale dropdown: ${prefix}.${channel}.${def.id} = "${String(current.val)}" \u2192 "${String(def.def)}"`
             );
-            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
+            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true
             });
@@ -556,7 +527,7 @@ class StateManager {
    */
   async createSegmentStates(device) {
     const prefix = this.devicePrefix(device);
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments`,
       {
         type: "channel",
@@ -572,11 +543,11 @@ class StateManager {
     const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
     await this.ensureState(`${prefix}.segments.count`, (0, import_i18n.tName)("segmentCount"), "number", "value", false);
-    await this.adapter.setStateAsync(`${prefix}.segments.count`, {
+    await this.adapter.setState(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true
     });
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.manual_mode`,
       {
         type: "state",
@@ -593,7 +564,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.manual_list`,
       {
         type: "state",
@@ -612,16 +583,16 @@ class StateManager {
     );
     const manualModeVal = device.manualMode === true;
     const manualListVal = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.join(",") : "";
-    await this.adapter.setStateAsync(`${prefix}.segments.manual_mode`, {
+    await this.adapter.setState(`${prefix}.segments.manual_mode`, {
       val: manualModeVal,
       ack: true
     });
-    await this.adapter.setStateAsync(`${prefix}.segments.manual_list`, {
+    await this.adapter.setState(`${prefix}.segments.manual_list`, {
       val: manualListVal,
       ack: true
     });
     for (const i of validIndices) {
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}`,
         {
           type: "channel",
@@ -630,7 +601,7 @@ class StateManager {
         },
         { preserve: { common: ["name"] } }
       );
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}.color`,
         {
           type: "state",
@@ -647,7 +618,7 @@ class StateManager {
         },
         { preserve: { common: ["name"] } }
       );
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}.brightness`,
         {
           type: "state",
@@ -668,7 +639,7 @@ class StateManager {
         { preserve: { common: ["name"] } }
       );
     }
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.command`,
       {
         type: "state",
@@ -723,7 +694,7 @@ class StateManager {
    * was an extra object-read on the hot path (one MQTT push = one update
    * call). createDeviceStates has already run before any update lands,
    * so the states are guaranteed to exist; if one disappears (manual
-   * deletion), the setStateAsync will reject and we swallow it.
+   * deletion), the setState will reject and we swallow it.
    *
    * @param device Govee device
    * @param state Partial state update
@@ -760,7 +731,7 @@ class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online) {
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       "groups",
       {
         type: "folder",
@@ -769,7 +740,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       "groups.info",
       {
         type: "channel",
@@ -779,7 +750,7 @@ class StateManager {
       { preserve: { common: ["name"] } }
     );
     await this.ensureState("groups.info.online", "Cloud Online", "boolean", "indicator.reachable", false);
-    await this.adapter.setStateAsync("groups.info.online", {
+    await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true
     });
@@ -790,7 +761,7 @@ class StateManager {
    * @param online Cloud connection status
    */
   async updateGroupsOnline(online) {
-    await this.adapter.setStateAsync("groups.info.online", { val: online, ack: true }).catch(() => void 0);
+    await this.adapter.setState("groups.info.online", { val: online, ack: true }).catch(() => void 0);
   }
   /**
    * Update info.membersUnreachable for a group.
@@ -800,7 +771,7 @@ class StateManager {
    * deleted the object on "all reachable" — but that produced a js-controller
    * WARN "State 'X.membersUnreachable' has no existing object" every ~2 minutes,
    * because parallel updateGroupReachability calls (LAN+MQTT status updates fire
-   * almost simultaneously) could trigger a race condition between setStateAsync
+   * almost simultaneously) could trigger a race condition between setState
    * (object exists) and safeDeleteState (object gone). Always keeping the state
    * present avoids that entirely.
    *
@@ -812,7 +783,7 @@ class StateManager {
     const stateId = `${prefix}.info.membersUnreachable`;
     const unreachable = memberDevices.filter((m) => !m.state.online).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId));
     await this.ensureState(stateId, "Unreachable Members", "string", "text", false);
-    await this.adapter.setStateAsync(stateId, {
+    await this.adapter.setState(stateId, {
       val: unreachable.join(", "),
       ack: true
     });
@@ -986,7 +957,7 @@ class StateManager {
   }
   /**
    * Create a state if it doesn't exist. Cached after the first successful
-   * `extendObjectAsync` so hot-path callers (e.g. `updateGroupMembersUnreachable`
+   * `extendObject` so hot-path callers (e.g. `updateGroupMembersUnreachable`
    * fires per status update) skip the Redis round-trip.
    *
    * @param id State object ID
@@ -1016,7 +987,7 @@ class StateManager {
     if (def !== void 0) {
       common.def = def;
     }
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       id,
       {
         type: "state",
@@ -1071,7 +1042,7 @@ class StateManager {
     }
     const current = await this.adapter.getStateAsync(stateId).catch(() => null);
     if (!current || current.val !== desiredOnline) {
-      await this.adapter.setStateAsync(stateId, { val: desiredOnline, ack: true }).catch(() => void 0);
+      await this.adapter.setState(stateId, { val: desiredOnline, ack: true }).catch(() => void 0);
     }
     let lightOnlineChanged = false;
     if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.state.online !== desiredOnline) {

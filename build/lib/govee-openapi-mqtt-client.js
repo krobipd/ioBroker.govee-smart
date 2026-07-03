@@ -176,6 +176,10 @@ class GoveeOpenapiMqttClient extends import_reconnecting_mqtt_client.Reconnectin
    */
   handleMessage(payload) {
     var _a, _b;
+    if (payload.length > 64 * 1024) {
+      this.log.debug(`Cloud-events: dropping oversized MQTT message (${payload.length} bytes)`);
+      return;
+    }
     try {
       const rawStr = payload.toString();
       (_a = this.onRaw) == null ? void 0 : _a.call(this, rawStr);

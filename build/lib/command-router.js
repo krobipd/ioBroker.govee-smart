@@ -424,10 +424,7 @@ class CommandRouter {
       await this.executeRateLimited(execute);
     }
     if (parsed.brightness !== void 0) {
-      const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
-      const brightCap = caps.find(
-        (c) => c && typeof c.type === "string" && typeof c.instance === "string" && c.type.includes("segment_color_setting") && c.instance.toLowerCase().includes("brightness")
-      );
+      const brightCap = this.findCapabilityForCommand(device, "segmentBrightness:0");
       const execute = async () => {
         await this.cloudClient.controlDevice(
           device.sku,
@@ -610,16 +607,7 @@ class CommandRouter {
         continue;
       }
       const shortType = cap.type.replace("devices.capabilities.", "");
-      if (command === "power" && shortType === "on_off") {
-        return cap;
-      }
-      if (command === "brightness" && shortType === "range" && cap.instance.toLowerCase().includes("brightness")) {
-        return cap;
-      }
-      if (command === "colorRgb" && shortType === "color_setting" && cap.instance === "colorRgb") {
-        return cap;
-      }
-      if (command === "colorTemperature" && shortType === "color_setting" && cap.instance.includes("colorTem")) {
+      if ((command === "power" || command === "brightness" || command === "colorRgb" || command === "colorTemperature") && (0, import_types.capMatchesControl)(cap, command)) {
         return cap;
       }
       if (command === "scene" && shortType === "mode" && cap.instance === "presetScene") {

@@ -249,9 +249,7 @@ class GoveeCloudClient {
         body
       });
       if (result.fallback) {
-        this.log.debug(
-          `Cloud API: ${method} ${path}: ${result.fallback} (status=${result.statusCode}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""}) \u2014 treated as no data`
-        );
+        this.log.debug(`Cloud API: ${method} ${path}: ${(0, import_http_client.formatFallback)(result)}`);
       }
       this.lastErrorCategory = null;
       return result.value;

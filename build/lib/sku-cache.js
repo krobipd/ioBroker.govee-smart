@@ -186,6 +186,30 @@ class SkuCache {
     }
     return pruned;
   }
+  /**
+   * Delete the cache file for a single device — used by the account-reconciler
+   * when a device is removed from the Govee account, so the next start does not
+   * rehydrate the deleted device from cache (the third store the removal must
+   * touch, alongside the in-memory map and the ioBroker objects). No-op when
+   * the file is already gone.
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier
+   */
+  evictDevice(sku, deviceId) {
+    if (!this.dataAvailable) {
+      return;
+    }
+    const file = this.cacheFile(sku, deviceId);
+    try {
+      if (fs.existsSync(file)) {
+        fs.unlinkSync(file);
+        this.log.debug(`Cache: evicted ${sku} ${deviceId} (removed from Govee account)`);
+      }
+    } catch (e) {
+      this.log.debug(`Cache evictDevice failed for ${sku} ${deviceId}: ${(0, import_types.errMessage)(e)}`);
+    }
+  }
   /** Delete all cached files. */
   clear() {
     try {

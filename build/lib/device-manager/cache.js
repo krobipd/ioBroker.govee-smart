@@ -73,12 +73,14 @@ function normalize(d) {
   const manualMode = d.manualMode ? true : void 0;
   const manualSegments = manualMode && Array.isArray(d.manualSegments) && d.manualSegments.length > 0 ? d.manualSegments.slice() : void 0;
   const sceneSpeed = typeof d.sceneSpeed === "number" && d.sceneSpeed > 0 ? d.sceneSpeed : void 0;
+  const accountMissCount = typeof d.accountMissCount === "number" && d.accountMissCount > 0 ? d.accountMissCount : void 0;
   return {
     ...d,
     segmentCount,
     manualMode,
     manualSegments,
-    sceneSpeed
+    sceneSpeed,
+    accountMissCount
   };
 }
 function persistDeviceToCache(adapter, device) {

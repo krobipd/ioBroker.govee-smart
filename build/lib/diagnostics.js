@@ -294,15 +294,6 @@ class DiagnosticsCollector {
     }
   }
   /**
-   * Drop all buffers for a device — called when the adapter forgets a
-   * device (cleanupDevices in device-manager). Keeps memory bounded.
-   *
-   * @param deviceId Govee device id
-   */
-  forget(deviceId) {
-    this.buffers.delete(deviceId);
-  }
-  /**
    * Drop buffers for all devices that are NOT in the live list.
    *
    * Called from the adapter cleanup path (reapStaleDevices) so logs / packets /
@@ -316,10 +307,6 @@ class DiagnosticsCollector {
         this.buffers.delete(id);
       }
     }
-  }
-  /** Drop all buffers — useful in tests. */
-  clear() {
-    this.buffers.clear();
   }
   /**
    * Build the diagnostics-export JSON for a device. Combines static

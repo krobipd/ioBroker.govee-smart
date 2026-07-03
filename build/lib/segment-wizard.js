@@ -46,10 +46,6 @@ class SegmentWizard {
   }
   session = null;
   timeoutHandle = void 0;
-  /** Currently active? Exposed for diagnostics/tests. */
-  isActive() {
-    return this.session !== null;
-  }
   /**
    * Snapshot the active session — used by the diag-export runtime-state
    * provider. Returns null when no session is in flight. Plain object so

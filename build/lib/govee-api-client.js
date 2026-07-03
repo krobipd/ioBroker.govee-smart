@@ -70,13 +70,7 @@ class GoveeApiClient {
     if (!this.bearerToken) {
       throw new Error("Bearer token required \u2014 call hasBearerToken() first");
     }
-    return {
-      Authorization: `Bearer ${this.bearerToken}`,
-      appVersion: import_govee_constants.GOVEE_APP_VERSION,
-      clientId: this.clientId,
-      clientType: import_govee_constants.GOVEE_CLIENT_TYPE,
-      "User-Agent": import_govee_constants.GOVEE_USER_AGENT
-    };
+    return (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { bearer: this.bearerToken });
   }
   /**
    * Log a non-JSON fallback (empty / plain-text-status body) for an App-API
@@ -88,9 +82,7 @@ class GoveeApiClient {
    */
   logFallback(endpoint, result) {
     if (result.fallback) {
-      this.log.debug(
-        `App API ${endpoint}: ${result.fallback} (status=${result.statusCode}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""}) \u2014 treated as no data`
-      );
+      this.log.debug(`App API ${endpoint}: ${(0, import_http_client.formatFallback)(result)}`);
     }
   }
   /**
@@ -193,8 +185,8 @@ class GoveeApiClient {
       method: "GET",
       url,
       headers: {
-        appVersion: import_govee_constants.GOVEE_APP_VERSION,
-        "User-Agent": import_govee_constants.GOVEE_USER_AGENT
+        appVersion: (0, import_govee_constants.getAppVersion)(),
+        "User-Agent": (0, import_govee_constants.goveeUserAgent)()
       }
     });
     this.logFallback(`/light-effect-libraries sku=${sku}`, result);
