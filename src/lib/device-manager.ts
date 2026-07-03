@@ -1515,14 +1515,7 @@ export class DeviceManager {
       // never reaches info.online via the capability pipeline. Pluck it out and
       // apply it directly — otherwise sensor SKUs like H5179 stay at
       // info.online=false forever even while their readings keep updating.
-      // Cloud-only lights (no local API, lanIp === null) have no LAN reachability
-      // signal, so the cloud online cap is their only truth — apply it like
-      // sensors/appliances. LAN-capable lights stay excluded: their info.online
-      // is LAN-driven, and Govee's Cloud cache lags real LAN reachability (2×
-      // false-positive `true` during 2026-05-13).
-      if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
-        this.applyOnlineCap(device, caps);
-      }
+      this.maybeApplyCloudOnline(device, caps);
       this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
       updated++;
     }
@@ -1546,6 +1539,21 @@ export class DeviceManager {
    */
   private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[]): void {
     cloudMergeHelpers.applyOnlineCap(this, device, caps);
+  }
+
+  /**
+   * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
+   * reachability signal: sensors, appliances, and cloud-only lights (no local
+   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
+   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   *
+   * @param device Target device
+   * @param caps Capability list carrying the online flag
+   */
+  private maybeApplyCloudOnline(device: GoveeDevice, caps: CloudStateCapability[]): void {
+    if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
+      this.applyOnlineCap(device, caps);
+    }
   }
 
   /**
@@ -1611,11 +1619,8 @@ export class DeviceManager {
     // are the only signal we get for appliance state (heater on/off,
     // ice-bucket-full, …) — without this, info.online for those SKUs
     // never flips to true even while events stream in.
-    // Cloud-only lights need the cloud online signal too (see the App-API
-    // path above); LAN-capable lights stay LAN-driven. OpenAPI-MQTT in practice
-    // mostly carries appliance events, but cloud-only lights can ride it too.
-    if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
-      this.applyOnlineCap(device, event.capabilities);
-    }
+    // Cloud-only lights need the cloud online signal too; LAN-capable lights
+    // stay LAN-driven (same rule as the App-API path — see maybeApplyCloudOnline).
+    this.maybeApplyCloudOnline(device, event.capabilities);
   }
 }

@@ -1,4 +1,4 @@
-import { httpsRequest, HttpError, type HttpsRequestFn } from "./http-client";
+import { formatFallback, httpsRequest, HttpError, type HttpsRequestFn } from "./http-client";
 import {
   classifyError,
   type CapabilityOption,
@@ -308,9 +308,7 @@ export class GoveeCloudClient {
         body,
       });
       if (result.fallback) {
-        this.log.debug(
-          `Cloud API: ${method} ${path}: ${result.fallback} (status=${result.statusCode}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""}) — treated as no data`,
-        );
+        this.log.debug(`Cloud API: ${method} ${path}: ${formatFallback(result)}`);
       }
       // Reset the failure category on success — getFailureReason() then returns
       // null until the next error.

@@ -51,94 +51,66 @@ const CHANNEL_NAMES: Record<string, string> = {
  * needing a separate `createDeviceStates` pass for sensor-only devices.
  * Keep IDs lowercase; resolveStatePath calls this on the raw stateId.
  */
-// Both lookup sets contain two spellings per state ID:
-//   - the "raw" form (e.g. `temperature`) for instances named exactly that
-//   - the sanitizeId output (e.g. `sensor_temperature`) for camelCase instances
-//     that sanitizeId converted to snake_case
-// `sanitizeId` in capability-mapper converts camelCase → snake_case, so
-// "sensorTemperature" becomes "sensor_temperature" and "lackWaterEvent"
-// becomes "lack_water_event". Without these aliases the sanitized variants
-// would fall back to the safe default "control" and the states would be
-// unreachable.
-const SENSOR_STATE_IDS = new Set([
-  // raw forms
-  "temperature",
-  "humidity",
-  "battery",
-  "co2",
-  "carbondioxide",
-  "online",
-  // sanitizeId(instance) forms
-  "sensor_temperature",
-  "sensor_humidity",
-  "sensor_battery",
-]);
-const EVENT_STATE_IDS = new Set([
-  // raw forms (no underscore separator)
-  "lackwater",
-  "lackwaterevent",
-  "icefull",
-  "icefullevent",
-  "bodyappeared",
-  "dirtdetected",
-  // sanitizeId(instance) forms (camelCase → snake_case)
-  "lack_water",
-  "lack_water_event",
-  "ice_full",
-  "ice_full_event",
-  "body_appeared",
-  "dirt_detected",
-]);
+// Two spellings per ID below — the "raw" form (e.g. `temperature`) for instances
+// named exactly that, and the sanitizeId output (e.g. `sensor_temperature`) for
+// camelCase instances that capability-mapper's sanitizeId converted to
+// snake_case. Without the alias the sanitized variant would fall back to the
+// safe default "control" and its state would be unreachable.
 
 /**
- * Best-effort channel routing for state IDs that don't have a
- * stateChannelMap entry yet (e.g. App-API synthetic caps before the device
- * has gone through createDeviceStates). Empty input falls back to the safe
- * default "control".
- *
- * @param stateId The raw state ID (e.g. "battery", "lackWater")
+ * Per-stateId metadata for synthetic states (App-API/OpenAPI-MQTT pipe). The
+ * `channel` is the single source of truth for {@link inferChannelFromStateId},
+ * so the routing and the state definition never drift apart.
  */
-function inferChannelFromStateId(stateId: string): string {
-  const normalised = stateId.toLowerCase();
-  if (SENSOR_STATE_IDS.has(normalised)) {
-    return "sensor";
-  }
-  if (EVENT_STATE_IDS.has(normalised)) {
-    return "events";
-  }
-  return "control";
-}
-
-/** Per-stateId metadata for synthetic states (App-API/OpenAPI-MQTT pipe). */
 interface SyntheticStateMeta {
   type: "boolean" | "number";
   role: string;
   unit?: string;
   nameKey: I18nKey;
+  /** Semantic channel — sensor readings vs. device events. */
+  channel: "sensor" | "events";
 }
 const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
-  temperature: { type: "number", role: "value.temperature", unit: "°C", nameKey: "temperature" },
-  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity" },
-  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery" },
-  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2" },
-  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2" },
-  online: { type: "boolean", role: "indicator.connected", nameKey: "online" },
-  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected" },
-  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected" },
-  sensor_temperature: { type: "number", role: "value.temperature", unit: "°C", nameKey: "temperature" },
-  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity" },
-  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery" },
-  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater" },
-  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull" },
-  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected" },
-  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected" },
+  temperature: { type: "number", role: "value.temperature", unit: "°C", nameKey: "temperature", channel: "sensor" },
+  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
+  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
+  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
+  sensor_temperature: {
+    type: "number",
+    role: "value.temperature",
+    unit: "°C",
+    nameKey: "temperature",
+    channel: "sensor",
+  },
+  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
+  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
+  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
+  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
 };
+
+/**
+ * Best-effort channel routing for a synthetic state ID with no stateChannelMap
+ * entry yet (App-API caps before createDeviceStates). Reads the channel straight
+ * from {@link SYNTHETIC_STATE_META}; an unknown ID falls back to the safe default
+ * "control". Keep IDs lowercase — resolveStatePath calls this on the raw stateId.
+ *
+ * @param stateId The raw state ID (e.g. "battery", "lackWater")
+ */
+function inferChannelFromStateId(stateId: string): string {
+  return SYNTHETIC_STATE_META[stateId.toLowerCase()]?.channel ?? "control";
+}
 
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {

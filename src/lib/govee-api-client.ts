@@ -1,4 +1,4 @@
-import { httpsRequest, type HttpResult } from "./http-client";
+import { formatFallback, httpsRequest, type HttpResult } from "./http-client";
 import {
   GOVEE_APP_BASE_URL,
   GOVEE_APP_VERSION,
@@ -164,9 +164,7 @@ export class GoveeApiClient {
    */
   private logFallback(endpoint: string, result: HttpResult<unknown>): void {
     if (result.fallback) {
-      this.log.debug(
-        `App API ${endpoint}: ${result.fallback} (status=${result.statusCode}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""}) — treated as no data`,
-      );
+      this.log.debug(`App API ${endpoint}: ${formatFallback(result)}`);
     }
   }
 

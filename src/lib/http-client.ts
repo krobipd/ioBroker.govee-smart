@@ -235,3 +235,16 @@ export class HttpError extends Error {
     this.responseBody = responseBody;
   }
 }
+
+/**
+ * Format the tail of a fallback log line for a non-JSON (empty / plain-text
+ * status) 2xx response. Shared by the App-API and Cloud clients so the
+ * "why is this null?" trace reads identically; the caller prefixes the endpoint.
+ *
+ * @param result HttpResult whose `fallback` is set
+ */
+export function formatFallback(result: HttpResult<unknown>): string {
+  return `${result.fallback} (status=${result.statusCode}${
+    result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""
+  }) — treated as no data`;
+}
