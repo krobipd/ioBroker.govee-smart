@@ -478,21 +478,22 @@ class GoveeAdapter extends utils.Adapter {
           });
         });
 
-        // Re-use cached MQTT credentials across restarts. Stored in the
-        // info.mqttCredentials state (NOT in adapter native): writing to
-        // system.adapter.X.0 native triggers a js-controller adapter
-        // restart, which would loop endlessly on every login. States are
-        // restart-safe.
+        // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
+        // the <namespace>.credentials meta.user FILE — not a state (so the
+        // credentials aren't a visible / history-loggable datapoint) and not
+        // adapter native (a native write would trigger a js-controller restart,
+        // looping endlessly on every login). loadPersistedCreds migrates an
+        // older info.mqttCredentials state into the file on first run.
         //
         // One-shot: clean up legacy v2.1.0/v2.1.1/v2.1.2 native fields
         // that contained plaintext credentials. Best-effort.
         await cloudCreds.cleanupLegacyMqttNativeOnce(this);
-        const cachedCreds = await cloudCreds.loadPersistedCredsFromState(this);
+        const cachedCreds = await cloudCreds.loadPersistedCreds(this);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
         this.mqttClient.setOnCredentialsRefresh(creds => {
-          cloudCreds.persistCredsToState(this, creds).catch(e => {
+          cloudCreds.persistCreds(this, creds).catch(e => {
             this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
           });
         });

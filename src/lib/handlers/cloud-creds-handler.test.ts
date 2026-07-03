@@ -2,25 +2,29 @@ import {
   type CloudCredsAdapter,
   cleanupLegacyMqttNativeOnce,
   clearVerificationCodeSetting,
-  loadPersistedCredsFromState,
-  persistCredsToState,
+  loadPersistedCreds,
+  persistCreds,
 } from "./cloud-creds-handler";
 import type { PersistedMqttCredentials } from "../types";
+
+const noopLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger;
 
 function makeAdapter(native: Record<string, unknown> = {}): CloudCredsAdapter & { calls: string[] } {
   const calls: string[] = [];
   return {
     calls,
-    log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger,
+    log: noopLog,
     namespace: "govee-smart.0",
     getStateAsync: async () => null,
-    setState: async id => {
-      calls.push(`setState:${id}`);
-    },
     getForeignObjectAsync: async () => ({ native }),
     extendForeignObjectAsync: async (_id, obj) => {
       calls.push(`extend:${JSON.stringify(obj.native)}`);
     },
+    readFileAsync: async () => {
+      throw new Error("Not exists");
+    },
+    writeFileAsync: async () => {},
+    delObjectAsync: async () => {},
     encrypt: v => v,
     decrypt: v => v,
   };
@@ -51,23 +55,38 @@ describe("cleanupLegacyMqttNativeOnce", () => {
   });
 });
 
-describe("MQTT credential persistence", () => {
+describe("MQTT credential persistence (meta.user file)", () => {
+  const CREDS_KEY = "govee-smart.0.credentials/mqtt.json";
+
   function makeCredAdapter() {
     const states = new Map<string, string>();
+    const files = new Map<string, string>();
+    const deletedObjects: string[] = [];
     const adapter: CloudCredsAdapter = {
-      log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger,
+      log: noopLog,
       namespace: "govee-smart.0",
       getStateAsync: async id => (states.has(id) ? ({ val: states.get(id) } as ioBroker.State) : null),
-      setState: async (id, s) => {
-        states.set(id, (s as { val: string }).val);
-      },
       getForeignObjectAsync: async () => ({ native: {} }),
       extendForeignObjectAsync: async () => undefined,
+      readFileAsync: async (meta, name) => {
+        const key = `${meta}/${name}`;
+        if (!files.has(key)) {
+          throw new Error("Not exists"); // mirrors ioBroker: rejects when the file is absent
+        }
+        return { file: files.get(key)! };
+      },
+      writeFileAsync: async (meta, name, data) => {
+        files.set(`${meta}/${name}`, typeof data === "string" ? data : data.toString("utf-8"));
+      },
+      delObjectAsync: async id => {
+        deletedObjects.push(id);
+        states.delete(id);
+      },
       // reversible stand-in for the real system-secret crypto
       encrypt: v => `enc:${v}`,
       decrypt: v => v.replace(/^enc:/, ""),
     };
-    return { adapter, states };
+    return { adapter, states, files, deletedObjects };
   }
 
   const creds: PersistedMqttCredentials = {
@@ -80,38 +99,68 @@ describe("MQTT credential persistence", () => {
     tokenExpiresAt: 1234567890,
   };
 
-  it("persists sensitive fields encrypted, non-sensitive in clear, and loads them back (round-trip)", async () => {
-    const { adapter, states } = makeCredAdapter();
-    await persistCredsToState(adapter, creds);
-    const stored = JSON.parse(states.get("info.mqttCredentials")!);
+  it("persists sensitive fields encrypted, non-sensitive in clear, into the file, and loads them back", async () => {
+    const { adapter, files } = makeCredAdapter();
+    await persistCreds(adapter, creds);
+    const stored = JSON.parse(files.get(CREDS_KEY)!);
     expect(stored.bearerToken).toBe("enc:bt"); // encrypted at rest
     expect(stored.p12Cert).toBe("enc:cert");
     expect(stored.p12Pass).toBe("enc:pass");
     expect(stored.iotEndpoint).toBe("iot.example"); // not sensitive → clear
     expect(stored.tokenExpiresAt).toBe(1234567890);
-    expect(await loadPersistedCredsFromState(adapter)).toEqual(creds); // decrypted back
+    expect(await loadPersistedCreds(adapter)).toEqual(creds); // decrypted back
   });
 
-  it("load returns null when nothing is stored", async () => {
-    expect(await loadPersistedCredsFromState(makeCredAdapter().adapter)).toBeNull();
+  it("load returns null when nothing is stored (no file, no legacy state)", async () => {
+    expect(await loadPersistedCreds(makeCredAdapter().adapter)).toBeNull();
   });
 
   it("load returns null when a required field is missing", async () => {
-    const { adapter, states } = makeCredAdapter();
-    states.set("info.mqttCredentials", JSON.stringify({ ...creds, bearerToken: "" }));
-    expect(await loadPersistedCredsFromState(adapter)).toBeNull();
+    const { adapter, files } = makeCredAdapter();
+    files.set(CREDS_KEY, JSON.stringify({ ...creds, bearerToken: "" }));
+    expect(await loadPersistedCreds(adapter)).toBeNull();
   });
 
   it("load returns null on unparseable JSON", async () => {
-    const { adapter, states } = makeCredAdapter();
-    states.set("info.mqttCredentials", "{ not json");
-    expect(await loadPersistedCredsFromState(adapter)).toBeNull();
+    const { adapter, files } = makeCredAdapter();
+    files.set(CREDS_KEY, "{ not json");
+    expect(await loadPersistedCreds(adapter)).toBeNull();
   });
 
   it("load coerces a non-string sensitive field (tampered blob) and rejects the bundle", async () => {
-    const { adapter, states } = makeCredAdapter();
-    states.set("info.mqttCredentials", JSON.stringify({ ...creds, bearerToken: 42 }));
-    expect(await loadPersistedCredsFromState(adapter)).toBeNull();
+    const { adapter, files } = makeCredAdapter();
+    files.set(CREDS_KEY, JSON.stringify({ ...creds, bearerToken: 42 }));
+    expect(await loadPersistedCreds(adapter)).toBeNull();
+  });
+
+  it("one-shot migration: copies a legacy info.mqttCredentials state into the file and deletes the state", async () => {
+    const { adapter, states, files, deletedObjects } = makeCredAdapter();
+    // The legacy state holds the already-encrypted blob (same shape persistCreds writes).
+    const encBlob = JSON.stringify({
+      bearerToken: "enc:bt",
+      iotEndpoint: "iot.example",
+      p12Cert: "enc:cert",
+      p12Pass: "enc:pass",
+      accountId: "acc",
+      accountTopic: "GA/acc",
+      tokenExpiresAt: 1234567890,
+    });
+    states.set("info.mqttCredentials", encBlob);
+
+    const loaded = await loadPersistedCreds(adapter);
+    expect(loaded).toEqual(creds); // decrypted from the migrated blob
+    expect(files.get(CREDS_KEY)).toBe(encBlob); // copied verbatim (still encrypted)
+    expect(deletedObjects).toContain("info.mqttCredentials"); // old state removed
+    expect(states.has("info.mqttCredentials")).toBe(false);
+  });
+
+  it("prefers the file over the legacy state (no migration when the file already has creds)", async () => {
+    const { adapter, states, deletedObjects } = makeCredAdapter();
+    await persistCreds(adapter, creds); // file populated
+    states.set("info.mqttCredentials", JSON.stringify({ ...creds, accountId: "STALE" }));
+    const loaded = await loadPersistedCreds(adapter);
+    expect(loaded).toEqual(creds); // from the file, not the stale state
+    expect(deletedObjects).toHaveLength(0); // legacy path never touched
   });
 });
 

@@ -332,31 +332,6 @@
       "native": {}
     },
     {
-      "_id": "info.mqttCredentials",
-      "type": "state",
-      "common": {
-        "name": {
-          "en": "Persisted MQTT credentials",
-          "de": "Gespeicherte MQTT-Anmeldedaten",
-          "ru": "Сохранённые учётные данные MQTT",
-          "pt": "Credenciais MQTT persistidas",
-          "nl": "Opgeslagen MQTT-referenties",
-          "fr": "Identifiants MQTT enregistrés",
-          "it": "Credenziali MQTT salvate",
-          "es": "Credenciales MQTT guardadas",
-          "pl": "Zapisane dane uwierzytelniające MQTT",
-          "uk": "Збережені облікові дані MQTT",
-          "zh-cn": "已保存的 MQTT 凭据"
-        },
-        "type": "string",
-        "role": "json",
-        "read": true,
-        "write": false,
-        "def": ""
-      },
-      "native": {}
-    },
-    {
       "_id": "info.appVersionDrift",
       "type": "state",
       "common": {
@@ -464,6 +439,28 @@
           "pl": "Lokalne migawki zapisane przez użytkownika",
           "uk": "Збережені користувачем локальні знімки",
           "zh-cn": "用户保存的本地快照"
+        },
+        "type": "meta.user",
+        "role": "meta.user"
+      },
+      "native": {}
+    },
+    {
+      "_id": "credentials",
+      "type": "meta",
+      "common": {
+        "name": {
+          "en": "Persisted MQTT credentials (encrypted, internal)",
+          "de": "Gespeicherte MQTT-Anmeldedaten (verschlüsselt, intern)",
+          "ru": "Сохранённые учётные данные MQTT (зашифровано, внутреннее)",
+          "pt": "Credenciais MQTT persistidas (encriptadas, internas)",
+          "nl": "Opgeslagen MQTT-referenties (versleuteld, intern)",
+          "fr": "Identifiants MQTT enregistrés (chiffrés, internes)",
+          "it": "Credenziali MQTT salvate (crittografate, interne)",
+          "es": "Credenciales MQTT guardadas (cifradas, internas)",
+          "pl": "Zapisane dane uwierzytelniające MQTT (zaszyfrowane, wewnętrzne)",
+          "uk": "Збережені облікові дані MQTT (зашифровано, внутрішнє)",
+          "zh-cn": "已保存的 MQTT 凭据（已加密，内部）"
         },
         "type": "meta.user",
         "role": "meta.user"
