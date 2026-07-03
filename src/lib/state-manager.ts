@@ -1,5 +1,5 @@
 import type * as utils from "@iobroker/adapter-core";
-import { buildLanStateDefs, LAN_STATE_IDS, SENSOR_ROLE_UNIT, type StateDefinition } from "./capability-mapper";
+import { buildLanStateDefs, LAN_STATE_IDS, type StateDefinition } from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
 import { resolveSegmentCount } from "./device-manager";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
@@ -70,27 +70,12 @@ interface SyntheticStateMeta {
   /** Semantic channel — sensor readings vs. device events. */
   channel: "sensor" | "events";
 }
-/**
- * Numeric-sensor meta with role + unit pulled from the shared
- * {@link SENSOR_ROLE_UNIT}, so the App-API/MQTT path can't drift from the
- * Cloud-capability path. Booleans/events stay inline — they're heterogeneous.
- *
- * @param kind Sensor kind keying into {@link SENSOR_ROLE_UNIT}
- * @param nameKey i18n key for the state's display name
- */
-const numSensor = (kind: keyof typeof SENSOR_ROLE_UNIT, nameKey: I18nKey): SyntheticStateMeta => ({
-  type: "number",
-  role: SENSOR_ROLE_UNIT[kind].role,
-  unit: SENSOR_ROLE_UNIT[kind].unit,
-  nameKey,
-  channel: "sensor",
-});
 const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
-  temperature: numSensor("temperature", "temperature"),
-  humidity: numSensor("humidity", "humidity"),
-  battery: numSensor("battery", "battery"),
-  co2: numSensor("co2", "co2"),
-  carbondioxide: numSensor("co2", "co2"),
+  temperature: { type: "number", role: "value.temperature", unit: "°C", nameKey: "temperature", channel: "sensor" },
+  humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
+  co2: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
+  carbondioxide: { type: "number", role: "value.co2", unit: "ppm", nameKey: "co2", channel: "sensor" },
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
   lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
@@ -98,9 +83,15 @@ const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
   bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
   dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
-  sensor_temperature: numSensor("temperature", "temperature"),
-  sensor_humidity: numSensor("humidity", "humidity"),
-  sensor_battery: numSensor("battery", "battery"),
+  sensor_temperature: {
+    type: "number",
+    role: "value.temperature",
+    unit: "°C",
+    nameKey: "temperature",
+    channel: "sensor",
+  },
+  sensor_humidity: { type: "number", role: "value.humidity", unit: "%", nameKey: "humidity", channel: "sensor" },
+  sensor_battery: { type: "number", role: "value.battery", unit: "%", nameKey: "battery", channel: "sensor" },
   lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
   ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
