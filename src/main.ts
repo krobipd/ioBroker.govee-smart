@@ -277,6 +277,13 @@ class GoveeAdapter extends utils.Adapter {
         onGroupMembersReady: (group, allDevices) => deviceEvents.onGroupMembersReady(this, group, allDevices),
       });
 
+      // After an account-reconcile eviction, clean up the now-orphan objects +
+      // diagnostics buffers. A poll-driven eviction never fires onCloudDataReady,
+      // so reapStaleDevices must be triggered explicitly here.
+      this.deviceManager.onDevicesRemoved = () => {
+        void this.reapStaleDevices().catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
+      };
+
       // Update info.ip when LAN IP changes
       this.deviceManager.onLanIpChanged = (device, ip) => {
         const prefix = this.stateManager!.devicePrefix(device);
@@ -403,6 +410,11 @@ class GoveeAdapter extends utils.Adapter {
       // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)
       this.lanScanTimer = this.setTimeout(() => {
         this.lanScanDone = true;
+        // Enable the account-reconcile only now — before this a cache-restored
+        // LAN device hasn't had channels.lan set and would count a false miss.
+        if (this.deviceManager) {
+          this.deviceManager.accountReconcileEnabled = true;
+        }
         connectionState.checkAllReady(this);
       }, LAN_SCAN_INITIAL_WAIT_MS);
 

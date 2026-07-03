@@ -347,6 +347,15 @@ export interface GoveeDevice {
    */
   lastSeenOnNetwork?: number;
   /**
+   * Consecutive account-reconcile passes this device was missing from its
+   * authoritative account list (Cloud `/user/devices` for lights/appliances,
+   * App-API list for sensors, group list for BaseGroups) while not
+   * LAN-reachable. Persisted via the SKU cache so the debounce survives
+   * restarts; reset to 0 the instant the device reappears in any source or is
+   * seen on LAN. Reaching the evict threshold removes the device (irreversible).
+   */
+  accountMissCount?: number;
+  /**
    * Timestamp (ms) when device last replied to a LAN-direct probe (multicast
    * discovery or unicast devStatus). Only set by the LAN-Discovery / LAN-Status
    * paths — NOT by MQTT-push (broker buffering risk) and NOT by Cloud caps.

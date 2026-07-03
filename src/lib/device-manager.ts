@@ -17,6 +17,12 @@ import {
 } from "./device-manager/mapping";
 import * as cacheHelpers from "./device-manager/cache";
 import * as cloudMergeHelpers from "./device-manager/cloud-merge";
+import {
+  ABSENT_SOURCE,
+  reconcileAccountMembership,
+  type ReconcileSource,
+  type ReconcileSources,
+} from "./device-manager/reconciler";
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
@@ -89,6 +95,28 @@ export class DeviceManager {
   private lastAppApiErrorCategory: ErrorCategory | null = null;
   /** Dedup tracker for `loadGroupMembers` errors — first warn per category, rest debug. */
   private lastGroupMembersErrorCategory: ErrorCategory | null = null;
+
+  // === Account reconcile (auto-remove devices no longer in the Govee account) ===
+  /**
+   * Latest snapshot of each account-membership source, `null` until that source
+   * has been fetched at least once this session. Fed to the reconciler whenever
+   * either source refreshes (end of loadFromCloud / pollAppApi).
+   */
+  private lastCloudList: ReconcileSource | null = null;
+  private lastAppList: ReconcileSource | null = null;
+  /**
+   * Gate for the account-reconcile — main flips this true once the initial LAN
+   * scan is done, so a cache-restored LAN device isn't counted as an account
+   * miss before `channels.lan` has been set (advisor guard).
+   */
+  public accountReconcileEnabled = false;
+  /**
+   * Fired after devices were evicted from the account so the adapter runs the
+   * object cleanup (reapStaleDevices → cleanupDevices + diagnostics prune). An
+   * App-API-poll-driven eviction never fires onCloudDataReady, so the cleanup
+   * must be triggered explicitly.
+   */
+  public onDevicesRemoved: (() => void) | null = null;
 
   /**
    * @param log    ioBroker logger
@@ -283,6 +311,46 @@ export class DeviceManager {
   }
 
   /**
+   * Central account-membership reconcile — runs after either source refreshes
+   * (loadFromCloud / pollAppApi). Removes devices that persisted missing from
+   * their authoritative account list across the debounce window AND are not
+   * LAN-reachable, atomically across all three stores (in-memory map,
+   * SKU-cache file, ioBroker objects). Gated until the initial LAN scan is
+   * done. Decision logic lives in the pure {@link reconcileAccountMembership}.
+   */
+  private runAccountReconcile(): void {
+    if (!this.accountReconcileEnabled) {
+      return;
+    }
+    const sources: ReconcileSources = {
+      cloud: this.lastCloudList ?? ABSENT_SOURCE,
+      app: this.lastAppList ?? ABSENT_SOURCE,
+      group: ABSENT_SOURCE,
+    };
+    // Nothing successfully queried yet → nothing to judge.
+    if (!sources.cloud.ok && !sources.app.ok) {
+      return;
+    }
+    const toEvict = reconcileAccountMembership({
+      sources,
+      devices: this.devices.values(),
+      keyOf: (sku, id) => this.deviceKey(sku, id),
+    });
+    if (toEvict.length === 0) {
+      return;
+    }
+    for (const device of toEvict) {
+      this.log.info(`Removed device ${device.name} (${device.sku}) — no longer in your Govee account`);
+      this.removeDevice(device.sku, device.deviceId);
+      this.skuCache?.evictDevice(device.sku, device.deviceId);
+    }
+    // Persist the survivors' updated miss counters, then clean up the now-orphan
+    // ioBroker objects + diagnostics buffers for the evicted devices.
+    this.saveDevicesToCache();
+    this.onDevicesRemoved?.();
+  }
+
+  /**
    * Load devices from local SKU cache.
    * Returns true if any devices were loaded (= Cloud not needed).
    */
@@ -439,29 +507,15 @@ export class DeviceManager {
         }
       }
 
-      // Reconcile account membership (BUG-1): Govee's /user/devices returns
-      // devices deleted from the account capability-less, so they drop out
-      // after the hard-filter. A cloud-only device (never seen on LAN) that is
-      // no longer in the fresh list has been removed from the account — drop
-      // it, instead of letting the cache rehydrate it forever. Guards: only on
-      // a plausible non-empty response; never a LAN-present device (LAN-first);
-      // never a capability-bearing device (that's just offline — keep it).
-      if (cloudDevices.length > 0) {
-        const ownedKeys = new Set(cloudDevices.map(cd => this.deviceKey(cd.sku, cd.device)));
-        const removed: GoveeDevice[] = [];
-        for (const device of this.devices.values()) {
-          if (device.sku === "BaseGroup" || device.channels.lan || !device.channels.cloud) {
-            continue;
-          }
-          if (!ownedKeys.has(this.deviceKey(device.sku, device.deviceId))) {
-            removed.push(device);
-          }
-        }
-        for (const device of removed) {
-          this.log.info(`Removed device ${device.name} (${device.sku}) — no longer in your Govee account`);
-          this.removeDevice(device.sku, device.deviceId);
-        }
-      }
+      // Capture the Cloud /user/devices list as one account-membership source
+      // and run the central reconciler. `ok` requires a plausible non-empty
+      // response — a transient empty body (Govee returns HTTP 200 empty on
+      // hiccups) must never drive an irreversible removal.
+      this.lastCloudList = {
+        ok: cloudDevices.length > 0,
+        keys: new Set(cloudDevices.map(cd => this.deviceKey(cd.sku, cd.device))),
+      };
+      this.runAccountReconcile();
 
       // Step 3: Prune stale cache entries (only after successful Cloud-load
       // with a plausible response — never prune on Cloud failure or empty list)
@@ -1416,6 +1470,13 @@ export class DeviceManager {
     }
     // Reset on success so the next failure warns again.
     this.lastAppApiErrorCategory = null;
+    // Snapshot the App-API list as the second account-membership source. This
+    // endpoint (empty-body POST) returns the COMPLETE Govee-Home account list,
+    // so it is authoritative for sensors (which never appear in /user/devices).
+    this.lastAppList = {
+      ok: entries.length > 0,
+      keys: new Set(entries.map(e => this.deviceKey(e.sku, e.device))),
+    };
     // Process all entries in parallel — each entry only touches its own
     // device (no shared mutation), and the downstream callbacks (onCloud-
     // Capabilities → main.applyCloudCapabilities → setState queue)
@@ -1458,7 +1519,11 @@ export class DeviceManager {
         }),
       ),
     );
-    return results.filter(Boolean).length;
+    const updated = results.filter(Boolean).length;
+    // Reconcile now that the (complete) App-API account list is fresh — this is
+    // what surfaces a sold sensor (absent here) for removal after the debounce.
+    this.runAccountReconcile();
+    return updated;
   }
 
   /**

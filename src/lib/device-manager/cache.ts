@@ -115,12 +115,17 @@ function normalize<T extends Omit<GoveeDevice, "state" | "channels" | "lanIp" | 
   const manualSegments =
     manualMode && Array.isArray(d.manualSegments) && d.manualSegments.length > 0 ? d.manualSegments.slice() : undefined;
   const sceneSpeed = typeof d.sceneSpeed === "number" && d.sceneSpeed > 0 ? d.sceneSpeed : undefined;
+  // Drop a zeroed miss-counter so the cache stays compact — 0 and undefined
+  // are equivalent to the reconciler (both mean "no pending misses").
+  const accountMissCount =
+    typeof d.accountMissCount === "number" && d.accountMissCount > 0 ? d.accountMissCount : undefined;
   return {
     ...d,
     segmentCount,
     manualMode,
     manualSegments,
     sceneSpeed,
+    accountMissCount,
   };
 }
 

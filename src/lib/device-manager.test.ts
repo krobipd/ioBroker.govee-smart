@@ -492,13 +492,12 @@ describe("DeviceManager", () => {
       expect(tracker.calls[0].args[4]).toBe(1); // power on = 1
     });
 
-    it("removes a cloud-only device no longer in the account, keeps LAN-present ones (BUG-1 reconcile)", async () => {
+    it("removes a cloud-only light no longer in the account after the debounce, keeps LAN-present ones", async () => {
       const deleted = createTestDevice({
-        sku: "H5179",
+        sku: "H61BE",
         deviceId: "DEADBEEF01",
-        name: "Sold Thermo",
+        name: "Sold Light",
         lanIp: undefined,
-        capabilities: [],
         channels: { lan: false, mqtt: false, cloud: true },
       });
       const lanKept = createTestDevice({
@@ -506,24 +505,58 @@ describe("DeviceManager", () => {
         deviceId: "AABBCCDDEEFF0011",
         channels: { lan: true, mqtt: false, cloud: true },
       });
-      (dm as any).devices.set("H5179_deadbeef01", deleted);
-      (dm as any).devices.set("H6160_aabbccddeeff0011", lanKept);
+      (dm as any).devices.set((dm as any).deviceKey("H61BE", "DEADBEEF01"), deleted);
+      (dm as any).devices.set((dm as any).deviceKey("H6160", "AABBCCDDEEFF0011"), lanKept);
+      dm.accountReconcileEnabled = true; // main enables this once lanScanDone
       dm.setCloudClient({
         getDevices: () =>
           Promise.resolve([
             {
               sku: "H5100",
               device: "PRESENT0001",
-              deviceName: "Present Sensor",
-              type: "devices.types.thermometer",
-              capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature" }],
+              deviceName: "Present Light",
+              type: "devices.types.light",
+              capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+            },
+          ]),
+      } as any);
+
+      // Pass 1 — debounce: one miss, device NOT yet removed (transient guard).
+      await dm.loadFromCloud();
+      expect(dm.getDevices().map(d => d.deviceId)).toContain("DEADBEEF01");
+      expect(deleted.accountMissCount).toBe(1);
+
+      // Pass 2 — second consecutive miss crosses the threshold → removed.
+      await dm.loadFromCloud();
+      const ids = dm.getDevices().map(d => d.deviceId);
+      expect(ids).not.toContain("DEADBEEF01"); // account-deleted light → removed
+      expect(ids).toContain("AABBCCDDEEFF0011"); // LAN-present → kept (LAN-first)
+    });
+
+    it("does not reconcile before accountReconcileEnabled (LAN-scan window guard)", async () => {
+      const cloudOnly = createTestDevice({
+        sku: "H61BE",
+        deviceId: "DEADBEEF02",
+        lanIp: undefined,
+        channels: { lan: false, mqtt: false, cloud: true },
+      });
+      (dm as any).devices.set((dm as any).deviceKey("H61BE", "DEADBEEF02"), cloudOnly);
+      // accountReconcileEnabled stays false (default)
+      dm.setCloudClient({
+        getDevices: () =>
+          Promise.resolve([
+            {
+              sku: "H5100",
+              device: "PRESENT0001",
+              type: "devices.types.light",
+              capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
             },
           ]),
       } as any);
       await dm.loadFromCloud();
-      const ids = dm.getDevices().map(d => d.deviceId);
-      expect(ids).not.toContain("DEADBEEF01"); // cloud-only, account-deleted → removed
-      expect(ids).toContain("AABBCCDDEEFF0011"); // LAN-present → kept (LAN-first)
+      await dm.loadFromCloud();
+      expect(dm.getDevices().map(d => d.deviceId)).toContain("DEADBEEF02");
+      expect(cloudOnly.accountMissCount ?? 0).toBe(0); // gated → never touched
     });
 
     it("loadFromCloud classifies a 429 as rate-limited with the Retry-After delay (L29)", async () => {
@@ -2415,6 +2448,35 @@ describe("DeviceManager — loadFromCache merge", () => {
         }) as never,
       );
       expect(await dm2.pollAppApi()).toBe(0); // unknown entry ignored despite a known device present
+    });
+
+    it("removes a sold sensor absent from the App-API account list after the debounce (reported H5179 bug)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      // A cache-restored, sold thermometer: no LAN, not in any account list.
+      const sold = createTestDevice({
+        sku: "H5179",
+        deviceId: "SOLD0001",
+        name: "Sold Thermo",
+        type: "devices.types.thermometer",
+        lanIp: undefined,
+        channels: { lan: false, mqtt: false, cloud: false },
+      });
+      (dm2 as any).devices.set((dm2 as any).deviceKey("H5179", "SOLD0001"), sold);
+      dm2.accountReconcileEnabled = true;
+      // App-API returns a DIFFERENT still-owned sensor → list non-empty (ok=true),
+      // the sold sensor is absent → reconcilable via the App-API authority.
+      dm2.setApiClient(
+        makeApiMock({
+          entries: [{ sku: "H5075", device: "OWNED0001", deviceName: "Kept", lastData: { online: true, tem: 2100 } }],
+        }) as never,
+      );
+
+      await dm2.pollAppApi(); // pass 1 → miss 1, kept
+      expect(dm2.getDevices().map(d => d.deviceId)).toContain("SOLD0001");
+      expect(sold.accountMissCount).toBe(1);
+
+      await dm2.pollAppApi(); // pass 2 → miss 2 → evicted
+      expect(dm2.getDevices().map(d => d.deviceId)).not.toContain("SOLD0001");
     });
 
     it("forwards synthetic caps for known devices via onCloudCapabilities", async () => {
