@@ -83,8 +83,8 @@ export function goveeUserAgent(): string {
  *
  * @param clientId Account-derived Govee client id
  * @param opts `bearer` token and/or `withTimestamp` for login-style calls
- * @param opts.bearer
- * @param opts.withTimestamp
+ * @param opts.bearer Bearer token — adds the `Authorization` header for authenticated endpoints
+ * @param opts.withTimestamp Add `iotVersion` + a fresh `timestamp` for login / verification calls
  */
 export function buildGoveeAppHeaders(
   clientId: string,

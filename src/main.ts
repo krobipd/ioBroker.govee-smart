@@ -54,7 +54,7 @@ import {
  * The device's learned physical segment count, or 0 when not yet known — the
  * cap for filtering out echo indices above the real strip length.
  *
- * @param device
+ * @param device Device whose learned physical segment count to read
  */
 function physicalSegmentCap(device: GoveeDevice): number {
   return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;

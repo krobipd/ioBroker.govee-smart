@@ -320,7 +320,7 @@ export class DeviceManager {
    * SKU-cache file, ioBroker objects). Gated until the initial LAN scan is
    * done. Decision logic lives in the pure {@link reconcileAccountMembership}.
    *
-   * @param refreshedSource
+   * @param refreshedSource Which source list just refreshed (cloud / app / group) — only devices whose authoritative source matches get their absence advanced this pass
    */
   private runAccountReconcile(refreshedSource: SourceKind): void {
     if (!this.accountReconcileEnabled) {
@@ -785,14 +785,14 @@ export class DeviceManager {
    * @param hasBearer Whether a bearer token is present (for the failure log)
    * @param cfg Per-library specifics — force flag, current field, endpoint,
    *   labels, and the fetch + assign closures
-   * @param cfg.force
-   * @param cfg.current
-   * @param cfg.ep
-   * @param cfg.label
-   * @param cfg.noun
-   * @param cfg.failLabel
-   * @param cfg.fetch
-   * @param cfg.assign
+   * @param cfg.force Refetch even when the field already holds data
+   * @param cfg.current The device field being populated — skipped when non-empty unless forced
+   * @param cfg.ep API endpoint path, recorded in the diag buffer and failure log
+   * @param cfg.label Human-readable library name for the debug count line
+   * @param cfg.noun Plural noun for the count line (e.g. "scenes")
+   * @param cfg.failLabel Library label passed to the undocumented-API failure log
+   * @param cfg.fetch Closure that performs the actual API fetch
+   * @param cfg.assign Closure that stores the fetched array on the device
    */
   private async loadLibrary<T>(
     device: GoveeDevice,
