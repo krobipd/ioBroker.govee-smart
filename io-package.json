@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.18.1",
     "news": {
+      "NEXT": {
+        "en": "Internal refactoring. No user-facing changes.",
+        "de": "Interne Überarbeitung. Keine für Nutzer sichtbaren Änderungen.",
+        "ru": "Внутренний рефакторинг. Никаких изменений для пользователя.",
+        "pt": "Refatoração interna. Nenhuma alteração visível para o utilizador.",
+        "nl": "Interne refactoring. Geen zichtbare wijzigingen voor gebruikers.",
+        "fr": "Refactorisation interne. Aucun changement visible pour l'utilisateur.",
+        "it": "Refactoring interno. Nessuna modifica visibile all'utente.",
+        "es": "Refactorización interna. Sin cambios visibles para el usuario.",
+        "pl": "Wewnętrzny refaktoring. Brak zmian widocznych dla użytkownika.",
+        "uk": "Внутрішній рефакторинг. Жодних змін для користувача.",
+        "zh-cn": "内部重构。无用户可见的更改。"
+      },
       "2.18.1": {
         "en": "New Govee devices in the catalog: more lamps and sensors, including a CO2 monitor. They start as experimental — enable them in the adapter settings to try them.",
         "de": "Neue Govee-Geräte im Katalog: mehr Lampen und Sensoren, darunter ein CO2-Monitor. Sie starten experimentell — in den Adapter-Einstellungen aktivieren zum Ausprobieren.",
@@ -80,19 +93,6 @@
         "pl": "Światłami i urządzeniami bez połączenia lokalnego można teraz sterować przez Cloud, plus czytelniejsze jednorazowe powiadomienia i więcej obsługiwanych urządzeń.",
         "uk": "Освітлення та пристрої без локального підключення тепер керуються через хмару, плюс зрозуміліші одноразові сповіщення та більше підтримуваних пристроїв.",
         "zh-cn": "无本地连接的灯和设备现在可通过云端控制，并提供更清晰的一次性提醒和更多受支持的设备。"
-      },
-      "2.15.0": {
-        "en": "Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.",
-        "de": "Optionale Fehlermeldung über Sentry hinzugefügt: Abstürze werden an den Entwickler gesendet, damit Probleme schneller behoben werden. Nur aktiv bei eingeschalteter ioBroker-Diagnose; anonym.",
-        "ru": "Добавлена необязательная отправка ошибок через Sentry: сбои отправляются разработчику, чтобы быстрее их устранять. Работает только при включённой диагностике ioBroker; анонимно.",
-        "pt": "Adicionado relatório de erros opcional via Sentry: as falhas são enviadas ao programador para corrigir problemas mais rápido. Ativo apenas com o diagnóstico do ioBroker ligado; anónimo.",
-        "nl": "Optionele foutrapportage via Sentry toegevoegd: crashes worden naar de ontwikkelaar gestuurd om problemen sneller op te lossen. Alleen actief met ioBroker-diagnostiek ingeschakeld; anoniem.",
-        "fr": "Rapport d'erreurs optionnel via Sentry ajouté : les plantages sont envoyés au développeur pour corriger plus vite. Actif seulement si le diagnostic ioBroker est activé ; anonyme.",
-        "it": "Aggiunta segnalazione errori opzionale via Sentry: gli arresti vengono inviati allo sviluppatore per risolvere prima i problemi. Attivo solo con la diagnostica ioBroker attiva; anonimo.",
-        "es": "Añadido informe de errores opcional mediante Sentry: los fallos se envían al desarrollador para solucionar problemas más rápido. Activo solo con el diagnóstico de ioBroker activado; anónimo.",
-        "pl": "Dodano opcjonalne raportowanie błędów przez Sentry: awarie są wysyłane do dewelopera, aby szybciej rozwiązywać problemy. Aktywne tylko przy włączonej diagnostyce ioBroker; anonimowo.",
-        "uk": "Додано необов'язкову відправку помилок через Sentry: збої надсилаються розробнику, щоб швидше їх виправляти. Працює лише з увімкненою діагностикою ioBroker; анонімно.",
-        "zh-cn": "新增可选的 Sentry 错误上报：崩溃信息会发送给开发者以更快修复问题。仅在启用 ioBroker 诊断时生效；匿名。"
       }
     },
     "plugins": {

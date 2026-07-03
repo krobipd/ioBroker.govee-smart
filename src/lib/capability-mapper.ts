@@ -459,6 +459,19 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
 }
 
 /**
+ * Canonical (role, unit) for the numeric Govee sensor kinds — the single
+ * source of truth shared between {@link mapProperty} (Cloud property caps) and
+ * state-manager's synthetic-state table, so a reading gets the same role + unit
+ * whether it arrives via the Cloud-capability path or the App-API/MQTT path.
+ */
+export const SENSOR_ROLE_UNIT = {
+  temperature: { role: "value.temperature", unit: "°C" },
+  humidity: { role: "value.humidity", unit: "%" },
+  battery: { role: "value.battery", unit: "%" },
+  co2: { role: "value.co2", unit: "ppm" },
+} as const;
+
+/**
  * Map property capability (read-only sensors). Routes to the `sensor`
  * channel so a Heater's temperature reading sits cleanly next to other
  * sensor-style states instead of in `control`.
@@ -471,17 +484,13 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
   let unit: string | undefined;
 
   if (instance.includes("temperature")) {
-    role = "value.temperature";
-    unit = "°C";
+    ({ role, unit } = SENSOR_ROLE_UNIT.temperature);
   } else if (instance.includes("humidity")) {
-    role = "value.humidity";
-    unit = "%";
+    ({ role, unit } = SENSOR_ROLE_UNIT.humidity);
   } else if (instance.includes("battery")) {
-    role = "value.battery";
-    unit = "%";
+    ({ role, unit } = SENSOR_ROLE_UNIT.battery);
   } else if (instance.includes("co2") || instance.includes("carbondioxide")) {
-    role = "value.co2";
-    unit = "ppm";
+    ({ role, unit } = SENSOR_ROLE_UNIT.co2);
   }
 
   return [
