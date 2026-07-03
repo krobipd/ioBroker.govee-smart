@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.18.0",
+    "version": "2.18.1",
     "news": {
-      "NEXT": {
+      "2.18.1": {
         "en": "New Govee devices in the catalog: more lamps and sensors, including a CO2 monitor. They start as experimental — enable them in the adapter settings to try them.",
         "de": "Neue Govee-Geräte im Katalog: mehr Lampen und Sensoren, darunter ein CO2-Monitor. Sie starten experimentell — in den Adapter-Einstellungen aktivieren zum Ausprobieren.",
         "ru": "Новые устройства Govee в каталоге: больше ламп и датчиков, включая монитор CO2. Они экспериментальные — включите их в настройках адаптера, чтобы попробовать.",

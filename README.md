@@ -94,7 +94,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.18.1 (2026-07-03)
 
 - Added several new Govee devices to the catalog — 4 more lamps and 3 sensors (including a CO2 monitor). They start as experimental; enable them in the adapter settings to try them.
 
@@ -151,13 +151,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Running in compact mode no longer intercepts errors from other adapters in the same process — error reporting stays correctly attributed per adapter.
 - Cloud commands issued during a long rate-limit window no longer pile up without limit; stale queued calls are dropped with a single warning.
 - Device info entries (name, model, IP address) no longer rewrite their timestamps on every refresh — state history stays clean.
-
-### 2.16.0 (2026-06-09)
-
-- Lights and appliances without a local connection can now be controlled through the Cloud and report their correct online status; devices that support local control keep using it first.
-- When account verification, the Cloud API key or the Govee password needs your attention, the adapter now flags it once clearly and as an ioBroker notification instead of repeating the same error.
-- Added many more supported device models to the catalog, including Curtain Lights v1 and v2, the TV Backlight 3 Pro and the DreamView T1.
-- Requires ioBroker js-controller 7.2.2 or newer.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
