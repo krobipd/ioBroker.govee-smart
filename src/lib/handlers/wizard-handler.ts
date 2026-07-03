@@ -17,7 +17,7 @@ export interface WizardHandlerAdapter {
   readonly stateManager: StateManager | null;
   segmentWizard: SegmentWizard | null;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
   /** Apply manual segments — owned by main.ts because it touches StateManager + cache. */
@@ -122,7 +122,7 @@ export async function runWizardStep(
   }
   const response = await adapter.segmentWizard.runStep(action, deviceKey);
   const statusText = adapter.segmentWizard.getStatusText();
-  await adapter.setStateAsync("info.wizardStatus", {
+  await adapter.setState("info.wizardStatus", {
     val: statusText,
     ack: true,
   });

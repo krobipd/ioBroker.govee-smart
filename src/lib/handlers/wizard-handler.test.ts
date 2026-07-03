@@ -41,7 +41,7 @@ function makeAdapter(devices: GoveeDevice[]): {
     stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
     segmentWizard: null,
     getStateAsync: async () => null,
-    setStateAsync: async (id, state) => {
+    setState: async (id, state) => {
       statusWrites.push({ id, val: (state as { val: unknown }).val });
     },
     setTimeout: () => undefined,

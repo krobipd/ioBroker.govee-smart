@@ -92,7 +92,7 @@ function makeRig(opts: {
     readyLogged: false,
     lastConnectionState: null,
     channelStatus: opts.channelStatus,
-    setStateAsync: async (id, state) => {
+    setState: async (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
       return undefined;
     },

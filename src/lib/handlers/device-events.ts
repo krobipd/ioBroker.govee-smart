@@ -26,7 +26,7 @@ export interface DeviceEventsAdapter {
   readonly statesReady: boolean;
   readonly stateCreationQueue: Promise<void>[];
   /** Re-fired into stateManager + connection-state + groupFanout-reachability. */
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   /** Optional reapStaleDevices delegate — owned by main.ts because it touches diagnosticsLastRun. */
   reapStaleDevices?(): Promise<void>;
 }

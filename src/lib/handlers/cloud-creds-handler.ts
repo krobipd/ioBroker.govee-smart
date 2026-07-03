@@ -11,7 +11,7 @@ export interface CloudCredsAdapter {
   readonly log: ioBroker.Logger;
   readonly namespace: string;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getForeignObjectAsync(id: string): Promise<{ native?: unknown } | null | undefined>;
   extendForeignObjectAsync(id: string, obj: { native?: Record<string, unknown> }): Promise<unknown>;
   encrypt(value: string): string;
@@ -110,7 +110,7 @@ export async function persistCredsToState(adapter: CloudCredsAdapter, creds: Per
     accountTopic: creds.accountTopic,
     tokenExpiresAt: creds.tokenExpiresAt,
   });
-  await adapter.setStateAsync("info.mqttCredentials", { val: blob, ack: true });
+  await adapter.setState("info.mqttCredentials", { val: blob, ack: true });
 }
 
 /**

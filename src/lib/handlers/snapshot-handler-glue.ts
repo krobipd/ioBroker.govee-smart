@@ -6,7 +6,7 @@ import type { GoveeDevice } from "../types";
 
 /**
  * Adapter surface required to build the SnapshotHandler host. Loose
- * `setStateAsync` signature for utils.Adapter structural matching.
+ * `setState` signature for utils.Adapter structural matching.
  */
 export interface SnapshotHandlerGlueAdapter {
   readonly log: ioBroker.Logger;

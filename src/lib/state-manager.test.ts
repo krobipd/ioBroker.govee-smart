@@ -55,12 +55,12 @@ function createMockAdapter(): {
       silly: () => {},
       level: "debug",
     },
-    extendObjectAsync: async (id: string, obj: Record<string, unknown>, opts?: Record<string, unknown>) => {
-      calls.push({ method: "extendObjectAsync", args: [id, obj, opts] });
+    extendObject: async (id: string, obj: Record<string, unknown>, opts?: Record<string, unknown>) => {
+      calls.push({ method: "extendObject", args: [id, obj, opts] });
       objects.set(id, obj);
     },
-    setStateAsync: async (id: string, val: Record<string, unknown>) => {
-      calls.push({ method: "setStateAsync", args: [id, val] });
+    setState: async (id: string, val: Record<string, unknown>) => {
+      calls.push({ method: "setState", args: [id, val] });
       states.set(id, val as unknown as ioBroker.State);
     },
     setStateChangedAsync: async (id: string, val: Record<string, unknown>) => {
@@ -132,7 +132,7 @@ function createTestDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
     state: { online: true },
     // Fresh LAN-reply timestamp so StateManager.syncInfoOnline resolves
     // info.online to true for Light test devices (matches the
-    // pre-fix default which had a direct setStateAsync write).
+    // pre-fix default which had a direct setState write).
     lastLanReplyAt: Date.now(),
     channels: { lan: true, mqtt: false, cloud: false },
     ...overrides,
@@ -1035,10 +1035,10 @@ describe("StateManager", () => {
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
       // Check Channel-Object created
       expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
-      // Check State-Object created via extendObjectAsync (NOT setObjectNotExists)
+      // Check State-Object created via extendObject (NOT setObjectNotExists)
       expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(true);
-      // Verify extendObjectAsync was used (idempotent + repairs partial-formed)
-      const extendCalls = calls.filter(c => c.method === "extendObjectAsync");
+      // Verify extendObject was used (idempotent + repairs partial-formed)
+      const extendCalls = calls.filter(c => c.method === "extendObject");
       const stateExtend = extendCalls.find(c => c.args[0] === "devices.h5179_3c1b.sensor.sensor_temperature");
       expect(stateExtend).toBeDefined();
     });
@@ -1047,7 +1047,7 @@ describe("StateManager", () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "unknown_state_xyz");
-      const extendCalls = calls.filter(c => c.method === "extendObjectAsync");
+      const extendCalls = calls.filter(c => c.method === "extendObject");
       expect(extendCalls).toHaveLength(0);
     });
 
@@ -1062,7 +1062,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
       const final = objects.get("devices.h5179_3c1b.sensor.sensor_humidity") as Record<string, unknown>;
-      // extendObjectAsync stores latest write — common should now be the full meta
+      // extendObject stores latest write — common should now be the full meta
       const common = final?.common as { role?: string };
       expect(common?.role).toBe("value.humidity");
     });

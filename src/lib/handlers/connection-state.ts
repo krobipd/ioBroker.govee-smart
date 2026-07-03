@@ -33,7 +33,7 @@ export interface ConnectionStateAdapter {
   lastConnectionState: boolean | null;
   /** In-memory channel-status snapshot pulled by the log-prefix wrapper. */
   channelStatus?: ChannelStatusSnapshot;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
 /**
@@ -46,7 +46,7 @@ export interface ConnectionStateAdapter {
  *   otherwise false (e.g. EADDRINUSE or a bind error).
  *
  * Write-only-on-change cache (lastConnectionState) so we don't spam
- * setStateAsync on every device-state-update.
+ * setState on every device-state-update.
  *
  */
 export function updateConnectionState(adapter: ConnectionStateAdapter): void {
@@ -61,7 +61,7 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {
     adapter.lastConnectionState = connected;
-    adapter.setStateAsync("info.connection", { val: connected, ack: true }).catch(() => {});
+    adapter.setState("info.connection", { val: connected, ack: true }).catch(() => {});
   }
 
   // Sync the in-memory channelStatus snapshot used by the log-prefix wrapper.
@@ -120,7 +120,7 @@ export async function checkAppVersionDrift(adapter: ConnectionStateAdapter): Pro
         : driftMinor <= 2
           ? `minor drift (live=${liveVersion}, local=${GOVEE_APP_VERSION})`
           : `STALE (live=${liveVersion}, local=${GOVEE_APP_VERSION}) — bump GOVEE_APP_VERSION`;
-    await adapter.setStateAsync("info.appVersionDrift", { val: driftMessage, ack: true }).catch(() => undefined);
+    await adapter.setState("info.appVersionDrift", { val: driftMessage, ack: true }).catch(() => undefined);
     if (driftMinor > 2) {
       adapter.log.warn(
         `Govee app version drift: live ${liveVersion} vs local ${GOVEE_APP_VERSION} — undocumented endpoints may start failing. Run sync-govee-app-version.py + release a new adapter version.`,

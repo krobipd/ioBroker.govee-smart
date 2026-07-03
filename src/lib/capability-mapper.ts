@@ -886,7 +886,7 @@ function humanize(str: string): string {
 export interface CloudStateValue {
   /** State ID in control/ channel (e.g. "power", "brightness", "gradient_toggle") */
   stateId: string;
-  /** Converted value ready for ioBroker setStateAsync */
+  /** Converted value ready for ioBroker setState */
   value: ioBroker.StateValue;
 }
 

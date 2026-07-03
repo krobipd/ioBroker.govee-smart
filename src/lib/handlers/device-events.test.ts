@@ -70,7 +70,7 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     localSnapshots: { getSnapshots: () => [{ name: "Snap" }] } as never,
     statesReady: opts.statesReady ?? false,
     stateCreationQueue: queue,
-    setStateAsync: async () => undefined,
+    setState: async () => undefined,
     reapStaleDevices: async () => {
       reapCalls.push(1);
     },
@@ -100,8 +100,8 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     sendMusicCommand: async () => undefined,
   } as unknown as Parameters<typeof onDeviceStateUpdate>[0];
 
-  // Observe dropdown resets through the shared setStateAsync.
-  (adapter as { setStateAsync: unknown }).setStateAsync = async (id: string, state: unknown) => {
+  // Observe dropdown resets through the shared setState.
+  (adapter as { setState: unknown }).setState = async (id: string, state: unknown) => {
     if ((state as { val: unknown }).val === "0") {
       dropdownResets.push(id);
     }

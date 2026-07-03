@@ -80,7 +80,7 @@ class GoveeAdapter extends utils.Adapter {
   public cloudInitTimer: ioBroker.Timeout | undefined;
   /**
    * Last info.connection value — cached so not every device update issues an
-   * unnecessary setStateAsync (H4).
+   * unnecessary setState (H4).
    */
   /** Public for handler modules (connection-state). */
   public lastConnectionState: boolean | null = null;
@@ -136,7 +136,7 @@ class GoveeAdapter extends utils.Adapter {
   /**
    * Set true at the start of onUnload — async paths (onStateChange,
    * applyCloudCapabilities, retrySceneData, …) check this between awaits
-   * and bail before further setStateAsync against a torn-down adapter.
+   * and bail before further setState against a torn-down adapter.
    */
   /** Public for handler modules (state-change-router). */
   public unloading = false;
@@ -207,14 +207,14 @@ class GoveeAdapter extends utils.Adapter {
       // info channel + states are declared as instanceObjects in
       // io-package.json, so js-controller materialises them on install /
       // upgrade. We only initialise the runtime values here.
-      await this.setStateAsync("info.connection", { val: false, ack: true });
-      await this.setStateAsync("info.mqttConnected", { val: false, ack: true });
-      await this.setStateAsync("info.cloudConnected", { val: false, ack: true });
-      await this.setStateAsync("info.openapiMqttConnected", {
+      await this.setState("info.connection", { val: false, ack: true });
+      await this.setState("info.mqttConnected", { val: false, ack: true });
+      await this.setState("info.cloudConnected", { val: false, ack: true });
+      await this.setState("info.openapiMqttConnected", {
         val: false,
         ack: true,
       });
-      await this.setStateAsync("info.wizardStatus", {
+      await this.setState("info.wizardStatus", {
         val: wizardIdleText(),
         ack: true,
       });
@@ -280,7 +280,7 @@ class GoveeAdapter extends utils.Adapter {
       // Update info.ip when LAN IP changes
       this.deviceManager.onLanIpChanged = (device, ip) => {
         const prefix = this.stateManager!.devicePrefix(device);
-        this.setStateAsync(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {});
+        this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {});
       };
 
       // Sync individual segment states after batch command.
@@ -298,13 +298,13 @@ class GoveeAdapter extends utils.Adapter {
           }
           if (batch.color !== undefined) {
             const hex = rgbIntToHex(batch.color);
-            this.setStateAsync(`${prefix}.segments.${idx}.color`, {
+            this.setState(`${prefix}.segments.${idx}.color`, {
               val: hex,
               ack: true,
             }).catch(() => {});
           }
           if (batch.brightness !== undefined) {
-            this.setStateAsync(`${prefix}.segments.${idx}.brightness`, {
+            this.setState(`${prefix}.segments.${idx}.brightness`, {
               val: batch.brightness,
               ack: true,
             }).catch(() => {});
@@ -321,11 +321,11 @@ class GoveeAdapter extends utils.Adapter {
           if (cap === 0 || seg.index >= cap) {
             continue;
           }
-          this.setStateAsync(`${prefix}.segments.${seg.index}.color`, {
+          this.setState(`${prefix}.segments.${seg.index}.color`, {
             val: rgbToHex(seg.r, seg.g, seg.b),
             ack: true,
           }).catch(() => {});
-          this.setStateAsync(`${prefix}.segments.${seg.index}.brightness`, {
+          this.setState(`${prefix}.segments.${seg.index}.brightness`, {
             val: seg.brightness,
             ack: true,
           }).catch(() => {});
@@ -478,7 +478,7 @@ class GoveeAdapter extends utils.Adapter {
         await this.mqttClient.connect(
           update => this.deviceManager!.handleMqttStatus(update),
           connected => {
-            this.setStateAsync("info.mqttConnected", {
+            this.setState("info.mqttConnected", {
               val: connected,
               ack: true,
             }).catch(() => {});
@@ -531,7 +531,7 @@ class GoveeAdapter extends utils.Adapter {
         this.openapiMqttClient.connect(
           event => this.deviceManager?.handleOpenApiEvent(event),
           connected => {
-            this.setStateAsync("info.openapiMqttConnected", {
+            this.setState("info.openapiMqttConnected", {
               val: connected,
               ack: true,
             }).catch(() => {});
@@ -592,7 +592,7 @@ class GoveeAdapter extends utils.Adapter {
           const result = await cloudRetryHandler.cloudInitWithTimeout(this);
           this.cloudWasConnected = result.ok;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(result.ok);
-          this.setStateAsync("info.cloudConnected", {
+          this.setState("info.cloudConnected", {
             val: result.ok,
             ack: true,
           }).catch(() => {});
@@ -610,7 +610,7 @@ class GoveeAdapter extends utils.Adapter {
           this.log.debug(`Using cached device data — no Cloud calls needed`);
           this.cloudWasConnected = true;
           cloudRetryHandler.ensureCloudRetry(this).setConnected(true);
-          this.setStateAsync("info.cloudConnected", {
+          this.setState("info.cloudConnected", {
             val: true,
             ack: true,
           }).catch(() => {});
@@ -678,7 +678,7 @@ class GoveeAdapter extends utils.Adapter {
 
       // info.online sync — re-evaluates per-device online truth every 20 s.
       // For Lights this drives the offline-transition (lastLanReplyAt TTL).
-      // For all devices it suppresses ts-rewrite-spam (no setStateAsync when
+      // For all devices it suppresses ts-rewrite-spam (no setState when
       // value is unchanged). When a Light flips online/offline, also refreshes
       // group-reachability since the original onDeviceUpdate path no longer
       // sees those transitions for Lights.
@@ -807,7 +807,7 @@ class GoveeAdapter extends utils.Adapter {
    */
   private onUnload(callback: () => void): void {
     // Set first — async paths read this between awaits and bail before
-    // further setStateAsync, sendCommand, etc. against a torn-down adapter.
+    // further setState, sendCommand, etc. against a torn-down adapter.
     this.unloading = true;
     try {
       if (this.lanScanTimer) {

@@ -1418,9 +1418,9 @@ export class DeviceManager {
     this.lastAppApiErrorCategory = null;
     // Process all entries in parallel — each entry only touches its own
     // device (no shared mutation), and the downstream callbacks (onCloud-
-    // Capabilities → main.applyCloudCapabilities → setStateAsync queue)
+    // Capabilities → main.applyCloudCapabilities → setState queue)
     // are async-safe. Sequential `for` blocked the App-API tick on a slow
-    // setStateAsync round-trip per device.
+    // setState round-trip per device.
     // Wrap each per-entry block in `Promise.resolve` so the iterable is a
     // true Thenable — synchronous returns confuse `await Promise.all`'s
     // type-checker (await-thenable lint rule) even though the runtime would

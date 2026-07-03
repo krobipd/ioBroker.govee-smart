@@ -1,11 +1,11 @@
 /**
  * Adapter surface required by the dropdown-reset helpers. Loose
- * `setStateAsync` shape for utils.Adapter structural matching.
+ * `setState` shape for utils.Adapter structural matching.
  */
 export interface GroupStateHelpersAdapter {
   readonly namespace: string;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
 /**
@@ -113,7 +113,7 @@ export async function resetModeDropdowns(
       const stateId = `${adapter.namespace}.${prefix}.${dropdown}`;
       const current = await adapter.getStateAsync(stateId);
       if (current?.val && current.val !== "0" && current.val !== 0) {
-        await adapter.setStateAsync(stateId, { val: "0", ack: true });
+        await adapter.setState(stateId, { val: "0", ack: true });
       }
     }),
   );

@@ -149,7 +149,7 @@ export class StateManager {
   private readonly stateChannelMap = new Map<string, string>();
   /**
    * Cache of state IDs already created via {@link ensureState} — skips the
-   * `extendObjectAsync` round-trip on the hot path. Refreshed on
+   * `extendObject` round-trip on the hot path. Refreshed on
    * {@link removeDevice}/{@link forgetPrefix} so a re-pair doesn't reuse stale
    * cache entries.
    */
@@ -169,7 +169,7 @@ export class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * `extendObjectAsync` deep-merges and CANNOT replace an object-value with a
+   * `extendObject` deep-merges and CANNOT replace an object-value with a
    * string. Only a full `setObjectAsync` replaces. Same fix-pattern as
    * hassemu v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown). Admin
    * renders states-values as React children — a translation object triggers
@@ -192,7 +192,7 @@ export class StateManager {
     if (!buggy) {
       return;
     }
-    await this.adapter.extendObjectAsync(id, { common: { states: fresh } }).catch(() => undefined);
+    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(() => undefined);
   }
 
   /**
@@ -243,7 +243,7 @@ export class StateManager {
       return;
     }
     const prefix = this.devicePrefix(device);
-    await this.adapter.setStateAsync(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => undefined);
+    await this.adapter.setState(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => undefined);
   }
 
   /**
@@ -319,7 +319,7 @@ export class StateManager {
     // in events/. Without an extendObject the channel parent stays missing
     // and Admin shows the state directly under the device root.
     await this.adapter
-      .extendObjectAsync(
+      .extendObject(
         `${prefix}.${channel}`,
         {
           type: "channel",
@@ -330,7 +330,7 @@ export class StateManager {
       )
       .catch(() => undefined);
     await this.adapter
-      .extendObjectAsync(
+      .extendObject(
         `${prefix}.${channel}.${stateId}`,
         {
           type: "state",
@@ -358,7 +358,7 @@ export class StateManager {
    * of legacy device-level info states.
    *
    * Idempotent. Called from every phase callback (LAN-Phase + Cloud-Phase
-   * + Group-Phase) — extendObjectAsync de-duplicates so the cost is small.
+   * + Group-Phase) — extendObject de-duplicates so the cost is small.
    *
    * Never deletes states from MANAGED_CHANNELS. The info channel is not in
    * MANAGED_CHANNELS, so cleanup never touches its content.
@@ -394,7 +394,7 @@ export class StateManager {
       ? `${this.adapter.namespace}.groups.info.online`
       : `${this.adapter.namespace}.${prefix}.info.online`;
     const icon = isGroup ? GROUP_ICON : iconForGoveeType(device.type);
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       prefix,
       {
         type: "device",
@@ -412,7 +412,7 @@ export class StateManager {
     );
 
     // Info channel — groups only get name (no individual online)
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.info`,
       {
         type: "channel",
@@ -422,7 +422,7 @@ export class StateManager {
       { preserve: { common: ["name"] } },
     );
 
-    // setStateChangedAsync (not setStateAsync) for the info metadata below:
+    // setStateChangedAsync (not setState) for the info metadata below:
     // createInfoStates re-runs on every phase callback (cloud refresh,
     // snapshot save/delete, …) with mostly identical values — only a real
     // change should write and bump the timestamp. No consumer reads the
@@ -559,7 +559,7 @@ export class StateManager {
   /**
    * Shared inner loop — group stateDefs by channel, create the channel
    * object once, then create each state. Called from createLanStates and
-   * createCloudStates. Idempotent (extendObjectAsync).
+   * createCloudStates. Idempotent (extendObject).
    *
    * @param prefix Device prefix (e.g. "devices.h6172_abcd")
    * @param stateDefs State definitions to write
@@ -581,7 +581,7 @@ export class StateManager {
     );
 
     for (const [channel, defs] of channelGroups) {
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.${channel}`,
         {
           type: "channel",
@@ -619,7 +619,7 @@ export class StateManager {
           common.desc = def.desc as ioBroker.StringOrTranslated;
         }
 
-        await this.adapter.extendObjectAsync(
+        await this.adapter.extendObject(
           `${prefix}.${channel}.${def.id}`,
           {
             type: "state",
@@ -634,7 +634,7 @@ export class StateManager {
 
         // Existing diag.tier datapoints from v2.6.0+ may carry translation-object
         // VALUES in common.states (the old buildCloudStateDefs wrote tLabel(...)
-        // directly). extendObjectAsync deep-merges and cannot replace an
+        // directly). extendObject deep-merges and cannot replace an
         // object-value with a string. Force-replace via setObjectAsync when
         // any persisted state value is non-string. Pattern proven in hassemu
         // v1.27.2 / v1.28.4. React Error #31 would otherwise fatal-crash Admin
@@ -649,7 +649,7 @@ export class StateManager {
           const current = await this.adapter.getStateAsync(`${prefix}.${channel}.${def.id}`);
           if (!current || current.val === null || current.val === undefined) {
             // Set default value for new states
-            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
+            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true,
             });
@@ -658,7 +658,7 @@ export class StateManager {
             this.adapter.log.debug(
               `Resetting stale dropdown: ${prefix}.${channel}.${def.id} = "${String(current.val)}" → "${String(def.def)}"`,
             );
-            await this.adapter.setStateAsync(`${prefix}.${channel}.${def.id}`, {
+            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
               val: def.def,
               ack: true,
             });
@@ -676,7 +676,7 @@ export class StateManager {
   async createSegmentStates(device: GoveeDevice): Promise<void> {
     const prefix = this.devicePrefix(device);
 
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments`,
       {
         type: "channel",
@@ -706,13 +706,13 @@ export class StateManager {
     const reportedCount = validIndices.length;
 
     await this.ensureState(`${prefix}.segments.count`, tName("segmentCount"), "number", "value", false);
-    await this.adapter.setStateAsync(`${prefix}.segments.count`, {
+    await this.adapter.setState(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true,
     });
 
     // Manual-mode toggle and list — user-writable for cut-strip overrides
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.manual_mode`,
       {
         type: "state",
@@ -729,7 +729,7 @@ export class StateManager {
       },
       { preserve: { common: ["name"] } },
     );
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.manual_list`,
       {
         type: "state",
@@ -755,17 +755,17 @@ export class StateManager {
       device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? device.manualSegments.join(",")
         : "";
-    await this.adapter.setStateAsync(`${prefix}.segments.manual_mode`, {
+    await this.adapter.setState(`${prefix}.segments.manual_mode`, {
       val: manualModeVal,
       ack: true,
     });
-    await this.adapter.setStateAsync(`${prefix}.segments.manual_list`, {
+    await this.adapter.setState(`${prefix}.segments.manual_list`, {
       val: manualListVal,
       ack: true,
     });
 
     for (const i of validIndices) {
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}`,
         {
           type: "channel",
@@ -775,7 +775,7 @@ export class StateManager {
         { preserve: { common: ["name"] } },
       );
 
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}.color`,
         {
           type: "state",
@@ -792,7 +792,7 @@ export class StateManager {
         { preserve: { common: ["name"] } },
       );
 
-      await this.adapter.extendObjectAsync(
+      await this.adapter.extendObject(
         `${prefix}.segments.${i}.brightness`,
         {
           type: "state",
@@ -814,7 +814,7 @@ export class StateManager {
     }
 
     // Comfort command state for batch segment control
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       `${prefix}.segments.command`,
       {
         type: "state",
@@ -880,7 +880,7 @@ export class StateManager {
    * was an extra object-read on the hot path (one MQTT push = one update
    * call). createDeviceStates has already run before any update lands,
    * so the states are guaranteed to exist; if one disappears (manual
-   * deletion), the setStateAsync will reject and we swallow it.
+   * deletion), the setState will reject and we swallow it.
    *
    * @param device Govee device
    * @param state Partial state update
@@ -890,7 +890,7 @@ export class StateManager {
     const writes: Promise<unknown>[] = [];
 
     const set = (id: string, val: ioBroker.StateValue): void => {
-      // setStateChangedAsync (not setStateAsync): the LAN devStatus poll (every
+      // setStateChangedAsync (not setState): the LAN devStatus poll (every
       // 30 s when no MQTT is connected) re-delivers identical power / brightness
       // / colorRgb / colorTemperature each cycle — only write (and bump the
       // timestamp) on a real value change. Freshness lives on the device object
@@ -931,7 +931,7 @@ export class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online: boolean): Promise<void> {
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       "groups",
       {
         type: "folder",
@@ -940,7 +940,7 @@ export class StateManager {
       },
       { preserve: { common: ["name"] } },
     );
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       "groups.info",
       {
         type: "channel",
@@ -950,7 +950,7 @@ export class StateManager {
       { preserve: { common: ["name"] } },
     );
     await this.ensureState("groups.info.online", "Cloud Online", "boolean", "indicator.reachable", false);
-    await this.adapter.setStateAsync("groups.info.online", {
+    await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true,
     });
@@ -962,7 +962,7 @@ export class StateManager {
    * @param online Cloud connection status
    */
   async updateGroupsOnline(online: boolean): Promise<void> {
-    await this.adapter.setStateAsync("groups.info.online", { val: online, ack: true }).catch(() => undefined);
+    await this.adapter.setState("groups.info.online", { val: online, ack: true }).catch(() => undefined);
   }
 
   /**
@@ -973,7 +973,7 @@ export class StateManager {
    * deleted the object on "all reachable" — but that produced a js-controller
    * WARN "State 'X.membersUnreachable' has no existing object" every ~2 minutes,
    * because parallel updateGroupReachability calls (LAN+MQTT status updates fire
-   * almost simultaneously) could trigger a race condition between setStateAsync
+   * almost simultaneously) could trigger a race condition between setState
    * (object exists) and safeDeleteState (object gone). Always keeping the state
    * present avoids that entirely.
    *
@@ -987,7 +987,7 @@ export class StateManager {
     const unreachable = memberDevices.filter(m => !m.state.online).map(m => treeKey(m.sku, m.deviceId));
 
     await this.ensureState(stateId, "Unreachable Members", "string", "text", false);
-    await this.adapter.setStateAsync(stateId, {
+    await this.adapter.setState(stateId, {
       val: unreachable.join(", "),
       ack: true,
     });
@@ -1170,9 +1170,9 @@ export class StateManager {
       }
     }
     // Drop ensureState cache for this device too — a re-pair must run the
-    // full extendObjectAsync path again so the new device's name/type get
+    // full extendObject path again so the new device's name/type get
     // applied (cache hit would skip the round-trip and keep stale common.*).
-    // ensureState stores namespace-less ids (extendObjectAsync takes a relative
+    // ensureState stores namespace-less ids (extendObject takes a relative
     // id), so match the same way as stateChannelMap above — the old namespaced
     // match never fired, so re-paired devices skipped info-state creation (M4).
     for (const id of this.ensuredStates) {
@@ -1193,7 +1193,7 @@ export class StateManager {
 
   /**
    * Create a state if it doesn't exist. Cached after the first successful
-   * `extendObjectAsync` so hot-path callers (e.g. `updateGroupMembersUnreachable`
+   * `extendObject` so hot-path callers (e.g. `updateGroupMembersUnreachable`
    * fires per status update) skip the Redis round-trip.
    *
    * @param id State object ID
@@ -1231,7 +1231,7 @@ export class StateManager {
     if (def !== undefined) {
       common.def = def;
     }
-    await this.adapter.extendObjectAsync(
+    await this.adapter.extendObject(
       id,
       {
         type: "state",
@@ -1296,7 +1296,7 @@ export class StateManager {
 
     const current = await this.adapter.getStateAsync(stateId).catch(() => null);
     if (!current || current.val !== desiredOnline) {
-      await this.adapter.setStateAsync(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
+      await this.adapter.setState(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
     }
 
     let lightOnlineChanged = false;

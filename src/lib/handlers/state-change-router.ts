@@ -27,7 +27,7 @@ export interface StateChangeRouterAdapter {
   readonly lanClient: GoveeLanClient | null;
   readonly diagnosticsLastRun: Map<string, number>;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getObjectAsync(id: string): Promise<unknown>;
   /** Owned by main.ts — reloads the Cloud-state tree after a per-device refresh. */
   loadCloudStates(): Promise<void>;
@@ -40,7 +40,7 @@ export interface StateChangeRouterAdapter {
 /**
  * Locate a device by the state-tree prefix it owns. Linear scan because the
  * device count is small (typical Govee account has 5-30 devices) and the
- * call is cheap relative to the surrounding `setStateAsync`.
+ * call is cheap relative to the surrounding `setState`.
  *
  */
 export function findDeviceForState(adapter: StateChangeRouterAdapter, localId: string): GoveeDevice | undefined {
@@ -250,7 +250,7 @@ export async function handleGenericCapabilityCommand(
         `Routing to generic capability for ${device.name}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`,
       );
       await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, val);
-      await adapter.setStateAsync(id, { val, ack: true });
+      await adapter.setState(id, { val, ack: true });
     } catch (err) {
       adapter.log.warn(`Command failed for ${device.name}: ${errMessage(err)}`);
     }
@@ -303,7 +303,7 @@ export async function onStateChange(
       adapter.log.info("Manual device sync requested — refreshing the device list from your Govee account");
       await adapter.syncDevicesManually?.();
     }
-    await adapter.setStateAsync(id, { val: false, ack: true });
+    await adapter.setState(id, { val: false, ack: true });
     return;
   }
 
@@ -344,7 +344,7 @@ export async function onStateChange(
   if (device.sku === "BaseGroup" && device.groupMembers) {
     const reached = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
     if (reached) {
-      await adapter.setStateAsync(id, { val, ack: true });
+      await adapter.setState(id, { val, ack: true });
       if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
         await dropdownReset.resetRelatedDropdowns(
           adapter,
@@ -359,7 +359,7 @@ export async function onStateChange(
   // Local snapshot commands (no Cloud/MQTT needed)
   if (stateSuffix === "snapshots.snapshot_save" && typeof val === "string" && val.trim()) {
     await adapter.snapshotHandler!.save(device, val.trim());
-    await adapter.setStateAsync(id, { val: "", ack: true });
+    await adapter.setState(id, { val: "", ack: true });
     return;
   }
   if (stateSuffix === "snapshots.snapshot_local") {
@@ -367,12 +367,12 @@ export async function onStateChange(
       await adapter.snapshotHandler!.restore(device, val);
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, "snapshotLocal");
     }
-    await adapter.setStateAsync(id, { val, ack: true });
+    await adapter.setState(id, { val, ack: true });
     return;
   }
   if (stateSuffix === "snapshots.snapshot_delete" && typeof val === "string" && val.trim()) {
     await adapter.snapshotHandler!.delete(device, val.trim());
-    await adapter.setStateAsync(id, { val: "", ack: true });
+    await adapter.setState(id, { val: "", ack: true });
     return;
   }
 
@@ -392,7 +392,7 @@ export async function onStateChange(
         adapter.log.warn(`Refresh cloud data for ${device.name} failed: ${errMessage(e)}`);
       }
     }
-    await adapter.setStateAsync(id, { val: false, ack: true });
+    await adapter.setState(id, { val: false, ack: true });
     return;
   }
 
@@ -433,7 +433,7 @@ export async function onStateChange(
     (command === "lightScene" || command === "diyScene" || command === "snapshot" || command === "scene") &&
     (val === "0" || val === 0 || val === "")
   ) {
-    await adapter.setStateAsync(id, { val, ack: true });
+    await adapter.setState(id, { val, ack: true });
     return;
   }
 
@@ -445,18 +445,18 @@ export async function onStateChange(
       device.sceneSpeed = level;
       adapter.deviceManager?.persistDeviceToCache(device);
     }
-    await adapter.setStateAsync(id, { val, ack: true });
+    await adapter.setState(id, { val, ack: true });
     return;
   }
 
   try {
     if (command === "music") {
       if (stateSuffix === "music.music_mode" && (val === "0" || val === 0)) {
-        await adapter.setStateAsync(id, { val, ack: true });
+        await adapter.setState(id, { val, ack: true });
         return;
       }
       await sendMusicCommand(adapter, device, prefix, stateSuffix, val);
-      await adapter.setStateAsync(id, { val, ack: true });
+      await adapter.setState(id, { val, ack: true });
       if (stateSuffix === "music.music_mode") {
         await dropdownReset.resetRelatedDropdowns(adapter, prefix, "music");
       }
@@ -464,7 +464,7 @@ export async function onStateChange(
     }
 
     await adapter.deviceManager.sendCommand(device, command, val);
-    await adapter.setStateAsync(id, { val, ack: true });
+    await adapter.setState(id, { val, ack: true });
     // Power-off resets all mode dropdowns (device off → no active mode).
     if (command === "power" && val === false) {
       await dropdownReset.resetModeDropdowns(adapter, prefix, "");

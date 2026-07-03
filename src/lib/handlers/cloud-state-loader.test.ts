@@ -50,7 +50,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
         removed.push({ prefix, stateId });
       },
     } as never,
-    setStateAsync: async (id, state) => {
+    setState: async (id, state) => {
       writes.push({ id, val: (state as { val: unknown }).val });
     },
   };

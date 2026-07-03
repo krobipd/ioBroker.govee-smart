@@ -112,7 +112,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     } as never,
     diagnosticsLastRun: new Map<string, number>(),
     getStateAsync: async id => (states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
-    setStateAsync: async (id, state) => {
+    setState: async (id, state) => {
       acks.push({ id, val: (state as { val: unknown }).val });
     },
     getObjectAsync: async id => objects.get(id) ?? null,

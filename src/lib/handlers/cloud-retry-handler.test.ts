@@ -42,7 +42,7 @@ function makeRig(): TestRig {
     cloudInitTimer: undefined,
     cloudRetry: undefined,
     cloudWasConnected: false,
-    setStateAsync: async (id, state) => {
+    setState: async (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
     },
     setTimeout: (cb, ms) => {

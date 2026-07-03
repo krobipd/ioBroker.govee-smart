@@ -14,7 +14,7 @@ function makeAdapter(native: Record<string, unknown> = {}): CloudCredsAdapter & 
     log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger,
     namespace: "govee-smart.0",
     getStateAsync: async () => null,
-    setStateAsync: async id => {
+    setState: async id => {
       calls.push(`setState:${id}`);
     },
     getForeignObjectAsync: async () => ({ native }),
@@ -58,7 +58,7 @@ describe("MQTT credential persistence", () => {
       log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger,
       namespace: "govee-smart.0",
       getStateAsync: async id => (states.has(id) ? ({ val: states.get(id) } as ioBroker.State) : null),
-      setStateAsync: async (id, s) => {
+      setState: async (id, s) => {
         states.set(id, (s as { val: string }).val);
       },
       getForeignObjectAsync: async () => ({ native: {} }),

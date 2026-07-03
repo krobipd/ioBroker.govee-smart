@@ -4,14 +4,14 @@ import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 
 /**
- * Adapter surface required for diagnostics export. Loose `setStateAsync`
+ * Adapter surface required for diagnostics export. Loose `setState`
  * shape so structural typing matches utils.Adapter.
  */
 export interface DiagnosticsHandlerAdapter {
   readonly log: ioBroker.Logger;
   readonly namespace: string;
   readonly version?: string;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
 /**
@@ -40,16 +40,16 @@ export async function handleDiagnosticsExport(
   const last = lastRun.get(deviceKey) ?? 0;
   if (now - last < DIAGNOSTICS_EXPORT_THROTTLE_MS) {
     adapter.log.debug(`Diagnostics export throttled for ${device.name} — last run ${now - last}ms ago`);
-    await adapter.setStateAsync(triggerStateId, { val: false, ack: true });
+    await adapter.setState(triggerStateId, { val: false, ack: true });
     return;
   }
   lastRun.set(deviceKey, now);
   const diag = deviceManager.generateDiagnostics(device, adapter.version ?? "unknown");
   const resultId = `${adapter.namespace}.${prefix}.diag.result`;
-  await adapter.setStateAsync(resultId, {
+  await adapter.setState(resultId, {
     val: JSON.stringify(diag, null, 2),
     ack: true,
   });
-  await adapter.setStateAsync(triggerStateId, { val: false, ack: true });
+  await adapter.setState(triggerStateId, { val: false, ack: true });
   adapter.log.info(`Diagnostics exported for ${device.name} (${device.sku})`);
 }

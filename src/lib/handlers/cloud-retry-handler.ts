@@ -18,7 +18,7 @@ export interface CloudRetryHandlerAdapter {
   cloudInitTimer: ioBroker.Timeout | undefined;
   cloudRetry: CloudRetryLoop | undefined;
   cloudWasConnected: boolean;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
   /** Reload Cloud-state-tree after a recovered connection. */
@@ -70,7 +70,7 @@ export function buildCloudRetryHost(adapter: CloudRetryHandlerAdapter): CloudRet
     onCloudRestored: async () => {
       adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
       adapter.cloudWasConnected = true;
-      adapter.setStateAsync("info.cloudConnected", { val: true, ack: true }).catch(() => {});
+      adapter.setState("info.cloudConnected", { val: true, ack: true }).catch(() => {});
       adapter.stateManager?.updateGroupsOnline(true).catch(() => {});
       await adapter.loadCloudStates();
     },

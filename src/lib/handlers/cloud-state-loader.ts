@@ -6,14 +6,14 @@ import type { CloudStateCapability, GoveeDevice } from "../types";
 
 /**
  * Adapter surface required by the cloud-state-loader helpers. Loose
- * `setStateAsync` for utils.Adapter structural matching.
+ * `setState` for utils.Adapter structural matching.
  */
 export interface CloudStateLoaderAdapter {
   readonly log: ioBroker.Logger;
   readonly cloudClient: GoveeCloudClient | null;
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
-  setStateAsync(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
 /**
@@ -55,7 +55,7 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter): Promise
         // Fire-and-forget — States are created before loadCloudStates runs;
         // a rejection here means the state was deleted out-of-band and
         // can be safely ignored.
-        writes.push(adapter.setStateAsync(statePath, { val: mapped.value, ack: true }).catch(() => undefined));
+        writes.push(adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => undefined));
       }
       await Promise.all(writes);
       loaded++;
@@ -119,7 +119,7 @@ export async function applyCloudCapabilities(
   }
   const writes = planned.map(mapped => {
     const statePath = adapter.stateManager!.resolveStatePath(prefix, mapped.stateId);
-    return adapter.setStateAsync(statePath, { val: mapped.value, ack: true }).catch(() => undefined);
+    return adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => undefined);
   });
   await Promise.all(writes);
 
