@@ -2,7 +2,7 @@ import * as crypto from "node:crypto";
 import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
-import { GOVEE_APP_VERSION, GOVEE_CLIENT_TYPE, GOVEE_USER_AGENT, deriveGoveeClientId } from "./govee-constants";
+import { buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
 import { MQTT_MAX_AUTH_FAILURES, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import { ReconnectingMqttClient } from "./reconnecting-mqtt-client";
 import {
@@ -763,14 +763,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     const result = await this.httpsRequestImpl<GoveeLoginResponse>({
       method: "POST",
       url: LOGIN_URL,
-      headers: {
-        appVersion: GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: GOVEE_CLIENT_TYPE,
-        iotVersion: "0",
-        timestamp: String(Date.now()),
-        "User-Agent": GOVEE_USER_AGENT,
-      },
+      headers: buildGoveeAppHeaders(this.clientId, { withTimestamp: true }),
       body,
     });
     if (!result.value) {
@@ -808,14 +801,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     await this.httpsRequestImpl<unknown>({
       method: "POST",
       url,
-      headers: {
-        appVersion: GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: GOVEE_CLIENT_TYPE,
-        iotVersion: "0",
-        timestamp: String(Date.now()),
-        "User-Agent": GOVEE_USER_AGENT,
-      },
+      headers: buildGoveeAppHeaders(this.clientId, { withTimestamp: true }),
       body: {
         type: 8,
         email: this.email,
@@ -828,13 +814,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     const result = await this.httpsRequestImpl<GoveeIotKeyResponse>({
       method: "GET",
       url: IOT_KEY_URL,
-      headers: {
-        Authorization: `Bearer ${this._bearerToken}`,
-        appVersion: GOVEE_APP_VERSION,
-        clientId: this.clientId,
-        clientType: GOVEE_CLIENT_TYPE,
-        "User-Agent": GOVEE_USER_AGENT,
-      },
+      headers: buildGoveeAppHeaders(this.clientId, { bearer: this._bearerToken }),
     });
     if (!result.value) {
       throw new Error(

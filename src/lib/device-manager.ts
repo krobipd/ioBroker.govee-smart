@@ -773,6 +773,67 @@ export class DeviceManager {
   }
 
   /**
+   * Fetch one undocumented-API library (scene / music / DIY) into its device
+   * field, rate-limited. Only fetches when forced or the field is still empty;
+   * records the raw array in the diag buffer (incl. scenceParam Base64 + config
+   * JSON) so a byte-level "why won't this activate on SKU X?" diagnosis works
+   * from the diag JSON alone. Returns true if the device changed.
+   *
+   * @param device Target device
+   * @param sku Product model (for the endpoint + log line)
+   * @param runLimited Rate-limited slot runner from loadDeviceLibraries
+   * @param hasBearer Whether a bearer token is present (for the failure log)
+   * @param cfg Per-library specifics — force flag, current field, endpoint,
+   *   labels, and the fetch + assign closures
+   * @param cfg.force
+   * @param cfg.current
+   * @param cfg.ep
+   * @param cfg.label
+   * @param cfg.noun
+   * @param cfg.failLabel
+   * @param cfg.fetch
+   * @param cfg.assign
+   */
+  private async loadLibrary<T>(
+    device: GoveeDevice,
+    sku: string,
+    runLimited: (fn: () => Promise<void>) => Promise<void>,
+    hasBearer: boolean,
+    cfg: {
+      force: boolean;
+      current: T[];
+      ep: string;
+      label: string;
+      noun: string;
+      failLabel: string;
+      fetch: () => Promise<T[]>;
+      assign: (lib: T[]) => void;
+    },
+  ): Promise<boolean> {
+    if (!(cfg.force || cfg.current.length === 0)) {
+      return false;
+    }
+    let changed = false;
+    await runLimited(async () => {
+      try {
+        const lib = await cfg.fetch();
+        this.diagnostics.recordApiSuccess(device.deviceId, cfg.ep, lib);
+        this.log.debug(
+          `${cfg.label} for ${sku}: ${lib.length} ${cfg.noun}${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
+        );
+        if (lib.length > 0) {
+          cfg.assign(lib);
+          changed = true;
+        }
+      } catch (e) {
+        this.diagnostics.recordApiFailure(device.deviceId, cfg.ep, e, this.extractStatus(e));
+        this.logUndocApiFailure(sku, cfg.failLabel, cfg.ep, hasBearer, e);
+      }
+    });
+    return changed;
+  }
+
+  /**
    * Load scene/music/DIY libraries and SKU features from undocumented API.
    *
    * Each fetch runs through the rate-limiter so a fresh install with 10
@@ -804,69 +865,55 @@ export class DeviceManager {
 
     const hasBearer = this.apiClient.hasBearerToken();
 
-    if (force || device.sceneLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/light-effect-libraries?sku=${sku}`;
-        try {
-          const lib = await this.apiClient!.fetchSceneLibrary(sku);
-          // v2.9.1 — record the raw library array (incl. scenceParam Base64
-          // + speedInfo.config JSON) so a byte-level "why does this scene
-          // not activate on H61A8 but works on H61BE?" diagnosis can be done
-          // from the diag JSON alone. Old projection ({count, names}) hid
-          // the very bytes the user would need.
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `Scene library for ${sku}: ${lib.length} scene(s)${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
-          );
-          if (lib.length > 0) {
-            device.sceneLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "scene library", ep, hasBearer, e);
-        }
-      });
+    if (
+      await this.loadLibrary(device, sku, runLimited, hasBearer, {
+        force,
+        current: device.sceneLibrary,
+        ep: `/light-effect-libraries?sku=${sku}`,
+        label: "Scene library",
+        noun: "scene(s)",
+        failLabel: "scene library",
+        fetch: () => this.apiClient!.fetchSceneLibrary(sku),
+        assign: lib => {
+          device.sceneLibrary = lib;
+        },
+      })
+    ) {
+      changed = true;
     }
 
-    if (force || device.musicLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/light-effect-libraries-music?sku=${sku}`;
-        try {
-          const lib = await this.apiClient!.fetchMusicLibrary(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `Music library for ${sku}: ${lib.length} mode(s)${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
-          );
-          if (lib.length > 0) {
-            device.musicLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "music library", ep, hasBearer, e);
-        }
-      });
+    if (
+      await this.loadLibrary(device, sku, runLimited, hasBearer, {
+        force,
+        current: device.musicLibrary,
+        ep: `/light-effect-libraries-music?sku=${sku}`,
+        label: "Music library",
+        noun: "mode(s)",
+        failLabel: "music library",
+        fetch: () => this.apiClient!.fetchMusicLibrary(sku),
+        assign: lib => {
+          device.musicLibrary = lib;
+        },
+      })
+    ) {
+      changed = true;
     }
 
-    if (force || device.diyLibrary.length === 0) {
-      await runLimited(async () => {
-        const ep = `/diy-effect-libraries?sku=${sku}`;
-        try {
-          const lib = await this.apiClient!.fetchDiyLibrary(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, lib);
-          this.log.debug(
-            `DIY library for ${sku}: ${lib.length} effect(s)${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
-          );
-          if (lib.length > 0) {
-            device.diyLibrary = lib;
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "DIY library", ep, hasBearer, e);
-        }
-      });
+    if (
+      await this.loadLibrary(device, sku, runLimited, hasBearer, {
+        force,
+        current: device.diyLibrary,
+        ep: `/diy-effect-libraries?sku=${sku}`,
+        label: "DIY library",
+        noun: "effect(s)",
+        failLabel: "DIY library",
+        fetch: () => this.apiClient!.fetchDiyLibrary(sku),
+        assign: lib => {
+          device.diyLibrary = lib;
+        },
+      })
+    ) {
+      changed = true;
     }
 
     if (force || !device.skuFeatures) {

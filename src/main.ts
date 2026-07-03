@@ -51,6 +51,16 @@ import {
 // Rate-limit defaults moved to lib/timing-constants.ts as CLOUD_FULL_LIMITS so
 // every module that touches Govee budgeting reads the same canonical values.
 
+/**
+ * The device's learned physical segment count, or 0 when not yet known — the
+ * cap for filtering out echo indices above the real strip length.
+ *
+ * @param device
+ */
+function physicalSegmentCap(device: GoveeDevice): number {
+  return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+}
+
 class GoveeAdapter extends utils.Adapter {
   /** Public for handler modules (state-change-router, group-fanout, wizard, snapshot, diagnostics). */
   public deviceManager: DeviceManager | null = null;
@@ -298,7 +308,7 @@ class GoveeAdapter extends utils.Adapter {
       // (e.g. segments.51..55 on a 19-segment strip).
       this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
         const prefix = this.stateManager!.devicePrefix(device);
-        const cap = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+        const cap = physicalSegmentCap(device);
         for (const idx of batch.segments) {
           if (cap === 0 || idx >= cap) {
             continue;
@@ -323,7 +333,7 @@ class GoveeAdapter extends utils.Adapter {
       // Gleicher Cap-Filter wie bei batch — defensive vor stale Pakete.
       this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
         const prefix = this.stateManager!.devicePrefix(device);
-        const cap = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+        const cap = physicalSegmentCap(device);
         for (const seg of segments) {
           if (cap === 0 || seg.index >= cap) {
             continue;

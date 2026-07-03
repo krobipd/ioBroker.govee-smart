@@ -2,8 +2,8 @@ import { formatFallback, httpsRequest, type HttpResult } from "./http-client";
 import {
   GOVEE_APP_BASE_URL,
   GOVEE_APP_VERSION,
-  GOVEE_CLIENT_TYPE,
   GOVEE_USER_AGENT,
+  buildGoveeAppHeaders,
   deriveGoveeClientId,
 } from "./govee-constants";
 
@@ -145,13 +145,7 @@ export class GoveeApiClient {
     if (!this.bearerToken) {
       throw new Error("Bearer token required — call hasBearerToken() first");
     }
-    return {
-      Authorization: `Bearer ${this.bearerToken}`,
-      appVersion: GOVEE_APP_VERSION,
-      clientId: this.clientId,
-      clientType: GOVEE_CLIENT_TYPE,
-      "User-Agent": GOVEE_USER_AGENT,
-    };
+    return buildGoveeAppHeaders(this.clientId, { bearer: this.bearerToken });
   }
 
   /**

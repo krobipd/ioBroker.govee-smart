@@ -504,15 +504,9 @@ export class CommandRouter {
     }
 
     if (parsed.brightness !== undefined) {
-      const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
-      const brightCap = caps.find(
-        c =>
-          c &&
-          typeof c.type === "string" &&
-          typeof c.instance === "string" &&
-          c.type.includes("segment_color_setting") &&
-          c.instance.toLowerCase().includes("brightness"),
-      );
+      // Prefer the dedicated segment-brightness cap via the same resolver the
+      // colour path uses; fall back to the colour cap when none is declared.
+      const brightCap = this.findCapabilityForCommand(device, "segmentBrightness:0");
       const execute = async (): Promise<void> => {
         await this.cloudClient!.controlDevice(
           device.sku,

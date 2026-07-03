@@ -42,6 +42,39 @@ export const GOVEE_APP_VERSION = "7.5.20";
 export const GOVEE_CLIENT_TYPE = "1";
 export const GOVEE_USER_AGENT = `GoveeHome/${GOVEE_APP_VERSION} (com.ihoment.GoVeeSensor; build:8; iOS 26.5.0) Alamofire/5.11.0`;
 
+/**
+ * Build the common Govee-app request headers. Every authenticated app endpoint
+ * shares appVersion + clientId + clientType + User-Agent; the login /
+ * verification calls additionally send `iotVersion` + a fresh `timestamp`
+ * (`withTimestamp`), and the bearer endpoints add `Authorization` (`bearer`).
+ * Kept in one place so the header set can't drift across the MQTT + App-API
+ * clients. (Public endpoints with only appVersion + User-Agent build inline.)
+ *
+ * @param clientId Account-derived Govee client id
+ * @param opts `bearer` token and/or `withTimestamp` for login-style calls
+ * @param opts.bearer
+ * @param opts.withTimestamp
+ */
+export function buildGoveeAppHeaders(
+  clientId: string,
+  opts: { bearer?: string; withTimestamp?: boolean } = {},
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    appVersion: GOVEE_APP_VERSION,
+    clientId,
+    clientType: GOVEE_CLIENT_TYPE,
+    "User-Agent": GOVEE_USER_AGENT,
+  };
+  if (opts.withTimestamp) {
+    headers.iotVersion = "0";
+    headers.timestamp = String(Date.now());
+  }
+  if (opts.bearer) {
+    headers.Authorization = `Bearer ${opts.bearer}`;
+  }
+  return headers;
+}
+
 /** Base URL for the undocumented Govee app API (devices/v1/list, scene library, etc.). */
 export const GOVEE_APP_BASE_URL = "https://app2.govee.com";
 
