@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.18.0",
     "news": {
+      "NEXT": {
+        "en": "New Govee devices in the catalog: more lamps and sensors, including a CO2 monitor. They start as experimental — enable them in the adapter settings to try them.",
+        "de": "Neue Govee-Geräte im Katalog: mehr Lampen und Sensoren, darunter ein CO2-Monitor. Sie starten experimentell — in den Adapter-Einstellungen aktivieren zum Ausprobieren.",
+        "ru": "Новые устройства Govee в каталоге: больше ламп и датчиков, включая монитор CO2. Они экспериментальные — включите их в настройках адаптера, чтобы попробовать.",
+        "pt": "Novos dispositivos Govee no catálogo: mais lâmpadas e sensores, incluindo um monitor de CO2. Começam experimentais — ative-os nas configurações do adaptador.",
+        "nl": "Nieuwe Govee-apparaten in de catalogus: meer lampen en sensoren, waaronder een CO2-monitor. Ze starten experimenteel — schakel ze in via de adapterinstellingen.",
+        "fr": "Nouveaux appareils Govee au catalogue : plus de lampes et de capteurs, dont un moniteur de CO2. Ils démarrent en expérimental — activez-les dans les réglages de l'adaptateur.",
+        "it": "Nuovi dispositivi Govee nel catalogo: più lampade e sensori, incluso un monitor CO2. Partono come sperimentali — abilitali nelle impostazioni dell'adattatore.",
+        "es": "Nuevos dispositivos Govee en el catálogo: más lámparas y sensores, incluido un monitor de CO2. Empiezan como experimentales — actívalos en los ajustes del adaptador.",
+        "pl": "Nowe urządzenia Govee w katalogu: więcej lamp i czujników, w tym monitor CO2. Startują jako eksperymentalne — włącz je w ustawieniach adaptera, aby wypróbować.",
+        "uk": "Нові пристрої Govee в каталозі: більше ламп і датчиків, зокрема монітор CO2. Вони експериментальні — увімкніть їх у налаштуваннях адаптера, щоб спробувати.",
+        "zh-cn": "目录中新增 Govee 设备：更多灯具和传感器，包括一个 CO2 监测器。它们默认实验性——在适配器设置中启用即可试用。"
+      },
       "2.18.0": {
         "en": "Devices you delete from your Govee account now disappear from the adapter automatically. Colour control is restored for groups that contain a cloud-only member.",
         "de": "Geräte, die du aus deinem Govee-Konto löschst, verschwinden jetzt automatisch aus dem Adapter. Die Farbsteuerung für Gruppen mit einem reinen Cloud-Mitglied ist wiederhergestellt.",
@@ -80,19 +93,6 @@
         "pl": "Dodano opcjonalne raportowanie błędów przez Sentry: awarie są wysyłane do dewelopera, aby szybciej rozwiązywać problemy. Aktywne tylko przy włączonej diagnostyce ioBroker; anonimowo.",
         "uk": "Додано необов'язкову відправку помилок через Sentry: збої надсилаються розробнику, щоб швидше їх виправляти. Працює лише з увімкненою діагностикою ioBroker; анонімно.",
         "zh-cn": "新增可选的 Sentry 错误上报：崩溃信息会发送给开发者以更快修复问题。仅在启用 ioBroker 诊断时生效；匿名。"
-      },
-      "2.14.1": {
-        "en": "Corrected the ioBroker role of the scene, mode and snapshot selector states (no change to how they work)",
-        "de": "Korrigierte die ioBroker Rolle der Szene, Modus und Snapshot-Selektorzustände (keine Änderung, wie sie funktionieren)",
-        "ru": "Исправлена роль ioBroker в сценах, режимах и состояниях селектора снимка (без изменений в том, как они работают)",
-        "pt": "Corrigido o papel ioBroker da cena, do modo e dos estados seletores de instantâneo (sem alteração de como eles funcionam)",
-        "nl": "Correctie van de rol van ioBroker van de scène, modus en snapshot selector toestanden (geen verandering in hoe ze werken)",
-        "fr": "Correction du rôle ioBroker de la scène, du mode et des états de sélecteur d'instantanés (pas de changement dans leur fonctionnement)",
-        "it": "Corretto il ruolo ioBroker della scena, della modalità e degli stati del selettore di snapshot (nessuna modifica a come funzionano)",
-        "es": "Corregido el papel de ioBroker de la escena, el modo y los estados selectores de instantáneas (sin cambio a cómo funcionan)",
-        "pl": "Poprawił rolę jOBroker sceny, tryb i migawki selekcjonera stanów (bez zmian w sposobie działania)",
-        "uk": "Виправлено роль ioBroker сцени, режим і знімок екрана станів (не змінити, як вони працюють)",
-        "zh-cn": "校正了场景、模式和快照选择器的ioBroker角色状态( 他们的工作方式不变)"
       }
     },
     "plugins": {

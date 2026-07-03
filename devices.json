@@ -31,11 +31,53 @@
       "status": "verified",
       "since": "2.0.0"
     },
+    "H5107": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H5140": {
+      "name": "Smart CO2 Monitor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H5171": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.18.1"
+    },
     "H1630": {
       "name": "Lantern Floor Lamp",
       "type": "light",
       "status": "reported",
       "since": "2.17.0"
+    },
+    "H1401": {
+      "name": "Smart Bulb A21",
+      "type": "light",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H16B0": {
+      "name": "Floor Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H1741": {
+      "name": "Table Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H8025": {
+      "name": "Smart Outdoor String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.18.1"
     },
     "H6003": {
       "name": "LED Bulb",
