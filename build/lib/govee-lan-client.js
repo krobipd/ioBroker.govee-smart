@@ -654,29 +654,32 @@ function finishPacket(data) {
   data.push(xorChecksum(data));
   return data;
 }
+function buildAFramedPackets(paramBytes, header, contPrefix, initMarker) {
+  const rawData = [...header];
+  let numLines = 0;
+  let lastLineMarker = initMarker;
+  for (const b of paramBytes) {
+    if (rawData.length % 19 === 0) {
+      numLines++;
+      rawData.push(...contPrefix);
+      lastLineMarker = rawData.length;
+      rawData.push(numLines);
+    }
+    rawData.push(b);
+  }
+  rawData[lastLineMarker] = 255;
+  rawData[3] = numLines + 1;
+  const packets = [];
+  for (let i = 0; i < rawData.length; i += 19) {
+    packets.push(Buffer.from(finishPacket(rawData.slice(i, i + 19))).toString("base64"));
+  }
+  return packets;
+}
 function buildScenePackets(sceneCode, scenceParam) {
   const packets = [];
   if (scenceParam) {
     const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    const rawData = [163, 0, 1, 0, 2];
-    let numLines = 0;
-    let lastLineMarker = 1;
-    for (const b of paramBytes) {
-      if (rawData.length % 19 === 0) {
-        numLines++;
-        rawData.push(163);
-        lastLineMarker = rawData.length;
-        rawData.push(numLines);
-      }
-      rawData.push(b);
-    }
-    rawData[lastLineMarker] = 255;
-    rawData[3] = numLines + 1;
-    for (let i = 0; i < rawData.length; i += 19) {
-      const chunk = rawData.slice(i, i + 19);
-      const pkt = finishPacket([...chunk]);
-      packets.push(Buffer.from(pkt).toString("base64"));
-    }
+    packets.push(...buildAFramedPackets(paramBytes, [163, 0, 1, 0, 2], [163], 1));
   }
   const lo = sceneCode & 255;
   const hi = sceneCode >> 8 & 255;
@@ -688,24 +691,7 @@ function buildDiyPackets(scenceParam) {
   const packets = [];
   if (scenceParam) {
     const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    const rawData = [161, 2, 0, 0];
-    let numLines = 0;
-    let lastLineMarker = 2;
-    for (const b of paramBytes) {
-      if (rawData.length % 19 === 0) {
-        numLines++;
-        rawData.push(161, 2);
-        lastLineMarker = rawData.length;
-        rawData.push(numLines);
-      }
-      rawData.push(b);
-    }
-    rawData[lastLineMarker] = 255;
-    rawData[3] = numLines + 1;
-    for (let i = 0; i < rawData.length; i += 19) {
-      const chunk = rawData.slice(i, i + 19);
-      packets.push(Buffer.from(finishPacket([...chunk])).toString("base64"));
-    }
+    packets.push(...buildAFramedPackets(paramBytes, [161, 2, 0, 0], [161, 2], 2));
   }
   packets.push(Buffer.from(finishPacket([51, 5, 10])).toString("base64"));
   return packets;

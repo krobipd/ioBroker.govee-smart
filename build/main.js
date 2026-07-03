@@ -162,6 +162,7 @@ class GoveeAdapter extends utils.Adapter {
       const config = this.config;
       void connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
+      await this.delObjectAsync("info.appVersionDrift").catch(() => void 0);
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
           "Credentials encryption migration: stored values look corrupted \u2014 please re-enter API key, Govee password and verification code in the adapter settings (one-time after upgrade to v2.11.0)."

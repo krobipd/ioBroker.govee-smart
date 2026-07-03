@@ -183,6 +183,11 @@ class GoveeAdapter extends utils.Adapter {
       // info.manual_sync_devices (BUG-1). Drop the dead orphan.
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
 
+      // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
+      // Govee-app version now self-heals in the background, so there is nothing
+      // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
+      await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
+
       // v2.11.0 credential-encryption migration check: if encryptedNative was
       // added retroactively, js-controller still decrypts existing plaintext
       // values via the legacy XOR fallback — the adapter sees garbage that
