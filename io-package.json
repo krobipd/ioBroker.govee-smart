@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.17.0",
     "news": {
+      "NEXT": {
+        "en": "Devices you removed from your Govee account now disappear from the adapter automatically. Restored colour control in groups with a cloud-only member. Fixed the color_rgb startup warnings, plus a security hardening and internal cleanups.",
+        "de": "Geräte, die du aus deinem Govee-Konto entfernt hast, verschwinden jetzt automatisch aus dem Adapter. Farbsteuerung in Gruppen mit reinem Cloud-Mitglied wiederhergestellt. color_rgb-Startwarnungen behoben, plus Security-Härtung und interne Aufräumarbeiten.",
+        "ru": "Устройства, удалённые из вашего аккаунта Govee, теперь автоматически удаляются из адаптера. Восстановлено управление цветом в группах с облачным участником. Исправлены предупреждения color_rgb при запуске, усилена безопасность и выполнена внутренняя очистка.",
+        "pt": "Os dispositivos que removeu da sua conta Govee desaparecem agora automaticamente do adaptador. Controlo de cor restaurado em grupos com um membro só na nuvem. Corrigidos os avisos color_rgb no arranque, além de reforço de segurança e limpezas internas.",
+        "nl": "Apparaten die je uit je Govee-account hebt verwijderd, verdwijnen nu automatisch uit de adapter. Kleurbesturing hersteld in groepen met een cloud-only lid. color_rgb-opstartwaarschuwingen opgelost, plus beveiligingsverharding en interne opschoning.",
+        "fr": "Les appareils que vous avez retirés de votre compte Govee disparaissent désormais automatiquement de l'adaptateur. Contrôle des couleurs rétabli dans les groupes avec un membre cloud uniquement. Avertissements color_rgb au démarrage corrigés, plus un renforcement de la sécurité et des nettoyages internes.",
+        "it": "I dispositivi rimossi dal tuo account Govee ora scompaiono automaticamente dall'adattatore. Ripristinato il controllo del colore nei gruppi con un membro solo cloud. Corretti gli avvisi color_rgb all'avvio, più un rafforzamento della sicurezza e pulizie interne.",
+        "es": "Los dispositivos que quitaste de tu cuenta Govee ahora desaparecen del adaptador automáticamente. Restaurado el control de color en grupos con un miembro solo en la nube. Corregidas las advertencias color_rgb al iniciar, además de refuerzo de seguridad y limpiezas internas.",
+        "pl": "Urządzenia usunięte z konta Govee znikają teraz z adaptera automatycznie. Przywrócono sterowanie kolorem w grupach z członkiem tylko w chmurze. Naprawiono ostrzeżenia color_rgb przy starcie oraz wzmocniono bezpieczeństwo i wykonano wewnętrzne porządki.",
+        "uk": "Пристрої, які ви видалили з облікового запису Govee, тепер автоматично зникають з адаптера. Відновлено керування кольором у групах із хмарним учасником. Виправлено попередження color_rgb під час запуску, посилено безпеку та виконано внутрішнє очищення.",
+        "zh-cn": "从您的 Govee 账户中移除的设备现在会自动从适配器中清除。已恢复仅云端成员群组的颜色控制。修复了启动时的 color_rgb 警告，并加强了安全性和内部清理。"
+      },
       "2.17.0": {
         "en": "Breaking: the colour datapoints are renamed to snake_case (control.color_rgb / control.color_temperature) — update your scripts. Plus security hardening and sensor online + humidity fixes.",
         "de": "Breaking: die Farb-Datenpunkte heißen jetzt snake_case (control.color_rgb / control.color_temperature) — Skripte anpassen. Dazu Sicherheits-Härtung und Fixes für Sensor-Online + Feuchte.",
@@ -80,19 +93,6 @@
         "pl": "Poprawił rolę jOBroker sceny, tryb i migawki selekcjonera stanów (bez zmian w sposobie działania)",
         "uk": "Виправлено роль ioBroker сцени, режим і знімок екрана станів (не змінити, як вони працюють)",
         "zh-cn": "校正了场景、模式和快照选择器的ioBroker角色状态( 他们的工作方式不变)"
-      },
-      "2.14.0": {
-        "en": "Wizard and Cloud login-test messages now appear in all admin languages. LAN-only lights record brightness, color and state only when they actually change, keeping their history cleaner.",
-        "de": "Wizard- und Cloud-Login-Test-Meldungen erscheinen jetzt in allen Admin-Sprachen. LAN-only-Lampen speichern Helligkeit, Farbe und Status nur bei echter Änderung — sauberere History.",
-        "ru": "Сообщения мастера и проверки входа в облако теперь на всех языках админки. Лампы только-LAN сохраняют яркость, цвет и состояние только при реальном изменении — чище история.",
-        "pt": "Mensagens do assistente e do teste de login na nuvem agora em todos os idiomas do admin. Luzes apenas-LAN guardam brilho, cor e estado só quando mudam de facto — histórico mais limpo.",
-        "nl": "Wizard- en cloud-login-testmeldingen verschijnen nu in alle admin-talen. LAN-only lampen leggen helderheid, kleur en status alleen bij echte wijziging vast — schonere historie.",
-        "fr": "Messages de l'assistant et du test cloud dans toutes les langues de l'admin. Les lampes LAN seul enregistrent luminosité, couleur et état seulement en cas de changement — historique plus propre.",
-        "it": "Messaggi della procedura guidata e del test cloud ora in tutte le lingue dell'admin. Le luci solo-LAN salvano luminosità, colore e stato solo quando cambiano davvero — cronologia più pulita.",
-        "es": "Mensajes del asistente y de la prueba de login en la nube ahora en todos los idiomas del admin. Las luces solo-LAN guardan brillo, color y estado solo cuando cambian — historial más limpio.",
-        "pl": "Komunikaty kreatora i testu logowania do chmury teraz we wszystkich językach panelu admina. Lampy tylko-LAN zapisują jasność, kolor i stan tylko przy realnej zmianie — czystsza historia.",
-        "uk": "Повідомлення майстра та тесту входу в хмару тепер усіма мовами адмінки. Лампи лише-LAN зберігають яскравість, колір і стан лише при реальній зміні — чистіша історія.",
-        "zh-cn": "向导和云登录测试的消息现在以所有管理界面语言显示。仅局域网的灯具仅在亮度、颜色和状态实际变化时才保存，使历史记录更整洁。"
       }
     },
     "plugins": {

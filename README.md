@@ -94,6 +94,13 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Devices you removed from your Govee account (and that aren't reachable on your local network) now disappear from the adapter automatically after a short safety delay, instead of lingering in the object tree forever. Deleted groups are cleaned up the same way.
+- Restored colour control in groups that contain a cloud-only member — `control.color_rgb` and `control.color_temperature` had gone missing from those groups.
+- No more `control.color_rgb has no existing object` warnings in the log when LAN lights come up at startup.
+- Hardened the Cloud-events channel against oversized MQTT messages. Internal: dead-code removal, migration off deprecated adapter methods, and DRY/KISS cleanups.
+
 ### 2.17.0 (2026-07-01)
 
 - **Breaking:** colour datapoints renamed to snake_case — e.g. `control.colorRgb` → `control.color_rgb`, and the colour-temperature one likewise (devices + groups). Update your scripts.
