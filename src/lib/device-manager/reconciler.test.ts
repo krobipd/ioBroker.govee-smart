@@ -204,11 +204,14 @@ describe("reconcileAccountMembership", () => {
   });
 
   describe("classification helpers", () => {
-    it("isSensorType — thermometer + sensor are sensors, the rest are not", () => {
+    it("isSensorType — thermometer + sensor (full AND short form) are sensors, the rest are not", () => {
       expect(isSensorType(GOVEE_DEVICE_TYPE.THERMOMETER)).toBe(true);
       expect(isSensorType(GOVEE_DEVICE_TYPE.SENSOR)).toBe(true);
+      expect(isSensorType("thermometer")).toBe(true); // short label (device catalog)
+      expect(isSensorType("sensor")).toBe(true);
       expect(isSensorType(GOVEE_DEVICE_TYPE.LIGHT)).toBe(false);
       expect(isSensorType(GOVEE_DEVICE_TYPE.HEATER)).toBe(false);
+      expect(isSensorType("light")).toBe(false);
     });
 
     it("authoritativeKind — group for BaseGroup, app for sensors, cloud otherwise", () => {

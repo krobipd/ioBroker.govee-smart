@@ -34,9 +34,20 @@ export const DEFAULT_EVICT_THRESHOLD = 2;
  * Device types that are NOT listed by Cloud `/user/devices` (they carry no
  * cloud capabilities) — sensors surface only through the App-API device list,
  * so that list, not the Cloud list, is authoritative for them.
+ *
+ * Accepts both the full Govee type (`devices.types.thermometer`) and the short
+ * label (`thermometer`) — `device.type` is normally the full form, but the
+ * device catalog uses short labels, and misclassifying a sensor as
+ * cloud-authoritative would false-evict an owned sensor on a Cloud refresh
+ * (it is never in /user/devices). Defensive because the eviction is irreversible.
  */
 export function isSensorType(type: string): boolean {
-  return type === GOVEE_DEVICE_TYPE.THERMOMETER || type === GOVEE_DEVICE_TYPE.SENSOR;
+  return (
+    type === GOVEE_DEVICE_TYPE.THERMOMETER ||
+    type === GOVEE_DEVICE_TYPE.SENSOR ||
+    type === "thermometer" ||
+    type === "sensor"
+  );
 }
 
 /** Which of the three account sources a device belongs to. */
