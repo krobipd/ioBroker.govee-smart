@@ -94,14 +94,12 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.18.0 (2026-07-03)
 
 - Devices you removed from your Govee account (and not reachable on your local network) now disappear from the adapter after a safety delay, instead of lingering forever — deleted groups too.
 - Restored colour control in groups that contain a cloud-only member — `control.color_rgb` and `control.color_temperature` had gone missing from those groups.
-- No more `control.color_rgb has no existing object` warnings in the log when LAN lights come up at startup.
 - The persisted MQTT credentials are no longer a visible datapoint (`info.mqttCredentials` is gone) — they moved to an internal, non-loggable store, still encrypted.
-- `info.appVersionDrift` is gone — the adapter now keeps its Govee-app version current on its own in the background, so the undocumented endpoints keep working when Govee updates their app.
-- Hardened the Cloud-events channel against oversized MQTT messages. Internal: dead-code removal, migration off deprecated adapter methods, and DRY/KISS cleanups.
+- `info.appVersionDrift` is gone — the adapter now keeps its Govee-app version current on its own, so it keeps working when Govee updates their app (no adapter update needed).
 
 ### 2.17.0 (2026-07-01)
 
@@ -156,10 +154,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - When account verification, the Cloud API key or the Govee password needs your attention, the adapter now flags it once clearly and as an ioBroker notification instead of repeating the same error.
 - Added many more supported device models to the catalog, including Curtain Lights v1 and v2, the TV Backlight 3 Pro and the DreamView T1.
 - Requires ioBroker js-controller 7.2.2 or newer.
-
-### 2.15.0 (2026-06-07)
-
-- Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

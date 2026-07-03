@@ -1,4 +1,8 @@
 # Older Changes
+## 2.15.0 (2026-06-07)
+
+- Added optional Sentry error reporting: crashes are sent to the developer so issues get fixed faster. Active only with ioBroker diagnostics enabled; anonymous.
+
 ## 2.14.1 (2026-06-05)
 
 - Corrected the ioBroker role of the scene, mode and snapshot selector states (no change to how they work)
