@@ -80,11 +80,8 @@ export const READY_SAFETY_TIMEOUT_MS = 60_000;
 /** Delay after startup before reaping stale devices (30 s — lets the LAN scan settle). */
 export const STALE_DEVICE_CLEANUP_DELAY_MS = 30_000;
 
-/** Daily app-version-drift check interval (24 h). */
+/** Daily Govee-app-version refresh interval (24 h). */
 export const APP_VERSION_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
-/** Initial app-version-drift check delay after startup (2 min). */
-export const APP_VERSION_INITIAL_DELAY_MS = 2 * 60 * 1000;
 
 /** Fallback retry delay after a transient Cloud-load failure (5 min). */
 export const TRANSIENT_RETRY_MS = 5 * 60_000;

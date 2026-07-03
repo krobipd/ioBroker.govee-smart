@@ -38,9 +38,40 @@ export const GOVEE_DEVICE_TYPE = {
   AROMA_DIFFUSER: "devices.types.aroma_diffuser",
 } as const;
 
+/** Bundled Govee-app version — the fallback until the live lookup succeeds. */
 export const GOVEE_APP_VERSION = "7.5.20";
 export const GOVEE_CLIENT_TYPE = "1";
-export const GOVEE_USER_AGENT = `GoveeHome/${GOVEE_APP_VERSION} (com.ihoment.GoVeeSensor; build:8; iOS 26.5.0) Alamofire/5.11.0`;
+
+/**
+ * The Govee-app version the adapter impersonates in request headers. Defaults to
+ * the bundled {@link GOVEE_APP_VERSION} and is updated at runtime from the live
+ * App-Store lookup ({@link setAppVersion}) so the undocumented endpoints keep
+ * accepting us when Govee bumps their app — without a manual constant bump.
+ */
+let currentAppVersion: string = GOVEE_APP_VERSION;
+
+/** The app version to send in request headers (live if known, else bundled). */
+export function getAppVersion(): string {
+  return currentAppVersion;
+}
+
+/**
+ * Update the impersonated app version from the live App-Store lookup. Ignores
+ * empty / malformed values so a bad lookup can never break the headers — the
+ * previous (bundled or last-good) version stays in effect.
+ *
+ * @param version Live iOS app version, e.g. "7.5.21"
+ */
+export function setAppVersion(version: string): void {
+  if (typeof version === "string" && /^\d+(\.\d+)+$/.test(version)) {
+    currentAppVersion = version;
+  }
+}
+
+/** User-Agent for the Govee app endpoints, built with the current app version. */
+export function goveeUserAgent(): string {
+  return `GoveeHome/${currentAppVersion} (com.ihoment.GoVeeSensor; build:8; iOS 26.5.0) Alamofire/5.11.0`;
+}
 
 /**
  * Build the common Govee-app request headers. Every authenticated app endpoint
@@ -60,10 +91,10 @@ export function buildGoveeAppHeaders(
   opts: { bearer?: string; withTimestamp?: boolean } = {},
 ): Record<string, string> {
   const headers: Record<string, string> = {
-    appVersion: GOVEE_APP_VERSION,
+    appVersion: currentAppVersion,
     clientId,
     clientType: GOVEE_CLIENT_TYPE,
-    "User-Agent": GOVEE_USER_AGENT,
+    "User-Agent": goveeUserAgent(),
   };
   if (opts.withTimestamp) {
     headers.iotVersion = "0";

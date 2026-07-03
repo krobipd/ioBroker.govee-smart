@@ -332,32 +332,6 @@
       "native": {}
     },
     {
-      "_id": "info.appVersionDrift",
-      "type": "state",
-      "common": {
-        "name": {
-          "en": "Govee App Version drift",
-          "de": "Govee App Versionsabweichung",
-          "ru": "Расхождение версии приложения Govee",
-          "pt": "Desvio de versão do app Govee",
-          "nl": "Govee App versieafwijking",
-          "fr": "Dérive de version de l'app Govee",
-          "it": "Scostamento versione app Govee",
-          "es": "Desviación de versión de la app Govee",
-          "pl": "Odchylenie wersji aplikacji Govee",
-          "uk": "Розбіжність версії додатку Govee",
-          "zh-cn": "Govee 应用版本偏差"
-        },
-        "type": "string",
-        "role": "text",
-        "read": true,
-        "write": false,
-        "def": "",
-        "desc": "Comparison of the local GOVEE_APP_VERSION constant vs the latest iOS App Store version. 'current' / 'minor drift' / 'STALE'."
-      },
-      "native": {}
-    },
-    {
       "_id": "info.manual_sync_devices",
       "type": "state",
       "common": {

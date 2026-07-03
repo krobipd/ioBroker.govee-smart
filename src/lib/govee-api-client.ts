@@ -1,10 +1,10 @@
 import { formatFallback, httpsRequest, type HttpResult } from "./http-client";
 import {
   GOVEE_APP_BASE_URL,
-  GOVEE_APP_VERSION,
-  GOVEE_USER_AGENT,
   buildGoveeAppHeaders,
   deriveGoveeClientId,
+  getAppVersion,
+  goveeUserAgent,
 } from "./govee-constants";
 
 /**
@@ -313,8 +313,8 @@ export class GoveeApiClient {
       method: "GET",
       url,
       headers: {
-        appVersion: GOVEE_APP_VERSION,
-        "User-Agent": GOVEE_USER_AGENT,
+        appVersion: getAppVersion(),
+        "User-Agent": goveeUserAgent(),
       },
     });
     this.logFallback(`/light-effect-libraries sku=${sku}`, result);

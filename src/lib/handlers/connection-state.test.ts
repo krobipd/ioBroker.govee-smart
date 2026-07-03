@@ -1,18 +1,18 @@
 import { vi } from "vitest";
 
-// checkAppVersionDrift calls the module-level httpsRequest (no DI) — mock it.
+// refreshLiveAppVersion calls the module-level httpsRequest (no DI) — mock it.
 vi.mock("../http-client", () => ({ httpsRequest: vi.fn() }));
 
 import {
   checkAllReady,
-  checkAppVersionDrift,
   logDeviceSummary,
+  refreshLiveAppVersion,
   reapStaleDevices,
   updateConnectionState,
   type ConnectionStateAdapter,
 } from "./connection-state";
 import { httpsRequest } from "../http-client";
-import { GOVEE_APP_VERSION } from "../govee-constants";
+import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-constants";
 import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
 import type { GoveeDevice } from "../types";
@@ -227,49 +227,49 @@ describe("reapStaleDevices", () => {
   });
 });
 
-describe("checkAppVersionDrift", () => {
+describe("refreshLiveAppVersion", () => {
   // NOTE: no beforeEach(mockReset) here — vitest 4's mockReset drops the
   // handled-marker of stored rejected mock results, re-reporting an already
   // CAUGHT rejection as unhandled at test end. Each test installs its own
-  // implementation, which is isolation enough.
+  // implementation, which is isolation enough. We DO reset the module-level app
+  // version so an adopted value doesn't leak between tests.
+  beforeEach(() => setAppVersion(GOVEE_APP_VERSION));
 
   function itunesVersion(version: string): never {
     return { value: { resultCount: 1, results: [{ version }] }, statusCode: 200 } as never;
   }
 
-  it("warns + flags STALE when the live app is more than 2 minor versions ahead", async () => {
-    const [major, minor] = GOVEE_APP_VERSION.split(".").map(Number);
-    mockHttp.mockResolvedValue(itunesVersion(`${major}.${minor + 3}.0`));
+  it("adopts the live app version for the request headers (no datapoint, no warning)", async () => {
+    mockHttp.mockResolvedValue(itunesVersion("9.9.9"));
     const rig = makeRig({});
-    await checkAppVersionDrift(rig.adapter);
-    expect(rig.logs.warn.some(m => m.includes("app version drift"))).toBe(true);
-    const write = rig.stateWrites.find(w => w.id === "info.appVersionDrift");
-    expect(String(write?.val)).toContain("STALE");
-  });
-
-  it("stays quiet (debug + state only) while the local version is current", async () => {
-    mockHttp.mockResolvedValue(itunesVersion(GOVEE_APP_VERSION));
-    const rig = makeRig({});
-    await checkAppVersionDrift(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter);
+    expect(getAppVersion()).toBe("9.9.9");
     expect(rig.logs.warn).toHaveLength(0);
-    const write = rig.stateWrites.find(w => w.id === "info.appVersionDrift");
-    expect(String(write?.val)).toContain("current");
+    expect(rig.stateWrites.find(w => w.id === "info.appVersionDrift")).toBeUndefined();
   });
 
-  it("network failures are silent debug — the daily check must never alarm the user", async () => {
+  it("keeps the bundled fallback on a malformed store response", async () => {
+    mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 } as never);
+    const rig = makeRig({});
+    await refreshLiveAppVersion(rig.adapter);
+    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
+  });
+
+  it("ignores a non-numeric version string (regex guard never breaks the headers)", async () => {
+    mockHttp.mockResolvedValue(itunesVersion("garbage"));
+    const rig = makeRig({});
+    await refreshLiveAppVersion(rig.adapter);
+    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
+  });
+
+  it("keeps the current version + logs debug on a network failure (never alarms)", async () => {
     mockHttp.mockImplementation(async () => {
       throw new Error("ENOTFOUND itunes.apple.com");
     });
     const rig = makeRig({});
-    await checkAppVersionDrift(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter);
     expect(rig.logs.warn).toHaveLength(0);
-    expect(rig.logs.debug.some(m => m.includes("App version check failed"))).toBe(true);
-  });
-
-  it("ignores a malformed store response without writing the state", async () => {
-    mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 } as never);
-    const rig = makeRig({});
-    await checkAppVersionDrift(rig.adapter);
-    expect(rig.stateWrites).toHaveLength(0);
+    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
+    expect(rig.logs.debug.some(m => m.includes("App version lookup failed"))).toBe(true);
   });
 });

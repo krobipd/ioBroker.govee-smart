@@ -39,7 +39,6 @@ import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
   APP_VERSION_CHECK_INTERVAL_MS,
-  APP_VERSION_INITIAL_DELAY_MS,
   CLOUD_FULL_LIMITS,
   LAN_SCAN_INITIAL_WAIT_MS,
   LAN_SCAN_INTERVAL_MS,
@@ -150,8 +149,6 @@ class GoveeAdapter extends utils.Adapter {
    */
   /** Public for handler modules (state-change-router). */
   public unloading = false;
-  /** Initial app-version-check timer (2 min after start) — kept so onUnload can clear it. */
-  private appVersionInitialTimer: ioBroker.Timeout | undefined;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
@@ -172,6 +169,14 @@ class GoveeAdapter extends utils.Adapter {
     try {
       await I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
+
+      // Fetch the live Govee-app version early (fire-and-forget) so the first
+      // login / requests already use a current version — the undocumented
+      // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
+      // this resolves; a daily timer keeps it fresh.
+      void connectionState
+        .refreshLiveAppVersion(this)
+        .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
 
       // One-shot cleanup: the global info.refresh_cloud_data button was removed
       // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
@@ -723,22 +728,13 @@ class GoveeAdapter extends utils.Adapter {
         })();
       }, ONLINE_SYNC_INTERVAL_MS);
 
-      // App-version-drift monitor — daily check + an initial one after 2 min if
-      // the adapter start fell through without an MQTT login (e.g. LAN-only).
+      // Keep the impersonated Govee-app version current — daily refresh (the
+      // initial fetch is fired early in onReady, above).
       this.appVersionCheckTimer = this.setInterval(() => {
         connectionState
-          .checkAppVersionDrift(this)
-          .catch(e => this.log.debug(`App version check error: ${errMessage(e)}`));
+          .refreshLiveAppVersion(this)
+          .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
       }, APP_VERSION_CHECK_INTERVAL_MS);
-      this.appVersionInitialTimer = this.setTimeout(() => {
-        this.appVersionInitialTimer = undefined;
-        if (this.unloading) {
-          return;
-        }
-        connectionState
-          .checkAppVersionDrift(this)
-          .catch(e => this.log.debug(`App version check error: ${errMessage(e)}`));
-      }, APP_VERSION_INITIAL_DELAY_MS);
 
       connectionState.updateConnectionState(this);
 
@@ -862,10 +858,6 @@ class GoveeAdapter extends utils.Adapter {
       if (this.appVersionCheckTimer) {
         this.clearInterval(this.appVersionCheckTimer);
         this.appVersionCheckTimer = undefined;
-      }
-      if (this.appVersionInitialTimer) {
-        this.clearTimeout(this.appVersionInitialTimer);
-        this.appVersionInitialTimer = undefined;
       }
       this.cloudRetry?.dispose();
       this.segmentWizard?.dispose();

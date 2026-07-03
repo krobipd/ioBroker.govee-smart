@@ -8,7 +8,7 @@ import { httpsRequest } from "../http-client";
 import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
 import { errMessage } from "../types";
-import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE } from "../govee-constants";
+import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
 
 /**
  * Adapter surface required by the connection-state helpers — covers the
@@ -85,15 +85,17 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
 }
 
 /**
- * Daily app-version-drift check vs. the iTunes app-store lookup.
+ * Keep the impersonated Govee-app version current — self-healing, no datapoint.
  *
- * Govee's app2.govee.com endpoints reject very stale User-Agent strings.
- * Compares live iOS app version with local `GOVEE_APP_VERSION`. On drift
- * > 2 minor: warn-Log + state `info.appVersionDrift`. Failures (5xx,
- * network) are silent debug-logged — no user impact.
+ * Govee's undocumented app2.govee.com endpoints reject very stale app versions.
+ * Instead of comparing a hardcoded constant against the live version and asking
+ * a human to bump + release, the adapter looks the live iOS version up (iTunes)
+ * and just uses it in the request headers ({@link setAppVersion}). A failed or
+ * malformed lookup is silently ignored; the bundled {@link GOVEE_APP_VERSION}
+ * stays as the fallback.
  *
  */
-export async function checkAppVersionDrift(adapter: ConnectionStateAdapter): Promise<void> {
+export async function refreshLiveAppVersion(adapter: ConnectionStateAdapter): Promise<void> {
   try {
     const result = await httpsRequest<{ resultCount?: number; results?: Array<{ version?: string }> }>({
       method: "GET",
@@ -105,31 +107,10 @@ export async function checkAppVersionDrift(adapter: ConnectionStateAdapter): Pro
     if (typeof liveVersion !== "string" || liveVersion.length === 0) {
       return;
     }
-    const localParts = GOVEE_APP_VERSION.split(".").map(Number);
-    const liveParts = liveVersion.split(".").map(Number);
-    const localMajor = localParts[0] ?? 0;
-    const localMinor = localParts[1] ?? 0;
-    const liveMajor = liveParts[0] ?? 0;
-    const liveMinor = liveParts[1] ?? 0;
-    const liveTotal = liveMajor * 100 + liveMinor;
-    const localTotal = localMajor * 100 + localMinor;
-    const driftMinor = liveTotal - localTotal;
-    const driftMessage =
-      driftMinor === 0
-        ? `current (live=${liveVersion}, local=${GOVEE_APP_VERSION})`
-        : driftMinor <= 2
-          ? `minor drift (live=${liveVersion}, local=${GOVEE_APP_VERSION})`
-          : `STALE (live=${liveVersion}, local=${GOVEE_APP_VERSION}) — bump GOVEE_APP_VERSION`;
-    await adapter.setState("info.appVersionDrift", { val: driftMessage, ack: true }).catch(() => undefined);
-    if (driftMinor > 2) {
-      adapter.log.warn(
-        `Govee app version drift: live ${liveVersion} vs local ${GOVEE_APP_VERSION} — undocumented endpoints may start failing. Run sync-govee-app-version.py + release a new adapter version.`,
-      );
-    } else {
-      adapter.log.debug(`App version: ${driftMessage}`);
-    }
+    setAppVersion(liveVersion);
+    adapter.log.debug(`Govee app version: using ${getAppVersion()} (bundled fallback ${GOVEE_APP_VERSION})`);
   } catch (e) {
-    adapter.log.debug(`App version check failed: ${errMessage(e)}`);
+    adapter.log.debug(`App version lookup failed, keeping ${getAppVersion()}: ${errMessage(e)}`);
   }
 }
 
