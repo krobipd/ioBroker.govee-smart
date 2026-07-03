@@ -265,6 +265,44 @@ describe("buildDiyPackets", () => {
   });
 });
 
+// Byte-golden master for the A3/A1 packet framing — pins the exact base64
+// output so a DRY refactor of buildScenePackets/buildDiyPackets is provably
+// byte-identical. The structural tests above check headers/checksums; these
+// lock every byte, including the multi-packet continuation where numLines
+// increments and lastLineMarker moves (the subtle off-by-one spot).
+describe("A-frame packet framing (byte-golden)", () => {
+  const small = Buffer.from([1, 2, 3, 4, 5]).toString("base64"); // 5B → single data chunk
+  const big = Buffer.from(Array.from({ length: 40 }, (_, i) => i)).toString("base64"); // 40B → crosses the 19-byte boundary twice
+
+  it("buildScenePackets: empty / single / multi-packet are byte-exact", () => {
+    expect(buildScenePackets(42, "")).toEqual(["MwUEKgAAAAAAAAAAAAAAAAAAABg="]);
+    expect(buildScenePackets(100, small)).toEqual([
+      "o/8BAQIBAgMEBQAAAAAAAAAAAF8=",
+      "MwUEZAAAAAAAAAAAAAAAAAAAAFY=",
+    ]);
+    expect(buildScenePackets(500, big)).toEqual([
+      "owABAwIAAQIDBAUGBwgJCgsMDaI=",
+      "owEODxAREhMUFRYXGBkaGxwdHrw=",
+      "o/8fICEiIyQlJicAAAAAAAAAAEM=",
+      "MwUE9AEAAAAAAAAAAAAAAAAAAMc=",
+    ]);
+  });
+
+  it("buildDiyPackets: empty / single / multi-packet are byte-exact", () => {
+    expect(buildDiyPackets("")).toEqual(["MwUKAAAAAAAAAAAAAAAAAAAAADw="]);
+    expect(buildDiyPackets(small)).toEqual([
+      "oQL/AQECAwQFAAAAAAAAAAAAAFw=",
+      "MwUKAAAAAAAAAAAAAAAAAAAAADw=",
+    ]);
+    expect(buildDiyPackets(big)).toEqual([
+      "oQIAAwABAgMEBQYHCAkKCwwNDq8=",
+      "oQIBDxAREhMUFRYXGBkaGxwdHrI=",
+      "oQL/HyAhIiMkJSYnAAAAAAAAAEM=",
+      "MwUKAAAAAAAAAAAAAAAAAAAAADw=",
+    ]);
+  });
+});
+
 describe("buildSegmentBitmask", () => {
   it("should set bit 0 for segment 0", () => {
     const mask = buildSegmentBitmask([0], 7);

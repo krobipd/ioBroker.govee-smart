@@ -798,6 +798,50 @@ function finishPacket(data: number[]): number[] {
 }
 
 /**
+ * Frame arbitrary payload bytes into 19-byte BLE packets using Govee's
+ * line-continuation protocol, then base64 each. Scenes (A3) and DIY (A1) differ
+ * only in the header bytes, the per-line continuation prefix, and which header
+ * index the 0xff line-marker defaults to when the payload fits a single line —
+ * the `% 19` chunking, the `rawData[3] = numLines + 1` count, and the chunk →
+ * checksum → base64 tail are identical. Byte-locked by the
+ * "A-frame packet framing (byte-golden)" test.
+ *
+ * @param paramBytes Decoded payload bytes
+ * @param header Leading frame bytes (the line count is written at index 3)
+ * @param contPrefix Bytes that open each continuation line (before its number)
+ * @param initMarker Header index the 0xff marker defaults to for a single line
+ */
+function buildAFramedPackets(
+  paramBytes: number[],
+  header: number[],
+  contPrefix: number[],
+  initMarker: number,
+): string[] {
+  const rawData: number[] = [...header];
+  let numLines = 0;
+  let lastLineMarker = initMarker;
+
+  for (const b of paramBytes) {
+    if (rawData.length % 19 === 0) {
+      numLines++;
+      rawData.push(...contPrefix);
+      lastLineMarker = rawData.length;
+      rawData.push(numLines);
+    }
+    rawData.push(b);
+  }
+  rawData[lastLineMarker] = 0xff;
+  rawData[3] = numLines + 1;
+
+  // Split into 19-byte chunks, pad + checksum each
+  const packets: string[] = [];
+  for (let i = 0; i < rawData.length; i += 19) {
+    packets.push(Buffer.from(finishPacket(rawData.slice(i, i + 19))).toString("base64"));
+  }
+  return packets;
+}
+
+/**
  * Build Base64-encoded BLE packets for scene activation via ptReal.
  *
  * @param sceneCode Scene code from library (> 0)
@@ -806,32 +850,10 @@ function finishPacket(data: number[]): number[] {
 export function buildScenePackets(sceneCode: number, scenceParam: string): string[] {
   const packets: string[] = [];
 
-  // Multi-packet scene data from scenceParam (A3 header protocol)
+  // Multi-packet scene data (A3 framing: header A3 00 01 00 02, continuation A3)
   if (scenceParam) {
     const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    // Build A3-framed packets: first chunk starts with A3 00 01 00 02
-    const rawData: number[] = [0xa3, 0x00, 0x01, 0x00, 0x02];
-    let numLines = 0;
-    let lastLineMarker = 1;
-
-    for (const b of paramBytes) {
-      if (rawData.length % 19 === 0) {
-        numLines++;
-        rawData.push(0xa3);
-        lastLineMarker = rawData.length;
-        rawData.push(numLines);
-      }
-      rawData.push(b);
-    }
-    rawData[lastLineMarker] = 0xff;
-    rawData[3] = numLines + 1;
-
-    // Split into 19-byte chunks, pad + checksum each
-    for (let i = 0; i < rawData.length; i += 19) {
-      const chunk = rawData.slice(i, i + 19);
-      const pkt = finishPacket([...chunk]);
-      packets.push(Buffer.from(pkt).toString("base64"));
-    }
+    packets.push(...buildAFramedPackets(paramBytes, [0xa3, 0x00, 0x01, 0x00, 0x02], [0xa3], 1));
   }
 
   // Final scene-code activation packet: 33 05 04 lo hi
@@ -852,29 +874,10 @@ export function buildScenePackets(sceneCode: number, scenceParam: string): strin
 export function buildDiyPackets(scenceParam: string): string[] {
   const packets: string[] = [];
 
+  // Multi-packet DIY data (A1 framing: header A1 02 00 00, continuation A1 02)
   if (scenceParam) {
     const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    // A1-framed packets: start A1 02 00 <total>
-    const rawData: number[] = [0xa1, 0x02, 0x00, 0x00];
-    let numLines = 0;
-    let lastLineMarker = 2;
-
-    for (const b of paramBytes) {
-      if (rawData.length % 19 === 0) {
-        numLines++;
-        rawData.push(0xa1, 0x02);
-        lastLineMarker = rawData.length;
-        rawData.push(numLines);
-      }
-      rawData.push(b);
-    }
-    rawData[lastLineMarker] = 0xff;
-    rawData[3] = numLines + 1;
-
-    for (let i = 0; i < rawData.length; i += 19) {
-      const chunk = rawData.slice(i, i + 19);
-      packets.push(Buffer.from(finishPacket([...chunk])).toString("base64"));
-    }
+    packets.push(...buildAFramedPackets(paramBytes, [0xa1, 0x02, 0x00, 0x00], [0xa1, 0x02], 2));
   }
 
   // Activation: 33 05 0A
