@@ -86,7 +86,7 @@ class GroupFanoutHandler {
         }
         succeeded += 1;
       } catch (err) {
-        this.host.log.debug(`Group fan-out to ${member.name}: ${(0, import_types.errMessage)(err)}`);
+        this.host.log.debug(`Group fan-out to ${(0, import_types.deviceLabel)(member)}: ${(0, import_types.errMessage)(err)}`);
       }
     }
     if (succeeded === 0) {

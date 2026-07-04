@@ -24,6 +24,7 @@ __export(segment_wizard_exports, {
 module.exports = __toCommonJS(segment_wizard_exports);
 var import_lookups = require("./device-manager/lookups");
 var import_timing_constants = require("./timing-constants");
+var import_types = require("./types");
 var import_device_baseline = require("./device-baseline");
 var import_i18n = require("./i18n");
 function format(template, params) {
@@ -288,7 +289,7 @@ ${this.t("abortRestart")}`,
     await this.host.applyWizardResult(device, result);
     await this.restoreBaseline(device, session.baseline);
     const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${manualList}")` : ", no gaps";
-    this.host.log.info(`Segment wizard for ${device.name}: ${segmentCount} segments detected${gapsSuffix}`);
+    this.host.log.info(`Segment wizard for ${(0, import_types.deviceLabel)(device)}: ${segmentCount} segments detected${gapsSuffix}`);
     this.session = null;
     this.clearIdleTimer();
     const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
@@ -312,7 +313,7 @@ ${this.t("finishTreeRebuilt")}`,
       if (!this.session) {
         return;
       }
-      this.host.log.warn(`Segment wizard for ${this.session.name}: idle timeout (5 min), aborted`);
+      this.host.log.warn(`Segment wizard for ${(0, import_types.deviceLabel)(this.session)}: idle timeout (5 min), aborted`);
       this.abort().catch((e) => {
         this.host.log.warn(
           this.t("logAbortFailed", {

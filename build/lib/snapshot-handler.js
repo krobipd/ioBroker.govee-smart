@@ -21,6 +21,7 @@ __export(snapshot_handler_exports, {
   SnapshotHandler: () => SnapshotHandler
 });
 module.exports = __toCommonJS(snapshot_handler_exports);
+var import_types = require("./types");
 var import_device_baseline = require("./device-baseline");
 class SnapshotHandler {
   /**
@@ -48,7 +49,7 @@ class SnapshotHandler {
       savedAt: Date.now()
     };
     await this.host.store.saveSnapshot(device.sku, device.deviceId, snapshot);
-    this.host.log.info(`Local snapshot saved: "${name}" for ${device.name}`);
+    this.host.log.info(`Local snapshot saved: "${name}" for ${(0, import_types.deviceLabel)(device)}`);
     this.host.refreshDeviceStates(device);
   }
   /**
@@ -65,10 +66,10 @@ class SnapshotHandler {
     const snaps = this.host.store.getSnapshots(device.sku, device.deviceId);
     const snap = snaps[idx - 1];
     if (!snap) {
-      this.host.log.warn(`Local snapshot index ${idx} not found for ${device.name}`);
+      this.host.log.warn(`Local snapshot index ${idx} not found for ${(0, import_types.deviceLabel)(device)}`);
       return;
     }
-    this.host.log.info(`Restoring local snapshot "${snap.name}" for ${device.name}`);
+    this.host.log.info(`Restoring local snapshot "${snap.name}" for ${(0, import_types.deviceLabel)(device)}`);
     await this.host.sendCommand(device, "power", snap.power);
     if (snap.power) {
       await this.host.sendCommand(device, "brightness", snap.brightness);
@@ -119,10 +120,10 @@ class SnapshotHandler {
    */
   async delete(device, name) {
     if (await this.host.store.deleteSnapshot(device.sku, device.deviceId, name)) {
-      this.host.log.info(`Local snapshot deleted: "${name}" for ${device.name}`);
+      this.host.log.info(`Local snapshot deleted: "${name}" for ${(0, import_types.deviceLabel)(device)}`);
       this.host.refreshDeviceStates(device);
     } else {
-      this.host.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
+      this.host.log.warn(`Local snapshot "${name}" not found for ${(0, import_types.deviceLabel)(device)}`);
     }
   }
 }

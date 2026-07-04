@@ -174,7 +174,7 @@ class SkuCache {
           const ageDays = Math.round((nowMs - data.lastSeenOnNetwork) / 864e5);
           fs.unlinkSync(full);
           pruned++;
-          prunedDetails.push(`${data.sku} ${data.deviceId} (${ageDays}d)`);
+          prunedDetails.push(`${(0, import_types.deviceLabel)(data)} ${data.deviceId} (${ageDays}d)`);
         }
       } catch {
       }
@@ -195,8 +195,9 @@ class SkuCache {
    *
    * @param sku Product model
    * @param deviceId Device identifier
+   * @param label Optional display label (name + model) for the log line
    */
-  evictDevice(sku, deviceId) {
+  evictDevice(sku, deviceId, label) {
     if (!this.dataAvailable) {
       return;
     }
@@ -204,10 +205,10 @@ class SkuCache {
     try {
       if (fs.existsSync(file)) {
         fs.unlinkSync(file);
-        this.log.debug(`Cache: evicted ${sku} ${deviceId} (removed from Govee account)`);
+        this.log.debug(`Cache: evicted ${label != null ? label : sku} ${deviceId} (removed from Govee account)`);
       }
     } catch (e) {
-      this.log.debug(`Cache evictDevice failed for ${sku} ${deviceId}: ${(0, import_types.errMessage)(e)}`);
+      this.log.debug(`Cache evictDevice failed for ${label != null ? label : sku} ${deviceId}: ${(0, import_types.errMessage)(e)}`);
     }
   }
   /** Delete all cached files. */

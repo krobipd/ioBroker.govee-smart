@@ -236,10 +236,10 @@ class CommandRouter {
       return;
     }
     if (device.channels.cloud && !this.cloudClient) {
-      this.log.debug(`Command for ${device.name} dropped: Cloud client not ready yet`);
+      this.log.debug(`Command for ${(0, import_types.deviceLabel)(device)} dropped: Cloud client not ready yet`);
       return;
     }
-    this.log.warn(`No channel available for ${device.name} (${device.sku})`);
+    this.log.warn(`No channel available for ${(0, import_types.deviceLabel)(device)}`);
   }
   /**
    * Send a command to a device. Routing is decided up-front by
@@ -375,7 +375,7 @@ class CommandRouter {
    */
   async sendCapabilityCommand(device, capabilityType, capabilityInstance, value) {
     if (!this.cloudClient || !device.channels.cloud) {
-      this.log.debug(`Cloud not available for generic command on ${device.name}`);
+      this.log.debug(`Cloud not available for generic command on ${(0, import_types.deviceLabel)(device)}`);
       return;
     }
     const shortType = capabilityType.replace("devices.capabilities.", "");
@@ -406,12 +406,12 @@ class CommandRouter {
       return;
     }
     if (!parsed) {
-      this.log.warn(`Invalid segment command "${commandStr}" for ${device.name}`);
+      this.log.warn(`Invalid segment command "${commandStr}" for ${(0, import_types.deviceLabel)(device)}`);
       return;
     }
     const cap = this.findCapabilityForCommand(device, "segmentColor:0");
     if (!cap) {
-      this.log.debug(`No segment capability for ${device.name}`);
+      this.log.debug(`No segment capability for ${(0, import_types.deviceLabel)(device)}`);
       return;
     }
     if (parsed.color !== void 0) {
@@ -552,7 +552,7 @@ class CommandRouter {
       case "lightScene": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.scenes.length) {
-          this.log.warn(`${device.sku}: invalid scene index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid scene index ${String(value)}`);
           return value;
         }
         return device.scenes[idx - 1].value;
@@ -560,7 +560,7 @@ class CommandRouter {
       case "diyScene": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.diyScenes.length) {
-          this.log.warn(`${device.sku}: invalid scene index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid scene index ${String(value)}`);
           return value;
         }
         return device.diyScenes[idx - 1].value;
@@ -568,7 +568,7 @@ class CommandRouter {
       case "snapshot": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
-          this.log.warn(`${device.sku}: invalid snapshot index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid snapshot index ${String(value)}`);
           return value;
         }
         return device.snapshots[idx - 1].value;
@@ -577,7 +577,7 @@ class CommandRouter {
         if (command.startsWith("segmentColor:")) {
           const segIdx = parseInt(command.split(":")[1], 10);
           if (isNaN(segIdx) || segIdx < 0) {
-            this.log.warn(`${device.sku}: invalid segment index in ${command}`);
+            this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid segment index in ${command}`);
             return value;
           }
           const { r, g, b } = (0, import_types.hexToRgb)(value);
@@ -586,7 +586,7 @@ class CommandRouter {
         if (command.startsWith("segmentBrightness:")) {
           const segIdx = parseInt(command.split(":")[1], 10);
           if (isNaN(segIdx) || segIdx < 0) {
-            this.log.warn(`${device.sku}: invalid segment index in ${command}`);
+            this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid segment index in ${command}`);
             return value;
           }
           return { segment: [segIdx], brightness: value };
@@ -667,7 +667,7 @@ class CommandRouter {
       case "diyScene": {
         const diyIdx = parseInt(String(value), 10);
         if (isNaN(diyIdx) || diyIdx < 1 || diyIdx > device.diyScenes.length) {
-          this.log.warn(`${device.sku}: invalid scene index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid scene index ${String(value)}`);
           return;
         }
         const diyScene = device.diyScenes[diyIdx - 1];
@@ -685,7 +685,7 @@ class CommandRouter {
       case "lightScene": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.scenes.length) {
-          this.log.warn(`${device.sku}: invalid scene index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid scene index ${String(value)}`);
           return;
         }
         const scene = device.scenes[idx - 1];
@@ -709,7 +709,7 @@ class CommandRouter {
       case "snapshot": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
-          this.log.warn(`${device.sku}: invalid snapshot index ${String(value)}`);
+          this.log.warn(`${(0, import_types.deviceLabel)(device)}: invalid snapshot index ${String(value)}`);
           return;
         }
         const cmdGroups = (_e = device.snapshotBleCmds) == null ? void 0 : _e[idx - 1];

@@ -23,6 +23,7 @@ __export(types_exports, {
   clampByte: () => clampByte,
   classifyError: () => classifyError,
   coerceFiniteNumber: () => coerceFiniteNumber,
+  deviceLabel: () => deviceLabel,
   disambiguateLabels: () => disambiguateLabels,
   errMessage: () => errMessage,
   hexToRgb: () => hexToRgb,
@@ -40,6 +41,10 @@ function normalizeDeviceId(id) {
     return "";
   }
   return id.replace(/:/g, "").toLowerCase();
+}
+function deviceLabel(device) {
+  const name = typeof device.name === "string" ? device.name.trim() : "";
+  return name && name !== device.sku ? `${name} (${device.sku})` : device.sku;
 }
 function classifyError(err) {
   if (err instanceof Error) {
@@ -262,6 +267,7 @@ function capMatchesControl(cap, kind) {
   clampByte,
   classifyError,
   coerceFiniteNumber,
+  deviceLabel,
   disambiguateLabels,
   errMessage,
   hexToRgb,

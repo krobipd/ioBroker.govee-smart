@@ -852,7 +852,7 @@ function buildCloudStateDefs(device, log, localSnapshots, memberDevices) {
           }
         }
       } catch (e) {
-        log.debug(`${device.sku}: speed-config parse failed for scene "${entry.name}": ${(0, import_types.errMessage)(e)}`);
+        log.debug(`${(0, import_types.deviceLabel)(device)}: speed-config parse failed for scene "${entry.name}": ${(0, import_types.errMessage)(e)}`);
       }
     }
     return max;

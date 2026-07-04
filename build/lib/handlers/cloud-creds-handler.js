@@ -1,7 +1,9 @@
 "use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __export = (target, all) => {
   for (var name in all)
@@ -15,15 +17,26 @@ var __copyProps = (to, from, except, desc) => {
   }
   return to;
 };
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var cloud_creds_handler_exports = {};
 __export(cloud_creds_handler_exports, {
   cleanupLegacyMqttNativeOnce: () => cleanupLegacyMqttNativeOnce,
   clearVerificationCodeSetting: () => clearVerificationCodeSetting,
   loadPersistedCreds: () => loadPersistedCreds,
+  migrateCredentialsMetaOnce: () => migrateCredentialsMetaOnce,
   persistCreds: () => persistCreds
 });
 module.exports = __toCommonJS(cloud_creds_handler_exports);
+var fs = __toESM(require("node:fs"));
+var path = __toESM(require("node:path"));
 var import_types = require("../types");
 async function clearVerificationCodeSetting(adapter) {
   var _a;
@@ -40,9 +53,16 @@ async function clearVerificationCodeSetting(adapter) {
     adapter.log.warn(`Could not clear mqttVerificationCode: ${(0, import_types.errMessage)(e)}`);
   }
 }
-const CREDENTIALS_FILE = "mqtt.json";
-function credentialsMeta(adapter) {
+const CREDENTIALS_FILE = "mqtt-credentials.json";
+function legacyCredentialsMeta(adapter) {
   return `${adapter.namespace}.credentials`;
+}
+function credentialsFilePath(dataDir) {
+  return path.join(dataDir, CREDENTIALS_FILE);
+}
+function writeCredentialsFile(dataDir, blob) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 384 });
 }
 function parsePersistedBlob(adapter, raw) {
   try {
@@ -63,10 +83,9 @@ function parsePersistedBlob(adapter, raw) {
     return null;
   }
 }
-async function loadPersistedCreds(adapter) {
+async function loadPersistedCreds(adapter, dataDir) {
   try {
-    const { file } = await adapter.readFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE);
-    const raw = typeof file === "string" ? file : file.toString("utf-8");
+    const raw = fs.readFileSync(credentialsFilePath(dataDir), "utf-8");
     const creds = raw ? parsePersistedBlob(adapter, raw) : null;
     if (creds) {
       return creds;
@@ -79,7 +98,7 @@ async function loadPersistedCreds(adapter) {
     if (!raw) {
       return null;
     }
-    await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, raw);
+    writeCredentialsFile(dataDir, raw);
     await adapter.delObjectAsync("info.mqttCredentials").catch(() => void 0);
     adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
     return parsePersistedBlob(adapter, raw);
@@ -87,7 +106,7 @@ async function loadPersistedCreds(adapter) {
     return null;
   }
 }
-async function persistCreds(adapter, creds) {
+async function persistCreds(adapter, dataDir, creds) {
   const blob = JSON.stringify({
     bearerToken: adapter.encrypt(creds.bearerToken),
     iotEndpoint: creds.iotEndpoint,
@@ -97,7 +116,24 @@ async function persistCreds(adapter, creds) {
     accountTopic: creds.accountTopic,
     tokenExpiresAt: creds.tokenExpiresAt
   });
-  await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, blob);
+  await fs.promises.mkdir(dataDir, { recursive: true });
+  await fs.promises.writeFile(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 384 });
+}
+async function migrateCredentialsMetaOnce(adapter, dataDir) {
+  try {
+    const { file } = await adapter.readFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+    const raw = typeof file === "string" ? file : file.toString("utf-8");
+    if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
+      writeCredentialsFile(dataDir, raw);
+      adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+    }
+  } catch {
+  }
+  try {
+    await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+  } catch {
+  }
+  await adapter.delObjectAsync("credentials").catch(() => void 0);
 }
 async function cleanupLegacyMqttNativeOnce(adapter) {
   var _a;
@@ -132,6 +168,7 @@ async function cleanupLegacyMqttNativeOnce(adapter) {
   cleanupLegacyMqttNativeOnce,
   clearVerificationCodeSetting,
   loadPersistedCreds,
+  migrateCredentialsMetaOnce,
   persistCreds
 });
 //# sourceMappingURL=cloud-creds-handler.js.map

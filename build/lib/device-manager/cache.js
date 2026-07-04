@@ -26,6 +26,7 @@ __export(cache_exports, {
 });
 module.exports = __toCommonJS(cache_exports);
 var import_govee_constants = require("../govee-constants");
+var import_types = require("../types");
 function populateScenesFromLibrary(adapter, device) {
   if (device.scenes.length === 0 && device.sceneLibrary.length > 0) {
     device.scenes = device.sceneLibrary.map((entry) => ({
@@ -99,7 +100,7 @@ function saveDevicesToCache(adapter) {
     const isLight = device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT;
     if (isLight && !device.scenesChecked) {
       skippedCount++;
-      adapter.log.debug(`Not caching ${device.name} (${device.sku}) \u2014 scenes not yet checked`);
+      adapter.log.debug(`Not caching ${(0, import_types.deviceLabel)(device)} \u2014 scenes not yet checked`);
     } else {
       adapter.skuCache.save(goveeDeviceToCached(device));
       cachedCount++;

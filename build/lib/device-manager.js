@@ -302,9 +302,9 @@ class DeviceManager {
       return;
     }
     for (const device of toEvict) {
-      this.log.info(`Removed device ${device.name} (${device.sku}) \u2014 no longer in your Govee account`);
+      this.log.info(`Removed device ${(0, import_types.deviceLabel)(device)} \u2014 no longer in your Govee account`);
       this.removeDevice(device.sku, device.deviceId);
-      (_d = this.skuCache) == null ? void 0 : _d.evictDevice(device.sku, device.deviceId);
+      (_d = this.skuCache) == null ? void 0 : _d.evictDevice(device.sku, device.deviceId, (0, import_types.deviceLabel)(device));
     }
     this.saveDevicesToCache();
     (_e = this.onDevicesRemoved) == null ? void 0 : _e.call(this);
@@ -591,7 +591,7 @@ class DeviceManager {
         }
       } catch (e) {
         this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/scenes", e, this.extractStatus(e));
-        this.log.debug(`Could not load scenes for ${cd.sku}: ${(0, import_types.errMessage)(e)}`);
+        this.log.debug(`Could not load scenes for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
       }
     };
     await this.commandRouter.executeRateLimited(loadScenes, 2);
@@ -604,7 +604,7 @@ class DeviceManager {
           }
         } catch (e) {
           this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/diy-scenes", e, this.extractStatus(e));
-          this.log.debug(`Could not load DIY scenes for ${cd.sku}: ${(0, import_types.errMessage)(e)}`);
+          this.log.debug(`Could not load DIY scenes for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
         }
       };
       await this.commandRouter.executeRateLimited(loadDiy, 2);
@@ -624,7 +624,7 @@ class DeviceManager {
           name: o.name,
           value: typeof o.value === "number" ? o.value : o.value
         }));
-        this.log.debug(`Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`);
+        this.log.debug(`Snapshots from capabilities for ${(0, import_types.deviceLabel)(device)}: ${device.snapshots.length}`);
       }
     }
     return device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0;
@@ -928,7 +928,7 @@ class DeviceManager {
       (_a = this.onLanDeviceReady) == null ? void 0 : _a.call(this, matched, this.getDevices());
     }
     if (ipChanged) {
-      this.log.debug(`LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`);
+      this.log.debug(`LAN: ${(0, import_types.deviceLabel)(matched)} at ${lanDevice.ip}`);
       (_b = this.onLanIpChanged) == null ? void 0 : _b.call(this, matched, lanDevice.ip);
     }
     if (wasOffline) {
@@ -1101,11 +1101,15 @@ class DeviceManager {
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = (_a = device.segmentCount) != null ? _a : 0;
     if (maxSeen > import_lookups.SEGMENT_HARD_MAX) {
-      this.log.debug(`${device.name}: ignoring segmentCount=${maxSeen} (above protocol limit ${import_lookups.SEGMENT_HARD_MAX})`);
+      this.log.debug(
+        `${(0, import_types.deviceLabel)(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${import_lookups.SEGMENT_HARD_MAX})`
+      );
       return;
     }
     if (maxSeen > current) {
-      this.log.info(`${device.name}: detected ${maxSeen} segments via MQTT (was ${current}) \u2014 rebuilding state tree`);
+      this.log.info(
+        `${(0, import_types.deviceLabel)(device)}: detected ${maxSeen} segments via MQTT (was ${current}) \u2014 rebuilding state tree`
+      );
       device.segmentCount = maxSeen;
       if (this.skuCache) {
         this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));

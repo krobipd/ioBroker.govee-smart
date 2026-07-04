@@ -163,6 +163,7 @@ class GoveeAdapter extends utils.Adapter {
       void connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
       await this.delObjectAsync("info.appVersionDrift").catch(() => void 0);
+      await cloudCreds.migrateCredentialsMetaOnce(this, utils.getAbsoluteInstanceDataDir(this));
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
           "Credentials encryption migration: stored values look corrupted \u2014 please re-enter API key, Govee password and verification code in the adapter settings (one-time after upgrade to v2.11.0)."
@@ -298,7 +299,9 @@ class GoveeAdapter extends utils.Adapter {
           return;
         }
         this.stateManager.createSegmentStates(device).catch((e) => {
-          this.log.warn(`Failed to rebuild segment tree for ${device.name} after count growth: ${(0, import_types.errMessage)(e)}`);
+          this.log.warn(
+            `Failed to rebuild segment tree for ${(0, import_types.deviceLabel)(device)} after count growth: ${(0, import_types.errMessage)(e)}`
+          );
         });
       };
       const startChannels = ["LAN"];
@@ -391,12 +394,12 @@ class GoveeAdapter extends utils.Adapter {
           });
         });
         await cloudCreds.cleanupLegacyMqttNativeOnce(this);
-        const cachedCreds = await cloudCreds.loadPersistedCreds(this);
+        const cachedCreds = await cloudCreds.loadPersistedCreds(this, dataDir);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
         this.mqttClient.setOnCredentialsRefresh((creds) => {
-          cloudCreds.persistCreds(this, creds).catch((e) => {
+          cloudCreds.persistCreds(this, dataDir, creds).catch((e) => {
             this.log.warn(`Could not persist MQTT credentials: ${(0, import_types.errMessage)(e)}`);
           });
         });
@@ -523,7 +526,7 @@ class GoveeAdapter extends utils.Adapter {
           if (device.lanIp && device.capabilities.length === 0) {
             const prefix = this.stateManager.devicePrefix(device);
             await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch((e) => {
-              this.log.debug(`v2.8.0 migration cleanup failed for ${device.name}: ${(0, import_types.errMessage)(e)}`);
+              this.log.debug(`v2.8.0 migration cleanup failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
             });
             this.log.info(
               `Migrated v2.8.0: removed legacy cloud-owned states for ${device.name} (pure-LAN, no API key)`
@@ -532,7 +535,7 @@ class GoveeAdapter extends utils.Adapter {
         }
         for (const device of this.deviceManager.getDevices()) {
           await this.stateManager.migrateLegacyColorStateIds(device).catch((e) => {
-            this.log.debug(`B2 colour-state migration failed for ${device.name}: ${(0, import_types.errMessage)(e)}`);
+            this.log.debug(`B2 colour-state migration failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
           });
         }
       }
