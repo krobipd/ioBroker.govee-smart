@@ -94,7 +94,7 @@ Seit v2.0.0 (2026-04-25) gemerged in govee-smart. Repo `iobroker.govee-appliance
 ```
 src/main.ts                              → Lifecycle, Wiring, Field-Declarations (v2.6.5: 1159 Zeilen, war 2008)
 src/lib/handlers/                        → 8 Handler-Files für main.ts (v2.6.5)
-  cloud-creds-handler.ts                 → MQTT-Creds: clearVerification + load/persist + cleanupLegacy
+  cloud-creds-handler.ts                 → MQTT-Creds: clearVerification + load/persist (verschlüsselte Datei im Instanz-Datenverzeichnis, wie SKU-Cache; re-derivierbarer Cache → bewusst KEIN meta.user — kein sichtbarer Objektbaum-Knoten) + One-Shot-Migrationen (state v2.17.x, meta v2.18.x) + cleanupLegacy
   cloud-retry-handler.ts                 → cloudInitWithTimeout + buildCloudRetryHost + ensure + handleFailure + manualRefresh
   diagnostics-handler.ts                 → handleDiagnosticsExport (Throttle + JSON-Dump)
   group-fanout-handler.ts                → buildGroupFanoutHost + resolveGroupMembers + updateGroupReachability

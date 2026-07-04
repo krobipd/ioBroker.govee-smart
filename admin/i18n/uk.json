@@ -69,7 +69,6 @@
   "infoCloudConnected": "Cloud API підключено",
   "infoConnection": "Адаптер підключено",
   "infoMqttConnected": "MQTT підключено",
-  "infoMqttCredentials": "Збережені облікові дані MQTT",
   "infoOpenapiMqttConnected": "Govee OpenAPI MQTT підключено",
   "infoWizardStatus": "Статус майстра сегментів",
   "information": "Інформація",

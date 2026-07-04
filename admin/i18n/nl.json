@@ -69,7 +69,6 @@
   "infoCloudConnected": "Cloud-API verbonden",
   "infoConnection": "Adapter verbonden",
   "infoMqttConnected": "MQTT verbonden",
-  "infoMqttCredentials": "Opgeslagen MQTT-referenties",
   "infoOpenapiMqttConnected": "Govee OpenAPI MQTT verbonden",
   "infoWizardStatus": "Segment-wizard status",
   "information": "Informatie",

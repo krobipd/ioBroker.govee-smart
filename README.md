@@ -94,6 +94,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
+- The internal `credentials` object is gone from the object tree: cached login tokens now live in an encrypted file inside the adapter's data directory and migrate over automatically
+
 ### 2.18.2 (2026-07-03)
 
 - Internal refactoring. No user-facing changes.

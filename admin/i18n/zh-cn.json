@@ -69,7 +69,6 @@
   "infoCloudConnected": "云 API 已连接",
   "infoConnection": "适配器已连接",
   "infoMqttConnected": "MQTT 已连接",
-  "infoMqttCredentials": "已保存的 MQTT 凭据",
   "infoOpenapiMqttConnected": "Govee OpenAPI MQTT 已连接",
   "infoWizardStatus": "分段向导状态",
   "information": "信息",

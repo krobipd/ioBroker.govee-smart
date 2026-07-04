@@ -69,7 +69,6 @@
   "infoCloudConnected": "Cloud API połączony",
   "infoConnection": "Adapter połączony",
   "infoMqttConnected": "MQTT połączony",
-  "infoMqttCredentials": "Zapisane dane uwierzytelniające MQTT",
   "infoOpenapiMqttConnected": "Govee OpenAPI MQTT połączony",
   "infoWizardStatus": "Status kreatora segmentów",
   "information": "Informacja",

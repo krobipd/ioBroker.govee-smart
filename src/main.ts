@@ -34,7 +34,7 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { errMessage, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
+import { deviceLabel, errMessage, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
 import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
@@ -187,6 +187,12 @@ class GoveeAdapter extends utils.Adapter {
       // Govee-app version now self-heals in the background, so there is nothing
       // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
       await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
+
+      // One-shot migration + cleanup: the <namespace>.credentials meta object
+      // (v2.18.0–v2.18.2) is replaced by an encrypted file in the instance data
+      // directory — the credentials are a re-derivable cache (the account
+      // settings ARE in every backup), and the visible object node disappears.
+      await cloudCreds.migrateCredentialsMetaOnce(this, utils.getAbsoluteInstanceDataDir(this));
 
       // v2.11.0 credential-encryption migration check: if encryptedNative was
       // added retroactively, js-controller still decrypts existing plaintext
@@ -366,7 +372,9 @@ class GoveeAdapter extends utils.Adapter {
           return;
         }
         this.stateManager.createSegmentStates(device).catch(e => {
-          this.log.warn(`Failed to rebuild segment tree for ${device.name} after count growth: ${errMessage(e)}`);
+          this.log.warn(
+            `Failed to rebuild segment tree for ${deviceLabel(device)} after count growth: ${errMessage(e)}`,
+          );
         });
       };
 
@@ -489,21 +497,23 @@ class GoveeAdapter extends utils.Adapter {
         });
 
         // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
-        // the <namespace>.credentials meta.user FILE — not a state (so the
-        // credentials aren't a visible / history-loggable datapoint) and not
-        // adapter native (a native write would trigger a js-controller restart,
-        // looping endlessly on every login). loadPersistedCreds migrates an
-        // older info.mqttCredentials state into the file on first run.
+        // a FILE in the instance data directory — not a state and not a meta
+        // object (so the credentials are neither a visible datapoint nor a
+        // visible object-tree node) and not adapter native (a native write
+        // would trigger a js-controller restart, looping endlessly on every
+        // login). loadPersistedCreds migrates an older info.mqttCredentials
+        // state into the file on first run; the v2.18.x meta object is
+        // migrated + dropped earlier in onReady (migrateCredentialsMetaOnce).
         //
         // One-shot: clean up legacy v2.1.0/v2.1.1/v2.1.2 native fields
         // that contained plaintext credentials. Best-effort.
         await cloudCreds.cleanupLegacyMqttNativeOnce(this);
-        const cachedCreds = await cloudCreds.loadPersistedCreds(this);
+        const cachedCreds = await cloudCreds.loadPersistedCreds(this, dataDir);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
         this.mqttClient.setOnCredentialsRefresh(creds => {
-          cloudCreds.persistCreds(this, creds).catch(e => {
+          cloudCreds.persistCreds(this, dataDir, creds).catch(e => {
             this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
           });
         });
@@ -676,7 +686,7 @@ class GoveeAdapter extends utils.Adapter {
           if (device.lanIp && device.capabilities.length === 0) {
             const prefix = this.stateManager.devicePrefix(device);
             await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch(e => {
-              this.log.debug(`v2.8.0 migration cleanup failed for ${device.name}: ${errMessage(e)}`);
+              this.log.debug(`v2.8.0 migration cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
             });
             this.log.info(
               `Migrated v2.8.0: removed legacy cloud-owned states for ${device.name} (pure-LAN, no API key)`,
@@ -691,7 +701,7 @@ class GoveeAdapter extends utils.Adapter {
         // Idempotent + existence-checked; covers devices AND groups.
         for (const device of this.deviceManager.getDevices()) {
           await this.stateManager.migrateLegacyColorStateIds(device).catch(e => {
-            this.log.debug(`B2 colour-state migration failed for ${device.name}: ${errMessage(e)}`);
+            this.log.debug(`B2 colour-state migration failed for ${deviceLabel(device)}: ${errMessage(e)}`);
           });
         }
       }

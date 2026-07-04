@@ -1,3 +1,5 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { errMessage, type PersistedMqttCredentials } from "../types";
 
 /**
@@ -13,11 +15,11 @@ export interface CloudCredsAdapter {
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
   getForeignObjectAsync(id: string): Promise<{ native?: unknown } | null | undefined>;
   extendForeignObjectAsync(id: string, obj: { native?: Record<string, unknown> }): Promise<unknown>;
-  /** Read a file from a meta.user object; rejects when the file is absent. */
+  /** Read a file from a meta.user object — one-shot legacy migration; rejects when the file is absent. */
   readFileAsync(meta: string, name: string): Promise<{ file: Buffer | string; mimeType?: string }>;
-  /** Write a file into a meta.user object. */
-  writeFileAsync(meta: string, name: string, data: Buffer | string): Promise<void>;
-  /** Delete an object — used to drop the migrated-away credentials state. */
+  /** Delete a file from a meta.user object — one-shot legacy migration cleanup. */
+  delFileAsync(meta: string, name: string): Promise<void>;
+  /** Delete an object — used to drop the migrated-away credentials state/meta objects. */
   delObjectAsync(id: string, options?: unknown): Promise<void>;
   encrypt(value: string): string;
   decrypt(value: string): string;
@@ -45,12 +47,35 @@ export async function clearVerificationCodeSetting(adapter: CloudCredsAdapter): 
   }
 }
 
-/** File name the encrypted MQTT credentials live in, inside the meta object. */
-const CREDENTIALS_FILE = "mqtt.json";
+/** File name the encrypted MQTT credentials live in, inside the instance data directory. */
+const CREDENTIALS_FILE = "mqtt-credentials.json";
 
-/** The `<namespace>.credentials` meta.user object id. */
-function credentialsMeta(adapter: CloudCredsAdapter): string {
+/** The legacy `<namespace>.credentials` meta.user object id (v2.18.0–v2.18.2). */
+function legacyCredentialsMeta(adapter: CloudCredsAdapter): string {
   return `${adapter.namespace}.credentials`;
+}
+
+/**
+ * Absolute path of the encrypted credentials file inside the adapter's
+ * instance data directory (`iobroker-data/<namespace>/`) — invisible in the
+ * object tree, host-local like the SKU cache.
+ *
+ * @param dataDir Adapter instance data directory
+ */
+function credentialsFilePath(dataDir: string): string {
+  return path.join(dataDir, CREDENTIALS_FILE);
+}
+
+/**
+ * Write the encrypted credentials blob to disk (owner-read/write only — the
+ * sensitive fields inside are additionally encrypted with the system secret).
+ *
+ * @param dataDir Adapter instance data directory
+ * @param blob    JSON blob as produced by {@link persistCreds}
+ */
+function writeCredentialsFile(dataDir: string, blob: string): void {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 0o600 });
 }
 
 /**
@@ -93,23 +118,29 @@ function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedM
 }
 
 /**
- * Load persisted MQTT credentials from the `<namespace>.credentials` meta.user
- * file. The sensitive fields are encrypted (see {@link persistCreds}). Returns
- * null when nothing is stored.
+ * Load persisted MQTT credentials from the encrypted file in the instance data
+ * directory. The sensitive fields are encrypted (see {@link persistCreds}).
+ * Returns null when nothing is stored.
  *
- * Stored in a meta.user FILE (not a state) so the encrypted credentials are not
- * a visible / history-loggable datapoint, and saving does NOT trigger an adapter
- * restart (a native write would loop login → save → restart → login). One-shot
- * migration: an earlier `info.mqttCredentials` state (v2.1.3–v2.17.x) is copied
- * into the file and the state object removed on first load.
+ * Stored as a plain FILE (not a state, not a meta object) so the encrypted
+ * credentials are neither a visible datapoint nor a visible object-tree node,
+ * and saving does NOT trigger an adapter restart (a native write would loop
+ * login → save → restart → login). This is a re-derivable cache — the source
+ * of truth (account e-mail/password) lives in the encrypted adapter config.
+ * One-shot migration: an earlier `info.mqttCredentials` state (v2.1.3–v2.17.x)
+ * is copied into the file and the state object removed on first load; the
+ * v2.18.x meta-object file is handled by {@link migrateCredentialsMetaOnce}.
  *
  * @param adapter ioBroker adapter surface
+ * @param dataDir Adapter instance data directory
  */
-export async function loadPersistedCreds(adapter: CloudCredsAdapter): Promise<PersistedMqttCredentials | null> {
-  // 1. Preferred: the meta.user file.
+export async function loadPersistedCreds(
+  adapter: CloudCredsAdapter,
+  dataDir: string,
+): Promise<PersistedMqttCredentials | null> {
+  // 1. Preferred: the encrypted file in the instance data directory.
   try {
-    const { file } = await adapter.readFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE);
-    const raw = typeof file === "string" ? file : file.toString("utf-8");
+    const raw = fs.readFileSync(credentialsFilePath(dataDir), "utf-8");
     const creds = raw ? parsePersistedBlob(adapter, raw) : null;
     if (creds) {
       return creds;
@@ -126,7 +157,7 @@ export async function loadPersistedCreds(adapter: CloudCredsAdapter): Promise<Pe
     }
     // The state blob is already encrypted — copy it verbatim into the file, then
     // drop the old state object so the credentials stop being a datapoint.
-    await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, raw);
+    writeCredentialsFile(dataDir, raw);
     await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
     adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
     return parsePersistedBlob(adapter, raw);
@@ -136,15 +167,20 @@ export async function loadPersistedCreds(adapter: CloudCredsAdapter): Promise<Pe
 }
 
 /**
- * Persist freshly-issued MQTT credentials into the `<namespace>.credentials`
- * meta.user file. Sensitive fields go through `adapter.encrypt()` so the blob
- * is useless without the system secret. Writing a file does NOT trigger an
- * adapter restart (unlike a native write).
+ * Persist freshly-issued MQTT credentials into the encrypted file in the
+ * instance data directory. Sensitive fields go through `adapter.encrypt()` so
+ * the blob is useless without the system secret. Writing a file does NOT
+ * trigger an adapter restart (unlike a native write).
  *
  * @param adapter ioBroker adapter surface
+ * @param dataDir Adapter instance data directory
  * @param creds   The freshly-issued MQTT bundle from a successful login
  */
-export async function persistCreds(adapter: CloudCredsAdapter, creds: PersistedMqttCredentials): Promise<void> {
+export async function persistCreds(
+  adapter: CloudCredsAdapter,
+  dataDir: string,
+  creds: PersistedMqttCredentials,
+): Promise<void> {
   const blob = JSON.stringify({
     bearerToken: adapter.encrypt(creds.bearerToken),
     iotEndpoint: creds.iotEndpoint,
@@ -154,7 +190,42 @@ export async function persistCreds(adapter: CloudCredsAdapter, creds: PersistedM
     accountTopic: creds.accountTopic,
     tokenExpiresAt: creds.tokenExpiresAt,
   });
-  await adapter.writeFileAsync(credentialsMeta(adapter), CREDENTIALS_FILE, blob);
+  // async fs on the hot path (runs on every login/token refresh); the sync
+  // writeCredentialsFile stays for the two one-shot startup migrations.
+  await fs.promises.mkdir(dataDir, { recursive: true });
+  await fs.promises.writeFile(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 0o600 });
+}
+
+/**
+ * One-shot migration + cleanup of the legacy `<namespace>.credentials`
+ * meta.user object (v2.18.0–v2.18.2). The credentials cache now lives as a
+ * file in the instance data directory: it is re-derivable from the configured
+ * account (which IS part of every backup), so it does not need the meta
+ * object's backup inclusion — and the visible `credentials` node disappears
+ * from the object tree. Copies a stored blob into the new file (unless one
+ * already exists), then drops the meta file and the meta object. Idempotent,
+ * best-effort — runs on every start and no-ops once everything is gone.
+ *
+ * @param adapter ioBroker adapter surface
+ * @param dataDir Adapter instance data directory
+ */
+export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dataDir: string): Promise<void> {
+  try {
+    const { file } = await adapter.readFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+    const raw = typeof file === "string" ? file : file.toString("utf-8");
+    if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
+      writeCredentialsFile(dataDir, raw);
+      adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+    }
+  } catch {
+    // no stored blob (fresh install or already migrated) — still drop the meta object below
+  }
+  try {
+    await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+  } catch {
+    // file already gone
+  }
+  await adapter.delObjectAsync("credentials").catch(() => undefined);
 }
 
 /**
