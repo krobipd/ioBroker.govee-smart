@@ -1,5 +1,6 @@
 import {
   normalizeDeviceId,
+  deviceLabel,
   classifyError,
   rgbToHex,
   hexToRgb,
@@ -16,6 +17,27 @@ import {
 } from "./types";
 
 describe("Types utilities", () => {
+  describe("deviceLabel", () => {
+    it("formats name plus model", () => {
+      expect(deviceLabel({ name: "Wifi Thermometer", sku: "H5179" })).toBe("Wifi Thermometer (H5179)");
+    });
+
+    it("falls back to the bare SKU when no name is known", () => {
+      expect(deviceLabel({ sku: "H5179" })).toBe("H5179");
+      expect(deviceLabel({ name: "", sku: "H5179" })).toBe("H5179");
+      expect(deviceLabel({ name: "   ", sku: "H5179" })).toBe("H5179");
+      expect(deviceLabel({ name: 42 as unknown as string, sku: "H5179" })).toBe("H5179");
+    });
+
+    it("collapses name === SKU to the bare SKU (no 'H5179 (H5179)')", () => {
+      expect(deviceLabel({ name: "H5179", sku: "H5179" })).toBe("H5179");
+    });
+
+    it("keeps the LAN-only fallback name distinct from the SKU", () => {
+      expect(deviceLabel({ name: "H6159_c31b", sku: "H6159" })).toBe("H6159_c31b (H6159)");
+    });
+  });
+
   describe("normalizeDeviceId", () => {
     it("should remove colons and lowercase", () => {
       expect(normalizeDeviceId("AA:BB:CC:DD:EE:FF:00:11")).toBe("aabbccddeeff0011");

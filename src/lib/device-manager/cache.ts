@@ -1,6 +1,6 @@
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { CachedDeviceData, SkuCache } from "../sku-cache";
-import type { GoveeDevice } from "../types";
+import { deviceLabel, type GoveeDevice } from "../types";
 
 /**
  * Adapter surface required by the cache helpers — DeviceManager exposes
@@ -157,7 +157,7 @@ export function saveDevicesToCache(adapter: DeviceCacheAdapter): void {
     const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
     if (isLight && !device.scenesChecked) {
       skippedCount++;
-      adapter.log.debug(`Not caching ${device.name} (${device.sku}) — scenes not yet checked`);
+      adapter.log.debug(`Not caching ${deviceLabel(device)} — scenes not yet checked`);
     } else {
       adapter.skuCache.save(goveeDeviceToCached(device));
       cachedCount++;

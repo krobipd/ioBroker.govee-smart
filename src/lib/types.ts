@@ -405,6 +405,20 @@ export function normalizeDeviceId(id: string): string {
   return id.replace(/:/g, "").toLowerCase();
 }
 
+/**
+ * Consistent device label for log lines: always name plus model, e.g.
+ * `Wifi Thermometer (H5179)`. Falls back to the bare SKU when no display
+ * name is known (or the name IS the SKU) — never produces `H5179 (H5179)`.
+ *
+ * @param device Anything carrying a display name and a SKU (GoveeDevice, cached entry, …)
+ * @param device.name Optional display name (user-assigned or Cloud-provided)
+ * @param device.sku Product model
+ */
+export function deviceLabel(device: { name?: string; sku: string }): string {
+  const name = typeof device.name === "string" ? device.name.trim() : "";
+  return name && name !== device.sku ? `${name} (${device.sku})` : device.sku;
+}
+
 /** Error categories for dedup logging */
 export type ErrorCategory =
   | "NETWORK"

@@ -1,6 +1,6 @@
 import { SEGMENT_COUNT_MAX, SEGMENT_HARD_MAX } from "./device-manager/lookups";
 import { WIZARD_IDLE_TIMEOUT_MS } from "./timing-constants";
-import type { GoveeDevice } from "./types";
+import { deviceLabel, type GoveeDevice } from "./types";
 import { readDeviceBaseline } from "./device-baseline";
 import { resolveLabel, type I18nKey } from "./i18n";
 
@@ -423,7 +423,7 @@ export class SegmentWizard {
     // Logs are English regardless of admin language (system-language rule); the
     // user-facing `message`/`progress` below stay localized (C6).
     const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${manualList}")` : ", no gaps";
-    this.host.log.info(`Segment wizard for ${device.name}: ${segmentCount} segments detected${gapsSuffix}`);
+    this.host.log.info(`Segment wizard for ${deviceLabel(device)}: ${segmentCount} segments detected${gapsSuffix}`);
 
     this.session = null;
     this.clearIdleTimer();
@@ -450,7 +450,7 @@ export class SegmentWizard {
       if (!this.session) {
         return;
       }
-      this.host.log.warn(`Segment wizard for ${this.session.name}: idle timeout (5 min), aborted`);
+      this.host.log.warn(`Segment wizard for ${deviceLabel(this.session)}: idle timeout (5 min), aborted`);
       this.abort().catch(e => {
         this.host.log.warn(
           this.t("logAbortFailed", {

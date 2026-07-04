@@ -1,5 +1,5 @@
 import type { LocalSnapshot, LocalSnapshotStore, SnapshotSegment } from "./local-snapshots";
-import type { GoveeDevice } from "./types";
+import { deviceLabel, type GoveeDevice } from "./types";
 import { readDeviceBaseline } from "./device-baseline";
 
 /**
@@ -61,7 +61,7 @@ export class SnapshotHandler {
     };
 
     await this.host.store.saveSnapshot(device.sku, device.deviceId, snapshot);
-    this.host.log.info(`Local snapshot saved: "${name}" for ${device.name}`);
+    this.host.log.info(`Local snapshot saved: "${name}" for ${deviceLabel(device)}`);
     // Targeted refresh — only this device's snapshot_local dropdown changed.
     this.host.refreshDeviceStates(device);
   }
@@ -80,10 +80,10 @@ export class SnapshotHandler {
     const snaps = this.host.store.getSnapshots(device.sku, device.deviceId);
     const snap = snaps[idx - 1];
     if (!snap) {
-      this.host.log.warn(`Local snapshot index ${idx} not found for ${device.name}`);
+      this.host.log.warn(`Local snapshot index ${idx} not found for ${deviceLabel(device)}`);
       return;
     }
-    this.host.log.info(`Restoring local snapshot "${snap.name}" for ${device.name}`);
+    this.host.log.info(`Restoring local snapshot "${snap.name}" for ${deviceLabel(device)}`);
 
     // Send each state via LAN → Cloud routing
     await this.host.sendCommand(device, "power", snap.power);
@@ -148,11 +148,11 @@ export class SnapshotHandler {
    */
   async delete(device: GoveeDevice, name: string): Promise<void> {
     if (await this.host.store.deleteSnapshot(device.sku, device.deviceId, name)) {
-      this.host.log.info(`Local snapshot deleted: "${name}" for ${device.name}`);
+      this.host.log.info(`Local snapshot deleted: "${name}" for ${deviceLabel(device)}`);
       // Targeted refresh — only this device's snapshot_local dropdown changed.
       this.host.refreshDeviceStates(device);
     } else {
-      this.host.log.warn(`Local snapshot "${name}" not found for ${device.name}`);
+      this.host.log.warn(`Local snapshot "${name}" not found for ${deviceLabel(device)}`);
     }
   }
 }

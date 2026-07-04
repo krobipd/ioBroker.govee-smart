@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { errMessage, type CloudCapability, type CloudScene } from "./types";
+import { deviceLabel, errMessage, type CloudCapability, type CloudScene } from "./types";
 import { treeKey } from "./device-key";
 
 /** Data persisted per device in the SKU cache */
@@ -242,7 +242,7 @@ export class SkuCache {
           const ageDays = Math.round((nowMs - data.lastSeenOnNetwork) / 86400000);
           fs.unlinkSync(full);
           pruned++;
-          prunedDetails.push(`${data.sku} ${data.deviceId} (${ageDays}d)`);
+          prunedDetails.push(`${deviceLabel(data)} ${data.deviceId} (${ageDays}d)`);
         }
       } catch {
         // skip corrupt files
@@ -265,8 +265,9 @@ export class SkuCache {
    *
    * @param sku Product model
    * @param deviceId Device identifier
+   * @param label Optional display label (name + model) for the log line
    */
-  evictDevice(sku: string, deviceId: string): void {
+  evictDevice(sku: string, deviceId: string, label?: string): void {
     if (!this.dataAvailable) {
       return;
     }
@@ -274,10 +275,10 @@ export class SkuCache {
     try {
       if (fs.existsSync(file)) {
         fs.unlinkSync(file);
-        this.log.debug(`Cache: evicted ${sku} ${deviceId} (removed from Govee account)`);
+        this.log.debug(`Cache: evicted ${label ?? sku} ${deviceId} (removed from Govee account)`);
       }
     } catch (e) {
-      this.log.debug(`Cache evictDevice failed for ${sku} ${deviceId}: ${errMessage(e)}`);
+      this.log.debug(`Cache evictDevice failed for ${label ?? sku} ${deviceId}: ${errMessage(e)}`);
     }
   }
 

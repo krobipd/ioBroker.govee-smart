@@ -1,4 +1,4 @@
-import { errMessage, type GoveeDevice } from "./types";
+import { deviceLabel, errMessage, type GoveeDevice } from "./types";
 import { sessionKey } from "./device-key";
 
 /**
@@ -114,7 +114,7 @@ export class GroupFanoutHandler {
         }
         succeeded += 1;
       } catch (err) {
-        this.host.log.debug(`Group fan-out to ${member.name}: ${errMessage(err)}`);
+        this.host.log.debug(`Group fan-out to ${deviceLabel(member)}: ${errMessage(err)}`);
       }
     }
     if (succeeded === 0) {

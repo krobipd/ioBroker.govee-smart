@@ -1,6 +1,7 @@
 import {
   buildUniqueLabelMap,
   capMatchesControl,
+  deviceLabel,
   errMessage,
   rgbToHex,
   type CapabilityOption,
@@ -1283,7 +1284,7 @@ export function buildCloudStateDefs(
           }
         }
       } catch (e) {
-        log.debug(`${device.sku}: speed-config parse failed for scene "${entry.name}": ${errMessage(e)}`);
+        log.debug(`${deviceLabel(device)}: speed-config parse failed for scene "${entry.name}": ${errMessage(e)}`);
       }
     }
     return max;

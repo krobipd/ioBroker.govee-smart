@@ -45,6 +45,7 @@ import {
   type LanDevice,
   type MqttStatusUpdate,
   type TimerAdapter,
+  deviceLabel,
   errMessage,
 } from "./types";
 import { HttpError } from "./http-client";
@@ -345,9 +346,9 @@ export class DeviceManager {
       return;
     }
     for (const device of toEvict) {
-      this.log.info(`Removed device ${device.name} (${device.sku}) — no longer in your Govee account`);
+      this.log.info(`Removed device ${deviceLabel(device)} — no longer in your Govee account`);
       this.removeDevice(device.sku, device.deviceId);
-      this.skuCache?.evictDevice(device.sku, device.deviceId);
+      this.skuCache?.evictDevice(device.sku, device.deviceId, deviceLabel(device));
     }
     // Persist the survivors' updated miss counters, then clean up the now-orphan
     // ioBroker objects + diagnostics buffers for the evicted devices.
@@ -709,7 +710,7 @@ export class DeviceManager {
         }
       } catch (e) {
         this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/scenes", e, this.extractStatus(e));
-        this.log.debug(`Could not load scenes for ${cd.sku}: ${errMessage(e)}`);
+        this.log.debug(`Could not load scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
       }
     };
     await this.commandRouter.executeRateLimited(loadScenes, 2);
@@ -729,7 +730,7 @@ export class DeviceManager {
           }
         } catch (e) {
           this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/diy-scenes", e, this.extractStatus(e));
-          this.log.debug(`Could not load DIY scenes for ${cd.sku}: ${errMessage(e)}`);
+          this.log.debug(`Could not load DIY scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
         }
       };
       await this.commandRouter.executeRateLimited(loadDiy, 2);
@@ -764,7 +765,7 @@ export class DeviceManager {
             name: o.name,
             value: typeof o.value === "number" ? o.value : (o.value as Record<string, unknown>),
           }));
-        this.log.debug(`Snapshots from capabilities for ${cd.sku}: ${device.snapshots.length}`);
+        this.log.debug(`Snapshots from capabilities for ${deviceLabel(device)}: ${device.snapshots.length}`);
       }
     }
 
@@ -1139,7 +1140,7 @@ export class DeviceManager {
       this.onLanDeviceReady?.(matched, this.getDevices());
     }
     if (ipChanged) {
-      this.log.debug(`LAN: ${matched.name} (${matched.sku}) at ${lanDevice.ip}`);
+      this.log.debug(`LAN: ${deviceLabel(matched)} at ${lanDevice.ip}`);
       this.onLanIpChanged?.(matched, lanDevice.ip);
     }
     if (wasOffline) {
@@ -1320,11 +1321,15 @@ export class DeviceManager {
     // L6 — plausibility cap: SEGMENT_HARD_MAX (55) is the Govee protocol upper
     // limit. Values above it only come from broken/spoofed packets.
     if (maxSeen > SEGMENT_HARD_MAX) {
-      this.log.debug(`${device.name}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_HARD_MAX})`);
+      this.log.debug(
+        `${deviceLabel(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_HARD_MAX})`,
+      );
       return;
     }
     if (maxSeen > current) {
-      this.log.info(`${device.name}: detected ${maxSeen} segments via MQTT (was ${current}) — rebuilding state tree`);
+      this.log.info(
+        `${deviceLabel(device)}: detected ${maxSeen} segments via MQTT (was ${current}) — rebuilding state tree`,
+      );
       device.segmentCount = maxSeen;
       // Persist now so a restart starts from the real value instead of
       // falling back to Cloud capabilities and deleting the extra slots.
