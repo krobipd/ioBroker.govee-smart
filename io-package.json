@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.18.2",
+    "version": "2.19.0",
     "news": {
+      "2.19.0": {
+        "en": "Device log lines now consistently name devices as \"name (model)\"\nThe credentials entry disappears from the object tree — login tokens stay saved in encrypted form",
+        "de": "Geräte-Logzeilen nennen Geräte jetzt durchgängig als \"Name (Modell)\"\nDer credentials-Eintrag verschwindet aus dem Objektbaum — Login-Tokens bleiben verschlüsselt gespeichert",
+        "ru": "Строки журнала теперь единообразно называют устройства как «имя (модель)»\nЗапись credentials исчезает из дерева объектов — токены входа остаются сохранёнными в зашифрованном виде",
+        "pt": "As linhas de log nomeiam agora os dispositivos como \"nome (modelo)\"\nA entrada credentials desaparece da árvore de objetos — os tokens de login continuam guardados encriptados",
+        "nl": "Apparaat-logregels benoemen apparaten nu consequent als \"naam (model)\"\nDe credentials-vermelding verdwijnt uit de objectboom — login-tokens blijven versleuteld opgeslagen",
+        "fr": "Les lignes de journal nomment les appareils de façon cohérente « nom (modèle) »\nL'entrée credentials disparaît de l'arborescence — les jetons de connexion restent enregistrés chiffrés",
+        "it": "Le righe di log ora nominano i dispositivi come \"nome (modello)\"\nLa voce credentials sparisce dall'albero degli oggetti — i token di accesso restano salvati cifrati",
+        "es": "Las líneas de registro ahora nombran los dispositivos como \"nombre (modelo)\"\nLa entrada credentials desaparece del árbol de objetos — los tokens siguen guardados cifrados",
+        "pl": "Wiersze dziennika nazywają teraz urządzenia spójnie jako „nazwa (model)\"\nWpis credentials znika z drzewa obiektów — tokeny logowania pozostają zapisane w formie zaszyfrowanej",
+        "uk": "Рядки журналу тепер послідовно називають пристрої як «назва (модель)»\nЗапис credentials зникає з дерева об'єктів — токени входу залишаються збереженими у зашифрованому вигляді",
+        "zh-cn": "设备日志行现在统一以\"名称（型号）\"命名设备\ncredentials 条目从对象树中消失——登录令牌仍以加密形式保存"
+      },
       "2.18.2": {
         "en": "Internal refactoring. No user-facing changes.",
         "de": "Interne Überarbeitung. Keine für Nutzer sichtbaren Änderungen.",
@@ -80,19 +93,6 @@
         "pl": "Tryb kompaktowy nie przechwytuje już błędów innych adapterów, a wpisy informacji o urządzeniu zachowują czystą historię. Polecenia chmury nie gromadzą się już bez limitu podczas przerw.",
         "uk": "Компактний режим більше не перехоплює помилки інших адаптерів, а записи інформації про пристрій зберігають чисту історію. Хмарні команди більше не накопичуються без обмежень під час пауз.",
         "zh-cn": "紧凑模式不再拦截其他适配器的错误，设备信息条目保持干净的状态历史。云命令在限流暂停期间不再无限堆积。"
-      },
-      "2.16.0": {
-        "en": "Lights and appliances without a local connection are now controllable via the Cloud, plus clearer one-time alerts and more supported devices.",
-        "de": "Lichter und Geräte ohne lokale Verbindung lassen sich jetzt über die Cloud steuern, dazu klarere einmalige Hinweise und mehr unterstützte Geräte.",
-        "ru": "Светильники и устройства без локального подключения теперь управляются через облако, плюс понятные разовые уведомления и больше поддерживаемых устройств.",
-        "pt": "Luzes e aparelhos sem ligação local agora podem ser controlados pela Cloud, além de avisos únicos mais claros e mais dispositivos suportados.",
-        "nl": "Lampen en apparaten zonder lokale verbinding zijn nu bedienbaar via de Cloud, plus duidelijkere eenmalige meldingen en meer ondersteunde apparaten.",
-        "fr": "Les lumières et appareils sans connexion locale sont désormais pilotables via le Cloud, avec des alertes uniques plus claires et plus d'appareils pris en charge.",
-        "it": "Luci e dispositivi senza connessione locale ora sono controllabili tramite il Cloud, con avvisi singoli più chiari e più dispositivi supportati.",
-        "es": "Las luces y aparatos sin conexión local ahora se pueden controlar por la Cloud, además de avisos únicos más claros y más dispositivos compatibles.",
-        "pl": "Światłami i urządzeniami bez połączenia lokalnego można teraz sterować przez Cloud, plus czytelniejsze jednorazowe powiadomienia i więcej obsługiwanych urządzeń.",
-        "uk": "Освітлення та пристрої без локального підключення тепер керуються через хмару, плюс зрозуміліші одноразові сповіщення та більше підтримуваних пристроїв.",
-        "zh-cn": "无本地连接的灯和设备现在可通过云端控制，并提供更清晰的一次性提醒和更多受支持的设备。"
       }
     },
     "plugins": {

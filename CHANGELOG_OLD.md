@@ -1,4 +1,7 @@
 # Older Changes
+## 2.16.2 (2026-06-16) — stable
+- On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.
+
 ## 2.16.1 (2026-06-11)
 
 - Running in compact mode no longer intercepts errors from other adapters in the same process — error reporting stays correctly attributed per adapter.

@@ -94,10 +94,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.19.0 (2026-07-04)
 
 - Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
-- The internal `credentials` object is gone from the object tree: cached login tokens now live in an encrypted file inside the adapter's data directory and migrate over automatically
+- The credentials entry disappears from the object tree — login tokens stay saved in encrypted form, just no longer visible as an object
 
 ### 2.18.2 (2026-07-03)
 
@@ -151,9 +151,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a sensor sending fresh readings now shows `info.online = true` even when Govee's cloud wrongly reports it offline (e.g. gateway thermometers) — online is derived from data freshness.
 - Fixed: temperature-only sensors no longer keep a phantom humidity datapoint stuck at 0 — a device with no humidity sensor drops it, while a real thermo-hygrometer keeps its humidity.
 - Fixed: a rejected Govee API key is now always reported as "API key rejected — check Govee API key" and stops the retry loop, instead of a generic error and retrying a bad key forever.
-
-### 2.16.2 (2026-06-16) — stable
-- On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
