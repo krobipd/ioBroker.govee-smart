@@ -29,7 +29,7 @@ export interface StateChangeRouterAdapter {
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getObjectAsync(id: string): Promise<unknown>;
   /** Owned by main.ts — reloads the Cloud-state tree after a per-device refresh. */
-  loadCloudStates(): Promise<void>;
+  loadCloudStates(only?: GoveeDevice): Promise<void>;
   /** Owned by main.ts — central entry point for manual-segment updates. */
   applyManualSegments(device: GoveeDevice, mode: boolean, indices?: number[]): Promise<void>;
   /** Owned by main.ts — manual "sync devices" button: reload account list + reconcile. */
@@ -387,7 +387,10 @@ export async function onStateChange(
         if (changed) {
           // Rebuild the Cloud-state tree so the fresh snapshot_cloud / scene
           // dropdown options propagate to the ioBroker objects.
-          await adapter.loadCloudStates();
+          // Scoped to the one refreshed device — the button is per-device by
+          // design (Pattern 55); reloading every device burned the budget the
+          // pattern exists to protect.
+          await adapter.loadCloudStates(device);
         }
       } catch (e) {
         adapter.log.warn(`Refresh cloud data for ${device.name} failed: ${errMessage(e)}`);

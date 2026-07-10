@@ -31,6 +31,9 @@ function makeRig(devices: GoveeDevice[]): TestRig {
 
   const adapter: CloudStateLoaderAdapter = {
     log: mockLog,
+    // null = direct execution; the budgeting itself is covered by the
+    // rate-limited dispatch test below.
+    rateLimiter: null,
     cloudClient: { getDeviceState: (sku: string, id: string) => getDeviceState(sku, id) } as never,
     deviceManager: {
       getDevices: () => devices,
@@ -132,6 +135,42 @@ describe("loadCloudStates", () => {
     const rig = makeRig([]);
     (rig.adapter as { cloudClient: unknown }).cloudClient = null;
     await expect(loadCloudStates(rig.adapter)).resolves.toBeUndefined();
+  });
+
+  it("dispatches every /device/state call through the RateLimiter at background priority (M2)", async () => {
+    const d1 = createTestDevice({ deviceId: "AA:06", channels: { lan: false, mqtt: false, cloud: true } });
+    const d2 = createTestDevice({ deviceId: "AA:07", channels: { lan: false, mqtt: false, cloud: true } });
+    const rig = makeRig([d1, d2]);
+    rig.setDeviceState(async () => [batteryCap]);
+    const dispatched: number[] = [];
+    const limited = {
+      ...rig.adapter,
+      rateLimiter: {
+        tryExecute: async (fn: () => Promise<void>, priority: number) => {
+          dispatched.push(priority);
+          await fn();
+          return true;
+        },
+      } as never,
+    };
+    await loadCloudStates(limited);
+    // one budgeted call per device, background priority (2) like scene loads
+    expect(dispatched).toEqual([2, 2]);
+    expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery"))).toHaveLength(2);
+  });
+
+  it("loads only the given device when scoped (per-device refresh_cloud button, Pattern 55)", async () => {
+    const d1 = createTestDevice({ deviceId: "AA:08", channels: { lan: false, mqtt: false, cloud: true } });
+    const d2 = createTestDevice({ deviceId: "AA:09", channels: { lan: false, mqtt: false, cloud: true } });
+    const rig = makeRig([d1, d2]);
+    let calls = 0;
+    rig.setDeviceState(async () => {
+      calls++;
+      return [batteryCap];
+    });
+    await loadCloudStates(rig.adapter, d2);
+    expect(calls).toBe(1);
+    expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery"))).toHaveLength(1);
   });
 });
 

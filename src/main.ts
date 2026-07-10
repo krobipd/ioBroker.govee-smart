@@ -76,7 +76,8 @@ class GoveeAdapter extends utils.Adapter {
   public actionableProblems!: ActionableProblems;
   /** Public for handler modules. */
   public cloudClient: GoveeCloudClient | null = null;
-  private rateLimiter: RateLimiter | null = null;
+  /** Public for handler modules (cloud-state-loader budgets its /device/state calls). */
+  public rateLimiter: RateLimiter | null = null;
   /** Repeating timer for the App-API poll (sensor-state pull). */
   private appApiPollTimer: ioBroker.Interval | undefined;
   /**
@@ -957,8 +958,8 @@ class GoveeAdapter extends utils.Adapter {
   }
 
   /** Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface. */
-  public loadCloudStates(): Promise<void> {
-    return cloudStateLoader.loadCloudStates(this);
+  public loadCloudStates(only?: GoveeDevice): Promise<void> {
+    return cloudStateLoader.loadCloudStates(this, only);
   }
 
   /**
