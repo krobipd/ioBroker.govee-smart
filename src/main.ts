@@ -999,7 +999,11 @@ class GoveeAdapter extends utils.Adapter {
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
       createMqttProbeClient: () => {
         const config = this.config;
-        return new GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        const probe = new GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        // One-shot probe: a failed login must not arm the reconnect backoff —
+        // it could fire a second login against Govee inside the probe window.
+        probe.enableProbeMode();
+        return probe;
       },
       getSegmentDeviceList: () => {
         const devices = this.deviceManager?.getDevices() ?? [];

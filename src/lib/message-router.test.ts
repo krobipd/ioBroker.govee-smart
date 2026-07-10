@@ -35,8 +35,15 @@ const mockLog = {
 interface FakeProbeOpts {
   /** When set, simulate a successful login + connected state. */
   connected?: boolean;
-  /** Throw this error from probe.connect (overrides connected). */
-  connectError?: Error;
+  /**
+   * Failure the client would classify from a failed login/connect. Models the
+   * REAL contract: connect() resolves on every failure path — the outcome is
+   * only readable via getLastError() (H2). A fake that throws from connect()
+   * would test dead code.
+   */
+  lastError?: { category: string; message: string };
+  /** When set, lastError surfaces only on the SECOND getLastError() read — models a broker-stage failure that lands during the edge-wait. */
+  lateError?: boolean;
   /** Throw this from probe.requestVerificationCode. */
   requestError?: Error;
   /** Called whenever probe.disconnect() runs — lets a test assert disposal. */
@@ -44,23 +51,33 @@ interface FakeProbeOpts {
 }
 
 function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
+  let lastErrorReads = 0;
   const probe = {
     setVerificationCode: (_code: string) => {},
+    enableProbeMode: () => {},
     disconnect: () => opts.onDisconnect?.(),
+    getLastError: () => {
+      if (!opts.lastError) {
+        return null;
+      }
+      lastErrorReads++;
+      if (opts.lateError && lastErrorReads === 1) {
+        return null;
+      }
+      return opts.lastError;
+    },
     requestVerificationCode: async (): Promise<void> => {
       if (opts.requestError) {
         throw opts.requestError;
       }
     },
     connect: async (_onStatus: unknown, onConnection: (connected: boolean) => void): Promise<void> => {
-      if (opts.connectError) {
-        throw opts.connectError;
-      }
       // The real client resolves connect() after the login + cert handshake and
       // only issues the MQTT connect — the "connected" edge (onConnection(true))
       // arrives asynchronously AFTER this resolves, via the mqtt "connect" event
       // → subscribe. Model that timing so a probe that reads `connected`
-      // synchronously right after connect() sees false (the M2 bug).
+      // synchronously right after connect() sees false (the M2 bug). connect()
+      // NEVER throws — failures land in getLastError() (H2).
       if (opts.connected) {
         setTimeout(() => onConnection(true), 0);
       }
@@ -190,7 +207,7 @@ describe("MessageRouter", () => {
 
     it("disposes the probe on the error path too — no socket leak (M2)", async () => {
       let disconnects = 0;
-      const probe = makeProbe({ connectError: new Error("Login failed: bad"), onDisconnect: () => (disconnects += 1) });
+      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: bad" }, onDisconnect: () => (disconnects += 1) });
       const { host } = makeHost({ probe });
       const router = new MessageRouter(host, 20);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -199,7 +216,7 @@ describe("MessageRouter", () => {
     });
 
     it("returns 2FA hint on Verification required error", async () => {
-      const probe = makeProbe({ connectError: new Error("Verification required by Govee") });
+      const probe = makeProbe({ lastError: { category: "VERIFICATION_PENDING", message: "Verification required by Govee — request a code via Adapter settings (status 454)" } });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -209,7 +226,7 @@ describe("MessageRouter", () => {
     });
 
     it("returns invalid-code hint on Verification code invalid", async () => {
-      const probe = makeProbe({ connectError: new Error("Verification code invalid or expired") });
+      const probe = makeProbe({ lastError: { category: "VERIFICATION_FAILED", message: "Verification code invalid or expired (status 455)" } });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -219,7 +236,7 @@ describe("MessageRouter", () => {
     });
 
     it("returns email-not-registered on matching error", async () => {
-      const probe = makeProbe({ connectError: new Error("Login failed: email not registered") });
+      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: email not registered (status 451)" } });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -229,7 +246,7 @@ describe("MessageRouter", () => {
     });
 
     it("returns rate-limit hint", async () => {
-      const probe = makeProbe({ connectError: new Error("Rate limited by Govee") });
+      const probe = makeProbe({ lastError: { category: "RATE_LIMIT", message: "Rate limited by Govee: too many requests (status 429)" } });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -239,13 +256,43 @@ describe("MessageRouter", () => {
     });
 
     it("returns account-locked hint", async () => {
-      const probe = makeProbe({ connectError: new Error("Account temporarily locked by Govee") });
+      const probe = makeProbe({ lastError: { category: "UNKNOWN", message: "Account temporarily locked by Govee: abnormal login (status 400)" } });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       const r = responses[0].data as { result: string };
       expect(r.result).toContain("temporarily locked");
+    });
+
+    it("H2 regression: wrong password reports 'rejected' immediately — NOT 'login ok, MQTT not up' after the timeout", async () => {
+      // The real client never rejects from connect(); before H2 the router
+      // classified in a catch that could never fire and answered
+      // mqttAuthLoginNoMqtt after burning the full probe timeout.
+      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: wrong password (status 401)" } });
+      const { host, responses } = makeHost({ probe });
+      const router = new MessageRouter(host, 5000);
+      const t0 = Date.now();
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const r = responses[0].data as { result: string };
+      expect(r.result).toContain("rejected the password");
+      // Classified synchronously after connect() — no 5s edge-wait burned.
+      expect(Date.now() - t0).toBeLessThan(1000);
+    });
+
+    it("H2: broker-stage failure during the edge-wait beats the generic 'MQTT not up' answer", async () => {
+      const probe = makeProbe({
+        lastError: { category: "UNKNOWN", message: "Govee login rejected: policy mismatch" },
+        lateError: true,
+      });
+      const { host, responses } = makeHost({ probe });
+      const router = new MessageRouter(host, 20);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 60));
+      const r = responses[0].data as { result: string };
+      expect(r.result).toContain("policy mismatch");
+      expect(r.result).not.toContain("MQTT connection is not up");
     });
 
     it("rejects when email or password missing", async () => {

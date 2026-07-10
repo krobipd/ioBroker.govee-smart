@@ -8,6 +8,7 @@ import { ReconnectingMqttClient } from "./reconnecting-mqtt-client";
 import {
   classifyError,
   logDedup,
+  type ErrorCategory,
   type GoveeIotKeyResponse,
   type GoveeLoginResponse,
   type MqttStatusUpdate,
@@ -76,6 +77,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   private readonly sessionUuid: string = crypto.randomUUID();
   private authFailCount = 0;
+  /** One-shot probe (admin "test login"): never schedule reconnects. */
+  private probeMode = false;
   private onStatus: MqttStatusCallback | null = null;
   private onConnection: MqttConnectionCallback | null = null;
   private onToken: MqttTokenCallback | null = null;
@@ -225,6 +228,30 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       default:
         return null;
     }
+  }
+
+  /**
+   * Category + raw message of the last connect()/login failure — null while
+   * connected or before any failure. connect() itself never rejects (every
+   * failure path ends in a classified return/reconnect), so probes like the
+   * admin "test login" button MUST read the outcome from here instead of a
+   * try/catch around connect().
+   */
+  getLastError(): { category: ErrorCategory; message: string } | null {
+    if (this.connected || !this.lastErrorCategory) {
+      return null;
+    }
+    return { category: this.lastErrorCategory, message: this.lastErrorMessage ?? "" };
+  }
+
+  /**
+   * Probe mode: never schedule a reconnect. The admin "test login" probe is a
+   * one-shot — without this, a transient/auth failure arms the backoff timer
+   * and the probe can fire a SECOND login against Govee before its finally
+   * block disconnects.
+   */
+  enableProbeMode(): void {
+    this.probeMode = true;
   }
 
   /**
@@ -395,6 +422,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       this.attachClientHandlers();
     } catch (err) {
       const category = classifyError(err);
+      this.lastErrorMessage = errMessage(err);
       const msg = `MQTT connection failed: ${errMessage(err)}`;
 
       // State sync: a connect() throw = not connected, regardless of error type
@@ -461,9 +489,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     }
   }
 
-  /** Stop reconnecting after repeated auth failures (check email/password). */
+  /** Stop reconnecting after repeated auth failures (check email/password) — or always in probe mode. */
   protected reconnectExhausted(): boolean {
-    return this.authFailCount >= MQTT_MAX_AUTH_FAILURES;
+    return this.probeMode || this.authFailCount >= MQTT_MAX_AUTH_FAILURES;
   }
 
   /** Re-enter the full connect()/login flow when a backoff timer fires. */
@@ -623,6 +651,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
             this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
             this.lastErrorCategory = null;
           }
+          this.lastErrorMessage = null;
           this.log.debug(`MQTT subscribed to account topic: topic=${this.accountTopic} qos=0`);
           this.onConnection?.(true);
         },

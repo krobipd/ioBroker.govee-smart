@@ -43,6 +43,11 @@ export abstract class ReconnectingMqttClient {
   protected reconnectAttempts = 0;
   /** Last classified error category, for warn-once / debug-on-repeat dedup. */
   protected lastErrorCategory: ErrorCategory | null = null;
+  /**
+   * Raw message of the last connect failure — kept alongside the category so
+   * probes can distinguish sub-cases (e.g. "email not registered" within AUTH).
+   */
+  protected lastErrorMessage: string | null = null;
   /** Set in disconnect(); reconnect paths bail on it so timers that fire after stop are no-ops. */
   protected disposed = false;
 

@@ -1,4 +1,4 @@
-import { errMessage } from "./types";
+import { errMessage, type ErrorCategory } from "./types";
 import type { GoveeMqttClient } from "./govee-mqtt-client";
 import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import { resolveLabel } from "./i18n";
@@ -41,6 +41,35 @@ export class MessageRouter {
   private lastVerificationRequestMs = 0;
   /** Separate throttle for the `test` action so it doesn't share the requestCode window (SEC-I1). */
   private lastTestRequestMs = 0;
+
+  /**
+   * Map a probe failure (category + raw client message) onto the localized
+   * admin result labels. Category first; the raw message only disambiguates
+   * sub-cases inside a category (451 "email not registered" is AUTH like a
+   * wrong password) and the not-classifiable Govee account states.
+   *
+   * @param failure          Last error from the probe client
+   * @param failure.category Classified error category
+   * @param failure.message  Raw client error message
+   */
+  private labelForProbeFailure(failure: { category: ErrorCategory; message: string }): string {
+    switch (failure.category) {
+      case "VERIFICATION_PENDING":
+        return resolveLabel("mqttAuthVerifyRequired");
+      case "VERIFICATION_FAILED":
+        return resolveLabel("mqttAuthCodeInvalid");
+      case "AUTH":
+        return /email not registered/i.test(failure.message)
+          ? resolveLabel("mqttAuthEmailNotRegistered")
+          : resolveLabel("mqttAuthPasswordRejected");
+      case "RATE_LIMIT":
+        return resolveLabel("mqttAuthRateLimited");
+      default:
+        return /account temporarily locked/i.test(failure.message)
+          ? resolveLabel("mqttAuthAccountLocked")
+          : resolveLabel("mqttAuthLoginFailed", failure.message);
+    }
+  }
 
   /**
    * @param host Adapter dependencies via the host interface
@@ -138,7 +167,9 @@ export class MessageRouter {
         const connectedEdge = new Promise<boolean>(resolve => {
           signalConnected = resolve;
         });
-        // connect() rejects on login/credential failure → classified below.
+        // connect() NEVER rejects — every failure path inside the client ends
+        // in a classified return (see GoveeMqttClient.getLastError). The
+        // outcome MUST be read from getLastError(), not from a try/catch.
         await probe.connect(
           () => {},
           isConnected => {
@@ -147,6 +178,13 @@ export class MessageRouter {
             }
           },
         );
+        // Login-stage failure (wrong password, 2FA, rate limit …) is known
+        // synchronously after connect() resolves — classify immediately
+        // instead of burning the 10s edge-wait on a doomed probe.
+        const loginFailure = probe.getLastError();
+        if (loginFailure) {
+          return { result: this.labelForProbeFailure(loginFailure) };
+        }
         // Login + cert OK. Wait a bounded time for the MQTT socket to actually
         // connect + subscribe; a timeout means "credentials fine, MQTT not up".
         // The timeout also guarantees the admin sendTo never hangs on the probe.
@@ -156,30 +194,19 @@ export class MessageRouter {
             probeTimer = this.host.setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
           }),
         ]);
+        if (connected) {
+          return { result: resolveLabel("mqttAuthLoginOk") };
+        }
+        // A broker-stage failure (cert rejected, subscribe refused) can land
+        // during the edge-wait — prefer the concrete reason over "not up".
+        const lateFailure = probe.getLastError();
         return {
-          result: connected ? resolveLabel("mqttAuthLoginOk") : resolveLabel("mqttAuthLoginNoMqtt"),
+          result: lateFailure ? this.labelForProbeFailure(lateFailure) : resolveLabel("mqttAuthLoginNoMqtt"),
         };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (/Verification required/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthVerifyRequired") };
-        }
-        if (/Verification code invalid/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthCodeInvalid") };
-        }
-        if (/email not registered/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthEmailNotRegistered") };
-        }
-        if (/Login failed/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthPasswordRejected") };
-        }
-        if (/Rate limited/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthRateLimited") };
-        }
-        if (/Account temporarily locked/i.test(msg)) {
-          return { result: resolveLabel("mqttAuthAccountLocked") };
-        }
-        return { result: resolveLabel("mqttAuthLoginFailed", msg) };
+        // Safety net for unexpected synchronous throws only — the regular
+        // failure paths never reject (see above).
+        return { result: resolveLabel("mqttAuthLoginFailed", e instanceof Error ? e.message : String(e)) };
       } finally {
         // Dispose on every path — success, timeout, and error — so the probe's
         // MQTT socket + reconnect timer never leak (the old code disconnected
