@@ -940,7 +940,16 @@ class GoveeAdapter extends utils.Adapter {
     if (!this.deviceManager) {
       return;
     }
-    await this.deviceManager.loadFromCloud();
+    const result = await this.deviceManager.loadFromCloud();
+    if (!result.ok) {
+      // Same single mechanism as the init/retry path: auth-failed reaches the
+      // ActionableProblems registry, transient failures arm the retry loop.
+      // Plus one non-deduplicated line — the user explicitly pressed the
+      // button and must see why nothing happened (M4).
+      this.log.warn(`Manual device sync failed (${result.reason}) — see earlier log for details`);
+      cloudRetryHandler.handleCloudFailure(this, result);
+      return;
+    }
     await this.reapStaleDevices();
   }
 
