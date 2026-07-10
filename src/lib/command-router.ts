@@ -114,6 +114,24 @@ export class CommandRouter {
   }
 
   /**
+   * Budgeted USER-COMMAND send, coupled to the ACTUAL execution: on an
+   * exhausted budget tryExecute resolves on enqueue, the state-change router
+   * acks the write, and a later queue failure would only surface as a debug
+   * line — the user sees ack=true and nothing happens (M3). executeTracked
+   * settles when the call really ran (or was evicted/cancelled), so the
+   * existing "Command failed" warn path fires and no false ack is written.
+   *
+   * @param fn The cloud send to execute
+   */
+  private async sendBudgeted(fn: () => Promise<void>): Promise<void> {
+    if (this.rateLimiter) {
+      await this.rateLimiter.executeTracked(fn, 0);
+    } else {
+      await fn();
+    }
+  }
+
+  /**
    * Force the device into static-color mode before sending segment_color_setting
    * ptReal packets. Without this, the device silently ignores segment-level
    * overrides while it's in Scene/Gradient/Music mode — the classic "I set
@@ -464,7 +482,7 @@ export class CommandRouter {
       );
     };
 
-    await this.executeRateLimited(execute);
+    await this.sendBudgeted(execute);
   }
 
   /**
@@ -501,7 +519,7 @@ export class CommandRouter {
           rgb: parsed.color,
         });
       };
-      await this.executeRateLimited(execute);
+      await this.sendBudgeted(execute);
     }
 
     if (parsed.brightness !== undefined) {
@@ -517,7 +535,7 @@ export class CommandRouter {
           { segment: parsed.segments, brightness: parsed.brightness },
         );
       };
-      await this.executeRateLimited(execute);
+      await this.sendBudgeted(execute);
     }
     // NOTE: no onSegmentBatchUpdate here — dispatchSegmentBatch (the only caller)
     // already emits it once for both the LAN and Cloud paths, before dispatch.
@@ -944,6 +962,6 @@ export class CommandRouter {
       await cloudClient.controlDevice(device.sku, device.deviceId, cap.type, cap.instance, cloudValue);
     };
 
-    await this.executeRateLimited(execute);
+    await this.sendBudgeted(execute);
   }
 }

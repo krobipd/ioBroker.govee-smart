@@ -65,6 +65,10 @@ function makeRateLimiter(): RateLimiter {
       await fn();
       return true;
     },
+    // User-command sends run through the tracked variant (M3); inline here too.
+    executeTracked: async (fn: () => Promise<void>): Promise<void> => {
+      await fn();
+    },
   } as unknown as RateLimiter;
 }
 

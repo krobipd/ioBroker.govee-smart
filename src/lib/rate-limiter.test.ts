@@ -164,6 +164,70 @@ describe("RateLimiter", () => {
     expect(result).toBe(true);
   });
 
+  describe("executeTracked (M3 — user commands couple to the ACTUAL execution)", () => {
+    it("runs immediately within budget and propagates an immediate failure", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 10, 100);
+      let ran = 0;
+      await rl.executeTracked(async () => {
+        ran++;
+      });
+      expect(ran).toBe(1);
+      await expect(rl.executeTracked(async () => Promise.reject(new Error("cloud says no")))).rejects.toThrow(
+        "cloud says no",
+      );
+    });
+
+    it("settles only when the QUEUED call eventually ran — success case", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
+      await rl.tryExecute(async () => {}); // burn the minute budget
+      let ran = 0;
+      const tracked = rl.executeTracked(async () => {
+        ran++;
+      });
+      expect(ran).toBe(0); // queued, not run
+      (rl as any).callsThisMinute = 0; // minute reset
+      (rl as any).processQueue();
+      await tracked;
+      expect(ran).toBe(1);
+    });
+
+    it("rejects when the QUEUED call eventually fails — before M3 this was a debug line after the ack", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
+      await rl.tryExecute(async () => {}); // burn the minute budget
+      const tracked = rl.executeTracked(async () => Promise.reject(new Error("late 429")));
+      (rl as any).callsThisMinute = 0;
+      (rl as any).processQueue();
+      await expect(tracked).rejects.toThrow("late 429");
+    });
+
+    it("rejects when the tracked call is evicted from a full queue", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 0, 100_000); // all queue
+      for (let i = 0; i < MAX_QUEUE_LENGTH - 1; i++) {
+        rl.enqueue(async () => {}, 2);
+      }
+      const evictable = rl.executeTracked(async () => {}, 2); // tracked tail
+      const incoming = rl.executeTracked(async () => {}, 0); // outranks → evicts the tail
+      await expect(evictable).rejects.toThrow("evicted");
+      // the incoming call itself stays queued (never settles here) — detach it
+      void incoming.catch(() => undefined);
+    });
+
+    it("rejects pending tracked calls on stop() instead of hanging forever", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 0, 100); // all queue
+      const tracked = rl.executeTracked(async () => {}, 0);
+      rl.stop();
+      await expect(tracked).rejects.toThrow("stopped");
+    });
+
+    it("rejects immediately when a full queue drops the call", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 0, 100_000);
+      for (let i = 0; i < MAX_QUEUE_LENGTH; i++) {
+        rl.enqueue(async () => {}, 0); // full with top-priority calls
+      }
+      await expect(rl.executeTracked(async () => {}, 2)).rejects.toThrow("queue full");
+    });
+  });
+
   it("should track both minute and daily counters", async () => {
     const rl = new RateLimiter(mockLog, mockTimers, 5, 100);
 

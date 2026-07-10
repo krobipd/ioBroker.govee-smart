@@ -6,6 +6,11 @@ interface QueuedCall {
   execute: () => Promise<void>;
   /** Priority (lower = higher priority) */
   priority: number;
+  /**
+   * Set for tracked calls (executeTracked): rejects the caller's promise when
+   * the call is evicted from a full queue or the limiter stops before it ran.
+   */
+  reject?: (err: Error) => void;
 }
 
 /**
@@ -110,6 +115,12 @@ export class RateLimiter {
       this.timers.clearInterval(this.processTimer);
       this.processTimer = undefined;
     }
+    // Reject pending TRACKED calls so no caller awaits a promise that can
+    // never settle after stop (compact mode keeps the process alive —
+    // a hanging await would leak its closure).
+    for (const call of this.queue) {
+      call.reject?.(new Error("Rate limiter stopped — queued Cloud call cancelled"));
+    }
     this.queue.length = 0;
   }
 
@@ -135,7 +146,7 @@ export class RateLimiter {
    * @param execute The API call to make
    * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
    */
-  enqueue(execute: () => Promise<void>, priority = 1): void {
+  enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void): boolean {
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
       // Queue full. The queue is sorted ascending, so the tail is the
       // lowest-priority call. Evict it in favour of the new call when the new
@@ -150,13 +161,15 @@ export class RateLimiter {
           this.warnedQueueFull = true;
           this.log.warn(msg);
         }
-        return;
+        return false;
       }
-      this.queue.pop(); // evict the lowest-priority queued call to make room
+      const evicted = this.queue.pop(); // evict the lowest-priority queued call to make room
+      evicted?.reject?.(new Error("Cloud call evicted — rate-limiter queue full"));
     }
-    this.queue.push({ execute, priority });
+    this.queue.push({ execute, priority, reject });
     // Sort by priority (lower first)
     this.queue.sort((a, b) => a.priority - b.priority);
+    return true;
   }
 
   /**
@@ -175,6 +188,45 @@ export class RateLimiter {
     }
     this.enqueue(execute, priority);
     return false;
+  }
+
+  /**
+   * Execute within the budget and settle when the call ACTUALLY ran —
+   * including when it had to queue. User commands need this coupling:
+   * tryExecute resolves on enqueue, the caller acks the state, and a later
+   * queue failure would be invisible to the user (M3). Loaders keep
+   * tryExecute (fire-and-queue is fine for background data).
+   *
+   * Rejects with the call's error, or with a queue-drop error when the
+   * capped queue evicts the call before it ever ran.
+   *
+   * @param execute The API call to make
+   * @param priority Call priority (0 = control)
+   */
+  async executeTracked(execute: () => Promise<void>, priority = 0): Promise<void> {
+    if (this.canMakeCall()) {
+      this.callsThisMinute++;
+      this.callsToday++;
+      await execute();
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const accepted = this.enqueue(
+        async () => {
+          try {
+            await execute();
+            resolve();
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        },
+        priority,
+        reject,
+      );
+      if (!accepted) {
+        reject(new Error("Cloud call dropped — rate-limiter queue full"));
+      }
+    });
   }
 
   /** Whether a call can be made right now */
