@@ -1130,13 +1130,12 @@ export function buildLanStateDefs(device: GoveeDevice, log: ioBroker.Logger): St
 }
 
 /**
- * The three diagnostics states (export button, JSON result, trust tier).
- * Shared by buildCloudStateDefs (tier default "unknown") and
- * buildGroupStateDefs (tier default "verified") — only the tier default differs.
+ * The three diagnostics states (export button, JSON result, trust tier) for
+ * real devices. Groups get none (dead button — no group handler; Pattern 33).
  *
  * @param tierDef Initial value for the diag.tier state
  */
-function buildDiagStateDefs(tierDef: string | null): StateDefinition[] {
+function buildDiagStateDefs(tierDef: string): StateDefinition[] {
   const defs: StateDefinition[] = [
     {
       id: "export",
@@ -1161,28 +1160,23 @@ function buildDiagStateDefs(tierDef: string | null): StateDefinition[] {
       channel: "diag",
     },
   ];
-  // The trust tier is a per-SKU catalog attribute — meaningless for a BaseGroup
-  // (not a real device), which used to show a hard-coded "verified". Groups pass
-  // null and get no tier state at all (B4).
-  if (tierDef !== null) {
-    defs.push({
-      id: "tier",
-      name: tName("deviceTier"),
-      type: "string",
-      role: "text",
-      write: false,
-      def: tierDef,
-      states: {
-        verified: resolveLabel("deviceTierVerified"),
-        reported: resolveLabel("deviceTierReported"),
-        seed: resolveLabel("deviceTierSeed"),
-        unknown: resolveLabel("deviceTierUnknown"),
-      },
-      capabilityType: "local",
-      capabilityInstance: "diagnosticsTier",
-      channel: "diag",
-    });
-  }
+  defs.push({
+    id: "tier",
+    name: tName("deviceTier"),
+    type: "string",
+    role: "text",
+    write: false,
+    def: tierDef,
+    states: {
+      verified: resolveLabel("deviceTierVerified"),
+      reported: resolveLabel("deviceTierReported"),
+      seed: resolveLabel("deviceTierSeed"),
+      unknown: resolveLabel("deviceTierUnknown"),
+    },
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsTier",
+    channel: "diag",
+  });
   return defs;
 }
 
@@ -1470,10 +1464,12 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
     }
   }
 
-  // v2.9.1 — BaseGroups get the same three diag states. Tier defaults to
-  // "verified" because BaseGroup isn't a real SKU and has no quirks entry —
-  // the diag-button just renders consistently.
-  stateDefs.push(...buildDiagStateDefs(null));
+  // NO diag states for groups: the diag button never had a group handler
+  // (BaseGroup writes route entirely into the command fan-out, which drops
+  // diag.export silently), StateManager.createInfoStates removes a leftover
+  // groups.*.diag channel, and Pattern 33 documents groups without
+  // diagnostics. Creating the states here only produced a dead button that
+  // was deleted and re-created on every group refresh.
 
   return stateDefs;
 }

@@ -1372,7 +1372,7 @@ describe("CapabilityMapper", () => {
       expect(ids).toContain("color_temperature");
     });
 
-    it("should not include local snapshots for groups but DOES include diag states (v2.9.1)", () => {
+    it("should not include local snapshots or diag states for groups", () => {
       const group = createGroup();
       const m1 = createMember();
       const result = buildAllStateDefsForTest(group, undefined, [m1]);
@@ -1382,12 +1382,12 @@ describe("CapabilityMapper", () => {
       expect(ids).not.toContain("snapshot_save");
       expect(ids).not.toContain("snapshot_delete");
       expect(ids).not.toContain("snapshot");
-      // v2.9.1 — BaseGroups get diag.export/result so users can export
-      // group-specific issues ("fan-out doesn't reach member X")…
-      expect(ids).toContain("export");
-      expect(ids).toContain("result");
-      // …but NOT diag.tier: the trust tier is a per-SKU catalog attribute and a
-      // BaseGroup is not a real device (it used to show a hard-coded "verified") — B4.
+      // No diag states for groups: the export button never had a group
+      // handler (BaseGroup writes route into the fan-out, which drops it
+      // silently) and createInfoStates deletes a leftover diag channel on
+      // every refresh — a dead button in a create/delete loop (Pattern 33).
+      expect(ids).not.toContain("export");
+      expect(ids).not.toContain("result");
       expect(ids).not.toContain("tier");
     });
 
