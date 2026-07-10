@@ -150,12 +150,18 @@ export class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * `extendObject` deep-merges and CANNOT replace an object-value with a
-   * string. Only a full `setObjectAsync` replaces. Same fix-pattern as
-   * hassemu v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown). Admin
-   * renders states-values as React children — a translation object triggers
-   * React Error #31 → fatal "Error in GUI" on dropdown open (write:true) or
-   * any render path (write:false like diag.tier).
+   * This MUST be a full-object `setObject`: js-controller's `extendObject`
+   * deep-merges via node.extend (verified against js-controller 7.2.2 /
+   * node.extend 2.0.3) — same-key values ARE replaced, but stale keys absent
+   * from `fresh` survive the merge, and one surviving translation-object
+   * value is enough to keep crashing the Admin. S5054 suggests
+   * setObjectNotExists/extendObject instead of setObject — both provably
+   * cannot deliver the "map contains exactly `fresh`" postcondition here.
+   * Same fix-pattern as hassemu v1.27.2 (URL-dropdown) and v1.28.4
+   * (mode-dropdown). Admin renders states-values as React children — a
+   * translation object triggers React Error #31 → fatal "Error in GUI" on
+   * dropdown open (write:true) or any render path (write:false like
+   * diag.tier).
    *
    * @param id    Full state path.
    * @param fresh Plain-string `common.states` map to write.
@@ -173,7 +179,8 @@ export class StateManager {
     if (!buggy) {
       return;
     }
-    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(() => undefined);
+    existing.common.states = fresh;
+    await this.adapter.setObject(id, existing).catch(() => undefined);
   }
 
   /**
@@ -615,12 +622,11 @@ export class StateManager {
 
         // Existing diag.tier datapoints from v2.6.0+ may carry translation-object
         // VALUES in common.states (the old buildCloudStateDefs wrote tLabel(...)
-        // directly). extendObject deep-merges and cannot replace an
-        // object-value with a string. Force-replace via setObjectAsync when
-        // any persisted state value is non-string. Pattern proven in hassemu
-        // v1.27.2 / v1.28.4. React Error #31 would otherwise fatal-crash Admin
-        // on dropdown open (write:true states) or any view that renders the
-        // value (write:false states like diag.tier).
+        // directly). extendObject deep-merges: stale keys absent from the fresh
+        // map would survive with their object values — only a full setObject
+        // guarantees a plain-string map. React Error #31 would otherwise
+        // fatal-crash Admin on dropdown open (write:true states) or any view
+        // that renders the value (write:false states like diag.tier).
         if (def.states) {
           await this.repairCommonStatesIfBuggy(`${prefix}.${channel}.${def.id}`, def.states);
         }

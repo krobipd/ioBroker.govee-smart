@@ -57,6 +57,35 @@ function createMockAdapter(): {
     },
     extendObject: async (id: string, obj: Record<string, unknown>, opts?: Record<string, unknown>) => {
       calls.push({ method: "extendObject", args: [id, obj, opts] });
+      // Merge-faithful mock: js-controller extendObject deep-merges via
+      // node.extend (verified against js-controller 7.2.2) — same-key values
+      // are replaced (even object → string), but keys absent from the patch
+      // SURVIVE. A plain objects.set() here would hide exactly the class of
+      // bug repairCommonStatesIfBuggy exists for.
+      const deepExtend = (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
+        for (const [k, v] of Object.entries(source)) {
+          if (v === undefined) {
+            continue;
+          }
+          const cur = target[k];
+          if (v !== null && typeof v === "object" && !Array.isArray(v)) {
+            target[k] = deepExtend(
+              cur !== null && typeof cur === "object" && !Array.isArray(cur)
+                ? { ...(cur as Record<string, unknown>) }
+                : {},
+              v as Record<string, unknown>,
+            );
+          } else {
+            target[k] = v;
+          }
+        }
+        return target;
+      };
+      const existing = objects.get(id);
+      objects.set(id, existing ? deepExtend({ ...existing }, obj) : obj);
+    },
+    setObject: async (id: string, obj: Record<string, unknown>) => {
+      calls.push({ method: "setObject", args: [id, obj] });
       objects.set(id, obj);
     },
     setState: async (id: string, val: Record<string, unknown>) => {
@@ -282,6 +311,83 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never);
       const dev = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
       expect(sm.devicePrefix(dev)).toBe("devices.h6160_525f");
+    });
+  });
+
+  describe("repairCommonStatesIfBuggy (React #31 guard)", () => {
+    it("replaces a persisted buggy states map COMPLETELY — stale keys with i18n-object values must not survive", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const dev = createTestDevice();
+
+      // Persisted object from an old release: values are translation OBJECTS
+      // (pre-v2.8.4 tLabel output) and it carries a stale key "9" that the
+      // fresh map no longer contains. extendObject deep-merge would fix "0"
+      // and "1" but leave "9" as an object → Admin still crashes (React #31).
+      objects.set("devices.h6160_0011.scenes.light_scene", {
+        type: "state",
+        common: {
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          states: {
+            "0": { en: "none", de: "keine" },
+            "1": { en: "Aurora", de: "Aurora" },
+            "9": { en: "stale entry", de: "alter Eintrag" },
+          },
+        },
+        native: {},
+      });
+
+      const fresh: Record<string, string> = { "0": "---", "1": "Aurora" };
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "light_scene",
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          write: true,
+          channel: "scenes",
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+          states: fresh,
+          def: "0",
+        },
+      ]);
+
+      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+        common: { states: Record<string, unknown> };
+      };
+      // The postcondition of the repair: the persisted map is EXACTLY the
+      // fresh plain-string map — no stale keys, no object values.
+      expect(obj.common.states).toEqual(fresh);
+      for (const v of Object.values(obj.common.states)) {
+        expect(typeof v).toBe("string");
+      }
+    });
+
+    it("does not rewrite healthy plain-string maps", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const dev = createTestDevice();
+
+      const fresh: Record<string, string> = { "0": "---", "1": "Aurora" };
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "light_scene",
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          write: true,
+          channel: "scenes",
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+          states: fresh,
+          def: "0",
+        },
+      ]);
+      // First creation: no full-replace call must happen (nothing buggy).
+      expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
     });
   });
 
