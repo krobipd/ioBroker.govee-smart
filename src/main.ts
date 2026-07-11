@@ -201,8 +201,13 @@ class GoveeAdapter extends utils.Adapter {
       // bears no resemblance to the original. Detect: Govee API keys are
       // strict UUIDv4 (8-4-4-4-12 hex). Non-empty + non-UUID = needs re-entry.
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
+        // The same symptom has two very different causes — lead with the
+        // common one (typo/whitespace on a fresh install) instead of
+        // frightening every new user with 'encryption migration corrupted'
+        // and demanding a password re-entry the key alone doesn't need (M10).
         this.log.error(
-          "Credentials encryption migration: stored values look corrupted — please re-enter API key, Govee password and verification code in the adapter settings (one-time after upgrade to v2.11.0).",
+          "The Govee API key does not look like a valid key (expected UUID format like 12345678-1234-1234-1234-123456789abc) — check for typos or copied whitespace in the adapter settings. " +
+            "If this appeared right after upgrading a very old install (v2.11.0 encryption migration), re-enter the API key, Govee password and verification code once.",
         );
       }
 
@@ -394,6 +399,21 @@ class GoveeAdapter extends utils.Adapter {
       // --- LAN (always active) ---
       this.lanClient = new GoveeLanClient(this.log, this);
       this.deviceManager.setLanClient(this.lanClient);
+
+      // A socket error on a PINNED interface is user-fixable config (the
+      // selected IP is gone after a DHCP/network change) — surface it once
+      // via the actionable-problems registry instead of a debug line that
+      // left the LAN channel silently dead (M11).
+      this.lanClient.onInterfaceError = message => {
+        this.actionableProblems.report({
+          key: "lan-interface",
+          title: "LAN unavailable on the selected network interface",
+          action: message,
+        });
+      };
+      this.lanClient.onListenReady = () => {
+        this.actionableProblems.resolve("lan-interface", "LAN listening on the selected network interface");
+      };
 
       // v2.9.1 — wire LAN-traffic into the diag-collector. Resolves
       // destination-IP → device on every send/status/scan so the diag
