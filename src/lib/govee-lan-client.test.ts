@@ -15,12 +15,20 @@ import type { LanDevice, LanStatus } from "./types";
 // on the scan socket + bind on the command socket) is unit-testable. The rest of the
 // suite never calls start(), so these mocks stay inert for those tests.
 const dgramMock = vi.hoisted(() => {
-  const sockets: Array<{ binds: Array<[unknown, unknown]>; mcastIf: unknown[] }> = [];
+  const sockets: Array<{
+    binds: Array<[unknown, unknown]>;
+    mcastIf: unknown[];
+    handlers: Record<string, Array<(...a: unknown[]) => void>>;
+  }> = [];
   const make = (): unknown => {
     const s = {
       binds: [] as Array<[unknown, unknown]>,
       mcastIf: [] as unknown[],
-      on: () => {},
+      handlers: {} as Record<string, Array<(...a: unknown[]) => void>>,
+      on: (ev: unknown, cb: unknown) => {
+        const key = String(ev);
+        (s.handlers[key] ??= []).push(cb as (...a: unknown[]) => void);
+      },
       bind: (a: unknown, b: unknown, c: unknown) => {
         s.binds.push([a, b]);
         if (typeof b === "function") (b as () => void)();
@@ -587,6 +595,53 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
     const scanSock = dgramMock.sockets[2];
     expect(sendSock.binds).toContainEqual([0, "10.0.0.5"]); // command socket source-bound to the interface
     expect(scanSock.mcastIf).toContain("10.0.0.5"); // outgoing multicast pinned to the interface
+    client.stop();
+  });
+
+  it("surfaces a socket error on a pinned interface as warn + onInterfaceError (M11)", () => {
+    const warns: string[] = [];
+    const debugs: string[] = [];
+    const log = { ...lanLog, warn: (m: string) => warns.push(m), debug: (m: string) => debugs.push(m) };
+    const client = new GoveeLanClient(log as never, lanTimers);
+    const problems: string[] = [];
+    client.onInterfaceError = m => problems.push(m);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "10.0.0.5",
+    );
+    const listenSock = dgramMock.sockets[1];
+    const err = Object.assign(new Error("bind EADDRNOTAVAIL 10.0.0.5"), { code: "EADDRNOTAVAIL" });
+    listenSock.handlers["error"]?.forEach(h => h(err));
+    // warn-once + actionable message pointing at the Network Interface setting
+    expect(warns.some(m => m.includes("LAN listen socket error"))).toBe(true);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("10.0.0.5");
+    expect(problems[0]).toContain("Network Interface setting");
+    // repeat errors stay on debug (no warn spam)
+    listenSock.handlers["error"]?.forEach(h => h(err));
+    expect(warns.filter(m => m.includes("socket error"))).toHaveLength(1);
+    client.stop();
+  });
+
+  it("does NOT raise onInterfaceError without a pinned interface — warn only", () => {
+    const warns: string[] = [];
+    const log = { ...lanLog, warn: (m: string) => warns.push(m) };
+    const client = new GoveeLanClient(log as never, lanTimers);
+    const problems: string[] = [];
+    client.onInterfaceError = m => problems.push(m);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const listenSock = dgramMock.sockets[1];
+    const err = Object.assign(new Error("something"), { code: "EINVAL" });
+    listenSock.handlers["error"]?.forEach(h => h(err));
+    expect(warns.some(m => m.includes("LAN listen socket error"))).toBe(true);
+    expect(problems).toHaveLength(0);
     client.stop();
   });
 
