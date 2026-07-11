@@ -1,3 +1,4 @@
+import { SYNTHETIC_STATE_META } from "./state-manager";
 import { vi } from "vitest";
 
 vi.mock("@iobroker/adapter-core", () => ({
@@ -20,7 +21,7 @@ import {
   type StateDefinition,
 } from "./capability-mapper";
 import { _resetDeviceRegistry, initDeviceRegistry } from "./device-registry";
-import { mockLog } from "./test-helpers";
+import { createTestDevice, mockLog } from "./test-helpers";
 import type { CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
 
 // Test-side wrappers that auto-inject `mockLog` so the existing 60+ tests
@@ -2042,5 +2043,83 @@ describe("musicModeNameUsesRgb (A2 — colour modes keyed on name, not value)", 
   it("returns false for a non-string name (defensive)", () => {
     expect(musicModeNameUsesRgb(undefined)).toBe(false);
     expect(musicModeNameUsesRgb(123 as unknown as string)).toBe(false);
+  });
+});
+
+describe("Invariant (M12-B): every value-side stateId has an owning state object", () => {
+  // Directed invariant against the B12 failure class: for every capability
+  // the VALUE mapper (mapCloudStateValue) handles, its stateId must be
+  // creatable — either by the def side (buildCloudStateDefs of a device
+  // carrying that capability) or by the synthetic table (App-API/MQTT pipe).
+  // The reverse direction is deliberately NOT tested: many defs (buttons,
+  // _segment_ stubs, action-only dropdowns) legitimately have no value
+  // mapper. The two switches are NOT a parallel derivation — see M12-B
+  // decision record (advisor review 2026-07-11).
+  it("value-side ids ⊆ def-side ids ∪ synthetic ids", () => {
+    const capDefs: CloudCapability[] = [
+      { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.toggle", instance: "gradientToggle", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.toggle", instance: "oscillationToggle", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.range", instance: "brightness", parameters: { dataType: "INTEGER", range: { min: 0, max: 100, precision: 1 } } },
+      { type: "devices.capabilities.color_setting", instance: "colorRgb", parameters: { dataType: "INTEGER", range: { min: 0, max: 16777215, precision: 1 } } },
+      { type: "devices.capabilities.color_setting", instance: "colorTemperatureK", parameters: { dataType: "INTEGER", range: { min: 2000, max: 9000, precision: 1 } } },
+      {
+        type: "devices.capabilities.work_mode",
+        instance: "workMode",
+        parameters: {
+          dataType: "STRUCT",
+          fields: [
+            { fieldName: "workMode", dataType: "ENUM", options: [{ name: "Auto", value: 1 }] },
+            { fieldName: "modeValue", dataType: "ENUM", options: [] },
+          ],
+        },
+      },
+      {
+        type: "devices.capabilities.music_setting",
+        instance: "musicMode",
+        parameters: {
+          dataType: "STRUCT",
+          fields: [
+            { fieldName: "musicMode", dataType: "ENUM", options: [{ name: "Rhythm", value: 3 }] },
+            { fieldName: "sensitivity", dataType: "INTEGER", range: { min: 0, max: 100, precision: 1 } },
+            { fieldName: "autoColor", dataType: "ENUM", options: [] },
+          ],
+        },
+      },
+      { type: "devices.capabilities.dynamic_scene", instance: "lightScene", parameters: { dataType: "ENUM", options: [] } },
+      { type: "devices.capabilities.dynamic_scene", instance: "diyScene", parameters: { dataType: "ENUM", options: [] } },
+      { type: "devices.capabilities.dynamic_scene", instance: "snapshot", parameters: { dataType: "ENUM", options: [] } },
+      { type: "devices.capabilities.property", instance: "sensorTemperature", parameters: { dataType: "INTEGER" } },
+      { type: "devices.capabilities.property", instance: "sensorHumidity", parameters: { dataType: "INTEGER" } },
+      { type: "devices.capabilities.event", instance: "lackWaterEvent", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.event", instance: "bodyAppeared", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.temperature_setting", instance: "targetTemperature", parameters: { dataType: "STRUCT", fields: [] } },
+      { type: "devices.capabilities.online", instance: "online", parameters: { dataType: "ENUM" } },
+    ] as CloudCapability[];
+
+    const device = createTestDevice({
+      lanIp: undefined,
+      capabilities: capDefs,
+      scenes: [{ name: "Aurora", value: { id: 1 } }],
+      diyScenes: [{ name: "MyDIY", value: { id: 2, paramId: "p" } }],
+      snapshots: [{ name: "Snap", value: 7 }],
+    });
+    const defIds = new Set(buildCloudStateDefs(device).map(d => d.id));
+    const syntheticIds = new Set(Object.keys(SYNTHETIC_STATE_META));
+
+    const valueCaps: CloudStateCapability[] = capDefs.map(c => ({
+      type: c.type,
+      instance: c.instance,
+      state: { value: 1 },
+    }));
+
+    for (const cap of valueCaps) {
+      const mapped = mapCloudStateValue(cap);
+      if (!mapped) {
+        continue; // action-only / handled elsewhere — legitimate
+      }
+      const owned = defIds.has(mapped.stateId) || syntheticIds.has(mapped.stateId.toLowerCase());
+      expect(owned, `${cap.type}/${cap.instance} → "${mapped.stateId}" has NO owning state def (B12 class)`).toBe(true);
+    }
   });
 });

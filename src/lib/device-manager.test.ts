@@ -2859,139 +2859,8 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     };
   }
 
-  it("pulls newly-created snapshots from /user/devices when /device/scenes returns empty", async () => {
-    // Setup: device has a cached snapshot from a previous run.
-    const device = createTestDevice({
-      snapshots: [{ name: "OldSnap", value: 100 }],
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    dm.setCloudClient(setupMockCloud([]) as any);
-
-    // CloudDevice arrives from a fresh /user/devices call with TWO snapshots
-    // — the old one + a new one the user just created in the Govee app.
-    const cd = {
-      sku: "H6160",
-      device: "AABBCCDDEEFF0011",
-      deviceName: "Test Light",
-      type: "devices.types.light",
-      capabilities: [
-        ...lightCapabilities(),
-        snapCap([
-          { name: "OldSnap", value: 100 },
-          { name: "NewlyAdded", value: 200 },
-        ]),
-      ],
-    };
-
-    await (dm as any).loadDeviceScenes(device, cd);
-
-    expect(device.snapshots).toHaveLength(2);
-    expect(device.snapshots.map(s => s.name)).toEqual(["OldSnap", "NewlyAdded"]);
-  });
-
-  it("re-queries the dedicated DIY endpoint even when the DIY cache is non-empty (L2)", async () => {
-    // Pattern 54: the DIY-endpoint fallback used to be gated on an empty DIY
-    // cache, so a DIY scene the user creates in the Govee app after the first
-    // load never surfaced. It must re-query whenever /device/scenes carries no
-    // DIY, exactly like the snapshot fallback above.
-    const device = createTestDevice({ diyScenes: [{ name: "OldDIY", value: { id: 100, paramId: "old" } }] });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    let diyCalls = 0;
-    dm.setCloudClient({
-      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
-      getDiyScenes: () => {
-        diyCalls += 1;
-        return Promise.resolve([{ name: "NewDIY", value: { id: 200, paramId: "new" } }]);
-      },
-    } as any);
-    const cd = {
-      sku: "H6160",
-      device: "AABBCCDDEEFF0011",
-      deviceName: "Test Light",
-      type: "devices.types.light",
-      capabilities: lightCapabilities(),
-    };
-
-    await (dm as any).loadDeviceScenes(device, cd);
-
-    expect(diyCalls).toBe(1);
-    expect(device.diyScenes).toEqual([{ name: "NewDIY", value: { id: 200, paramId: "new" } }]);
-  });
-
-  it("preserves cached snapshots when /device/scenes is empty AND /user/devices has no snapshot capability", async () => {
-    // Regression guard: a flaky Cloud response (no snapshot cap returned)
-    // must NOT wipe the user's known-good snapshot list. Worse than the
-    // original bug to clobber valid data on a transient API blip.
-    const device = createTestDevice({
-      snapshots: [{ name: "CachedSnap", value: 100 }],
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    dm.setCloudClient(setupMockCloud([]) as any);
-
-    const cd = {
-      sku: "H6160",
-      device: "AABBCCDDEEFF0011",
-      deviceName: "Test Light",
-      type: "devices.types.light",
-      capabilities: lightCapabilities().filter(c => c.instance !== "snapshot"),
-    };
-
-    await (dm as any).loadDeviceScenes(device, cd);
-
-    expect(device.snapshots).toHaveLength(1);
-    expect(device.snapshots[0].name).toBe("CachedSnap");
-  });
-
-  it("clears the snapshot list when the user deleted everything in the Govee app", async () => {
-    // /user/devices DID return a snapshot capability — its options array is
-    // just empty because the user removed all snapshots from the app side.
-    // The dropdown should reflect that, not the stale cache.
-    const device = createTestDevice({
-      snapshots: [{ name: "OldSnap", value: 100 }],
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    dm.setCloudClient(setupMockCloud([]) as any);
-
-    const cd = {
-      sku: "H6160",
-      device: "AABBCCDDEEFF0011",
-      deviceName: "Test Light",
-      type: "devices.types.light",
-      capabilities: [...lightCapabilities(), snapCap([])],
-    };
-
-    await (dm as any).loadDeviceScenes(device, cd);
-
-    expect(device.snapshots).toHaveLength(0);
-  });
-
-  it("/device/scenes returning snapshots wins over the capability fallback", async () => {
-    // Sanity: if /device/scenes succeeds with snapshots, those are the
-    // authoritative list — capability options should NOT overwrite them.
-    const device = createTestDevice({
-      snapshots: [{ name: "OldSnap", value: 100 }],
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    dm.setCloudClient(
-      setupMockCloud([
-        { name: "FromScenesEndpoint1", value: 300 },
-        { name: "FromScenesEndpoint2", value: 301 },
-      ]) as any,
-    );
-
-    const cd = {
-      sku: "H6160",
-      device: "AABBCCDDEEFF0011",
-      deviceName: "Test Light",
-      type: "devices.types.light",
-      capabilities: [...lightCapabilities(), snapCap([{ name: "WouldBeIgnored", value: 999 }])],
-    };
-
-    await (dm as any).loadDeviceScenes(device, cd);
-
-    expect(device.snapshots.map(s => s.name)).toEqual(["FromScenesEndpoint1", "FromScenesEndpoint2"]);
-  });
-
+  // The loadDeviceScenes/loadDeviceLibraries behaviour tests moved to
+  // device-manager/library-loader.test.ts with the M12 extraction.
   it("refreshSceneDataForDevice refetches /user/devices before re-running loadDeviceScenes", async () => {
     // Fix B: without this call, the manual refresh used stale capabilities
     // from the in-memory device — meaning the snapshot fallback in
@@ -3040,63 +2909,6 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     expect(changed).toBe(true);
   });
 
-  it("loadDeviceLibraries(force=true) refetches snapshotBleCmds even when already cached (Issue #13 v2.8.2)", async () => {
-    // The snapshot-BLE-cmds block was gated on `!device.snapshotBleCmds`
-    // alone — `refresh_cloud` couldn't clear stale BLE packets once the
-    // cache file was populated. tukey42 hit this on H61A8: ptReal Snapshot
-    // log line appeared but the device didn't react because the cached
-    // packets were stale. Force-branch fixes it.
-    const device = createTestDevice({
-      snapshots: [
-        { name: "Snap1", value: 1 },
-        { name: "Snap2", value: 2 },
-      ],
-      snapshotBleCmds: [[["STALE_CACHE_PACKET_A"]], [["STALE_CACHE_PACKET_B"]]],
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-
-    let fetchSnapshotsCallCount = 0;
-    const mockApi = {
-      hasBearerToken: () => true,
-      fetchSceneLibrary: () => Promise.resolve([]),
-      fetchMusicLibrary: () => Promise.resolve([]),
-      fetchDiyLibrary: () => Promise.resolve([]),
-      fetchSkuFeatures: () => Promise.resolve(null),
-      fetchSnapshots: () => {
-        fetchSnapshotsCallCount++;
-        return Promise.resolve([
-          { name: "Snap1", bleCmds: [["FRESH_PACKET_1"]] },
-          { name: "Snap2", bleCmds: [["FRESH_PACKET_2"]] },
-        ]);
-      },
-    };
-    dm.setApiClient(mockApi as never);
-
-    const cd = {
-      sku: device.sku,
-      device: device.deviceId,
-      deviceName: device.name,
-      type: device.type,
-      capabilities: device.capabilities,
-    };
-
-    // Without force the block is skipped (cache wins)
-    await (dm as any).loadDeviceLibraries(device, cd.sku, /* force */ false);
-    expect(
-      fetchSnapshotsCallCount,
-      "fetchSnapshots MUST NOT be called when force=false and snapshotBleCmds already cached",
-    ).toBe(0);
-    expect(device.snapshotBleCmds?.[0]?.[0]?.[0]).toBe("STALE_CACHE_PACKET_A");
-
-    // With force the BLE packets are refreshed
-    await (dm as any).loadDeviceLibraries(device, cd.sku, /* force */ true);
-    expect(
-      fetchSnapshotsCallCount,
-      "fetchSnapshots MUST be called when force=true even with existing snapshotBleCmds",
-    ).toBe(1);
-    expect(device.snapshotBleCmds?.[0]?.[0]?.[0]).toBe("FRESH_PACKET_1");
-    expect(device.snapshotBleCmds?.[1]?.[0]?.[0]).toBe("FRESH_PACKET_2");
-  });
 });
 
 describe("DeviceManager — internal logic helpers", () => {
@@ -3110,16 +2922,6 @@ describe("DeviceManager — internal logic helpers", () => {
     expect(dm.removeDevice("H61BE", "AA:BB:CC:DD")).toBeNull(); // already gone
   });
 
-  it("extractStatus pulls the HTTP status from known error shapes, else undefined", () => {
-    const dm = new DeviceManager(mockLog, mockTimers);
-    const ex = (e: unknown): number | undefined => (dm as any).extractStatus(e);
-    expect(ex(new HttpError("rate", 429))).toBe(429);
-    expect(ex({ statusCode: 503 })).toBe(503);
-    expect(ex({ status: 401 })).toBe(401);
-    expect(ex(new Error("network"))).toBeUndefined();
-    expect(ex("string error")).toBeUndefined();
-    expect(ex(null)).toBeUndefined();
-  });
 
   it("getErrorCategorySnapshot mirrors the per-source error trackers", () => {
     const dm = new DeviceManager(mockLog, mockTimers);

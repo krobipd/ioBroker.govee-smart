@@ -1,5 +1,5 @@
 import * as http from "node:http";
-import { HttpError, httpsRequest, interpretOkBody } from "./http-client";
+import { extractHttpStatus, HttpError, httpsRequest, interpretOkBody } from "./http-client";
 
 /**
  * Local HTTP stub server — `http`, not `https`, so the tests don't need a
@@ -464,5 +464,16 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
 
   it("verifies real httpsRequest is exported and callable (compile-time only)", () => {
     expect(typeof httpsRequest).toBe("function");
+  });
+});
+
+describe("extractHttpStatus", () => {
+  it("pulls the HTTP status from known error shapes, else undefined", () => {
+    expect(extractHttpStatus(new HttpError("rate", 429))).toBe(429);
+    expect(extractHttpStatus({ statusCode: 503 })).toBe(503);
+    expect(extractHttpStatus({ status: 401 })).toBe(401);
+    expect(extractHttpStatus(new Error("network"))).toBeUndefined();
+    expect(extractHttpStatus("string error")).toBeUndefined();
+    expect(extractHttpStatus(null)).toBeUndefined();
   });
 });

@@ -248,3 +248,28 @@ export function formatFallback(result: HttpResult<unknown>): string {
     result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""
   }) — treated as no data`;
 }
+
+/**
+ * Pull the HTTP status code out of any error shape the Govee stack produces
+ * (HttpError, API responses with `.statusCode` / `.status`). Returns
+ * undefined for network errors / generic failures so a diagnostics entry
+ * shows "no status — likely network/timeout". Lives here next to HttpError
+ * because callers outside the device-manager need it too (M12).
+ *
+ * @param e Caught error value
+ */
+export function extractHttpStatus(e: unknown): number | undefined {
+  if (e instanceof HttpError) {
+    return e.statusCode;
+  }
+  if (typeof e === "object" && e !== null) {
+    const x = e as { statusCode?: unknown; status?: unknown };
+    if (typeof x.statusCode === "number") {
+      return x.statusCode;
+    }
+    if (typeof x.status === "number") {
+      return x.status;
+    }
+  }
+  return undefined;
+}

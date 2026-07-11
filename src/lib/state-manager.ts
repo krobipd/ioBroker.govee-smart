@@ -85,7 +85,7 @@ const numSensor = (kind: keyof typeof SENSOR_ROLE_UNIT, nameKey: I18nKey): Synth
   nameKey,
   channel: "sensor",
 });
-const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
+export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   temperature: numSensor("temperature", "temperature"),
   humidity: numSensor("humidity", "humidity"),
   battery: numSensor("battery", "battery"),

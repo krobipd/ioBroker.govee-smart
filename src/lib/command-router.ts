@@ -100,20 +100,6 @@ export class CommandRouter {
   }
 
   /**
-   * Execute a function through the rate limiter if available, or directly.
-   *
-   * @param fn Async function to execute
-   * @param priority Queue priority (0 = highest)
-   */
-  async executeRateLimited(fn: () => Promise<void>, priority = 0): Promise<void> {
-    if (this.rateLimiter) {
-      await this.rateLimiter.tryExecute(fn, priority);
-    } else {
-      await fn();
-    }
-  }
-
-  /**
    * Budgeted USER-COMMAND send, coupled to the ACTUAL execution: on an
    * exhausted budget tryExecute resolves on enqueue, the state-change router
    * acks the write, and a later queue failure would only surface as a debug
@@ -937,7 +923,7 @@ export class CommandRouter {
   private async sendCloudCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     // M19 — closure capture: local variable after the guard. Prevents a race
     // when `setCloudClient(null)` runs between the guard check and
-    // executeRateLimited (e.g. adapter stop mid-await).
+    // sendBudgeted (e.g. adapter stop mid-await).
     const cloudClient = this.cloudClient;
     if (!cloudClient) {
       return;
