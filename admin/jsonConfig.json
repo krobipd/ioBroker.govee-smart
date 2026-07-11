@@ -271,147 +271,17 @@
       "type": "panel",
       "label": "tabWizard",
       "items": {
-        "_wizHeader": {
-          "newLine": true,
-          "type": "header",
-          "text": "wizardHeader",
-          "size": 4
-        },
-        "_wizInfo": {
-          "type": "staticText",
-          "text": "wizardInfo",
+        "_segmentWizard": {
+          "type": "custom",
+          "i18n": true,
+          "url": "custom/customComponents.js",
+          "name": "ConfigCustomGoveeSegmentSet/Components/SegmentWizardConfig",
+          "bundlerType": "module",
           "xs": 12,
           "sm": 12,
           "md": 12,
           "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 16
-          }
-        },
-        "_wizDevice": {
-          "type": "selectSendTo",
-          "command": "getSegmentDevices",
-          "label": "wizardDeviceLabel",
-          "alsoDependsOn": [],
-          "noTranslation": true,
-          "xs": 12,
-          "sm": 12,
-          "md": 8,
-          "lg": 6,
-          "xl": 6
-        },
-        "_wizStart": {
-          "type": "sendTo",
-          "newLine": true,
-          "command": "segmentWizard",
-          "jsonData": "{ \"action\": \"start\", \"device\": \"${data._wizDevice}\" }",
-          "label": "wizardBtnStart",
-          "variant": "contained",
-          "color": "primary",
-          "xs": 12,
-          "sm": 6,
-          "md": 3,
-          "lg": 2,
-          "xl": 2
-        },
-        "_wizStatus": {
-          "newLine": true,
-          "type": "state",
-          "oid": "info.wizardStatus",
-          "label": "wizardStatusLabel",
-          "foreign": false,
-          "controlDelay": 0,
-          "readOnly": true,
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 15,
-            "fontWeight": "500",
-            "marginTop": 16,
-            "marginBottom": 8,
-            "padding": 16,
-            "backgroundColor": "rgba(33, 150, 243, 0.12)",
-            "borderRadius": 4,
-            "whiteSpace": "pre-line",
-            "lineHeight": 1.5
-          }
-        },
-        "_wizYes": {
-          "newLine": true,
-          "type": "sendTo",
-          "command": "segmentWizard",
-          "jsonData": "{ \"action\": \"yes\" }",
-          "label": "wizardBtnYes",
-          "variant": "contained",
-          "color": "primary",
-          "xs": 12,
-          "sm": 4,
-          "md": 3,
-          "lg": 2,
-          "xl": 2
-        },
-        "_wizNo": {
-          "type": "sendTo",
-          "command": "segmentWizard",
-          "jsonData": "{ \"action\": \"no\" }",
-          "label": "wizardBtnNo",
-          "variant": "outlined",
-          "color": "secondary",
-          "xs": 12,
-          "sm": 4,
-          "md": 3,
-          "lg": 2,
-          "xl": 2
-        },
-        "_wizDone": {
-          "type": "sendTo",
-          "command": "segmentWizard",
-          "jsonData": "{ \"action\": \"done\" }",
-          "label": "wizardBtnDone",
-          "variant": "contained",
-          "color": "primary",
-          "xs": 12,
-          "sm": 4,
-          "md": 3,
-          "lg": 2,
-          "xl": 2
-        },
-        "_wizAbort": {
-          "newLine": true,
-          "type": "sendTo",
-          "command": "segmentWizard",
-          "jsonData": "{ \"action\": \"abort\" }",
-          "label": "wizardBtnAbort",
-          "variant": "outlined",
-          "color": "secondary",
-          "xs": 12,
-          "sm": 6,
-          "md": 3,
-          "lg": 2,
-          "xl": 2,
-          "style": {
-            "marginTop": 16
-          }
-        },
-        "_wizHelp": {
-          "newLine": true,
-          "type": "staticText",
-          "text": "wizardHelp",
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 13,
-            "marginTop": 24,
-            "opacity": 0.8
-          }
+          "xl": 12
         }
       }
     }

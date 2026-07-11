@@ -42,6 +42,10 @@ export default [
       // Generated coverage report (npm run coverage) — never lint it.
       "coverage",
       "admin",
+      // Custom admin React component — its own toolchain (src-admin/eslint.config.mjs).
+      "src-admin",
+      // Root build script for the src-admin Module-Federation component (CommonJS).
+      "tasks.js",
       "node_modules",
       // Catches macOS-Finder duplicate-on-restore artifacts like "node_modules 2/" —
       // without this, eslint scans every .ts file in the copy and the type-aware

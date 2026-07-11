@@ -126,6 +126,15 @@ git commit -m "feat(wizard): grid snapshot in responses + apply action for corre
 
 ## Task 2: Scaffold `src-admin/` — empty custom component builds + renders
 
+> ✅ **DONE** (commit below). Verified against the real public-holidays scaffold — several drafted details were corrected:
+> - **Federation name** kept as the plan's `ConfigCustomGoveeSegmentSet` (a valid convention; PH uses `<Name>ComponentSet` — either works as long as it's byte-identical in vite.config `name` + jsonConfig `name` + manifest). jsonConfig field: `name: "ConfigCustomGoveeSegmentSet/Components/SegmentWizardConfig"` + **`bundlerType: "module"`** (both were missing/wrong in the draft — verified from PH's live jsonConfig).
+> - **Added `SegmentWizardConfig.tsx`** (not in the plan's file list): the MF-exposed component MUST extend `ConfigGeneric` (mirrors PH `ExcludeSelector`) — jsonConfig `type:custom` instantiates it and drives `renderItem`. It hosts the plain `<SegmentWizard>` (Task 5), wired to `oContext.socket` + `adapterName.instance`. `Components.tsx` exposes `{ SegmentWizardConfig }`.
+> - **`@iobroker/build-tools` (^3.0.1) added at ROOT** (not just src-admin) — `node tasks` runs at repo root and `require`s it from root node_modules (PH declares it at root too). Root eslint now ignores `src-admin` + `tasks.js`; root tsconfig/vitest already scope to `src/**` so they don't pick up src-admin.
+> - **Test target = the shell `SegmentWizard` component**, not `<App>` — the full `GenericApp` App can't boot in jsdom (renders a Loader until socket-connected). The shell test proves the jsdom/testing-library toolchain (vitest 4 + jsdom + @testing-library, own `src-admin/vitest.config.ts`); the real scaffold verification is the artifact + `npm pack`.
+> - `tsconfig.node.json` copied **verbatim** (phantom `vite-importmap-shim.ts` include and all — harmless glob, matches PH; not "corrected").
+>
+> **Verified:** `node tasks` builds `admin/custom/customComponents.js` (mf-manifest `name=ConfigCustomGoveeSegmentSet`, exposes `./Components`, 29 assets, i18n); `npm pack --dry-run` packs customComponents.js + mf-manifest.json + 29 assets + i18n; src-admin shell test 1/1 + lint 0/0; root tsc + lint + 1210 tests still green.
+
 **Files (all adapted verbatim from `iobroker.public-holidays`, names changed):**
 - Create: `src-admin/package.json`, `vite.config.ts`, `tsconfig.json`, `tsconfig.node.json`, `eslint.config.mjs`, `index.html`
 - Create: `src-admin/src/index.tsx`, `src-admin/src/Components.tsx`, `src-admin/src/App.tsx` (shell)
