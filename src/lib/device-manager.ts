@@ -1390,12 +1390,19 @@ export class DeviceManager {
     device.lastLanReplyAt = Date.now();
     const { r, g, b } = status.color;
     const state: Partial<DeviceState> = {
-      online: true,
       power: status.onOff === 1,
       brightness: status.brightness,
       colorRgb: rgbToHex(r, g, b),
       colorTemperature: status.colorTemInKelvin || undefined,
     };
+    // `online` only on a real offline→online flip (mirrors
+    // applyLanDiscoveryToExisting): with online:true in EVERY devStatus
+    // patch, each poll reply triggered the group-reachability pass and a
+    // per-group state write — pure churn on a steady LAN (M6). A flip
+    // still carries `online`, so the <1s recovery path is unchanged.
+    if (device.state.online !== true) {
+      state.online = true;
+    }
 
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);

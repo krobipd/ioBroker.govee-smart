@@ -974,7 +974,12 @@ export class StateManager {
     const unreachable = memberDevices.filter(m => !m.state.online).map(m => treeKey(m.sku, m.deviceId));
 
     await this.ensureState(stateId, "Unreachable Members", "string", "text", false);
-    await this.adapter.setState(stateId, {
+    // setStateChangedAsync: reachability is re-evaluated on every online
+    // signal — with an unconditional setState every devStatus poll reply
+    // bumped ts on an unchanged (usually empty) value, spamming state
+    // events and history adapters (M6; same class as the v2.9.0
+    // info.online ts-rewrite fix).
+    await this.adapter.setStateChangedAsync(stateId, {
       val: unreachable.join(", "),
       ack: true,
     });
