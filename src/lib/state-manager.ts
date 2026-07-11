@@ -30,16 +30,33 @@ const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "
  * path would overwrite the original "Device Information" name with the
  * literal "info".
  */
-const CHANNEL_NAMES: Record<string, ioBroker.StringOrTranslated> = {
-  control: tName("channelControls"),
-  scenes: tName("channelScenes"),
-  music: tName("channelMusic"),
-  snapshots: tName("channelSnapshots"),
-  sensor: tName("channelSensorData"),
-  events: tName("channelEvents"),
-  info: tName("deviceInformation"),
-  diag: tName("channelDiagnostics"),
+const CHANNEL_NAME_KEYS: Record<string, I18nKey> = {
+  control: "channelControls",
+  scenes: "channelScenes",
+  music: "channelMusic",
+  snapshots: "channelSnapshots",
+  sensor: "channelSensorData",
+  events: "channelEvents",
+  info: "deviceInformation",
+  diag: "channelDiagnostics",
 };
+
+/**
+ * Resolve a channel's display name at runtime.
+ *
+ * MUST resolve here, not at module scope: tName() calls
+ * I18n.getTranslatedObject(), which throws "i18n not initialized" until the
+ * adapter runs I18n.init() in onReady. A module-scope map of tName() calls
+ * evaluates on import and crashes the adapter at startup — same class of bug
+ * as the v2.13.2 SYNTHETIC_STATE_META fix (caught by the CI integration test,
+ * not the unit suite). Unknown channels fall back to the raw id.
+ *
+ * @param channel Channel id (e.g. "control", "info")
+ */
+function channelName(channel: string): ioBroker.StringOrTranslated {
+  const key = CHANNEL_NAME_KEYS[channel];
+  return key ? tName(key) : channel;
+}
 
 /**
  * Synthetic capabilities written by the App-API poll and OpenAPI-MQTT
@@ -369,7 +386,7 @@ export class StateManager {
         `${prefix}.${channel}`,
         {
           type: "channel",
-          common: { name: CHANNEL_NAMES[channel] ?? channel },
+          common: { name: channelName(channel) },
           native: {},
         },
         { preserve: { common: ["name"] } },
@@ -631,7 +648,7 @@ export class StateManager {
         `${prefix}.${channel}`,
         {
           type: "channel",
-          common: { name: CHANNEL_NAMES[channel] ?? channel },
+          common: { name: channelName(channel) },
           native: {},
         },
         { preserve: { common: ["name"] } },
