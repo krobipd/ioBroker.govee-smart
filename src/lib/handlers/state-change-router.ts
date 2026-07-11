@@ -6,7 +6,7 @@ import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
-import { errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
+import { deviceLabel, errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
 import * as diagnosticsHandler from "./diagnostics-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
 
@@ -144,7 +144,7 @@ export async function sendMusicCommand(
     // music mode itself still works over LAN.
     if (changedSuffix === "music.music_sensitivity" || changedSuffix === "music.music_auto_color") {
       adapter.log.warn(
-        `${device.name} (${device.sku}): music sensitivity / auto-color can't be set over the local API — ` +
+        `${deviceLabel(device)}: music sensitivity / auto-color can't be set over the local API — ` +
           `only the music mode applies for LAN-controlled lights.`,
       );
       return;
@@ -205,7 +205,7 @@ export async function handleManualSegmentsChange(
         : "";
 
   if (!modeVal) {
-    adapter.log.info(`${device.name}: manual segments disabled — strip treated as contiguous`);
+    adapter.log.info(`${deviceLabel(device)}: manual segments disabled — strip treated as contiguous`);
     await adapter.applyManualSegments(device, false);
     return;
   }
@@ -214,12 +214,12 @@ export async function handleManualSegmentsChange(
     typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount - 1 : SEGMENT_HARD_MAX;
   const parsed = parseSegmentList(listVal, maxIndex);
   if (parsed.error) {
-    adapter.log.warn(`${device.name}: manual_list invalid (${parsed.error}) — disabling manual mode`);
+    adapter.log.warn(`${deviceLabel(device)}: manual_list invalid (${parsed.error}) — disabling manual mode`);
     await adapter.applyManualSegments(device, false);
     return;
   }
 
-  adapter.log.debug(`${device.name}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`);
+  adapter.log.debug(`${deviceLabel(device)}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`);
   await adapter.applyManualSegments(device, true, parsed.indices);
 }
 
@@ -246,19 +246,19 @@ export async function handleGenericCapabilityCommand(
   if (typeof capType === "string" && typeof capInstance === "string") {
     try {
       adapter.log.debug(
-        `Routing to generic capability for ${device.name}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`,
+        `Routing to generic capability for ${deviceLabel(device)}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`,
       );
       await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, val);
       await adapter.setState(id, { val, ack: true });
     } catch (err) {
-      adapter.log.warn(`Command failed for ${device.name}: ${errMessage(err)}`);
+      adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
     }
   } else {
     // No STATE_TO_COMMAND entry + no native capabilityType/Instance — nothing
     // we can route. Logging this is the bug-report-from-debug-log path for
     // "I wrote my state and the adapter ignored me".
     adapter.log.debug(
-      `No handler matched for ${device.name} (${device.sku}) state=${stateSuffix} val=${JSON.stringify(val)} — writable state without command mapping or capability metadata, silently ignored`,
+      `No handler matched for ${deviceLabel(device)} state=${stateSuffix} val=${JSON.stringify(val)} — writable state without command mapping or capability metadata, silently ignored`,
     );
   }
 }
@@ -320,7 +320,7 @@ export async function onStateChange(
   const prefix = adapter.stateManager.devicePrefix(device);
   const stateSuffix = localId.slice(prefix.length + 1);
   adapter.log.debug(
-    `onStateChange ${id}: device=${device.name} (${device.sku}) suffix=${stateSuffix} val=${JSON.stringify(state.val)}`,
+    `onStateChange ${id}: device=${deviceLabel(device)} suffix=${stateSuffix} val=${JSON.stringify(state.val)}`,
   );
   // v2.9.1 — surface the user-write into the per-device diag log so a
   // "I set state X and the adapter ignored me" report has the write
@@ -381,7 +381,7 @@ export async function onStateChange(
   // DeviceManager.refreshSceneDataForDevice for the API-budget rationale.
   if (stateSuffix === "snapshots.refresh_cloud" && val) {
     if (adapter.deviceManager) {
-      adapter.log.info(`Refresh cloud data for ${device.name} (${device.sku}): re-fetching scenes and snapshots`);
+      adapter.log.info(`Refresh cloud data for ${deviceLabel(device)}: re-fetching scenes and snapshots`);
       try {
         const changed = await adapter.deviceManager.refreshSceneDataForDevice(device.deviceId);
         if (changed) {
@@ -393,7 +393,7 @@ export async function onStateChange(
           await adapter.loadCloudStates(device);
         }
       } catch (e) {
-        adapter.log.warn(`Refresh cloud data for ${device.name} failed: ${errMessage(e)}`);
+        adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${errMessage(e)}`);
       }
     }
     await adapter.setState(id, { val: false, ack: true });
@@ -476,6 +476,6 @@ export async function onStateChange(
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, command);
     }
   } catch (err) {
-    adapter.log.warn(`Command failed for ${device.name}: ${errMessage(err)}`);
+    adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
   }
 }

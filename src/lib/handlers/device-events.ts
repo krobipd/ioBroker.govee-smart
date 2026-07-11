@@ -4,7 +4,7 @@ import { getDeviceTier } from "../device-registry";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
-import { errMessage, type DeviceState, type GoveeDevice } from "../types";
+import { deviceLabel, errMessage, type DeviceState, type GoveeDevice } from "../types";
 import * as connectionState from "./connection-state";
 import * as groupFanoutHandler from "./group-fanout-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
@@ -113,7 +113,7 @@ export function onLanDeviceReady<T extends DeviceEventsAdapter & connectionState
     await sm.createInfoStates(device);
     await sm.createLanStates(device);
   })().catch(e => {
-    adapter.log.error(`onLanDeviceReady failed for ${device.name}: ${errMessage(e)}`);
+    adapter.log.error(`onLanDeviceReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
   });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
@@ -154,7 +154,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
     await sm.migrateLegacyDiagnostics(device);
     await sm.updateDeviceTier(device, getDeviceTier(device.sku));
   })().catch(e => {
-    adapter.log.error(`onCloudDataReady failed for ${device.name}: ${errMessage(e)}`);
+    adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
   });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);

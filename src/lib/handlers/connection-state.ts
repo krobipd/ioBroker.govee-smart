@@ -7,7 +7,7 @@ import type { StateManager } from "../state-manager";
 import { httpsRequest } from "../http-client";
 import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
-import { errMessage } from "../types";
+import { deviceLabel, errMessage } from "../types";
 import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
 
 /**
@@ -221,7 +221,7 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
     );
     for (const d of lights) {
       if (!d.lanIp) {
-        adapter.log.info(`${d.name} (${d.sku}): no LAN — enable the local API in the Govee Home app`);
+        adapter.log.info(`${deviceLabel(d)}: no LAN — enable the local API in the Govee Home app`);
       }
     }
   }

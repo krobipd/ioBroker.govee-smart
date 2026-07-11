@@ -1,5 +1,5 @@
 import type { DeviceManager } from "../device-manager";
-import type { GoveeDevice } from "../types";
+import { deviceLabel, type GoveeDevice } from "../types";
 import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 
@@ -39,7 +39,7 @@ export async function handleDiagnosticsExport(
   const now = Date.now();
   const last = lastRun.get(deviceKey) ?? 0;
   if (now - last < DIAGNOSTICS_EXPORT_THROTTLE_MS) {
-    adapter.log.debug(`Diagnostics export throttled for ${device.name} — last run ${now - last}ms ago`);
+    adapter.log.debug(`Diagnostics export throttled for ${deviceLabel(device)} — last run ${now - last}ms ago`);
     await adapter.setState(triggerStateId, { val: false, ack: true });
     return;
   }
@@ -51,5 +51,5 @@ export async function handleDiagnosticsExport(
     ack: true,
   });
   await adapter.setState(triggerStateId, { val: false, ack: true });
-  adapter.log.info(`Diagnostics exported for ${device.name} (${device.sku})`);
+  adapter.log.info(`Diagnostics exported for ${deviceLabel(device)}`);
 }

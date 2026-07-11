@@ -276,7 +276,7 @@ export class CommandRouter {
         logDedup(
           this.log,
           prev,
-          `Cloud transport override for ${device.name}/${command} but no Cloud channel available`,
+          `Cloud transport override for ${deviceLabel(device)}/${command} but no Cloud channel available`,
           new Error("override-cloud-missing"),
         ),
       );
@@ -391,7 +391,7 @@ export class CommandRouter {
       // (A4, live: h61d5 "1-15;#ffca91"). Warn with the offending value + syntax.
       if (typeof value === "string") {
         this.log.warn(
-          `${device.name} (${device.sku}): could not parse segment command "${value}" — ` +
+          `${deviceLabel(device)}: could not parse segment command "${value}" — ` +
             `expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`,
         );
       }
@@ -922,7 +922,7 @@ export class CommandRouter {
       const prev = this.lastErrorByCategory.get("cloud-fallback") ?? null;
       this.lastErrorByCategory.set(
         "cloud-fallback",
-        logDedup(this.log, prev, `Cloud fallback for ${device.name}/${command}`, e),
+        logDedup(this.log, prev, `Cloud fallback for ${deviceLabel(device)}/${command}`, e),
       );
     });
   }
@@ -951,7 +951,7 @@ export class CommandRouter {
       const prev = this.lastErrorByCategory.get("no-capability") ?? null;
       this.lastErrorByCategory.set(
         "no-capability",
-        logDedup(this.log, prev, `No channel for ${device.name}/${command}`, new Error("no matching capability")),
+        logDedup(this.log, prev, `No channel for ${deviceLabel(device)}/${command}`, new Error("no matching capability")),
       );
       return;
     }
