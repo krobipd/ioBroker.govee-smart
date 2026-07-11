@@ -1,3 +1,20 @@
 {
-    "gsw_title": "Segment detection"
+    "gsw_title": "Segment detection",
+    "gsw_deviceLabel": "Device",
+    "gsw_noDevices": "No segment-capable devices found. Enter a Cloud API key in the adapter settings so device capabilities are known.",
+    "gsw_start": "Start measuring",
+    "gsw_measureHint": "Watch the strip — which segment lights up bright white?",
+    "gsw_question": "Segment %s — is it lit?",
+    "gsw_lit": "Lit",
+    "gsw_dark": "Dark (gap)",
+    "gsw_finish": "Finished — end of strip",
+    "gsw_cancel": "Cancel",
+    "gsw_reviewHint": "Click a cell to flip lit / gap, then apply.",
+    "gsw_resultNoGaps": "%s segments, no gaps",
+    "gsw_resultGaps": "%s segments, %s gap(s)",
+    "gsw_apply": "Apply",
+    "gsw_remeasure": "Measure again",
+    "gsw_applied": "Applied: %s segments.",
+    "gsw_error": "Wizard error: %s",
+    "gsw_close": "Close"
 }

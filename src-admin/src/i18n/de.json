@@ -1,3 +1,20 @@
 {
-    "gsw_title": "Segment-Erkennung"
+    "gsw_title": "Segment-Erkennung",
+    "gsw_deviceLabel": "Gerät",
+    "gsw_noDevices": "Keine Geräte mit Segmenten gefunden. Trage einen Cloud-API-Key in den Adaptereinstellungen ein, damit die Gerätefähigkeiten bekannt sind.",
+    "gsw_start": "Messung starten",
+    "gsw_measureHint": "Beobachte den Strip — welches Segment leuchtet hell weiß auf?",
+    "gsw_question": "Segment %s — leuchtet es?",
+    "gsw_lit": "Leuchtet",
+    "gsw_dark": "Dunkel (Lücke)",
+    "gsw_finish": "Fertig — Strip zu Ende",
+    "gsw_cancel": "Abbrechen",
+    "gsw_reviewHint": "Zelle anklicken, um zwischen Leuchtet/Lücke zu wechseln, dann übernehmen.",
+    "gsw_resultNoGaps": "%s Segmente, keine Lücke",
+    "gsw_resultGaps": "%s Segmente, %s Lücke(n)",
+    "gsw_apply": "Übernehmen",
+    "gsw_remeasure": "Nochmal messen",
+    "gsw_applied": "Übernommen: %s Segmente.",
+    "gsw_error": "Wizard-Fehler: %s",
+    "gsw_close": "Schließen"
 }

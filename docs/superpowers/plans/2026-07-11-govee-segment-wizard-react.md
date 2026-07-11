@@ -281,6 +281,11 @@ git commit -m "feat(admin): SegmentGrid visual map component"
 
 ## Task 5: `SegmentWizard` — 3-screen state machine
 
+> ✅ **DONE** (commit below). Screens `select → measure → review → success`. **Applies the Task-1 flow resolution, NOT the plan's stale "done→review":** "Finished" moves to review **locally** from the last snapshot (session stays open); Übernehmen → `api.apply(device, confirmed)` finalizes. Test asserts `api.done` is **never** called.
+> - **Uniform response reducer** (advisor): every `api.*` result funnels through `reduce()` — `error → reset+banner`, `aborted → select`, `applied||done → success`, else → snapshot update. This handles the backend **auto-finalize at `SEGMENT_HARD_MAX`** (a `yes`/`no` can come back `{done:true}` with the session already applied+closed → success screen, no editable review) and device-gone/idle-timeout errors, not just the happy path.
+> - Measure grid `total=currentIndex+1` (fills as you go), `flashing=currentIndex`, gaps derived. Review grid `total=currentIndex`, editable, local `confirmed` edits. First device auto-selected; "Finished" gated on `currentIndex≥1`; "Übernehmen" disabled on empty set (backend also guards it).
+> - **i18n:** `I18n.t` verified at source — uses `%s` args (not `{}`) and `loadI18n` falls back to `en.json` for missing langs (loads en content into the active lang → readable). So en + de shipped now; **the other 9 langs are pending (Task 6)** and render English until then. 19 src-admin tests (7 wizard: happy/never-done, review-toggle, HARD_MAX→success, abort→select, error→reset, finish-disabled, no-devices), lint 0/0, MF build green (SegmentWizard chunk 235 B shell → 5.83 kB real).
+
 **Files:** Create `src-admin/src/SegmentWizard.tsx`; Test `src-admin/src/SegmentWizard.test.tsx`; Modify `src-admin/src/App.tsx` (render the real component)
 
 **Interfaces:**
@@ -318,6 +323,8 @@ git commit -m "feat(admin): SegmentWizard 3-screen state machine"
 ## Task 6: Remove `info.wizardStatus` + old UI remnants
 
 **Files:** Modify `src/lib/handlers/wizard-handler.ts` (drop the `setState("info.wizardStatus", …)` mirror), the info-state owner (drop the state definition), add one-shot `delObject` cleanup; `admin/i18n/*.json` (drop dead `wizardStatus`/old-button keys, add new component keys); verify `admin/jsonConfig.json` has no leftover `_wizard` sendTo items.
+
+> **⚠️ Carry-over from Task 5 — complete the component i18n here:** `src-admin/src/i18n/` currently has **en + de only** (18 `gsw_*` keys). The other **9 languages (es, fr, it, nl, pl, pt, ru, uk, zh-cn) are pending** — add `src-admin/src/i18n/<lang>.json` for each so non-en/de admins get their own language instead of the English fallback. This is the component's OWN i18n (copied to `admin/custom/i18n/` by `tasks.js`), separate from the adapter's `admin/i18n/`. The dead adapter keys to drop here are the old jsonConfig wizard keys: `wizardHeader/wizardInfo/wizardDeviceLabel/wizardBtnStart/wizardStatusLabel/wizardBtnYes/wizardBtnNo/wizardBtnDone/wizardBtnAbort/wizardHelp/tabWizard` — confirm none are still referenced after the jsonConfig `_wizard` panel became a single `type:custom` field. Rebuild the MF component (`npm run build:admin`) after adding langs.
 
 **Interfaces:** Consumes nothing new. Produces: no `info.wizardStatus` object; existing installs get it removed once on start.
 
