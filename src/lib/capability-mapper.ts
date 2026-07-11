@@ -473,6 +473,30 @@ export const SENSOR_ROLE_UNIT = {
 } as const;
 
 /**
+ * Single source for the roles of event states (events/ channel) — consumed by
+ * mapEvent (Cloud-capability path) AND state-manager's SYNTHETIC_STATE_META
+ * (App-API / OpenAPI-MQTT path). Both paths extend the SAME state object;
+ * two diverging role literals made the persisted role flap depending on
+ * which path wrote last (M5). Keys are sanitized state ids — snake_case is
+ * what sanitizeId produces today, the squashed forms are the pre-B2 legacy
+ * ids that the synthetic table still recognises.
+ */
+export const EVENT_STATE_ROLES = {
+  lackwater: { role: "indicator.maintenance" },
+  lackwaterevent: { role: "indicator.maintenance" },
+  icefull: { role: "indicator.maintenance" },
+  icefullevent: { role: "indicator.maintenance" },
+  bodyappeared: { role: "sensor.motion" },
+  dirtdetected: { role: "indicator.maintenance" },
+  lack_water: { role: "indicator.maintenance" },
+  lack_water_event: { role: "indicator.maintenance" },
+  ice_full: { role: "indicator.maintenance" },
+  ice_full_event: { role: "indicator.maintenance" },
+  body_appeared: { role: "sensor.motion" },
+  dirt_detected: { role: "indicator.maintenance" },
+} as const;
+
+/**
  * Map property capability (read-only sensors). Routes to the `sensor`
  * channel so a Heater's temperature reading sits cleanly next to other
  * sensor-style states instead of in `control`.
@@ -683,12 +707,15 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
  * @param cap Cloud event capability
  */
 function mapEvent(cap: CloudCapability): StateDefinition[] {
+  const id = sanitizeId(cap.instance);
   return [
     {
-      id: sanitizeId(cap.instance),
+      id,
       name: humanize(cap.instance),
       type: "boolean",
-      role: "indicator.alarm",
+      // Known events use the shared role table (M5 — same role as the
+      // synthetic write path); a genuinely unknown event is an alarm.
+      role: id in EVENT_STATE_ROLES ? EVENT_STATE_ROLES[id as keyof typeof EVENT_STATE_ROLES].role : "indicator.alarm",
       write: false,
       def: false,
       capabilityType: cap.type,

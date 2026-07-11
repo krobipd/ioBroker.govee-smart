@@ -601,9 +601,26 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("lack_water");
       expect(result[0].type).toBe("boolean");
-      expect(result[0].role).toBe("indicator.alarm");
+      // M5 — same role as the synthetic (App-API/MQTT) write path via the
+      // shared EVENT_STATE_ROLES table; two paths writing the same object
+      // with different role literals made the persisted role flap.
+      expect(result[0].role).toBe("indicator.maintenance");
       expect(result[0].write).toBe(false);
       expect(result[0].channel).toBe("events");
+    });
+
+    it("maps an UNKNOWN event instance to indicator.alarm (fallback, M5)", () => {
+      const caps: CloudCapability[] = [
+        {
+          type: "devices.capabilities.event",
+          instance: "somethingNovel",
+          parameters: { dataType: "ENUM" },
+        },
+      ];
+      const result = mapCapabilities(caps);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("something_novel");
+      expect(result[0].role).toBe("indicator.alarm");
     });
 
     it("should route property/temperature into sensor channel", () => {

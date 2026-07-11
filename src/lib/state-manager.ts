@@ -1,5 +1,5 @@
 import type * as utils from "@iobroker/adapter-core";
-import { buildLanStateDefs, LAN_STATE_IDS, SENSOR_ROLE_UNIT, type StateDefinition } from "./capability-mapper";
+import { buildLanStateDefs, EVENT_STATE_ROLES, LAN_STATE_IDS, SENSOR_ROLE_UNIT, type StateDefinition } from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
 import { resolveSegmentCount } from "./device-manager";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
@@ -92,21 +92,21 @@ const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   co2: numSensor("co2", "co2"),
   carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
-  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
-  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
+  lackwater: { type: "boolean", role: EVENT_STATE_ROLES.lackwater.role, nameKey: "lackOfWater", channel: "events" },
+  lackwaterevent: { type: "boolean", role: EVENT_STATE_ROLES.lackwaterevent.role, nameKey: "lackOfWater", channel: "events" },
+  icefull: { type: "boolean", role: EVENT_STATE_ROLES.icefull.role, nameKey: "iceBucketFull", channel: "events" },
+  icefullevent: { type: "boolean", role: EVENT_STATE_ROLES.icefullevent.role, nameKey: "iceBucketFull", channel: "events" },
+  bodyappeared: { type: "boolean", role: EVENT_STATE_ROLES.bodyappeared.role, nameKey: "bodyDetected", channel: "events" },
+  dirtdetected: { type: "boolean", role: EVENT_STATE_ROLES.dirtdetected.role, nameKey: "dirtDetected", channel: "events" },
   sensor_temperature: numSensor("temperature", "temperature"),
   sensor_humidity: numSensor("humidity", "humidity"),
   sensor_battery: numSensor("battery", "battery"),
-  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
-  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
+  lack_water: { type: "boolean", role: EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
+  lack_water_event: { type: "boolean", role: EVENT_STATE_ROLES.lack_water_event.role, nameKey: "lackOfWater", channel: "events" },
+  ice_full: { type: "boolean", role: EVENT_STATE_ROLES.ice_full.role, nameKey: "iceBucketFull", channel: "events" },
+  ice_full_event: { type: "boolean", role: EVENT_STATE_ROLES.ice_full_event.role, nameKey: "iceBucketFull", channel: "events" },
+  body_appeared: { type: "boolean", role: EVENT_STATE_ROLES.body_appeared.role, nameKey: "bodyDetected", channel: "events" },
+  dirt_detected: { type: "boolean", role: EVENT_STATE_ROLES.dirt_detected.role, nameKey: "dirtDetected", channel: "events" },
 };
 
 /**
