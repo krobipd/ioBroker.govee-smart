@@ -98,11 +98,17 @@ async function loadPersistedCreds(adapter, dataDir) {
     if (!raw) {
       return null;
     }
-    writeCredentialsFile(dataDir, raw);
-    await adapter.delObjectAsync("info.mqttCredentials").catch(() => void 0);
-    adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
-    return parsePersistedBlob(adapter, raw);
-  } catch {
+    const creds = parsePersistedBlob(adapter, raw);
+    try {
+      writeCredentialsFile(dataDir, raw);
+      await adapter.delObjectAsync("info.mqttCredentials").catch(() => void 0);
+      adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
+    } catch (e) {
+      adapter.log.debug(`Credentials file write failed \u2014 keeping legacy state for next start: ${(0, import_types.errMessage)(e)}`);
+    }
+    return creds;
+  } catch (e) {
+    adapter.log.debug(`Legacy credentials migration failed: ${(0, import_types.errMessage)(e)}`);
     return null;
   }
 }
@@ -120,20 +126,28 @@ async function persistCreds(adapter, dataDir, creds) {
   await fs.promises.writeFile(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 384 });
 }
 async function migrateCredentialsMetaOnce(adapter, dataDir) {
+  let carryOverOk = true;
   try {
     const { file } = await adapter.readFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
     const raw = typeof file === "string" ? file : file.toString("utf-8");
     if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
-      writeCredentialsFile(dataDir, raw);
-      adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+      try {
+        writeCredentialsFile(dataDir, raw);
+        adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+      } catch (e) {
+        carryOverOk = false;
+        adapter.log.debug(`Credentials carry-over failed \u2014 keeping legacy meta for next start: ${(0, import_types.errMessage)(e)}`);
+      }
     }
   } catch {
   }
-  try {
-    await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
-  } catch {
+  if (carryOverOk) {
+    try {
+      await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+    } catch {
+    }
+    await adapter.delObjectAsync("credentials").catch(() => void 0);
   }
-  await adapter.delObjectAsync("credentials").catch(() => void 0);
 }
 async function cleanupLegacyMqttNativeOnce(adapter) {
   var _a;

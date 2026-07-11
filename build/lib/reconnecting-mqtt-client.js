@@ -44,6 +44,11 @@ class ReconnectingMqttClient {
   reconnectAttempts = 0;
   /** Last classified error category, for warn-once / debug-on-repeat dedup. */
   lastErrorCategory = null;
+  /**
+   * Raw message of the last connect failure — kept alongside the category so
+   * probes can distinguish sub-cases (e.g. "email not registered" within AUTH).
+   */
+  lastErrorMessage = null;
   /** Set in disconnect(); reconnect paths bail on it so timers that fire after stop are no-ops. */
   disposed = false;
   /** Whether the underlying client is currently connected. */

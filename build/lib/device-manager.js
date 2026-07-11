@@ -46,6 +46,7 @@ var import_lookups = require("./device-manager/lookups");
 var import_mapping = require("./device-manager/mapping");
 var cacheHelpers = __toESM(require("./device-manager/cache"));
 var cloudMergeHelpers = __toESM(require("./device-manager/cloud-merge"));
+var libraryLoader = __toESM(require("./device-manager/library-loader"));
 var import_reconciler = require("./device-manager/reconciler");
 var import_types = require("./types");
 var import_http_client = require("./http-client");
@@ -73,6 +74,8 @@ class DeviceManager {
   onCloudCapabilities = null;
   /** Per-source dedup so a Cloud NETWORK error doesn't shadow an App-API one. */
   lastErrorCategory = null;
+  /** Shared Cloud budget — owned here for the data loaders since M12. */
+  rateLimiter = null;
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -141,54 +144,6 @@ class DeviceManager {
     };
   }
   /**
-   * Pull the HTTP status code out of any error shape we know about
-   * (HttpError, Govee API responses with `.statusCode` / `.status`).
-   * Returns undefined for network errors / generic failures so the
-   * diagnostics entry shows "no status — likely network/timeout".
-   *
-   * @param e Caught error value
-   */
-  extractStatus(e) {
-    if (e instanceof import_http_client.HttpError) {
-      return e.statusCode;
-    }
-    if (typeof e === "object" && e !== null) {
-      const x = e;
-      if (typeof x.statusCode === "number") {
-        return x.statusCode;
-      }
-      if (typeof x.status === "number") {
-        return x.status;
-      }
-    }
-    return void 0;
-  }
-  /**
-   * Structured debug-log for failed undocumented App-API calls. Pulls apart
-   * the cryptic "Invalid JSON in HTTP 200 response — body starts with: <snippet>"
-   * message into addressable fields so the user can read the actual facts:
-   * endpoint URL, HTTP status, bearer-token presence, body snippet.
-   * No interpretation — just the data.
-   *
-   * @param sku Govee SKU (for log context)
-   * @param what Human-readable name of the data being loaded
-   * @param endpoint Endpoint identifier for diagnostics history
-   * @param hasBearer Whether a bearer token was attached to the request
-   * @param e Caught error
-   */
-  logUndocApiFailure(sku, what, endpoint, hasBearer, e) {
-    var _a;
-    const httpStatus = this.extractStatus(e);
-    const msg = (0, import_types.errMessage)(e);
-    const bodyMatch = msg.match(/body starts with: (.+)$/);
-    const bodySnippet = (_a = bodyMatch == null ? void 0 : bodyMatch[1]) != null ? _a : "";
-    const statusPart = httpStatus !== void 0 ? ` httpStatus=${httpStatus}` : "";
-    const bodyPart = bodySnippet ? ` body="${bodySnippet}"` : ` error="${msg}"`;
-    this.log.debug(
-      `Could not load ${what} for ${sku}: endpoint=${endpoint}${statusPart} bearer=${hasBearer ? "yes" : "no"}${bodyPart}`
-    );
-  }
-  /**
    * Register the LAN client
    *
    * @param client LAN UDP client instance
@@ -219,7 +174,29 @@ class DeviceManager {
    * @param limiter Rate limiter instance
    */
   setRateLimiter(limiter) {
+    this.rateLimiter = limiter;
     this.commandRouter.setRateLimiter(limiter);
+  }
+  /**
+   * Host for the extracted library loaders (device-manager/library-loader).
+   * runLimited pins the budget semantics: fire-and-queue tryExecute at
+   * background priority — see the LibraryLoaderHost doc for why this must
+   * not become executeTracked.
+   */
+  libraryHost() {
+    return {
+      cloudClient: this.cloudClient,
+      apiClient: this.apiClient,
+      log: this.log,
+      diagnostics: this.diagnostics,
+      runLimited: async (fn) => {
+        if (this.rateLimiter) {
+          await this.rateLimiter.tryExecute(fn, 2);
+        } else {
+          await fn();
+        }
+      }
+    };
   }
   /**
    * Register the SKU cache for persistent device data
@@ -424,10 +401,11 @@ class DeviceManager {
         if (isLight) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
-            if (await this.loadDeviceScenes(device, cd)) {
+            const host = this.libraryHost();
+            if (await libraryLoader.loadDeviceScenes(host, device, cd)) {
               changed = true;
             }
-            if (await this.loadDeviceLibraries(device, cd.sku)) {
+            if (await libraryLoader.loadDeviceLibraries(host, device, cd.sku)) {
               changed = true;
             }
             device.scenesChecked = true;
@@ -522,7 +500,15 @@ class DeviceManager {
     }
     this.diagnostics.addLog(target.deviceId, "info", `User-triggered refresh-cloud-data for ${target.sku}`);
     try {
-      const rawCloudDevices = await this.cloudClient.getDevices();
+      let rawCloudDevices = [];
+      const fetchList = async () => {
+        rawCloudDevices = await this.cloudClient.getDevices();
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.executeTracked(fetchList, 1);
+      } else {
+        await fetchList();
+      }
       const cloudDevices = (0, import_mapping.filterCloudDevicesWithCapabilities)(rawCloudDevices);
       this.mergeCloudDevices(cloudDevices);
     } catch (e) {
@@ -536,10 +522,12 @@ class DeviceManager {
       capabilities: Array.isArray(target.capabilities) ? target.capabilities : []
     };
     let changed = false;
-    if (await this.loadDeviceScenes(target, cd)) {
+    const host = this.libraryHost();
+    if (await libraryLoader.loadDeviceScenes(host, target, cd)) {
       changed = true;
     }
-    if (await this.loadDeviceLibraries(
+    if (await libraryLoader.loadDeviceLibraries(
+      host,
       target,
       cd.sku,
       /* force */
@@ -563,227 +551,6 @@ class DeviceManager {
    */
   mergeCloudDevices(cloudDevices) {
     return cloudMergeHelpers.mergeCloudDevices(this, cloudDevices);
-  }
-  /**
-   * Load scenes, DIY scenes, and snapshots for a device from Cloud API.
-   *
-   * @param device Target device to populate
-   * @param cd Cloud device data with capabilities
-   * @returns true if any scene data changed
-   */
-  async loadDeviceScenes(device, cd) {
-    var _a;
-    this.diagnostics.addLog(cd.device, "debug", `loadDeviceScenes called for ${cd.sku}`);
-    let scenesCallSucceeded = false;
-    let snapsFromScenesCall = [];
-    let diyFromScenesCall = [];
-    const loadScenes = async () => {
-      try {
-        const { lightScenes, diyScenes, snapshots } = await this.cloudClient.getScenes(cd.sku, cd.device);
-        scenesCallSucceeded = true;
-        snapsFromScenesCall = snapshots;
-        diyFromScenesCall = diyScenes;
-        if (lightScenes.length > 0) {
-          device.scenes = lightScenes;
-        }
-        if (diyScenes.length > 0) {
-          device.diyScenes = diyScenes;
-        }
-      } catch (e) {
-        this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/scenes", e, this.extractStatus(e));
-        this.log.debug(`Could not load scenes for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
-      }
-    };
-    await this.commandRouter.executeRateLimited(loadScenes, 2);
-    if (diyFromScenesCall.length === 0) {
-      const loadDiy = async () => {
-        try {
-          const diy = await this.cloudClient.getDiyScenes(cd.sku, cd.device);
-          if (diy.length > 0) {
-            device.diyScenes = diy;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/diy-scenes", e, this.extractStatus(e));
-          this.log.debug(`Could not load DIY scenes for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
-        }
-      };
-      await this.commandRouter.executeRateLimited(loadDiy, 2);
-    }
-    if (snapsFromScenesCall.length > 0) {
-      device.snapshots = snapsFromScenesCall;
-    } else if (scenesCallSucceeded) {
-      const caps = Array.isArray(cd.capabilities) ? cd.capabilities : [];
-      const snapCap = caps.find(
-        (c) => {
-          var _a2;
-          return c && c.type === import_govee_constants.GOVEE_CAP_TYPE.DYNAMIC_SCENE && c.instance === "snapshot" && Array.isArray((_a2 = c.parameters) == null ? void 0 : _a2.options);
-        }
-      );
-      if ((_a = snapCap == null ? void 0 : snapCap.parameters) == null ? void 0 : _a.options) {
-        device.snapshots = snapCap.parameters.options.filter((o) => o && typeof o.name === "string" && o.value !== void 0 && o.value !== null).map((o) => ({
-          name: o.name,
-          value: typeof o.value === "number" ? o.value : o.value
-        }));
-        this.log.debug(`Snapshots from capabilities for ${(0, import_types.deviceLabel)(device)}: ${device.snapshots.length}`);
-      }
-    }
-    return device.scenes.length > 0 || device.diyScenes.length > 0 || device.snapshots.length > 0;
-  }
-  /**
-   * Fetch one undocumented-API library (scene / music / DIY) into its device
-   * field, rate-limited. Only fetches when forced or the field is still empty;
-   * records the raw array in the diag buffer (incl. scenceParam Base64 + config
-   * JSON) so a byte-level "why won't this activate on SKU X?" diagnosis works
-   * from the diag JSON alone. Returns true if the device changed.
-   *
-   * @param device Target device
-   * @param sku Product model (for the endpoint + log line)
-   * @param runLimited Rate-limited slot runner from loadDeviceLibraries
-   * @param hasBearer Whether a bearer token is present (for the failure log)
-   * @param cfg Per-library specifics — force flag, current field, endpoint,
-   *   labels, and the fetch + assign closures
-   * @param cfg.force Refetch even when the field already holds data
-   * @param cfg.current The device field being populated — skipped when non-empty unless forced
-   * @param cfg.ep API endpoint path, recorded in the diag buffer and failure log
-   * @param cfg.label Human-readable library name for the debug count line
-   * @param cfg.noun Plural noun for the count line (e.g. "scenes")
-   * @param cfg.failLabel Library label passed to the undocumented-API failure log
-   * @param cfg.fetch Closure that performs the actual API fetch
-   * @param cfg.assign Closure that stores the fetched array on the device
-   */
-  async loadLibrary(device, sku, runLimited, hasBearer, cfg) {
-    if (!(cfg.force || cfg.current.length === 0)) {
-      return false;
-    }
-    let changed = false;
-    await runLimited(async () => {
-      try {
-        const lib = await cfg.fetch();
-        this.diagnostics.recordApiSuccess(device.deviceId, cfg.ep, lib);
-        this.log.debug(
-          `${cfg.label} for ${sku}: ${lib.length} ${cfg.noun}${lib.length === 0 ? " \u2014 empty (Govee returned no data for this SKU)" : ""}`
-        );
-        if (lib.length > 0) {
-          cfg.assign(lib);
-          changed = true;
-        }
-      } catch (e) {
-        this.diagnostics.recordApiFailure(device.deviceId, cfg.ep, e, this.extractStatus(e));
-        this.logUndocApiFailure(sku, cfg.failLabel, cfg.ep, hasBearer, e);
-      }
-    });
-    return changed;
-  }
-  /**
-   * Load scene/music/DIY libraries and SKU features from undocumented API.
-   *
-   * Each fetch runs through the rate-limiter so a fresh install with 10
-   * devices doesn't slam app2.govee.com with 40 back-to-back requests —
-   * those endpoints are undocumented and aggressive callers can get the
-   * account temporarily locked.
-   *
-   * @param device Target device to populate
-   * @param sku Product model
-   * @param force When true, refetch every endpoint regardless of cache —
-   *   used by the user-triggered refresh button so a stale library
-   *   actually gets replaced
-   * @returns true if any library data changed
-   */
-  async loadDeviceLibraries(device, sku, force = false) {
-    if (!this.apiClient) {
-      return false;
-    }
-    this.diagnostics.addLog(device.deviceId, "debug", `loadDeviceLibraries called for ${sku} (force=${force})`);
-    let changed = false;
-    const runLimited = async (fn) => {
-      await this.commandRouter.executeRateLimited(fn, 2);
-    };
-    const hasBearer = this.apiClient.hasBearerToken();
-    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
-      force,
-      current: device.sceneLibrary,
-      ep: `/light-effect-libraries?sku=${sku}`,
-      label: "Scene library",
-      noun: "scene(s)",
-      failLabel: "scene library",
-      fetch: () => this.apiClient.fetchSceneLibrary(sku),
-      assign: (lib) => {
-        device.sceneLibrary = lib;
-      }
-    })) {
-      changed = true;
-    }
-    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
-      force,
-      current: device.musicLibrary,
-      ep: `/light-effect-libraries-music?sku=${sku}`,
-      label: "Music library",
-      noun: "mode(s)",
-      failLabel: "music library",
-      fetch: () => this.apiClient.fetchMusicLibrary(sku),
-      assign: (lib) => {
-        device.musicLibrary = lib;
-      }
-    })) {
-      changed = true;
-    }
-    if (await this.loadLibrary(device, sku, runLimited, hasBearer, {
-      force,
-      current: device.diyLibrary,
-      ep: `/diy-effect-libraries?sku=${sku}`,
-      label: "DIY library",
-      noun: "effect(s)",
-      failLabel: "DIY library",
-      fetch: () => this.apiClient.fetchDiyLibrary(sku),
-      assign: (lib) => {
-        device.diyLibrary = lib;
-      }
-    })) {
-      changed = true;
-    }
-    if (force || !device.skuFeatures) {
-      await runLimited(async () => {
-        const ep = `/sku-features?sku=${sku}`;
-        try {
-          const features = await this.apiClient.fetchSkuFeatures(sku);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, features);
-          if (features) {
-            device.skuFeatures = features;
-            changed = true;
-            this.log.debug(`SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`);
-          } else {
-            this.log.debug(`SKU features for ${sku}: null \u2014 Govee returned no data for this SKU`);
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "SKU features", ep, hasBearer, e);
-        }
-      });
-    }
-    if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0) {
-      await runLimited(async () => {
-        const ep = `/bff-app/v1/devices/snapshots?sku=${sku}`;
-        try {
-          const snaps = await this.apiClient.fetchSnapshots(sku, device.deviceId);
-          this.diagnostics.recordApiSuccess(device.deviceId, ep, snaps);
-          this.log.debug(
-            `Snapshot BLE for ${sku}: ${snaps.length} snapshot(s) with local data${snaps.length === 0 ? " \u2014 Govee returned no BLE-cmds for this SKU/device" : ""}`
-          );
-          if (snaps.length > 0) {
-            device.snapshotBleCmds = device.snapshots.map((ds) => {
-              var _a;
-              const match = snaps.find((s) => s.name === ds.name);
-              return (_a = match == null ? void 0 : match.bleCmds) != null ? _a : [];
-            });
-            changed = true;
-          }
-        } catch (e) {
-          this.diagnostics.recordApiFailure(device.deviceId, ep, e, this.extractStatus(e));
-          this.logUndocApiFailure(sku, "snapshot BLE", ep, hasBearer, e);
-        }
-      });
-    }
-    return changed;
   }
   /**
    * Load group membership from undocumented API and attach to BaseGroup devices.
@@ -856,7 +623,7 @@ class DeviceManager {
       return changed;
     } catch (e) {
       this.lastGroupList = { ok: false, keys: /* @__PURE__ */ new Set() };
-      const status = this.extractStatus(e);
+      const status = (0, import_http_client.extractHttpStatus)(e);
       for (const group of this.devices.values()) {
         if (group.sku === "BaseGroup") {
           this.diagnostics.recordApiFailure(group.deviceId, ep, e, status);
@@ -1151,12 +918,14 @@ class DeviceManager {
     device.lastLanReplyAt = Date.now();
     const { r, g, b } = status.color;
     const state = {
-      online: true,
       power: status.onOff === 1,
       brightness: status.brightness,
       colorRgb: (0, import_types.rgbToHex)(r, g, b),
       colorTemperature: status.colorTemInKelvin || void 0
     };
+    if (device.state.online !== true) {
+      state.online = true;
+    }
     Object.assign(device.state, state);
     (_a = this.onDeviceUpdate) == null ? void 0 : _a.call(this, device, state);
   }

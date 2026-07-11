@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var state_manager_exports = {};
 __export(state_manager_exports, {
+  SYNTHETIC_STATE_META: () => SYNTHETIC_STATE_META,
   StateManager: () => StateManager
 });
 module.exports = __toCommonJS(state_manager_exports);
@@ -29,14 +30,14 @@ var import_i18n = require("./i18n");
 var import_device_key = require("./device-key");
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
 const CHANNEL_NAMES = {
-  control: "Controls",
-  scenes: "Scenes",
-  music: "Music",
-  snapshots: "Snapshots",
-  sensor: "Sensor Data",
-  events: "Events",
-  info: "Device Information",
-  diag: "Diagnostics"
+  control: (0, import_i18n.tName)("channelControls"),
+  scenes: (0, import_i18n.tName)("channelScenes"),
+  music: (0, import_i18n.tName)("channelMusic"),
+  snapshots: (0, import_i18n.tName)("channelSnapshots"),
+  sensor: (0, import_i18n.tName)("channelSensorData"),
+  events: (0, import_i18n.tName)("channelEvents"),
+  info: (0, import_i18n.tName)("deviceInformation"),
+  diag: (0, import_i18n.tName)("channelDiagnostics")
 };
 const numSensor = (kind, nameKey) => ({
   type: "number",
@@ -52,21 +53,61 @@ const SYNTHETIC_STATE_META = {
   co2: numSensor("co2", "co2"),
   carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
-  lackwater: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  lackwaterevent: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  icefull: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  icefullevent: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  bodyappeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
-  dirtdetected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" },
+  lackwater: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.lackwater.role, nameKey: "lackOfWater", channel: "events" },
+  lackwaterevent: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.lackwaterevent.role,
+    nameKey: "lackOfWater",
+    channel: "events"
+  },
+  icefull: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.icefull.role, nameKey: "iceBucketFull", channel: "events" },
+  icefullevent: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.icefullevent.role,
+    nameKey: "iceBucketFull",
+    channel: "events"
+  },
+  bodyappeared: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.bodyappeared.role,
+    nameKey: "bodyDetected",
+    channel: "events"
+  },
+  dirtdetected: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.dirtdetected.role,
+    nameKey: "dirtDetected",
+    channel: "events"
+  },
   sensor_temperature: numSensor("temperature", "temperature"),
   sensor_humidity: numSensor("humidity", "humidity"),
   sensor_battery: numSensor("battery", "battery"),
-  lack_water: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  lack_water_event: { type: "boolean", role: "indicator.maintenance", nameKey: "lackOfWater", channel: "events" },
-  ice_full: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  ice_full_event: { type: "boolean", role: "indicator.maintenance", nameKey: "iceBucketFull", channel: "events" },
-  body_appeared: { type: "boolean", role: "sensor.motion", nameKey: "bodyDetected", channel: "events" },
-  dirt_detected: { type: "boolean", role: "indicator.maintenance", nameKey: "dirtDetected", channel: "events" }
+  lack_water: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
+  lack_water_event: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.lack_water_event.role,
+    nameKey: "lackOfWater",
+    channel: "events"
+  },
+  ice_full: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.ice_full.role, nameKey: "iceBucketFull", channel: "events" },
+  ice_full_event: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.ice_full_event.role,
+    nameKey: "iceBucketFull",
+    channel: "events"
+  },
+  body_appeared: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.body_appeared.role,
+    nameKey: "bodyDetected",
+    channel: "events"
+  },
+  dirt_detected: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.dirt_detected.role,
+    nameKey: "dirtDetected",
+    channel: "events"
+  }
 };
 function inferChannelFromStateId(stateId) {
   var _a, _b;
@@ -98,12 +139,22 @@ class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * `extendObject` deep-merges and CANNOT replace an object-value with a
-   * string. Only a full `setObjectAsync` replaces. Same fix-pattern as
-   * hassemu v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown). Admin
-   * renders states-values as React children — a translation object triggers
-   * React Error #31 → fatal "Error in GUI" on dropdown open (write:true) or
-   * any render path (write:false like diag.tier).
+   * A full-object replace is required: js-controller's `extendObject`
+   * deep-merges via node.extend (verified against js-controller 7.2.2 /
+   * node.extend 2.0.3) — same-key values ARE replaced, but stale keys absent
+   * from `fresh` survive the merge, and one surviving translation-object value
+   * is enough to keep crashing the Admin. `setObject` would deliver the "map
+   * contains exactly `fresh`" postcondition but is discouraged (repochecker
+   * S5054 — a blind full write clobbers runtime-added common fields). The
+   * js-controller-blessed full replace is `delObject` → `setObjectNotExists`:
+   * dropping the object physically clears the stale keys, recreating it from
+   * the read-back `existing` (with the plain-string `fresh` map) preserves
+   * name/native/role. The state value survives in the states DB and is
+   * re-seeded by the caller's def-value guard if the DB dropped it. Same
+   * React-#31 fix-pattern as hassemu v1.27.2 (URL-dropdown) and v1.28.4
+   * (mode-dropdown): Admin renders states-VALUES as React children, so a
+   * translation object triggers React Error #31 → fatal "Error in GUI" on
+   * dropdown open (write:true) or any render path (write:false like diag.tier).
    *
    * @param id    Full state path.
    * @param fresh Plain-string `common.states` map to write.
@@ -122,7 +173,9 @@ class StateManager {
     if (!buggy) {
       return;
     }
-    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(() => void 0);
+    existing.common.states = fresh;
+    await this.adapter.delObjectAsync(id).catch(() => void 0);
+    await this.adapter.setObjectNotExistsAsync(id, existing).catch(() => void 0);
   }
   /**
    * @param id Voller State-Pfad (`devices.X.info.Y`)
@@ -327,7 +380,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.ensureState(`${prefix}.info.name`, "Name", "string", "text", false);
+    await this.ensureState(`${prefix}.info.name`, (0, import_i18n.tName)("stateName"), "string", "text", false);
     await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true
@@ -335,17 +388,17 @@ class StateManager {
     if (!isGroup) {
       await this.ensureState(
         `${prefix}.info.online`,
-        "Online",
+        (0, import_i18n.tName)("online"),
         "boolean",
         "indicator.reachable",
         false,
         void 0,
         false
       );
-      await this.ensureState(`${prefix}.info.model`, "Model", "string", "text", false, void 0, "");
-      await this.ensureState(`${prefix}.info.serial`, "Serial Number", "string", "text", false, void 0, "");
-      await this.ensureState(`${prefix}.info.ip`, "IP Address", "string", "info.ip", false, void 0, "");
-      await this.ensureState(`${prefix}.info.type`, "Device Type", "string", "text", false, void 0, "");
+      await this.ensureState(`${prefix}.info.model`, (0, import_i18n.tName)("model"), "string", "text", false, void 0, "");
+      await this.ensureState(`${prefix}.info.serial`, (0, import_i18n.tName)("serialNumber"), "string", "text", false, void 0, "");
+      await this.ensureState(`${prefix}.info.ip`, (0, import_i18n.tName)("ipAddress"), "string", "info.ip", false, void 0, "");
+      await this.ensureState(`${prefix}.info.type`, (0, import_i18n.tName)("deviceType"), "string", "text", false, void 0, "");
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true
@@ -365,7 +418,7 @@ class StateManager {
       await this.syncInfoOnline(device);
     } else {
       const memberIds = ((_b = device.groupMembers) != null ? _b : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
-      await this.ensureState(`${prefix}.info.members`, "Members", "string", "text", false);
+      await this.ensureState(`${prefix}.info.members`, (0, import_i18n.tName)("members"), "string", "text", false);
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
         ack: true
@@ -465,7 +518,10 @@ class StateManager {
           name: def.name,
           type: def.type,
           role: def.role,
-          read: true,
+          // Buttons are write-only triggers (role catalogue) — the adapter
+          // already declares its io-package button (manual_sync_devices)
+          // with read:false; capability-driven buttons now match (LOW).
+          read: def.role === "button" ? false : true,
           write: def.write
         };
         if (def.unit) {
@@ -650,6 +706,7 @@ class StateManager {
           role: "text",
           read: false,
           write: true,
+          def: "",
           desc: (0, import_i18n.tDesc)("batchCommandDesc")
         },
         native: {}
@@ -750,7 +807,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    await this.ensureState("groups.info.online", "Cloud Online", "boolean", "indicator.reachable", false);
+    await this.ensureState("groups.info.online", (0, import_i18n.tName)("cloudOnline"), "boolean", "indicator.reachable", false);
     await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true
@@ -783,8 +840,8 @@ class StateManager {
     const prefix = this.devicePrefix(group);
     const stateId = `${prefix}.info.membersUnreachable`;
     const unreachable = memberDevices.filter((m) => !m.state.online).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId));
-    await this.ensureState(stateId, "Unreachable Members", "string", "text", false);
-    await this.adapter.setState(stateId, {
+    await this.ensureState(stateId, (0, import_i18n.tName)("membersUnreachable"), "string", "text", false);
+    await this.adapter.setStateChangedAsync(stateId, {
       val: unreachable.join(", "),
       ack: true
     });
@@ -873,7 +930,7 @@ class StateManager {
       endkey: `${devicePrefix}\u9999`
     });
     if (!(existing == null ? void 0 : existing.rows)) {
-      return;
+      return 0;
     }
     const totalsPerChannel = /* @__PURE__ */ new Map();
     for (const row of existing.rows) {
@@ -906,12 +963,15 @@ class StateManager {
       }
       totalsPerChannel.set(channel, totals);
     }
+    let deletedTotal = 0;
     for (const [channel, totals] of totalsPerChannel) {
+      deletedTotal += totals.deleted;
       if (totals.deleted > 0 && totals.deleted === totals.seen) {
         this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
         await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => void 0);
       }
     }
+    return deletedTotal;
   }
   /**
    * Get device object ID prefix — stable SKU + short device ID.
@@ -1055,6 +1115,7 @@ class StateManager {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  SYNTHETIC_STATE_META,
   StateManager
 });
 //# sourceMappingURL=state-manager.js.map

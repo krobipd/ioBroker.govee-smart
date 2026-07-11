@@ -74,6 +74,18 @@ class GoveeLanClient {
   log;
   onDiscovery = null;
   onStatus = null;
+  /**
+   * Fired when a socket on a PINNED interface errors (e.g. EADDRNOTAVAIL
+   * after a DHCP change killed the selected IP) — the adapter surfaces it
+   * as an actionable problem; a debug line alone left the LAN channel dead
+   * with the ready-hint pointing users at the Govee app instead of the
+   * Network Interface setting (M11).
+   */
+  onInterfaceError = null;
+  /** Fired when the listen socket is up — resolves a prior interface problem. */
+  onListenReady = null;
+  /** warn-once guard for non-EADDRINUSE socket errors. */
+  socketErrorWarned = false;
   onSend = null;
   onStatusRecord = null;
   onScanRecord = null;
@@ -111,6 +123,33 @@ class GoveeLanClient {
     this.onSend = cb;
   }
   /**
+   * Socket-error funnel: with a pinned interface the error is user-fixable
+   * (Network Interface setting) → warn-once + onInterfaceError for the
+   * actionable-problems registry. Without pinning it stays a warn-once —
+   * still visible (a dead socket kills the LAN channel), but not actionable
+   * config-wise.
+   *
+   * @param kind     Which socket errored (send/listen/scan)
+   * @param err      The socket error
+   * @param bindAddr The pinned interface IP, if any
+   */
+  reportSocketError(kind, err, bindAddr) {
+    var _a;
+    const msg = `LAN ${kind} socket error: ${err.message}`;
+    if (this.socketErrorWarned) {
+      this.log.debug(msg);
+    } else {
+      this.socketErrorWarned = true;
+      this.log.warn(msg);
+    }
+    if (bindAddr) {
+      (_a = this.onInterfaceError) == null ? void 0 : _a.call(
+        this,
+        `LAN ${kind} socket failed on the selected network interface ${bindAddr} (${err.message}) \u2014 check the Network Interface setting; the selected IP may no longer exist`
+      );
+    }
+  }
+  /**
    * Register a hook called for every parsed devStatus reply. Used for diag
    * capture — adapter looks up the device by IP and records the payload as
    * a pseudo-endpoint (`lan://devStatus`).
@@ -146,7 +185,7 @@ class GoveeLanClient {
     this.multicastBind = bindAddr;
     this.sendSocket = dgram.createSocket("udp4");
     this.sendSocket.on("error", (err) => {
-      this.log.debug(`LAN send socket error: ${err.message}`);
+      this.reportSocketError("send", err, bindAddr);
     });
     if (bindAddr) {
       this.sendSocket.bind(0, bindAddr);
@@ -160,24 +199,26 @@ class GoveeLanClient {
       if (code === "EADDRINUSE") {
         this.log.warn(`LAN listen port ${LISTEN_PORT} already in use \u2014 second instance? Status updates will be lost.`);
       } else {
-        this.log.debug(`LAN listen socket error: ${err.message}`);
+        this.reportSocketError("listen", err, bindAddr);
       }
     });
     this.listenSocket.bind(LISTEN_PORT, bindAddr, () => {
+      var _a;
       if (this.stopped) {
         return;
       }
       this.log.debug(`LAN listening on port ${LISTEN_PORT}`);
+      (_a = this.onListenReady) == null ? void 0 : _a.call(this);
       this.scanSocket = dgram.createSocket({ type: "udp4", reuseAddr: true });
       this.scanSocket.on("error", (err) => {
-        this.log.debug(`LAN scan socket error: ${err.message}`);
+        this.reportSocketError("scan", err, bindAddr);
       });
       this.scanSocket.bind(0, bindAddr, () => {
-        var _a, _b, _c;
+        var _a2, _b, _c;
         if (this.stopped) {
           return;
         }
-        (_a = this.scanSocket) == null ? void 0 : _a.setBroadcast(true);
+        (_a2 = this.scanSocket) == null ? void 0 : _a2.setBroadcast(true);
         try {
           (_b = this.scanSocket) == null ? void 0 : _b.addMembership(MULTICAST_ADDR, bindAddr);
         } catch {

@@ -83,14 +83,18 @@ class CommandRouter {
     this.rateLimiter = limiter;
   }
   /**
-   * Execute a function through the rate limiter if available, or directly.
+   * Budgeted USER-COMMAND send, coupled to the ACTUAL execution: on an
+   * exhausted budget tryExecute resolves on enqueue, the state-change router
+   * acks the write, and a later queue failure would only surface as a debug
+   * line — the user sees ack=true and nothing happens (M3). executeTracked
+   * settles when the call really ran (or was evicted/cancelled), so the
+   * existing "Command failed" warn path fires and no false ack is written.
    *
-   * @param fn Async function to execute
-   * @param priority Queue priority (0 = highest)
+   * @param fn The cloud send to execute
    */
-  async executeRateLimited(fn, priority = 0) {
+  async sendBudgeted(fn) {
     if (this.rateLimiter) {
-      await this.rateLimiter.tryExecute(fn, priority);
+      await this.rateLimiter.executeTracked(fn, 0);
     } else {
       await fn();
     }
@@ -229,7 +233,7 @@ class CommandRouter {
         (0, import_types.logDedup)(
           this.log,
           prev,
-          `Cloud transport override for ${device.name}/${command} but no Cloud channel available`,
+          `Cloud transport override for ${(0, import_types.deviceLabel)(device)}/${command} but no Cloud channel available`,
           new Error("override-cloud-missing")
         )
       );
@@ -319,7 +323,7 @@ class CommandRouter {
     if (!parsed) {
       if (typeof value === "string") {
         this.log.warn(
-          `${device.name} (${device.sku}): could not parse segment command "${value}" \u2014 expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`
+          `${(0, import_types.deviceLabel)(device)}: could not parse segment command "${value}" \u2014 expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`
         );
       }
       return;
@@ -392,7 +396,7 @@ class CommandRouter {
         cloudValue
       );
     };
-    await this.executeRateLimited(execute);
+    await this.sendBudgeted(execute);
   }
   /**
    * Send a batch segment command with pre-parsed data.
@@ -421,7 +425,7 @@ class CommandRouter {
           rgb: parsed.color
         });
       };
-      await this.executeRateLimited(execute);
+      await this.sendBudgeted(execute);
     }
     if (parsed.brightness !== void 0) {
       const brightCap = this.findCapabilityForCommand(device, "segmentBrightness:0");
@@ -434,7 +438,7 @@ class CommandRouter {
           { segment: parsed.segments, brightness: parsed.brightness }
         );
       };
-      await this.executeRateLimited(execute);
+      await this.sendBudgeted(execute);
     }
   }
   /**
@@ -743,7 +747,7 @@ class CommandRouter {
       const prev = (_a = this.lastErrorByCategory.get("cloud-fallback")) != null ? _a : null;
       this.lastErrorByCategory.set(
         "cloud-fallback",
-        (0, import_types.logDedup)(this.log, prev, `Cloud fallback for ${device.name}/${command}`, e)
+        (0, import_types.logDedup)(this.log, prev, `Cloud fallback for ${(0, import_types.deviceLabel)(device)}/${command}`, e)
       );
     });
   }
@@ -765,7 +769,12 @@ class CommandRouter {
       const prev = (_a = this.lastErrorByCategory.get("no-capability")) != null ? _a : null;
       this.lastErrorByCategory.set(
         "no-capability",
-        (0, import_types.logDedup)(this.log, prev, `No channel for ${device.name}/${command}`, new Error("no matching capability"))
+        (0, import_types.logDedup)(
+          this.log,
+          prev,
+          `No channel for ${(0, import_types.deviceLabel)(device)}/${command}`,
+          new Error("no matching capability")
+        )
       );
       return;
     }
@@ -773,7 +782,7 @@ class CommandRouter {
     const execute = async () => {
       await cloudClient.controlDevice(device.sku, device.deviceId, cap.type, cap.instance, cloudValue);
     };
-    await this.executeRateLimited(execute);
+    await this.sendBudgeted(execute);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

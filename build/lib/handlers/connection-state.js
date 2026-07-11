@@ -151,9 +151,17 @@ function logDeviceSummary(adapter) {
     );
     for (const d of lights) {
       if (!d.lanIp) {
-        adapter.log.info(`${d.name} (${d.sku}): no LAN \u2014 enable the local API in the Govee Home app`);
+        adapter.log.info(`${(0, import_types.deviceLabel)(d)}: no LAN \u2014 enable the local API in the Govee Home app`);
       }
     }
+  }
+  const sensors = allDevices.filter(
+    (d) => d.type === import_govee_constants.GOVEE_DEVICE_TYPE.SENSOR || d.type === import_govee_constants.GOVEE_DEVICE_TYPE.THERMOMETER
+  );
+  if (sensors.length > 0 && (!adapter.config.goveeEmail || !adapter.config.goveePassword)) {
+    adapter.log.warn(
+      `${sensors.length} sensor(s) found, but no Govee account is configured \u2014 sensor readings require email + password (adapter settings, "Govee Account" section)`
+    );
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

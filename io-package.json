@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.19.0",
+    "version": "2.20.0",
     "news": {
+      "2.20.0": {
+        "en": "Channel and device labels now follow the ioBroker system language\nClearer, honest feedback for Cloud login, API key, device sync and network problems",
+        "de": "Kanal- und Gerätelabels folgen jetzt der ioBroker-Systemsprache\nKlarere, ehrliche Rückmeldungen bei Cloud-Login, API-Key, Geräte-Sync und Netzwerkproblemen",
+        "ru": "Названия каналов и устройств теперь следуют системному языку ioBroker\nЧёткая, честная обратная связь при входе в облако, API-ключе, синхронизации и проблемах сети",
+        "pt": "Nomes de canais e dispositivos seguem agora o idioma do sistema ioBroker\nFeedback claro e honesto no login da nuvem, chave de API, sincronização e problemas de rede",
+        "nl": "Kanaal- en apparaatlabels volgen nu de ioBroker-systeemtaal\nDuidelijkere, eerlijke terugkoppeling bij cloudlogin, API-sleutel, apparaatsync en netwerkproblemen",
+        "fr": "Les noms de canaux et d'appareils suivent la langue système ioBroker\nRetour clair et honnête pour la connexion cloud, la clé API, la synchro et les problèmes réseau",
+        "it": "I nomi di canali e dispositivi seguono la lingua di sistema di ioBroker\nFeedback chiaro e onesto per login cloud, chiave API, sincronizzazione e problemi di rete",
+        "es": "Los nombres de canales y dispositivos siguen el idioma del sistema ioBroker\nComentarios claros y honestos en inicio de sesión, clave API, sincronización y errores de red",
+        "pl": "Nazwy kanałów i urządzeń podążają teraz za językiem systemowym ioBroker\nJaśniejsze, uczciwe komunikaty przy logowaniu do chmury, kluczu API, synchronizacji i sieci",
+        "uk": "Назви каналів і пристроїв тепер відповідають системній мові ioBroker\nЧіткий, чесний зворотний зв'язок для входу в хмару, ключа API, синхронізації та мережі",
+        "zh-cn": "频道和设备名称现在遵循 ioBroker 系统语言\n针对云登录、API 密钥、设备同步和网络问题提供更清晰、真实的反馈"
+      },
       "2.19.0": {
         "en": "Device log lines now consistently name devices as \"name (model)\"\nThe credentials entry disappears from the object tree — login tokens stay saved in encrypted form",
         "de": "Geräte-Logzeilen nennen Geräte jetzt durchgängig als \"Name (Modell)\"\nDer credentials-Eintrag verschwindet aus dem Objektbaum — Login-Tokens bleiben verschlüsselt gespeichert",
@@ -80,19 +93,6 @@
         "pl": "Na hostach z wieloma interfejsami sieciowymi wykrywanie urządzeń LAN używa teraz wybranego interfejsu dla ruchu wychodzącego i nie pomija już urządzeń przez skanowanie przez zły.",
         "uk": "На хостах із кількома мережевими інтерфейсами LAN-виявлення тепер використовує вибраний інтерфейс для вихідного трафіку й не пропускає пристрої через неправильний.",
         "zh-cn": "在具有多个网络接口的主机上，LAN 设备发现现在使用所选接口发送流量，不再因在错误接口上扫描而漏掉设备。"
-      },
-      "2.16.1": {
-        "en": "Compact mode no longer intercepts errors from other adapters, and device info entries keep a clean state history. Cloud commands no longer pile up without limit during rate-limit pauses.",
-        "de": "Compact Mode fängt keine Fehler fremder Adapter mehr ab, und Geräte-Info-Einträge behalten eine saubere State-History. Cloud-Befehle stauen sich bei Rate-Limit-Pausen nicht mehr unbegrenzt.",
-        "ru": "Компактный режим больше не перехватывает ошибки других адаптеров, а записи информации об устройстве сохраняют чистую историю. Облачные команды больше не накапливаются без ограничений при паузах.",
-        "pt": "O modo compacto não intercepta mais erros de outros adaptadores e as entradas de informação mantêm um histórico limpo. Comandos na nuvem não se acumulam mais sem limite durante pausas de limite.",
-        "nl": "Compact mode onderschept geen fouten van andere adapters meer en apparaatinfo-items houden een schone geschiedenis. Cloud-opdrachten stapelen zich niet meer onbeperkt op tijdens rate-limit-pauzes.",
-        "fr": "Le mode compact n'intercepte plus les erreurs des autres adaptateurs et les infos d'appareil gardent un historique propre. Les commandes Cloud ne s'accumulent plus sans limite pendant les pauses.",
-        "it": "La modalità compatta non intercetta più gli errori di altri adattatori e le voci info mantengono una cronologia pulita. I comandi cloud non si accumulano più senza limiti durante le pause.",
-        "es": "El modo compacto ya no intercepta errores de otros adaptadores y las entradas de información mantienen un historial limpio. Los comandos en la nube ya no se acumulan sin límite durante las pausas.",
-        "pl": "Tryb kompaktowy nie przechwytuje już błędów innych adapterów, a wpisy informacji o urządzeniu zachowują czystą historię. Polecenia chmury nie gromadzą się już bez limitu podczas przerw.",
-        "uk": "Компактний режим більше не перехоплює помилки інших адаптерів, а записи інформації про пристрій зберігають чисту історію. Хмарні команди більше не накопичуються без обмежень під час пауз.",
-        "zh-cn": "紧凑模式不再拦截其他适配器的错误，设备信息条目保持干净的状态历史。云命令在限流暂停期间不再无限堆积。"
       }
     },
     "plugins": {

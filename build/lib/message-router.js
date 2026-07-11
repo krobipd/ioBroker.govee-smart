@@ -40,6 +40,30 @@ class MessageRouter {
   /** Separate throttle for the `test` action so it doesn't share the requestCode window (SEC-I1). */
   lastTestRequestMs = 0;
   /**
+   * Map a probe failure (category + raw client message) onto the localized
+   * admin result labels. Category first; the raw message only disambiguates
+   * sub-cases inside a category (451 "email not registered" is AUTH like a
+   * wrong password) and the not-classifiable Govee account states.
+   *
+   * @param failure          Last error from the probe client
+   * @param failure.category Classified error category
+   * @param failure.message  Raw client error message
+   */
+  labelForProbeFailure(failure) {
+    switch (failure.category) {
+      case "VERIFICATION_PENDING":
+        return (0, import_i18n.resolveLabel)("mqttAuthVerifyRequired");
+      case "VERIFICATION_FAILED":
+        return (0, import_i18n.resolveLabel)("mqttAuthCodeInvalid");
+      case "AUTH":
+        return /email not registered/i.test(failure.message) ? (0, import_i18n.resolveLabel)("mqttAuthEmailNotRegistered") : (0, import_i18n.resolveLabel)("mqttAuthPasswordRejected");
+      case "RATE_LIMIT":
+        return (0, import_i18n.resolveLabel)("mqttAuthRateLimited");
+      default:
+        return /account temporarily locked/i.test(failure.message) ? (0, import_i18n.resolveLabel)("mqttAuthAccountLocked") : (0, import_i18n.resolveLabel)("mqttAuthLoginFailed", failure.message);
+    }
+  }
+  /**
    * Sync entry-point — registered as `this.on("message", ...)`. Wraps the
    * async handler in a catch so unhandled rejections can't crash the adapter.
    *
@@ -127,36 +151,25 @@ class MessageRouter {
             }
           }
         );
+        const loginFailure = probe.getLastError();
+        if (loginFailure) {
+          return { result: this.labelForProbeFailure(loginFailure) };
+        }
         const connected = await Promise.race([
           connectedEdge,
           new Promise((resolve) => {
             probeTimer = this.host.setTimeout(() => resolve(false), this.probeConnectTimeoutMs);
           })
         ]);
+        if (connected) {
+          return { result: (0, import_i18n.resolveLabel)("mqttAuthLoginOk") };
+        }
+        const lateFailure = probe.getLastError();
         return {
-          result: connected ? (0, import_i18n.resolveLabel)("mqttAuthLoginOk") : (0, import_i18n.resolveLabel)("mqttAuthLoginNoMqtt")
+          result: lateFailure ? this.labelForProbeFailure(lateFailure) : (0, import_i18n.resolveLabel)("mqttAuthLoginNoMqtt")
         };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        if (/Verification required/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthVerifyRequired") };
-        }
-        if (/Verification code invalid/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthCodeInvalid") };
-        }
-        if (/email not registered/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthEmailNotRegistered") };
-        }
-        if (/Login failed/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthPasswordRejected") };
-        }
-        if (/Rate limited/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthRateLimited") };
-        }
-        if (/Account temporarily locked/i.test(msg)) {
-          return { result: (0, import_i18n.resolveLabel)("mqttAuthAccountLocked") };
-        }
-        return { result: (0, import_i18n.resolveLabel)("mqttAuthLoginFailed", msg) };
+        return { result: (0, import_i18n.resolveLabel)("mqttAuthLoginFailed", e instanceof Error ? e.message : String(e)) };
       } finally {
         if (probeTimer) {
           this.host.clearTimeout(probeTimer);

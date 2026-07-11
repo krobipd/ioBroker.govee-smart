@@ -75,7 +75,7 @@ function onLanDeviceReady(adapter, device, _allDevices) {
     await sm.createInfoStates(device);
     await sm.createLanStates(device);
   })().catch((e) => {
-    adapter.log.error(`onLanDeviceReady failed for ${device.name}: ${(0, import_types.errMessage)(e)}`);
+    adapter.log.error(`onLanDeviceReady failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
   });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
@@ -103,7 +103,7 @@ function onCloudDataReady(adapter, device, allDevices) {
     await sm.migrateLegacyDiagnostics(device);
     await sm.updateDeviceTier(device, (0, import_device_registry.getDeviceTier)(device.sku));
   })().catch((e) => {
-    adapter.log.error(`onCloudDataReady failed for ${device.name}: ${(0, import_types.errMessage)(e)}`);
+    adapter.log.error(`onCloudDataReady failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
   });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);

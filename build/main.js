@@ -73,6 +73,7 @@ class GoveeAdapter extends utils.Adapter {
   actionableProblems;
   /** Public for handler modules. */
   cloudClient = null;
+  /** Public for handler modules (cloud-state-loader budgets its /device/state calls). */
   rateLimiter = null;
   /** Repeating timer for the App-API poll (sensor-state pull). */
   appApiPollTimer;
@@ -166,7 +167,7 @@ class GoveeAdapter extends utils.Adapter {
       await cloudCreds.migrateCredentialsMetaOnce(this, utils.getAbsoluteInstanceDataDir(this));
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
-          "Credentials encryption migration: stored values look corrupted \u2014 please re-enter API key, Govee password and verification code in the adapter settings (one-time after upgrade to v2.11.0)."
+          "The Govee API key does not look like a valid key (expected UUID format like 12345678-1234-1234-1234-123456789abc) \u2014 check for typos or copied whitespace in the adapter settings. If this appeared right after upgrading a very old install (v2.11.0 encryption migration), re-enter the API key, Govee password and verification code once."
         );
       }
       this.channelStatus = {
@@ -316,6 +317,16 @@ class GoveeAdapter extends utils.Adapter {
       );
       this.lanClient = new import_govee_lan_client.GoveeLanClient(this.log, this);
       this.deviceManager.setLanClient(this.lanClient);
+      this.lanClient.onInterfaceError = (message) => {
+        this.actionableProblems.report({
+          key: "lan-interface",
+          title: "LAN unavailable on the selected network interface",
+          action: message
+        });
+      };
+      this.lanClient.onListenReady = () => {
+        this.actionableProblems.resolve("lan-interface", "LAN listening on the selected network interface");
+      };
       this.lanClient.setSendHook((ip, cmd, payload, bytes, error) => {
         var _a2;
         const dev = (_a2 = this.deviceManager) == null ? void 0 : _a2.getDevices().find((d) => d.lanIp === ip);
@@ -525,12 +536,13 @@ class GoveeAdapter extends utils.Adapter {
         for (const device of this.deviceManager.getDevices()) {
           if (device.lanIp && device.capabilities.length === 0) {
             const prefix = this.stateManager.devicePrefix(device);
-            await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch((e) => {
-              this.log.debug(`v2.8.0 migration cleanup failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
+            const deleted = await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch((e) => {
+              this.log.debug(`Legacy cloud-state cleanup failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
+              return 0;
             });
-            this.log.info(
-              `Migrated v2.8.0: removed legacy cloud-owned states for ${device.name} (pure-LAN, no API key)`
-            );
+            if (deleted > 0) {
+              this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${(0, import_types.deviceLabel)(device)} (pure-LAN)`);
+            }
           }
         }
         for (const device of this.deviceManager.getDevices()) {
@@ -735,7 +747,12 @@ class GoveeAdapter extends utils.Adapter {
     if (!this.deviceManager) {
       return;
     }
-    await this.deviceManager.loadFromCloud();
+    const result = await this.deviceManager.loadFromCloud();
+    if (!result.ok) {
+      this.log.warn(`Manual device sync failed (${result.reason}) \u2014 see earlier log for details`);
+      cloudRetryHandler.handleCloudFailure(this, result);
+      return;
+    }
     await this.reapStaleDevices();
   }
   /**
@@ -750,9 +767,13 @@ class GoveeAdapter extends utils.Adapter {
   stateToCommand(suffix) {
     return dropdownReset.stateToCommand(suffix);
   }
-  /** Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface. */
-  loadCloudStates() {
-    return cloudStateLoader.loadCloudStates(this);
+  /**
+   * Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface.
+   *
+   * @param only Optional single device to reload; omit to reload every device's cloud states
+   */
+  loadCloudStates(only) {
+    return cloudStateLoader.loadCloudStates(this, only);
   }
   /**
    * Central entry point for manual-segment updates (public for the wizard +
@@ -791,7 +812,9 @@ class GoveeAdapter extends utils.Adapter {
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
       createMqttProbeClient: () => {
         const config = this.config;
-        return new import_govee_mqtt_client.GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        const probe = new import_govee_mqtt_client.GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        probe.enableProbeMode();
+        return probe;
       },
       getSegmentDeviceList: () => {
         var _a, _b;

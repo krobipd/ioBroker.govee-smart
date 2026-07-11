@@ -99,7 +99,7 @@ async function sendMusicCommand(adapter, device, prefix, changedSuffix, newValue
   if (device.lanIp && adapter.lanClient) {
     if (changedSuffix === "music.music_sensitivity" || changedSuffix === "music.music_auto_color") {
       adapter.log.warn(
-        `${device.name} (${device.sku}): music sensitivity / auto-color can't be set over the local API \u2014 only the music mode applies for LAN-controlled lights.`
+        `${(0, import_types.deviceLabel)(device)}: music sensitivity / auto-color can't be set over the local API \u2014 only the music mode applies for LAN-controlled lights.`
       );
       return;
     }
@@ -125,18 +125,20 @@ async function handleManualSegmentsChange(adapter, device, suffix, newValue) {
   const modeVal = suffix === "segments.manual_mode" ? Boolean(newValue) : device.manualMode === true;
   const listVal = suffix === "segments.manual_list" ? typeof newValue === "string" ? newValue : "" : Array.isArray(device.manualSegments) ? device.manualSegments.join(",") : "";
   if (!modeVal) {
-    adapter.log.info(`${device.name}: manual segments disabled \u2014 strip treated as contiguous`);
+    adapter.log.info(`${(0, import_types.deviceLabel)(device)}: manual segments disabled \u2014 strip treated as contiguous`);
     await adapter.applyManualSegments(device, false);
     return;
   }
   const maxIndex = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount - 1 : import_device_manager.SEGMENT_HARD_MAX;
   const parsed = (0, import_types.parseSegmentList)(listVal, maxIndex);
   if (parsed.error) {
-    adapter.log.warn(`${device.name}: manual_list invalid (${parsed.error}) \u2014 disabling manual mode`);
+    adapter.log.warn(`${(0, import_types.deviceLabel)(device)}: manual_list invalid (${parsed.error}) \u2014 disabling manual mode`);
     await adapter.applyManualSegments(device, false);
     return;
   }
-  adapter.log.debug(`${device.name}: manual segments active \u2014 ${parsed.indices.length} physical indices (${listVal})`);
+  adapter.log.debug(
+    `${(0, import_types.deviceLabel)(device)}: manual segments active \u2014 ${parsed.indices.length} physical indices (${listVal})`
+  );
   await adapter.applyManualSegments(device, true, parsed.indices);
 }
 async function handleGenericCapabilityCommand(adapter, device, id, stateSuffix, val) {
@@ -150,16 +152,16 @@ async function handleGenericCapabilityCommand(adapter, device, id, stateSuffix, 
   if (typeof capType === "string" && typeof capInstance === "string") {
     try {
       adapter.log.debug(
-        `Routing to generic capability for ${device.name}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`
+        `Routing to generic capability for ${(0, import_types.deviceLabel)(device)}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`
       );
       await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, val);
       await adapter.setState(id, { val, ack: true });
     } catch (err) {
-      adapter.log.warn(`Command failed for ${device.name}: ${(0, import_types.errMessage)(err)}`);
+      adapter.log.warn(`Command failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(err)}`);
     }
   } else {
     adapter.log.debug(
-      `No handler matched for ${device.name} (${device.sku}) state=${stateSuffix} val=${JSON.stringify(val)} \u2014 writable state without command mapping or capability metadata, silently ignored`
+      `No handler matched for ${(0, import_types.deviceLabel)(device)} state=${stateSuffix} val=${JSON.stringify(val)} \u2014 writable state without command mapping or capability metadata, silently ignored`
     );
   }
 }
@@ -197,7 +199,7 @@ async function onStateChange(adapter, id, state) {
   const prefix = adapter.stateManager.devicePrefix(device);
   const stateSuffix = localId.slice(prefix.length + 1);
   adapter.log.debug(
-    `onStateChange ${id}: device=${device.name} (${device.sku}) suffix=${stateSuffix} val=${JSON.stringify(state.val)}`
+    `onStateChange ${id}: device=${(0, import_types.deviceLabel)(device)} suffix=${stateSuffix} val=${JSON.stringify(state.val)}`
   );
   adapter.deviceManager.getDiagnostics().addLog(device.deviceId, "debug", `User-write ${stateSuffix}=${JSON.stringify(state.val)}`);
   const resolved = await resolveDropdownInput(adapter, id, state.val);
@@ -240,14 +242,14 @@ async function onStateChange(adapter, id, state) {
   }
   if (stateSuffix === "snapshots.refresh_cloud" && val) {
     if (adapter.deviceManager) {
-      adapter.log.info(`Refresh cloud data for ${device.name} (${device.sku}): re-fetching scenes and snapshots`);
+      adapter.log.info(`Refresh cloud data for ${(0, import_types.deviceLabel)(device)}: re-fetching scenes and snapshots`);
       try {
         const changed = await adapter.deviceManager.refreshSceneDataForDevice(device.deviceId);
         if (changed) {
-          await adapter.loadCloudStates();
+          await adapter.loadCloudStates(device);
         }
       } catch (e) {
-        adapter.log.warn(`Refresh cloud data for ${device.name} failed: ${(0, import_types.errMessage)(e)}`);
+        adapter.log.warn(`Refresh cloud data for ${(0, import_types.deviceLabel)(device)} failed: ${(0, import_types.errMessage)(e)}`);
       }
     }
     await adapter.setState(id, { val: false, ack: true });
@@ -309,7 +311,7 @@ async function onStateChange(adapter, id, state) {
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, command);
     }
   } catch (err) {
-    adapter.log.warn(`Command failed for ${device.name}: ${(0, import_types.errMessage)(err)}`);
+    adapter.log.warn(`Command failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(err)}`);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

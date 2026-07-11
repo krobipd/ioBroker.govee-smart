@@ -23,43 +23,50 @@ __export(cloud_state_loader_exports, {
 });
 module.exports = __toCommonJS(cloud_state_loader_exports);
 var import_capability_mapper = require("../capability-mapper");
-async function loadCloudStates(adapter) {
+var import_types = require("../types");
+async function loadCloudStates(adapter, only) {
   if (!adapter.cloudClient || !adapter.deviceManager || !adapter.stateManager) {
     return;
   }
-  const devices = adapter.deviceManager.getDevices();
-  let loaded = 0;
-  for (const device of devices) {
-    if (!device.channels.cloud || device.capabilities.length === 0) {
-      continue;
-    }
-    try {
-      const caps = await adapter.cloudClient.getDeviceState(device.sku, device.deviceId);
-      const prefix = adapter.stateManager.devicePrefix(device);
-      const writes = [];
-      for (const cap of caps) {
-        const mapped = (0, import_capability_mapper.mapCloudStateValue)(cap);
-        if (!mapped) {
-          continue;
-        }
-        if (device.lanIp && import_capability_mapper.LAN_STATE_IDS.has(mapped.stateId)) {
-          continue;
-        }
-        const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId);
-        writes.push(adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => void 0));
+  const targets = adapter.deviceManager.getDevices().filter((d) => d.channels.cloud && d.capabilities.length > 0 && (!only || d === only));
+  for (const device of targets) {
+    const loadOne = async () => {
+      if (!adapter.cloudClient || !adapter.stateManager) {
+        return;
       }
-      await Promise.all(writes);
-      loaded++;
-    } catch (e) {
-      if (adapter.deviceManager) {
-        const status = e && typeof e === "object" && "statusCode" in e ? e.statusCode : void 0;
-        adapter.deviceManager.getDiagnostics().recordApiFailure(device.deviceId, "/router/api/v1/device/state", e, status);
+      try {
+        const caps = await adapter.cloudClient.getDeviceState(device.sku, device.deviceId);
+        const prefix = adapter.stateManager.devicePrefix(device);
+        const writes = [];
+        for (const cap of caps) {
+          const mapped = (0, import_capability_mapper.mapCloudStateValue)(cap);
+          if (!mapped) {
+            continue;
+          }
+          if (device.lanIp && import_capability_mapper.LAN_STATE_IDS.has(mapped.stateId)) {
+            continue;
+          }
+          const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId);
+          writes.push(adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => void 0));
+        }
+        await Promise.all(writes);
+        adapter.log.debug(`Cloud state loaded for ${(0, import_types.deviceLabel)(device)}`);
+      } catch (e) {
+        if (adapter.deviceManager) {
+          const status = e && typeof e === "object" && "statusCode" in e ? e.statusCode : void 0;
+          adapter.deviceManager.getDiagnostics().recordApiFailure(device.deviceId, "/router/api/v1/device/state", e, status);
+        }
+        adapter.log.debug(`Could not load Cloud state for ${(0, import_types.deviceLabel)(device)}`);
       }
-      adapter.log.debug(`Could not load Cloud state for ${device.name} (${device.sku})`);
+    };
+    if (adapter.rateLimiter) {
+      await adapter.rateLimiter.tryExecute(loadOne, 2);
+    } else {
+      await loadOne();
     }
   }
-  if (loaded > 0) {
-    adapter.log.debug(`Cloud states loaded for ${loaded} devices`);
+  if (targets.length > 0) {
+    adapter.log.debug(`Cloud state load dispatched for ${targets.length} device(s) (rate-limited)`);
   }
 }
 async function applyCloudCapabilities(adapter, device, caps) {

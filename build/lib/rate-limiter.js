@@ -81,6 +81,7 @@ class RateLimiter {
   }
   /** Stop the rate limiter */
   stop() {
+    var _a;
     this.stopped = true;
     if (this.minuteResetTimer) {
       this.timers.clearInterval(this.minuteResetTimer);
@@ -97,6 +98,9 @@ class RateLimiter {
     if (this.processTimer) {
       this.timers.clearInterval(this.processTimer);
       this.processTimer = void 0;
+    }
+    for (const call of this.queue) {
+      (_a = call.reject) == null ? void 0 : _a.call(call, new Error("Rate limiter stopped \u2014 queued Cloud call cancelled"));
     }
     this.queue.length = 0;
   }
@@ -119,8 +123,10 @@ class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
+   * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
    */
-  enqueue(execute, priority = 1) {
+  enqueue(execute, priority = 1, reject) {
+    var _a;
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
       const tail = this.queue[this.queue.length - 1];
       if (!tail || tail.priority <= priority) {
@@ -131,12 +137,14 @@ class RateLimiter {
           this.warnedQueueFull = true;
           this.log.warn(msg);
         }
-        return;
+        return false;
       }
-      this.queue.pop();
+      const evicted = this.queue.pop();
+      (_a = evicted == null ? void 0 : evicted.reject) == null ? void 0 : _a.call(evicted, new Error("Cloud call evicted \u2014 rate-limiter queue full"));
     }
-    this.queue.push({ execute, priority });
+    this.queue.push({ execute, priority, reject });
     this.queue.sort((a, b) => a.priority - b.priority);
+    return true;
   }
   /**
    * Execute immediately if within limits, otherwise queue.
@@ -154,6 +162,44 @@ class RateLimiter {
     }
     this.enqueue(execute, priority);
     return false;
+  }
+  /**
+   * Execute within the budget and settle when the call ACTUALLY ran —
+   * including when it had to queue. User commands need this coupling:
+   * tryExecute resolves on enqueue, the caller acks the state, and a later
+   * queue failure would be invisible to the user (M3). Loaders keep
+   * tryExecute (fire-and-queue is fine for background data).
+   *
+   * Rejects with the call's error, or with a queue-drop error when the
+   * capped queue evicts the call before it ever ran.
+   *
+   * @param execute The API call to make
+   * @param priority Call priority (0 = control)
+   */
+  async executeTracked(execute, priority = 0) {
+    if (this.canMakeCall()) {
+      this.callsThisMinute++;
+      this.callsToday++;
+      await execute();
+      return;
+    }
+    await new Promise((resolve, reject) => {
+      const accepted = this.enqueue(
+        async () => {
+          try {
+            await execute();
+            resolve();
+          } catch (e) {
+            reject(e instanceof Error ? e : new Error(String(e)));
+          }
+        },
+        priority,
+        reject
+      );
+      if (!accepted) {
+        reject(new Error("Cloud call dropped \u2014 rate-limiter queue full"));
+      }
+    });
   }
   /** Whether a call can be made right now */
   canMakeCall() {

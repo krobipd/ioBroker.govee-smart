@@ -18,6 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var capability_mapper_exports = {};
 __export(capability_mapper_exports, {
+  EVENT_STATE_ROLES: () => EVENT_STATE_ROLES,
   LAN_STATE_IDS: () => LAN_STATE_IDS,
   SENSOR_ROLE_UNIT: () => SENSOR_ROLE_UNIT,
   applyQuirksToStates: () => applyQuirksToStates,
@@ -291,7 +292,7 @@ function mapMode(cap) {
   if (cap.instance !== "presetScene" || !Array.isArray((_a = cap.parameters) == null ? void 0 : _a.options)) {
     return [];
   }
-  const states = {};
+  const states = { "": "---" };
   for (const opt of cap.parameters.options) {
     if (!opt || typeof opt.name !== "string") {
       continue;
@@ -318,6 +319,20 @@ const SENSOR_ROLE_UNIT = {
   humidity: { role: "value.humidity", unit: "%" },
   battery: { role: "value.battery", unit: "%" },
   co2: { role: "value.co2", unit: "ppm" }
+};
+const EVENT_STATE_ROLES = {
+  lackwater: { role: "indicator.maintenance" },
+  lackwaterevent: { role: "indicator.maintenance" },
+  icefull: { role: "indicator.maintenance" },
+  icefullevent: { role: "indicator.maintenance" },
+  bodyappeared: { role: "sensor.motion" },
+  dirtdetected: { role: "indicator.maintenance" },
+  lack_water: { role: "indicator.maintenance" },
+  lack_water_event: { role: "indicator.maintenance" },
+  ice_full: { role: "indicator.maintenance" },
+  ice_full_event: { role: "indicator.maintenance" },
+  body_appeared: { role: "sensor.motion" },
+  dirt_detected: { role: "indicator.maintenance" }
 };
 function mapProperty(cap) {
   var _a, _b;
@@ -489,12 +504,15 @@ function mapTemperatureSetting(cap) {
   ];
 }
 function mapEvent(cap) {
+  const id = sanitizeId(cap.instance);
   return [
     {
-      id: sanitizeId(cap.instance),
+      id,
       name: humanize(cap.instance),
       type: "boolean",
-      role: "indicator.alarm",
+      // Known events use the shared role table (M5 — same role as the
+      // synthetic write path); a genuinely unknown event is an alarm.
+      role: id in EVENT_STATE_ROLES ? EVENT_STATE_ROLES[id].role : "indicator.alarm",
       write: false,
       def: false,
       capabilityType: cap.type,
@@ -783,25 +801,23 @@ function buildDiagStateDefs(tierDef) {
       channel: "diag"
     }
   ];
-  if (tierDef !== null) {
-    defs.push({
-      id: "tier",
-      name: (0, import_i18n.tName)("deviceTier"),
-      type: "string",
-      role: "text",
-      write: false,
-      def: tierDef,
-      states: {
-        verified: (0, import_i18n.resolveLabel)("deviceTierVerified"),
-        reported: (0, import_i18n.resolveLabel)("deviceTierReported"),
-        seed: (0, import_i18n.resolveLabel)("deviceTierSeed"),
-        unknown: (0, import_i18n.resolveLabel)("deviceTierUnknown")
-      },
-      capabilityType: "local",
-      capabilityInstance: "diagnosticsTier",
-      channel: "diag"
-    });
-  }
+  defs.push({
+    id: "tier",
+    name: (0, import_i18n.tName)("deviceTier"),
+    type: "string",
+    role: "text",
+    write: false,
+    def: tierDef,
+    states: {
+      verified: (0, import_i18n.resolveLabel)("deviceTierVerified"),
+      reported: (0, import_i18n.resolveLabel)("deviceTierReported"),
+      seed: (0, import_i18n.resolveLabel)("deviceTierSeed"),
+      unknown: (0, import_i18n.resolveLabel)("deviceTierUnknown")
+    },
+    capabilityType: "local",
+    capabilityInstance: "diagnosticsTier",
+    channel: "diag"
+  });
   return defs;
 }
 function buildCloudStateDefs(device, log, localSnapshots, memberDevices) {
@@ -992,11 +1008,11 @@ function buildGroupStateDefs(members) {
       });
     }
   }
-  stateDefs.push(...buildDiagStateDefs(null));
   return stateDefs;
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
+  EVENT_STATE_ROLES,
   LAN_STATE_IDS,
   SENSOR_ROLE_UNIT,
   applyQuirksToStates,

@@ -29,6 +29,7 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var http_client_exports = {};
 __export(http_client_exports, {
   HttpError: () => HttpError,
+  extractHttpStatus: () => extractHttpStatus,
   formatFallback: () => formatFallback,
   httpsRequest: () => httpsRequest,
   interpretOkBody: () => interpretOkBody
@@ -156,9 +157,25 @@ class HttpError extends Error {
 function formatFallback(result) {
   return `${result.fallback} (status=${result.statusCode}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""}) \u2014 treated as no data`;
 }
+function extractHttpStatus(e) {
+  if (e instanceof HttpError) {
+    return e.statusCode;
+  }
+  if (typeof e === "object" && e !== null) {
+    const x = e;
+    if (typeof x.statusCode === "number") {
+      return x.statusCode;
+    }
+    if (typeof x.status === "number") {
+      return x.status;
+    }
+  }
+  return void 0;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   HttpError,
+  extractHttpStatus,
   formatFallback,
   httpsRequest,
   interpretOkBody
