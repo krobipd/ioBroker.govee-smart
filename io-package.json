@@ -319,31 +319,6 @@
       "native": {}
     },
     {
-      "_id": "info.wizardStatus",
-      "type": "state",
-      "common": {
-        "name": {
-          "en": "Segment-Wizard status",
-          "de": "Segment-Wizard Status",
-          "ru": "Статус мастера сегментов",
-          "pt": "Estado do assistente de segmentos",
-          "nl": "Segment-wizard status",
-          "fr": "État de l'assistant de segments",
-          "it": "Stato del wizard segmenti",
-          "es": "Estado del asistente de segmentos",
-          "pl": "Status kreatora segmentów",
-          "uk": "Статус майстра сегментів",
-          "zh-cn": "分段向导状态"
-        },
-        "type": "string",
-        "role": "text",
-        "read": true,
-        "write": false,
-        "def": ""
-      },
-      "native": {}
-    },
-    {
       "_id": "info.manual_sync_devices",
       "type": "state",
       "common": {

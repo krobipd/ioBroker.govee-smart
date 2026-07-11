@@ -17,7 +17,6 @@ export interface WizardHandlerAdapter {
   readonly stateManager: StateManager | null;
   segmentWizard: SegmentWizard | null;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
   /** Apply manual segments — owned by main.ts because it touches StateManager + cache. */
@@ -106,10 +105,10 @@ export async function applyWizardResult(
 }
 
 /**
- * Execute one wizard step (start/yes/no/abort). Lazy-instantiates the
- * underlying {@link SegmentWizardClass} on first use, then mirrors its
- * status into `info.wizardStatus` so admin's `type: "state"` component
- * can show it live via state subscription.
+ * Execute one wizard step (start/yes/no/done/abort/apply). Lazy-instantiates
+ * the underlying {@link SegmentWizardClass} on first use and returns its
+ * response verbatim — the React admin component renders the wizard from the
+ * response's grid snapshot, so no status is mirrored into a state.
  *
  */
 export async function runWizardStep(
@@ -121,11 +120,5 @@ export async function runWizardStep(
   if (!adapter.segmentWizard) {
     adapter.segmentWizard = new SegmentWizardClass(buildWizardHost(adapter));
   }
-  const response = await adapter.segmentWizard.runStep(action, deviceKey, payload);
-  const statusText = adapter.segmentWizard.getStatusText();
-  await adapter.setState("info.wizardStatus", {
-    val: statusText,
-    ack: true,
-  });
-  return response;
+  return adapter.segmentWizard.runStep(action, deviceKey, payload);
 }

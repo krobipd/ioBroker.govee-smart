@@ -709,7 +709,6 @@ describe("SegmentWizard", () => {
       const r = await wizard.start(key);
       expect(typeof r.message).toBe("string");
       expect(r.message).toContain("Wizard started");
-      expect(wizard.getStatusText()).toContain("Can you see");
     });
   });
 

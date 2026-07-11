@@ -125,13 +125,6 @@ export interface WizardHost {
 // IDLE_TIMEOUT_MS is now sourced from timing-constants (WIZARD_IDLE_TIMEOUT_MS).
 
 /**
- * Resolve the wizard idle-state text in the system language (admin/i18n).
- */
-export function wizardIdleText(): string {
-  return resolveLabel("idle");
-}
-
-/**
  * Check whether a device has any segment capability at all. A strip with
  * zero segments (e.g. Curtain H70B3) can't be wizard-tested.
  *
@@ -179,28 +172,6 @@ export class SegmentWizard {
    */
   private t(key: I18nKey, params?: Record<string, string | number>): string {
     return format(resolveLabel(key), params);
-  }
-
-  /**
-   * Human-readable status string for the admin UI (rendered via textSendTo).
-   * Must stay a plain string — Admin renders it as-is into a read-only field.
-   */
-  public getStatusText(): string {
-    const s = this.session;
-    if (!s) {
-      return this.t("idle");
-    }
-    const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "—";
-    return (
-      `${this.t("deviceHeader")}: ${s.name}\n` +
-      `${this.t("segmentFlashing", { idx: s.current })}\n` +
-      `${this.t("canYouSeeStrip")}\n` +
-      `  ${this.t("btnYes")}\n` +
-      `  ${this.t("btnNo")}\n` +
-      `  ${this.t("btnDone")}\n` +
-      `\n` +
-      `${this.t("seenSoFar", { list: visibleStr })}`
-    );
   }
 
   /**

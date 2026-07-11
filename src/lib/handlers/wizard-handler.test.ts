@@ -29,10 +29,8 @@ import { createTestDevice, mockLog } from "../test-helpers";
 function makeAdapter(devices: GoveeDevice[]): {
   adapter: WizardHandlerAdapter;
   applied: Array<{ device: GoveeDevice; mode: boolean; indices?: number[] }>;
-  statusWrites: Array<{ id: string; val: unknown }>;
 } {
   const applied: Array<{ device: GoveeDevice; mode: boolean; indices?: number[] }> = [];
-  const statusWrites: Array<{ id: string; val: unknown }> = [];
   const adapter: WizardHandlerAdapter = {
     log: mockLog,
     namespace: "govee-smart.0",
@@ -41,16 +39,13 @@ function makeAdapter(devices: GoveeDevice[]): {
     stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
     segmentWizard: null,
     getStateAsync: async () => null,
-    setState: async (id, state) => {
-      statusWrites.push({ id, val: (state as { val: unknown }).val });
-    },
     setTimeout: () => undefined,
     clearTimeout: () => undefined,
     applyManualSegments: async (device, mode, indices) => {
       applied.push({ device, mode, indices });
     },
   };
-  return { adapter, applied, statusWrites };
+  return { adapter, applied };
 }
 
 describe("deviceKeyFor / findDeviceByKey", () => {
@@ -92,15 +87,14 @@ describe("applyWizardResult", () => {
 });
 
 describe("runWizardStep", () => {
-  it("lazily instantiates ONE wizard and mirrors its status into info.wizardStatus", async () => {
+  it("lazily instantiates ONE wizard and returns its response verbatim", async () => {
     const device = createTestDevice();
-    const { adapter, statusWrites } = makeAdapter([device]);
+    const { adapter } = makeAdapter([device]);
     expect(adapter.segmentWizard).toBeNull();
     // Unknown action — routes through the real SegmentWizard error path.
     const response = await runWizardStep(adapter, "bogus", deviceKeyFor(device));
     expect(adapter.segmentWizard).not.toBeNull();
     expect(typeof response.error).toBe("string");
-    expect(statusWrites.some(w => w.id === "info.wizardStatus")).toBe(true);
 
     const first = adapter.segmentWizard;
     await runWizardStep(adapter, "bogus", deviceKeyFor(device));

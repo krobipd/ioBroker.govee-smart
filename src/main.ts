@@ -28,7 +28,6 @@ import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
 import { RateLimiter } from "./lib/rate-limiter";
 import type { SegmentWizard } from "./lib/segment-wizard";
-import { wizardIdleText } from "./lib/segment-wizard";
 import { resolveLabel } from "./lib/i18n";
 import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
@@ -189,6 +188,11 @@ class GoveeAdapter extends utils.Adapter {
       // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
       await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
 
+      // One-shot cleanup: info.wizardStatus was removed in v2.21.0 — the segment
+      // wizard is now a React admin component that owns its own status, so the
+      // UI-only mirror state is gone. Drop the dead orphan on upgraded installs.
+      await this.delObjectAsync("info.wizardStatus").catch(() => undefined);
+
       // One-shot migration + cleanup: the <namespace>.credentials meta object
       // (v2.18.0–v2.18.2) is replaced by an encrypted file in the instance data
       // directory — the credentials are a re-derivable cache (the account
@@ -244,10 +248,6 @@ class GoveeAdapter extends utils.Adapter {
       await this.setState("info.cloudConnected", { val: false, ack: true });
       await this.setState("info.openapiMqttConnected", {
         val: false,
-        ack: true,
-      });
-      await this.setState("info.wizardStatus", {
-        val: wizardIdleText(),
         ack: true,
       });
 
