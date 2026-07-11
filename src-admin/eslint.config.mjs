@@ -11,6 +11,7 @@ export default [
             '.__mf__temp/',
             'admin/',
             '**/*.test.js',
+            '**/*.test.ts',
             '**/*.test.tsx',
             'src/setupTests.ts',
             'vitest.config.ts',

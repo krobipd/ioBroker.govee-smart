@@ -202,6 +202,8 @@ git commit -m "feat(admin): scaffold src-admin custom component + wire segment w
 
 ## Task 3: `useWizardApi` — typed sendTo wrapper
 
+> ✅ **DONE** (commit below). `makeWizardApi(socket, namespace)` → `{ listDevices, start, yes, no, done, abort, apply }`. Verified the real signature `socket.sendTo(instance, command, data)` against the **bundled** `@iobroker/socket-client` 5.0.2 (adapter-react-v5 7.7.5) + live json-config usage — the plan's assumption held. `start(device)` records the device for the follow-up steps; `apply(device, indices)` sends the corrected map. `WizardSocket` is a narrow injectable seam (just `sendTo`) so the factory is pure/testable. Frontend `WizardSnapshot`/`WizardResponse`/`DeviceOption` types re-declared locally (src-admin can't import from `../src`) with a comment pinning them to the backend contract. 6 tests (yes-payload, start-remembers-device, done/abort, apply, listDevices happy + non-array→[]). src-admin 7/7 tests, lint 0/0.
+
 **Files:** Create `src-admin/src/useWizardApi.ts`; Test `src-admin/src/useWizardApi.test.ts`
 
 **Interfaces:**
