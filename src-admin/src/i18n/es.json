@@ -1,0 +1,20 @@
+{
+    "gsw_title": "Detección de segmentos",
+    "gsw_deviceLabel": "Dispositivo",
+    "gsw_noDevices": "No se encontraron dispositivos con segmentos. Introduce una clave API de la nube en la configuración del adaptador para conocer las capacidades del dispositivo.",
+    "gsw_start": "Iniciar medición",
+    "gsw_measureHint": "Observa la tira: ¿qué segmento se ilumina en blanco brillante?",
+    "gsw_question": "Segmento %s: ¿está iluminado?",
+    "gsw_lit": "Iluminado",
+    "gsw_dark": "Oscuro (hueco)",
+    "gsw_finish": "Listo: final de la tira",
+    "gsw_cancel": "Cancelar",
+    "gsw_reviewHint": "Haz clic en una celda para cambiar entre iluminado/hueco, luego aplica.",
+    "gsw_resultNoGaps": "%s segmentos, sin huecos",
+    "gsw_resultGaps": "%s segmentos, %s hueco(s)",
+    "gsw_apply": "Aplicar",
+    "gsw_remeasure": "Medir de nuevo",
+    "gsw_applied": "Aplicado: %s segmentos.",
+    "gsw_error": "Error del asistente: %s",
+    "gsw_close": "Cerrar"
+}

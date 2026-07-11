@@ -1,0 +1,20 @@
+{
+    "gsw_title": "Deteção de segmentos",
+    "gsw_deviceLabel": "Dispositivo",
+    "gsw_noDevices": "Nenhum dispositivo com segmentos encontrado. Introduza uma chave de API da nuvem nas definições do adaptador para conhecer as capacidades do dispositivo.",
+    "gsw_start": "Iniciar medição",
+    "gsw_measureHint": "Observe a fita — que segmento acende em branco brilhante?",
+    "gsw_question": "Segmento %s — está aceso?",
+    "gsw_lit": "Aceso",
+    "gsw_dark": "Escuro (falha)",
+    "gsw_finish": "Pronto – fim da tira",
+    "gsw_cancel": "Cancelar",
+    "gsw_reviewHint": "Clique numa célula para alternar aceso/falha e depois aplique.",
+    "gsw_resultNoGaps": "%s segmentos, sem falhas",
+    "gsw_resultGaps": "%s segmentos, %s falha(s)",
+    "gsw_apply": "Aplicar",
+    "gsw_remeasure": "Medir novamente",
+    "gsw_applied": "Aplicado: %s segmentos.",
+    "gsw_error": "Erro do assistente: %s",
+    "gsw_close": "Fechar"
+}

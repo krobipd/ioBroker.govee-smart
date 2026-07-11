@@ -1,0 +1,20 @@
+{
+    "gsw_title": "分段检测",
+    "gsw_deviceLabel": "设备",
+    "gsw_noDevices": "未找到带分段的设备。请在适配器设置中输入云 API 密钥，以便获知设备功能。",
+    "gsw_start": "开始测量",
+    "gsw_measureHint": "观察灯带——哪个分段亮起明亮的白色？",
+    "gsw_question": "分段 %s — 它亮吗？",
+    "gsw_lit": "亮",
+    "gsw_dark": "暗（间隙）",
+    "gsw_finish": "完成 – 灯带结束",
+    "gsw_cancel": "中止",
+    "gsw_reviewHint": "点击单元格可在 亮/间隙 之间切换，然后应用。",
+    "gsw_resultNoGaps": "%s 个分段，无间隙",
+    "gsw_resultGaps": "%s 个分段，%s 个间隙",
+    "gsw_apply": "应用",
+    "gsw_remeasure": "重新测量",
+    "gsw_applied": "已应用：%s 个分段。",
+    "gsw_error": "向导错误：%s",
+    "gsw_close": "关闭"
+}

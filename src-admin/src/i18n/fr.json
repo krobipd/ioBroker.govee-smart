@@ -1,0 +1,20 @@
+{
+    "gsw_title": "Détection de segments",
+    "gsw_deviceLabel": "Appareil",
+    "gsw_noDevices": "Aucun appareil avec segments trouvé. Saisissez une clé API cloud dans les paramètres de l'adaptateur pour connaître les capacités de l'appareil.",
+    "gsw_start": "Démarrer la mesure",
+    "gsw_measureHint": "Observez le ruban : quel segment s'allume en blanc vif ?",
+    "gsw_question": "Segment %s — est-il allumé ?",
+    "gsw_lit": "Allumé",
+    "gsw_dark": "Sombre (lacune)",
+    "gsw_finish": "Terminé – fin du ruban",
+    "gsw_cancel": "Annuler",
+    "gsw_reviewHint": "Cliquez sur une cellule pour basculer allumé/lacune, puis appliquez.",
+    "gsw_resultNoGaps": "%s segments, aucune lacune",
+    "gsw_resultGaps": "%s segments, %s lacune(s)",
+    "gsw_apply": "Appliquer",
+    "gsw_remeasure": "Mesurer à nouveau",
+    "gsw_applied": "Appliqué : %s segments.",
+    "gsw_error": "Erreur de l'assistant : %s",
+    "gsw_close": "Fermer"
+}
