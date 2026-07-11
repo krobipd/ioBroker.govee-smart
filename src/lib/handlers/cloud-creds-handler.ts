@@ -155,13 +155,27 @@ export async function loadPersistedCreds(
     if (!raw) {
       return null;
     }
-    // The state blob is already encrypted — copy it verbatim into the file, then
-    // drop the old state object so the credentials stop being a datapoint.
-    writeCredentialsFile(dataDir, raw);
-    await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
-    adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
-    return parsePersistedBlob(adapter, raw);
-  } catch {
+    // Parse FIRST: the blob in hand is valid credentials for this session
+    // even if the file write below fails (read-only FS, full disk). The old
+    // order threw them away on a write error → fresh login + potential 2FA
+    // mail on every start — the exact storm this persistence exists to
+    // prevent.
+    const creds = parsePersistedBlob(adapter, raw);
+    try {
+      // The state blob is already encrypted — copy it verbatim into the file,
+      // then drop the old state object so the credentials stop being a
+      // datapoint. Only remove the legacy state once the file carry-over
+      // actually succeeded; otherwise keep it as the migration source for
+      // the next start.
+      writeCredentialsFile(dataDir, raw);
+      await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
+      adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
+    } catch (e) {
+      adapter.log.debug(`Credentials file write failed — keeping legacy state for next start: ${errMessage(e)}`);
+    }
+    return creds;
+  } catch (e) {
+    adapter.log.debug(`Legacy credentials migration failed: ${errMessage(e)}`);
     return null;
   }
 }
@@ -210,22 +224,34 @@ export async function persistCreds(
  * @param dataDir Adapter instance data directory
  */
 export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dataDir: string): Promise<void> {
+  let carryOverOk = true;
   try {
     const { file } = await adapter.readFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
     const raw = typeof file === "string" ? file : file.toString("utf-8");
     if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
-      writeCredentialsFile(dataDir, raw);
-      adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+      try {
+        writeCredentialsFile(dataDir, raw);
+        adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+      } catch (e) {
+        // Write failure (read-only FS, full disk) is NOT "no blob": keep the
+        // legacy meta file as the migration source for the next start —
+        // deleting it here would throw away a valid token cache and trigger
+        // the fresh-login/2FA path this cache exists to avoid.
+        carryOverOk = false;
+        adapter.log.debug(`Credentials carry-over failed — keeping legacy meta for next start: ${errMessage(e)}`);
+      }
     }
   } catch {
     // no stored blob (fresh install or already migrated) — still drop the meta object below
   }
-  try {
-    await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
-  } catch {
-    // file already gone
+  if (carryOverOk) {
+    try {
+      await adapter.delFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
+    } catch {
+      // file already gone
+    }
+    await adapter.delObjectAsync("credentials").catch(() => undefined);
   }
-  await adapter.delObjectAsync("credentials").catch(() => undefined);
 }
 
 /**
