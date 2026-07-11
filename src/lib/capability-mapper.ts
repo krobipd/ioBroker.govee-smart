@@ -435,7 +435,11 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
     return [];
   }
 
-  const states: Record<string, string> = {};
+  // Sentinel entry: def is "" — without a matching key the
+  // "Resetting stale dropdown" pass in writeStateDefsToChannels re-ran on
+  // EVERY start (the reset writes "", "" is not in the map, repeat). Same
+  // "---" convention as buildUniqueLabelMap's 0-sentinel (LOW).
+  const states: Record<string, string> = { "": "---" };
   for (const opt of cap.parameters.options) {
     if (!opt || typeof opt.name !== "string") {
       continue;

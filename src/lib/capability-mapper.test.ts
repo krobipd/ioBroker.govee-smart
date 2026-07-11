@@ -171,7 +171,8 @@ describe("CapabilityMapper", () => {
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("scene");
-      expect(result[0].states).toEqual({ "1": "Sunset", "2": "Rainbow", "3": "Movie" });
+      // "" sentinel: matches def "" so the stale-dropdown reset pass converges (LOW)
+      expect(result[0].states).toEqual({ "": "---", "1": "Sunset", "2": "Rainbow", "3": "Movie" });
       expect(result[0].write).toBe(true);
     });
 

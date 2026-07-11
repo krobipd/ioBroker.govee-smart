@@ -584,7 +584,10 @@ export class StateManager {
           name: def.name as ioBroker.StringOrTranslated,
           type: def.type,
           role: def.role,
-          read: true,
+          // Buttons are write-only triggers (role catalogue) — the adapter
+          // already declares its io-package button (manual_sync_devices)
+          // with read:false; capability-driven buttons now match (LOW).
+          read: def.role === "button" ? false : true,
           write: def.write,
         };
 
@@ -811,6 +814,7 @@ export class StateManager {
           role: "text",
           read: false,
           write: true,
+          def: "",
           desc: tDesc("batchCommandDesc"),
         },
         native: {},
