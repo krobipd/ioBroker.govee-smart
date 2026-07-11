@@ -88,6 +88,13 @@ function createMockAdapter(): {
       calls.push({ method: "setObject", args: [id, obj] });
       objects.set(id, obj);
     },
+    setObjectNotExistsAsync: async (id: string, obj: Record<string, unknown>) => {
+      calls.push({ method: "setObjectNotExistsAsync", args: [id, obj] });
+      // js-controller no-ops if the object already exists.
+      if (!objects.has(id)) {
+        objects.set(id, obj);
+      }
+    },
     setState: async (id: string, val: Record<string, unknown>) => {
       calls.push({ method: "setState", args: [id, val] });
       states.set(id, val as unknown as ioBroker.State);
@@ -316,7 +323,7 @@ describe("StateManager", () => {
 
   describe("repairCommonStatesIfBuggy (React #31 guard)", () => {
     it("replaces a persisted buggy states map COMPLETELY — stale keys with i18n-object values must not survive", async () => {
-      const { adapter, objects } = createMockAdapter();
+      const { adapter, objects, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never);
       const dev = createTestDevice();
 
@@ -364,6 +371,13 @@ describe("StateManager", () => {
       for (const v of Object.values(obj.common.states)) {
         expect(typeof v).toBe("string");
       }
+      // Mechanism pin: the full-object replace runs as delObject +
+      // setObjectNotExists (js-controller-blessed), never setObject
+      // (repochecker S5054). extendObject alone cannot drop the stale "9".
+      const repairPath = "devices.h6160_0011.scenes.light_scene";
+      expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(true);
+      expect(calls.some(c => c.method === "setObjectNotExistsAsync" && c.args[0] === repairPath)).toBe(true);
+      expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
     });
 
     it("does not rewrite healthy plain-string maps", async () => {
@@ -386,8 +400,13 @@ describe("StateManager", () => {
           def: "0",
         },
       ]);
-      // First creation: no full-replace call must happen (nothing buggy).
+      // Healthy plain-string map → the repair returns early: no full-object
+      // replace of any kind (neither the old setObject nor delObject +
+      // setObjectNotExists) touches the state.
+      const repairPath = "devices.h6160_0011.scenes.light_scene";
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
+      expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
+      expect(calls.some(c => c.method === "setObjectNotExistsAsync" && c.args[0] === repairPath)).toBe(false);
     });
   });
 

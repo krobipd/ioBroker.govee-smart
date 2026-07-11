@@ -196,18 +196,22 @@ export class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * This MUST be a full-object `setObject`: js-controller's `extendObject`
+   * A full-object replace is required: js-controller's `extendObject`
    * deep-merges via node.extend (verified against js-controller 7.2.2 /
    * node.extend 2.0.3) — same-key values ARE replaced, but stale keys absent
-   * from `fresh` survive the merge, and one surviving translation-object
-   * value is enough to keep crashing the Admin. S5054 suggests
-   * setObjectNotExists/extendObject instead of setObject — both provably
-   * cannot deliver the "map contains exactly `fresh`" postcondition here.
-   * Same fix-pattern as hassemu v1.27.2 (URL-dropdown) and v1.28.4
-   * (mode-dropdown). Admin renders states-values as React children — a
+   * from `fresh` survive the merge, and one surviving translation-object value
+   * is enough to keep crashing the Admin. `setObject` would deliver the "map
+   * contains exactly `fresh`" postcondition but is discouraged (repochecker
+   * S5054 — a blind full write clobbers runtime-added common fields). The
+   * js-controller-blessed full replace is `delObject` → `setObjectNotExists`:
+   * dropping the object physically clears the stale keys, recreating it from
+   * the read-back `existing` (with the plain-string `fresh` map) preserves
+   * name/native/role. The state value survives in the states DB and is
+   * re-seeded by the caller's def-value guard if the DB dropped it. Same
+   * React-#31 fix-pattern as hassemu v1.27.2 (URL-dropdown) and v1.28.4
+   * (mode-dropdown): Admin renders states-VALUES as React children, so a
    * translation object triggers React Error #31 → fatal "Error in GUI" on
-   * dropdown open (write:true) or any render path (write:false like
-   * diag.tier).
+   * dropdown open (write:true) or any render path (write:false like diag.tier).
    *
    * @param id    Full state path.
    * @param fresh Plain-string `common.states` map to write.
@@ -226,7 +230,15 @@ export class StateManager {
       return;
     }
     existing.common.states = fresh;
-    await this.adapter.setObject(id, existing).catch(() => undefined);
+    // delObject drops the object (with its stale keys); setObjectNotExists
+    // recreates it from `existing` holding exactly `fresh`. Not atomic, but the
+    // object is rebuilt on the very next line. delObject is safe here despite
+    // Pattern 46's "keep objects always-existent" rule: that guards concurrent
+    // update paths against js-controller's "has no existing object" WARN — this
+    // runs in the one-shot sequential state-creation path, where no parallel
+    // writer can observe the gap.
+    await this.adapter.delObjectAsync(id).catch(() => undefined);
+    await this.adapter.setObjectNotExistsAsync(id, existing).catch(() => undefined);
   }
 
   /**
