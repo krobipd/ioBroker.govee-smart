@@ -382,6 +382,16 @@ git commit -m "ci: build src-admin custom component in CI + publish"
 
 ## Task 8: Full green + docs
 
+> ✅ **DONE** (commit below) — **plan fully implemented.** All 5 gates green in one pass: `check` (tsc), `lint` (0/0), `test:unit` (**1210**), `build`, `test:integration` (adapter starts — "Govee adapter ready — LAN ✓"); plus src-admin 19/19 + lint 0/0. Docs: CLAUDE.md Pattern 42 rewritten for the v2.21.0 React component (flow + apply-finalizer + info.wizardStatus removal), `src-admin/` added to the Architektur block; README feature line + a WORK-IN-PROGRESS changelog bullet. **Not in Task 8 (release step):** version bump to 2.21.0, the CLAUDE.md v2.21.0 version-history entry + test-count refresh, io-package `news.NEXT` — all handled by `pre-release.py` → `npm run release minor` → CI-watch.
+> **Publish-path verified on the bench:** `rm -rf admin/custom src-admin/build && npm publish --dry-run` → `prepublishOnly` ran `node tasks`, rebuilt the MF component from a clean state, and packed `admin/custom/customComponents.js` + `mf-manifest.json` + assets + i18n (161 files). So the real CI deploy path (not just `--ignore-scripts` packs) produces a complete tarball — closes the v2.20.0 "passed everything except the real publish" risk for this feature.
+> **Still unverified (carried from Task 2/5, needs a browser) — RELEASE GATE:** the component actually rendering/mounting in a real admin. "1210 unit + integration green" proves the adapter *starts*, NOT that the wizard UI works (integration never loads the admin). Before it hits npm latest: one real browser render against a live admin (krobi's or a dev instance) — open the govee "Segment detection" tab, run measure → review → apply. Don't let green gates read as "feature verified"; an admin component is not "hardware" and can fall through the krobi/Claude test split.
+
+---
+
+## Follow-ups (not this plan — record so they don't rot)
+
+- **Dead-ish backend wizard text.** Task 6 deliberately kept the backend `message`/`progress` builders in `segment-wizard.ts` (the existing backend tests pin `r.message`/`r.progress`, so removing them is a separate task). But the React UI ignores those fields and uses the snapshot + its own `gsw_` i18n — so ~15 wizard admin/i18n keys (`segmentFlashing`, `canYouSeeStrip`, `yesNoDoneLine`, `markedVisible`/`markedDark`, `finish*`, `abort*`, `progress*`, `wizardStartedFor`, `canYouSeeShort`) plus the code building them are now unused-in-practice. A future cleanup task can strip the message/progress building + rewrite the pinned tests + drop those keys. Defensible scope discipline for now, but flagged so it's visible.
+
 - [ ] **Step 1:** `npm run check && npm run lint && npm run test:unit && npm run build && npm run test:integration` — all green. Fix anything red.
 - [ ] **Step 2:** Update `CLAUDE.md` (Pattern 42 → note the React component; add `src-admin/` to the Architektur block) and `README` "Segment detection" wording. Add the README `### **WORK IN PROGRESS**` bullet: "The segment-detection wizard now has a visual admin interface — a live map of the strip that fills in as you measure and can be corrected before you apply it."
 - [ ] **Step 3:** Commit `docs: React segment wizard`. (Release itself is a separate step: `pre-release.py` → `npm run release minor` → CI-watch, per the release workflow — NOT part of this plan.)

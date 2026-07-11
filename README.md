@@ -35,7 +35,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 - **Capability-driven** — states are generated from what the Govee API reports for each device. No SKU hardcoding, no hand-maintained device list to fall behind.
 - **LAN-first for lights** — UDP multicast discovery, sub-50 ms commands, status updates via AWS IoT MQTT
 - **Cloud + MQTT push for sensors and appliances** — readings via the App API, events via the OpenAPI MQTT broker
-- **Per-segment color and brightness** for LED strips with the right capability, including batch commands and an interactive segment detection wizard for cut strips
+- **Per-segment color and brightness** for LED strips with the right capability, including batch commands and a visual segment-detection wizard (with a live, correctable strip map) for cut strips
 - **Scenes, DIY scenes, music mode, gradient toggle** — activated locally via BLE-over-LAN where possible, Cloud fallback otherwise
 - **Cloud and local snapshots** — Govee-app snapshots and ioBroker-side snapshots side by side
 - **Groups** — bridge Govee groups into ioBroker with capability intersection across members
@@ -94,6 +94,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure each segment and can be corrected before you apply it.
+
 ### 2.20.0 (2026-07-11)
 
 - Channel names and the device-info labels such as Name, Model, Online and IP address now follow the ioBroker system language instead of always showing English.
