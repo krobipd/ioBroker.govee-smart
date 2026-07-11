@@ -686,12 +686,17 @@ class GoveeAdapter extends utils.Adapter {
         for (const device of this.deviceManager.getDevices()) {
           if (device.lanIp && device.capabilities.length === 0) {
             const prefix = this.stateManager.devicePrefix(device);
-            await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch(e => {
-              this.log.debug(`v2.8.0 migration cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+            const deleted = await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch(e => {
+              this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+              return 0;
             });
-            this.log.info(
-              `Migrated v2.8.0: removed legacy cloud-owned states for ${device.name} (pure-LAN, no API key)`,
-            );
+            // Only announce when something was actually removed: pure-LAN
+            // devices (no API key) match this condition on EVERY start, and
+            // an info-level "Migrated" line for a no-op was permanent log
+            // noise for exactly the credential-less target group (M7).
+            if (deleted > 0) {
+              this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
+            }
           }
         }
 

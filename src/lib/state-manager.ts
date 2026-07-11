@@ -1066,7 +1066,7 @@ export class StateManager {
    * @param prefix Device prefix
    * @param cloudStateDefs Current Cloud-phase state definitions (non-segment)
    */
-  async cleanupCloudOwnedStates(prefix: string, cloudStateDefs: StateDefinition[]): Promise<void> {
+  async cleanupCloudOwnedStates(prefix: string, cloudStateDefs: StateDefinition[]): Promise<number> {
     // Build expected state set per channel
     const expectedByChannel = new Map<string, Set<string>>();
     for (const def of cloudStateDefs) {
@@ -1083,7 +1083,7 @@ export class StateManager {
       endkey: `${devicePrefix}\u9999`,
     });
     if (!existing?.rows) {
-      return;
+      return 0;
     }
 
     const totalsPerChannel = new Map<string, { seen: number; deleted: number }>();
@@ -1123,12 +1123,15 @@ export class StateManager {
     }
 
     // Remove empty channel objects — no surviving states for this channel
+    let deletedTotal = 0;
     for (const [channel, totals] of totalsPerChannel) {
+      deletedTotal += totals.deleted;
       if (totals.deleted > 0 && totals.deleted === totals.seen) {
         this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
         await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => undefined);
       }
     }
+    return deletedTotal;
   }
 
   /**
