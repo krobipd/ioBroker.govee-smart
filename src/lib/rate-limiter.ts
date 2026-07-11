@@ -145,6 +145,7 @@ export class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
+   * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
    */
   enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void): boolean {
     if (this.queue.length >= MAX_QUEUE_LENGTH) {

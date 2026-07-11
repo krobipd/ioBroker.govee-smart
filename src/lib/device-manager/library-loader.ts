@@ -69,7 +69,11 @@ function logUndocApiFailure(
  * @param cd Cloud device data with capabilities
  * @returns true if the device ended up with any scene/snapshot data
  */
-export async function loadDeviceScenes(host: LibraryLoaderHost, device: GoveeDevice, cd: CloudDevice): Promise<boolean> {
+export async function loadDeviceScenes(
+  host: LibraryLoaderHost,
+  device: GoveeDevice,
+  cd: CloudDevice,
+): Promise<boolean> {
   host.diagnostics.addLog(cd.device, "debug", `loadDeviceScenes called for ${cd.sku}`);
   // Scenes from dedicated scenes endpoint (rate-limited).
   //

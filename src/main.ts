@@ -991,7 +991,11 @@ class GoveeAdapter extends utils.Adapter {
     return dropdownReset.stateToCommand(suffix);
   }
 
-  /** Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface. */
+  /**
+   * Public delegate for cloud-retry-handler's CloudRetryHandlerAdapter interface.
+   *
+   * @param only Optional single device to reload; omit to reload every device's cloud states
+   */
   public loadCloudStates(only?: GoveeDevice): Promise<void> {
     return cloudStateLoader.loadCloudStates(this, only);
   }

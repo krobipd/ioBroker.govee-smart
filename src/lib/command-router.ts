@@ -937,7 +937,12 @@ export class CommandRouter {
       const prev = this.lastErrorByCategory.get("no-capability") ?? null;
       this.lastErrorByCategory.set(
         "no-capability",
-        logDedup(this.log, prev, `No channel for ${deviceLabel(device)}/${command}`, new Error("no matching capability")),
+        logDedup(
+          this.log,
+          prev,
+          `No channel for ${deviceLabel(device)}/${command}`,
+          new Error("no matching capability"),
+        ),
       );
       return;
     }

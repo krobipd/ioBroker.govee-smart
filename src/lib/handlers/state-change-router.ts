@@ -219,7 +219,9 @@ export async function handleManualSegmentsChange(
     return;
   }
 
-  adapter.log.debug(`${deviceLabel(device)}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`);
+  adapter.log.debug(
+    `${deviceLabel(device)}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`,
+  );
   await adapter.applyManualSegments(device, true, parsed.indices);
 }
 

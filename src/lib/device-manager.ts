@@ -2,7 +2,7 @@ import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter } from "./command-router";
 import { getDeviceTier, isSeedAndDormant } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
-import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
 import {
   deviceKey as deviceKeyHelper,
@@ -38,7 +38,6 @@ import {
   rgbToHex,
   type CloudDevice,
   type CloudLoadResult,
-  type CloudScene,
   type CloudStateCapability,
   type DeviceState,
   type ErrorCategory,
