@@ -360,6 +360,8 @@ git commit -m "refactor(wizard): drop info.wizardStatus state (React component o
 
 ## Task 7: CI + release wiring for `src-admin`
 
+> ✅ **DONE** (commit below). Added an `admin-component` CI job (mirrors PH: `npm ci` + `npm run build:admin`, `needs: [check-and-lint]`, node 24.x) and listed it in `deploy.needs` — the actual publish still builds `admin/custom` via `prepublishOnly: node tasks` (same as PH; the job is an early build-breakage check). **repochecker `--local`: FINAL OK, no W5053** — govee's io-package already matches PH (`adminUI:{config:json}`, no `supportCustoms`). My `src-admin/package.json` introduced a **new W8905** (non-root package.json needs a dependabot directory) → fixed by adding a `/src-admin` npm dependabot entry with a wildcard `ignore` (mirrors PH — satisfies W8905, generates zero PRs so the pinned MF matrix isn't moved; **not** a suppression). Remaining repochecker findings (E1025 icon-CDN FP, W3052 windows-log FP, S5026/S8914) are pre-existing/known, unrelated. `npm pack --dry-run`: 42 `admin/custom` files (customComponents.js + mf-manifest.json + assets + i18n). Both YAML files validated.
+
 **Files:** Modify `.github/workflows/test-and-release.yml`; verify `package.json` `files`/`prepublishOnly`; verify io-package custom-support (repochecker W5053).
 
 **Interfaces:** Produces a CI that builds `admin/custom/` before package tests and includes it in the npm tarball.

@@ -115,6 +115,19 @@ jobs:
         with:
           fail_level: error
 
+  admin-component:
+    if: contains(github.event.head_commit.message, '[skip ci]') == false
+    needs: [check-and-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - run: npm ci
+      - name: Build admin custom component (Vite / Module Federation)
+        run: npm run build:admin
+
   adapter-tests:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
     needs: [check-and-lint, validate-devices]
@@ -132,7 +145,7 @@ jobs:
           build: true
 
   deploy:
-    needs: [check-and-lint, validate-devices, adapter-tests, repochecker-version-gate, workflow-lint]
+    needs: [check-and-lint, validate-devices, adapter-tests, repochecker-version-gate, workflow-lint, admin-component]
     if: |
       contains(github.event.head_commit.message, '[skip ci]') == false &&
       github.event_name == 'push' &&
