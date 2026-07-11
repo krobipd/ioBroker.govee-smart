@@ -240,6 +240,8 @@ git commit -m "feat(admin): useWizardApi sendTo wrapper"
 
 ## Task 4: `SegmentGrid` — pure visual map
 
+> ✅ **DONE** (commit below). Pure props-only grid: `<SegmentGrid total confirmed flashing gaps editable onToggle? />`. Each cell `data-testid="seg-cell-{i}"` + `className="seg-cell {state}"`; state precedence **flashing → confirmed → gap → open**; theme-aware MUI `sx` colors; clicks fire `onToggle(idx)` only when `editable`. No socket/network knowledge. 6 tests (states, gap, flashing-wins, toggle, no-toggle-when-readonly, total=0). **Plan-test fix:** the drafted `getAllByTestId("seg-cell")` (exact) can't coexist with per-cell `seg-cell-{i}` testids — used a `/^seg-cell-\d+$/` regex matcher for the count. **Test-infra fix (Task 2 gap surfaced here):** `setupTests.ts` now runs `afterEach(cleanup)` — with `globals:false`, testing-library's auto-cleanup never registered, so multi-render suites piled up duplicate testids. src-admin 13/13 tests, lint 0/0.
+
 **Files:** Create `src-admin/src/SegmentGrid.tsx`; Test `src-admin/src/SegmentGrid.test.tsx`
 
 **Interfaces:**
