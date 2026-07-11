@@ -21,7 +21,11 @@ export interface MessageRouterHost {
   /** Provides the list of devices that have segments (for getSegmentDevices). */
   getSegmentDeviceList: () => Array<{ value: string; label: string }>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
-  runWizardStep: (action: string, deviceKey: string) => Promise<Record<string, unknown>>;
+  runWizardStep: (
+    action: string,
+    deviceKey: string,
+    payload?: { indices?: number[] },
+  ) => Promise<Record<string, unknown>>;
   /** Adapter-managed setTimeout (cleaned up on unload) for the bounded probe wait. */
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   /** Adapter-managed clearTimeout counterpart. */
@@ -110,8 +114,10 @@ export class MessageRouter {
         return;
       }
       if (obj.command === "segmentWizard") {
-        const payload = (obj.message ?? {}) as { action?: string; device?: string };
-        const response = await this.host.runWizardStep(payload.action ?? "", payload.device ?? "");
+        const payload = (obj.message ?? {}) as { action?: string; device?: string; indices?: number[] };
+        const response = await this.host.runWizardStep(payload.action ?? "", payload.device ?? "", {
+          indices: payload.indices,
+        });
         this.host.sendResponse(obj, response);
         return;
       }

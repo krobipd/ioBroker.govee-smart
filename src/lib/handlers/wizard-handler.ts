@@ -116,11 +116,12 @@ export async function runWizardStep(
   adapter: WizardHandlerAdapter,
   action: string,
   deviceKey: string,
+  payload?: { indices?: number[] },
 ): Promise<Record<string, unknown>> {
   if (!adapter.segmentWizard) {
     adapter.segmentWizard = new SegmentWizardClass(buildWizardHost(adapter));
   }
-  const response = await adapter.segmentWizard.runStep(action, deviceKey);
+  const response = await adapter.segmentWizard.runStep(action, deviceKey, payload);
   const statusText = adapter.segmentWizard.getStatusText();
   await adapter.setState("info.wizardStatus", {
     val: statusText,

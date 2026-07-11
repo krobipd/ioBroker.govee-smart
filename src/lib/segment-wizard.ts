@@ -45,6 +45,24 @@ export interface SegmentWizardSession {
 /** Minimum response shape — onMessage forwards this verbatim to the caller. */
 export type WizardResponse = Record<string, unknown>;
 
+/**
+ * Grid snapshot folded into every {@link SegmentWizard.runStep} response so the
+ * React admin component can redraw the live segment map after each step. The
+ * backend emits only `"idle"` (no session) / `"measuring"` (flashing); `"review"`
+ * is a frontend-only phase — the React review screen derives its map from the
+ * last measuring snapshot (confirmed indices + currentIndex).
+ */
+export interface WizardSnapshot {
+  /** Session phase. Backend emits only `"idle"` / `"measuring"`. */
+  phase: "idle" | "measuring" | "review";
+  /** Upper bound of addressable segments (protocol limit, not Cloud count). */
+  total: number;
+  /** Index the wizard will flash next. */
+  currentIndex: number;
+  /** Indices the user has confirmed visible so far. */
+  confirmed: number[];
+}
+
 /** Result of a completed wizard session — the host applies this to the device. */
 export interface WizardResult {
   /** Real physical segment count (indices the user acknowledged, one past the last answered) */
@@ -228,12 +246,30 @@ export class SegmentWizard {
   }
 
   /**
-   * Route one wizard step from the sendTo handler.
+   * Route one wizard step from the sendTo handler and fold the current grid
+   * snapshot into every response so the React admin map can redraw per step.
    *
-   * @param action "start" | "yes" | "no" | "done" | "abort"
+   * @param action "start" | "yes" | "no" | "done" | "abort" | "apply"
    * @param deviceKey Target device — only consulted on action="start"
+   * @param payload Extra data for actions that need it (apply: corrected indices)
+   * @param payload.indices Review-corrected segment indices for the `apply` action
    */
-  public async runStep(action: string, deviceKey: string): Promise<WizardResponse> {
+  public async runStep(action: string, deviceKey: string, payload?: { indices?: number[] }): Promise<WizardResponse> {
+    const response = await this.route(action, deviceKey, payload);
+    return { ...response, snapshot: this.snapshot() };
+  }
+
+  /**
+   * Dispatch a wizard action to its handler. The session-active guard covers
+   * every action except `start` (which opens a session); `apply` shares that
+   * guard with `yes`/`no`/`done`/`abort`.
+   *
+   * @param action Wizard action string
+   * @param deviceKey Target device — only consulted on action="start"
+   * @param payload Extra data (apply: corrected indices)
+   * @param payload.indices Review-corrected segment indices for the `apply` action
+   */
+  private async route(action: string, deviceKey: string, payload?: { indices?: number[] }): Promise<WizardResponse> {
     if (action === "start") {
       return this.start(deviceKey);
     }
@@ -246,10 +282,31 @@ export class SegmentWizard {
     if (action === "done") {
       return this.done();
     }
+    if (action === "apply") {
+      return this.apply(payload?.indices ?? []);
+    }
     if (action === "yes" || action === "no") {
       return this.answer(action === "yes");
     }
     return { error: this.t("errUnknownAction", { action }) };
+  }
+
+  /**
+   * Shape the current session into a {@link WizardSnapshot} for the React grid.
+   * Maps the internal session fields (`current` → `currentIndex`, `visible` →
+   * `confirmed`) and returns an idle snapshot when no session is in flight.
+   */
+  private snapshot(): WizardSnapshot {
+    const s = this.session;
+    if (!s) {
+      return { phase: "idle", total: 0, currentIndex: 0, confirmed: [] };
+    }
+    return {
+      phase: "measuring",
+      total: s.total,
+      currentIndex: s.current,
+      confirmed: [...s.visible],
+    };
   }
 
   /**
@@ -417,16 +474,7 @@ export class SegmentWizard {
       hasGaps: !allContiguous,
     };
 
-    await this.host.applyWizardResult(device, result);
-    await this.restoreBaseline(device, session.baseline);
-
-    // Logs are English regardless of admin language (system-language rule); the
-    // user-facing `message`/`progress` below stay localized (C6).
-    const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${manualList}")` : ", no gaps";
-    this.host.log.info(`Segment wizard for ${deviceLabel(device)}: ${segmentCount} segments detected${gapsSuffix}`);
-
-    this.session = null;
-    this.clearIdleTimer();
+    await this.finalize(device, session, result);
 
     const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
     return {
@@ -441,6 +489,68 @@ export class SegmentWizard {
       list: manualList,
       hasGaps: result.hasGaps,
     };
+  }
+
+  /**
+   * Finalize the review-corrected segment map. The React review screen may have
+   * toggled cells before the user hit "Übernehmen"; the corrected indices arrive
+   * here and run through the SAME finalization as {@link finish} (apply →
+   * restore baseline → close session). Requires an active session — routed only
+   * after the session-active guard in {@link route} — and a present device.
+   *
+   * @param indices Segment indices the user confirmed as lit (0-based, unsorted)
+   */
+  private async apply(indices: number[]): Promise<WizardResponse> {
+    const session = this.session;
+    if (!session) {
+      return { error: this.t("errNoWizardShort") };
+    }
+    const clean = [...new Set(indices.filter(i => Number.isInteger(i) && i >= 0))].sort((a, b) => a - b);
+    if (clean.length === 0) {
+      // Nothing selected — the UI prevents this, but never build a -Infinity
+      // segment count from an empty map. Keep the session so the user can retry.
+      return { error: this.t("errAnswerFirst") };
+    }
+    const device = this.host.findDevice(session.deviceKey);
+    if (!device) {
+      this.session = null;
+      this.clearIdleTimer();
+      return { error: this.t("errDeviceGoneShort") };
+    }
+
+    const segmentCount = clean[clean.length - 1] + 1;
+    const hasGaps = clean.length < segmentCount;
+    const manualList = hasGaps ? compactIndices(clean) : "";
+    const result: WizardResult = { segmentCount, manualList, hasGaps };
+
+    await this.finalize(device, session, result);
+
+    return { applied: true, segmentCount, list: manualList, hasGaps };
+  }
+
+  /**
+   * Apply a consolidated result to the device, restore the strip's baseline,
+   * log the outcome and close the session. Shared side-effect path for
+   * {@link finish} (measured indices) and {@link apply} (review-corrected
+   * indices). Reads `session.baseline` before the session is nulled.
+   *
+   * @param device Target device
+   * @param session The active session being finalized
+   * @param result Consolidated wizard result to apply
+   */
+  private async finalize(device: GoveeDevice, session: SegmentWizardSession, result: WizardResult): Promise<void> {
+    await this.host.applyWizardResult(device, result);
+    await this.restoreBaseline(device, session.baseline);
+
+    // Logs are English regardless of admin language (system-language rule); the
+    // user-facing `message`/`progress` stay localized (C6).
+    const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${result.manualList}")` : ", no gaps";
+    this.host.log.info(
+      `Segment wizard for ${deviceLabel(device)}: ${result.segmentCount} segments detected${gapsSuffix}`,
+    );
+
+    this.session = null;
+    this.clearIdleTimer();
   }
 
   /** (Re-)arm the 5-minute idle timeout that fires abort(). */

@@ -170,6 +170,27 @@ describe("MessageRouter", () => {
       await new Promise(r => setTimeout(r, 0));
       expect(responses[0].data).toEqual({ error: "no action" });
     });
+
+    it("forwards the apply action with its indices payload to runWizardStep", async () => {
+      const calls: Array<{ action: string; device: string; payload?: unknown }> = [];
+      const { host, responses } = makeHost({ wizardResponse: { applied: true } });
+      host.runWizardStep = (action, device, payload) => {
+        calls.push({ action, device, payload });
+        return Promise.resolve({ applied: true });
+      };
+      const router = new MessageRouter(host);
+      router.onMessage(
+        makeMessage("segmentWizard", { action: "apply", device: "H6160:AA:01", indices: [0, 1, 2, 4] }),
+      );
+      await new Promise(r => setTimeout(r, 0));
+      expect(calls).toHaveLength(1);
+      expect(calls[0]).toEqual({
+        action: "apply",
+        device: "H6160:AA:01",
+        payload: { indices: [0, 1, 2, 4] },
+      });
+      expect(responses[0].data).toEqual({ applied: true });
+    });
   });
 
   describe("mqttAuth — test action", () => {

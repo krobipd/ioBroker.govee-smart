@@ -46,6 +46,8 @@
 
 ## Task 1: Backend — session snapshot in every response + `apply` action
 
+> ✅ **DONE** (commit below). Real method names differed from the drafted snippets: the "done" handler is `finish()` (private); session fields are `current`/`visible`/`total` (mapped `current→currentIndex`, `visible→confirmed`); `compactIndices` already exists. `apply` reuses a shared `finalize()` extracted from `finish`. 8 new tests (snapshot fold, idle snapshot, apply happy/contiguous/finalize-releases-lock, no-session + empty-map guards, router indices-forward). 1210 unit ✓, tsc ✓, lint 0/0.
+
 **Files:**
 - Modify: `src/lib/segment-wizard.ts`
 - Modify: `src/lib/handlers/wizard-handler.ts`
@@ -368,3 +370,4 @@ git commit -m "ci: build src-admin custom component in CI + publish"
 - The React component is **admin-only** — no adapter-runtime impact. The integration "adapter starts" test still covers startup.
 - Match **exact** bundled dep versions from public-holidays' `src-admin/package.json`. Reading `main` of any lib is wrong.
 - Do not add the custom-support/exception to any gate yourself — if a gate complains, mirror public-holidays or ask.
+- **Task 1 flow decision (done):** `apply` is an alternative **finalizer** to `finish` — routed only after the session-active guard, it reuses a shared `finalize()` (applyWizardResult → restore baseline → close session). So the React flow is measure(yes/no) → "Fertig" moves to review **locally from the last measuring snapshot** (session stays open) → `apply(corrected)` finalizes. Backend `done`/`finish` is unchanged (existing tests pin apply+close) and is **not** used by the React component. **Tension to revisit in Task 5:** spec §7 describes a `done` response carrying `{segmentCount,hasGaps,manualList,gaps}`, which fits a done→review→apply flow this decision rules out. If Task 5's frontend actually needs done→review→apply, the thing to revise is Task 1's apply session-guard (and add those fields to `finish`). Left off for now — untested, same open question, and keeping the session open through review means the 5-min idle timer runs during review (one more reason review→apply needs a deliberate call, decided in Task 5).

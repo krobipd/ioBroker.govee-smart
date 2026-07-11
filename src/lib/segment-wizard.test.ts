@@ -567,6 +567,78 @@ describe("SegmentWizard", () => {
     });
   });
 
+  describe("snapshot + apply (React grid)", () => {
+    it("folds a grid snapshot into every runStep response", async () => {
+      await wizard.runStep("start", key);
+      const res = await wizard.runStep("yes", key); // segment 0 visible, advance to 1
+      const snap = res.snapshot as {
+        phase: string;
+        total: number;
+        currentIndex: number;
+        confirmed: number[];
+      };
+      expect(snap).toMatchObject({ phase: "measuring", confirmed: [0] });
+      expect(typeof snap.currentIndex).toBe("number");
+      expect(snap.currentIndex).toBe(1);
+      expect(snap.total).toBeGreaterThan(0);
+    });
+
+    it("reports an idle snapshot when no session is active", async () => {
+      const res = await wizard.runStep("yes", key); // no session started
+      expect(res.snapshot).toMatchObject({ phase: "idle", confirmed: [], currentIndex: 0 });
+    });
+
+    it("apply(indices) routes the review-corrected map through applyWizardResult", async () => {
+      await wizard.runStep("start", key);
+      const res = await wizard.runStep("apply", key, { indices: [0, 1, 2, 4] }); // gap at 3
+      expect(res.applied).toBe(true);
+      expect(host.appliedResults).toHaveLength(1);
+      expect(host.appliedResults[0].result).toEqual({
+        segmentCount: 5,
+        manualList: "0-2,4",
+        hasGaps: true,
+      });
+    });
+
+    it("apply with a contiguous map reports no gaps", async () => {
+      await wizard.runStep("start", key);
+      await wizard.runStep("apply", key, { indices: [0, 1, 2] });
+      expect(host.appliedResults[0].result).toEqual({
+        segmentCount: 3,
+        manualList: "",
+        hasGaps: false,
+      });
+    });
+
+    it("apply finalizes the session — restores baseline and releases the lock", async () => {
+      await wizard.runStep("start", key);
+      host.calls.length = 0; // drop the flash calls — keep only the restore
+      await wizard.runStep("apply", key, { indices: [0, 1, 2] });
+      // baseline restored: last sendCommand is the restore segmentBatch
+      const last = host.calls[host.calls.length - 1];
+      expect(last.command).toBe("segmentBatch");
+      // session released → a fresh start succeeds (would be "already active" if leaked)
+      expect(wizard.getSessionSnapshot()).toBeNull();
+      const again = await wizard.runStep("start", key);
+      expect(again.active).toBe(true);
+    });
+
+    it("apply without an active session errors and applies nothing", async () => {
+      const res = await wizard.runStep("apply", key, { indices: [0, 1] });
+      expect(typeof res.error).toBe("string");
+      expect(res.error).toContain("No wizard");
+      expect(host.appliedResults).toHaveLength(0);
+    });
+
+    it("apply with an empty map errors and keeps the session open", async () => {
+      await wizard.runStep("start", key);
+      const res = await wizard.runStep("apply", key, { indices: [] });
+      expect(typeof res.error).toBe("string");
+      expect(host.appliedResults).toHaveLength(0);
+      expect(wizard.getSessionSnapshot()).not.toBeNull();
+    });
+  });
+
   describe("idle timeout", () => {
     it("should abort the session when the timer fires", async () => {
       await wizard.start(key);

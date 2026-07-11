@@ -1053,7 +1053,7 @@ class GoveeAdapter extends utils.Adapter {
             label: resolveLabel("segmentWizardDeviceOption", d.name, d.sku, resolveSegmentCount(d)),
           }));
       },
-      runWizardStep: (action, deviceKey) => wizardHandler.runWizardStep(this, action, deviceKey),
+      runWizardStep: (action, deviceKey, payload) => wizardHandler.runWizardStep(this, action, deviceKey, payload),
       setTimeout: (cb, ms) => this.setTimeout(cb, ms),
       clearTimeout: handle => this.clearTimeout(handle),
     };
