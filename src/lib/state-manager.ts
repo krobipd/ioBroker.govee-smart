@@ -1,5 +1,11 @@
 import type * as utils from "@iobroker/adapter-core";
-import { buildLanStateDefs, EVENT_STATE_ROLES, LAN_STATE_IDS, SENSOR_ROLE_UNIT, type StateDefinition } from "./capability-mapper";
+import {
+  buildLanStateDefs,
+  EVENT_STATE_ROLES,
+  LAN_STATE_IDS,
+  SENSOR_ROLE_UNIT,
+  type StateDefinition,
+} from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
 import { resolveSegmentCount } from "./device-manager";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
@@ -24,15 +30,15 @@ const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "
  * path would overwrite the original "Device Information" name with the
  * literal "info".
  */
-const CHANNEL_NAMES: Record<string, string> = {
-  control: "Controls",
-  scenes: "Scenes",
-  music: "Music",
-  snapshots: "Snapshots",
-  sensor: "Sensor Data",
-  events: "Events",
-  info: "Device Information",
-  diag: "Diagnostics",
+const CHANNEL_NAMES: Record<string, ioBroker.StringOrTranslated> = {
+  control: tName("channelControls"),
+  scenes: tName("channelScenes"),
+  music: tName("channelMusic"),
+  snapshots: tName("channelSnapshots"),
+  sensor: tName("channelSensorData"),
+  events: tName("channelEvents"),
+  info: tName("deviceInformation"),
+  diag: tName("channelDiagnostics"),
 };
 
 /**
@@ -93,20 +99,60 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
   lackwater: { type: "boolean", role: EVENT_STATE_ROLES.lackwater.role, nameKey: "lackOfWater", channel: "events" },
-  lackwaterevent: { type: "boolean", role: EVENT_STATE_ROLES.lackwaterevent.role, nameKey: "lackOfWater", channel: "events" },
+  lackwaterevent: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.lackwaterevent.role,
+    nameKey: "lackOfWater",
+    channel: "events",
+  },
   icefull: { type: "boolean", role: EVENT_STATE_ROLES.icefull.role, nameKey: "iceBucketFull", channel: "events" },
-  icefullevent: { type: "boolean", role: EVENT_STATE_ROLES.icefullevent.role, nameKey: "iceBucketFull", channel: "events" },
-  bodyappeared: { type: "boolean", role: EVENT_STATE_ROLES.bodyappeared.role, nameKey: "bodyDetected", channel: "events" },
-  dirtdetected: { type: "boolean", role: EVENT_STATE_ROLES.dirtdetected.role, nameKey: "dirtDetected", channel: "events" },
+  icefullevent: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.icefullevent.role,
+    nameKey: "iceBucketFull",
+    channel: "events",
+  },
+  bodyappeared: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.bodyappeared.role,
+    nameKey: "bodyDetected",
+    channel: "events",
+  },
+  dirtdetected: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.dirtdetected.role,
+    nameKey: "dirtDetected",
+    channel: "events",
+  },
   sensor_temperature: numSensor("temperature", "temperature"),
   sensor_humidity: numSensor("humidity", "humidity"),
   sensor_battery: numSensor("battery", "battery"),
   lack_water: { type: "boolean", role: EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
-  lack_water_event: { type: "boolean", role: EVENT_STATE_ROLES.lack_water_event.role, nameKey: "lackOfWater", channel: "events" },
+  lack_water_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.lack_water_event.role,
+    nameKey: "lackOfWater",
+    channel: "events",
+  },
   ice_full: { type: "boolean", role: EVENT_STATE_ROLES.ice_full.role, nameKey: "iceBucketFull", channel: "events" },
-  ice_full_event: { type: "boolean", role: EVENT_STATE_ROLES.ice_full_event.role, nameKey: "iceBucketFull", channel: "events" },
-  body_appeared: { type: "boolean", role: EVENT_STATE_ROLES.body_appeared.role, nameKey: "bodyDetected", channel: "events" },
-  dirt_detected: { type: "boolean", role: EVENT_STATE_ROLES.dirt_detected.role, nameKey: "dirtDetected", channel: "events" },
+  ice_full_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.ice_full_event.role,
+    nameKey: "iceBucketFull",
+    channel: "events",
+  },
+  body_appeared: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.body_appeared.role,
+    nameKey: "bodyDetected",
+    channel: "events",
+  },
+  dirt_detected: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.dirt_detected.role,
+    nameKey: "dirtDetected",
+    channel: "events",
+  },
 };
 
 /**
@@ -415,7 +461,7 @@ export class StateManager {
     // snapshot save/delete, …) with mostly identical values — only a real
     // change should write and bump the timestamp. No consumer reads the
     // ts/lc of these states as a freshness signal (grep-verified).
-    await this.ensureState(`${prefix}.info.name`, "Name", "string", "text", false);
+    await this.ensureState(`${prefix}.info.name`, tName("stateName"), "string", "text", false);
     await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true,
@@ -424,7 +470,7 @@ export class StateManager {
     if (!isGroup) {
       await this.ensureState(
         `${prefix}.info.online`,
-        "Online",
+        tName("online"),
         "boolean",
         "indicator.reachable",
         false,
@@ -435,13 +481,13 @@ export class StateManager {
       // ts-rewrite-spam). The initial sync happens right after this method
       // returns — see syncInfoOnline. Direct write here was the source of
       // periodic false→true bounces (captured 2026-05-13).
-      await this.ensureState(`${prefix}.info.model`, "Model", "string", "text", false, undefined, "");
-      await this.ensureState(`${prefix}.info.serial`, "Serial Number", "string", "text", false, undefined, "");
-      await this.ensureState(`${prefix}.info.ip`, "IP Address", "string", "info.ip", false, undefined, "");
+      await this.ensureState(`${prefix}.info.model`, tName("model"), "string", "text", false, undefined, "");
+      await this.ensureState(`${prefix}.info.serial`, tName("serialNumber"), "string", "text", false, undefined, "");
+      await this.ensureState(`${prefix}.info.ip`, tName("ipAddress"), "string", "info.ip", false, undefined, "");
       // Device-type marker — short label like "light", "thermometer",
       // "heater" (Govee API type without the "devices.types." prefix).
       // Lets scripts filter `*.info.type === "light"` without parsing.
-      await this.ensureState(`${prefix}.info.type`, "Device Type", "string", "text", false, undefined, "");
+      await this.ensureState(`${prefix}.info.type`, tName("deviceType"), "string", "text", false, undefined, "");
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true,
@@ -466,7 +512,7 @@ export class StateManager {
     } else {
       // Group members: comma-separated device prefix IDs
       const memberIds = (device.groupMembers ?? []).map(m => treeKey(m.sku, m.deviceId)).join(", ");
-      await this.ensureState(`${prefix}.info.members`, "Members", "string", "text", false);
+      await this.ensureState(`${prefix}.info.members`, tName("members"), "string", "text", false);
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
         ack: true,
@@ -940,7 +986,7 @@ export class StateManager {
       },
       { preserve: { common: ["name"] } },
     );
-    await this.ensureState("groups.info.online", "Cloud Online", "boolean", "indicator.reachable", false);
+    await this.ensureState("groups.info.online", tName("cloudOnline"), "boolean", "indicator.reachable", false);
     await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true,
@@ -977,7 +1023,7 @@ export class StateManager {
 
     const unreachable = memberDevices.filter(m => !m.state.online).map(m => treeKey(m.sku, m.deviceId));
 
-    await this.ensureState(stateId, "Unreachable Members", "string", "text", false);
+    await this.ensureState(stateId, tName("membersUnreachable"), "string", "text", false);
     // setStateChangedAsync: reachability is re-evaluated on every online
     // signal — with an unconditional setState every devStatus poll reply
     // bumped ts on an unchanged (usually empty) value, spamming state
