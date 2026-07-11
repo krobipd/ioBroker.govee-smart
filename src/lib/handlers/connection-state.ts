@@ -17,6 +17,8 @@ import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } fr
  */
 export interface ConnectionStateAdapter {
   readonly log: ioBroker.Logger;
+  /** Credential presence check for the sensors-without-account hint (M9). */
+  readonly config: { goveeEmail?: string; goveePassword?: string };
   readonly deviceManager: DeviceManager | null;
   readonly cloudClient: GoveeCloudClient | null;
   readonly cloudWasConnected: boolean;
@@ -224,5 +226,18 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
         adapter.log.info(`${deviceLabel(d)}: no LAN — enable the local API in the Govee Home app`);
       }
     }
+  }
+
+  // Sensors deliver their values ONLY via the account-authenticated App-API /
+  // MQTT path — with an API key alone their states stay empty forever. Say it
+  // once at ready time so "thermometer shows no temperature" ends here and
+  // not in the forum (M9).
+  const sensors = allDevices.filter(
+    d => d.type === GOVEE_DEVICE_TYPE.SENSOR || d.type === GOVEE_DEVICE_TYPE.THERMOMETER,
+  );
+  if (sensors.length > 0 && (!adapter.config.goveeEmail || !adapter.config.goveePassword)) {
+    adapter.log.warn(
+      `${sensors.length} sensor(s) found, but no Govee account is configured — sensor readings require email + password (adapter settings, "Govee Account" section)`,
+    );
   }
 }

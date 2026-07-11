@@ -103,7 +103,7 @@
   "mqttAuthUnknownAction": "未知操作“%s”。",
   "mqttAuthVerifyRequired": "Govee 需要两因素确认。点击“请求验证码”，输入电子邮件中的代码并保存。",
   "mqttHeader": "Govee 帐户（可选）",
-  "mqttInfo": "输入您的 Govee 帐户凭据以通过 MQTT 启用实时状态更新。如果没有这个，状态只会根据请求更新。",
+  "mqttInfo": "输入您的 Govee 账户凭据以启用通过 MQTT 的实时状态更新。传感器读数（温度计、湿度计、CO2 监测仪）和 Govee 群组控制也需要该账户——没有账户，传感器不会提供任何数值。",
   "musicAutoColor": "音乐自动颜色",
   "musicMode": "音乐模式",
   "musicSensitivity": "音乐灵敏度",

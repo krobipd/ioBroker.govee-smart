@@ -103,7 +103,7 @@
   "mqttAuthUnknownAction": "Azione sconosciuta '%s'.",
   "mqttAuthVerifyRequired": "Govee richiede la conferma di due fattori. Fai clic su \"Richiedi codice di verifica\", inserisci il codice ricevuto dall'e-mail e salva.",
   "mqttHeader": "Conto Govee (facoltativo)",
-  "mqttInfo": "Inserisci le credenziali del tuo account Govee per abilitare gli aggiornamenti di stato in tempo reale tramite MQTT. Senza questo, lo stato viene aggiornato solo su richiesta.",
+  "mqttInfo": "Inserisci le credenziali del tuo account Govee per attivare gli aggiornamenti di stato in tempo reale via MQTT. Necessarie anche per le letture dei sensori (termometri, igrometri, monitor CO2) e il controllo dei gruppi Govee — senza l'account i sensori non forniscono valori.",
   "musicAutoColor": "Colore automatico musica",
   "musicMode": "Modalità musica",
   "musicSensitivity": "Sensibilità musica",

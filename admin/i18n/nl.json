@@ -103,7 +103,7 @@
   "mqttAuthUnknownAction": "Onbekende actie '%s'.",
   "mqttAuthVerifyRequired": "Govee vereist bevestiging met twee factoren. Klik op 'Verificatiecode aanvragen', voer de code uit de e-mail in en sla deze op.",
   "mqttHeader": "Govee-account (optioneel)",
-  "mqttInfo": "Voer de inloggegevens van uw Govee-account in om realtime statusupdates via MQTT in te schakelen. Zonder dit wordt de status alleen op verzoek bijgewerkt.",
+  "mqttInfo": "Voer je Govee-accountgegevens in om realtime statusupdates via MQTT te activeren. Ook vereist voor sensormetingen (thermometers, hygrometers, CO2-monitors) en Govee-groepsbesturing — zonder account leveren sensoren geen waarden.",
   "musicAutoColor": "Muziek auto-kleur",
   "musicMode": "Muziekmodus",
   "musicSensitivity": "Muziekgevoeligheid",

@@ -51,6 +51,7 @@ function makeRig(opts: {
   const devices = opts.devices ?? [];
 
   const adapter: ConnectionStateAdapter = {
+    config: { goveeEmail: "user@example.com", goveePassword: "secret" },
     log: {
       debug: (m: string) => logs.debug.push(m),
       info: (m: string) => logs.info.push(m),
@@ -183,6 +184,21 @@ describe("checkAllReady", () => {
 });
 
 describe("logDeviceSummary", () => {
+  it("warns once when sensors exist but no Govee account is configured (M9)", () => {
+    const sensor = createTestDevice({ deviceId: "CC:01", type: "devices.types.thermometer" });
+    const rig = makeRig({ devices: [sensor] });
+    (rig.adapter as { config: { goveeEmail?: string; goveePassword?: string } }).config = {};
+    logDeviceSummary(rig.adapter);
+    expect(rig.logs.warn.some(m => m.includes("sensor readings require email + password"))).toBe(true);
+  });
+
+  it("stays quiet about sensors when account credentials are configured (M9)", () => {
+    const sensor = createTestDevice({ deviceId: "CC:02", type: "devices.types.sensor" });
+    const rig = makeRig({ devices: [sensor] });
+    logDeviceSummary(rig.adapter);
+    expect(rig.logs.warn.some(m => m.includes("sensor readings require"))).toBe(false);
+  });
+
   it("shows LAN ✗ with the enable-instructions warn + a per-device hint for every LAN-less light", () => {
     const noLan = createTestDevice({ lanIp: undefined });
     const rig = makeRig({ devices: [noLan] });
