@@ -1,0 +1,6 @@
+{
+  "instance": "govee-smart.0",
+  "tab": "Segment",
+  "mountSelectors": ["[data-testid=\"wiz-start\"]", "[data-testid=\"wiz-no-devices\"]"],
+  "gold": { "when": "[data-testid=\"wiz-start\"]", "value": "[data-testid=\"wiz-device-select\"]" }
+}
