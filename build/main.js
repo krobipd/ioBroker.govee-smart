@@ -49,7 +49,6 @@ var snapshotHandlerGlue = __toESM(require("./lib/handlers/snapshot-handler-glue"
 var stateChangeRouter = __toESM(require("./lib/handlers/state-change-router"));
 var wizardHandler = __toESM(require("./lib/handlers/wizard-handler"));
 var import_rate_limiter = require("./lib/rate-limiter");
-var import_segment_wizard = require("./lib/segment-wizard");
 var import_i18n = require("./lib/i18n");
 var import_sku_cache = require("./lib/sku-cache");
 var import_state_manager = require("./lib/state-manager");
@@ -164,6 +163,7 @@ class GoveeAdapter extends utils.Adapter {
       void connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
       await this.delObjectAsync("info.appVersionDrift").catch(() => void 0);
+      await this.delObjectAsync("info.wizardStatus").catch(() => void 0);
       await cloudCreds.migrateCredentialsMetaOnce(this, utils.getAbsoluteInstanceDataDir(this));
       if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
         this.log.error(
@@ -190,10 +190,6 @@ class GoveeAdapter extends utils.Adapter {
       await this.setState("info.cloudConnected", { val: false, ack: true });
       await this.setState("info.openapiMqttConnected", {
         val: false,
-        ack: true
-      });
-      await this.setState("info.wizardStatus", {
-        val: (0, import_segment_wizard.wizardIdleText)(),
         ack: true
       });
       this.stateManager = new import_state_manager.StateManager(this);
@@ -827,7 +823,7 @@ class GoveeAdapter extends utils.Adapter {
           label: (0, import_i18n.resolveLabel)("segmentWizardDeviceOption", d.name, d.sku, (0, import_device_manager.resolveSegmentCount)(d))
         }));
       },
-      runWizardStep: (action, deviceKey) => wizardHandler.runWizardStep(this, action, deviceKey),
+      runWizardStep: (action, deviceKey, payload) => wizardHandler.runWizardStep(this, action, deviceKey, payload),
       setTimeout: (cb, ms) => this.setTimeout(cb, ms),
       clearTimeout: (handle) => this.clearTimeout(handle)
     };

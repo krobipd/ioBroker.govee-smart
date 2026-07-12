@@ -84,17 +84,11 @@ async function applyWizardResult(adapter, device, result) {
     `applyWizardResult: ${device.sku} \u2192 segmentCount=${result.segmentCount}, manualMode=${device.manualMode}, list="${result.manualList}"`
   );
 }
-async function runWizardStep(adapter, action, deviceKey) {
+async function runWizardStep(adapter, action, deviceKey, payload) {
   if (!adapter.segmentWizard) {
     adapter.segmentWizard = new import_segment_wizard.SegmentWizard(buildWizardHost(adapter));
   }
-  const response = await adapter.segmentWizard.runStep(action, deviceKey);
-  const statusText = adapter.segmentWizard.getStatusText();
-  await adapter.setState("info.wizardStatus", {
-    val: statusText,
-    ack: true
-  });
-  return response;
+  return adapter.segmentWizard.runStep(action, deviceKey, payload);
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

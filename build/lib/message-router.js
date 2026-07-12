@@ -92,7 +92,9 @@ class MessageRouter {
       }
       if (obj.command === "segmentWizard") {
         const payload = (_a = obj.message) != null ? _a : {};
-        const response = await this.host.runWizardStep((_b = payload.action) != null ? _b : "", (_c = payload.device) != null ? _c : "");
+        const response = await this.host.runWizardStep((_b = payload.action) != null ? _b : "", (_c = payload.device) != null ? _c : "", {
+          indices: payload.indices
+        });
         this.host.sendResponse(obj, response);
         return;
       }

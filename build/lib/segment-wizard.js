@@ -18,8 +18,7 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var segment_wizard_exports = {};
 __export(segment_wizard_exports, {
-  SegmentWizard: () => SegmentWizard,
-  wizardIdleText: () => wizardIdleText
+  SegmentWizard: () => SegmentWizard
 });
 module.exports = __toCommonJS(segment_wizard_exports);
 var import_lookups = require("./device-manager/lookups");
@@ -32,9 +31,6 @@ function format(template, params) {
     return template;
   }
   return template.replace(/\{(\w+)\}/g, (m, key) => key in params ? String(params[key]) : m);
-}
-function wizardIdleText() {
-  return (0, import_i18n.resolveLabel)("idle");
 }
 function hasSegmentCapability(device) {
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
@@ -64,25 +60,6 @@ class SegmentWizard {
    */
   t(key, params) {
     return format((0, import_i18n.resolveLabel)(key), params);
-  }
-  /**
-   * Human-readable status string for the admin UI (rendered via textSendTo).
-   * Must stay a plain string — Admin renders it as-is into a read-only field.
-   */
-  getStatusText() {
-    const s = this.session;
-    if (!s) {
-      return this.t("idle");
-    }
-    const visibleStr = s.visible.length > 0 ? s.visible.join(", ") : "\u2014";
-    return `${this.t("deviceHeader")}: ${s.name}
-${this.t("segmentFlashing", { idx: s.current })}
-${this.t("canYouSeeStrip")}
-  ${this.t("btnYes")}
-  ${this.t("btnNo")}
-  ${this.t("btnDone")}
-
-${this.t("seenSoFar", { list: visibleStr })}`;
   }
   /**
    * Clear any pending idle-timer. Called from onUnload.
@@ -116,12 +93,30 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
     this.session = null;
   }
   /**
-   * Route one wizard step from the sendTo handler.
+   * Route one wizard step from the sendTo handler and fold the current grid
+   * snapshot into every response so the React admin map can redraw per step.
    *
-   * @param action "start" | "yes" | "no" | "done" | "abort"
+   * @param action "start" | "yes" | "no" | "done" | "abort" | "apply"
    * @param deviceKey Target device — only consulted on action="start"
+   * @param payload Extra data for actions that need it (apply: corrected indices)
+   * @param payload.indices Review-corrected segment indices for the `apply` action
    */
-  async runStep(action, deviceKey) {
+  async runStep(action, deviceKey, payload) {
+    const response = await this.route(action, deviceKey, payload);
+    return { ...response, snapshot: this.snapshot() };
+  }
+  /**
+   * Dispatch a wizard action to its handler. The session-active guard covers
+   * every action except `start` (which opens a session); `apply` shares that
+   * guard with `yes`/`no`/`done`/`abort`.
+   *
+   * @param action Wizard action string
+   * @param deviceKey Target device — only consulted on action="start"
+   * @param payload Extra data (apply: corrected indices)
+   * @param payload.indices Review-corrected segment indices for the `apply` action
+   */
+  async route(action, deviceKey, payload) {
+    var _a;
     if (action === "start") {
       return this.start(deviceKey);
     }
@@ -134,10 +129,30 @@ ${this.t("seenSoFar", { list: visibleStr })}`;
     if (action === "done") {
       return this.done();
     }
+    if (action === "apply") {
+      return this.apply((_a = payload == null ? void 0 : payload.indices) != null ? _a : []);
+    }
     if (action === "yes" || action === "no") {
       return this.answer(action === "yes");
     }
     return { error: this.t("errUnknownAction", { action }) };
+  }
+  /**
+   * Shape the current session into a {@link WizardSnapshot} for the React grid.
+   * Maps the internal session fields (`current` → `currentIndex`, `visible` →
+   * `confirmed`) and returns an idle snapshot when no session is in flight.
+   */
+  snapshot() {
+    const s = this.session;
+    if (!s) {
+      return { phase: "idle", total: 0, currentIndex: 0, confirmed: [] };
+    }
+    return {
+      phase: "measuring",
+      total: s.total,
+      currentIndex: s.current,
+      confirmed: [...s.visible]
+    };
   }
   /**
    * Begin a new wizard session. Captures baseline and flashes segment 0.
@@ -286,12 +301,7 @@ ${this.t("abortRestart")}`,
       manualList,
       hasGaps: !allContiguous
     };
-    await this.host.applyWizardResult(device, result);
-    await this.restoreBaseline(device, session.baseline);
-    const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${manualList}")` : ", no gaps";
-    this.host.log.info(`Segment wizard for ${(0, import_types.deviceLabel)(device)}: ${segmentCount} segments detected${gapsSuffix}`);
-    this.session = null;
-    this.clearIdleTimer();
+    await this.finalize(device, session, result);
     const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
     return {
       message: `${this.t("finishDone")}
@@ -305,6 +315,57 @@ ${this.t("finishTreeRebuilt")}`,
       list: manualList,
       hasGaps: result.hasGaps
     };
+  }
+  /**
+   * Finalize the review-corrected segment map. The React review screen may have
+   * toggled cells before the user hit "Übernehmen"; the corrected indices arrive
+   * here and run through the SAME finalization as {@link finish} (apply →
+   * restore baseline → close session). Requires an active session — routed only
+   * after the session-active guard in {@link route} — and a present device.
+   *
+   * @param indices Segment indices the user confirmed as lit (0-based, unsorted)
+   */
+  async apply(indices) {
+    const session = this.session;
+    if (!session) {
+      return { error: this.t("errNoWizardShort") };
+    }
+    const clean = [...new Set(indices.filter((i) => Number.isInteger(i) && i >= 0))].sort((a, b) => a - b);
+    if (clean.length === 0) {
+      return { error: this.t("errAnswerFirst") };
+    }
+    const device = this.host.findDevice(session.deviceKey);
+    if (!device) {
+      this.session = null;
+      this.clearIdleTimer();
+      return { error: this.t("errDeviceGoneShort") };
+    }
+    const segmentCount = clean[clean.length - 1] + 1;
+    const hasGaps = clean.length < segmentCount;
+    const manualList = hasGaps ? compactIndices(clean) : "";
+    const result = { segmentCount, manualList, hasGaps };
+    await this.finalize(device, session, result);
+    return { applied: true, segmentCount, list: manualList, hasGaps };
+  }
+  /**
+   * Apply a consolidated result to the device, restore the strip's baseline,
+   * log the outcome and close the session. Shared side-effect path for
+   * {@link finish} (measured indices) and {@link apply} (review-corrected
+   * indices). Reads `session.baseline` before the session is nulled.
+   *
+   * @param device Target device
+   * @param session The active session being finalized
+   * @param result Consolidated wizard result to apply
+   */
+  async finalize(device, session, result) {
+    await this.host.applyWizardResult(device, result);
+    await this.restoreBaseline(device, session.baseline);
+    const gapsSuffix = result.hasGaps ? `, gaps detected (manual_list="${result.manualList}")` : ", no gaps";
+    this.host.log.info(
+      `Segment wizard for ${(0, import_types.deviceLabel)(device)}: ${result.segmentCount} segments detected${gapsSuffix}`
+    );
+    this.session = null;
+    this.clearIdleTimer();
   }
   /** (Re-)arm the 5-minute idle timeout that fires abort(). */
   scheduleIdleTimeout() {
@@ -452,7 +513,6 @@ function compactIndices(sorted) {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  SegmentWizard,
-  wizardIdleText
+  SegmentWizard
 });
 //# sourceMappingURL=segment-wizard.js.map

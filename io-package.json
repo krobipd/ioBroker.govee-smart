@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.20.0",
+    "version": "2.21.0",
     "news": {
+      "2.21.0": {
+        "en": "The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure and can be corrected before you apply it.",
+        "de": "Der Segment-Erkennungs-Assistent für gekürzte LED-Strips hat jetzt eine visuelle Oberfläche: eine Live-Karte des Strips, die sich beim Messen füllt und vor dem Übernehmen korrigierbar ist.",
+        "ru": "Мастер определения сегментов для обрезанных LED-лент теперь имеет визуальный интерфейс: живую карту ленты, которая заполняется при измерении и может быть исправлена перед применением.",
+        "pt": "O assistente de deteção de segmentos para fitas LED cortadas tem agora uma interface visual: um mapa ao vivo da fita que se preenche à medida que mede e pode ser corrigido antes de aplicar.",
+        "nl": "De segmentdetectie-wizard voor geknipte LED-strips heeft nu een visuele interface: een live kaart van de strip die zich vult tijdens het meten en corrigeerbaar is voordat je hem toepast.",
+        "fr": "L'assistant de détection de segments pour rubans LED coupés a maintenant une interface visuelle : une carte du ruban qui se remplit pendant la mesure, corrigeable avant application.",
+        "it": "La procedura di rilevamento segmenti per strisce LED tagliate ha ora un'interfaccia visiva: una mappa della striscia che si riempie durante la misurazione, correggibile prima di applicarla.",
+        "es": "El asistente de detección de segmentos para tiras LED cortadas ahora tiene una interfaz visual: un mapa en vivo de la tira que se rellena a medida que mides y se puede corregir antes de aplicarlo.",
+        "pl": "Kreator wykrywania segmentów dla przyciętych taśm LED ma teraz wizualny interfejs: aktualną mapę taśmy, która wypełnia się podczas pomiaru i można ją poprawić przed zastosowaniem.",
+        "uk": "Майстер визначення сегментів для обрізаних LED-стрічок тепер має візуальний інтерфейс: живу карту стрічки, яка заповнюється під час вимірювання та може бути виправлена перед застосуванням.",
+        "zh-cn": "用于剪裁 LED 灯带的分段检测向导现在有了可视化界面：一张实时灯带图，随测量逐步填充，并可在应用前进行修正。"
+      },
       "2.20.0": {
         "en": "Channel and device labels now follow the ioBroker system language\nClearer, honest feedback for Cloud login, API key, device sync and network problems",
         "de": "Kanal- und Gerätelabels folgen jetzt der ioBroker-Systemsprache\nKlarere, ehrliche Rückmeldungen bei Cloud-Login, API-Key, Geräte-Sync und Netzwerkproblemen",
@@ -80,19 +93,6 @@
         "ru": "Важное изменение: датапоинты цвета переименованы в snake_case (control.color_rgb / control.color_temperature) — обновите скрипты. Плюс усиление безопасности и исправления датчиков.",
         "uk": "Важлива зміна: датапоінти кольору перейменовано на snake_case (control.color_rgb / control.color_temperature) — оновіть скрипти. Плюс посилення безпеки та виправлення датчиків.",
         "zh-cn": "重大变更：颜色数据点改为下划线命名 (control.color_rgb / control.color_temperature) — 请更新脚本。另有安全加固及传感器在线状态和湿度修复。"
-      },
-      "2.16.2": {
-        "en": "On hosts with multiple network interfaces, LAN device discovery now uses the selected interface for outgoing traffic, so it no longer misses devices by scanning on the wrong one.",
-        "de": "Auf Hosts mit mehreren Netzwerkschnittstellen nutzt die LAN-Erkennung jetzt die gewählte Schnittstelle für ausgehenden Verkehr und verpasst so keine Geräte mehr durch Scannen über die falsche.",
-        "ru": "На хостах с несколькими сетевыми интерфейсами LAN-обнаружение теперь использует выбранный интерфейс для исходящего трафика и больше не пропускает устройства из-за неверного.",
-        "pt": "Em hosts com várias interfaces de rede, a deteção de dispositivos LAN agora usa a interface selecionada para o tráfego de saída e deixa de perder dispositivos por procurar na errada.",
-        "nl": "Op hosts met meerdere netwerkinterfaces gebruikt LAN-detectie nu de geselecteerde interface voor uitgaand verkeer en mist zo geen apparaten meer door op de verkeerde te scannen.",
-        "fr": "Sur les hôtes à plusieurs interfaces réseau, la détection LAN utilise désormais l'interface sélectionnée pour le trafic sortant et ne manque plus d'appareils en analysant la mauvaise.",
-        "it": "Sugli host con più interfacce di rete, il rilevamento LAN ora usa l'interfaccia selezionata per il traffico in uscita e non perde più dispositivi cercando su quella sbagliata.",
-        "es": "En hosts con varias interfaces de red, la detección de dispositivos LAN ahora usa la interfaz seleccionada para el tráfico saliente y ya no pierde dispositivos al buscar en la incorrecta.",
-        "pl": "Na hostach z wieloma interfejsami sieciowymi wykrywanie urządzeń LAN używa teraz wybranego interfejsu dla ruchu wychodzącego i nie pomija już urządzeń przez skanowanie przez zły.",
-        "uk": "На хостах із кількома мережевими інтерфейсами LAN-виявлення тепер використовує вибраний інтерфейс для вихідного трафіку й не пропускає пристрої через неправильний.",
-        "zh-cn": "在具有多个网络接口的主机上，LAN 设备发现现在使用所选接口发送流量，不再因在错误接口上扫描而漏掉设备。"
       }
     },
     "plugins": {

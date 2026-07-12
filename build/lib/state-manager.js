@@ -29,16 +29,20 @@ var import_govee_constants = require("./govee-constants");
 var import_i18n = require("./i18n");
 var import_device_key = require("./device-key");
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
-const CHANNEL_NAMES = {
-  control: (0, import_i18n.tName)("channelControls"),
-  scenes: (0, import_i18n.tName)("channelScenes"),
-  music: (0, import_i18n.tName)("channelMusic"),
-  snapshots: (0, import_i18n.tName)("channelSnapshots"),
-  sensor: (0, import_i18n.tName)("channelSensorData"),
-  events: (0, import_i18n.tName)("channelEvents"),
-  info: (0, import_i18n.tName)("deviceInformation"),
-  diag: (0, import_i18n.tName)("channelDiagnostics")
+const CHANNEL_NAME_KEYS = {
+  control: "channelControls",
+  scenes: "channelScenes",
+  music: "channelMusic",
+  snapshots: "channelSnapshots",
+  sensor: "channelSensorData",
+  events: "channelEvents",
+  info: "deviceInformation",
+  diag: "channelDiagnostics"
 };
+function channelName(channel) {
+  const key = CHANNEL_NAME_KEYS[channel];
+  return key ? (0, import_i18n.tName)(key) : channel;
+}
 const numSensor = (kind, nameKey) => ({
   type: "number",
   role: import_capability_mapper.SENSOR_ROLE_UNIT[kind].role,
@@ -287,7 +291,6 @@ class StateManager {
    * @param stateId State ID without channel (e.g. "battery")
    */
   async ensureSyntheticStateObject(prefix, stateId) {
-    var _a;
     const meta = SYNTHETIC_STATE_META[stateId.toLowerCase()];
     if (!meta) {
       return;
@@ -297,7 +300,7 @@ class StateManager {
       `${prefix}.${channel}`,
       {
         type: "channel",
-        common: { name: (_a = CHANNEL_NAMES[channel]) != null ? _a : channel },
+        common: { name: channelName(channel) },
         native: {}
       },
       { preserve: { common: ["name"] } }
@@ -490,7 +493,7 @@ class StateManager {
    * @param logTag Short tag for the per-phase debug log line
    */
   async writeStateDefsToChannels(prefix, stateDefs, logTag) {
-    var _a, _b;
+    var _a;
     const channelGroups = /* @__PURE__ */ new Map();
     for (const def of stateDefs) {
       const channel = (_a = def.channel) != null ? _a : "control";
@@ -508,7 +511,7 @@ class StateManager {
         `${prefix}.${channel}`,
         {
           type: "channel",
-          common: { name: (_b = CHANNEL_NAMES[channel]) != null ? _b : channel },
+          common: { name: channelName(channel) },
           native: {}
         },
         { preserve: { common: ["name"] } }
