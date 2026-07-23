@@ -1,6 +1,6 @@
 import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter } from "./command-router";
-import { getDeviceTier, isSeedAndDormant, seedHasQuirks } from "./device-registry";
+import { getDeviceTier, isSeedAndDormant } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
@@ -915,12 +915,7 @@ export class DeviceManager {
       case "reported":
         return;
       case "seed":
-        if (!seedHasQuirks(upper)) {
-          // Quirk-less seed = pure catalog recognition. The experimental toggle
-          // would apply nothing for this SKU, so never send the user chasing it —
-          // in either toggle state the device just runs on the generic defaults.
-          this.log.info(`Device ${label} is recognised (experimental) and runs on the generic defaults.`);
-        } else if (isSeedAndDormant(upper)) {
+        if (isSeedAndDormant(upper)) {
           this.log.warn(
             `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`,
           );

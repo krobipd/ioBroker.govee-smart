@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.21.0",
+    "version": "2.22.0",
     "news": {
+      "2.22.0": {
+        "en": "Sensors connected through a Govee gateway now show the gateway they use instead of an empty IP field, and seven more device models are now in the catalog as experimental.",
+        "de": "Sensoren, die über ein Govee-Gateway angebunden sind, zeigen jetzt das Gateway statt eines leeren IP-Feldes, und sieben weitere Gerätemodelle sind jetzt experimentell im Katalog.",
+        "ru": "Датчики, подключённые через шлюз Govee, теперь показывают свой шлюз вместо пустого поля IP, и ещё семь моделей устройств теперь в каталоге как экспериментальные.",
+        "pt": "Os sensores ligados através de um gateway Govee mostram agora o gateway em vez de um campo de IP vazio, e mais sete modelos de dispositivos estão agora no catálogo como experimentais.",
+        "nl": "Sensoren die via een Govee-gateway zijn verbonden, tonen nu de gateway in plaats van een leeg IP-veld, en zeven extra apparaatmodellen staan nu experimenteel in de catalogus.",
+        "fr": "Les capteurs reliés par une passerelle Govee affichent désormais la passerelle au lieu d'un champ IP vide, et sept modèles d'appareils supplémentaires figurent désormais au catalogue en expérimental.",
+        "it": "I sensori collegati tramite un gateway Govee ora mostrano il gateway invece di un campo IP vuoto, e altri sette modelli di dispositivi sono ora nel catalogo come sperimentali.",
+        "es": "Los sensores conectados a través de una pasarela Govee ahora muestran la pasarela en lugar de un campo IP vacío, y siete modelos de dispositivos más están ahora en el catálogo como experimentales.",
+        "pl": "Czujniki podłączone przez bramę Govee pokazują teraz bramę zamiast pustego pola IP, a siedem kolejnych modeli urządzeń jest teraz w katalogu jako eksperymentalne.",
+        "uk": "Датчики, під'єднані через шлюз Govee, тепер показують свій шлюз замість порожнього поля IP, і ще сім моделей пристроїв тепер у каталозі як експериментальні.",
+        "zh-cn": "通过 Govee 网关连接的传感器现在会显示所使用的网关，而不再是空的 IP 字段，并且现在有七款设备型号作为实验性列入目录。"
+      },
       "2.21.0": {
         "en": "The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure and can be corrected before you apply it.",
         "de": "Der Segment-Erkennungs-Assistent für gekürzte LED-Strips hat jetzt eine visuelle Oberfläche: eine Live-Karte des Strips, die sich beim Messen füllt und vor dem Übernehmen korrigierbar ist.",
@@ -80,19 +93,6 @@
         "pl": "Urządzenia usunięte z konta Govee znikają teraz automatycznie z adaptera. Przywrócono sterowanie kolorami dla grup z członkiem tylko w chmurze.",
         "uk": "Пристрої, які ви видаляєте з облікового запису Govee, тепер автоматично зникають з адаптера. Відновлено керування кольором для груп з учасником лише з хмари.",
         "zh-cn": "从 Govee 账户中删除的设备现在会自动从适配器中消失。已恢复对包含纯云成员的群组的颜色控制。"
-      },
-      "2.17.0": {
-        "en": "Breaking: the colour datapoints are renamed to snake_case (control.color_rgb / control.color_temperature) — update your scripts. Plus security hardening and sensor online + humidity fixes.",
-        "de": "Breaking: die Farb-Datenpunkte heißen jetzt snake_case (control.color_rgb / control.color_temperature) — Skripte anpassen. Dazu Sicherheits-Härtung und Fixes für Sensor-Online + Feuchte.",
-        "es": "Cambio importante: los datapoints de color pasan a snake_case (control.color_rgb / control.color_temperature) — actualiza tus scripts. Además refuerzo de seguridad y arreglos de sensores.",
-        "fr": "Changement cassant : les datapoints de couleur passent en snake_case (control.color_rgb / control.color_temperature) — mettez à jour vos scripts. Plus sécurité renforcée et corrections capteurs.",
-        "it": "Modifica importante: i datapoint colore passano a snake_case (control.color_rgb / control.color_temperature) — aggiorna i tuoi script. Più sicurezza rafforzata e correzioni sensori.",
-        "nl": "Ingrijpend: de kleur-datapunten worden snake_case (control.color_rgb / control.color_temperature) — pas je scripts aan. Plus beveiligingsversterking en fixes voor sensor-online + vochtigheid.",
-        "pl": "Zmiana łamiąca: punkty danych koloru zmieniają się na snake_case (control.color_rgb / control.color_temperature) — zaktualizuj skrypty. Plus wzmocnienie bezpieczeństwa i poprawki czujników.",
-        "pt": "Alteração importante: os datapoints de cor passam a snake_case (control.color_rgb / control.color_temperature) — atualize os seus scripts. Mais reforço de segurança e correções de sensores.",
-        "ru": "Важное изменение: датапоинты цвета переименованы в snake_case (control.color_rgb / control.color_temperature) — обновите скрипты. Плюс усиление безопасности и исправления датчиков.",
-        "uk": "Важлива зміна: датапоінти кольору перейменовано на snake_case (control.color_rgb / control.color_temperature) — оновіть скрипти. Плюс посилення безпеки та виправлення датчиків.",
-        "zh-cn": "重大变更：颜色数据点改为下划线命名 (control.color_rgb / control.color_temperature) — 请更新脚本。另有安全加固及传感器在线状态和湿度修复。"
       }
     },
     "plugins": {

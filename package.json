@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "2.21.0",
+  "version": "2.22.0",
   "description": "Control Govee WiFi devices via LAN, MQTT and Cloud.",
   "author": {
     "name": "krobi",
@@ -31,7 +31,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@iobroker/adapter-core": "^3.4.2",
+    "@iobroker/adapter-core": "^3.4.3",
     "mqtt": "^5.15.2",
     "node-forge": "^1.4.0",
     "uuid": "^14.0.1"

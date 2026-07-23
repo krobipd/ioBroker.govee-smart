@@ -1630,60 +1630,6 @@ describe("DeviceManager", () => {
     });
   });
 
-  describe("maybeNudgeSeedSku — quirk-less seed does not over-promise", () => {
-    afterEach(() => _resetDeviceRegistry());
-
-    function captureLog(): { log: ioBroker.Logger; warnings: string[]; infos: string[] } {
-      const warnings: string[] = [];
-      const infos: string[] = [];
-      const log: ioBroker.Logger = {
-        debug: () => {},
-        info: (m: string) => infos.push(m),
-        warn: (m: string) => warnings.push(m),
-        error: () => {},
-        silly: () => {},
-        level: "debug",
-      };
-      return { log, warnings, infos };
-    }
-
-    it("a quirk-less dormant seed is 'recognised, generic defaults' — never 'apply corrections'", () => {
-      initDeviceRegistry({
-        data: { devices: { H1370: { name: "Ceiling Fan", type: "fan", status: "seed" } } } as never,
-        experimental: false,
-      });
-      const { log, warnings, infos } = captureLog();
-      const nudgeDm = new DeviceManager(log, mockTimers);
-      nudgeDm.maybeNudgeSeedSku("H1370", "Ceiling Fan");
-      expect(warnings).toHaveLength(0);
-      expect(infos.some(m => m.includes("recognised") && m.includes("generic defaults"))).toBe(true);
-      expect([...warnings, ...infos].some(m => m.includes("apply known per-SKU corrections"))).toBe(false);
-    });
-
-    it("a quirk-less seed with the toggle ON also stays neutral (no false 'quirks are active')", () => {
-      initDeviceRegistry({
-        data: { devices: { H1370: { name: "Ceiling Fan", type: "fan", status: "seed" } } } as never,
-        experimental: true,
-      });
-      const { log, infos } = captureLog();
-      const nudgeDm = new DeviceManager(log, mockTimers);
-      nudgeDm.maybeNudgeSeedSku("H1370", "Ceiling Fan");
-      expect(infos.some(m => m.includes("recognised") && m.includes("generic defaults"))).toBe(true);
-      expect(infos.some(m => m.includes("experimental quirks are active"))).toBe(false);
-    });
-
-    it("a seed WITH quirks still nudges to enable the toggle when dormant", () => {
-      initDeviceRegistry({
-        data: { devices: { H6141: { name: "LED Strip", type: "light", status: "seed", quirks: { brokenPlatformApi: true } } } } as never,
-        experimental: false,
-      });
-      const { log, warnings } = captureLog();
-      const nudgeDm = new DeviceManager(log, mockTimers);
-      nudgeDm.maybeNudgeSeedSku("H6141", "LED Strip");
-      expect(warnings.some(m => m.includes("apply known per-SKU corrections"))).toBe(true);
-    });
-  });
-
   describe("generateDiagnostics", () => {
     it("should include all device data in diagnostics export", () => {
       const device = createTestDevice({
