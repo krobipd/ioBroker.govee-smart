@@ -134,6 +134,7 @@
   "model": "Modelo",
   "serialNumber": "Número de serie",
   "ipAddress": "Dirección IP",
+  "gateway": "Puerta de enlace",
   "deviceType": "Tipo de dispositivo",
   "members": "Miembros",
   "membersUnreachable": "Miembros inaccesibles",

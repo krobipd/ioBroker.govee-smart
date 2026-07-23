@@ -47,6 +47,7 @@ import {
   type TimerAdapter,
   deviceLabel,
   errMessage,
+  formatGatewayLabel,
 } from "./types";
 import { extractHttpStatus, HttpError } from "./http-client";
 
@@ -1262,10 +1263,21 @@ export class DeviceManager {
     // device and the downstream onCloudCapabilities callback is fire-and-forget
     // (it enqueues its own setState work), so there is nothing to parallelise.
     let updated = 0;
+    const gatewayDiscovered: GoveeDevice[] = [];
     for (const entry of entries) {
       const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
       if (!device) {
         continue;
+      }
+      // Gateway-connected sensor (e.g. H5109 behind an H5042): capture which
+      // gateway it hangs off. Set-only-when-present — NEVER cleared on a poll
+      // that omits gatewayInfo, so a flaky/partial response can't churn the
+      // object tree. Independent of the reading caps below, so it happens even
+      // on a poll that carried no fresh temperature.
+      const gw = formatGatewayLabel(entry.settings?.gatewayInfo);
+      if (gw && device.gateway !== gw) {
+        device.gateway = gw;
+        gatewayDiscovered.push(device);
       }
       const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
       const caps = buildCapabilitiesFromAppEntryHelper(entry, Date.now(), hasHumidityCap);
@@ -1281,6 +1293,18 @@ export class DeviceManager {
       this.maybeApplyCloudOnline(device, caps);
       this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
       updated++;
+    }
+    // A newly-discovered gateway is static device metadata — persist it (so the
+    // info.gateway state is available straight from cache on the next restart,
+    // in phase 1) and re-run the info-state pass once so info.gateway appears
+    // now instead of only after the next cloud refresh. Guarded to fire only on
+    // a genuine change, so the steady state does no extra work.
+    if (gatewayDiscovered.length > 0) {
+      this.saveDevicesToCache();
+      const all = this.getDevices();
+      for (const device of gatewayDiscovered) {
+        this.onCloudDataReady?.(device, all);
+      }
     }
     // Reconcile now that the (complete) App-API account list is fresh — this is
     // what surfaces a sold sensor (absent here) for removal after the debounce.

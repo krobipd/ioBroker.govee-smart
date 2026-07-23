@@ -26,6 +26,7 @@ __export(types_exports, {
   deviceLabel: () => deviceLabel,
   disambiguateLabels: () => disambiguateLabels,
   errMessage: () => errMessage,
+  formatGatewayLabel: () => formatGatewayLabel,
   hexToRgb: () => hexToRgb,
   logDedup: () => logDedup,
   maskSecret: () => maskSecret,
@@ -45,6 +46,17 @@ function normalizeDeviceId(id) {
 function deviceLabel(device) {
   const name = typeof device.name === "string" ? device.name.trim() : "";
   return name && name !== device.sku ? `${name} (${device.sku})` : device.sku;
+}
+function formatGatewayLabel(gatewayInfo) {
+  if (!gatewayInfo || typeof gatewayInfo !== "object") {
+    return void 0;
+  }
+  const sku = typeof gatewayInfo.sku === "string" ? gatewayInfo.sku.trim() : "";
+  if (!sku) {
+    return void 0;
+  }
+  const bleName = typeof gatewayInfo.bleName === "string" ? gatewayInfo.bleName.trim() : "";
+  return bleName ? `${sku} (${bleName})` : sku;
 }
 function classifyError(err) {
   if (err instanceof Error) {
@@ -270,6 +282,7 @@ function capMatchesControl(cap, kind) {
   deviceLabel,
   disambiguateLabels,
   errMessage,
+  formatGatewayLabel,
   hexToRgb,
   logDedup,
   maskSecret,

@@ -356,6 +356,16 @@ export interface GoveeDevice {
    */
   accountMissCount?: number;
   /**
+   * Human-readable identifier of the Govee gateway this device reaches the
+   * cloud through, when it has no own WiFi (BLE→gateway sensors like the H5109
+   * pool thermometer behind an H5042). Format `<gateway SKU> (<gateway BLE
+   * name>)`, e.g. `H5042 (ihoment_H5042_3795)`. Set from the App-API
+   * `settings.gatewayInfo`; **set-only, never cleared** once seen (sticky), so
+   * a flaky poll that omits it can't churn the object tree. When present the
+   * device shows `info.gateway` instead of an always-empty `info.ip`.
+   */
+  gateway?: string;
+  /**
    * Timestamp (ms) when device last replied to a LAN-direct probe (multicast
    * discovery or unicast devStatus). Only set by the LAN-Discovery / LAN-Status
    * paths — NOT by MQTT-push (broker buffering risk) and NOT by Cloud caps.
@@ -417,6 +427,28 @@ export function normalizeDeviceId(id: string): string {
 export function deviceLabel(device: { name?: string; sku: string }): string {
   const name = typeof device.name === "string" ? device.name.trim() : "";
   return name && name !== device.sku ? `${name} (${device.sku})` : device.sku;
+}
+
+/**
+ * Human-readable label for the Govee gateway a device reaches the cloud
+ * through, derived from the App-API `settings.gatewayInfo`. Returns
+ * `<SKU> (<BLE name>)`, or just the SKU when no BLE name is present, or
+ * `undefined` when there is no usable gateway SKU — the caller then leaves the
+ * device on the normal `info.ip` path and never creates an `info.gateway` with
+ * a garbage value. Auth secrets (`secretCode`, `topic`) are deliberately ignored.
+ *
+ * @param gatewayInfo The `gatewayInfo` object from the App-API device settings
+ */
+export function formatGatewayLabel(gatewayInfo: { sku?: unknown; bleName?: unknown } | undefined): string | undefined {
+  if (!gatewayInfo || typeof gatewayInfo !== "object") {
+    return undefined;
+  }
+  const sku = typeof gatewayInfo.sku === "string" ? gatewayInfo.sku.trim() : "";
+  if (!sku) {
+    return undefined;
+  }
+  const bleName = typeof gatewayInfo.bleName === "string" ? gatewayInfo.bleName.trim() : "";
+  return bleName ? `${sku} (${bleName})` : sku;
 }
 
 /** Error categories for dedup logging */

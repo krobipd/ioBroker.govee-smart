@@ -134,6 +134,7 @@
   "model": "型号",
   "serialNumber": "序列号",
   "ipAddress": "IP地址",
+  "gateway": "网关",
   "deviceType": "设备类型",
   "members": "成员",
   "membersUnreachable": "无法访问的成员",

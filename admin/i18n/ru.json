@@ -134,6 +134,7 @@
   "model": "Модель",
   "serialNumber": "Серийный номер",
   "ipAddress": "IP-адрес",
+  "gateway": "Шлюз",
   "deviceType": "Тип устройства",
   "members": "Участники",
   "membersUnreachable": "Недоступные участники",

@@ -266,6 +266,62 @@ describe("StateManager", () => {
     });
   });
 
+  describe("createInfoStates — gateway-connected sensors", () => {
+    it("a gateway sensor gets info.gateway and never an (empty) info.ip", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const dev = createTestDevice({
+        sku: "H5109",
+        deviceId: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        type: "devices.types.thermometer",
+        lanIp: undefined,
+        gateway: "H5042 (ihoment_H5042_3795)",
+      });
+      const prefix = sm.devicePrefix(dev);
+      await sm.createInfoStates(dev);
+      expect(objects.has(`${prefix}.info.gateway`)).toBe(true);
+      expect(objects.has(`${prefix}.info.ip`)).toBe(false);
+    });
+
+    it("removes a leftover info.ip when a device becomes gateway-connected — exactly once, no re-toggle", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const dev = createTestDevice({
+        sku: "H5109",
+        deviceId: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        type: "devices.types.thermometer",
+        lanIp: undefined,
+      });
+      const prefix = sm.devicePrefix(dev);
+      // First run as a plain sensor → info.ip exists, no info.gateway yet.
+      await sm.createInfoStates(dev);
+      expect(objects.has(`${prefix}.info.ip`)).toBe(true);
+      expect(objects.has(`${prefix}.info.gateway`)).toBe(false);
+      // Now it's discovered behind a gateway.
+      dev.gateway = "H5042 (ihoment_H5042_3795)";
+      await sm.createInfoStates(dev);
+      expect(objects.has(`${prefix}.info.gateway`)).toBe(true);
+      expect(objects.has(`${prefix}.info.ip`)).toBe(false);
+      const delIpCount = (): number =>
+        calls.filter(c => c.method === "delObjectAsync" && c.args[0] === `${prefix}.info.ip`).length;
+      expect(delIpCount()).toBe(1);
+      // Idempotence: a third pass must not toggle the object tree again.
+      await sm.createInfoStates(dev);
+      expect(delIpCount()).toBe(1);
+      expect(objects.has(`${prefix}.info.gateway`)).toBe(true);
+    });
+
+    it("a normal device keeps info.ip and gets no info.gateway", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      const dev = createTestDevice({ sku: "H6160", lanIp: "192.168.1.50" });
+      const prefix = sm.devicePrefix(dev);
+      await sm.createInfoStates(dev);
+      expect(objects.has(`${prefix}.info.ip`)).toBe(true);
+      expect(objects.has(`${prefix}.info.gateway`)).toBe(false);
+    });
+  });
+
   describe("removeSyntheticStateOnce", () => {
     it("deletes an existing phantom sensor_humidity object exactly once (#31)", async () => {
       const { adapter, calls, objects } = createMockAdapter();

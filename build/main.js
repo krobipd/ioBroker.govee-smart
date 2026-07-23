@@ -245,6 +245,9 @@ class GoveeAdapter extends utils.Adapter {
         void this.reapStaleDevices().catch((e) => this.log.debug(`Post-eviction cleanup failed: ${(0, import_types.errMessage)(e)}`));
       };
       this.deviceManager.onLanIpChanged = (device, ip) => {
+        if (device.gateway) {
+          return;
+        }
         const prefix = this.stateManager.devicePrefix(device);
         this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {
         });

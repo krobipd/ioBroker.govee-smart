@@ -2599,6 +2599,52 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(await dm2.pollAppApi()).toBe(0); // unknown entry ignored despite a known device present
     });
 
+    it("gateway is sticky — set when gatewayInfo is present, never cleared on a poll that omits it", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers);
+      const dev = createTestDevice({
+        sku: "H5109",
+        deviceId: "AABBCCDDEEFF0002",
+        type: "devices.types.thermometer",
+        lanIp: undefined,
+      });
+      (dm2 as any).devices.set((dm2 as any).deviceKey("H5109", "AABBCCDDEEFF0002"), dev);
+
+      // Poll 1: Govee reports the gateway.
+      dm2.setApiClient(
+        makeApiMock({
+          entries: [
+            {
+              sku: "H5109",
+              device: "AABBCCDDEEFF0002",
+              deviceName: "Pool",
+              lastData: { tem: 2341 },
+              settings: { gatewayInfo: { sku: "H5042", bleName: "ihoment_H5042_3795" } },
+            },
+          ],
+        }) as never,
+      );
+      await dm2.pollAppApi();
+      expect(dev.gateway).toBe("H5042 (ihoment_H5042_3795)");
+
+      // Poll 2: a flaky/partial response omits gatewayInfo — the gateway must
+      // NOT be cleared (set-only, so no create/delete churn on the object tree).
+      dm2.setApiClient(
+        makeApiMock({
+          entries: [
+            {
+              sku: "H5109",
+              device: "AABBCCDDEEFF0002",
+              deviceName: "Pool",
+              lastData: { tem: 2350 },
+              settings: { uploadRate: 10 },
+            },
+          ],
+        }) as never,
+      );
+      await dm2.pollAppApi();
+      expect(dev.gateway).toBe("H5042 (ihoment_H5042_3795)");
+    });
+
     it("removes a sold sensor absent from the App-API account list after the debounce (reported H5179 bug)", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers);
       // A cache-restored, sold thermometer: no LAN, not in any account list.

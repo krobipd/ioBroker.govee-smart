@@ -57,6 +57,8 @@ export interface CachedDeviceData {
   lastSeenOnNetwork?: number;
   /** Consecutive account-reconcile misses — debounce for the irreversible auto-removal. */
   accountMissCount?: number;
+  /** Gateway identity for BLE→gateway sensors (see GoveeDevice.gateway); persisted so it survives restart. */
+  gateway?: string;
   /**
    * Physical segment count for this device. Resolved from (in order):
    * 1. MQTT `AA A5` stream — authoritative, the real device tells us

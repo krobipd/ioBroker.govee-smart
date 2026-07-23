@@ -292,6 +292,26 @@ export class StateManager {
   }
 
   /**
+   * One-shot removal of an `info.<stateId>` object, guarded by the same
+   * per-run set as {@link removeSyntheticStateOnce}. Used to drop an info field
+   * a device no longer carries — e.g. `info.ip` on a BLE→gateway sensor, which
+   * shows `info.gateway` instead. Because `device.gateway` is sticky, this is a
+   * one-time transition (first discovery / upgraded install); after the guard
+   * is set the object tree is never toggled again.
+   *
+   * @param prefix Device object prefix (e.g. "devices.h5109_001a")
+   * @param stateId Info state id under the `info` channel (e.g. "ip")
+   */
+  async removeInfoStateOnce(prefix: string, stateId: string): Promise<void> {
+    const id = `${prefix}.info.${stateId}`;
+    if (this.cleanedSyntheticStates.has(id)) {
+      return;
+    }
+    this.cleanedSyntheticStates.add(id);
+    await this.safeDeleteState(id);
+  }
+
+  /**
    * Push the device's trust tier (verified/reported/seed/unknown) into
    * the user-visible `diag.tier` state. Called after every device-state
    * refresh so the value tracks any registry change between adapter
@@ -512,7 +532,15 @@ export class StateManager {
       // periodic false→true bounces (captured 2026-05-13).
       await this.ensureState(`${prefix}.info.model`, tName("model"), "string", "text", false, undefined, "");
       await this.ensureState(`${prefix}.info.serial`, tName("serialNumber"), "string", "text", false, undefined, "");
-      await this.ensureState(`${prefix}.info.ip`, tName("ipAddress"), "string", "info.ip", false, undefined, "");
+      // A BLE→gateway sensor (device.gateway set) reaches the cloud only via a
+      // gateway and never has an own LAN IP — show which gateway it hangs off
+      // (info.gateway) instead of a permanently-empty info.ip. Everything else
+      // keeps info.ip as before.
+      if (device.gateway) {
+        await this.ensureState(`${prefix}.info.gateway`, tName("gateway"), "string", "text", false, undefined, "");
+      } else {
+        await this.ensureState(`${prefix}.info.ip`, tName("ipAddress"), "string", "info.ip", false, undefined, "");
+      }
       // Device-type marker — short label like "light", "thermometer",
       // "heater" (Govee API type without the "devices.types." prefix).
       // Lets scripts filter `*.info.type === "light"` without parsing.
@@ -525,10 +553,21 @@ export class StateManager {
         val: device.deviceId,
         ack: true,
       });
-      await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
-        val: device.lanIp ?? "",
-        ack: true,
-      });
+      if (device.gateway) {
+        await this.adapter.setStateChangedAsync(`${prefix}.info.gateway`, {
+          val: device.gateway,
+          ack: true,
+        });
+        // Drop a leftover info.ip from before the device was known to hang off a
+        // gateway. Once-guarded — after the first pass the object tree is never
+        // touched again (no per-refresh create/delete churn).
+        await this.removeInfoStateOnce(prefix, "ip");
+      } else {
+        await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
+          val: device.lanIp ?? "",
+          ack: true,
+        });
+      }
       await this.adapter.setStateChangedAsync(`${prefix}.info.type`, {
         val: shortenGoveeType(device.type),
         ack: true,

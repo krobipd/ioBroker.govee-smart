@@ -134,6 +134,7 @@
   "model": "Model",
   "serialNumber": "Numer seryjny",
   "ipAddress": "Adres IP",
+  "gateway": "Brama",
   "deviceType": "Typ urządzenia",
   "members": "Członkowie",
   "membersUnreachable": "Nieosiągalni członkowie",

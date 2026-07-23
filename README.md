@@ -99,6 +99,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - A Govee app device group of the "same mode" type no longer shows up as a phantom, uncontrollable device in the object tree — it is now skipped like the regular device groups already were, and any leftover one created by an earlier version is removed automatically on start.
 - Seven more Govee models are recognised so they no longer warn as unsupported: Edison Bulb (H14C0), G25 Edison Bulb (H14C1), Ceiling Light Ultra (H1270), Galaxy Light Projector 2 Pro (H609D), Recessed Downlight (H801D), Smart Floor Lamp (R16D0) and Ceiling Fan with Light (H1370).
 - A device that is only recognised for the experimental list no longer asks you to enable the experimental toggle when there are no per-device corrections to apply for it — it simply runs on the generic defaults.
+- Sensors that reach the cloud through a Govee gateway (for example a pool thermometer behind an H5042) now show which gateway they are connected through in a new `info.gateway` datapoint, instead of a permanently-empty IP field.
 
 ### 2.21.0 (2026-07-12) — stable
 

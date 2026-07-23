@@ -213,6 +213,25 @@ class StateManager {
     await this.safeDeleteState(this.resolveStatePath(prefix, stateId));
   }
   /**
+   * One-shot removal of an `info.<stateId>` object, guarded by the same
+   * per-run set as {@link removeSyntheticStateOnce}. Used to drop an info field
+   * a device no longer carries — e.g. `info.ip` on a BLE→gateway sensor, which
+   * shows `info.gateway` instead. Because `device.gateway` is sticky, this is a
+   * one-time transition (first discovery / upgraded install); after the guard
+   * is set the object tree is never toggled again.
+   *
+   * @param prefix Device object prefix (e.g. "devices.h5109_001a")
+   * @param stateId Info state id under the `info` channel (e.g. "ip")
+   */
+  async removeInfoStateOnce(prefix, stateId) {
+    const id = `${prefix}.info.${stateId}`;
+    if (this.cleanedSyntheticStates.has(id)) {
+      return;
+    }
+    this.cleanedSyntheticStates.add(id);
+    await this.safeDeleteState(id);
+  }
+  /**
    * Push the device's trust tier (verified/reported/seed/unknown) into
    * the user-visible `diag.tier` state. Called after every device-state
    * refresh so the value tracks any registry change between adapter
@@ -400,7 +419,11 @@ class StateManager {
       );
       await this.ensureState(`${prefix}.info.model`, (0, import_i18n.tName)("model"), "string", "text", false, void 0, "");
       await this.ensureState(`${prefix}.info.serial`, (0, import_i18n.tName)("serialNumber"), "string", "text", false, void 0, "");
-      await this.ensureState(`${prefix}.info.ip`, (0, import_i18n.tName)("ipAddress"), "string", "info.ip", false, void 0, "");
+      if (device.gateway) {
+        await this.ensureState(`${prefix}.info.gateway`, (0, import_i18n.tName)("gateway"), "string", "text", false, void 0, "");
+      } else {
+        await this.ensureState(`${prefix}.info.ip`, (0, import_i18n.tName)("ipAddress"), "string", "info.ip", false, void 0, "");
+      }
       await this.ensureState(`${prefix}.info.type`, (0, import_i18n.tName)("deviceType"), "string", "text", false, void 0, "");
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
@@ -410,10 +433,18 @@ class StateManager {
         val: device.deviceId,
         ack: true
       });
-      await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
-        val: (_a = device.lanIp) != null ? _a : "",
-        ack: true
-      });
+      if (device.gateway) {
+        await this.adapter.setStateChangedAsync(`${prefix}.info.gateway`, {
+          val: device.gateway,
+          ack: true
+        });
+        await this.removeInfoStateOnce(prefix, "ip");
+      } else {
+        await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
+          val: (_a = device.lanIp) != null ? _a : "",
+          ack: true
+        });
+      }
       await this.adapter.setStateChangedAsync(`${prefix}.info.type`, {
         val: (0, import_device_icons.shortenGoveeType)(device.type),
         ack: true

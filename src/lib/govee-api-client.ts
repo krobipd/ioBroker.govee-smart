@@ -58,6 +58,13 @@ export interface AppDeviceSettings {
   humMax?: number;
   /** App displays Fahrenheit instead of Celsius (display-only) */
   fahOpen?: boolean;
+  /**
+   * Present when the device reaches the cloud via a Govee gateway (BLE→gateway
+   * sensors, e.g. an H5109 behind an H5042). Only `sku` + `bleName` are used
+   * (see {@link formatGatewayLabel}); `secretCode`/`topic` are auth secrets and
+   * are never surfaced.
+   */
+  gatewayInfo?: { sku?: string; bleName?: string; device?: string; address?: string };
   /** Vendor-defined extras */
   [key: string]: unknown;
 }

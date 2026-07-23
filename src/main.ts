@@ -323,6 +323,12 @@ class GoveeAdapter extends utils.Adapter {
 
       // Update info.ip when LAN IP changes
       this.deviceManager.onLanIpChanged = (device, ip) => {
+        // A gateway-connected sensor has info.gateway, not info.ip — writing here
+        // would create an orphan state value. It is never LAN-discovered anyway,
+        // but guard defensively.
+        if (device.gateway) {
+          return;
+        }
         const prefix = this.stateManager!.devicePrefix(device);
         this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(() => {});
       };

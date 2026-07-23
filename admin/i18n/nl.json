@@ -134,6 +134,7 @@
   "model": "Model",
   "serialNumber": "Serienummer",
   "ipAddress": "IP-adres",
+  "gateway": "Gateway",
   "deviceType": "Apparaattype",
   "members": "Leden",
   "membersUnreachable": "Onbereikbare leden",

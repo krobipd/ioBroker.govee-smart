@@ -1,6 +1,7 @@
 import {
   normalizeDeviceId,
   deviceLabel,
+  formatGatewayLabel,
   classifyError,
   rgbToHex,
   hexToRgb,
@@ -35,6 +36,39 @@ describe("Types utilities", () => {
 
     it("keeps the LAN-only fallback name distinct from the SKU", () => {
       expect(deviceLabel({ name: "H6159_c31b", sku: "H6159" })).toBe("H6159_c31b (H6159)");
+    });
+  });
+
+  describe("formatGatewayLabel", () => {
+    it("formats gateway SKU plus BLE name", () => {
+      expect(formatGatewayLabel({ sku: "H5042", bleName: "ihoment_H5042_3795" })).toBe("H5042 (ihoment_H5042_3795)");
+    });
+
+    it("falls back to the bare SKU when no BLE name is present", () => {
+      expect(formatGatewayLabel({ sku: "H5042" })).toBe("H5042");
+      expect(formatGatewayLabel({ sku: "H5042", bleName: "" })).toBe("H5042");
+      expect(formatGatewayLabel({ sku: "H5042", bleName: "  " })).toBe("H5042");
+    });
+
+    it("returns undefined without a usable gateway SKU (so no garbage info.gateway)", () => {
+      expect(formatGatewayLabel(undefined)).toBeUndefined();
+      expect(formatGatewayLabel({})).toBeUndefined();
+      expect(formatGatewayLabel({ sku: "" })).toBeUndefined();
+      expect(formatGatewayLabel({ sku: "   " })).toBeUndefined();
+      expect(formatGatewayLabel({ sku: 42 as unknown as string, bleName: "x" })).toBeUndefined();
+      expect(formatGatewayLabel({ bleName: "orphan" })).toBeUndefined();
+    });
+
+    it("never surfaces auth secrets even if present on the object", () => {
+      const label = formatGatewayLabel({
+        sku: "H5042",
+        bleName: "ihoment_H5042_3795",
+        secretCode: "VYb5QvZVkjE=",
+        topic: "GD/deadbeef",
+      } as never);
+      expect(label).toBe("H5042 (ihoment_H5042_3795)");
+      expect(label).not.toContain("VYb5QvZVkjE=");
+      expect(label).not.toContain("GD/");
     });
   });
 

@@ -1028,7 +1028,7 @@ class DeviceManager {
    * @returns Number of devices that received an update
    */
   async pollAppApi() {
-    var _a;
+    var _a, _b, _c;
     if (!this.apiClient || !this.apiClient.hasBearerToken()) {
       return 0;
     }
@@ -1055,20 +1055,33 @@ class DeviceManager {
       keys: new Set(entries.map((e) => this.deviceKey(e.sku, e.device)))
     };
     let updated = 0;
+    const gatewayDiscovered = [];
     for (const entry of entries) {
       const device = this.devices.get(this.deviceKey(entry.sku, entry.device));
       if (!device) {
         continue;
+      }
+      const gw = (0, import_types.formatGatewayLabel)((_a = entry.settings) == null ? void 0 : _a.gatewayInfo);
+      if (gw && device.gateway !== gw) {
+        device.gateway = gw;
+        gatewayDiscovered.push(device);
       }
       const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
       const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry, Date.now(), hasHumidityCap);
       if (caps.length === 0) {
         continue;
       }
-      (_a = this.onCloudCapabilities) == null ? void 0 : _a.call(this, device, caps);
+      (_b = this.onCloudCapabilities) == null ? void 0 : _b.call(this, device, caps);
       this.maybeApplyCloudOnline(device, caps);
       this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
       updated++;
+    }
+    if (gatewayDiscovered.length > 0) {
+      this.saveDevicesToCache();
+      const all = this.getDevices();
+      for (const device of gatewayDiscovered) {
+        (_c = this.onCloudDataReady) == null ? void 0 : _c.call(this, device, all);
+      }
     }
     this.runAccountReconcile("app");
     return updated;
