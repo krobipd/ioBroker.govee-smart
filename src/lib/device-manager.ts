@@ -384,6 +384,13 @@ export class DeviceManager {
    * @param nowMs Cached `Date.now()` for age calculation across the batch
    */
   private applyCachedEntry(entry: CachedDeviceData, nowMs: number): void {
+    // A SameModeGroup pseudo-device may sit in a cache written by an older build
+    // that merged it before we learned to skip it (see mergeCloudDevices). Never
+    // restore it — it has no member-resolution path and only creates an orphaned
+    // control tree.
+    if (entry.sku === "SameModeGroup") {
+      return;
+    }
     const key = this.deviceKey(entry.sku, entry.deviceId);
     const existing = this.devices.get(key);
     const ageDays =

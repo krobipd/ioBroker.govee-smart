@@ -325,6 +325,9 @@ class DeviceManager {
    * @param nowMs Cached `Date.now()` for age calculation across the batch
    */
   applyCachedEntry(entry, nowMs) {
+    if (entry.sku === "SameModeGroup") {
+      return;
+    }
     const key = this.deviceKey(entry.sku, entry.deviceId);
     const existing = this.devices.get(key);
     const ageDays = typeof entry.lastSeenOnNetwork === "number" ? Math.round((nowMs - entry.lastSeenOnNetwork) / 864e5) : null;

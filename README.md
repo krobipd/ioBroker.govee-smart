@@ -94,6 +94,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- A Govee app device group of the "same mode" type no longer shows up as a phantom, uncontrollable device in the object tree — it is now skipped, just like the regular device groups already were.
+- Seven more Govee models are recognised so they no longer warn as unsupported: Edison Bulb (H14C0), G25 Edison Bulb (H14C1), Ceiling Light Ultra (H1270), Galaxy Light Projector 2 Pro (H609D), Recessed Downlight (H801D), Smart Floor Lamp (R16D0) and Ceiling Fan with Light (H1370).
+
 ### 2.21.0 (2026-07-12) — stable
 
 - The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure each segment and can be corrected before you apply it.

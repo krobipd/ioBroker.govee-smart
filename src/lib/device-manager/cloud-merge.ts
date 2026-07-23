@@ -34,6 +34,17 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
     if (!cd || typeof cd.sku !== "string" || typeof cd.device !== "string") {
       continue;
     }
+    // Govee's /user/devices returns app device-groups as pseudo-devices. BaseGroup
+    // is supported (members resolved via the app-API group list, fan-out built in
+    // capability-mapper); SameModeGroup has no member-resolution path here, so
+    // merging it verbatim would build a generic light from its capabilities and
+    // leave an orphaned control tree that never actually drives anything. Skip it.
+    if (cd.sku === "SameModeGroup") {
+      adapter.log.debug(
+        `Cloud: skipping SameModeGroup pseudo-device ${cd.deviceName ?? cd.device} (not a real device)`,
+      );
+      continue;
+    }
     const existing = adapter.devices.get(deviceKey(cd.sku, cd.device));
     if (existing) {
       existing.name = cd.deviceName || existing.name;

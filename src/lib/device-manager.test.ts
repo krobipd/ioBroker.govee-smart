@@ -1276,6 +1276,30 @@ describe("DeviceManager", () => {
       ];
       expect(() => (dm as any).mergeCloudDevices(bad)).not.toThrow();
     });
+
+    it("mergeCloudDevices should not create a phantom device for a SameModeGroup pseudo-entry", () => {
+      // Govee's OpenAPI /user/devices returns app device-groups as pseudo-devices
+      // (sku "BaseGroup" or "SameModeGroup"). We support BaseGroup (member fan-out
+      // resolved via the app-API group list), but a SameModeGroup has no member-
+      // resolution path here — merging it verbatim would build a generic light out
+      // of its capabilities and leave an orphaned control tree that never works.
+      const list = [
+        {
+          sku: "SameModeGroup",
+          device: "9100",
+          deviceName: "Living Room Same Mode",
+          type: "devices.types.light",
+          capabilities: [
+            { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 0 } },
+          ],
+        },
+        { sku: "H6160", device: "real123", deviceName: "Real Strip", type: "devices.types.light", capabilities: [] },
+      ];
+      (dm as any).mergeCloudDevices(list);
+      const skus = dm.getDevices().map(d => d.sku);
+      expect(skus).toContain("H6160");
+      expect(skus).not.toContain("SameModeGroup");
+    });
   });
 
   describe("handleMqttStatus — edge cases", () => {
@@ -2227,6 +2251,51 @@ describe("DeviceManager — loadFromCache merge", () => {
     expect(device.manualSegments).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
   });
 
+  it("never restores a SameModeGroup pseudo-device from an older cache", () => {
+    const dm = new DeviceManager(mockLog, mockTimers);
+    const cached = [
+      {
+        sku: "SameModeGroup",
+        deviceId: "9100",
+        name: "Living Room Same Mode",
+        type: "devices.types.light",
+        capabilities: lightCapabilities(),
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        scenesChecked: true,
+        cachedAt: Date.now(),
+      },
+      {
+        sku: "H6102",
+        deviceId: "00:11:22:33:44:55:66:88",
+        name: "Real Light",
+        type: "devices.types.light",
+        capabilities: lightCapabilities(),
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        scenesChecked: true,
+        cachedAt: Date.now(),
+      },
+    ];
+    dm.setSkuCache(makeMockSkuCache(cached) as never);
+
+    dm.loadFromCache();
+
+    const skus = dm.getDevices().map(d => d.sku);
+    expect(skus).toContain("H6102");
+    expect(skus).not.toContain("SameModeGroup");
+  });
+
   it("leaves merged fields undefined when cache entry has none (no segment data ever captured)", () => {
     const dm = new DeviceManager(mockLog, mockTimers);
     dm.handleLanDiscovery({
@@ -2845,18 +2914,6 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
       instance: "snapshot",
       parameters: { dataType: "ENUM", options },
     } as CloudCapability;
-  }
-
-  function setupMockCloud(snapshotsFromScenes: Array<{ name: string; value: number }>): unknown {
-    return {
-      getScenes: () =>
-        Promise.resolve({
-          lightScenes: [{ name: "Aurora", value: { id: 1 } }],
-          diyScenes: [],
-          snapshots: snapshotsFromScenes.map(s => ({ name: s.name, value: s.value })),
-        }),
-      getDiyScenes: () => Promise.resolve([]),
-    };
   }
 
   // The loadDeviceScenes/loadDeviceLibraries behaviour tests moved to

@@ -27,12 +27,19 @@ var import_govee_constants = require("../govee-constants");
 var import_mapping = require("./mapping");
 var import_lookups = require("./lookups");
 function mergeCloudDevices(adapter, cloudDevices) {
+  var _a;
   let changed = false;
   if (!Array.isArray(cloudDevices)) {
     return false;
   }
   for (const cd of cloudDevices) {
     if (!cd || typeof cd.sku !== "string" || typeof cd.device !== "string") {
+      continue;
+    }
+    if (cd.sku === "SameModeGroup") {
+      adapter.log.debug(
+        `Cloud: skipping SameModeGroup pseudo-device ${(_a = cd.deviceName) != null ? _a : cd.device} (not a real device)`
+      );
       continue;
     }
     const existing = adapter.devices.get((0, import_lookups.deviceKey)(cd.sku, cd.device));

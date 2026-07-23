@@ -45,7 +45,10 @@ const ALLOWED_OVERRIDE_COMMANDS = new Set([
 
 const ALLOWED_TRANSPORT_TARGETS = new Set(["cloud", "lan"]);
 
-const SKU_RE = /^H[0-9A-Z]{4}$/;
+// Govee SKUs are a leading letter followed by four alphanumerics. Almost all are
+// H-prefixed, but the R-series (e.g. R16D0, rebranded lamp/fan variants) uses R —
+// so the gate keys off "any uppercase leading letter", not a hard-coded H.
+const SKU_RE = /^[A-Z][0-9A-Z]{4}$/;
 const SEMVER_RE = /^[0-9]+\.[0-9]+\.[0-9]+$/;
 
 interface Issue {
@@ -72,7 +75,7 @@ function validate(devicesJsonPath: string): Issue[] {
 
   for (const [sku, entry] of Object.entries(devices)) {
     if (!SKU_RE.test(sku)) {
-      issues.push({ sku, msg: `SKU does not match /^H[0-9A-Z]{4}$/` });
+      issues.push({ sku, msg: `SKU does not match ${SKU_RE}` });
     }
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
       issues.push({ sku, msg: "entry must be an object" });

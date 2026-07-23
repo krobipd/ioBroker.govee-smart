@@ -494,6 +494,48 @@
       "type": "light",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H1270": {
+      "name": "Ceiling Light Ultra",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H1370": {
+      "name": "Ceiling Fan with Light",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H14C0": {
+      "name": "Edison Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H14C1": {
+      "name": "G25 Edison Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H609D": {
+      "name": "Galaxy Light Projector 2 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H801D": {
+      "name": "Recessed Downlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "R16D0": {
+      "name": "Smart Floor Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
     }
   }
 }
