@@ -901,6 +901,53 @@ class StateManager {
     return removed;
   }
   /**
+   * One-shot orphan cleanup: a Govee app "SameModeGroup" pseudo-device
+   * (sku `SameModeGroup`) was merged verbatim into a generic device by builds
+   * up to and including v2.21.0 (see cloud-merge.ts). The fix skips it at
+   * intake, but an object tree already created under an earlier build lingers
+   * under `devices.samemodegroup_*` — it never re-enters the device map, so the
+   * account-reconciler's {@link cleanupDevices} never reaps it. Delete any such
+   * orphan tree once on start. Same enumerate → drop-state-values → recursive
+   * delete shape as cleanupDevices, scoped to the `samemodegroup_` prefix.
+   *
+   * @returns Prefixes of removed orphans (empty on a clean install)
+   */
+  async cleanupSameModeGroupOrphansOnce() {
+    const removed = [];
+    let existing;
+    try {
+      existing = await this.adapter.getObjectViewAsync("system", "device", {
+        startkey: `${this.adapter.namespace}.devices.samemodegroup_`,
+        endkey: `${this.adapter.namespace}.devices.samemodegroup_\u9999`
+      });
+    } catch (e) {
+      this.adapter.log.debug(
+        `cleanupSameModeGroupOrphansOnce: getObjectViewAsync failed: ${e instanceof Error ? e.message : String(e)}`
+      );
+      return removed;
+    }
+    if (!(existing == null ? void 0 : existing.rows)) {
+      return removed;
+    }
+    for (const row of existing.rows) {
+      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+      const stateRows = await this.adapter.getObjectViewAsync("system", "state", {
+        startkey: `${row.id}.`,
+        endkey: `${row.id}.\u9999`
+      }).catch(() => void 0);
+      if (stateRows == null ? void 0 : stateRows.rows) {
+        for (const stateRow of stateRows.rows) {
+          await this.adapter.delStateAsync(stateRow.id.replace(`${this.adapter.namespace}.`, "")).catch(() => void 0);
+        }
+      }
+      await this.adapter.delObjectAsync(localId, { recursive: true }).catch(() => void 0);
+      this.forgetPrefix(localId);
+      this.adapter.log.info(`Removed a leftover SameModeGroup pseudo-device (${localId})`);
+      removed.push(localId);
+    }
+    return removed;
+  }
+  /**
    * Phase 3 cleanup — remove Cloud-owned states that are no longer in the
    * current Cloud-phase stateDefs. Respects LAN_STATE_IDS so the LAN phase's
    * states in the control channel never get touched.

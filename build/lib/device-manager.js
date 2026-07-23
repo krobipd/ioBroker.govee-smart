@@ -772,7 +772,9 @@ class DeviceManager {
       case "reported":
         return;
       case "seed":
-        if ((0, import_device_registry.isSeedAndDormant)(upper)) {
+        if (!(0, import_device_registry.seedHasQuirks)(upper)) {
+          this.log.info(`Device ${label} is recognised (experimental) and runs on the generic defaults.`);
+        } else if ((0, import_device_registry.isSeedAndDormant)(upper)) {
           this.log.warn(
             `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`
           );

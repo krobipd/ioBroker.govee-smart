@@ -252,6 +252,11 @@ class GoveeAdapter extends utils.Adapter {
       });
 
       this.stateManager = new StateManager(this);
+      // One-shot orphan cleanup: builds up to v2.21.0 merged a Govee app
+      // "SameModeGroup" pseudo-device into a generic device; the fix skips it at
+      // intake, but an object tree already created that way never re-enters the
+      // device map and so is never reaped. Drop any leftover on upgraded installs.
+      await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => undefined);
       // General groups online state (reflects Cloud connection)
       await this.stateManager.createGroupsOnlineState(false);
       this.deviceManager = new DeviceManager(this.log, this);

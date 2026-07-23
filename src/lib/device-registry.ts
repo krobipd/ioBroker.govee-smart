@@ -259,6 +259,22 @@ export class DeviceRegistry {
   }
 
   /**
+   * Whether a `seed`-status entry actually carries per-SKU `quirks`. A
+   * quirk-less seed is pure catalog recognition — there are no corrections for
+   * the experimental toggle to apply, so the "enable the toggle to apply known
+   * corrections" nudge must not fire for it.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  seedHasQuirks(sku: string): boolean {
+    if (!sku || typeof sku !== "string") {
+      return false;
+    }
+    const entry = this.entries.get(sku.toUpperCase());
+    return entry?.status === "seed" && !!entry.quirks && Object.keys(entry.quirks).length > 0;
+  }
+
+  /**
    * Quirks for a SKU. Returns undefined if SKU is unknown OR if it's a
    * seed-status entry and `experimental` is off.
    *
@@ -358,6 +374,15 @@ export function applyColorTempQuirk(sku: string, min: number, max: number): { mi
  */
 export function isSeedAndDormant(sku: string): boolean {
   return singleton?.isSeedAndDormant(sku) ?? false;
+}
+
+/**
+ * Module-level accessor for {@link DeviceRegistry.seedHasQuirks}.
+ *
+ * @param sku Govee SKU (case-insensitive)
+ */
+export function seedHasQuirks(sku: string): boolean {
+  return singleton?.seedHasQuirks(sku) ?? false;
 }
 
 /**

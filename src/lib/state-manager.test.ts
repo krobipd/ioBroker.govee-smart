@@ -234,6 +234,38 @@ describe("StateManager", () => {
     });
   });
 
+  describe("cleanupSameModeGroupOrphansOnce", () => {
+    it("deletes a leftover devices.samemodegroup_* tree but leaves real devices untouched", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      // Orphan pseudo-device left by a build that merged a SameModeGroup verbatim.
+      objects.set("devices.samemodegroup_9100", { type: "device" } as never);
+      objects.set("devices.samemodegroup_9100.control", { type: "channel" } as never);
+      objects.set("devices.samemodegroup_9100.control.power", { type: "state" } as never);
+      // A real device that must survive.
+      objects.set("devices.h6160_0011", { type: "device" } as never);
+      objects.set("devices.h6160_0011.control.power", { type: "state" } as never);
+
+      const removed = await sm.cleanupSameModeGroupOrphansOnce();
+
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).toContain("devices.samemodegroup_9100");
+      expect(deleted).not.toContain("devices.h6160_0011");
+      expect(removed).toEqual(["devices.samemodegroup_9100"]);
+    });
+
+    it("is a no-op on a clean install (no samemodegroup objects)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      objects.set("devices.h6160_0011", { type: "device" } as never);
+
+      const removed = await sm.cleanupSameModeGroupOrphansOnce();
+
+      expect(removed).toEqual([]);
+      expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
+    });
+  });
+
   describe("removeSyntheticStateOnce", () => {
     it("deletes an existing phantom sensor_humidity object exactly once (#31)", async () => {
       const { adapter, calls, objects } = createMockAdapter();

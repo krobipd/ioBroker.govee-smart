@@ -34,7 +34,8 @@ __export(device_registry_exports, {
   getDeviceQuirks: () => getDeviceQuirks,
   getDeviceTier: () => getDeviceTier,
   initDeviceRegistry: () => initDeviceRegistry,
-  isSeedAndDormant: () => isSeedAndDormant
+  isSeedAndDormant: () => isSeedAndDormant,
+  seedHasQuirks: () => seedHasQuirks
 });
 module.exports = __toCommonJS(device_registry_exports);
 var import_types = require("./types");
@@ -145,6 +146,21 @@ class DeviceRegistry {
     return ((_a = this.entries.get(sku.toUpperCase())) == null ? void 0 : _a.status) === "seed";
   }
   /**
+   * Whether a `seed`-status entry actually carries per-SKU `quirks`. A
+   * quirk-less seed is pure catalog recognition — there are no corrections for
+   * the experimental toggle to apply, so the "enable the toggle to apply known
+   * corrections" nudge must not fire for it.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  seedHasQuirks(sku) {
+    if (!sku || typeof sku !== "string") {
+      return false;
+    }
+    const entry = this.entries.get(sku.toUpperCase());
+    return (entry == null ? void 0 : entry.status) === "seed" && !!entry.quirks && Object.keys(entry.quirks).length > 0;
+  }
+  /**
    * Quirks for a SKU. Returns undefined if SKU is unknown OR if it's a
    * seed-status entry and `experimental` is off.
    *
@@ -200,6 +216,10 @@ function isSeedAndDormant(sku) {
   var _a;
   return (_a = singleton == null ? void 0 : singleton.isSeedAndDormant(sku)) != null ? _a : false;
 }
+function seedHasQuirks(sku) {
+  var _a;
+  return (_a = singleton == null ? void 0 : singleton.seedHasQuirks(sku)) != null ? _a : false;
+}
 function getDeviceTier(sku) {
   var _a;
   return (_a = singleton == null ? void 0 : singleton.getStatus(sku)) != null ? _a : "unknown";
@@ -212,6 +232,7 @@ function getDeviceTier(sku) {
   getDeviceQuirks,
   getDeviceTier,
   initDeviceRegistry,
-  isSeedAndDormant
+  isSeedAndDormant,
+  seedHasQuirks
 });
 //# sourceMappingURL=device-registry.js.map

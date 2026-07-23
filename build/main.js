@@ -193,6 +193,7 @@ class GoveeAdapter extends utils.Adapter {
         ack: true
       });
       this.stateManager = new import_state_manager.StateManager(this);
+      await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => void 0);
       await this.stateManager.createGroupsOnlineState(false);
       this.deviceManager = new import_device_manager.DeviceManager(this.log, this);
       const dataDir = utils.getAbsoluteInstanceDataDir(this);
