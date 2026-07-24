@@ -39,3 +39,8 @@ package/
 # Environment
 .env
 .env.local
+
+# Claude Code local files (not published)
+.claude/settings.local.json
+.claude/dev-history.md
+CLAUDE.local.md
