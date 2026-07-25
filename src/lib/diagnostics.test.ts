@@ -6,7 +6,7 @@ import type { GoveeDevice } from "./types";
 function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
   return {
     sku: "H61BE",
-    deviceId: "23:3E:CA:39:32:35:1D:6F",
+    deviceId: "AA:BB:CC:DD:EE:FF:1D:6F",
     name: "Test Light",
     type: "devices.types.light",
     capabilities: [],
@@ -370,11 +370,11 @@ describe("DiagnosticsCollector", () => {
   describe("v2.9.1 Class E — LAN UDP send capture", () => {
     it("addLanSend records outgoing ptReal payloads per-device", () => {
       const c = new DiagnosticsCollector();
-      c.addLanSend("dev1", "10.2.1.36", "ptReal", { command: ["pkt1", "pkt2"] }, 572);
+      c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1", "pkt2"] }, 572);
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
       expect(sends).toHaveLength(1);
-      expect(sends[0].ip).toBe("10.2.1.36");
+      expect(sends[0].ip).toBe("192.168.1.36");
       expect(sends[0].cmd).toBe("ptReal");
       expect(sends[0].bytes).toBe(572);
       expect((sends[0].payload as Record<string, unknown[]>).command).toEqual(["pkt1", "pkt2"]);
@@ -382,7 +382,7 @@ describe("DiagnosticsCollector", () => {
 
     it("captures error field when the UDP send fails", () => {
       const c = new DiagnosticsCollector();
-      c.addLanSend("dev1", "10.2.1.36", "ptReal", { command: ["pkt1"] }, 0, "EHOSTUNREACH");
+      c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1"] }, 0, "EHOSTUNREACH");
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
       expect(sends[0].error).toBe("EHOSTUNREACH");
@@ -391,7 +391,7 @@ describe("DiagnosticsCollector", () => {
     it("bounds at 30 lan-sends — newest 30 retained", () => {
       const c = new DiagnosticsCollector();
       for (let i = 0; i < 40; i++) {
-        c.addLanSend("dev1", "10.2.1.36", "turn", { value: i }, 50);
+        c.addLanSend("dev1", "192.168.1.36", "turn", { value: i }, 50);
       }
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
@@ -402,7 +402,7 @@ describe("DiagnosticsCollector", () => {
   describe("v2.9.1 Class F1 — AWS-IoT MQTT envelope durchgereicht", () => {
     it("addMqttPacket accepts {hex, rawJson} so state-only pushes are captured too", () => {
       const c = new DiagnosticsCollector();
-      const envelope = JSON.stringify({ sku: "H61BE", device: "23:3E:CA", state: { onOff: 1 } });
+      const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { hex: "abc123", rawJson: envelope });
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
@@ -412,7 +412,7 @@ describe("DiagnosticsCollector", () => {
 
     it("addMqttPacket accepts rawJson-only (no op.command in MQTT message)", () => {
       const c = new DiagnosticsCollector();
-      const envelope = JSON.stringify({ sku: "H61BE", device: "23:3E:CA", state: { onOff: 1 } });
+      const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { rawJson: envelope });
       const packets = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1").lastMqttPackets as Array<
         Record<string, unknown>
@@ -463,14 +463,14 @@ describe("DiagnosticsCollector", () => {
         mqttFailureReason: null,
         rateLimiter: { usedToday: 42, usedThisMinute: 3, dailyLimit: 9000, perMinuteLimit: 8, queueLength: 0 },
         wizardSession: null,
-        lanSeenDeviceIps: ["23:3E:CA:39:32:35:1D:6F:10.0.0.1"],
+        lanSeenDeviceIps: ["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"],
       }));
       const result = c.generate(makeDevice(), "2.9.1");
       const rt = result.runtimeState as Record<string, unknown>;
       expect(rt.deviceManagerLastErrorCategory).toBe("TIMEOUT");
       expect(rt.cloudFailureReason).toBe("Cloud request timeout");
       expect((rt.rateLimiter as Record<string, number>).usedToday).toBe(42);
-      expect(rt.lanSeenDeviceIps).toEqual(["23:3E:CA:39:32:35:1D:6F:10.0.0.1"]);
+      expect(rt.lanSeenDeviceIps).toEqual(["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"]);
     });
 
     it("yields null runtimeState when no provider is wired", () => {

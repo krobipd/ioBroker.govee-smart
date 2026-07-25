@@ -2424,7 +2424,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       const now = 1_800_000_000_000;
       const entry: AppDeviceEntry = {
         sku: "H5109",
-        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        device: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         deviceName: "Pool",
         // Govee's gateway sensors report online:false while readings keep flowing.
         lastData: { online: false, tem: 3197, lastTime: now - 5 * 60 * 1000 },
@@ -2439,7 +2439,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       const now = 1_800_000_000_000;
       const entry: AppDeviceEntry = {
         sku: "H5109",
-        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        device: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         deviceName: "Pool",
         lastData: { online: false, tem: 3197, lastTime: now - 60 * 60 * 1000 }, // 60 min ago
         settings: { uploadRate: 10 },
@@ -2453,7 +2453,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       const now = 1_800_000_000_000;
       const entry: AppDeviceEntry = {
         sku: "H5109",
-        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        device: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         deviceName: "Pool",
         lastData: { online: false, tem: 3197 }, // no lastTime
         settings: { uploadRate: 10 },
@@ -2466,7 +2466,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     it("suppresses a phantom humidity cap for a temp-only sensor (hum:0, no humidity capability) — #31", () => {
       const entry: AppDeviceEntry = {
         sku: "H5109",
-        device: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        device: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         deviceName: "Pool",
         lastData: { tem: 3197, hum: 0, battery: 100 }, // hum:0 = Govee's "no humidity sensor" sentinel
       };

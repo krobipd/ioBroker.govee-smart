@@ -272,7 +272,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never);
       const dev = createTestDevice({
         sku: "H5109",
-        deviceId: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceId: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         type: "devices.types.thermometer",
         lanIp: undefined,
         gateway: "H5042 (ihoment_H5042_3795)",
@@ -288,7 +288,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never);
       const dev = createTestDevice({
         sku: "H5109",
-        deviceId: "03:4E:E7:09:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
+        deviceId: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         type: "devices.types.thermometer",
         lanIp: undefined,
       });
@@ -865,7 +865,7 @@ describe("StateManager", () => {
         deviceId: "6781311",
         name: "living",
         groupMembers: [
-          { sku: "H61BE", deviceId: "22:78:CA:39:32:35:52:5F" },
+          { sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:FF:52:5F" },
           { sku: "H61BC", deviceId: "AA:BB:CC:DD:EE:FF:1A:2B" },
         ],
       });

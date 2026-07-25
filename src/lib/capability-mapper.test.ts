@@ -1094,7 +1094,7 @@ describe("CapabilityMapper", () => {
     function baseLight(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
       return {
         sku: "H6058",
-        deviceId: "D5:F7:CC:34:38:39:28:31",
+        deviceId: "AA:BB:CC:DD:EE:FF:28:31",
         name: "Dream2",
         type: "devices.types.light",
         capabilities: lightCaps(),
