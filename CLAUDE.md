@@ -54,8 +54,8 @@ Seit v2.0.0 (2026-04-25) gemerged in govee-smart. Repo `iobroker.govee-appliance
 
 `main.ts` = Lifecycle + Wiring; die Arbeit liegt in `src/lib/`. Zwei Aufteilungen sind nicht offensichtlich:
 
-- **`src/lib/handlers/`** — 8 Files, die main.ts entlasten (cloud-creds, cloud-retry, diagnostics, group-fanout, dropdown-reset, snapshot-glue, state-change-router, wizard). `cloud-creds-handler.ts` persistiert MQTT-Creds als **verschlüsselte Datei im Instanz-Datenverzeichnis** (wie SKU-Cache) — bewusst KEIN `meta.user`, weil re-derivierbarer Cache keinen sichtbaren Objektbaum-Knoten braucht.
-- **`src/lib/device-manager/`** — 4 Sub-Files (cloud-merge, cache, lookups, mapping); `lookups.ts` + `mapping.ts` sind rein (pure), daher direkt testbar.
+- **`src/lib/handlers/`** — entlastet `main.ts`, ein File je Zuständigkeit (Cloud-Creds, Cloud-Retry, Cloud-State-Loading, Connection-State, Device-Events, Diagnostics, Group-Fanout, Dropdown-Reset, Snapshot-Glue, State-Change-Router, Wizard). `cloud-creds-handler.ts` persistiert MQTT-Creds als **verschlüsselte Datei im Instanz-Datenverzeichnis** (wie SKU-Cache) — bewusst KEIN `meta.user`, weil re-derivierbarer Cache keinen sichtbaren Objektbaum-Knoten braucht.
+- **`src/lib/device-manager/`** — Sub-Files für Cloud-Merge, Cache, Library-Loading, Reconcile sowie die reinen (pure) `lookups.ts` + `mapping.ts`, die dadurch direkt testbar sind.
 
 `src-admin/` ist eine eigenständige Module-Federation-React-Komponente (Vite, Vorbild `iobroker.public-holidays`) → baut nach `admin/custom/customComponents.js` (gitignored, via `files[]` + `prepublishOnly` im Tarball). Eigene i18n mit `gsw_`-Keys, 11 Sprachen. Build `npm run build:admin`, Tests `npm --prefix src-admin run test`.
 
