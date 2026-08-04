@@ -1,4 +1,8 @@
 # Older Changes
+## 2.18.2 (2026-07-03)
+
+- Internal refactoring. No user-facing changes.
+
 ## 2.18.1 (2026-07-03)
 
 - Added several new Govee devices to the catalog — 4 more lamps and 3 sensors (including a CO2 monitor). They start as experimental; enable them in the adapter settings to try them.

@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.22.0",
+    "version": "2.23.0",
     "news": {
-      "NEXT": {
+      "2.23.0": {
         "en": "The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.",
         "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen funktioniert wieder unter ioBroker Admin 8, wo statt des Assistenten eine Fehlermeldung erschien, und läuft weiterhin unter Admin 7.",
         "ru": "Мастер определения сегментов в настройках адаптера снова работает в ioBroker Admin 8, где вместо него появлялась ошибка, и по-прежнему работает в Admin 7.",

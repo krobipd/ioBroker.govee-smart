@@ -94,7 +94,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.23.0 (2026-08-04)
 
 - The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.
 
@@ -120,10 +120,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
 - The credentials entry disappears from the object tree — login tokens stay saved in encrypted form, just no longer visible as an object
-
-### 2.18.2 (2026-07-03)
-
-- Internal refactoring. No user-facing changes.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
