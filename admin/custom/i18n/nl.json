@@ -1,0 +1,20 @@
+{
+    "gsw_title": "Segmentdetectie",
+    "gsw_deviceLabel": "Apparaat",
+    "gsw_noDevices": "Geen apparaten met segmenten gevonden. Voer een cloud-API-sleutel in bij de adapterinstellingen zodat de apparaatmogelijkheden bekend zijn.",
+    "gsw_start": "Meting starten",
+    "gsw_measureHint": "Kijk naar de strip — welk segment licht helderwit op?",
+    "gsw_question": "Segment %s — brandt het?",
+    "gsw_lit": "Brandt",
+    "gsw_dark": "Donker (gat)",
+    "gsw_finish": "Klaar – einde van de strip",
+    "gsw_cancel": "Afbreken",
+    "gsw_reviewHint": "Klik op een cel om te wisselen tussen brandt/gat, en pas dan toe.",
+    "gsw_resultNoGaps": "%s segmenten, geen gaten",
+    "gsw_resultGaps": "%s segmenten, %s gat(en)",
+    "gsw_apply": "Toepassen",
+    "gsw_remeasure": "Opnieuw meten",
+    "gsw_applied": "Toegepast: %s segmenten.",
+    "gsw_error": "Wizardfout: %s",
+    "gsw_close": "Sluiten"
+}

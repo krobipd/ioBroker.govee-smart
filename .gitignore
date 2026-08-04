@@ -23,8 +23,9 @@ coverage/
 .nyc_output/
 *.tsbuildinfo
 
-# Admin custom component (built at release, published to npm)
-/admin/custom
+# Admin custom component: the BUILT admin/custom/ is tracked (like build/) so a GitHub install
+# gets the component too — it is not built during a GitHub install, only on npm prepublish.
+# Only the src-admin work dirs stay ignored.
 /src-admin/build
 /src-admin/node_modules
 /src-admin/package-lock.json

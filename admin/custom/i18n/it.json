@@ -1,0 +1,20 @@
+{
+    "gsw_title": "Rilevamento segmenti",
+    "gsw_deviceLabel": "Dispositivo",
+    "gsw_noDevices": "Nessun dispositivo con segmenti trovato. Inserisci una chiave API cloud nelle impostazioni dell'adattatore per conoscere le funzionalità del dispositivo.",
+    "gsw_start": "Avvia misurazione",
+    "gsw_measureHint": "Osserva la striscia: quale segmento si illumina di bianco brillante?",
+    "gsw_question": "Segmento %s — è acceso?",
+    "gsw_lit": "Acceso",
+    "gsw_dark": "Buio (vuoto)",
+    "gsw_finish": "Fatto – fine della striscia",
+    "gsw_cancel": "Annulla",
+    "gsw_reviewHint": "Clicca una cella per alternare acceso/vuoto, poi applica.",
+    "gsw_resultNoGaps": "%s segmenti, nessun vuoto",
+    "gsw_resultGaps": "%s segmenti, %s vuoto/i",
+    "gsw_apply": "Applica",
+    "gsw_remeasure": "Misura di nuovo",
+    "gsw_applied": "Applicato: %s segmenti.",
+    "gsw_error": "Errore del wizard: %s",
+    "gsw_close": "Chiudi"
+}
