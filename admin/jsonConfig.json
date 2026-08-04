@@ -277,7 +277,6 @@
           "url": "custom/customComponents.js",
           "name": "ConfigCustomGoveeSegmentSet/Components/SegmentWizardConfig",
           "guiApi": 2,
-          "bundlerType": "module",
           "xs": 12,
           "sm": 12,
           "md": 12,

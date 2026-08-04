@@ -57,7 +57,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - ioBroker js-controller >= 7.2.2
-- ioBroker Admin >= 7.8.23
+- ioBroker Admin >= 8.0.1
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
 ---
@@ -94,13 +94,17 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
+
 ### 2.23.1 (2026-08-04)
 
-- The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.
+- Test release during the move to ioBroker Admin 8.
 
 ### 2.23.0 (2026-08-04)
 
-- The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.
+- Test release during the move to ioBroker Admin 8.
 
 ### 2.22.0 (2026-07-23)
 

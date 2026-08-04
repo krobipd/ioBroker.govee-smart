@@ -3,31 +3,44 @@
     "name": "govee-smart",
     "version": "2.23.1",
     "news": {
+      "NEXT": {
+        "en": "This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.",
+        "de": "Diese Version benötigt ioBroker Admin 8. Der Segment-Erkennungs-Assistent ist für Admin 8 gebaut und läuft nicht mehr unter Admin 7; dort wird dieses Update nicht angeboten.",
+        "ru": "Этой версии нужен ioBroker Admin 8. Мастер определения сегментов рассчитан на Admin 8 и больше не работает в Admin 7, поэтому там это обновление не предлагается.",
+        "pt": "Esta versão precisa do ioBroker Admin 8. O assistente de deteção de segmentos foi feito para o Admin 8 e já não funciona no Admin 7, pelo que aí não é oferecida esta atualização.",
+        "nl": "Deze versie vereist ioBroker Admin 8. De assistent voor segmentdetectie is voor Admin 8 gebouwd en werkt niet meer op Admin 7, dus daar wordt deze update niet aangeboden.",
+        "fr": "Cette version nécessite ioBroker Admin 8. L'assistant de détection des segments est conçu pour Admin 8 et ne fonctionne plus sous Admin 7 ; cette mise à jour n'y est donc pas proposée.",
+        "it": "Questa versione richiede ioBroker Admin 8. La procedura di rilevamento dei segmenti è pensata per Admin 8 e non funziona più su Admin 7, quindi lì non viene proposto questo aggiornamento.",
+        "es": "Esta versión necesita ioBroker Admin 8. El asistente de detección de segmentos está hecho para Admin 8 y ya no funciona en Admin 7, por lo que allí no se ofrece esta actualización.",
+        "pl": "Ta wersja wymaga ioBroker Admin 8. Kreator wykrywania segmentów jest przeznaczony dla Admin 8 i nie działa już w Admin 7, więc tam ta aktualizacja nie jest oferowana.",
+        "uk": "Ця версія потребує ioBroker Admin 8. Майстер визначення сегментів створено для Admin 8 і він більше не працює в Admin 7, тому там це оновлення не пропонується.",
+        "zh-cn": "此版本需要 ioBroker Admin 8。分段检测向导专为 Admin 8 构建，不再在 Admin 7 上运行，因此在 Admin 7 上不会提供此更新。"
+      },
       "2.23.1": {
-        "en": "The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.",
-        "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen öffnete sich in 2.23.0 unter ioBroker Admin 7 nicht mehr (leerer Reiter); er lädt jetzt wieder unter Admin 7 und Admin 8.",
-        "ru": "Мастер определения сегментов в настройках адаптера в версии 2.23.0 не открывался в ioBroker Admin 7 (пустая вкладка); теперь он снова загружается и в Admin 7, и в Admin 8.",
-        "pt": "O assistente de deteção de segmentos nas definições do adaptador deixou de abrir no ioBroker Admin 7 na versão 2.23.0 (separador vazio); agora volta a carregar no Admin 7 e no Admin 8.",
-        "nl": "De wizard voor segmentdetectie in de adapterinstellingen opende in 2.23.0 niet meer op ioBroker Admin 7 (leeg tabblad); hij laadt nu weer op zowel Admin 7 als Admin 8.",
-        "fr": "L'assistant de détection des segments dans les paramètres de l'adaptateur ne s'ouvrait plus sous ioBroker Admin 7 en 2.23.0 (onglet vide) ; il se charge à nouveau sous Admin 7 et Admin 8.",
-        "it": "La procedura guidata di rilevamento dei segmenti nelle impostazioni dell'adattatore non si apriva su ioBroker Admin 7 nella 2.23.0 (scheda vuota); ora si carica di nuovo su Admin 7 e Admin 8.",
-        "es": "El asistente de detección de segmentos en los ajustes del adaptador dejó de abrirse en ioBroker Admin 7 en la 2.23.0 (pestaña vacía); ahora vuelve a cargarse en Admin 7 y Admin 8.",
-        "pl": "Kreator wykrywania segmentów w ustawieniach adaptera przestał otwierać się w ioBroker Admin 7 w wersji 2.23.0 (pusta karta); teraz znów ładuje się w Admin 7 i Admin 8.",
-        "uk": "Майстер визначення сегментів у налаштуваннях адаптера у версії 2.23.0 не відкривався в ioBroker Admin 7 (порожня вкладка); тепер він знову завантажується в Admin 7 і Admin 8.",
-        "zh-cn": "适配器设置中的分段检测向导在 2.23.0 中无法在 ioBroker Admin 7 上打开（标签页空白）；现在可在 Admin 7 和 Admin 8 上重新加载。"
+        "en": "Test release during the move to ioBroker Admin 8.",
+        "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
+        "ru": "Тестовый выпуск во время перехода на ioBroker Admin 8.",
+        "pt": "Versão de teste durante a mudança para o ioBroker Admin 8.",
+        "nl": "Testversie tijdens de overstap naar ioBroker Admin 8.",
+        "fr": "Version de test pendant le passage à ioBroker Admin 8.",
+        "it": "Versione di prova durante il passaggio a ioBroker Admin 8.",
+        "es": "Versión de prueba durante el cambio a ioBroker Admin 8.",
+        "pl": "Wersja testowa podczas przejścia na ioBroker Admin 8.",
+        "uk": "Тестова версія під час переходу на ioBroker Admin 8.",
+        "zh-cn": "向 ioBroker Admin 8 迁移期间的测试版本。"
       },
       "2.23.0": {
-        "en": "The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.",
-        "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen funktioniert wieder unter ioBroker Admin 8, wo statt des Assistenten eine Fehlermeldung erschien, und läuft weiterhin unter Admin 7.",
-        "ru": "Мастер определения сегментов в настройках адаптера снова работает в ioBroker Admin 8, где вместо него появлялась ошибка, и по-прежнему работает в Admin 7.",
-        "pt": "O assistente de deteção de segmentos nas definições do adaptador volta a funcionar no ioBroker Admin 8, onde mostrava um erro em vez de carregar, e continua a funcionar no Admin 7.",
-        "nl": "De wizard voor segmentdetectie in de adapterinstellingen werkt weer onder ioBroker Admin 8, waar in plaats daarvan een foutmelding verscheen, en blijft werken op Admin 7.",
-        "fr": "L'assistant de détection des segments dans les paramètres de l'adaptateur fonctionne à nouveau sous ioBroker Admin 8, où une erreur s'affichait à la place, et continue de fonctionner sur Admin 7.",
-        "it": "La procedura guidata di rilevamento dei segmenti nelle impostazioni dell'adattatore funziona di nuovo con ioBroker Admin 8, dove mostrava un errore, e continua a funzionare su Admin 7.",
-        "es": "El asistente de detección de segmentos en los ajustes del adaptador vuelve a funcionar en ioBroker Admin 8, donde mostraba un error en su lugar, y sigue funcionando en Admin 7.",
-        "pl": "Kreator wykrywania segmentów w ustawieniach adaptera znów działa w ioBroker Admin 8, gdzie zamiast niego pojawiał się błąd, i nadal działa w Admin 7.",
-        "uk": "Майстер визначення сегментів у налаштуваннях адаптера знову працює в ioBroker Admin 8, де замість нього з'являлася помилка, і надалі працює в Admin 7.",
-        "zh-cn": "适配器设置中的分段检测向导在 ioBroker Admin 8 下重新可用（此前显示错误而非加载），并且在 Admin 7 下继续正常工作。"
+        "en": "Test release during the move to ioBroker Admin 8.",
+        "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
+        "ru": "Тестовый выпуск во время перехода на ioBroker Admin 8.",
+        "pt": "Versão de teste durante a mudança para o ioBroker Admin 8.",
+        "nl": "Testversie tijdens de overstap naar ioBroker Admin 8.",
+        "fr": "Version de test pendant le passage à ioBroker Admin 8.",
+        "it": "Versione di prova durante il passaggio a ioBroker Admin 8.",
+        "es": "Versión de prueba durante el cambio a ioBroker Admin 8.",
+        "pl": "Wersja testowa podczas przejścia na ioBroker Admin 8.",
+        "uk": "Тестова версія під час переходу на ioBroker Admin 8.",
+        "zh-cn": "向 ioBroker Admin 8 迁移期间的测试版本。"
       },
       "2.22.0": {
         "en": "Sensors connected through a Govee gateway now show the gateway they use instead of an empty IP field, and seven more device models are now in the catalog as experimental.",
@@ -80,19 +93,6 @@
         "pl": "Wiersze dziennika nazywają teraz urządzenia spójnie jako „nazwa (model)\"\nWpis credentials znika z drzewa obiektów — tokeny logowania pozostają zapisane w formie zaszyfrowanej",
         "uk": "Рядки журналу тепер послідовно називають пристрої як «назва (модель)»\nЗапис credentials зникає з дерева об'єктів — токени входу залишаються збереженими у зашифрованому вигляді",
         "zh-cn": "设备日志行现在统一以\"名称（型号）\"命名设备\ncredentials 条目从对象树中消失——登录令牌仍以加密形式保存"
-      },
-      "2.18.2": {
-        "en": "Internal refactoring. No user-facing changes.",
-        "de": "Interne Überarbeitung. Keine für Nutzer sichtbaren Änderungen.",
-        "ru": "Внутренний рефакторинг. Никаких изменений для пользователя.",
-        "pt": "Refatoração interna. Nenhuma alteração visível para o utilizador.",
-        "nl": "Interne refactoring. Geen zichtbare wijzigingen voor gebruikers.",
-        "fr": "Refactorisation interne. Aucun changement visible pour l'utilisateur.",
-        "it": "Refactoring interno. Nessuna modifica visibile all'utente.",
-        "es": "Refactorización interna. Sin cambios visibles para el usuario.",
-        "pl": "Wewnętrzny refaktoring. Brak zmian widocznych dla użytkownika.",
-        "uk": "Внутрішній рефакторинг. Жодних змін для користувача.",
-        "zh-cn": "内部重构。无用户可见的更改。"
       }
     },
     "plugins": {
@@ -169,7 +169,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=7.8.23"
+        "admin": ">=8.0.1"
       }
     ]
   },
