@@ -11,7 +11,7 @@ import {
   Loader,
   type GenericAppProps,
   type GenericAppState,
-} from "@iobroker/adapter-react-v5";
+} from "@iobroker/gui-components";
 
 import { SegmentWizard } from "./SegmentWizard";
 
@@ -47,7 +47,8 @@ class App extends GenericApp<GenericAppProps, AppState> {
       theme: this.createTheme(),
     };
 
-    I18n.setTranslations({ en: enLocal, de: deLocal });
+    I18n.extendTranslations(enLocal, "en");
+    I18n.extendTranslations(deLocal, "de");
     // @ts-expect-error userLanguage could exist
     const browserLang = (navigator.language || navigator.userLanguage || "en").toLowerCase();
     I18n.setLanguage(browserLang.substring(0, 2));

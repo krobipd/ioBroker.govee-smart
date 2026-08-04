@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.22.0",
     "news": {
+      "NEXT": {
+        "en": "The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.",
+        "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen funktioniert wieder unter ioBroker Admin 8, wo statt des Assistenten eine Fehlermeldung erschien, und läuft weiterhin unter Admin 7.",
+        "ru": "Мастер определения сегментов в настройках адаптера снова работает в ioBroker Admin 8, где вместо него появлялась ошибка, и по-прежнему работает в Admin 7.",
+        "pt": "O assistente de deteção de segmentos nas definições do adaptador volta a funcionar no ioBroker Admin 8, onde mostrava um erro em vez de carregar, e continua a funcionar no Admin 7.",
+        "nl": "De wizard voor segmentdetectie in de adapterinstellingen werkt weer onder ioBroker Admin 8, waar in plaats daarvan een foutmelding verscheen, en blijft werken op Admin 7.",
+        "fr": "L'assistant de détection des segments dans les paramètres de l'adaptateur fonctionne à nouveau sous ioBroker Admin 8, où une erreur s'affichait à la place, et continue de fonctionner sur Admin 7.",
+        "it": "La procedura guidata di rilevamento dei segmenti nelle impostazioni dell'adattatore funziona di nuovo con ioBroker Admin 8, dove mostrava un errore, e continua a funzionare su Admin 7.",
+        "es": "El asistente de detección de segmentos en los ajustes del adaptador vuelve a funcionar en ioBroker Admin 8, donde mostraba un error en su lugar, y sigue funcionando en Admin 7.",
+        "pl": "Kreator wykrywania segmentów w ustawieniach adaptera znów działa w ioBroker Admin 8, gdzie zamiast niego pojawiał się błąd, i nadal działa w Admin 7.",
+        "uk": "Майстер визначення сегментів у налаштуваннях адаптера знову працює в ioBroker Admin 8, де замість нього з'являлася помилка, і надалі працює в Admin 7.",
+        "zh-cn": "适配器设置中的分段检测向导在 ioBroker Admin 8 下重新可用（此前显示错误而非加载），并且在 Admin 7 下继续正常工作。"
+      },
       "2.22.0": {
         "en": "Sensors connected through a Govee gateway now show the gateway they use instead of an empty IP field, and seven more device models are now in the catalog as experimental.",
         "de": "Sensoren, die über ein Govee-Gateway angebunden sind, zeigen jetzt das Gateway statt eines leeren IP-Feldes, und sieben weitere Gerätemodelle sind jetzt experimentell im Katalog.",
@@ -80,19 +93,6 @@
         "pl": "Nowe urządzenia Govee w katalogu: więcej lamp i czujników, w tym monitor CO2. Startują jako eksperymentalne — włącz je w ustawieniach adaptera, aby wypróbować.",
         "uk": "Нові пристрої Govee в каталозі: більше ламп і датчиків, зокрема монітор CO2. Вони експериментальні — увімкніть їх у налаштуваннях адаптера, щоб спробувати.",
         "zh-cn": "目录中新增 Govee 设备：更多灯具和传感器，包括一个 CO2 监测器。它们默认实验性——在适配器设置中启用即可试用。"
-      },
-      "2.18.0": {
-        "en": "Devices you delete from your Govee account now disappear from the adapter automatically. Colour control is restored for groups that contain a cloud-only member.",
-        "de": "Geräte, die du aus deinem Govee-Konto löschst, verschwinden jetzt automatisch aus dem Adapter. Die Farbsteuerung für Gruppen mit einem reinen Cloud-Mitglied ist wiederhergestellt.",
-        "ru": "Устройства, удалённые из аккаунта Govee, теперь автоматически исчезают из адаптера. Восстановлено управление цветом для групп с участником только из облака.",
-        "pt": "Dispositivos que você exclui da sua conta Govee agora desaparecem automaticamente do adaptador. O controle de cor foi restaurado para grupos com um membro apenas na nuvem.",
-        "nl": "Apparaten die je uit je Govee-account verwijdert, verdwijnen nu automatisch uit de adapter. Kleurbesturing is hersteld voor groepen met een alleen-cloud-lid.",
-        "fr": "Les appareils que vous supprimez de votre compte Govee disparaissent automatiquement de l'adaptateur. Le contrôle des couleurs est rétabli pour les groupes avec un membre cloud uniquement.",
-        "it": "I dispositivi che elimini dal tuo account Govee ora scompaiono automaticamente dall'adattatore. Il controllo del colore è ripristinato per i gruppi con un membro solo cloud.",
-        "es": "Los dispositivos que eliminas de tu cuenta Govee ahora desaparecen automáticamente del adaptador. Se restauró el control de color para grupos con un miembro solo en la nube.",
-        "pl": "Urządzenia usunięte z konta Govee znikają teraz automatycznie z adaptera. Przywrócono sterowanie kolorami dla grup z członkiem tylko w chmurze.",
-        "uk": "Пристрої, які ви видаляєте з облікового запису Govee, тепер автоматично зникають з адаптера. Відновлено керування кольором для груп з учасником лише з хмари.",
-        "zh-cn": "从 Govee 账户中删除的设备现在会自动从适配器中消失。已恢复对包含纯云成员的群组的颜色控制。"
       }
     },
     "plugins": {

@@ -12,7 +12,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { I18n } from "@iobroker/adapter-react-v5";
+import { I18n } from "@iobroker/gui-components";
 
 import { SegmentGrid } from "./SegmentGrid";
 import {
@@ -25,7 +25,7 @@ import {
 
 /** Props for the segment-wizard React component. */
 export interface SegmentWizardProps {
-  /** Admin socket (adapter-react-v5) used for the wizard sendTo round-trips. */
+  /** Admin socket (gui-components) used for the wizard sendTo round-trips. */
   socket: unknown;
   /** Adapter instance namespace, e.g. "govee-smart.0". */
   namespace: string;
@@ -277,7 +277,7 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
         <Stack
           direction="row"
           spacing={1}
-          flexWrap="wrap"
+          sx={{ flexWrap: "wrap" }}
           useFlexGap
         >
           <Button
@@ -346,8 +346,7 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
         <Stack
           direction="row"
           spacing={1}
-          sx={{ mt: 2 }}
-          flexWrap="wrap"
+          sx={{ mt: 2, flexWrap: "wrap" }}
           useFlexGap
         >
           <Button

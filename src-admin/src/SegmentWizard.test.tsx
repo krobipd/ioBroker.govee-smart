@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { I18n } from "@iobroker/adapter-react-v5";
+import { I18n } from "@iobroker/gui-components";
 
 import enJson from "./i18n/en.json";
 
@@ -27,7 +27,7 @@ const DEVICE = "H6160:AABB";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  I18n.setTranslations({ en: enJson });
+  I18n.extendTranslations(enJson, "en");
   I18n.setLanguage("en");
   mockApi.listDevices.mockResolvedValue([{ value: DEVICE, label: "Strip Living" }]);
   mockApi.abort.mockResolvedValue({ aborted: true, done: true });
