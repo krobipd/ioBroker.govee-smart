@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.23.0",
     "news": {
+      "NEXT": {
+        "en": "The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.",
+        "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen öffnete sich in 2.23.0 unter ioBroker Admin 7 nicht mehr (leerer Reiter); er lädt jetzt wieder unter Admin 7 und Admin 8.",
+        "ru": "Мастер определения сегментов в настройках адаптера в версии 2.23.0 не открывался в ioBroker Admin 7 (пустая вкладка); теперь он снова загружается и в Admin 7, и в Admin 8.",
+        "pt": "O assistente de deteção de segmentos nas definições do adaptador deixou de abrir no ioBroker Admin 7 na versão 2.23.0 (separador vazio); agora volta a carregar no Admin 7 e no Admin 8.",
+        "nl": "De wizard voor segmentdetectie in de adapterinstellingen opende in 2.23.0 niet meer op ioBroker Admin 7 (leeg tabblad); hij laadt nu weer op zowel Admin 7 als Admin 8.",
+        "fr": "L'assistant de détection des segments dans les paramètres de l'adaptateur ne s'ouvrait plus sous ioBroker Admin 7 en 2.23.0 (onglet vide) ; il se charge à nouveau sous Admin 7 et Admin 8.",
+        "it": "La procedura guidata di rilevamento dei segmenti nelle impostazioni dell'adattatore non si apriva su ioBroker Admin 7 nella 2.23.0 (scheda vuota); ora si carica di nuovo su Admin 7 e Admin 8.",
+        "es": "El asistente de detección de segmentos en los ajustes del adaptador dejó de abrirse en ioBroker Admin 7 en la 2.23.0 (pestaña vacía); ahora vuelve a cargarse en Admin 7 y Admin 8.",
+        "pl": "Kreator wykrywania segmentów w ustawieniach adaptera przestał otwierać się w ioBroker Admin 7 w wersji 2.23.0 (pusta karta); teraz znów ładuje się w Admin 7 i Admin 8.",
+        "uk": "Майстер визначення сегментів у налаштуваннях адаптера у версії 2.23.0 не відкривався в ioBroker Admin 7 (порожня вкладка); тепер він знову завантажується в Admin 7 і Admin 8.",
+        "zh-cn": "适配器设置中的分段检测向导在 2.23.0 中无法在 ioBroker Admin 7 上打开（标签页空白）；现在可在 Admin 7 和 Admin 8 上重新加载。"
+      },
       "2.23.0": {
         "en": "The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.",
         "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen funktioniert wieder unter ioBroker Admin 8, wo statt des Assistenten eine Fehlermeldung erschien, und läuft weiterhin unter Admin 7.",
@@ -80,19 +93,6 @@
         "pl": "Wewnętrzny refaktoring. Brak zmian widocznych dla użytkownika.",
         "uk": "Внутрішній рефакторинг. Жодних змін для користувача.",
         "zh-cn": "内部重构。无用户可见的更改。"
-      },
-      "2.18.1": {
-        "en": "New Govee devices in the catalog: more lamps and sensors, including a CO2 monitor. They start as experimental — enable them in the adapter settings to try them.",
-        "de": "Neue Govee-Geräte im Katalog: mehr Lampen und Sensoren, darunter ein CO2-Monitor. Sie starten experimentell — in den Adapter-Einstellungen aktivieren zum Ausprobieren.",
-        "ru": "Новые устройства Govee в каталоге: больше ламп и датчиков, включая монитор CO2. Они экспериментальные — включите их в настройках адаптера, чтобы попробовать.",
-        "pt": "Novos dispositivos Govee no catálogo: mais lâmpadas e sensores, incluindo um monitor de CO2. Começam experimentais — ative-os nas configurações do adaptador.",
-        "nl": "Nieuwe Govee-apparaten in de catalogus: meer lampen en sensoren, waaronder een CO2-monitor. Ze starten experimenteel — schakel ze in via de adapterinstellingen.",
-        "fr": "Nouveaux appareils Govee au catalogue : plus de lampes et de capteurs, dont un moniteur de CO2. Ils démarrent en expérimental — activez-les dans les réglages de l'adaptateur.",
-        "it": "Nuovi dispositivi Govee nel catalogo: più lampade e sensori, incluso un monitor CO2. Partono come sperimentali — abilitali nelle impostazioni dell'adattatore.",
-        "es": "Nuevos dispositivos Govee en el catálogo: más lámparas y sensores, incluido un monitor de CO2. Empiezan como experimentales — actívalos en los ajustes del adaptador.",
-        "pl": "Nowe urządzenia Govee w katalogu: więcej lamp i czujników, w tym monitor CO2. Startują jako eksperymentalne — włącz je w ustawieniach adaptera, aby wypróbować.",
-        "uk": "Нові пристрої Govee в каталозі: більше ламп і датчиків, зокрема монітор CO2. Вони експериментальні — увімкніть їх у налаштуваннях адаптера, щоб спробувати.",
-        "zh-cn": "目录中新增 Govee 设备：更多灯具和传感器，包括一个 CO2 监测器。它们默认实验性——在适配器设置中启用即可试用。"
       }
     },
     "plugins": {

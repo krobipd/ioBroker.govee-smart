@@ -94,6 +94,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.
+
 ### 2.23.0 (2026-08-04)
 
 - The segment detection wizard in the adapter settings works again under ioBroker Admin 8, where it showed an error instead of loading, and it keeps working on Admin 7.
