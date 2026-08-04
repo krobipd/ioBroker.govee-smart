@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.23.1",
+    "version": "2.24.0",
     "news": {
-      "NEXT": {
+      "2.24.0": {
         "en": "This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.",
         "de": "Diese Version benötigt ioBroker Admin 8. Der Segment-Erkennungs-Assistent ist für Admin 8 gebaut und läuft nicht mehr unter Admin 7; dort wird dieses Update nicht angeboten.",
         "ru": "Этой версии нужен ioBroker Admin 8. Мастер определения сегментов рассчитан на Admin 8 и больше не работает в Admin 7, поэтому там это обновление не предлагается.",

@@ -94,7 +94,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.24.0 (2026-08-04)
 
 - This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
 
@@ -115,14 +115,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.21.0 (2026-07-12) — stable
 
 - The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure each segment and can be corrected before you apply it.
-
-### 2.20.0 (2026-07-11)
-
-- Channel names and the device-info labels such as Name, Model, Online and IP address now follow the ioBroker system language instead of always showing English.
-- Clearer Cloud API feedback: the admin "test login" button reports the real login result, and a malformed API key now gives a plain "invalid key" message instead of a generic failure.
-- Sensor-only setups are now told, both in the admin and at startup, that a Govee account login is required to receive sensor data.
-- Actions that used to fail quietly now report it — the manual device-sync button surfaces errors, and commands queued behind a rate limit settle with their real success or failure.
-- A network error on a manually pinned LAN interface is now raised as an actionable problem with a fix hint, instead of passing unnoticed.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

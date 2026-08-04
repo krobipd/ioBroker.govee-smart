@@ -1,4 +1,12 @@
 # Older Changes
+## 2.20.0 (2026-07-11)
+
+- Channel names and the device-info labels such as Name, Model, Online and IP address now follow the ioBroker system language instead of always showing English.
+- Clearer Cloud API feedback: the admin "test login" button reports the real login result, and a malformed API key now gives a plain "invalid key" message instead of a generic failure.
+- Sensor-only setups are now told, both in the admin and at startup, that a Govee account login is required to receive sensor data.
+- Actions that used to fail quietly now report it — the manual device-sync button surfaces errors, and commands queued behind a rate limit settle with their real success or failure.
+- A network error on a manually pinned LAN interface is now raised as an actionable problem with a fix hint, instead of passing unnoticed.
+
 ## 2.19.0 (2026-07-04)
 
 - Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
