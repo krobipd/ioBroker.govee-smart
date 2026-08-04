@@ -187,6 +187,10 @@ One vitest suite per module (`src/**/*.test.ts`), jede mit einem „Drift"-Block
 
 Schwester-Adapter `iobroker.govee` ist veraltet (nur LAN, keine MQTT, keine Sensoren/Appliances) — diese Implementation ist die einzige Govee-Lösung im Latest-Repo mit voller Multi-Channel + ptReal + Wizard. Aufnahme-PR ioBroker.repositories#5824 **MERGED 2026-06-06**. Live-Stand: `show-pr-status.py`.
 
+## Versionshistorie
+
+Aktuelle Version: `io-package.json`. **User-facing Changelog:** `README.md` + `io-package.json:common.news` (11 Sprachen, handgeschrieben). **Interne Entwicklungs-Historie** (Findings, Root-Causes, verworfene Wege): `.claude/dev-history.md` — lokal, nicht git-getrackt, bewusst aus dieser Datei ausgelagert um sie schlank zu halten.
+
 ## Befehle
 
 ```bash
