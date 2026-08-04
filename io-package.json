@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.23.0",
+    "version": "2.23.1",
     "news": {
-      "NEXT": {
+      "2.23.1": {
         "en": "The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.",
         "de": "Der Assistent zur Segment-Erkennung in den Adaptereinstellungen öffnete sich in 2.23.0 unter ioBroker Admin 7 nicht mehr (leerer Reiter); er lädt jetzt wieder unter Admin 7 und Admin 8.",
         "ru": "Мастер определения сегментов в настройках адаптера в версии 2.23.0 не открывался в ioBroker Admin 7 (пустая вкладка); теперь он снова загружается и в Admin 7, и в Admin 8.",

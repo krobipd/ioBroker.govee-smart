@@ -94,7 +94,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.23.1 (2026-08-04)
 
 - The segment detection wizard in the adapter settings failed to open on ioBroker Admin 7 in 2.23.0 (empty tab); it now loads again on both Admin 7 and Admin 8.
 
@@ -119,11 +119,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Sensor-only setups are now told, both in the admin and at startup, that a Govee account login is required to receive sensor data.
 - Actions that used to fail quietly now report it — the manual device-sync button surfaces errors, and commands queued behind a rate limit settle with their real success or failure.
 - A network error on a manually pinned LAN interface is now raised as an actionable problem with a fix hint, instead of passing unnoticed.
-
-### 2.19.0 (2026-07-04)
-
-- Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
-- The credentials entry disappears from the object tree — login tokens stay saved in encrypted form, just no longer visible as an object
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

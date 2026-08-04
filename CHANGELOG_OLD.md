@@ -1,4 +1,9 @@
 # Older Changes
+## 2.19.0 (2026-07-04)
+
+- Device log lines now consistently name devices as "name (model)" — cache maintenance, command errors and wizard messages included, no more bare model/address labels
+- The credentials entry disappears from the object tree — login tokens stay saved in encrypted form, just no longer visible as an object
+
 ## 2.18.2 (2026-07-03)
 
 - Internal refactoring. No user-facing changes.
