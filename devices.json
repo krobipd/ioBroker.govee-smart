@@ -536,6 +536,30 @@
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
+    },
+    "H1310": {
+      "name": "Smart Ceiling Fan",
+      "type": "fan",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H61E5": {
+      "name": "COB Light Strip",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H6062": {
+      "name": "Glide Light Bar",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H7020": {
+      "name": "Bulb String Lights",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
     }
   }
 }
