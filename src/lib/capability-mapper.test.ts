@@ -433,7 +433,9 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("work_mode");
       expect(result[0].type).toBe("mixed");
-      expect(result[0].role).toBe("level.mode.work");
+      // mixed dropdown → role "state" (a level.* role forces a numeric type and
+      // would trip the js-controller strict-type check; see design principle 21)
+      expect(result[0].role).toBe("state");
     });
 
     it("should map work_mode STRUCT with workMode field options to dropdown", () => {
