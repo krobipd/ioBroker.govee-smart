@@ -1061,9 +1061,8 @@ class GoveeAdapter extends utils.Adapter {
         };
       },
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
-      createMqttProbeClient: () => {
-        const config = this.config;
-        const probe = new GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+      createMqttProbeClient: (email: string, password: string) => {
+        const probe = new GoveeMqttClient(email, password, this.log, this);
         // One-shot probe: a failed login must not arm the reconnect backoff —
         // it could fire a second login against Govee inside the probe window.
         probe.enableProbeMode();

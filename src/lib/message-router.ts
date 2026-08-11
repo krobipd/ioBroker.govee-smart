@@ -4,6 +4,45 @@ import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timin
 import { resolveLabel } from "./i18n";
 
 /**
+ * Machine-readable outcome of a `mqttAuth` action. The React connection card
+ * reacts to `status` (e.g. `verifyRequired` → open the 2FA field); `result` is
+ * the localized text for a toast / fallback. Kept a superset for both actions.
+ */
+export type AuthStatus =
+  | "ok"
+  | "verifyRequired"
+  | "codeInvalid"
+  | "passwordRejected"
+  | "emailNotRegistered"
+  | "rateLimited"
+  | "accountLocked"
+  | "loginFailed"
+  | "mqttNotUp"
+  | "codeSent"
+  | "codeRejected"
+  | "needCredentials"
+  | "throttled"
+  | "unknownAction";
+
+/** Structured `mqttAuth` response — `result` = localized text, `status` = the case. */
+export interface AuthResponse {
+  /** Localized, user-readable text (toast / fallback). */
+  result: string;
+  /** Machine-readable case the connection card reacts to. */
+  status: AuthStatus;
+}
+
+/** Credentials the user is currently editing in the card, sent with the action. */
+export interface AuthCreds {
+  /** Account email (falls back to the saved config when omitted). */
+  email?: string;
+  /** Account password (falls back to the saved config when omitted). */
+  password?: string;
+  /** 2FA verification code (falls back to the saved config when omitted). */
+  code?: string;
+}
+
+/**
  * Host interface for MessageRouter.
  *
  * Same pattern as SnapshotHandler/GroupFanoutHandler — main.ts stays slim and
@@ -12,12 +51,16 @@ import { resolveLabel } from "./i18n";
 export interface MessageRouterHost {
   /** Adapter logger. */
   log: ioBroker.Logger;
-  /** Provides the adapter config for the runMqttAuthAction path. */
+  /** Saved adapter config — fallback when the card sends no live credentials. */
   getConfig: () => { goveeEmail: string; goveePassword: string; mqttVerificationCode?: string };
   /** Sends the JSON response back to the caller (sendMessageResponse path). */
   sendResponse: (obj: ioBroker.Message, data: unknown) => void;
-  /** Factory for a one-shot MqttClient (for the login test). */
-  createMqttProbeClient: () => GoveeMqttClient;
+  /**
+   * Factory for a one-shot MqttClient (for the login test), built with the
+   * given credentials — so a test uses what the user is currently editing in
+   * the card, without having to save first.
+   */
+  createMqttProbeClient: (email: string, password: string) => GoveeMqttClient;
   /** Provides the list of devices that have segments (for getSegmentDevices). */
   getSegmentDeviceList: () => Array<{ value: string; label: string }>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
@@ -38,7 +81,7 @@ export interface MessageRouterHost {
  * Dispatches 3 commands:
  *  - `getSegmentDevices` — selectSendTo data source for the wizard
  *  - `segmentWizard` — wizard step (start/yes/no/done/abort)
- *  - `mqttAuth` — login test + verification-code request
+ *  - `mqttAuth` — login test + verification-code request (with live credentials)
  */
 export class MessageRouter {
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
@@ -48,30 +91,31 @@ export class MessageRouter {
 
   /**
    * Map a probe failure (category + raw client message) onto the localized
-   * admin result labels. Category first; the raw message only disambiguates
-   * sub-cases inside a category (451 "email not registered" is AUTH like a
-   * wrong password) and the not-classifiable Govee account states.
+   * admin result label AND a machine-readable status. Category first; the raw
+   * message only disambiguates sub-cases inside a category (451 "email not
+   * registered" is AUTH like a wrong password) and the not-classifiable Govee
+   * account states.
    *
    * @param failure          Last error from the probe client
    * @param failure.category Classified error category
    * @param failure.message  Raw client error message
    */
-  private labelForProbeFailure(failure: { category: ErrorCategory; message: string }): string {
+  private resultForProbeFailure(failure: { category: ErrorCategory; message: string }): AuthResponse {
     switch (failure.category) {
       case "VERIFICATION_PENDING":
-        return resolveLabel("mqttAuthVerifyRequired");
+        return { result: resolveLabel("mqttAuthVerifyRequired"), status: "verifyRequired" };
       case "VERIFICATION_FAILED":
-        return resolveLabel("mqttAuthCodeInvalid");
+        return { result: resolveLabel("mqttAuthCodeInvalid"), status: "codeInvalid" };
       case "AUTH":
         return /email not registered/i.test(failure.message)
-          ? resolveLabel("mqttAuthEmailNotRegistered")
-          : resolveLabel("mqttAuthPasswordRejected");
+          ? { result: resolveLabel("mqttAuthEmailNotRegistered"), status: "emailNotRegistered" }
+          : { result: resolveLabel("mqttAuthPasswordRejected"), status: "passwordRejected" };
       case "RATE_LIMIT":
-        return resolveLabel("mqttAuthRateLimited");
+        return { result: resolveLabel("mqttAuthRateLimited"), status: "rateLimited" };
       default:
         return /account temporarily locked/i.test(failure.message)
-          ? resolveLabel("mqttAuthAccountLocked")
-          : resolveLabel("mqttAuthLoginFailed", failure.message);
+          ? { result: resolveLabel("mqttAuthAccountLocked"), status: "accountLocked" }
+          : { result: resolveLabel("mqttAuthLoginFailed", failure.message), status: "loginFailed" };
     }
   }
 
@@ -122,8 +166,12 @@ export class MessageRouter {
         return;
       }
       if (obj.command === "mqttAuth") {
-        const payload = (obj.message ?? {}) as { action?: string };
-        const response = await this.runMqttAuthAction(payload.action ?? "");
+        const payload = (obj.message ?? {}) as { action?: string; email?: string; password?: string; code?: string };
+        const response = await this.runMqttAuthAction(payload.action ?? "", {
+          email: payload.email,
+          password: payload.password,
+          code: payload.code,
+        });
         this.host.sendResponse(obj, response);
         return;
       }
@@ -141,27 +189,31 @@ export class MessageRouter {
    * Handle the `mqttAuth` onMessage commands.
    *
    * Two actions:
-   *   - `test`        — try a one-shot login with the current settings combo
-   *                     and return a single user-readable result.
+   *   - `test`        — try a one-shot login with the given credentials (live
+   *                     from the card, or the saved config) and return the case.
    *   - `requestCode` — POST to /verification, Govee mails a fresh code.
    *                     30s in-memory throttle against double-click email spam.
    *
-   * @param action Action name from the jsonConfig sendTo button
+   * @param action Action name from the connection card
+   * @param creds  Credentials the user is currently editing (fallback: saved config)
    */
-  private async runMqttAuthAction(action: string): Promise<{ result: string }> {
+  private async runMqttAuthAction(action: string, creds: AuthCreds = {}): Promise<AuthResponse> {
     const config = this.host.getConfig();
-    if (!config.goveeEmail || !config.goveePassword) {
-      return { result: resolveLabel("mqttAuthNeedCredentials") };
+    const email = (creds.email ?? config.goveeEmail ?? "").trim();
+    const password = creds.password ?? config.goveePassword ?? "";
+    const code = (creds.code ?? config.mqttVerificationCode ?? "").trim();
+    if (!email || !password) {
+      return { result: resolveLabel("mqttAuthNeedCredentials"), status: "needCredentials" };
     }
     if (action === "test") {
       const now = Date.now();
       if (now - this.lastTestRequestMs < VERIFICATION_REQUEST_THROTTLE_MS) {
         const remainingSec = Math.ceil((VERIFICATION_REQUEST_THROTTLE_MS - (now - this.lastTestRequestMs)) / 1000);
-        return { result: resolveLabel("mqttAuthThrottled", remainingSec) };
+        return { result: resolveLabel("mqttAuthThrottled", remainingSec), status: "throttled" };
       }
       this.lastTestRequestMs = now;
-      const probe = this.host.createMqttProbeClient();
-      probe.setVerificationCode(config.mqttVerificationCode ?? "");
+      const probe = this.host.createMqttProbeClient(email, password);
+      probe.setVerificationCode(code);
       let probeTimer: ioBroker.Timeout | undefined;
       try {
         // The "connected" edge (onConnection(true)) arrives asynchronously AFTER
@@ -189,7 +241,7 @@ export class MessageRouter {
         // instead of burning the 10s edge-wait on a doomed probe.
         const loginFailure = probe.getLastError();
         if (loginFailure) {
-          return { result: this.labelForProbeFailure(loginFailure) };
+          return this.resultForProbeFailure(loginFailure);
         }
         // Login + cert OK. Wait a bounded time for the MQTT socket to actually
         // connect + subscribe; a timeout means "credentials fine, MQTT not up".
@@ -201,18 +253,21 @@ export class MessageRouter {
           }),
         ]);
         if (connected) {
-          return { result: resolveLabel("mqttAuthLoginOk") };
+          return { result: resolveLabel("mqttAuthLoginOk"), status: "ok" };
         }
         // A broker-stage failure (cert rejected, subscribe refused) can land
         // during the edge-wait — prefer the concrete reason over "not up".
         const lateFailure = probe.getLastError();
-        return {
-          result: lateFailure ? this.labelForProbeFailure(lateFailure) : resolveLabel("mqttAuthLoginNoMqtt"),
-        };
+        return lateFailure
+          ? this.resultForProbeFailure(lateFailure)
+          : { result: resolveLabel("mqttAuthLoginNoMqtt"), status: "mqttNotUp" };
       } catch (e) {
         // Safety net for unexpected synchronous throws only — the regular
         // failure paths never reject (see above).
-        return { result: resolveLabel("mqttAuthLoginFailed", e instanceof Error ? e.message : String(e)) };
+        return {
+          result: resolveLabel("mqttAuthLoginFailed", e instanceof Error ? e.message : String(e)),
+          status: "loginFailed",
+        };
       } finally {
         // Dispose on every path — success, timeout, and error — so the probe's
         // MQTT socket + reconnect timer never leak (the old code disconnected
@@ -229,18 +284,18 @@ export class MessageRouter {
         const remainingSec = Math.ceil(
           (VERIFICATION_REQUEST_THROTTLE_MS - (now - this.lastVerificationRequestMs)) / 1000,
         );
-        return { result: resolveLabel("mqttAuthThrottled", remainingSec) };
+        return { result: resolveLabel("mqttAuthThrottled", remainingSec), status: "throttled" };
       }
       this.lastVerificationRequestMs = now;
-      const probe = this.host.createMqttProbeClient();
+      const probe = this.host.createMqttProbeClient(email, password);
       try {
         await probe.requestVerificationCode();
-        return { result: resolveLabel("mqttAuthCodeSent") };
+        return { result: resolveLabel("mqttAuthCodeSent"), status: "codeSent" };
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        return { result: resolveLabel("mqttAuthCodeRejected", msg) };
+        return { result: resolveLabel("mqttAuthCodeRejected", msg), status: "codeRejected" };
       }
     }
-    return { result: resolveLabel("mqttAuthUnknownAction", action) };
+    return { result: resolveLabel("mqttAuthUnknownAction", action), status: "unknownAction" };
   }
 }

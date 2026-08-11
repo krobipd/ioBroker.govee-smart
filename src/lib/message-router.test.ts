@@ -107,7 +107,7 @@ function makeHost(opts: {
       mqttVerificationCode: "",
     }),
     sendResponse: (obj, data) => responses.push({ obj, data }),
-    createMqttProbeClient: () => opts.probe ?? makeProbe({ connected: false }),
+    createMqttProbeClient: (_email: string, _password: string) => opts.probe ?? makeProbe({ connected: false }),
     getSegmentDeviceList: () => opts.segmentDevices ?? [],
     runWizardStep: () => Promise.resolve(opts.wizardResponse ?? { ok: true }),
     setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms) as unknown as ioBroker.Timeout,
@@ -335,6 +335,40 @@ describe("MessageRouter", () => {
       expect(responses).toHaveLength(2);
       const second = responses[1].data as { result: string };
       expect(second.result).toContain("Please wait");
+    });
+
+    it("returns a machine-readable status alongside the result — 'ok' on success", async () => {
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const r = responses[0].data as { result: string; status: string };
+      expect(r.status).toBe("ok");
+    });
+
+    it("returns status 'verifyRequired' on a 454 (the card opens the 2FA field)", async () => {
+      const probe = makeProbe({
+        lastError: { category: "VERIFICATION_PENDING", message: "Verification required by Govee (status 454)" },
+      });
+      const { host, responses } = makeHost({ probe });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const r = responses[0].data as { status: string };
+      expect(r.status).toBe("verifyRequired");
+    });
+
+    it("uses the LIVE credentials from the payload (not the saved config) so a test needs no save first", async () => {
+      const seen: Array<{ email: string; password: string }> = [];
+      const { host } = makeHost({ email: "saved@x.com", password: "savedpw" });
+      host.createMqttProbeClient = (email, password) => {
+        seen.push({ email, password });
+        return makeProbe({ connected: true });
+      };
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test", email: "live@x.com", password: "livepw" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(seen).toEqual([{ email: "live@x.com", password: "livepw" }]);
     });
   });
 

@@ -819,9 +819,8 @@ class GoveeAdapter extends utils.Adapter {
         };
       },
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
-      createMqttProbeClient: () => {
-        const config = this.config;
-        const probe = new import_govee_mqtt_client.GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+      createMqttProbeClient: (email, password) => {
+        const probe = new import_govee_mqtt_client.GoveeMqttClient(email, password, this.log, this);
         probe.enableProbeMode();
         return probe;
       },
