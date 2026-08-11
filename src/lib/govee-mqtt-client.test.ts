@@ -707,6 +707,156 @@ describe("GoveeMqttClient", () => {
     });
   });
 
+  // Issue #39: an account got 24h-locked by Govee after the adapter fired ~20
+  // account logins. Root cause: only AUTH capped the reconnect loop — every
+  // other Govee-reaching rejection (rate-limit, account-locked, unexpected)
+  // reset the counter and relooped forever. These prove the cap now covers
+  // ALL Govee-reaching rejections, while true network failures keep retrying.
+  describe("login-storm guard (issue #39)", () => {
+    // Counts scheduleReconnect() calls but returns undefined, so `reconnectTimer`
+    // stays falsy and never trips the "already armed" guard — otherwise a second
+    // connect() in the same tick would no-op instead of re-arming.
+    function makeCountingTimers() {
+      let count = 0;
+      const timers = {
+        setInterval: () => undefined,
+        clearInterval: () => {},
+        setTimeout: () => {
+          count += 1;
+          return undefined;
+        },
+        clearTimeout: () => {},
+        delay: () => Promise.resolve(),
+      } as never;
+      return { timers, count: () => count };
+    }
+    const exhausted = (c: GoveeMqttClient): boolean =>
+      (c as unknown as { reconnectExhausted(): boolean }).reconnectExhausted();
+    const failCount = (c: GoveeMqttClient): number => (c as unknown as { authFailCount: number }).authFailCount;
+
+    it("stops reconnecting + fires onLoginBlocked (not onAuthFailed) after 3 rate-limit (429) rejections", async () => {
+      const fake = makeFakeHttps(() => ({ status: 429, message: "too many requests" }));
+      const t = makeCountingTimers();
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, t.timers, fake.fn);
+      let blocked = 0;
+      let authFailed = 0;
+      client.setOnLoginBlocked(() => blocked++);
+      client.setOnAuthFailed(() => authFailed++);
+      for (let i = 0; i < 3; i++) {
+        await client.connect(
+          () => {},
+          () => {},
+        );
+      }
+      expect(fake.calls.length).toBe(3); // three real login POSTs went out …
+      expect(t.count()).toBe(2); // … the first two armed a reconnect; the 3rd stopped
+      expect(exhausted(client)).toBe(true); // reconnect loop halted for good
+      expect(blocked).toBe(1); // rate-limit is NOT a bad-credentials problem
+      expect(authFailed).toBe(0);
+      expect(client.getFailureReason()).toMatch(/retries stopped/i);
+      client.disconnect();
+    });
+
+    it("stops reconnecting + fires onLoginBlocked after 3 account-locked rejections", async () => {
+      // No status field → classifies as UNKNOWN (locked wording, not a 401/403).
+      const fake = makeFakeHttps(() => ({ message: "account abnormal — try again later" }));
+      const t = makeCountingTimers();
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, t.timers, fake.fn);
+      let blocked = 0;
+      client.setOnLoginBlocked(() => blocked++);
+      for (let i = 0; i < 3; i++) {
+        await client.connect(
+          () => {},
+          () => {},
+        );
+      }
+      expect(t.count()).toBe(2);
+      expect(exhausted(client)).toBe(true);
+      expect(blocked).toBe(1);
+      expect(client.getFailureReason()).toMatch(/retries stopped/i);
+      client.disconnect();
+    });
+
+    it("keeps retrying on pure network failures — they never reached Govee, so they must not cap", async () => {
+      const netErr: Error & { code?: string } = new Error("ECONNREFUSED");
+      netErr.code = "ECONNREFUSED";
+      const fake = makeFakeHttps(() => netErr);
+      const t = makeCountingTimers();
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, t.timers, fake.fn);
+      let blocked = 0;
+      client.setOnLoginBlocked(() => blocked++);
+      for (let i = 0; i < 5; i++) {
+        await client.connect(
+          () => {},
+          () => {},
+        );
+      }
+      expect(t.count()).toBe(5); // every attempt re-armed a reconnect — no cap
+      expect(failCount(client)).toBe(0); // network never counts toward the cap
+      expect(exhausted(client)).toBe(false); // still allowed to retry
+      expect(blocked).toBe(0);
+      expect(client.getFailureReason()).toBe("cannot reach Govee servers — will retry");
+      client.disconnect();
+    });
+
+    it("does not let a network blip between rejections reset the cap (alternating pattern)", async () => {
+      const netErr: Error & { code?: string } = new Error("ECONNRESET");
+      netErr.code = "ECONNRESET";
+      // 429, net, 429, net, 429 → the three 429s must reach the cap even though
+      // a network failure sits between each; the counter resets only on success.
+      const responses: unknown[] = [
+        { status: 429, message: "too many requests" },
+        netErr,
+        { status: 429, message: "too many requests" },
+        netErr,
+        { status: 429, message: "too many requests" },
+      ];
+      const fake = makeFakeHttps((_opts, idx) => responses[idx]);
+      const t = makeCountingTimers();
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, t.timers, fake.fn);
+      let blocked = 0;
+      client.setOnLoginBlocked(() => blocked++);
+      for (let i = 0; i < 5; i++) {
+        await client.connect(
+          () => {},
+          () => {},
+        );
+      }
+      expect(failCount(client)).toBe(3); // the three 429s counted; the two network blips did not
+      expect(blocked).toBe(1); // the 3rd 429 hit the cap despite the interleaved network errors
+      expect(exhausted(client)).toBe(true);
+      client.disconnect();
+    });
+
+    it("routes bad credentials to onAuthFailed, never to onLoginBlocked", async () => {
+      const fake = makeFakeHttps(() => ({ status: 401, message: "wrong password" }));
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      let blocked = 0;
+      let authFailed = 0;
+      client.setOnLoginBlocked(() => blocked++);
+      client.setOnAuthFailed(() => authFailed++);
+      for (let i = 0; i < 3; i++) {
+        await client.connect(
+          () => {},
+          () => {},
+        );
+      }
+      expect(authFailed).toBe(1);
+      expect(blocked).toBe(0);
+      expect(client.getFailureReason()).toBe("login rejected — check email/password");
+    });
+
+    it("proactive bearer refresh does not fire a login while disconnected (no cap bypass)", async () => {
+      const fake = makeFakeHttps(() => ({
+        client: { accountId: "a", topic: "GA/t", token: "x", token_expire_cycle: 3600 },
+      }));
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      // Not connected → the refresh must bail before issuing any /login POST.
+      await (client as unknown as { refreshBearerSilently: () => Promise<void> }).refreshBearerSilently();
+      expect(fake.calls.length).toBe(0);
+    });
+  });
+
   describe("handleMessage (status push parsing)", () => {
     function makeClient() {
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, mockTimers);

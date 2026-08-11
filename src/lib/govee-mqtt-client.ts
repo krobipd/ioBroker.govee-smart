@@ -76,6 +76,15 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * socket instead of refusing a new connection while the old one lingers.
    */
   private readonly sessionUuid: string = crypto.randomUUID();
+  /**
+   * Consecutive login attempts that REACHED Govee and were rejected — bad
+   * credentials, rate-limit, account-locked, or any other non-success
+   * response. Network/timeout failures, where the login POST never reached
+   * Govee and so cannot count against the account, deliberately do NOT
+   * increment it. Reset to 0 only on a fully successful subscribe. Caps the
+   * reconnect loop via {@link reconnectExhausted} so the adapter can't hammer
+   * Govee's login endpoint into locking the account (issue #39).
+   */
   private authFailCount = 0;
   /** One-shot probe (admin "test login"): never schedule reconnects. */
   private probeMode = false;
@@ -110,6 +119,14 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
 
   /** Fired when repeated logins are rejected for bad credentials (not 2FA) so the adapter can surface "check email/password". */
   private onAuthFailed: (() => void) | null = null;
+
+  /**
+   * Fired once repeated logins are stopped for a NON-credential reason
+   * (rate-limit, account temporarily locked, repeated unexpected rejections)
+   * so the adapter can tell the user auto-retries were halted and the account
+   * needs checking — distinct from onAuthFailed's "check email/password".
+   */
+  private onLoginBlocked: (() => void) | null = null;
 
   /** Persisted credentials from a previous run; null until setPersistedCredentials() is called. */
   private persisted: PersistedMqttCredentials | null = null;
@@ -193,6 +210,18 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this.onAuthFailed = cb;
   }
 
+  /**
+   * Hook called once the login is stopped after repeated Govee-reaching
+   * rejections that are NOT plain bad credentials (rate-limit / account
+   * locked / repeated unexpected errors). Lets the adapter surface a
+   * "retries stopped, check the account, restart" actionable problem.
+   *
+   * @param cb Callback
+   */
+  setOnLoginBlocked(cb: (() => void) | null): void {
+    this.onLoginBlocked = cb;
+  }
+
   /** Bearer token from login — available after connect, used for undocumented API */
   get token(): string {
     return this._bearerToken;
@@ -207,15 +236,21 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     if (this.connected) {
       return null;
     }
+    // Once the reject-cap is hit the reconnect loop is stopped for good — the
+    // "…will retry" wordings below would be a lie. Report the stopped state
+    // (the ready-summary reads this string).
+    if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
+      return this.lastErrorCategory === "AUTH"
+        ? "login rejected — check email/password"
+        : "login retries stopped — Govee rejected repeatedly (account may be locked); check the account, then restart";
+    }
     switch (this.lastErrorCategory) {
       case "VERIFICATION_PENDING":
         return "Govee asked for verification — request a code in adapter settings";
       case "VERIFICATION_FAILED":
         return "verification code rejected — request a fresh code";
       case "AUTH":
-        return this.authFailCount >= MQTT_MAX_AUTH_FAILURES
-          ? "login rejected — check email/password"
-          : "login failed (will retry)";
+        return "login failed (will retry)";
       case "RATE_LIMIT":
         return "rate-limited by Govee — will retry";
       case "NETWORK":
@@ -464,17 +499,33 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         return;
       }
 
-      // Auth backoff — stop reconnecting after repeated auth failures
-      if (category === "AUTH") {
+      // Login-storm guard (issue #39): cap the login attempts that actually
+      // REACH Govee. Bad credentials, rate-limit, account-locked and any other
+      // non-success RESPONSE all count. Only NETWORK/TIMEOUT — where the POST
+      // never reached Govee and so can't count against the account — keep
+      // retrying freely. The counter is reset EXCLUSIVELY on a successful
+      // subscribe (attachClientHandlers), never here, so an alternating
+      // reject / network-blip pattern still climbs to the cap.
+      const reachedGovee = category !== "NETWORK" && category !== "TIMEOUT";
+      if (reachedGovee) {
         this.authFailCount++;
         if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
-          // Actionable — surfaced once via the registry (onAuthFailed → main.ts); debug-only here (C8).
-          this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts — check email/password`);
-          this.onAuthFailed?.();
+          // Stop for good, then surface the right actionable problem once via
+          // the registry (main.ts) — debug-only here (C8). Plain bad creds →
+          // "check email/password"; everything else (rate-limit / locked /
+          // repeated unexpected) → "retries stopped, check the account".
+          this.lastErrorCategory = category;
+          if (category === "AUTH") {
+            this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts — check email/password`);
+            this.onAuthFailed?.();
+          } else {
+            this.log.debug(
+              `MQTT login stopped after ${this.authFailCount} Govee-reaching rejections (${category}) — account may be locked`,
+            );
+            this.onLoginBlocked?.();
+          }
           return;
         }
-      } else {
-        this.authFailCount = 0;
       }
 
       // Error dedup — warn on first/new category, debug on repeat
@@ -729,9 +780,13 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * recovery via the normal connect() path.
    */
   private async refreshBearerSilently(): Promise<void> {
-    if (this.disposed) {
-      // Adapter was stopped between timer-schedule and timer-fire — no more
-      // logging and no more login call.
+    // Bail if the adapter stopped, the reject-cap is already hit, or the live
+    // MQTT session is gone. This refresh is a full /login POST; running it
+    // after the storm-cap (issue #39) would bypass the guard, and running it
+    // while disconnected is pointless — the reconnect path rebuilds the bearer
+    // and counts rejections through connect(). Only a live session that needs
+    // its bearer kept fresh should reach Govee here.
+    if (this.disposed || this.reconnectExhausted() || !this.connected) {
       return;
     }
     this.log.debug("Proactive MQTT bearer refresh triggered");

@@ -156,7 +156,7 @@ class GoveeAdapter extends utils.Adapter {
   }
   /** Adapter started — initialize all channels */
   async onReady() {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f;
     try {
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
@@ -170,11 +170,12 @@ class GoveeAdapter extends utils.Adapter {
           "The Govee API key does not look like a valid key (expected UUID format like 12345678-1234-1234-1234-123456789abc) \u2014 check for typos or copied whitespace in the adapter settings. If this appeared right after upgrading a very old install (v2.11.0 encryption migration), re-enter the API key, Govee password and verification code once."
         );
       }
+      const hasAccountCreds = !!(((_a = config.goveeEmail) == null ? void 0 : _a.trim()) && ((_b = config.goveePassword) == null ? void 0 : _b.trim()));
       this.channelStatus = {
         lan: "off",
         // LAN listener always exists; flips to "on" after first discovery
         cloud: config.apiKey ? "off" : "n/a",
-        mqtt: config.goveeEmail && config.goveePassword ? "off" : "n/a",
+        mqtt: hasAccountCreds ? "off" : "n/a",
         openapi: config.apiKey ? "off" : "n/a"
       };
       (0, import_log_prefix.installLogPrefix)(this.log, () => this.channelStatus);
@@ -219,13 +220,13 @@ class GoveeAdapter extends utils.Adapter {
         return (_b2 = (_a2 = this.localSnapshots) == null ? void 0 : _a2.getSnapshots(sku, deviceId)) != null ? _b2 : [];
       });
       diag.setRuntimeStateProvider(() => {
-        var _a2, _b2, _c2, _d2, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+        var _a2, _b2, _c2, _d2, _e2, _f2, _g, _h, _i, _j, _k, _l, _m, _n;
         const errorCats = (_a2 = this.deviceManager) == null ? void 0 : _a2.getErrorCategorySnapshot();
         return {
           deviceManagerLastErrorCategory: (_b2 = errorCats == null ? void 0 : errorCats.deviceManager) != null ? _b2 : null,
           appApiLastErrorCategory: (_c2 = errorCats == null ? void 0 : errorCats.appApi) != null ? _c2 : null,
           groupMembersLastErrorCategory: (_d2 = errorCats == null ? void 0 : errorCats.groupMembers) != null ? _d2 : null,
-          cloudFailureReason: (_f = (_e = this.cloudClient) == null ? void 0 : _e.getFailureReason()) != null ? _f : null,
+          cloudFailureReason: (_f2 = (_e2 = this.cloudClient) == null ? void 0 : _e2.getFailureReason()) != null ? _f2 : null,
           mqttFailureReason: (_h = (_g = this.mqttClient) == null ? void 0 : _g.getFailureReason()) != null ? _h : null,
           rateLimiter: (_j = (_i = this.rateLimiter) == null ? void 0 : _i.getUsageSnapshot()) != null ? _j : null,
           wizardSession: (_l = (_k = this.segmentWizard) == null ? void 0 : _k.getSessionSnapshot()) != null ? _l : null,
@@ -309,7 +310,7 @@ class GoveeAdapter extends utils.Adapter {
       if (config.apiKey) {
         startChannels.push("Cloud");
       }
-      if (config.goveeEmail && config.goveePassword) {
+      if (hasAccountCreds) {
         startChannels.push("MQTT");
       }
       this.log.info(
@@ -368,13 +369,13 @@ class GoveeAdapter extends utils.Adapter {
         }
         connectionState.checkAllReady(this);
       }, import_timing_constants.LAN_SCAN_INITIAL_WAIT_MS);
-      if (config.goveeEmail && config.goveePassword) {
+      if (hasAccountCreds) {
         this.mqttClient = new import_govee_mqtt_client.GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
         this.mqttClient.setPacketHook((deviceId, topic, payload) => {
           var _a2;
           (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().addMqttPacket(deviceId, topic, payload);
         });
-        this.mqttClient.setVerificationCode((_a = config.mqttVerificationCode) != null ? _a : "");
+        this.mqttClient.setVerificationCode((_c = config.mqttVerificationCode) != null ? _c : "");
         this.mqttClient.setOnVerificationConsumed(() => {
           cloudCreds.clearVerificationCodeSetting(this).catch((e) => {
             this.log.warn(`Could not clear mqttVerificationCode: ${(0, import_types.errMessage)(e)}`);
@@ -404,6 +405,13 @@ class GoveeAdapter extends utils.Adapter {
             action: "check the Govee e-mail and password in the adapter settings (Govee Account section)"
           });
         });
+        this.mqttClient.setOnLoginBlocked(() => {
+          this.actionableProblems.report({
+            key: "mqtt-login-blocked",
+            title: "Govee stopped accepting the account login for real-time status",
+            action: "Govee rejected repeated login attempts (the account may be temporarily locked). Automatic retries are stopped \u2014 check your Govee account, then restart the adapter"
+          });
+        });
         await cloudCreds.cleanupLegacyMqttNativeOnce(this);
         const cachedCreds = await cloudCreds.loadPersistedCreds(this, dataDir);
         if (cachedCreds) {
@@ -428,6 +436,7 @@ class GoveeAdapter extends utils.Adapter {
                 "Govee real-time status connected \u2014 verification accepted"
               );
               this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
+              this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
               connectionState.checkAllReady(this);
             }
             connectionState.updateConnectionState(this);
@@ -505,7 +514,7 @@ class GoveeAdapter extends utils.Adapter {
             ack: true
           }).catch(() => {
           });
-          (_b = this.stateManager) == null ? void 0 : _b.updateGroupsOnline(result.ok).catch(() => {
+          (_d = this.stateManager) == null ? void 0 : _d.updateGroupsOnline(result.ok).catch(() => {
           });
           if (result.ok) {
             await cloudStateLoader.loadCloudStates(this);
@@ -521,7 +530,7 @@ class GoveeAdapter extends utils.Adapter {
             ack: true
           }).catch(() => {
           });
-          (_c = this.stateManager) == null ? void 0 : _c.updateGroupsOnline(true).catch(() => {
+          (_e = this.stateManager) == null ? void 0 : _e.updateGroupsOnline(true).catch(() => {
           });
         }
         await this.deviceManager.loadGroupMembers();
@@ -586,7 +595,7 @@ class GoveeAdapter extends utils.Adapter {
         }
       }, import_timing_constants.READY_SAFETY_TIMEOUT_MS);
     } catch (error) {
-      this.log.error(`onReady failed: ${error instanceof Error ? (_d = error.stack) != null ? _d : error.message : String(error)}`);
+      this.log.error(`onReady failed: ${error instanceof Error ? (_f = error.stack) != null ? _f : error.message : String(error)}`);
     }
   }
   /**

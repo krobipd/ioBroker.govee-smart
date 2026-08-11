@@ -215,6 +215,11 @@ class GoveeAdapter extends utils.Adapter {
         );
       }
 
+      // Account credentials gate — trimmed so a stray space in a field can't
+      // trip the truthy check into a login with junk data (issue #39). Drives
+      // the status prefix, the startup log and the MQTT init below alike.
+      const hasAccountCreds = !!(config.goveeEmail?.trim() && config.goveePassword?.trim());
+
       // Channel-status prefix for every log line — must run BEFORE sub-libraries
       // are constructed so they pick up the wrapped adapter.log automatically.
       // Initial snapshot reflects which credentials the user provided; status
@@ -222,7 +227,7 @@ class GoveeAdapter extends utils.Adapter {
       this.channelStatus = {
         lan: "off", // LAN listener always exists; flips to "on" after first discovery
         cloud: config.apiKey ? "off" : "n/a",
-        mqtt: config.goveeEmail && config.goveePassword ? "off" : "n/a",
+        mqtt: hasAccountCreds ? "off" : "n/a",
         openapi: config.apiKey ? "off" : "n/a",
       };
       installLogPrefix(this.log, () => this.channelStatus);
@@ -400,7 +405,7 @@ class GoveeAdapter extends utils.Adapter {
       if (config.apiKey) {
         startChannels.push("Cloud");
       }
-      if (config.goveeEmail && config.goveePassword) {
+      if (hasAccountCreds) {
         startChannels.push("MQTT");
       }
       this.log.info(
@@ -480,7 +485,7 @@ class GoveeAdapter extends utils.Adapter {
 
       // --- MQTT (if account credentials provided) ---
       // Initialize MQTT before Cloud so scene library can load on first cycle
-      if (config.goveeEmail && config.goveePassword) {
+      if (hasAccountCreds) {
         this.mqttClient = new GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
@@ -527,6 +532,14 @@ class GoveeAdapter extends utils.Adapter {
             action: "check the Govee e-mail and password in the adapter settings (Govee Account section)",
           });
         });
+        this.mqttClient.setOnLoginBlocked(() => {
+          this.actionableProblems.report({
+            key: "mqtt-login-blocked",
+            title: "Govee stopped accepting the account login for real-time status",
+            action:
+              "Govee rejected repeated login attempts (the account may be temporarily locked). Automatic retries are stopped — check your Govee account, then restart the adapter",
+          });
+        });
 
         // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
         // a FILE in the instance data directory — not a state and not a meta
@@ -563,6 +576,7 @@ class GoveeAdapter extends utils.Adapter {
                 "Govee real-time status connected — verification accepted",
               );
               this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
+              this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
               connectionState.checkAllReady(this);
             }
             connectionState.updateConnectionState(this);

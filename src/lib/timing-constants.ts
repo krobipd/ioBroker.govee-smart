@@ -9,7 +9,13 @@
 
 // === MQTT ===
 
-/** Maximum consecutive auth failures before reconnect is stopped permanently. */
+/**
+ * Maximum consecutive login attempts that REACH Govee and are rejected before
+ * the account-MQTT reconnect is stopped permanently (until adapter restart).
+ * Covers bad credentials, rate-limit, account-locked and any other non-success
+ * response; network/timeout failures don't count (issue #39). Kept low so a
+ * fault can't hammer Govee's login endpoint into a 24 h account lock.
+ */
 export const MQTT_MAX_AUTH_FAILURES = 3;
 
 // === App API (sensor polling) ===
