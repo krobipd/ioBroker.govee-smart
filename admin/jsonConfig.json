@@ -32,24 +32,24 @@
           "lg": 4,
           "xl": 4
         },
-        "_lanHeader": {
+        "_connectionCard": {
           "newLine": true,
-          "type": "header",
-          "text": "lanHeader",
-          "size": 4
-        },
-        "_lanInfo": {
-          "type": "staticText",
-          "text": "lanInfo",
+          "type": "custom",
+          "i18n": true,
+          "url": "custom/customComponents.js",
+          "name": "ConfigCustomGoveeSegmentSet/Components/ConnectionConfig",
+          "guiApi": 2,
           "xs": 12,
           "sm": 12,
           "md": 12,
           "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 16
-          }
+          "xl": 12
+        },
+        "_advancedHeader": {
+          "newLine": true,
+          "type": "header",
+          "text": "advancedHeader",
+          "size": 5
         },
         "networkInterface": {
           "type": "ip",
@@ -64,140 +64,8 @@
           "lg": 6,
           "xl": 6
         },
-        "_cloudHeader": {
-          "newLine": true,
-          "type": "header",
-          "text": "cloudHeader",
-          "size": 5
-        },
-        "_cloudInfo": {
-          "type": "staticText",
-          "text": "cloudInfo",
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 8
-          }
-        },
-        "apiKey": {
-          "type": "password",
-          "label": "apiKeyLabel",
-          "xs": 12,
-          "sm": 12,
-          "md": 8,
-          "lg": 6,
-          "xl": 6
-        },
-        "_mqttHeader": {
-          "newLine": true,
-          "type": "header",
-          "text": "mqttHeader",
-          "size": 5
-        },
-        "_mqttInfo": {
-          "type": "staticText",
-          "text": "mqttInfo",
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 8
-          }
-        },
-        "goveeEmail": {
-          "type": "text",
-          "label": "emailLabel",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 4,
-          "xl": 4,
-          "validator": "!data.goveeEmail || data.goveeEmail.includes('@')",
-          "validatorErrorText": "validatorEmailError"
-        },
-        "goveePassword": {
-          "type": "password",
-          "label": "passwordLabel",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 4,
-          "xl": 4
-        },
-        "_authTest": {
-          "newLine": true,
-          "type": "sendTo",
-          "command": "mqttAuth",
-          "jsonData": "{ \"action\": \"test\" }",
-          "label": "authBtnTest",
-          "variant": "outlined",
-          "color": "primary",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 3,
-          "xl": 3,
-          "style": {
-            "marginTop": 8
-          }
-        },
-        "_2faHeader": {
-          "newLine": true,
-          "type": "header",
-          "text": "twoFaHeader",
-          "size": 5
-        },
-        "_2faInfo": {
-          "type": "staticText",
-          "text": "twoFaInfo",
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 8
-          }
-        },
-        "_2faRequest": {
-          "type": "sendTo",
-          "command": "mqttAuth",
-          "jsonData": "{ \"action\": \"requestCode\" }",
-          "label": "twoFaBtnRequest",
-          "variant": "contained",
-          "color": "primary",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 3,
-          "xl": 3
-        },
-        "mqttVerificationCode": {
-          "type": "text",
-          "label": "twoFaCodeLabel",
-          "tooltip": "twoFaCodeTooltip",
-          "xs": 12,
-          "sm": 6,
-          "md": 4,
-          "lg": 3,
-          "xl": 3,
-          "maxLength": 8
-        },
-        "_advancedHeader": {
-          "newLine": true,
-          "type": "header",
-          "text": "advancedHeader",
-          "size": 5
-        },
         "_advancedInfo": {
+          "newLine": true,
           "type": "staticText",
           "text": "experimentalQuirksInfo",
           "xs": 12,

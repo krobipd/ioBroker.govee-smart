@@ -94,6 +94,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Redesigned connection setup: one card for the Cloud API key, account login and 2FA, with live connection status and the verification-code prompt shown right in the card instead of only in the log.
+- Fixed a work-mode dropdown (heater/humidifier/fan) writing a strict-type warning to the log when you set it by its numeric value.
+
 ### 2.24.0 (2026-08-04)
 
 - This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.

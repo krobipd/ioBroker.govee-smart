@@ -255,6 +255,10 @@ class GoveeAdapter extends utils.Adapter {
         val: false,
         ack: true,
       });
+      // Clear any stale 2FA-pending flag from a previous run — it is set true
+      // again by the login flow if Govee still wants a code, so leaving an old
+      // true here would keep the connection card's code field open forever.
+      await this.setState("info.verificationPending", { val: false, ack: true });
 
       this.stateManager = new StateManager(this);
       // One-shot orphan cleanup: builds up to v2.21.0 merged a Govee app
@@ -508,20 +512,25 @@ class GoveeAdapter extends utils.Adapter {
           // On 'failed' (455 / 454+code-was-sent) blank the code so the user
           // doesn't keep retrying with a stale value. On 'pending' (454 + no
           // code) we leave the field as-is — the user is about to fill it.
+          // Surface the "code needed" state on info.verificationPending so the
+          // connection card can show it live (the notification below is only a
+          // nudge for when the user isn't in the settings — the actual flow
+          // runs through the card, never a second login path).
+          this.setState("info.verificationPending", { val: true, ack: true }).catch(() => {});
           if (reason === "failed") {
             cloudCreds.clearVerificationCodeSetting(this).catch(() => {});
             this.actionableProblems.report({
               key: "mqtt-verification",
               title: "Govee rejected the verification code for real-time status",
               action:
-                "request a fresh code in the adapter settings (Govee Account section) and paste the one Govee e-mails you",
+                "open the adapter settings — the connection card requests a fresh code; enter the one Govee e-mails you",
             });
           } else {
             this.actionableProblems.report({
               key: "mqtt-verification",
               title: "Govee requires a verification code to enable real-time status (lights/sensors stay readable)",
               action:
-                "open the adapter settings (Govee Account section), request a code, and paste the one Govee e-mails you",
+                "open the adapter settings — the connection card requests a code and takes the one Govee e-mails you",
             });
           }
         });
@@ -529,7 +538,7 @@ class GoveeAdapter extends utils.Adapter {
           this.actionableProblems.report({
             key: "mqtt-auth",
             title: "Govee rejected the account login for real-time status",
-            action: "check the Govee e-mail and password in the adapter settings (Govee Account section)",
+            action: "check the Govee email and password in the adapter settings (connection card)",
           });
         });
         this.mqttClient.setOnLoginBlocked(() => {
@@ -577,6 +586,7 @@ class GoveeAdapter extends utils.Adapter {
               );
               this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
               this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
+              this.setState("info.verificationPending", { val: false, ack: true }).catch(() => {});
               connectionState.checkAllReady(this);
             }
             connectionState.updateConnectionState(this);

@@ -319,6 +319,44 @@
       "native": {}
     },
     {
+      "_id": "info.verificationPending",
+      "type": "state",
+      "common": {
+        "name": {
+          "en": "Verification code required",
+          "de": "Bestätigungscode erforderlich",
+          "ru": "Требуется код подтверждения",
+          "pt": "Código de verificação necessário",
+          "nl": "Verificatiecode vereist",
+          "fr": "Code de vérification requis",
+          "it": "Codice di verifica richiesto",
+          "es": "Código de verificación requerido",
+          "pl": "Wymagany kod weryfikacyjny",
+          "uk": "Потрібен код підтвердження",
+          "zh-cn": "需要验证码"
+        },
+        "desc": {
+          "en": "True while Govee is waiting for a 2FA verification code before the real-time account login can finish. Enter the code in the adapter's connection card.",
+          "de": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben.",
+          "ru": "Истина, пока Govee ожидает код подтверждения 2FA для завершения входа в аккаунт реального времени. Введите код в карточке подключения адаптера.",
+          "pt": "Verdadeiro enquanto a Govee aguarda um código de verificação 2FA para concluir o início de sessão da conta em tempo real. Introduza o código no cartão de ligação do adaptador.",
+          "nl": "Waar zolang Govee wacht op een 2FA-verificatiecode voordat de realtime-accountaanmelding kan worden voltooid. Voer de code in de verbindingskaart van de adapter in.",
+          "fr": "Vrai tant que Govee attend un code de vérification 2FA pour terminer la connexion au compte en temps réel. Saisissez le code dans la carte de connexion de l'adaptateur.",
+          "it": "Vero mentre Govee attende un codice di verifica 2FA per completare l'accesso all'account in tempo reale. Inserisci il codice nella scheda di connessione dell'adattatore.",
+          "es": "Verdadero mientras Govee espera un código de verificación 2FA para completar el inicio de sesión de la cuenta en tiempo real. Introduce el código en la tarjeta de conexión del adaptador.",
+          "pl": "Prawda, gdy Govee czeka na kod weryfikacyjny 2FA, aby dokończyć logowanie do konta w czasie rzeczywistym. Wpisz kod w karcie połączenia adaptera.",
+          "uk": "Істина, поки Govee очікує код підтвердження 2FA для завершення входу в обліковий запис у реальному часі. Введіть код у картці підключення адаптера.",
+          "zh-cn": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。"
+        },
+        "type": "boolean",
+        "role": "indicator.maintenance",
+        "read": true,
+        "write": false,
+        "def": false
+      },
+      "native": {}
+    },
+    {
       "_id": "info.manual_sync_devices",
       "type": "state",
       "common": {

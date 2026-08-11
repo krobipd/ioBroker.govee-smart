@@ -1,3 +1,4 @@
+import ConnectionConfig from "./ConnectionConfig";
 import SegmentWizardConfig from "./SegmentWizardConfig";
 
-export default { SegmentWizardConfig };
+export default { ConnectionConfig, SegmentWizardConfig };

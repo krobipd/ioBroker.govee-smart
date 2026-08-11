@@ -382,19 +382,21 @@ class GoveeAdapter extends utils.Adapter {
           });
         });
         this.mqttClient.setOnVerificationFailed((reason) => {
+          this.setState("info.verificationPending", { val: true, ack: true }).catch(() => {
+          });
           if (reason === "failed") {
             cloudCreds.clearVerificationCodeSetting(this).catch(() => {
             });
             this.actionableProblems.report({
               key: "mqtt-verification",
               title: "Govee rejected the verification code for real-time status",
-              action: "request a fresh code in the adapter settings (Govee Account section) and paste the one Govee e-mails you"
+              action: "open the adapter settings \u2014 the connection card requests a fresh code; enter the one Govee e-mails you"
             });
           } else {
             this.actionableProblems.report({
               key: "mqtt-verification",
               title: "Govee requires a verification code to enable real-time status (lights/sensors stay readable)",
-              action: "open the adapter settings (Govee Account section), request a code, and paste the one Govee e-mails you"
+              action: "open the adapter settings \u2014 the connection card requests a code and takes the one Govee e-mails you"
             });
           }
         });
@@ -402,7 +404,7 @@ class GoveeAdapter extends utils.Adapter {
           this.actionableProblems.report({
             key: "mqtt-auth",
             title: "Govee rejected the account login for real-time status",
-            action: "check the Govee e-mail and password in the adapter settings (Govee Account section)"
+            action: "check the Govee email and password in the adapter settings (connection card)"
           });
         });
         this.mqttClient.setOnLoginBlocked(() => {
@@ -437,6 +439,8 @@ class GoveeAdapter extends utils.Adapter {
               );
               this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
               this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
+              this.setState("info.verificationPending", { val: false, ack: true }).catch(() => {
+              });
               connectionState.checkAllReady(this);
             }
             connectionState.updateConnectionState(this);
