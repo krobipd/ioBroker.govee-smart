@@ -45,3 +45,5 @@ package/
 .claude/settings.local.json
 .claude/dev-history.md
 CLAUDE.local.md
+# Internal planning/spec artifacts (brainstorming output — not for the public repo)
+docs/superpowers/
