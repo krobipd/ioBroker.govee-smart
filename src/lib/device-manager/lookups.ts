@@ -1,5 +1,6 @@
 import { normalizeDeviceId, type GoveeDevice } from "../types";
 import { mapKey } from "../device-key";
+import { getDeviceQuirks } from "../device-registry";
 
 /** Parsed per-segment data from MQTT BLE packets */
 export interface MqttSegmentData {
@@ -13,6 +14,19 @@ export interface MqttSegmentData {
   g: number;
   /** Blue channel 0-255 */
   b: number;
+}
+
+/** Result of parsing a segment push. */
+export interface ParsedMqttSegments {
+  /** Per-segment data with trailing padding slots removed. */
+  segments: MqttSegmentData[];
+  /**
+   * True when trailing padding was actually stripped — the device ended its
+   * list, so `segments.length` is the real count and may be trusted to SHRINK
+   * the stored total. False when nothing was stripped: the list may have been
+   * truncated at the 20-slot parser cap, so the count must only grow.
+   */
+  complete: boolean;
 }
 
 /**
@@ -30,9 +44,9 @@ export interface MqttSegmentData {
  *
  * @param commands Base64-encoded BLE packets from MQTT op.command
  */
-export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
+export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
   if (!Array.isArray(commands)) {
-    return [];
+    return { segments: [], complete: false };
   }
 
   const segments: MqttSegmentData[] = [];
@@ -91,25 +105,35 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
     }
   }
 
+  // Strip trailing padding. The final packet is padded to 4 slots when the real
+  // segment count isn't a multiple of 4. Padding is either all-zero OR carries
+  // an impossible brightness (>100 can never be a real segment — the H6076 pads
+  // with 0x92 = 146). If we stripped anything, the device ended its list here →
+  // `complete`, and the count may shrink the stored total. If we stripped
+  // nothing, the list may be truncated at the 20-slot parser cap → grow-only.
+  let strippedPadding = false;
   while (segments.length > 0) {
     const tail = segments[segments.length - 1];
-    if (tail.brightness === 0 && tail.r === 0 && tail.g === 0 && tail.b === 0) {
+    const allZero = tail.brightness === 0 && tail.r === 0 && tail.g === 0 && tail.b === 0;
+    if (allZero || tail.brightness > 100) {
       segments.pop();
+      strippedPadding = true;
     } else {
       break;
     }
   }
 
-  return segments;
+  return { segments, complete: strippedPadding };
 }
 
 /**
  * Resolve the authoritative segment count for a device.
  *
  * Priority:
- *   1. `device.segmentCount` if already set (from cache, MQTT discovery, or wizard)
- *   2. Minimum of positive `segment_color_setting` capability counts
- *   3. 0 if no capability advertises segments
+ *   1. `segmentCount` quirk if present — a hard override for a lying capability
+ *   2. `device.segmentCount` if already set (from cache, MQTT discovery, or wizard)
+ *   3. Minimum of positive `segment_color_setting` capability counts
+ *   4. 0 if no capability advertises segments
  *
  * Why `min` over the capability caps: Govee reports `segmentedBrightness` and
  * `segmentedColorRgb` separately, and on at least one SKU (H70D1) those two
@@ -120,6 +144,12 @@ export function parseMqttSegmentData(commands: string[]): MqttSegmentData[] {
  * @param device Target device
  */
 export function resolveSegmentCount(device: GoveeDevice): number {
+  // A segmentCount quirk is a hard override — Govee's capability count lies for
+  // some SKUs; this wins over Cloud, cache and the live MQTT value.
+  const override = getDeviceQuirks(device.sku)?.segmentCount;
+  if (typeof override === "number" && override > 0) {
+    return override;
+  }
   if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
     return device.segmentCount;
   }

@@ -1,6 +1,6 @@
 import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter } from "./command-router";
-import { getDeviceTier, isSeedAndDormant } from "./device-registry";
+import { getDeviceQuirks, getDeviceTier, isSeedAndDormant } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
@@ -1009,7 +1009,7 @@ export class DeviceManager {
    * @param opCommand Raw `op.command` payload from the MQTT update (string[] when AA A5)
    */
   private processMqttSegmentPacket(device: GoveeDevice, opCommand: string[]): void {
-    const segData = parseMqttSegmentData(opCommand);
+    const { segments: segData, complete } = parseMqttSegmentData(opCommand);
     if (segData.length === 0) {
       return;
     }
@@ -1026,19 +1026,33 @@ export class DeviceManager {
       );
       return;
     }
-    if (maxSeen > current) {
+    // A segmentCount quirk is a hard override (a cloud-only SKU whose capability
+    // count lies and which never pushes AA-A5 to self-correct) — a live packet
+    // must never fight it.
+    const quirk = getDeviceQuirks(device.sku)?.segmentCount;
+    const quirkLocked = typeof quirk === "number" && quirk > 0;
+    // Adopt the packet count when it disagrees with the stored total: always
+    // upward (a bigger real strip); downward ONLY when the push proved complete
+    // (trailing padding was stripped), so a set truncated at the 20-slot parser
+    // cap can never delete real segments (e.g. 20-29 on a 30-segment strip).
+    // MQTT is authoritative — the device reports what it physically has — but
+    // only as far as the parser can see. Same rebuild path both ways:
+    // createSegmentStates adds the missing / prunes the excess.
+    const grow = maxSeen > current;
+    const shrink = maxSeen < current && complete;
+    if (!quirkLocked && maxSeen > 0 && (grow || shrink)) {
       this.log.info(
-        `${deviceLabel(device)}: detected ${maxSeen} segments via MQTT (was ${current}) — rebuilding state tree`,
+        `${deviceLabel(device)}: ${grow ? "detected" : "corrected to"} ${maxSeen} segments via MQTT (was ${current}) — rebuilding state tree`,
       );
       device.segmentCount = maxSeen;
       // Persist now so a restart starts from the real value instead of
-      // falling back to Cloud capabilities and deleting the extra slots.
+      // falling back to Cloud capabilities.
       if (this.skuCache) {
         this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
       }
-      // Skip per-segment sync for this push — the new datapoints don't exist
-      // yet. The next AA A5 push hits the fully-built tree.
-      this.onSegmentCountGrown?.(device);
+      // Skip per-segment sync for this push — the datapoints are being rebuilt.
+      // The next AA A5 push hits the fully-built tree.
+      this.onSegmentCountChanged?.(device);
       return;
     }
     // Filter by manual-segments override if active — ignore indices the user
@@ -1157,12 +1171,13 @@ export class DeviceManager {
   onMqttSegmentUpdate?: (device: GoveeDevice, segments: MqttSegmentData[]) => void;
 
   /**
-   * Callback when the device's physical segment count turns out to be
-   * larger than the Cloud-reported value (observed via MQTT AA A5 stream).
-   * The adapter rebuilds the state tree in response so the extra indices
-   * appear as datapoints.
+   * Callback when the device's physical segment count changes from the stored
+   * value (observed via the MQTT AA A5 stream) — up when the real strip is
+   * bigger than Cloud advertised, or down when a complete push proves Cloud
+   * over-reported. The adapter rebuilds the state tree in response so the
+   * datapoints match: missing indices are added, excess ones pruned.
    */
-  onSegmentCountGrown?: (device: GoveeDevice) => void;
+  onSegmentCountChanged?: (device: GoveeDevice) => void;
 
   /**
    * Find device by SKU and device ID (handles format differences)

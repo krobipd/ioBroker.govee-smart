@@ -77,6 +77,12 @@
           "additionalProperties": false,
           "description": "Override color-temperature range — Govee API often claims pauschal 2000-9000K, real range is narrower."
         },
+        "segmentCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 55,
+          "description": "Override segment count — Govee's segment capabilities sometimes advertise more slots than the strip physically has. Hard override of Cloud, cache and MQTT. Mainly for cloud-only SKUs that can't self-correct via AA-A5 status packets."
+        },
         "brokenPlatformApi": {
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."

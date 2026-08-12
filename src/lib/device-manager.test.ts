@@ -38,6 +38,8 @@ const QUIRK_TEST_REGISTRY = {
     H61BE: { name: "LED Strip", type: "light", status: "verified" },
     H6056: { name: "LED Strip", type: "light", status: "verified" },
     H70D1: { name: "LED Strip", type: "light", status: "verified" },
+    // H9999 is a SYNTHETIC test SKU (not in devices.json) — only exercises the segmentCount quirk.
+    H9999: { name: "Segment Quirk Strip", type: "light", status: "verified", quirks: { segmentCount: 5 } },
   },
 };
 
@@ -1721,7 +1723,7 @@ describe("DeviceManager", () => {
         [75, 0, 0, 255], // seg 2: brightness 75, blue
         [1, 128, 128, 128], // seg 3: brightness 1 (not padding), grey
       ]);
-      const result = parseMqttSegmentData([pkt]);
+      const result = parseMqttSegmentData([pkt]).segments;
       expect(result).toHaveLength(4);
       expect(result[0]).toEqual({ index: 0, brightness: 100, r: 255, g: 0, b: 0 });
       expect(result[1]).toEqual({ index: 1, brightness: 50, r: 0, g: 255, b: 0 });
@@ -1742,7 +1744,7 @@ describe("DeviceManager", () => {
         [40, 70, 80, 90],
         [20, 100, 110, 120],
       ]);
-      const result = parseMqttSegmentData([pkt1, pkt2]);
+      const result = parseMqttSegmentData([pkt1, pkt2]).segments;
       expect(result).toHaveLength(8);
       // Packet 2 starts at segment index 4
       expect(result[4]).toEqual({ index: 4, brightness: 80, r: 10, g: 20, b: 30 });
@@ -1753,7 +1755,7 @@ describe("DeviceManager", () => {
       const nz: [number, number, number, number] = [100, 10, 20, 30]; // non-zero → not trailing-trimmed
       const dup = buildAaA5Packet(1, [nz, nz, nz, nz]);
       const flood = Array.from({ length: 5000 }, () => dup); // 5000 duplicate packet-1's
-      const result = parseMqttSegmentData(flood);
+      const result = parseMqttSegmentData(flood).segments;
       expect(result.length).toBeLessThanOrEqual(20); // deduped, not 5000×4
       expect(result).toHaveLength(4); // one packet-1 = 4 segments
     });
@@ -1761,7 +1763,7 @@ describe("DeviceManager", () => {
     it("still parses all 5 distinct packets after the dedupe/cap (SEC-GC1 no regression)", () => {
       const nz: [number, number, number, number] = [50, 1, 2, 3];
       const msg = [1, 2, 3, 4, 5].map(n => buildAaA5Packet(n, [nz, nz, nz, nz]));
-      expect(parseMqttSegmentData(msg)).toHaveLength(20);
+      expect(parseMqttSegmentData(msg).segments).toHaveLength(20);
     });
 
     it("should trim trailing all-zero padding slots from the final packet", () => {
@@ -1774,7 +1776,7 @@ describe("DeviceManager", () => {
         [0, 0, 0, 0], // padding
         [0, 0, 0, 0], // padding
       ]);
-      const result = parseMqttSegmentData([pkt]);
+      const result = parseMqttSegmentData([pkt]).segments;
       expect(result).toHaveLength(2);
       expect(result[0].index).toBe(0);
       expect(result[1].index).toBe(1);
@@ -1789,7 +1791,7 @@ describe("DeviceManager", () => {
         [100, 0, 255, 0],
         [1, 128, 128, 128], // non-padding last
       ]);
-      const result = parseMqttSegmentData([pkt]);
+      const result = parseMqttSegmentData([pkt]).segments;
       expect(result).toHaveLength(4);
       expect(result[1]).toEqual({ index: 1, brightness: 0, r: 0, g: 0, b: 0 });
     });
@@ -1807,13 +1809,13 @@ describe("DeviceManager", () => {
         [75, 128, 128, 128],
         [1, 1, 1, 1],
       ]);
-      const result = parseMqttSegmentData([modePkt, segPkt]);
+      const result = parseMqttSegmentData([modePkt, segPkt]).segments;
       expect(result).toHaveLength(4);
       expect(result[0].index).toBe(0);
     });
 
     it("should return empty array for empty commands", () => {
-      const result = parseMqttSegmentData([]);
+      const result = parseMqttSegmentData([]).segments;
       expect(result).toHaveLength(0);
     });
 
@@ -1823,7 +1825,7 @@ describe("DeviceManager", () => {
       bytes[1] = 0xa5;
       bytes[2] = 6; // invalid: must be 1-5
       const pkt = Buffer.from(bytes).toString("base64");
-      const result = parseMqttSegmentData([pkt]);
+      const result = parseMqttSegmentData([pkt]).segments;
       expect(result).toHaveLength(0);
     });
 
@@ -1833,7 +1835,7 @@ describe("DeviceManager", () => {
       shortBytes[1] = 0xa5;
       shortBytes[2] = 1;
       const pkt = Buffer.from(shortBytes).toString("base64");
-      const result = parseMqttSegmentData([pkt]);
+      const result = parseMqttSegmentData([pkt]).segments;
       expect(result).toHaveLength(0);
     });
 
@@ -1850,7 +1852,7 @@ describe("DeviceManager", () => {
           ]),
         );
       }
-      const result = parseMqttSegmentData(pkts);
+      const result = parseMqttSegmentData(pkts).segments;
       expect(result).toHaveLength(20);
       expect(result[0].index).toBe(0);
       expect(result[19].index).toBe(19);
@@ -1864,17 +1866,17 @@ describe("DeviceManager", () => {
 
     // Drift guards — MQTT payload structure could change unexpectedly.
     it("should return [] for non-array commands input", () => {
-      const result = parseMqttSegmentData(null as unknown as string[]);
+      const result = parseMqttSegmentData(null as unknown as string[]).segments;
       expect(result).toEqual([]);
     });
 
     it("should return [] for undefined commands input", () => {
-      const result = parseMqttSegmentData(undefined as unknown as string[]);
+      const result = parseMqttSegmentData(undefined as unknown as string[]).segments;
       expect(result).toEqual([]);
     });
 
     it("should return [] for object instead of array", () => {
-      const result = parseMqttSegmentData({} as unknown as string[]);
+      const result = parseMqttSegmentData({} as unknown as string[]).segments;
       expect(result).toEqual([]);
     });
 
@@ -1890,10 +1892,48 @@ describe("DeviceManager", () => {
         42 as unknown as string,
         goodPkt,
         {} as unknown as string,
-      ]);
+      ]).segments;
       expect(result.length).toBe(4);
       expect(result[0].index).toBe(0);
       expect(result[0].r).toBe(255);
+    });
+
+    it("strips a >100 padding slot and reports complete (H6076: 7 real + 1 junk)", () => {
+      // The H6076 has 7 segments; the 8th slot in packet 2 is filler with an
+      // impossible brightness (0x92 = 146). It must be stripped and the result
+      // flagged complete — the device ended its list, so 7 is authoritative.
+      const real: [number, number, number, number] = [100, 255, 206, 146];
+      const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
+      const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
+      const { segments, complete } = parseMqttSegmentData([pkt1, pkt2]);
+      expect(segments).toHaveLength(7);
+      expect(segments[6].index).toBe(6);
+      expect(complete).toBe(true);
+    });
+
+    it("does NOT strip a >100 slot mid-list — trailing-only (no mid-list filter)", () => {
+      const pkt = buildAaA5Packet(1, [
+        [100, 1, 2, 3],
+        [146, 4, 5, 6], // impossible brightness in the MIDDLE — must stay
+        [100, 7, 8, 9],
+        [50, 10, 11, 12], // valid trailing → nothing gets stripped
+      ]);
+      const { segments, complete } = parseMqttSegmentData([pkt]);
+      expect(segments).toHaveLength(4);
+      expect(segments[1].brightness).toBe(146);
+      expect(complete).toBe(false); // nothing stripped → not authoritative
+    });
+
+    it("reports NOT complete for a full packet with no padding (may be truncated)", () => {
+      const pkt = buildAaA5Packet(1, [
+        [100, 1, 1, 1],
+        [100, 2, 2, 2],
+        [100, 3, 3, 3],
+        [100, 4, 4, 4],
+      ]);
+      const { segments, complete } = parseMqttSegmentData([pkt]);
+      expect(segments).toHaveLength(4);
+      expect(complete).toBe(false);
     });
   });
 
@@ -1902,9 +1942,11 @@ describe("DeviceManager", () => {
       const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" };
       dm.handleLanDiscovery(lanDevice);
 
-      // Set segmentCount on the device
+      // Match segmentCount to what this packet reports (2), so the push takes
+      // the per-segment-sync path rather than a count change (which would skip
+      // the sync to rebuild first — that path has its own dedicated tests).
       const device = dm.getDevices()[0];
-      device.segmentCount = 15;
+      device.segmentCount = 2;
 
       let segmentUpdates: import("./device-manager").MqttSegmentData[] | null = null;
       dm.setCallbacks({
@@ -1949,7 +1991,7 @@ describe("DeviceManager", () => {
       expect(segmentUpdates![1]).toEqual({ index: 1, brightness: 50, r: 0, g: 255, b: 0 });
     });
 
-    it("should discover segmentCount and call onSegmentCountGrown on first AA A5", () => {
+    it("should discover segmentCount and call onSegmentCountChanged on first AA A5", () => {
       const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" };
       dm.handleLanDiscovery(lanDevice);
       // Device starts with segmentCount undefined — LAN-only, no Cloud data yet
@@ -1961,7 +2003,7 @@ describe("DeviceManager", () => {
         onCloudDataReady: () => {},
         onGroupMembersReady: () => {},
       });
-      dm.onSegmentCountGrown = d => {
+      dm.onSegmentCountChanged = d => {
         grownDevice = d;
       };
       dm.onMqttSegmentUpdate = () => {
@@ -2010,7 +2052,7 @@ describe("DeviceManager", () => {
         onCloudDataReady: () => {},
         onGroupMembersReady: () => {},
       });
-      dm.onSegmentCountGrown = d => {
+      dm.onSegmentCountChanged = d => {
         grownDevice = d;
       };
 
@@ -2039,6 +2081,138 @@ describe("DeviceManager", () => {
 
       expect(grownDevice).not.toBeNull();
       expect(dm.getDevices()[0].segmentCount).toBe(20);
+    });
+
+    /** Build one AA A5 packet (num 1-5) from up to 4 [brightness,r,g,b] slots. */
+    function mkAaA5(num: number, slots: Array<[number, number, number, number]>): string {
+      const b = new Uint8Array(20);
+      b[0] = 0xaa;
+      b[1] = 0xa5;
+      b[2] = num;
+      slots.forEach((s, i) => {
+        b[3 + i * 4] = s[0];
+        b[4 + i * 4] = s[1];
+        b[5 + i * 4] = s[2];
+        b[6 + i * 4] = s[3];
+      });
+      let xor = 0;
+      for (let i = 0; i < 19; i++) xor ^= b[i];
+      b[19] = xor;
+      return Buffer.from(b).toString("base64");
+    }
+
+    it("shrinks segmentCount when a COMPLETE push proves Cloud over-reported (H6076 15→7)", () => {
+      const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6076" };
+      dm.handleLanDiscovery(lanDevice);
+      dm.getDevices()[0].segmentCount = 15; // Cloud's lie for the H6076
+      dm.setCallbacks({
+        onUpdate: () => {},
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      let changed: GoveeDevice | null = null;
+      dm.onSegmentCountChanged = d => {
+        changed = d;
+      };
+      dm.onMqttSegmentUpdate = () => {};
+
+      // 7 real segments (4 + 3) + a padding slot with brightness 146 > 100.
+      const real: [number, number, number, number] = [100, 255, 206, 146];
+      const pkt1 = mkAaA5(1, [real, real, real, real]);
+      const pkt2 = mkAaA5(2, [real, real, real, [146, 100, 100, 100]]);
+
+      dm.handleMqttStatus({ sku: "H6076", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
+
+      expect(changed).not.toBeNull();
+      expect(dm.getDevices()[0].segmentCount).toBe(7);
+    });
+
+    it("does NOT shrink on an incomplete push — a 20-slot cap can't prove a 30-strip is only 20", () => {
+      const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H61BE" };
+      dm.handleLanDiscovery(lanDevice);
+      dm.getDevices()[0].segmentCount = 30; // a genuine 30-segment strip
+      dm.setCallbacks({
+        onUpdate: () => {},
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      let changed: GoveeDevice | null = null;
+      dm.onSegmentCountChanged = d => {
+        changed = d;
+      };
+      dm.onMqttSegmentUpdate = () => {};
+
+      // 5 full packets = 20 valid slots, NO padding → complete=false → grow-only.
+      const packets = [1, 2, 3, 4, 5].map(p =>
+        mkAaA5(p, [
+          [50, 255, 0, 0],
+          [50, 255, 0, 0],
+          [50, 255, 0, 0],
+          [50, 255, 0, 0],
+        ]),
+      );
+
+      dm.handleMqttStatus({ sku: "H61BE", device: "AABBCCDDEEFF0011", op: { command: packets } });
+
+      expect(changed).toBeNull(); // must NOT rebuild — segments 20-29 would be deleted
+      expect(dm.getDevices()[0].segmentCount).toBe(30);
+    });
+
+    it("a segmentCount quirk locks the count — even a complete packet can't change it", () => {
+      const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H9999" };
+      dm.handleLanDiscovery(lanDevice);
+      dm.getDevices()[0].segmentCount = 5; // the quirk-locked value
+      dm.setCallbacks({
+        onUpdate: () => {},
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      let changed: GoveeDevice | null = null;
+      dm.onSegmentCountChanged = d => {
+        changed = d;
+      };
+      dm.onMqttSegmentUpdate = () => {};
+
+      // A complete push reporting 7 real segments — would normally grow 5→7,
+      // but the segmentCount quirk is a hard override and must win.
+      const real: [number, number, number, number] = [100, 255, 206, 146];
+      const pkt1 = mkAaA5(1, [real, real, real, real]);
+      const pkt2 = mkAaA5(2, [real, real, real, [146, 100, 100, 100]]);
+
+      dm.handleMqttStatus({ sku: "H9999", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
+
+      expect(changed).toBeNull(); // quirk-locked — no rebuild
+      expect(dm.getDevices()[0].segmentCount).toBe(5);
+    });
+
+    it("resolveSegmentCount: a segmentCount quirk hard-overrides a cached value", () => {
+      expect(resolveSegmentCount({ sku: "H9999", segmentCount: 15 } as GoveeDevice)).toBe(5);
+    });
+
+    it("resolveSegmentCount: without a quirk, falls back to the cached value", () => {
+      expect(resolveSegmentCount({ sku: "H61BE", segmentCount: 12 } as GoveeDevice)).toBe(12);
+    });
+
+    it("resolveSegmentCount: a learned/lowered count wins over Cloud caps (no shrink→rebuild flip-flop)", () => {
+      // After a downward correction device.segmentCount=7 while the Cloud caps
+      // still advertise 15. The rebuild (state-manager) consumes resolveSegmentCount,
+      // which must return 7 — not re-derive 15 — else every status packet would
+      // shrink-then-rebuild-to-15 forever, churning the state tree.
+      const device = {
+        sku: "H61BE",
+        segmentCount: 7,
+        capabilities: [
+          {
+            type: "devices.capabilities.segment_color_setting",
+            instance: "segmentedBrightness",
+            parameters: { fields: [{ fieldName: "segment", elementRange: { min: 0, max: 14 } }] },
+          },
+        ],
+      } as unknown as GoveeDevice;
+      expect(resolveSegmentCount(device)).toBe(7);
     });
 
     it("should not call onMqttSegmentUpdate when no AA A5 packets in command", () => {

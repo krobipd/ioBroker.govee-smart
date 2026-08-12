@@ -391,15 +391,16 @@ class GoveeAdapter extends utils.Adapter {
         }
       };
 
-      // When MQTT reveals more segments than the Cloud advertised, rebuild
-      // the device's state tree so the extra segments get their datapoints.
-      this.deviceManager.onSegmentCountGrown = device => {
+      // When MQTT reveals the device's real segment count differs from what
+      // Cloud advertised, rebuild the state tree so the datapoints match
+      // (extra indices added, excess ones pruned).
+      this.deviceManager.onSegmentCountChanged = device => {
         if (!this.stateManager) {
           return;
         }
         this.stateManager.createSegmentStates(device).catch(e => {
           this.log.warn(
-            `Failed to rebuild segment tree for ${deviceLabel(device)} after count growth: ${errMessage(e)}`,
+            `Failed to rebuild segment tree for ${deviceLabel(device)} after count change: ${errMessage(e)}`,
           );
         });
       };

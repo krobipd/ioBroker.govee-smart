@@ -13,18 +13,23 @@ import * as path from "node:path";
  * allowed — SKU-specific notes go into the per-release issue tracker or
  * the Wiki Devices page, not into the schema.
  *
- * Three pattern families cover all observed Govee quirks:
+ * Four pattern families cover all observed Govee quirks:
  *  1. Range-Override: API reports a wrong numeric range (colorTempRange)
  *  2. Boolean-Flag: per-SKU behaviour toggle (brokenPlatformApi)
  *  3. Map-Override: per-operation routing/behaviour map (transportOverrides)
- *
- * A fourth family (Number-Override for timing constants) is identified as
- * the next likely shape — add additively when a real SKU need shows up,
- * no architecture refactor required.
+ *  4. Number-Override: API reports a wrong scalar (segmentCount)
  */
 export interface DeviceQuirks {
   /** Override color-temperature range (Govee API often claims a flat 2000-9000K, real range is narrower). */
   colorTempRange?: { min: number; max: number };
+  /**
+   * Override the segment count. Govee's segment capabilities sometimes advertise
+   * more slots than the strip physically has. A HARD cap: overrides Cloud, the
+   * cache AND the live MQTT count. Intended for cloud-only SKUs that never push
+   * AA-A5 status packets and therefore can't self-correct — LAN/MQTT devices
+   * usually correct themselves once a complete status push arrives.
+   */
+  segmentCount?: number;
   /** Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states. */
   brokenPlatformApi?: boolean;
   /**
