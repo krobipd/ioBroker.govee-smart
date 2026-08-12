@@ -193,6 +193,7 @@ class GoveeAdapter extends utils.Adapter {
         val: false,
         ack: true
       });
+      await this.setState("info.verificationPending", { val: false, ack: true });
       this.stateManager = new import_state_manager.StateManager(this);
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => void 0);
       await this.stateManager.createGroupsOnlineState(false);
@@ -296,13 +297,13 @@ class GoveeAdapter extends utils.Adapter {
           });
         }
       };
-      this.deviceManager.onSegmentCountGrown = (device) => {
+      this.deviceManager.onSegmentCountChanged = (device) => {
         if (!this.stateManager) {
           return;
         }
         this.stateManager.createSegmentStates(device).catch((e) => {
           this.log.warn(
-            `Failed to rebuild segment tree for ${(0, import_types.deviceLabel)(device)} after count growth: ${(0, import_types.errMessage)(e)}`
+            `Failed to rebuild segment tree for ${(0, import_types.deviceLabel)(device)} after count change: ${(0, import_types.errMessage)(e)}`
           );
         });
       };

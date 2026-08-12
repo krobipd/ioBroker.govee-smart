@@ -1,4 +1,8 @@
 # Older Changes
+## 2.21.0 (2026-07-12) — stable
+
+- The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure each segment and can be corrected before you apply it.
+
 ## 2.20.0 (2026-07-11)
 
 - Channel names and the device-info labels such as Name, Model, Online and IP address now follow the ioBroker system language instead of always showing English.

@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.24.0",
+    "version": "2.25.0",
     "news": {
+      "2.25.0": {
+        "en": "Connection setup is now one card with live status for the Cloud key, account login and 2FA. Light strips also report their real segment count again.",
+        "de": "Die Verbindungs-Einrichtung ist jetzt eine Karte mit Live-Status für Cloud-Key, Konto-Login und 2FA. Lichtstreifen melden zudem wieder ihre echte Segment-Anzahl.",
+        "ru": "Настройка подключения теперь одна карточка с живым статусом для ключа облака, входа в аккаунт и 2FA. Ленты также снова сообщают реальное число сегментов.",
+        "pt": "A configuração da ligação é agora um cartão com estado em tempo real para a chave da nuvem, sessão e 2FA. As fitas voltam a indicar o número real de segmentos.",
+        "nl": "Verbinding instellen gaat nu via één kaart met live status voor de Cloud-sleutel, aanmelding en 2FA. Lichtstrips melden ook weer hun echte aantal segmenten.",
+        "fr": "La configuration de la connexion tient dans une carte avec état en direct pour la clé cloud, la connexion et la 2FA. Les rubans indiquent aussi leur vrai nombre de segments.",
+        "it": "La configurazione della connessione è ora un'unica scheda con stato in tempo reale per chiave cloud, accesso e 2FA. Le strisce indicano di nuovo il numero reale di segmenti.",
+        "es": "La configuración de la conexión es ahora una tarjeta con estado en vivo para la clave de la nube, el inicio de sesión y 2FA. Las tiras vuelven a indicar su número real de segmentos.",
+        "pl": "Konfiguracja połączenia to teraz jedna karta ze statusem na żywo dla klucza chmury, logowania i 2FA. Taśmy ponownie podają prawdziwą liczbę segmentów.",
+        "uk": "Налаштування підключення тепер одна картка зі статусом у реальному часі для ключа хмари, входу та 2FA. Стрічки також знову повідомляють реальну кількість сегментів.",
+        "zh-cn": "连接设置现在集中在一张带实时状态的卡片中，包含云密钥、账户登录和 2FA。灯带也会重新报告其真实的分段数量。"
+      },
       "2.24.0": {
         "en": "This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.",
         "de": "Diese Version benötigt ioBroker Admin 8. Der Segment-Erkennungs-Assistent ist für Admin 8 gebaut und läuft nicht mehr unter Admin 7; dort wird dieses Update nicht angeboten.",
@@ -80,19 +93,6 @@
         "pl": "Nazwy kanałów i urządzeń podążają teraz za językiem systemowym ioBroker\nJaśniejsze, uczciwe komunikaty przy logowaniu do chmury, kluczu API, synchronizacji i sieci",
         "uk": "Назви каналів і пристроїв тепер відповідають системній мові ioBroker\nЧіткий, чесний зворотний зв'язок для входу в хмару, ключа API, синхронізації та мережі",
         "zh-cn": "频道和设备名称现在遵循 ioBroker 系统语言\n针对云登录、API 密钥、设备同步和网络问题提供更清晰、真实的反馈"
-      },
-      "2.19.0": {
-        "en": "Device log lines now consistently name devices as \"name (model)\"\nThe credentials entry disappears from the object tree — login tokens stay saved in encrypted form",
-        "de": "Geräte-Logzeilen nennen Geräte jetzt durchgängig als \"Name (Modell)\"\nDer credentials-Eintrag verschwindet aus dem Objektbaum — Login-Tokens bleiben verschlüsselt gespeichert",
-        "ru": "Строки журнала теперь единообразно называют устройства как «имя (модель)»\nЗапись credentials исчезает из дерева объектов — токены входа остаются сохранёнными в зашифрованном виде",
-        "pt": "As linhas de log nomeiam agora os dispositivos como \"nome (modelo)\"\nA entrada credentials desaparece da árvore de objetos — os tokens de login continuam guardados encriptados",
-        "nl": "Apparaat-logregels benoemen apparaten nu consequent als \"naam (model)\"\nDe credentials-vermelding verdwijnt uit de objectboom — login-tokens blijven versleuteld opgeslagen",
-        "fr": "Les lignes de journal nomment les appareils de façon cohérente « nom (modèle) »\nL'entrée credentials disparaît de l'arborescence — les jetons de connexion restent enregistrés chiffrés",
-        "it": "Le righe di log ora nominano i dispositivi come \"nome (modello)\"\nLa voce credentials sparisce dall'albero degli oggetti — i token di accesso restano salvati cifrati",
-        "es": "Las líneas de registro ahora nombran los dispositivos como \"nombre (modelo)\"\nLa entrada credentials desaparece del árbol de objetos — los tokens siguen guardados cifrados",
-        "pl": "Wiersze dziennika nazywają teraz urządzenia spójnie jako „nazwa (model)\"\nWpis credentials znika z drzewa obiektów — tokeny logowania pozostają zapisane w formie zaszyfrowanej",
-        "uk": "Рядки журналу тепер послідовно називають пристрої як «назва (модель)»\nЗапис credentials зникає з дерева об'єктів — токени входу залишаються збереженими у зашифрованому вигляді",
-        "zh-cn": "设备日志行现在统一以\"名称（型号）\"命名设备\ncredentials 条目从对象树中消失——登录令牌仍以加密形式保存"
       }
     },
     "plugins": {

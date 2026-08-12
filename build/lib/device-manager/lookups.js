@@ -30,9 +30,10 @@ __export(lookups_exports, {
 module.exports = __toCommonJS(lookups_exports);
 var import_types = require("../types");
 var import_device_key = require("../device-key");
+var import_device_registry = require("../device-registry");
 function parseMqttSegmentData(commands) {
   if (!Array.isArray(commands)) {
-    return [];
+    return { segments: [], complete: false };
   }
   const segments = [];
   const seenPackets = /* @__PURE__ */ new Set();
@@ -78,17 +79,25 @@ function parseMqttSegmentData(commands) {
       });
     }
   }
+  let strippedPadding = false;
   while (segments.length > 0) {
     const tail = segments[segments.length - 1];
-    if (tail.brightness === 0 && tail.r === 0 && tail.g === 0 && tail.b === 0) {
+    const allZero = tail.brightness === 0 && tail.r === 0 && tail.g === 0 && tail.b === 0;
+    if (allZero || tail.brightness > 100) {
       segments.pop();
+      strippedPadding = true;
     } else {
       break;
     }
   }
-  return segments;
+  return { segments, complete: strippedPadding };
 }
 function resolveSegmentCount(device) {
+  var _a;
+  const override = (_a = (0, import_device_registry.getDeviceQuirks)(device.sku)) == null ? void 0 : _a.segmentCount;
+  if (typeof override === "number" && override > 0) {
+    return override;
+  }
   if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
     return device.segmentCount;
   }

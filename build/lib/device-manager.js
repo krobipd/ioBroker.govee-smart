@@ -863,8 +863,8 @@ class DeviceManager {
    * @param opCommand Raw `op.command` payload from the MQTT update (string[] when AA A5)
    */
   processMqttSegmentPacket(device, opCommand) {
-    var _a, _b, _c;
-    const segData = (0, import_lookups.parseMqttSegmentData)(opCommand);
+    var _a, _b, _c, _d;
+    const { segments: segData, complete } = (0, import_lookups.parseMqttSegmentData)(opCommand);
     if (segData.length === 0) {
       return;
     }
@@ -876,20 +876,24 @@ class DeviceManager {
       );
       return;
     }
-    if (maxSeen > current) {
+    const quirk = (_b = (0, import_device_registry.getDeviceQuirks)(device.sku)) == null ? void 0 : _b.segmentCount;
+    const quirkLocked = typeof quirk === "number" && quirk > 0;
+    const grow = maxSeen > current;
+    const shrink = maxSeen < current && complete;
+    if (!quirkLocked && maxSeen > 0 && (grow || shrink)) {
       this.log.info(
-        `${(0, import_types.deviceLabel)(device)}: detected ${maxSeen} segments via MQTT (was ${current}) \u2014 rebuilding state tree`
+        `${(0, import_types.deviceLabel)(device)}: ${grow ? "detected" : "corrected to"} ${maxSeen} segments via MQTT (was ${current}) \u2014 rebuilding state tree`
       );
       device.segmentCount = maxSeen;
       if (this.skuCache) {
         this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
       }
-      (_b = this.onSegmentCountGrown) == null ? void 0 : _b.call(this, device);
+      (_c = this.onSegmentCountChanged) == null ? void 0 : _c.call(this, device);
       return;
     }
     const filtered = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? segData.filter((s) => device.manualSegments.includes(s.index)) : segData;
     if (filtered.length > 0) {
-      (_c = this.onMqttSegmentUpdate) == null ? void 0 : _c.call(this, device, filtered);
+      (_d = this.onMqttSegmentUpdate) == null ? void 0 : _d.call(this, device, filtered);
     }
   }
   /**
@@ -968,12 +972,13 @@ class DeviceManager {
   /** Callback when MQTT delivers per-segment state data (AA A5 BLE packets) */
   onMqttSegmentUpdate;
   /**
-   * Callback when the device's physical segment count turns out to be
-   * larger than the Cloud-reported value (observed via MQTT AA A5 stream).
-   * The adapter rebuilds the state tree in response so the extra indices
-   * appear as datapoints.
+   * Callback when the device's physical segment count changes from the stored
+   * value (observed via the MQTT AA A5 stream) — up when the real strip is
+   * bigger than Cloud advertised, or down when a complete push proves Cloud
+   * over-reported. The adapter rebuilds the state tree in response so the
+   * datapoints match: missing indices are added, excess ones pruned.
    */
-  onSegmentCountGrown;
+  onSegmentCountChanged;
   /**
    * Find device by SKU and device ID (handles format differences)
    *
