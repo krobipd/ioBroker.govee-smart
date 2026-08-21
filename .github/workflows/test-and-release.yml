@@ -10,6 +10,9 @@ on:
   pull_request:
     branches:
       - main
+  # TEMPORARY (2026-08-21): manual trigger for the one-shot npm backfill
+  # below — remove together with the npm-backfill job.
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.ref }}
@@ -157,6 +160,32 @@ jobs:
           node-version: ${{ matrix.node-version }}
           os: ${{ matrix.os }}
           build: true
+
+  # TEMPORARY (2026-08-21): one-shot npm backfill of the already-tagged
+  # v2.25.0 whose tag CI was blocked by the old strict version-gate
+  # (admin >=8.0.1 ahead of stable). Checks out the existing release tag
+  # and publishes it through the regular trusted-publisher path.
+  # Remove this job and the workflow_dispatch trigger after the run.
+  npm-backfill:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/v2.25.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - run: npm ci
+      - run: npm run build
+      - name: Publish tagged version to npm (trusted publisher)
+        run: |
+          npm install -g npm@11
+          npm -v
+          npm publish
 
   deploy:
     needs: [check-and-lint, validate-devices, adapter-tests, repochecker-version-gate, workflow-lint, admin-component]
