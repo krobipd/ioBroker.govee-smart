@@ -16,19 +16,6 @@
         "uk": "Налаштування підключення тепер одна картка зі статусом у реальному часі для ключа хмари, входу та 2FA. Стрічки також знову повідомляють реальну кількість сегментів.",
         "zh-cn": "连接设置现在集中在一张带实时状态的卡片中，包含云密钥、账户登录和 2FA。灯带也会重新报告其真实的分段数量。"
       },
-      "2.24.0": {
-        "en": "This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.",
-        "de": "Diese Version benötigt ioBroker Admin 8. Der Segment-Erkennungs-Assistent ist für Admin 8 gebaut und läuft nicht mehr unter Admin 7; dort wird dieses Update nicht angeboten.",
-        "ru": "Этой версии нужен ioBroker Admin 8. Мастер определения сегментов рассчитан на Admin 8 и больше не работает в Admin 7, поэтому там это обновление не предлагается.",
-        "pt": "Esta versão precisa do ioBroker Admin 8. O assistente de deteção de segmentos foi feito para o Admin 8 e já não funciona no Admin 7, pelo que aí não é oferecida esta atualização.",
-        "nl": "Deze versie vereist ioBroker Admin 8. De assistent voor segmentdetectie is voor Admin 8 gebouwd en werkt niet meer op Admin 7, dus daar wordt deze update niet aangeboden.",
-        "fr": "Cette version nécessite ioBroker Admin 8. L'assistant de détection des segments est conçu pour Admin 8 et ne fonctionne plus sous Admin 7 ; cette mise à jour n'y est donc pas proposée.",
-        "it": "Questa versione richiede ioBroker Admin 8. La procedura di rilevamento dei segmenti è pensata per Admin 8 e non funziona più su Admin 7, quindi lì non viene proposto questo aggiornamento.",
-        "es": "Esta versión necesita ioBroker Admin 8. El asistente de detección de segmentos está hecho para Admin 8 y ya no funciona en Admin 7, por lo que allí no se ofrece esta actualización.",
-        "pl": "Ta wersja wymaga ioBroker Admin 8. Kreator wykrywania segmentów jest przeznaczony dla Admin 8 i nie działa już w Admin 7, więc tam ta aktualizacja nie jest oferowana.",
-        "uk": "Ця версія потребує ioBroker Admin 8. Майстер визначення сегментів створено для Admin 8 і він більше не працює в Admin 7, тому там це оновлення не пропонується.",
-        "zh-cn": "此版本需要 ioBroker Admin 8。分段检测向导专为 Admin 8 构建，不再在 Admin 7 上运行，因此在 Admin 7 上不会提供此更新。"
-      },
       "2.23.1": {
         "en": "Test release during the move to ioBroker Admin 8.",
         "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
