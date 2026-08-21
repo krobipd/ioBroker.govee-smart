@@ -38,7 +38,13 @@ jobs:
           # ioBroker.repositories. Default-Installationen (`activeRepo: stable`)
           # ziehen alle ioBroker-Adapter von dort. Jede in io-package.json
           # deklarierte Adapter-Voraussetzung (common.dependencies +
-          # common.globalDependencies) muss latest-stable matchen.
+          # common.globalDependencies) muss MINDESTENS latest-stable sein.
+          # Dahinter = Drift (Block). Voraus = erlaubt: die Abhängigkeits-
+          # Prüfung bei der Installation blockt das Update auf Anlagen, die
+          # die Anforderung nicht erfüllen, und Stable-Nutzer bekommen ohnehin
+          # nur die in sources-dist-stable.json gepinnte Adapter-Version
+          # (tt-tom17-Muster, ioBroker.public-transport 1.x auf npm-latest
+          # mit globalDependencies admin >=8.0.1 vor Admin-8-stable).
           URL="https://raw.githubusercontent.com/ioBroker/ioBroker.repositories/master/sources-dist-stable.json"
           HTTP_STATUS=$(curl -sLo /tmp/stable.json -w "%{http_code}" --max-time 30 "$URL" || echo "000")
           if [ "$HTTP_STATUS" = "404" ]; then
@@ -76,22 +82,30 @@ jobs:
               echo "::warning ::${NAME} not in sources-dist-stable.json — skipping (no autosync target)"
               continue
             fi
-            EXPECTED=">=${STABLE}"
-            if [ "${VALUE}" != "${EXPECTED}" ]; then
-              echo "::error ::Drift: io-package.json ${KIND}.${NAME}=${VALUE}, expected ${EXPECTED} (latest stable)"
-              FAIL=1
-            else
+            case "${VALUE}" in
+              ">="*) MIN="${VALUE#>=}" ;;
+              *)
+                echo "::error ::Unexpected format: io-package.json ${KIND}.${NAME}=${VALUE} — fleet standard is \">=<version>\""
+                FAIL=1
+                continue ;;
+            esac
+            if [ "${MIN}" = "${STABLE}" ]; then
               echo "✓ ${KIND}.${NAME} = ${VALUE}"
+            elif [ "$(printf '%s\n%s\n' "${MIN}" "${STABLE}" | sort -V | head -n1)" = "${STABLE}" ]; then
+              echo "✓ ${KIND}.${NAME} = ${VALUE} (ahead of stable ${STABLE} — install-side dependency check protects older systems)"
+            else
+              echo "::error ::Drift: io-package.json ${KIND}.${NAME}=${VALUE} is behind stable, expected at least >=${STABLE}"
+              FAIL=1
             fi
           done <<< "${DEPS}"
           if [ "${FAIL}" -eq 1 ]; then
             echo ""
             echo "Source: https://github.com/ioBroker/ioBroker.repositories/blob/master/sources-dist-stable.json"
-            echo "Fix: bump io-package.json common.dependencies / globalDependencies to the stable versions above."
+            echo "Fix: bump io-package.json common.dependencies / globalDependencies to at least the stable versions above."
             echo "(release-script before_commit hook does this automatically — run 'npm run release' to apply.)"
             exit 1
           fi
-          echo "✓ all ioBroker-deps synced with stable repository"
+          echo "✓ all ioBroker-deps at or ahead of stable repository"
 
   validate-devices:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
