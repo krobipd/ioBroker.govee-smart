@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.25.0",
+    "version": "2.26.0",
     "news": {
+      "2.26.0": {
+        "en": "Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints after it has shut down.",
+        "de": "Stoppen oder Neustarten der Instanz beendet die Cloud-Verbindung jetzt wirklich; der Adapter aktualisiert nach dem Herunterfahren keine Datenpunkte mehr.",
+        "ru": "Остановка или перезапуск экземпляра теперь действительно завершает облачное соединение; после выключения адаптер больше не обновляет точки данных.",
+        "pt": "Parar ou reiniciar a instância termina agora mesmo a ligação à nuvem; após o encerramento o adaptador já não atualiza pontos de dados.",
+        "nl": "Stoppen of herstarten van de instantie beëindigt de cloudverbinding nu echt; na het afsluiten werkt de adapter geen datapunten meer bij.",
+        "fr": "Arrêter ou redémarrer l'instance met désormais vraiment fin à la connexion cloud ; après l'arrêt, l'adaptateur ne met plus à jour de points de données.",
+        "it": "Arrestare o riavviare l'istanza ora chiude davvero la connessione cloud; dopo lo spegnimento l'adattatore non aggiorna più i punti dati.",
+        "es": "Detener o reiniciar la instancia ahora finaliza realmente la conexión a la nube; tras el apagado el adaptador ya no actualiza puntos de datos.",
+        "pl": "Zatrzymanie lub restart instancji naprawdę kończy teraz połączenie z chmurą; po wyłączeniu adapter nie aktualizuje już punktów danych.",
+        "uk": "Зупинка або перезапуск примірника тепер справді завершує хмарне з'єднання; після вимкнення адаптер більше не оновлює точки даних.",
+        "zh-cn": "停止或重启实例现在会真正结束云连接；关闭之后适配器不再更新数据点。"
+      },
       "2.25.0": {
         "en": "Connection setup is now one card with live status for the Cloud key, account login and 2FA. Light strips also report their real segment count again.",
         "de": "Die Verbindungs-Einrichtung ist jetzt eine Karte mit Live-Status für Cloud-Key, Konto-Login und 2FA. Lichtstreifen melden zudem wieder ihre echte Segment-Anzahl.",

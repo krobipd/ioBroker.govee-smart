@@ -1,4 +1,10 @@
 # Older Changes
+## 2.22.0 (2026-07-23)
+
+- A Govee app device group of the "same mode" type no longer appears as a phantom, uncontrollable device in the object tree.
+- Seven more Govee models join the catalog, from Edison bulbs to a ceiling fan. They start as experimental — enable them in the adapter settings to try them.
+- Sensors that reach the cloud through a Govee gateway now show which gateway they are connected through, instead of an empty IP field.
+
 ## 2.21.0 (2026-07-12) — stable
 
 - The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure each segment and can be corrected before you apply it.
