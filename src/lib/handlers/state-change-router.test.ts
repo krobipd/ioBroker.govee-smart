@@ -457,6 +457,21 @@ describe("sendMusicCommand", () => {
     expect(rig.capCommands).toHaveLength(0);
   });
 
+  it("the '---' sentinel (index 0) sends nothing even on a device WITH music modes", async () => {
+    // The plain `device` above has no music library, so it would skip for that
+    // reason alone — a device with real options is what makes this test bite.
+    const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
+    const rig = makeRig([lanDev]);
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 0);
+    expect(rig.lanMusic).toHaveLength(0);
+    expect(rig.capCommands).toHaveLength(0);
+
+    // Index 1 on the same device DOES send — proves the guard is the only
+    // thing holding the sentinel back.
+    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1);
+    expect(rig.lanMusic).toHaveLength(1);
+  });
+
   it("LAN device + Spectrum: reads control.color_rgb and sends the mode + RGB over LAN", async () => {
     const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
     const rig = makeRig([lanDev]);

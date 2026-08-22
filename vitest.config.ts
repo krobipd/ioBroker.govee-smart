@@ -19,12 +19,16 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.ts",
         "src/**/*.d.ts",
-        // Lifecycle wiring only — covered by test/integration.js (adapter
-        // boot harness); unit-mocking it would test the mocks.
-        "src/main.ts",
         // Test scaffolding, not production code.
         "src/lib/test-helpers.ts",
       ],
+      // NOTE: `src/main.ts` used to be excluded here as "covered by
+      // test/integration.js". Measured in the 2026-08-22 test audit: it was at
+      // 0 % — the integration harness asserts exactly one thing ("the adapter
+      // starts") and runs under mocha, so it never reaches this report. The
+      // exclusion also overstated the headline number by 7 points (87.4 vs
+      // 80.5 %). main.ts is now unit-tested through the factory seams like every
+      // other adapter in the fleet; do not re-add it here.
     },
   },
 });

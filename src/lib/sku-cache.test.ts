@@ -1,3 +1,20 @@
+import { vi } from "vitest";
+
+/**
+ * node:fs is passed through unchanged except for a fsyncSync counter — the
+ * durability test below needs to see that the save really flushed, and vitest
+ * cannot spy on ESM exports.
+ */
+const fsCounters = vi.hoisted(() => ({ fsync: 0 }));
+vi.mock("node:fs", async importOriginal => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  const fsyncSync = (fd: number): void => {
+    fsCounters.fsync++;
+    actual.fsyncSync(fd);
+  };
+  return { ...actual, default: { ...actual, fsyncSync }, fsyncSync };
+});
+
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -184,6 +201,17 @@ describe("SkuCache", () => {
     expect(() => cache.save(data)).not.toThrow();
   });
 
+  describe("save — durability", () => {
+    it("flushes the cache file to disk instead of leaving it in the page cache", () => {
+      const before = fsCounters.fsync;
+      const cache = new SkuCache(dir, mockLog);
+      cache.save(createTestData("H6100", "FSY:00:00:00:00:00:00:01"));
+      // Without the fsync a SIGKILL inside the ~30 s writeback window loses
+      // the save silently and the next start reads stale device data.
+      expect(fsCounters.fsync).toBeGreaterThan(before);
+    });
+  });
+
   describe("pruneStale", () => {
     const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -211,6 +239,23 @@ describe("SkuCache", () => {
 
       const pruned = cache.pruneStale(14);
       expect(pruned).toBe(0);
+      expect(cache.loadAll()).toHaveLength(1);
+    });
+
+    it("keeps an entry whose timestamp is not a number (hand-edited / foreign file)", () => {
+      const cache = new SkuCache(dir, mockLog);
+      const data = createTestData("H6005", "STR:00:00:00:00:00:00:05");
+      cache.save(data);
+      // A string timestamp compares as `"..." < cutoff` → true, so an
+      // unchecked prune would delete a perfectly current entry.
+      const file = fs.readdirSync(path.join(dir, "cache"))[0];
+      const full = path.join(dir, "cache", file);
+      const raw = JSON.parse(fs.readFileSync(full, "utf-8")) as Record<string, unknown>;
+      // Old enough that an unguarded `"..." < cutoff` comparison deletes it.
+      raw.lastSeenOnNetwork = String(Date.now() - 30 * DAY_MS);
+      fs.writeFileSync(full, JSON.stringify(raw));
+
+      expect(cache.pruneStale(14)).toBe(0);
       expect(cache.loadAll()).toHaveLength(1);
     });
 

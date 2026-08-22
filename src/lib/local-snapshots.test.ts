@@ -327,3 +327,30 @@ describe("LocalSnapshotStore", () => {
     expect(files.has("govee-smart.0.snapshots/h6160_0011.json")).toBe(false);
   });
 });
+
+describe("LocalSnapshotStore — storage not initialised", () => {
+  it("refuses to save and says why instead of pretending it worked", async () => {
+    const warns: string[] = [];
+    const mock = createMockAdapter();
+    const store = new LocalSnapshotStore(mock.adapter, {
+      ...mockLog,
+      warn: (m: string) => warns.push(m),
+    } as ioBroker.Logger);
+    // init() deliberately NOT called — mirrors a start where meta.user is not
+    // reachable. Saving anyway would put the snapshot in the in-memory cache
+    // only: the dropdown shows it, and it is gone after the next restart.
+    await store.saveSnapshot("H6160", "AABBCCDDEEFF0011", {
+      name: "Ghost",
+      power: true,
+      brightness: 80,
+      colorRgb: "#ff6600",
+      colorTemperature: 0,
+      savedAt: 1712700000,
+    });
+
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("not initialised");
+    expect(store.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
+    expect(mock.files.size).toBe(0);
+  });
+});

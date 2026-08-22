@@ -176,6 +176,45 @@ describe("GroupFanoutHandler", () => {
       expect(warns).toHaveLength(1);
     });
 
+    it("names the actual reason: unreachable members, not '0 commands failed'", async () => {
+      const warns: string[] = [];
+      const m1 = makeMember({ state: { online: false } });
+      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
+      const { host } = makeHost({ devices: [m1] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      const handler = new GroupFanoutHandler(host);
+      await handler.fanOut(group, "control.power", true);
+      // "all 0 member command(s) failed" would be both nonsense and useless —
+      // the user needs to know the members are offline.
+      expect(warns[0]).toContain("no reachable members");
+    });
+
+    it("re-arms the warn-once after a recovery, so a later outage warns again", async () => {
+      const warns: string[] = [];
+      const m1 = makeMember({ deviceId: "AA:01" });
+      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
+      const { host } = makeHost({ devices: [m1] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      let fail = true;
+      host.sendCommand = async () => {
+        if (fail) {
+          throw new Error("unreachable");
+        }
+      };
+      const handler = new GroupFanoutHandler(host);
+
+      await handler.fanOut(group, "control.power", true);
+      await handler.fanOut(group, "control.power", true);
+      expect(warns).toHaveLength(1); // warn-once while it stays broken
+
+      fail = false;
+      expect(await handler.fanOut(group, "control.power", true)).toBe(true); // recovered
+
+      fail = true;
+      await handler.fanOut(group, "control.power", true);
+      expect(warns).toHaveLength(2); // a NEW outage must be visible again
+    });
+
     it("returns false and warns when every member command throws", async () => {
       const warns: string[] = [];
       const m1 = makeMember({ deviceId: "AA:01" });

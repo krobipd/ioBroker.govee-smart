@@ -1393,6 +1393,28 @@ describe("CapabilityMapper", () => {
       expect(ids).toContain("color_temperature");
     });
 
+    it("control states are the INTERSECTION of members, not the union", () => {
+      const group = createGroup();
+      const full = createMember({ sku: "H61BE", lanIp: "192.168.1.1" });
+      // A cloud-only member that can only be switched: the group must not
+      // offer brightness/colour — writing them would silently do nothing on
+      // this member while the state shows a value.
+      const powerOnly = createMember({
+        sku: "H5100",
+        deviceId: "CLOUDONLY01",
+        lanIp: undefined,
+        channels: { lan: false, mqtt: false, cloud: true },
+        capabilities: [
+          { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+        ],
+      });
+      const ids = buildAllStateDefsForTest(group, undefined, [full, powerOnly]).map(d => d.id);
+      expect(ids).toContain("power");
+      expect(ids).not.toContain("brightness");
+      expect(ids).not.toContain("color_rgb");
+      expect(ids).not.toContain("color_temperature");
+    });
+
     it("should not include local snapshots or diag states for groups", () => {
       const group = createGroup();
       const m1 = createMember();

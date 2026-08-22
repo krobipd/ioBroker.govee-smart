@@ -250,10 +250,15 @@ describe("SnapshotHandler", () => {
         colorTemperature: 0,
         savedAt: 0,
       };
+      const warns: string[] = [];
       const { host, commands } = makeHost({ initialSnapshots: [snap] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
       const handler = new SnapshotHandler(host);
       await handler.restore(makeDevice(), "0");
       expect(commands).toHaveLength(0);
+      // 0 is the sentinel every dropdown reset writes — warning about it would
+      // put a "snapshot index 0 not found" line in the log on every mode change.
+      expect(warns).toHaveLength(0);
     });
 
     it("handles malformed segment color hex by defaulting to black", async () => {

@@ -1,3 +1,4 @@
+import type * as http from "node:http";
 import * as https from "node:https";
 
 /**
@@ -6,6 +7,23 @@ import * as https from "node:https";
  * accidentally hit Govee with 100 simultaneous calls.
  */
 const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 4 });
+
+/**
+ * Injectable transport. Production always uses node:https with the keep-alive
+ * agent above; the test suite passes a node:http transport so the request /
+ * response / error / abort logic below is exercised AS IS, without needing a
+ * TLS certificate. Before v2.26.0 the tests carried their own ~80-line copy of
+ * this function — it had already drifted (no agent, a different timeout
+ * message) and a bug introduced here would not have failed a single test.
+ */
+export interface HttpTransport {
+  /** `https.request` in production, `http.request` under test. */
+  request(options: https.RequestOptions, callback: (res: http.IncomingMessage) => void): http.ClientRequest;
+  /** Connection agent passed through to the request; omitted for plain HTTP. */
+  agent?: https.Agent;
+}
+
+const httpsTransport: HttpTransport = { request: https.request, agent: keepAliveAgent };
 
 /** Options for an HTTPS request */
 export interface HttpRequestOptions {
@@ -97,8 +115,12 @@ export function interpretOkBody<T>(raw: string, statusCode: number): HttpResult<
  * `bodySnippet`) for 2xx/3xx, rejects with {@link HttpError} for 4xx/5xx.
  *
  * @param options Request options
+ * @param transport Injectable transport — defaults to node:https (see {@link HttpTransport})
  */
-export function httpsRequest<T>(options: HttpRequestOptions): Promise<HttpResult<T>> {
+export function httpsRequest<T>(
+  options: HttpRequestOptions,
+  transport: HttpTransport = httpsTransport,
+): Promise<HttpResult<T>> {
   return new Promise((resolve, reject) => {
     const u = new URL(options.url);
     const postData = options.body ? JSON.stringify(options.body) : undefined;
@@ -117,8 +139,13 @@ export function httpsRequest<T>(options: HttpRequestOptions): Promise<HttpResult
           : {}),
       },
       timeout: options.timeout ?? 15_000,
-      agent: keepAliveAgent,
+      agent: transport.agent,
     };
+    // Non-default ports only ever appear in tests today, but dropping u.port
+    // would silently send such a request to 443 instead of failing loudly.
+    if (u.port) {
+      reqOptions.port = u.port;
+    }
 
     // Track the abort listener so we can detach it when the request resolves
     // or rejects normally — without this the AbortSignal accumulates one
@@ -132,7 +159,7 @@ export function httpsRequest<T>(options: HttpRequestOptions): Promise<HttpResult
       }
     };
 
-    const req = https.request(reqOptions, res => {
+    const req = transport.request(reqOptions, res => {
       const chunks: Buffer[] = [];
       // res.on("error") catches mid-stream failures (TCP RST after headers,
       // socket-close before "end" fires). Without this, such errors propagate

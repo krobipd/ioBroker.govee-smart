@@ -1716,6 +1716,27 @@ describe("DeviceManager", () => {
       return Buffer.from(bytes).toString("base64");
     }
 
+    it("rejects a packet whose XOR checksum does not match (spoofed / corrupt)", () => {
+      const good = buildAaA5Packet(1, [
+        [100, 255, 0, 0],
+        [50, 0, 255, 0],
+        [75, 0, 0, 255],
+        [1, 128, 128, 128],
+      ]);
+      expect(parseMqttSegmentData([good]).segments).toHaveLength(4);
+
+      // Flip the checksum byte only — everything else stays a valid packet, so
+      // an unchecked parser would happily persist a wrong segment count.
+      const bytes = Buffer.from(good, "base64");
+      bytes[19] = bytes[19] ^ 0xff;
+      expect(parseMqttSegmentData([bytes.toString("base64")]).segments).toHaveLength(0);
+
+      // A flipped payload byte invalidates the checksum too.
+      const tampered = Buffer.from(good, "base64");
+      tampered[5] = tampered[5] ^ 0x0f;
+      expect(parseMqttSegmentData([tampered.toString("base64")]).segments).toHaveLength(0);
+    });
+
     it("should parse single AA A5 packet with 4 segments", () => {
       const pkt = buildAaA5Packet(1, [
         [100, 255, 0, 0], // seg 0: brightness 100, red
@@ -3210,5 +3231,279 @@ describe("DeviceManager — internal logic helpers", () => {
       appApi: "RATE_LIMIT",
       groupMembers: null,
     });
+  });
+});
+
+describe("DeviceManager — invariants without a test (mutation audit)", () => {
+  beforeEach(() => {
+    initDeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+  });
+  afterEach(() => _resetDeviceRegistry());
+
+  it("binds a LAN reply to a same-SKU device only when exactly one candidate exists", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    // Two cloud-only devices of the same SKU: the discovery frame's deviceId
+    // matches neither, so a SKU fallback would bind the wrong one.
+    const a = createTestDevice({ sku: "H61BE", deviceId: "AAAA0001", name: "Strip A", lanIp: undefined });
+    const b = createTestDevice({ sku: "H61BE", deviceId: "BBBB0002", name: "Strip B", lanIp: undefined });
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AAAA0001"), a);
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "BBBB0002"), b);
+
+    dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "CC:CC:CC:CC:CC:CC:00:03", sku: "H61BE" });
+
+    expect(a.lanIp).toBeUndefined();
+    expect(b.lanIp).toBeUndefined();
+    // Unmatched frame → a NEW device record, never a hijacked existing one.
+    expect(dm2.getDevices()).toHaveLength(3);
+
+    // With exactly one candidate the fallback is allowed to bind.
+    const dm3 = new DeviceManager(mockLog, mockTimers);
+    const only = createTestDevice({ sku: "H61BE", deviceId: "AAAA0001", lanIp: undefined });
+    (dm3 as any).devices.set((dm3 as any).deviceKey("H61BE", "AAAA0001"), only);
+    dm3.handleLanDiscovery({ ip: "192.168.1.50", device: "CC:CC:CC:CC:CC:CC:00:03", sku: "H61BE" });
+    expect(only.lanIp).toBe("192.168.1.50");
+    expect(dm3.getDevices()).toHaveLength(1);
+  });
+
+  it("ignores Cloud entries without capabilities (stale/deleted registrations)", async () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    dm2.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([
+          {
+            sku: "H5100",
+            device: "REAL0001",
+            deviceName: "Real Light",
+            type: "devices.types.light",
+            capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+          },
+          // Govee /user/devices also returns historical registrations of devices
+          // the user deleted — they carry an empty capability list.
+          { sku: "H6160", device: "GHOST0001", deviceName: "Deleted Light", type: "devices.types.light", capabilities: [] },
+          { sku: "H6160", device: "GHOST0002", deviceName: "No caps at all", type: "devices.types.light" },
+        ]),
+    } as never);
+
+    await dm2.loadFromCloud();
+    const ids = dm2.getDevices().map(d => d.deviceId);
+    expect(ids).toEqual(["REAL0001"]);
+  });
+
+  it("an empty Cloud device list never counts as a valid account list", async () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const cloudOnly = createTestDevice({
+      sku: "H61BE",
+      deviceId: "DEADBEEF03",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "DEADBEEF03"), cloudOnly);
+    dm2.accountReconcileEnabled = true;
+    let pruneCalls = 0;
+    dm2.setSkuCache({
+      loadAll: () => [],
+      save: () => {},
+      pruneStale: () => {
+        pruneCalls++;
+        return 0;
+      },
+    } as never);
+    // Govee answers HTTP 200 with an empty body on hiccups — treating that as
+    // "your account is empty" would delete every device and prune the cache.
+    dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as never);
+
+    await dm2.loadFromCloud();
+    await dm2.loadFromCloud();
+
+    expect(dm2.getDevices().map(d => d.deviceId)).toContain("DEADBEEF03");
+    expect(cloudOnly.accountMissCount ?? 0).toBe(0);
+    expect(pruneCalls).toBe(0);
+  });
+
+  it("prunes the cache only after a plausible non-empty Cloud response", async () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    let pruneCalls = 0;
+    dm2.setSkuCache({
+      loadAll: () => [],
+      save: () => {},
+      pruneStale: () => {
+        pruneCalls++;
+        return 0;
+      },
+    } as never);
+    dm2.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([
+          {
+            sku: "H5100",
+            device: "PRESENT0001",
+            type: "devices.types.light",
+            capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+          },
+        ]),
+    } as never);
+    await dm2.loadFromCloud();
+    expect(pruneCalls).toBe(1);
+  });
+
+  it("a Cloud online flag never overrides a LAN-capable light", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const lanLight = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
+    lanLight.state.online = true;
+    const cloudLight = createTestDevice({ sku: "H6056", deviceId: "CCDD00000001", lanIp: undefined });
+    cloudLight.state.online = true;
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), lanLight);
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H6056", "CCDD00000001"), cloudLight);
+
+    const offlineEvent = (sku: string, device: string): never =>
+      ({
+        sku,
+        device,
+        capabilities: [{ type: "devices.capabilities.online", instance: "online", state: { value: false } }],
+      }) as never;
+
+    // Govee's cloud cache lags real LAN reachability — a false "offline" must
+    // not reach a light we can talk to directly.
+    dm2.handleOpenApiEvent(offlineEvent("H61BE", "AABBCCDDEEFF0011"));
+    expect(lanLight.state.online).toBe(true);
+
+    // A cloud-only light has no other truth source, so it must follow.
+    dm2.handleOpenApiEvent(offlineEvent("H6056", "CCDD00000001"));
+    expect(cloudLight.state.online).toBe(false);
+  });
+
+  it("an unchanged online state fires no update (no group-reachability churn)", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const sensor = createTestDevice({
+      sku: "H5179",
+      deviceId: "EEFF00000001",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+    });
+    sensor.state.online = true;
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H5179", "EEFF00000001"), sensor);
+    const updates: unknown[] = [];
+    dm2.onDeviceUpdate = (_d, s) => updates.push(s);
+
+    const onlineEvent = {
+      sku: "H5179",
+      device: "EEFF00000001",
+      capabilities: [{ type: "devices.capabilities.online", instance: "online", state: { value: true } }],
+    } as never;
+    dm2.handleOpenApiEvent(onlineEvent);
+    expect(updates).toHaveLength(0);
+    expect(sensor.lastSeenOnNetwork).toBeGreaterThan(0);
+
+    // A real transition still reports.
+    sensor.state.online = false;
+    dm2.handleOpenApiEvent(onlineEvent);
+    expect(updates).toEqual([{ online: true }]);
+  });
+
+  it("a repeated LAN discovery of an already-online device reports no transition", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const updates: unknown[] = [];
+    dm2.onDeviceUpdate = (_d, s) => updates.push(s);
+    const frame = { ip: "192.168.1.100", device: "AA:BB:CC:DD:EE:FF:00:11", sku: "H61BE" };
+
+    dm2.handleLanDiscovery(frame);
+    const dev = dm2.getDevices()[0];
+    dev.state.online = false;
+    updates.length = 0;
+
+    dm2.handleLanDiscovery(frame); // offline → online: one transition
+    expect(updates).toEqual([{ online: true }]);
+
+    updates.length = 0;
+    dm2.handleLanDiscovery(frame); // already online: silent
+    dm2.handleLanDiscovery(frame);
+    expect(updates).toHaveLength(0);
+  });
+
+  it("a devStatus reply carries `online` only on a real offline→online flip", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const dev = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
+    dev.state.online = false;
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), dev);
+    const patches: Partial<DeviceState>[] = [];
+    dm2.onDeviceUpdate = (_d, s) => patches.push(s);
+    const reply = { onOff: 1, brightness: 50, color: { r: 255, g: 0, b: 0 }, colorTemInKelvin: 0 };
+
+    dm2.handleLanStatus("192.168.1.100", reply);
+    expect(patches).toHaveLength(1);
+    expect(patches[0].online).toBe(true); // the flip is reported
+
+    // Steady LAN: every further poll reply would otherwise carry online:true
+    // and trigger a group-reachability pass + per-group write on each poll.
+    dm2.handleLanStatus("192.168.1.100", reply);
+    dm2.handleLanStatus("192.168.1.100", reply);
+    expect(patches).toHaveLength(3);
+    expect(patches[1].online).toBeUndefined();
+    expect(patches[2].online).toBeUndefined();
+  });
+
+  it("skips the App-API poll entirely in a lights-only installation", async () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    (dm2 as any).devices.set(
+      (dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"),
+      createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011" }),
+    );
+    let fetches = 0;
+    dm2.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: async () => {
+        fetches++;
+        return [];
+      },
+    } as never);
+
+    expect(await dm2.pollAppApi()).toBe(0);
+    expect(fetches).toBe(0); // lights never need the App API — no request at all
+
+    // One sensor is enough to arm the poll.
+    (dm2 as any).devices.set(
+      (dm2 as any).deviceKey("H5179", "EEFF00000001"),
+      createTestDevice({ sku: "H5179", deviceId: "EEFF00000001", type: "devices.types.thermometer" }),
+    );
+    await dm2.pollAppApi();
+    expect(fetches).toBe(1);
+  });
+
+  it("re-reports a gateway only when it actually changes", async () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers);
+    const dev = createTestDevice({
+      sku: "H5109",
+      deviceId: "AABBCCDDEEFF0002",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+    });
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H5109", "AABBCCDDEEFF0002"), dev);
+    const rebuilds: string[] = [];
+    dm2.onCloudDataReady = d => rebuilds.push(d.deviceId);
+
+    const entry = (bleName: string): unknown => ({
+      sku: "H5109",
+      device: "AABBCCDDEEFF0002",
+      deviceName: "Pool",
+      lastData: { tem: 2341 },
+      settings: { gatewayInfo: { sku: "H5042", bleName } },
+    });
+    dm2.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: async () => [entry("ihoment_H5042_3795")],
+    } as never);
+
+    await dm2.pollAppApi();
+    expect(rebuilds).toEqual(["AABBCCDDEEFF0002"]); // first sighting rebuilds
+    await dm2.pollAppApi();
+    await dm2.pollAppApi();
+    expect(rebuilds).toHaveLength(1); // same gateway → no object-tree churn
+
+    dm2.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: async () => [entry("ihoment_H5042_9999")],
+    } as never);
+    await dm2.pollAppApi();
+    expect(rebuilds).toHaveLength(2); // moved to another gateway → rebuild
   });
 });

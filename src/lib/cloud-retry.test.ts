@@ -1,6 +1,11 @@
 import { CloudRetryLoop, type CloudRetryHost } from "./cloud-retry";
 import type { CloudLoadResult } from "./types";
 
+/** Let every pending microtask AND macrotask settle. */
+function settle(): Promise<void> {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
 /**
  * Test harness — records every call the loop makes to its host and lets tests
  * fire the scheduled timer on demand. The real adapter's ioBroker setTimeout
@@ -245,10 +250,21 @@ describe("CloudRetryLoop", () => {
       };
       loop.handleResult({ ok: false, reason: "transient" });
       host.fireLatestTimer();
-      await Promise.resolve();
-      await Promise.resolve();
+      // Drain the whole microtask chain — two `await Promise.resolve()` stop
+      // BEFORE runAttempt continues past its own await, so the assertions
+      // below would pass even with the post-load stopped-check removed.
+      await settle();
+      expect(host.loadCalls).toBe(1); // the load really ran to completion
       expect(host.restoredCalls).toBe(0);
       expect(host.logs.filter(l => l.level === "info").some(l => l.msg.includes("restored"))).toBe(false);
+    });
+
+    it("dispose stops the loop for good — no retry can be armed afterwards", () => {
+      loop.dispose();
+      const before = host.timers.length;
+      loop.handleResult({ ok: false, reason: "transient" });
+      loop.handleResult({ ok: false, reason: "rate-limited", retryAfterMs: 1000 });
+      expect(host.timers).toHaveLength(before);
     });
 
     it("should re-arm when the retry still fails", async () => {

@@ -660,3 +660,32 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
     client.stop();
   });
 });
+
+describe("setColorTemperature — range clamping", () => {
+  /** Captures the outgoing command data via the diagnostics send-hook. */
+  function makeCapturingClient(): { client: GoveeLanClient; sent: Array<Record<string, unknown>> } {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    const sent: Array<Record<string, unknown>> = [];
+    client.setSendHook((_ip, _cmd, payload) => {
+      sent.push(payload as Record<string, unknown>);
+    });
+    return { client, sent };
+  }
+
+  it("clamps out-of-band kelvin into Govee's published 2000-9000 K range", () => {
+    const { client, sent } = makeCapturingClient();
+    client.setColorTemperature("10.0.0.1", 1000);
+    client.setColorTemperature("10.0.0.1", 12000);
+    client.setColorTemperature("10.0.0.1", 4321.6);
+    // A device fed a value outside its firmware range answers with a dropped
+    // packet or an unpredictable colour — clamping keeps the command valid.
+    expect(sent.map(d => d.colorTemInKelvin)).toEqual([2000, 9000, 4322]);
+  });
+
+  it("falls back to the lower bound for a non-numeric value", () => {
+    const { client, sent } = makeCapturingClient();
+    client.setColorTemperature("10.0.0.1", NaN);
+    client.setColorTemperature("10.0.0.1", Infinity);
+    expect(sent.map(d => d.colorTemInKelvin)).toEqual([2000, 2000]);
+  });
+});

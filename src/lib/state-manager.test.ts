@@ -1975,3 +1975,116 @@ describe("StateManager", () => {
     });
   });
 });
+
+describe("StateManager — invariants without a test (mutation audit)", () => {
+  it("a LAN light goes offline once its last LAN reply ages past the freshness window", async () => {
+    const { adapter, states } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now(), state: { online: true } });
+    await createAllStatesForTest(sm, dev, []);
+
+    await sm.syncInfoOnline(dev);
+    expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+
+    // 91 s without a reply: the device is gone even though the last reply
+    // timestamp is still set — a truthy check alone would keep it "online"
+    // forever after the very first discovery.
+    dev.lastLanReplyAt = Date.now() - 91_000;
+    await sm.syncInfoOnline(dev);
+    expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+  });
+
+  it("info.online is written only when the value actually changes", async () => {
+    const { adapter, calls } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now() });
+    await createAllStatesForTest(sm, dev, []);
+    const countWrites = (): number =>
+      calls.filter(c => c.method === "setState" && c.args[0] === "devices.h6160_0011.info.online").length;
+
+    await sm.syncInfoOnline(dev); // settle whatever createInfoStates left behind
+    const before = countWrites();
+    await sm.syncInfoOnline(dev);
+    await sm.syncInfoOnline(dev);
+    await sm.syncInfoOnline(dev);
+    // Runs every 20 s per device — a write per pass is pure timestamp spam in
+    // every history/InfluxDB attached to the state.
+    expect(countWrites()).toBe(before);
+
+    dev.lastLanReplyAt = Date.now() - 91_000;
+    await sm.syncInfoOnline(dev);
+    expect(countWrites()).toBe(before + 1); // a real change still writes
+  });
+
+  it("syncInfoOnline ignores groups (they have no own reachability)", async () => {
+    const { adapter, calls } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const group = createTestDevice({ sku: "BaseGroup", deviceId: "9001", name: "Living room" });
+    const before = calls.length;
+    expect(await sm.syncInfoOnline(group)).toBe(false);
+    expect(calls.length).toBe(before); // not a single adapter call
+  });
+
+  it("a manual segment list may raise the segment count, never lower it", async () => {
+    const { adapter, objects } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const dev = createTestDevice({
+      capabilities: [
+        {
+          type: "devices.capabilities.segment_color_setting",
+          instance: "segmentedColorRgb",
+          parameters: { dataType: "STRUCT", fields: [{ fieldName: "segment", elementRange: { min: 0, max: 9 } }] },
+        },
+      ],
+      manualMode: true,
+      // A cut strip whose user-entered list reaches beyond what Cloud reports.
+      manualSegments: [0, 5, 13],
+    });
+    await sm.createSegmentStates(dev);
+    expect(objects.has("devices.h6160_0011.segments.13")).toBe(true);
+    expect(dev.segmentCount).toBe(14);
+  });
+
+  it("ensureState writes an object once per id, not on every call", async () => {
+    const { adapter, calls } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const dev = createTestDevice();
+    const ensured = (): string[] =>
+      calls.filter(c => c.method === "extendObject" && String(c.args[0]).endsWith(".info.name")).map(c => String(c.args[0]));
+    await sm.createInfoStates(dev);
+    expect(ensured()).toHaveLength(1);
+    // Called again on every cloud refresh / reconnect — without the cache this
+    // rewrites the same object each time.
+    await sm.createInfoStates(dev);
+    await sm.createInfoStates(dev);
+    expect(ensured()).toHaveLength(1);
+  });
+
+  it("creates buttons write-only (role catalogue) and everything else readable", async () => {
+    const { adapter, objects } = createMockAdapter();
+    const sm = new StateManager(adapter as never);
+    const dev = createTestDevice();
+    await sm.createCloudStates(dev, [
+      {
+        id: "refresh_cloud",
+        name: "Refresh",
+        type: "boolean",
+        role: "button",
+        write: true,
+        capabilityType: "devices.capabilities.on_off",
+        capabilityInstance: "refresh",
+      },
+      {
+        id: "power_state",
+        name: "Power",
+        type: "boolean",
+        role: "switch",
+        write: true,
+        capabilityType: "devices.capabilities.on_off",
+        capabilityInstance: "powerSwitch",
+      },
+    ] as StateDefinition[]);
+    expect((objects.get("devices.h6160_0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
+    expect((objects.get("devices.h6160_0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
+  });
+});

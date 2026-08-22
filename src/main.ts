@@ -59,7 +59,70 @@ function physicalSegmentCap(device: GoveeDevice): number {
   return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
 }
 
-class GoveeAdapter extends utils.Adapter {
+/**
+ * Exported so the orchestration unit tests can drive the lifecycle handlers
+ * directly (fleet harness, see `reference_orchestration_test_harness`). The
+ * runtime entry point below still constructs it the same way.
+ */
+export class GoveeAdapter extends utils.Adapter {
+  // ── Test seams ────────────────────────────────────────────────────────────
+  // Network-facing collaborators are built through overridable factory fields
+  // instead of inline `new` calls, so the orchestration tests can drive onReady
+  // without sockets, TLS or a live Govee account. The state-facing ones
+  // (StateManager, DeviceManager, SkuCache, LocalSnapshotStore) deliberately
+  // run FOR REAL against the stub adapter — that is what makes the state-tree
+  // assertions meaningful (hassemu hybrid pattern). Production behaviour is
+  // unchanged: every default is the same constructor call as before.
+  /**
+   * @param log Adapter logger forwarded to the LAN client
+   * @param timers Adapter timer wrapper
+   */
+  private makeLanClient: (log: ioBroker.Logger, timers: GoveeAdapter) => GoveeLanClient = (log, timers) =>
+    new GoveeLanClient(log, timers);
+  /**
+   * @param email Govee account email
+   * @param password Govee account password
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   */
+  private makeMqttClient: (
+    email: string,
+    password: string,
+    log: ioBroker.Logger,
+    timers: GoveeAdapter,
+  ) => GoveeMqttClient = (email, password, log, timers) => new GoveeMqttClient(email, password, log, timers);
+  /**
+   * @param apiKey Govee Cloud API key
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   */
+  private makeOpenapiMqttClient: (
+    apiKey: string,
+    log: ioBroker.Logger,
+    timers: GoveeAdapter,
+  ) => GoveeOpenapiMqttClient = (apiKey, log, timers) => new GoveeOpenapiMqttClient(apiKey, log, timers);
+  /**
+   * @param apiKey Govee Cloud API key
+   * @param log Adapter logger
+   */
+  private makeCloudClient: (apiKey: string, log: ioBroker.Logger) => GoveeCloudClient = (apiKey, log) =>
+    new GoveeCloudClient(apiKey, log);
+  /** @param log Adapter logger */
+  private makeApiClient: (log: ioBroker.Logger) => GoveeApiClient = log => new GoveeApiClient(log);
+  /**
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   * @param perMinute Per-minute Cloud budget
+   * @param perDay Per-day Cloud budget
+   */
+  private makeRateLimiter: (
+    log: ioBroker.Logger,
+    timers: GoveeAdapter,
+    perMinute: number,
+    perDay: number,
+  ) => RateLimiter = (log, timers, perMinute, perDay) => new RateLimiter(log, timers, perMinute, perDay);
+  // ──────────────────────────────────────────────────────────────────────────
+
   /** Public for handler modules (state-change-router, group-fanout, wizard, snapshot, diagnostics). */
   public deviceManager: DeviceManager | null = null;
   /** Public for handler modules. */
@@ -312,7 +375,7 @@ class GoveeAdapter extends utils.Adapter {
       });
 
       // API client for undocumented scene/music/DIY libraries (always available)
-      const apiClient = new GoveeApiClient(this.log);
+      const apiClient = this.makeApiClient(this.log);
       apiClient.setEmail(config.goveeEmail);
       this.deviceManager.setApiClient(apiClient);
 
@@ -418,7 +481,7 @@ class GoveeAdapter extends utils.Adapter {
       );
 
       // --- LAN (always active) ---
-      this.lanClient = new GoveeLanClient(this.log, this);
+      this.lanClient = this.makeLanClient(this.log, this);
       this.deviceManager.setLanClient(this.lanClient);
 
       // A socket error on a PINNED interface is user-fixable config (the
@@ -491,7 +554,7 @@ class GoveeAdapter extends utils.Adapter {
       // --- MQTT (if account credentials provided) ---
       // Initialize MQTT before Cloud so scene library can load on first cycle
       if (hasAccountCreds) {
-        this.mqttClient = new GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        this.mqttClient = this.makeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
         // so diag.export contains the recent packets per device. v2.9.1: the
@@ -602,7 +665,7 @@ class GoveeAdapter extends utils.Adapter {
       const cachedOk = this.deviceManager.loadFromCache();
 
       if (config.apiKey) {
-        this.cloudClient = new GoveeCloudClient(config.apiKey, this.log);
+        this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
         // Capture the most recent Cloud response per (deviceId, endpoint) for
         // diagnostics — bounded by the DiagnosticsCollector's response slot cap.
         this.cloudClient.setResponseHook((deviceId, endpoint, body) => {
@@ -619,7 +682,7 @@ class GoveeAdapter extends utils.Adapter {
             .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
         });
 
-        this.rateLimiter = new RateLimiter(this.log, this, CLOUD_FULL_LIMITS.perMinute, CLOUD_FULL_LIMITS.perDay);
+        this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_FULL_LIMITS.perMinute, CLOUD_FULL_LIMITS.perDay);
         this.rateLimiter.start();
         this.deviceManager.setRateLimiter(this.rateLimiter);
 
@@ -627,7 +690,7 @@ class GoveeAdapter extends utils.Adapter {
         // (lackWater, iceFull, bodyAppeared etc.). API key is enough; no
         // separate credentials required. Connection runs in parallel to
         // the AWS-IoT MQTT used for status push of regular devices.
-        this.openapiMqttClient = new GoveeOpenapiMqttClient(config.apiKey, this.log, this);
+        this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
         this.openapiMqttClient.connect(
           event => this.deviceManager?.handleOpenApiEvent(event),
           connected => {

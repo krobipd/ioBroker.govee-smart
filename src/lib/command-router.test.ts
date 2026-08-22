@@ -731,3 +731,110 @@ describe("CommandRouter", () => {
   // device-registry.test.ts (the registry owns the catalog contract) —
   // an identical copy here was removed in v2.16.1.
 });
+
+describe("CommandRouter — invariants without a test (mutation audit)", () => {
+  it("the no-segment cloud heuristic applies to scene activation only", async () => {
+    const lan = makeLanStub();
+    const cloud = makeCloudStub();
+    const router = new CommandRouter(mockLog, noopTimers);
+    router.setLanClient(lan.client);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(makeRateLimiter());
+    const noSegments = makeDevice({ segmentCount: 0 });
+
+    // A scene on a segment-less SKU: the A3-framed ptReal frames get dropped
+    // by the firmware, so this one goes to the Cloud.
+    await router.sendCommand(noSegments, "lightScene", 1);
+    expect(cloud.calls).toHaveLength(1);
+    expect(lan.calls.find(c => c.method === "setScene")).toBeUndefined();
+
+    // Everything else stays LAN-first — routing every command to the Cloud
+    // would burn the 10/min budget on plain power/brightness writes.
+    await router.sendCommand(noSegments, "power", true);
+    await router.sendCommand(noSegments, "brightness", 40);
+    expect(cloud.calls).toHaveLength(1);
+    expect(lan.calls.find(c => c.method === "setPower")).toBeDefined();
+    expect(lan.calls.find(c => c.method === "setBrightness")).toBeDefined();
+  });
+
+  it("waits for the firmware to switch into colour mode before sending segments", async () => {
+    const lan = makeLanStub();
+    const order: string[] = [];
+    const recordingTimers: TimerAdapter = {
+      ...noopTimers,
+      delay: async (ms: number) => {
+        order.push(`delay:${ms}`);
+      },
+    };
+    const router = new CommandRouter(mockLog, recordingTimers);
+    router.setLanClient(lan.client);
+    const lanRecorder = new Proxy(lan.client as never, {
+      get: (t: never, p: string) => {
+        const orig = (t as Record<string, (...a: unknown[]) => unknown>)[p];
+        return (...args: unknown[]) => {
+          order.push(p);
+          return orig(...args);
+        };
+      },
+    });
+    router.setLanClient(lanRecorder);
+
+    await router.sendCommand(makeDevice(), "segmentColor:3", "#0000FF");
+    // Without the settle window the strip is still in scene/gradient mode and
+    // swallows the segment frame — the classic "nothing happened" symptom.
+    expect(order.indexOf("setColor")).toBeLessThan(order.indexOf("delay:150"));
+    expect(order.indexOf("delay:150")).toBeLessThan(order.indexOf("setSegmentColor"));
+  });
+
+  it("a user command is tracked to its real execution, never just enqueued", async () => {
+    const seen: string[] = [];
+    const limiter = {
+      tryExecute: async (fn: () => Promise<void>): Promise<boolean> => {
+        seen.push("tryExecute");
+        await fn();
+        return true;
+      },
+      executeTracked: async (fn: () => Promise<void>): Promise<void> => {
+        seen.push("executeTracked");
+        await fn();
+      },
+    } as unknown as RateLimiter;
+    const cloud = makeCloudStub();
+    const router = new CommandRouter(mockLog, noopTimers);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(limiter);
+
+    // Cloud-only device → the send goes through the budget. tryExecute resolves
+    // on ENQUEUE, so the router would ack a write that never ran (M3).
+    await router.sendCommand(
+      makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } }),
+      "power",
+      true,
+    );
+    expect(seen).toEqual(["executeTracked"]);
+  });
+
+  it("a segment colour command never lands on the brightness capability", async () => {
+    const cloud = makeCloudStub();
+    const router = new CommandRouter(mockLog, noopTimers);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(makeRateLimiter());
+    // Capability order is NOT guaranteed by Govee — list brightness first so a
+    // matcher that only checks the capability TYPE picks the wrong one.
+    const cloudOnly = makeDevice({
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+      capabilities: [
+        { type: "devices.capabilities.segment_color_setting", instance: "segmentedBrightness" },
+        { type: "devices.capabilities.segment_color_setting", instance: "segmentedColorRgb" },
+      ],
+    });
+
+    await router.sendCommand(cloudOnly, "segmentColor:3", "#0000FF");
+    expect(cloud.calls).toHaveLength(1);
+    expect(cloud.calls[0].instance).toBe("segmentedColorRgb");
+
+    await router.sendCommand(cloudOnly, "segmentBrightness:3", 50);
+    expect(cloud.calls[1].instance).toBe("segmentedBrightness");
+  });
+});

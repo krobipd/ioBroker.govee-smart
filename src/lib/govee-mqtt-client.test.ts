@@ -485,6 +485,14 @@ describe("GoveeMqttClient", () => {
         return new Error("network");
       });
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      // Make the cert VALID so the expiry check is the only thing that can send
+      // this through a fresh login — with a broken p12 the test passed even
+      // without the TTL guard (reusing an expired token is a 401 storm).
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
       client.setPersistedCredentials({
         bearerToken: "expired-tok",
         iotEndpoint: "iot.example.com",

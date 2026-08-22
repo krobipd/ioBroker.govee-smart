@@ -1,13 +1,11 @@
 import * as http from "node:http";
 import { extractHttpStatus, HttpError, httpsRequest, interpretOkBody } from "./http-client";
+import type { HttpResult } from "./http-client";
 
 /**
  * Local HTTP stub server — `http`, not `https`, so the tests don't need a
- * pre-generated TLS cert. The `httpsRequest` impl uses node:https, but it
- * accepts any URL, so we hit `http://127.0.0.1:<port>` via a sibling
- * `httpRequestPlain` shim that mirrors the real impl byte-for-byte minus
- * the TLS layer. The shim lives next to `httpsRequest` so we test the
- * exact same response/error/abort logic.
+ * pre-generated TLS cert. `httpsRequest` takes an injectable transport, so
+ * these tests run the production function itself against the stub.
  */
 
 interface StubResponse {
@@ -84,6 +82,11 @@ async function startStubServer(): Promise<StubServer> {
  * `httpsRequest` clone using `http` instead of `https` — same logic, no TLS.
  * The point of the tests is the request/response handling, not the TLS layer.
  */
+/**
+ * The tests drive the REAL httpsRequest with a node:http transport (the
+ * `transport` seam added in v2.26.0). Before that this file carried a copy of
+ * the implementation, so a bug in production code failed nothing here.
+ */
 function httpRequestPlain<T>(options: {
   method: "GET" | "POST";
   url: string;
@@ -91,77 +94,8 @@ function httpRequestPlain<T>(options: {
   body?: unknown;
   timeout?: number;
   signal?: AbortSignal;
-}): Promise<import("./http-client").HttpResult<T>> {
-  return new Promise((resolve, reject) => {
-    const u = new URL(options.url);
-    const postData = options.body ? JSON.stringify(options.body) : undefined;
-    const reqOptions: http.RequestOptions = {
-      method: options.method,
-      hostname: u.hostname,
-      port: u.port,
-      path: u.pathname + u.search,
-      headers: {
-        ...options.headers,
-        ...(postData ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(postData) } : {}),
-      },
-      timeout: options.timeout ?? 15_000,
-    };
-
-    let onAbort: (() => void) | null = null;
-    const cleanup = (): void => {
-      if (onAbort && options.signal) {
-        options.signal.removeEventListener("abort", onAbort);
-        onAbort = null;
-      }
-    };
-
-    const req = http.request(reqOptions, res => {
-      const chunks: Buffer[] = [];
-      res.on("error", err => {
-        cleanup();
-        reject(err);
-      });
-      res.on("data", c => chunks.push(c as Buffer));
-      res.on("end", () => {
-        cleanup();
-        const raw = Buffer.concat(chunks).toString();
-        const statusCode = res.statusCode ?? 0;
-        if (statusCode < 200 || statusCode >= 400) {
-          reject(new HttpError(`HTTP ${statusCode}`, statusCode, res.headers, raw));
-          return;
-        }
-        // Use the REAL interpretOkBody so this shim can't drift from production
-        // (the whole point of the shim is to test the exact same logic).
-        try {
-          resolve(interpretOkBody<T>(raw, statusCode));
-        } catch (parseErr) {
-          reject(parseErr instanceof Error ? parseErr : new Error(String(parseErr)));
-        }
-      });
-    });
-    req.on("error", err => {
-      cleanup();
-      reject(err);
-    });
-    req.on("timeout", () => req.destroy(new Error("Timeout")));
-
-    if (options.signal) {
-      if (options.signal.aborted) {
-        req.destroy(new Error("Aborted"));
-        reject(new Error("Aborted"));
-        return;
-      }
-      onAbort = (): void => {
-        req.destroy(new Error("Aborted"));
-        reject(new Error("Aborted"));
-      };
-      options.signal.addEventListener("abort", onAbort, { once: true });
-    }
-    if (postData) {
-      req.write(postData);
-    }
-    req.end();
-  });
+}): Promise<HttpResult<T>> {
+  return httpsRequest<T>(options, { request: http.request });
 }
 
 describe("HttpError", () => {

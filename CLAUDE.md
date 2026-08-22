@@ -176,7 +176,11 @@ Single Page: **1.** LAN (immer aktiv) · **2.** Cloud API (optional, API Key →
 
 ## Tests
 
-One vitest suite per Modul (`src/**/*.test.ts`), jede mit einem „Drift"-Block gegen malformed / non-string / null API-Payloads (inkl. der ganzen `handlers/`-Schicht). Ehrliche Coverage über `coverage.include: ["src/**/*.ts"]`; `main.ts` (integration-covered) + `test-helpers.ts` mit Begründung ausgenommen. Package + Integration unter `test/`. React-Komponente: `npm --prefix src-admin run test` (vitest + jsdom). Aktuelle Zahlen: `npx vitest run`.
+One vitest suite per Modul (`src/**/*.test.ts`), jede mit einem „Drift"-Block gegen malformed / non-string / null API-Payloads (inkl. der ganzen `handlers/`-Schicht). Ehrliche Coverage über `coverage.include: ["src/**/*.ts"]`; ausgenommen ist nur noch `test-helpers.ts` (Test-Gerüst). Package + Integration unter `test/`. React-Komponente: `npm --prefix src-admin run test` (vitest + jsdom). Aktuelle Zahlen: `npx vitest run`.
+
+**`main.ts` ist unit-getestet** (`src/main.test.ts`) — die frühere Coverage-Ausnahme „integration-covered" war falsch: der mocha-Integrationstest prüft genau eine Sache („der Adapter startet") und taucht im vitest-Report gar nicht auf, `main.ts` stand real bei 0 %. Der Harness stubbt `@iobroker/adapter-core` mit einer Adapter-Basisklasse samt In-Memory-Objekt-/State-/File-Store, sodass StateManager, DeviceManager, SkuCache und LocalSnapshotStore ECHT laufen; ersetzt werden nur die netzseitigen Kollaborateure über die `make*Client`-Fabrik-Seams in `main.ts` (`makeLanClient`, `makeMqttClient`, `makeOpenapiMqttClient`, `makeCloudClient`, `makeApiClient`, `makeRateLimiter`). Jeder Test bekommt über `beforeEach` ein eigenes Instanz-Datenverzeichnis — SKU-Cache und Credentials-Datei liegen dort, ein geteiltes Verzeichnis macht Tests reihenfolgenabhängig.
+
+`httpsRequest` nimmt einen optionalen `transport` (Default `node:https` + Keep-alive-Agent); die Tests fahren damit den ECHTEN Produktivcode über `node:http` gegen einen lokalen Stub-Server. Vorher lag in der Testdatei eine ~80-zeilige Kopie der Implementierung — sie war bereits abgedriftet und hätte einen Fehler im Produktivcode nicht bemerkt.
 
 ## Konkurrenz-Lage
 

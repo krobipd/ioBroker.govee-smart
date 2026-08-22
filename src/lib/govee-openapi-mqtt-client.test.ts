@@ -13,8 +13,8 @@ const mqttMock = vi.hoisted(() => {
   interface FakeClient {
     connected: boolean;
     ended: boolean | null;
-    on(ev: string, cb: () => void): FakeClient;
-    emit(ev: string): void;
+    on(ev: string, cb: (...args: unknown[]) => void): FakeClient;
+    emit(ev: string, ...args: unknown[]): void;
     subscribe(topic: string, opts: unknown, cb: (e: Error | null) => void): void;
     end(force: boolean): void;
     removeAllListeners(): FakeClient;
@@ -23,7 +23,7 @@ const mqttMock = vi.hoisted(() => {
   let subscribeBehavior: (cb: (e: Error | null) => void) => void = cb => cb(null);
   return {
     connect: (): FakeClient => {
-      const handlers: Record<string, (() => void) | undefined> = {};
+      const handlers: Record<string, ((...args: unknown[]) => void) | undefined> = {};
       const c: FakeClient = {
         connected: false,
         ended: null,
@@ -31,8 +31,8 @@ const mqttMock = vi.hoisted(() => {
           handlers[ev] = cb;
           return c;
         },
-        emit(ev) {
-          handlers[ev]?.();
+        emit(ev, ...args) {
+          handlers[ev]?.(...args);
         },
         subscribe(_topic, _opts, cb) {
           subscribeBehavior(cb);
@@ -177,6 +177,35 @@ describe("GoveeOpenapiMqttClient", () => {
       fake.emit("connect");
       expect(fake.ended).toBe(true); // forced close so the close-handler can reconnect
       expect(connFlag).toBeNull(); // onConnection(true) was NOT called
+      client.disconnect();
+    });
+
+    it("stops retrying after repeated auth rejections — a bad API key must not loop forever", () => {
+      const t = makeCapturingTimers();
+      const client = new GoveeOpenapiMqttClient("bad-key", mockLog, t.timers);
+      let connFlag: boolean | null = null;
+      client.connect(
+        () => {},
+        c => {
+          connFlag = c;
+        },
+      );
+      const fake = mqttMock.clients[0];
+      const authErr = Object.assign(new Error("Connection refused: Not authorized"), { code: 5 });
+
+      // Below the cap the client keeps going (a single rejection can be a
+      // Govee hiccup) — no forced end, no onConnection(false).
+      fake.emit("error", authErr);
+      expect(fake.ended).toBeNull();
+
+      // At the cap (5 consecutive auth errors) it gives up: reports the outage
+      // and closes for good, so the adapter stops hammering Govee with a key
+      // it already rejected.
+      for (let i = 0; i < 4; i++) {
+        fake.emit("error", authErr);
+      }
+      expect(connFlag).toBe(false);
+      expect(fake.ended).toBe(true);
       client.disconnect();
     });
 

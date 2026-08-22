@@ -229,6 +229,28 @@ describe("GoveeCloudClient", () => {
     });
   });
 
+  describe("controlDevice — payload-level failures", () => {
+    it("rejects when Govee answers HTTP 200 with a logical error code", async () => {
+      // The device never received the command; a resolved promise would ack
+      // the ioBroker state and show the user a change that did not happen.
+      const fake = makeFakeHttps(() => ({ code: 400, message: "capability not allowed" }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(
+        client.controlDevice("H6160", "AABB", "devices.capabilities.on_off", "powerSwitch", 1),
+      ).rejects.toThrow(/code=400.*capability not allowed/);
+    });
+
+    it("accepts the two success codes Govee uses (200 and 0)", async () => {
+      for (const code of [200, 0]) {
+        const fake = makeFakeHttps(() => ({ code }));
+        const client = new GoveeCloudClient("k", mockLog, fake.fn);
+        await expect(
+          client.controlDevice("H6160", "AABB", "devices.capabilities.on_off", "powerSwitch", 1),
+        ).resolves.toBeUndefined();
+      }
+    });
+  });
+
   describe("getScenes", () => {
     it("should split lightScene/diyScene/snapshot into separate buckets", async () => {
       const fake = makeFakeHttps(() => ({

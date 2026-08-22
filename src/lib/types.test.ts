@@ -160,6 +160,17 @@ describe("Types utilities", () => {
       expect(hexToRgb("xyz")).toEqual({ r: 0, g: 0, b: 0 });
     });
 
+    it("rejects wrong-length hex instead of guessing a colour", () => {
+      // "f60" would parse to r=0 g=15 b=96 via parseInt truncation and
+      // "ff6600ff" to a sign-extended value — both silently wrong colours.
+      expect(hexToRgb("#f60")).toEqual({ r: 0, g: 0, b: 0 });
+      expect(hexToRgb("#ff66")).toEqual({ r: 0, g: 0, b: 0 });
+      expect(hexToRgb("#ff6600ff")).toEqual({ r: 0, g: 0, b: 0 });
+      expect(hexToRgb("#")).toEqual({ r: 0, g: 0, b: 0 });
+      // Six characters that are not all hex digits must not slip through.
+      expect(hexToRgb("#gg6600")).toEqual({ r: 0, g: 0, b: 0 });
+    });
+
     // Drift guard — MQTT/Cloud could deliver non-string in color fields.
     it("should return black for non-string input (undefined)", () => {
       expect(hexToRgb(undefined as unknown as string)).toEqual({ r: 0, g: 0, b: 0 });
