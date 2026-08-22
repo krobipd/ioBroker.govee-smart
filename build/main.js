@@ -5,6 +5,10 @@ var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getProtoOf = Object.getPrototypeOf;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
     for (let key of __getOwnPropNames(from))
@@ -21,6 +25,12 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var main_exports = {};
+__export(main_exports, {
+  GoveeAdapter: () => GoveeAdapter
+});
+module.exports = __toCommonJS(main_exports);
 var import_adapter_core = require("@iobroker/adapter-core");
 var utils = __toESM(require("@iobroker/adapter-core"));
 var fs = __toESM(require("node:fs"));
@@ -58,6 +68,47 @@ function physicalSegmentCap(device) {
   return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
 }
 class GoveeAdapter extends utils.Adapter {
+  // ── Test seams ────────────────────────────────────────────────────────────
+  // Network-facing collaborators are built through overridable factory fields
+  // instead of inline `new` calls, so the orchestration tests can drive onReady
+  // without sockets, TLS or a live Govee account. The state-facing ones
+  // (StateManager, DeviceManager, SkuCache, LocalSnapshotStore) deliberately
+  // run FOR REAL against the stub adapter — that is what makes the state-tree
+  // assertions meaningful (hassemu hybrid pattern). Production behaviour is
+  // unchanged: every default is the same constructor call as before.
+  /**
+   * @param log Adapter logger forwarded to the LAN client
+   * @param timers Adapter timer wrapper
+   */
+  makeLanClient = (log, timers) => new import_govee_lan_client.GoveeLanClient(log, timers);
+  /**
+   * @param email Govee account email
+   * @param password Govee account password
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   */
+  makeMqttClient = (email, password, log, timers) => new import_govee_mqtt_client.GoveeMqttClient(email, password, log, timers);
+  /**
+   * @param apiKey Govee Cloud API key
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   */
+  makeOpenapiMqttClient = (apiKey, log, timers) => new import_govee_openapi_mqtt_client.GoveeOpenapiMqttClient(apiKey, log, timers);
+  /**
+   * @param apiKey Govee Cloud API key
+   * @param log Adapter logger
+   */
+  makeCloudClient = (apiKey, log) => new import_govee_cloud_client.GoveeCloudClient(apiKey, log);
+  /** @param log Adapter logger */
+  makeApiClient = (log) => new import_govee_api_client.GoveeApiClient(log);
+  /**
+   * @param log Adapter logger
+   * @param timers Adapter timer wrapper
+   * @param perMinute Per-minute Cloud budget
+   * @param perDay Per-day Cloud budget
+   */
+  makeRateLimiter = (log, timers, perMinute, perDay) => new import_rate_limiter.RateLimiter(log, timers, perMinute, perDay);
+  // ──────────────────────────────────────────────────────────────────────────
   /** Public for handler modules (state-change-router, group-fanout, wizard, snapshot, diagnostics). */
   deviceManager = null;
   /** Public for handler modules. */
@@ -234,7 +285,7 @@ class GoveeAdapter extends utils.Adapter {
           lanSeenDeviceIps: (_n = (_m = this.lanClient) == null ? void 0 : _m.getDiagSnapshot().seenDeviceIps) != null ? _n : []
         };
       });
-      const apiClient = new import_govee_api_client.GoveeApiClient(this.log);
+      const apiClient = this.makeApiClient(this.log);
       apiClient.setEmail(config.goveeEmail);
       this.deviceManager.setApiClient(apiClient);
       this.deviceManager.setCallbacks({
@@ -317,7 +368,7 @@ class GoveeAdapter extends utils.Adapter {
       this.log.info(
         `Starting (${startChannels.join(", ")}) \u2014 please wait, a "ready" message will follow when all channels are up`
       );
-      this.lanClient = new import_govee_lan_client.GoveeLanClient(this.log, this);
+      this.lanClient = this.makeLanClient(this.log, this);
       this.deviceManager.setLanClient(this.lanClient);
       this.lanClient.onInterfaceError = (message) => {
         this.actionableProblems.report({
@@ -371,7 +422,7 @@ class GoveeAdapter extends utils.Adapter {
         connectionState.checkAllReady(this);
       }, import_timing_constants.LAN_SCAN_INITIAL_WAIT_MS);
       if (hasAccountCreds) {
-        this.mqttClient = new import_govee_mqtt_client.GoveeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        this.mqttClient = this.makeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
         this.mqttClient.setPacketHook((deviceId, topic, payload) => {
           var _a2;
           (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().addMqttPacket(deviceId, topic, payload);
@@ -453,7 +504,7 @@ class GoveeAdapter extends utils.Adapter {
       }
       const cachedOk = this.deviceManager.loadFromCache();
       if (config.apiKey) {
-        this.cloudClient = new import_govee_cloud_client.GoveeCloudClient(config.apiKey, this.log);
+        this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
         this.cloudClient.setResponseHook((deviceId, endpoint, body) => {
           var _a2;
           (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().recordApiSuccess(deviceId, endpoint, body);
@@ -462,10 +513,10 @@ class GoveeAdapter extends utils.Adapter {
         this.deviceManager.setOnCloudCapabilities((device, caps) => {
           cloudStateLoader.applyCloudCapabilities(this, device, caps).catch((e) => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${(0, import_types.errMessage)(e)}`));
         });
-        this.rateLimiter = new import_rate_limiter.RateLimiter(this.log, this, import_timing_constants.CLOUD_FULL_LIMITS.perMinute, import_timing_constants.CLOUD_FULL_LIMITS.perDay);
+        this.rateLimiter = this.makeRateLimiter(this.log, this, import_timing_constants.CLOUD_FULL_LIMITS.perMinute, import_timing_constants.CLOUD_FULL_LIMITS.perDay);
         this.rateLimiter.start();
         this.deviceManager.setRateLimiter(this.rateLimiter);
-        this.openapiMqttClient = new import_govee_openapi_mqtt_client.GoveeOpenapiMqttClient(config.apiKey, this.log, this);
+        this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
         this.openapiMqttClient.connect(
           (event) => {
             var _a2;
@@ -862,4 +913,8 @@ if (require.main !== module) {
 } else {
   (() => new GoveeAdapter())();
 }
+// Annotate the CommonJS export names for ESM import in node:
+0 && (module.exports = {
+  GoveeAdapter
+});
 //# sourceMappingURL=main.js.map

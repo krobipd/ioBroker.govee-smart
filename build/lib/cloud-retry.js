@@ -44,8 +44,17 @@ class CloudRetryLoop {
       this.retryTimer = void 0;
     }
   }
-  /** Cancel any pending retry. Called from onUnload. */
+  /**
+   * Cancel any pending retry and stop the loop for good. Called from onUnload.
+   *
+   * `stopped` is what makes the post-load check in {@link runAttempt} bite: a
+   * loadFromCloud already in flight when the adapter unloads resolves AFTER
+   * teardown, and without this flag it logged "Cloud connection restored" and
+   * ran onCloudRestored — setState + a full cloud-state rebuild against a
+   * torn-down adapter. Clearing the timer alone never stopped that path.
+   */
   dispose() {
+    this.stopped = true;
     if (this.retryTimer !== void 0) {
       this.host.clearTimeout(this.retryTimer);
       this.retryTimer = void 0;

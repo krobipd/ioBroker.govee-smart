@@ -37,6 +37,7 @@ __export(http_client_exports, {
 module.exports = __toCommonJS(http_client_exports);
 var https = __toESM(require("node:https"));
 const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 4 });
+const httpsTransport = { request: https.request, agent: keepAliveAgent };
 function interpretOkBody(raw, statusCode) {
   const trimmed = raw.trim();
   if (trimmed.length === 0) {
@@ -53,7 +54,7 @@ function interpretOkBody(raw, statusCode) {
     throw new Error(`Invalid JSON in HTTP ${statusCode} response: ${detail} \u2014 body starts with: ${snippet}`);
   }
 }
-function httpsRequest(options) {
+function httpsRequest(options, transport = httpsTransport) {
   return new Promise((resolve, reject) => {
     var _a;
     const u = new URL(options.url);
@@ -70,8 +71,11 @@ function httpsRequest(options) {
         } : {}
       },
       timeout: (_a = options.timeout) != null ? _a : 15e3,
-      agent: keepAliveAgent
+      agent: transport.agent
     };
+    if (u.port) {
+      reqOptions.port = u.port;
+    }
     let onAbort = null;
     const cleanupAbort = () => {
       if (onAbort && options.signal) {
@@ -79,7 +83,7 @@ function httpsRequest(options) {
         onAbort = null;
       }
     };
-    const req = https.request(reqOptions, (res) => {
+    const req = transport.request(reqOptions, (res) => {
       const chunks = [];
       res.on("error", (err) => {
         cleanupAbort();
