@@ -121,6 +121,10 @@ export async function sendMusicCommand(
   // Index 0 = the "---" sentinel = nothing selected. Gate the skip on the
   // INDEX, not the resolved device value: on a 0-based SKU index 1 resolves to
   // device value 0 (a real mode) which must NOT be swallowed here (A1).
+  // The `<= 0` half has no test of its own on purpose: index 0 would resolve to
+  // `options[-1]` → undefined → NaN and fall through the guard below anyway, so
+  // dropping it only changes which debug line appears (equivalent mutant,
+  // 2026-08-22 test audit). It stays because it names the intent.
   if (!Number.isFinite(selectedIndex) || selectedIndex <= 0) {
     adapter.log.debug("Music mode not selected, skipping command");
     return;

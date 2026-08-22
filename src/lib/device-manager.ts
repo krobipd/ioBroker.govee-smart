@@ -1019,7 +1019,11 @@ export class DeviceManager {
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = device.segmentCount ?? 0;
     // L6 — plausibility cap: SEGMENT_HARD_MAX (55) is the Govee protocol upper
-    // limit. Values above it only come from broken/spoofed packets.
+    // limit. Values above it only come from broken/spoofed packets. Untestable
+    // through the public path and kept anyway: the parser above only yields
+    // packet numbers 1-5 → indices 0-19, so maxSeen can never exceed 20
+    // (equivalent mutant, 2026-08-22 test audit). Guards the day the parser
+    // learns more packet numbers.
     if (maxSeen > SEGMENT_HARD_MAX) {
       this.log.debug(
         `${deviceLabel(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_HARD_MAX})`,

@@ -106,6 +106,10 @@ export async function refreshLiveAppVersion(adapter: ConnectionStateAdapter): Pr
       timeout: 10_000,
     });
     const liveVersion = result.value?.results?.[0]?.version;
+    // Defence in depth, deliberately kept without its own test: setAppVersion()
+    // validates the same thing itself (typeof + /^\d+(\.\d+)+$/), so removing
+    // this guard changes nothing but one debug line. Measured as an equivalent
+    // mutant in the 2026-08-22 test audit.
     if (typeof liveVersion !== "string" || liveVersion.length === 0) {
       return;
     }
