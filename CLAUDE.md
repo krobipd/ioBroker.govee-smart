@@ -65,6 +65,34 @@ Ordnername = immer `sku_shortid` (z.B. `h61be_1d6f` = SKU + letzte 4 Hex der Dev
 
 Geräte unter `devices/`, Gruppen unter `groups/`. Pro Gerät fünf Channels: `control`, `scenes`, `music`, `snapshots`, `info`, dazu dynamisch `segments`. Gruppen bekommen nur die Fan-Out-fähige Teilmenge (kein Snapshot, keine Diagnostics). **Alle States haben `def`** in der StateDefinition und werden beim Erstellen initialisiert (keine null-Werte).
 
+## Online-Kennzeichnung + Summen (ab 2.27.0)
+
+Das Symbol am Geräte-Knoten kommt aus `common.statusStates` → `<gerät>.info.online`, **nicht** aus
+`info.connection`. Bis 2.26.0 blieb beim Abschalten des Adapters jedes Gerät grün stehen. Der Marker
+braucht **vier** Teile (allgemeine Regel + Herleitung: `Entwicklung/CLAUDE_CODING.md`):
+
+1. **Kein `supportedMessages.stopInstance` im Manifest** — mit dem Eintrag schießt der Host den
+   Prozess bedingungslos ab und `onUnload` läuft NIE; alles darin war toter Code.
+2. **`clearStopInstanceFlag()` als erstes in `onReady`**, danach sofort `return` — der Eintrag lebt
+   als Kopie im Instanzobjekt weiter und überlebt jedes Update. Nur schreiben, wenn das Feld gesetzt
+   ist (jede Objekt-Änderung löst einen Neustart aus → sonst Neustart-Schleife).
+3. **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`):
+   `stateManager.markAllOffline()` + die vier `info.*`-Verbindungs-Datenpunkte.
+4. **Start-Stempel**: `markAllOffline()` direkt nach dem Anlegen des StateManagers, VOR dem ersten
+   Scan — der einzige Teil, der auch nach Absturz und Stromausfall greift.
+
+**Die drei Summen** (`info.devicesTotal` / `devicesOnline` / `devicesAllOnline`) werden aus denselben
+Markern in derselben 20-Sekunden-Runde abgeleitet, die die Einzelnen neu bewertet
+(`onlineSyncTimer` → `writeDeviceRollup()`), damit Summe und Einzelne nicht auseinanderlaufen.
+
+- **Nur `devices.*` zählt.** Die App-Gerätegruppen unter `groups/` führen denselben Marker, sind aber
+  keine physischen Geräte — sie mitzuzählen würde die Zahl über das treiben, was der Nutzer besitzt.
+- **`devicesAllOnline` braucht `total > 0`** — null Geräte sind nicht „alles in Ordnung".
+- **`devicesTotal` bleibt beim Abschalten stehen**, nur `devicesOnline`/`devicesAllOnline` werden
+  zurückgesetzt: wie viele Geräte es gibt, ändert sich nicht dadurch, dass niemand hinsieht.
+- **`clearDeviceRollup()` legt nichts an**, es fasst nur vorhandene Datenpunkte an — sonst bekäme eine
+  frische Installation beim ersten Beenden eine Summe, die sie nie hatte.
+
 ## Cloud REST API v2
 
 **Base URL:** `https://openapi.api.govee.com` · **Auth:** Header `Govee-API-Key: <key>`
