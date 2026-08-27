@@ -94,6 +94,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.27.0 (2026-08-27)
+
+- Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
+- Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
+
 ### 2.26.0 (2026-08-22)
 
 - Fixed: Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints for a moment after it has shut down.
@@ -108,10 +113,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
 
 ### 2.23.1 (2026-08-04)
-
-- Test release during the move to ioBroker Admin 8.
-
-### 2.23.0 (2026-08-04)
 
 - Test release during the move to ioBroker Admin 8.
 

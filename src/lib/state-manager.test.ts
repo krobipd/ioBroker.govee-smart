@@ -217,6 +217,44 @@ describe("StateManager", () => {
     });
   });
 
+  describe("markAllOffline", () => {
+    it("sets every online marker to false — devices and the group rollup alike", async () => {
+      // info.online is what colours a device in the object tree. Left on its last
+      // value it keeps every Govee device green while the instance is switched off.
+      const { adapter, states, objects } = createMockAdapter();
+      objects.set("devices.h6160_0011.info.online", { type: "state" });
+      objects.set("devices.h6160_0022.info.online", { type: "state" });
+      objects.set("groups.info.online", { type: "state" });
+      objects.set("devices.h6160_0011.control.power", { type: "state" });
+      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      states.set("devices.h6160_0022.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      states.set("groups.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      states.set("devices.h6160_0011.control.power", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+
+      const sm = new StateManager(adapter as never);
+      const touched = await sm.markAllOffline();
+
+      expect(touched.sort()).toEqual([
+        "devices.h6160_0011.info.online",
+        "devices.h6160_0022.info.online",
+        "groups.info.online",
+      ]);
+      expect(states.get("devices.h6160_0011.info.online")?.val).toBe(false);
+      expect(states.get("groups.info.online")?.val).toBe(false);
+      // Everything else is left alone — this is not a blanket reset.
+      expect(states.get("devices.h6160_0011.control.power")?.val).toBe(true);
+    });
+
+    it("works off the object database, so it also runs before any device is known", async () => {
+      // At startup the device map is empty and at shutdown it may already be gone.
+      const { adapter, objects, states } = createMockAdapter();
+      objects.set("devices.h6160_0011.info.online", { type: "state" });
+      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const sm = new StateManager(adapter as never);
+      expect(await sm.markAllOffline()).toEqual(["devices.h6160_0011.info.online"]);
+    });
+  });
+
   describe("cleanupCloudOwnedStates", () => {
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();

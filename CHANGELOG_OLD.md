@@ -1,4 +1,8 @@
 # Older Changes
+## 2.23.0 (2026-08-04)
+
+- Test release during the move to ioBroker Admin 8.
+
 ## 2.22.0 (2026-07-23)
 
 - A Govee app device group of the "same mode" type no longer appears as a phantom, uncontrollable device in the object tree.

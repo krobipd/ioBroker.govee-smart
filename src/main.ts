@@ -228,8 +228,46 @@ export class GoveeAdapter extends utils.Adapter {
   }
 
   /** Adapter started — initialize all channels */
+  /**
+   * Clear a leftover `supportedMessages.stopInstance` from THIS instance's object.
+   *
+   * The entry lives in two places: in the adapter's manifest, and as a copy in the
+   * instance object in the database. An update merges the manifest into that copy —
+   * it never removes a field. Without this correction the host keeps killing the
+   * process outright on every installation that ever ran a version carrying the
+   * entry, `onUnload` never runs, and every state written there is dead code.
+   *
+   * Writing the instance object makes the host restart this instance once — that is
+   * the price, and it happens exactly once because the condition is false afterwards.
+   *
+   * @returns true when the correction was written and the restart is coming; the
+   *   caller has to stop right there, or it arms timers of a process the host is
+   *   already shutting down.
+   */
+  private async clearStopInstanceFlag(): Promise<boolean> {
+    const id = `system.adapter.${this.namespace}`;
+    try {
+      const obj = await this.getForeignObjectAsync(id);
+      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
+      if (!supported?.stopInstance) {
+        return false;
+      }
+      this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      return true;
+    } catch (e) {
+      this.log.debug(`Could not check the instance object: ${errMessage(e)}`);
+      return false;
+    }
+  }
+
   private async onReady(): Promise<void> {
     try {
+      // First of all: without this the whole shutdown path stays dead on an updated
+      // install, and the correction restarts us — so nothing else may start up here.
+      if (await this.clearStopInstanceFlag()) {
+        return;
+      }
       await I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
 
@@ -324,6 +362,10 @@ export class GoveeAdapter extends utils.Adapter {
       await this.setState("info.verificationPending", { val: false, ack: true });
 
       this.stateManager = new StateManager(this);
+      // Nothing has been asked yet, so nothing may still claim to be reachable from
+      // the previous run — least of all after a crash, where no shutdown code ran at
+      // all and the old values would stand until the 20-second sync catches up.
+      await this.stateManager.markAllOffline().catch(() => undefined);
       // One-shot orphan cleanup: builds up to v2.21.0 merged a Govee app
       // "SameModeGroup" pseudo-device into a generic device; the fix skips it at
       // intake, but an object tree already created that way never re-enters the
@@ -1005,15 +1047,32 @@ export class GoveeAdapter extends utils.Adapter {
       this.mqttClient?.disconnect();
       this.openapiMqttClient?.disconnect();
       this.rateLimiter?.stop();
-      // onUnload MUST be synchronous — don't await, but silence potential
-      // promise rejection during teardown to avoid "unhandled rejection" warnings.
-      this.setState("info.connection", { val: false, ack: true }).catch(() => {});
-      this.setState("info.mqttConnected", { val: false, ack: true }).catch(() => {});
-      this.setState("info.openapiMqttConnected", {
-        val: false,
-        ack: true,
-      }).catch(() => {});
-      this.setState("info.cloudConnected", { val: false, ack: true }).catch(() => {});
+      // The callback is the "we are done" signal to the host, and it comes AFTER
+      // these writes: issued fire-and-forget and followed by an immediate callback,
+      // not one of them reaches the database — the process is gone first (measured
+      // on a live server 2026-08-27). The host allows a second before it ends the
+      // process; these writes take about a tenth of that.
+      //
+      // The per-device markers belong here just as much: `info.online` is what
+      // colours a device in the object tree, so writing only the four connection
+      // flags leaves every Govee device standing green while the instance is off.
+      const done = (): void => callback();
+      const writes: Promise<unknown>[] = [
+        this.setState("info.connection", { val: false, ack: true }),
+        this.setState("info.mqttConnected", { val: false, ack: true }),
+        this.setState("info.openapiMqttConnected", { val: false, ack: true }),
+        this.setState("info.cloudConnected", { val: false, ack: true }),
+      ];
+      if (this.stateManager) {
+        writes.push(this.stateManager.markAllOffline());
+      }
+      void Promise.all(writes)
+        .catch((e: unknown) => {
+          // States DB already going down — nothing left to report to.
+          this.log.debug(`onUnload: final states rejected: ${errMessage(e)}`);
+        })
+        .finally(done);
+      return;
     } catch {
       // ignore
     }

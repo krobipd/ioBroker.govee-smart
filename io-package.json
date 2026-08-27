@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.26.0",
+    "version": "2.27.0",
     "news": {
+      "2.27.0": {
+        "en": "Switching the instance off now shows every device as offline in the object tree, instead of leaving them green while the adapter is not running",
+        "de": "Beim Abschalten der Instanz werden jetzt alle Geräte im Objektbaum als offline angezeigt, statt grün stehen zu bleiben, solange der Adapter nicht läuft",
+        "ru": "При выключении экземпляра все устройства теперь отображаются в дереве объектов как офлайн, а не остаются зелёными, пока адаптер не работает",
+        "pt": "Ao desligar a instância, todos os dispositivos passam a aparecer offline na árvore de objetos, em vez de ficarem verdes enquanto o adaptador não corre",
+        "nl": "Bij het uitschakelen van de instantie worden alle apparaten nu offline getoond in de objectboom, in plaats van groen te blijven zolang de adapter niet draait",
+        "fr": "À l'arrêt de l'instance, tous les appareils apparaissent désormais hors ligne dans l'arbre des objets, au lieu de rester verts tant que l'adaptateur ne tourne pas",
+        "it": "Allo spegnimento dell'istanza tutti i dispositivi vengono ora mostrati offline nell'albero degli oggetti, invece di restare verdi mentre l'adapter non è in funzione",
+        "es": "Al apagar la instancia, todos los dispositivos se muestran ahora sin conexión en el árbol de objetos, en vez de seguir en verde mientras el adaptador no funciona",
+        "pl": "Po wyłączeniu instancji wszystkie urządzenia są teraz pokazywane jako offline w drzewie obiektów, zamiast pozostawać zielone, gdy adapter nie działa",
+        "uk": "Під час вимкнення екземпляра всі пристрої тепер показуються офлайн у дереві об'єктів, а не лишаються зеленими, поки адаптер не працює",
+        "zh-cn": "停用实例后，所有设备现在会在对象树中显示为离线，而不再在适配器未运行时仍保持绿色"
+      },
       "2.26.0": {
         "en": "Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints after it has shut down.",
         "de": "Stoppen oder Neustarten der Instanz beendet die Cloud-Verbindung jetzt wirklich; der Adapter aktualisiert nach dem Herunterfahren keine Datenpunkte mehr.",
@@ -80,19 +93,6 @@
         "pl": "Kreator wykrywania segmentów dla przyciętych taśm LED ma teraz wizualny interfejs: aktualną mapę taśmy, która wypełnia się podczas pomiaru i można ją poprawić przed zastosowaniem.",
         "uk": "Майстер визначення сегментів для обрізаних LED-стрічок тепер має візуальний інтерфейс: живу карту стрічки, яка заповнюється під час вимірювання та може бути виправлена перед застосуванням.",
         "zh-cn": "用于剪裁 LED 灯带的分段检测向导现在有了可视化界面：一张实时灯带图，随测量逐步填充，并可在应用前进行修正。"
-      },
-      "2.20.0": {
-        "en": "Channel and device labels now follow the ioBroker system language\nClearer, honest feedback for Cloud login, API key, device sync and network problems",
-        "de": "Kanal- und Gerätelabels folgen jetzt der ioBroker-Systemsprache\nKlarere, ehrliche Rückmeldungen bei Cloud-Login, API-Key, Geräte-Sync und Netzwerkproblemen",
-        "ru": "Названия каналов и устройств теперь следуют системному языку ioBroker\nЧёткая, честная обратная связь при входе в облако, API-ключе, синхронизации и проблемах сети",
-        "pt": "Nomes de canais e dispositivos seguem agora o idioma do sistema ioBroker\nFeedback claro e honesto no login da nuvem, chave de API, sincronização e problemas de rede",
-        "nl": "Kanaal- en apparaatlabels volgen nu de ioBroker-systeemtaal\nDuidelijkere, eerlijke terugkoppeling bij cloudlogin, API-sleutel, apparaatsync en netwerkproblemen",
-        "fr": "Les noms de canaux et d'appareils suivent la langue système ioBroker\nRetour clair et honnête pour la connexion cloud, la clé API, la synchro et les problèmes réseau",
-        "it": "I nomi di canali e dispositivi seguono la lingua di sistema di ioBroker\nFeedback chiaro e onesto per login cloud, chiave API, sincronizzazione e problemi di rete",
-        "es": "Los nombres de canales y dispositivos siguen el idioma del sistema ioBroker\nComentarios claros y honestos en inicio de sesión, clave API, sincronización y errores de red",
-        "pl": "Nazwy kanałów i urządzeń podążają teraz za językiem systemowym ioBroker\nJaśniejsze, uczciwe komunikaty przy logowaniu do chmury, kluczu API, synchronizacji i sieci",
-        "uk": "Назви каналів і пристроїв тепер відповідають системній мові ioBroker\nЧіткий, чесний зворотний зв'язок для входу в хмару, ключа API, синхронізації та мережі",
-        "zh-cn": "频道和设备名称现在遵循 ioBroker 系统语言\n针对云登录、API 密钥、设备同步和网络问题提供更清晰、真实的反馈"
       }
     },
     "plugins": {
@@ -158,9 +158,6 @@
     "dataSource": "push",
     "adminUI": {
       "config": "json"
-    },
-    "supportedMessages": {
-      "stopInstance": true
     },
     "dependencies": [
       {

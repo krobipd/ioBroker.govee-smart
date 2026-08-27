@@ -135,6 +135,7 @@ vi.mock("@iobroker/adapter-core", () => {
 
 import { GoveeAdapter } from "./main";
 import * as connectionState from "./lib/handlers/connection-state";
+import { StateManager } from "./lib/state-manager";
 import type { GoveeDevice } from "./lib/types";
 
 beforeEach(() => {
@@ -181,7 +182,7 @@ function internalOf(adapter: GoveeAdapter): {
   log: Record<"silly" | "debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   namespace: string;
   deviceManager: { getDevices(): GoveeDevice[]; [k: string]: unknown } | null;
-  stateManager: { devicePrefix(d: GoveeDevice): string; [k: string]: unknown } | null;
+  stateManager: { devicePrefix(d: GoveeDevice): string; markAllOffline(): Promise<string[]>; [k: string]: unknown } | null;
   lanClient: unknown;
   mqttClient: unknown;
   openapiMqttClient: unknown;
@@ -205,6 +206,9 @@ function internalOf(adapter: GoveeAdapter): {
   sendTo: ReturnType<typeof vi.fn>;
   onReady: () => Promise<void>;
   onUnload: (cb: () => void) => void;
+  clearStopInstanceFlag: () => Promise<boolean>;
+  getForeignObjectAsync: ReturnType<typeof vi.fn>;
+  extendForeignObjectAsync: ReturnType<typeof vi.fn>;
   onStateChange: (id: string, s: unknown) => Promise<void>;
   onMessage: (obj: unknown) => void;
   syncDevicesManually: () => Promise<void>;
@@ -531,6 +535,7 @@ describe("GoveeAdapter onReady — timers", () => {
     i.clearTimeout.mockClear();
     const cb = vi.fn();
     i.onUnload(cb);
+    await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(i.unloading).toBe(true);
     // 3 intervals (app-api poll, online sync, app-version) + the one-shot timers.
@@ -552,7 +557,96 @@ describe("GoveeAdapter onReady — timers", () => {
     });
     const cb = vi.fn();
     i.onUnload(cb);
+    await new Promise(resolve => setTimeout(resolve, 10));
     expect(cb).toHaveBeenCalledTimes(1);
+  });
+
+  it("a leftover stopInstance flag is corrected once and the startup stops there", async () => {
+    // The entry lives in the manifest AND as a copy in the instance object; an update
+    // merges and never removes, so without this the whole shutdown path stays dead on
+    // every installation that once ran a version carrying it. Writing the object makes
+    // the host restart us — carrying on would arm timers of a dying process.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({
+      common: { supportedMessages: { stopInstance: true } },
+    });
+    i.extendForeignObjectAsync.mockClear();
+    i.setInterval.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
+      common: { supportedMessages: { stopInstance: false } },
+    });
+    expect(i.setInterval).not.toHaveBeenCalled();
+  });
+
+  it("no leftover flag means the startup carries on", async () => {
+    // Writing on every start would restart the instance every start — a loop.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.extendForeignObjectAsync.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
+      `system.adapter.${i.namespace}`,
+      expect.objectContaining({ common: expect.objectContaining({ supportedMessages: expect.anything() }) }),
+    );
+  });
+
+  it("the startup marks everything offline before anything was asked", async () => {
+    // After a crash no shutdown code ran at all — the previous run's values would
+    // stand until the 20-second sync catches up, plus 90 seconds of reply timeout
+    // for a LAN light.
+    // onReady builds a FRESH state manager, so the spy goes on the prototype —
+    // patching the existing instance would be discarded and prove nothing.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const marked = vi.spyOn(StateManager.prototype, "markAllOffline").mockResolvedValue([]);
+
+    await i.onReady();
+
+    expect(marked).toHaveBeenCalled();
+    marked.mockRestore();
+  });
+
+  it("onUnload marks the devices offline, not just the connection flags", async () => {
+    // Writing only the four connection flags leaves every device standing green.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const marked = vi.fn(async () => [] as string[]);
+    i.stateManager!.markAllOffline = marked;
+
+    i.onUnload(() => undefined);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(marked).toHaveBeenCalled();
+  });
+
+  it("onUnload writes the final states BEFORE it reports back", async () => {
+    // Fire-and-forget plus an immediate callback loses the write: the process is
+    // gone before the value reaches the database, and every device keeps standing
+    // green in the object tree while the instance is switched off.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const order: string[] = [];
+    const realSetState = adapter.setState.bind(adapter);
+    adapter.setState = ((id: string, val: unknown) =>
+      new Promise(resolve =>
+        setTimeout(() => {
+          order.push(`write:${id}`);
+          void realSetState(id as never, val as never);
+          resolve(undefined);
+        }, 1),
+      )) as unknown as typeof adapter.setState;
+
+    i.onUnload(() => order.push("callback"));
+    await new Promise(resolve => setTimeout(resolve, 20));
+
+    expect(order[order.length - 1]).toBe("callback");
+    expect(order).toContain("write:info.connection");
   });
 });
 
