@@ -249,6 +249,40 @@ class StateManager {
     await this.adapter.setState(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => void 0);
   }
   /**
+   * Say that nothing is reachable — for startup and for shutdown.
+   *
+   * `info.online` is what colours a device in the admin's object tree. On its last
+   * value it keeps every Govee device green for as long as the instance is switched
+   * off, and after a crash the previous run's values stand until the 20-second sync
+   * has run and the devices are known again — for a LAN light that is another 90
+   * seconds of reply timeout on top.
+   *
+   * Works off the object database, not off the device map: at startup no device is
+   * known yet, and at shutdown the map may already be torn down. Everything that
+   * carries an `info.online` state is covered in one pass, devices and the group
+   * rollup alike.
+   *
+   * @returns the state ids that were set to false
+   */
+  async markAllOffline() {
+    var _a;
+    let view;
+    try {
+      view = await this.adapter.getObjectViewAsync("system", "state", {
+        startkey: `${this.adapter.namespace}.`,
+        endkey: `${this.adapter.namespace}.\u9999`
+      });
+    } catch (e) {
+      this.adapter.log.debug(`markAllOffline: cannot list states: ${e instanceof Error ? e.message : String(e)}`);
+      return [];
+    }
+    const ids = ((_a = view == null ? void 0 : view.rows) != null ? _a : []).map((row) => row.id.replace(`${this.adapter.namespace}.`, "")).filter((id) => id.endsWith(".info.online"));
+    for (const id of ids) {
+      await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => void 0);
+    }
+    return ids;
+  }
+  /**
    * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
    * (`diag.*`). Deletes the three old objects + states; the new ones get
    * created by the regular `createDeviceStates` pass. Idempotent — calling

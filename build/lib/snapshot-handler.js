@@ -30,6 +30,7 @@ class SnapshotHandler {
   constructor(host) {
     this.host = host;
   }
+  host;
   /**
    * Save current device state as a local snapshot.
    *

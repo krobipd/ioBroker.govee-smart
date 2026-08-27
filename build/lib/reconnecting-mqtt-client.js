@@ -36,6 +36,8 @@ class ReconnectingMqttClient {
     this.log = log;
     this.timers = timers;
   }
+  log;
+  timers;
   /** Live mqtt client, or null while disconnected. */
   client = null;
   /** Armed backoff timer between a failed attempt and the next reconnect. */

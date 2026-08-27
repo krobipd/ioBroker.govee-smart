@@ -35,6 +35,8 @@ class MessageRouter {
     this.host = host;
     this.probeConnectTimeoutMs = probeConnectTimeoutMs;
   }
+  host;
+  probeConnectTimeoutMs;
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
   lastVerificationRequestMs = 0;
   /** Separate throttle for the `test` action so it doesn't share the requestCode window (SEC-I1). */

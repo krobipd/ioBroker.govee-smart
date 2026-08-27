@@ -41,6 +41,7 @@ class SegmentWizard {
   constructor(host) {
     this.host = host;
   }
+  host;
   session = null;
   timeoutHandle = void 0;
   /**

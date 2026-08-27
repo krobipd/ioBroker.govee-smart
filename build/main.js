@@ -206,9 +206,45 @@ class GoveeAdapter extends utils.Adapter {
     this.on("unload", this.onUnload.bind(this));
   }
   /** Adapter started — initialize all channels */
+  /**
+   * Clear a leftover `supportedMessages.stopInstance` from THIS instance's object.
+   *
+   * The entry lives in two places: in the adapter's manifest, and as a copy in the
+   * instance object in the database. An update merges the manifest into that copy —
+   * it never removes a field. Without this correction the host keeps killing the
+   * process outright on every installation that ever ran a version carrying the
+   * entry, `onUnload` never runs, and every state written there is dead code.
+   *
+   * Writing the instance object makes the host restart this instance once — that is
+   * the price, and it happens exactly once because the condition is false afterwards.
+   *
+   * @returns true when the correction was written and the restart is coming; the
+   *   caller has to stop right there, or it arms timers of a process the host is
+   *   already shutting down.
+   */
+  async clearStopInstanceFlag() {
+    var _a;
+    const id = `system.adapter.${this.namespace}`;
+    try {
+      const obj = await this.getForeignObjectAsync(id);
+      const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
+      if (!(supported == null ? void 0 : supported.stopInstance)) {
+        return false;
+      }
+      this.log.info("Correcting a leftover setting from an earlier version \u2014 this instance restarts once");
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      return true;
+    } catch (e) {
+      this.log.debug(`Could not check the instance object: ${(0, import_types.errMessage)(e)}`);
+      return false;
+    }
+  }
   async onReady() {
     var _a, _b, _c, _d, _e, _f;
     try {
+      if (await this.clearStopInstanceFlag()) {
+        return;
+      }
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
       const config = this.config;
       void connectionState.refreshLiveAppVersion(this).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
@@ -246,6 +282,7 @@ class GoveeAdapter extends utils.Adapter {
       });
       await this.setState("info.verificationPending", { val: false, ack: true });
       this.stateManager = new import_state_manager.StateManager(this);
+      await this.stateManager.markAllOffline().catch(() => void 0);
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => void 0);
       await this.stateManager.createGroupsOnlineState(false);
       this.deviceManager = new import_device_manager.DeviceManager(this.log, this);
@@ -761,17 +798,20 @@ class GoveeAdapter extends utils.Adapter {
       (_d = this.mqttClient) == null ? void 0 : _d.disconnect();
       (_e = this.openapiMqttClient) == null ? void 0 : _e.disconnect();
       (_f = this.rateLimiter) == null ? void 0 : _f.stop();
-      this.setState("info.connection", { val: false, ack: true }).catch(() => {
-      });
-      this.setState("info.mqttConnected", { val: false, ack: true }).catch(() => {
-      });
-      this.setState("info.openapiMqttConnected", {
-        val: false,
-        ack: true
-      }).catch(() => {
-      });
-      this.setState("info.cloudConnected", { val: false, ack: true }).catch(() => {
-      });
+      const done = () => callback();
+      const writes = [
+        this.setState("info.connection", { val: false, ack: true }),
+        this.setState("info.mqttConnected", { val: false, ack: true }),
+        this.setState("info.openapiMqttConnected", { val: false, ack: true }),
+        this.setState("info.cloudConnected", { val: false, ack: true })
+      ];
+      if (this.stateManager) {
+        writes.push(this.stateManager.markAllOffline());
+      }
+      void Promise.all(writes).catch((e) => {
+        this.log.debug(`onUnload: final states rejected: ${(0, import_types.errMessage)(e)}`);
+      }).finally(done);
+      return;
     } catch {
     }
     callback();

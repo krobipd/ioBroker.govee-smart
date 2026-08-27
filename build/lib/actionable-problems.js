@@ -28,6 +28,7 @@ class ActionableProblems {
   constructor(host) {
     this.host = host;
   }
+  host;
   active = /* @__PURE__ */ new Map();
   /**
    * Report an actionable problem. Surfaces it (warn + notification) when it is

@@ -48,6 +48,7 @@ class GroupFanoutHandler {
   constructor(host) {
     this.host = host;
   }
+  host;
   /**
    * Fan out a group command to all online member devices.
    * Basic controls (power/brightness/color) pass straight through.

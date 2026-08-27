@@ -28,6 +28,7 @@ class CloudRetryLoop {
   constructor(host) {
     this.host = host;
   }
+  host;
   retryTimer = void 0;
   connected = false;
   stopped = false;

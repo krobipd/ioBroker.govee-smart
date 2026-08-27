@@ -35,6 +35,7 @@ class GoveeApiClient {
   constructor(log) {
     this.log = log;
   }
+  log;
   bearerToken = null;
   /** Account-derived client ID. Defaults to anonymous fallback until setEmail() is called. */
   clientId = (0, import_govee_constants.deriveGoveeClientId)(void 0);
