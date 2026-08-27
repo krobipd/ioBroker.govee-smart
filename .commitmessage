@@ -1,0 +1,4 @@
+chore: release v2.27.0
+
+- Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
+- Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up

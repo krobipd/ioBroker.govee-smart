@@ -98,6 +98,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
 - Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
+- New: Three new datapoints under info — how many devices there are, how many are reachable right now, and whether that is all of them
 
 ### 2.26.0 (2026-08-22)
 

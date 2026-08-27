@@ -346,23 +346,96 @@ export class StateManager {
    * @returns the state ids that were set to false
    */
   public async markAllOffline(): Promise<string[]> {
-    let view;
-    try {
-      view = await this.adapter.getObjectViewAsync("system", "state", {
-        startkey: `${this.adapter.namespace}.`,
-        endkey: `${this.adapter.namespace}.\u9999`,
-      });
-    } catch (e) {
-      this.adapter.log.debug(`markAllOffline: cannot list states: ${e instanceof Error ? e.message : String(e)}`);
-      return [];
-    }
-    const ids = (view?.rows ?? [])
-      .map(row => row.id.replace(`${this.adapter.namespace}.`, ""))
-      .filter(id => id.endsWith(".info.online"));
+    const ids = await this.onlineMarkerIds();
     for (const id of ids) {
       await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => undefined);
     }
+    await this.clearDeviceRollup();
     return ids;
+  }
+
+  /**
+   * Every state id that exists below this instance, without the namespace.
+   *
+   * @returns the ids, or an empty list when the object database does not answer
+   */
+  private async existingStateIds(): Promise<string[]> {
+    try {
+      const view = await this.adapter.getObjectViewAsync("system", "state", {
+        startkey: `${this.adapter.namespace}.`,
+        endkey: `${this.adapter.namespace}.\u9999`,
+      });
+      return (view?.rows ?? []).map(row => row.id.replace(`${this.adapter.namespace}.`, ""));
+    } catch (e) {
+      this.adapter.log.debug(`cannot list states: ${e instanceof Error ? e.message : String(e)}`);
+      return [];
+    }
+  }
+
+  /**
+   * The online markers of devices and of the group rollup.
+   *
+   * @returns the state ids ending in `.info.online`
+   */
+  private async onlineMarkerIds(): Promise<string[]> {
+    return (await this.existingStateIds()).filter(id => id.endsWith(".info.online"));
+  }
+
+  /**
+   * Write the device rollup: how many devices exist, how many are reachable, and
+   * whether that is all of them.
+   *
+   * Answers at a glance what otherwise means opening ten nodes, and gives an
+   * automation one datapoint to hang on instead of ten.
+   *
+   * Counts REAL devices only — the Govee app's groups live in the tree as
+   * pseudo-devices and would inflate the number beyond what the user physically
+   * owns. Works off the object database for the same reason `markAllOffline` does:
+   * it has to be right before any device is known and after the map is gone.
+   *
+   * @returns total and online counts, for the caller to log or assert on
+   */
+  public async writeDeviceRollup(): Promise<{ total: number; online: number }> {
+    const ids = await this.onlineMarkerIds();
+    const deviceIds = ids.filter(id => id.startsWith("devices."));
+    let online = 0;
+    for (const id of deviceIds) {
+      const state = await this.adapter.getStateAsync(id).catch(() => null);
+      if (state?.val === true) {
+        online++;
+      }
+    }
+    const total = deviceIds.length;
+    await this.ensureState("info.devicesTotal", tName("devicesTotal"), "number", "value", false);
+    await this.ensureState("info.devicesOnline", tName("devicesOnline"), "number", "value", false);
+    await this.ensureState("info.devicesAllOnline", tName("devicesAllOnline"), "boolean", "indicator", false);
+    await this.adapter.setStateChangedAsync("info.devicesTotal", { val: total, ack: true });
+    await this.adapter.setStateChangedAsync("info.devicesOnline", { val: online, ack: true });
+    await this.adapter.setStateChangedAsync("info.devicesAllOnline", {
+      val: total > 0 && online === total,
+      ack: true,
+    });
+    return { total, online };
+  }
+
+  /**
+   * Clear the rollup — for startup and shutdown.
+   *
+   * "8 of 10 online" while nothing is being read is the same lie the per-device
+   * markers tell. `devicesTotal` deliberately STAYS: how many devices exist did not
+   * change just because nobody is looking. Only touches states that already exist,
+   * so a fresh install does not get a rollup it never had.
+   */
+  public async clearDeviceRollup(): Promise<void> {
+    const ids = new Set(await this.existingStateIds());
+    if (ids.has("info.devicesOnline")) {
+      await this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }).catch(() => undefined);
+    }
+    if (ids.has("info.devicesAllOnline")) {
+      await this.adapter
+        .setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true })
+        .catch(() => undefined);
+    }
   }
 
   /**

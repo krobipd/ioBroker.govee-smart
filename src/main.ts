@@ -907,6 +907,12 @@ export class GoveeAdapter extends utils.Adapter {
           if (anyLightChanged) {
             groupFanoutHandler.updateGroupReachability(this);
           }
+          // The rollup rides on the same round: it is derived from exactly the
+          // markers that were just re-evaluated, so it can never drift away from
+          // what the individual devices say.
+          await this.stateManager!.writeDeviceRollup().catch(e => {
+            this.log.debug(`Device rollup failed: ${errMessage(e)}`);
+          });
         })();
       }, ONLINE_SYNC_INTERVAL_MS);
 
@@ -1064,6 +1070,7 @@ export class GoveeAdapter extends utils.Adapter {
         this.setState("info.cloudConnected", { val: false, ack: true }),
       ];
       if (this.stateManager) {
+        // Covers the per-device markers, the group marker and the rollup.
         writes.push(this.stateManager.markAllOffline());
       }
       void Promise.all(writes)

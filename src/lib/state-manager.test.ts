@@ -255,6 +255,72 @@ describe("StateManager", () => {
     });
   });
 
+  describe("writeDeviceRollup", () => {
+    it("counts the real devices and how many of them are reachable", async () => {
+      const { adapter, objects, states } = createMockAdapter();
+      for (const [id, online] of [
+        ["devices.h6160_0011", true],
+        ["devices.h6160_0022", true],
+        ["devices.h6160_0033", false],
+      ] as [string, boolean][]) {
+        objects.set(`${id}.info.online`, { type: "state" });
+        states.set(`${id}.info.online`, { val: online, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      }
+      // The Govee app's groups sit in the tree as pseudo-devices — counting them
+      // would show more devices than the user physically owns.
+      objects.set("groups.info.online", { type: "state" });
+      states.set("groups.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+
+      const sm = new StateManager(adapter as never);
+      const result = await sm.writeDeviceRollup();
+
+      expect(result).toEqual({ total: 3, online: 2 });
+      expect(states.get("info.devicesTotal")?.val).toBe(3);
+      expect(states.get("info.devicesOnline")?.val).toBe(2);
+      expect(states.get("info.devicesAllOnline")?.val).toBe(false);
+    });
+
+    it("all reachable sets the flag", async () => {
+      const { adapter, objects, states } = createMockAdapter();
+      objects.set("devices.h6160_0011.info.online", { type: "state" });
+      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const sm = new StateManager(adapter as never);
+      await sm.writeDeviceRollup();
+      expect(states.get("info.devicesAllOnline")?.val).toBe(true);
+    });
+
+    it("no devices at all does not claim everything is fine", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      expect(await sm.writeDeviceRollup()).toEqual({ total: 0, online: 0 });
+      expect(states.get("info.devicesAllOnline")?.val).toBe(false);
+    });
+
+    it("markAllOffline zeroes the rollup but keeps the device count", async () => {
+      // How many devices exist did not change just because nobody is reading them.
+      const { adapter, objects, states } = createMockAdapter();
+      objects.set("devices.h6160_0011.info.online", { type: "state" });
+      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const sm = new StateManager(adapter as never);
+      await sm.writeDeviceRollup();
+      expect(states.get("info.devicesTotal")?.val).toBe(1);
+
+      await sm.markAllOffline();
+
+      expect(states.get("info.devicesOnline")?.val).toBe(0);
+      expect(states.get("info.devicesAllOnline")?.val).toBe(false);
+      expect(states.get("info.devicesTotal")?.val).toBe(1);
+    });
+
+    it("a fresh install gets no rollup it never had", async () => {
+      // clearDeviceRollup only touches states that already exist.
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.markAllOffline();
+      expect(states.has("info.devicesOnline")).toBe(false);
+    });
+  });
+
   describe("cleanupCloudOwnedStates", () => {
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();

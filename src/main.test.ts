@@ -182,7 +182,12 @@ function internalOf(adapter: GoveeAdapter): {
   log: Record<"silly" | "debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   namespace: string;
   deviceManager: { getDevices(): GoveeDevice[]; [k: string]: unknown } | null;
-  stateManager: { devicePrefix(d: GoveeDevice): string; markAllOffline(): Promise<string[]>; [k: string]: unknown } | null;
+  stateManager: {
+    devicePrefix(d: GoveeDevice): string;
+    markAllOffline(): Promise<string[]>;
+    writeDeviceRollup(): Promise<{ total: number; online: number }>;
+    [k: string]: unknown;
+  } | null;
   lanClient: unknown;
   mqttClient: unknown;
   openapiMqttClient: unknown;
@@ -623,6 +628,25 @@ describe("GoveeAdapter onReady — timers", () => {
     await new Promise(resolve => setTimeout(resolve, 10));
 
     expect(marked).toHaveBeenCalled();
+  });
+
+  it("the 20-second round refreshes the rollup right after the markers", async () => {
+    // Derived from exactly the markers that were just re-evaluated, so the count
+    // can never drift away from what the individual devices say.
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    const rollup = vi.fn(async () => ({ total: 0, online: 0 }));
+    i.stateManager!.writeDeviceRollup = rollup;
+    const tick = i.setInterval.mock.calls.map(c => c[0] as () => void);
+    rollup.mockClear();
+
+    for (const run of tick) {
+      run();
+    }
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(rollup).toHaveBeenCalled();
+    void f;
   });
 
   it("onUnload writes the final states BEFORE it reports back", async () => {

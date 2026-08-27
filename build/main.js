@@ -674,6 +674,9 @@ class GoveeAdapter extends utils.Adapter {
           if (anyLightChanged) {
             groupFanoutHandler.updateGroupReachability(this);
           }
+          await this.stateManager.writeDeviceRollup().catch((e) => {
+            this.log.debug(`Device rollup failed: ${(0, import_types.errMessage)(e)}`);
+          });
         })();
       }, import_timing_constants.ONLINE_SYNC_INTERVAL_MS);
       this.appVersionCheckTimer = this.setInterval(() => {
