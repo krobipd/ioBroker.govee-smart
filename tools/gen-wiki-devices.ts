@@ -75,6 +75,8 @@ interface Texts {
   experimentalBody: string;
   /** Footer with timestamp */
   footer: string;
+  /** Word after the entry count in the footer ("entries" / "Einträge") */
+  entriesWord: string;
 }
 
 const TEXTS_DE: Texts = {
@@ -146,6 +148,7 @@ Sobald wir Diagnostics von deinem Gerät haben, wandert es im nächsten Release
 auf 🟢 **User-bestätigt** — dann ist es für alle ohne Sonder-Aktivierung
 direkt nutzbar.`,
   footer: "Diese Seite ist automatisch generiert.",
+  entriesWord: "Einträge",
 };
 
 const TEXTS_EN: Texts = {
@@ -217,6 +220,7 @@ Once we have diagnostics from your device, it moves to 🟢 **User-confirmed**
 in the next release — then it's directly usable for everyone without the
 experimental toggle.`,
   footer: "This page is auto-generated.",
+  entriesWord: "entries",
 };
 
 function escapePipe(s: string): string {
@@ -291,7 +295,7 @@ function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
   out.push("");
   out.push(`---`);
   out.push("");
-  out.push(`*${t.footer} ${totalCount} entries · ${new Date().toISOString().slice(0, 10)}*`);
+  out.push(`*${t.footer} ${totalCount} ${t.entriesWord} · ${new Date().toISOString().slice(0, 10)}*`);
   out.push("");
   return out.join("\n");
 }
