@@ -73,3 +73,41 @@ export async function readDeviceBaseline(
     segments,
   };
 }
+
+/**
+ * Replay a captured per-segment gradient onto a device — one `segmentBatch`
+ * per distinct (colour, brightness) tuple, so a 3-zone gradient restores in 3
+ * batches instead of segmentCount sequential writes (each batch pays
+ * forceColorMode's settle delay once). Malformed colours fall back to black,
+ * missing brightness to 100 — matching the capture-side defaults.
+ *
+ * Shared by SnapshotHandler.restoreSegments (local-snapshot restore) and
+ * SegmentWizard.restoreBaseline (wizard end/abort) — the grouping logic lived
+ * as two drifting copies before.
+ *
+ * @param sendCommand Command dispatcher (DeviceManager.sendCommand via host)
+ * @param device Target device
+ * @param segments Per-segment colour + brightness with explicit indices
+ */
+export async function restoreSegmentsGrouped(
+  sendCommand: (device: GoveeDevice, command: string, value: unknown) => Promise<void>,
+  device: GoveeDevice,
+  segments: { idx: number; color: string; brightness: number }[],
+): Promise<void> {
+  const groups = new Map<string, { segments: number[]; color: number; brightness: number }>();
+  for (const seg of segments) {
+    const hex = typeof seg.color === "string" && /^#?[0-9a-fA-F]{6}$/.test(seg.color) ? seg.color : "#000000";
+    const color = parseInt(hex.replace("#", ""), 16);
+    const brightness = typeof seg.brightness === "number" ? seg.brightness : 100;
+    const key = `${color}:${brightness}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.segments.push(seg.idx);
+    } else {
+      groups.set(key, { segments: [seg.idx], color, brightness });
+    }
+  }
+  for (const group of groups.values()) {
+    await sendCommand(device, "segmentBatch", group);
+  }
+}

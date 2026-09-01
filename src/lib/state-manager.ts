@@ -15,6 +15,13 @@ import type { DeviceState, GoveeDevice } from "./types";
 import { mapKey, treeKey } from "./device-key";
 
 /**
+ * High sort-end marker for getObjectView key ranges (`startkey: prefix,
+ * endkey: prefix + SORT_KEY_END` covers every id below the prefix). U+9999 is
+ * the conventional js-controller "after everything ASCII" endkey.
+ */
+const SORT_KEY_END = "香";
+
+/**
  * Channels whose state-set is fully described by capability-driven stateDefs.
  * Only these get the stale-state cleanup pass — `info` is intentionally absent
  * because it mixes capability-driven states (diagnostics_export/result) with
@@ -203,6 +210,16 @@ export class StateManager {
    * bounds the phantom-state cleanup to one existence-check per adapter run.
    */
   private readonly cleanedSyntheticStates = new Set<string>();
+  /**
+   * Cached `.info.online` marker ids (namespace-less) for the 20-second rollup
+   * round. The previous per-round full-namespace `getObjectView` scan grew
+   * linearly with the whole state tree (>1000 rows on a 30-device install,
+   * every 20 s) just to re-derive a set that only changes when a device is
+   * created, migrated or removed — exactly the places that now maintain the
+   * cache. `null` = not yet populated; {@link markAllOffline} (startup/shutdown,
+   * where the object DB is the only truth) always refreshes it from the DB.
+   */
+  private onlineMarkerCache: Set<string> | null = null;
 
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter: utils.AdapterInstance) {
@@ -346,7 +363,7 @@ export class StateManager {
    * @returns the state ids that were set to false
    */
   public async markAllOffline(): Promise<string[]> {
-    const ids = await this.onlineMarkerIds();
+    const ids = await this.onlineMarkerIds(true);
     for (const id of ids) {
       await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => undefined);
     }
@@ -363,7 +380,7 @@ export class StateManager {
     try {
       const view = await this.adapter.getObjectViewAsync("system", "state", {
         startkey: `${this.adapter.namespace}.`,
-        endkey: `${this.adapter.namespace}.\u9999`,
+        endkey: `${this.adapter.namespace}.${SORT_KEY_END}`,
       });
       return (view?.rows ?? []).map(row => row.id.replace(`${this.adapter.namespace}.`, ""));
     } catch (e) {
@@ -373,12 +390,21 @@ export class StateManager {
   }
 
   /**
-   * The online markers of devices and of the group rollup.
+   * The online markers of devices and of the group rollup. Served from
+   * {@link onlineMarkerCache} on the 20-second rollup path; a DB scan runs only
+   * when the cache is cold or a refresh is forced (startup/shutdown via
+   * {@link markAllOffline}, where leftovers from a previous run must be found).
    *
+   * @param forceRefresh Rebuild the cache from the object DB
    * @returns the state ids ending in `.info.online`
    */
-  private async onlineMarkerIds(): Promise<string[]> {
-    return (await this.existingStateIds()).filter(id => id.endsWith(".info.online"));
+  private async onlineMarkerIds(forceRefresh = false): Promise<string[]> {
+    if (!forceRefresh && this.onlineMarkerCache) {
+      return Array.from(this.onlineMarkerCache);
+    }
+    const ids = (await this.existingStateIds()).filter(id => id.endsWith(".info.online"));
+    this.onlineMarkerCache = new Set(ids);
+    return ids;
   }
 
   /**
@@ -574,6 +600,7 @@ export class StateManager {
           this.stateChannelMap.delete(mapKey);
         }
       }
+      this.onlineMarkerCache?.delete(`${oldPrefix}.info.online`);
     }
     this.prefixMap.set(key, newPrefix);
 
@@ -635,6 +662,7 @@ export class StateManager {
         undefined,
         false,
       );
+      this.onlineMarkerCache?.add(`${prefix}.info.online`);
       // info.online is written via syncInfoOnline (resolver-based, no
       // ts-rewrite-spam). The initial sync happens right after this method
       // returns — see syncInfoOnline. Direct write here was the source of
@@ -709,6 +737,7 @@ export class StateManager {
       ]) {
         await this.safeDeleteState(`${prefix}.info.${staleId}`);
       }
+      this.onlineMarkerCache?.delete(`${prefix}.info.online`);
       // Groups never had a `diag` channel — drop any leftover from migrated installs.
       await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
     }
@@ -1061,7 +1090,7 @@ export class StateManager {
     const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
     const existing = await this.adapter.getObjectViewAsync("system", "channel", {
       startkey: segPrefix,
-      endkey: `${segPrefix}\u9999`,
+      endkey: `${segPrefix}${SORT_KEY_END}`,
     });
 
     if (!existing?.rows) {
@@ -1164,6 +1193,7 @@ export class StateManager {
       { preserve: { common: ["name"] } },
     );
     await this.ensureState("groups.info.online", tName("cloudOnline"), "boolean", "indicator.reachable", false);
+    this.onlineMarkerCache?.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true,
@@ -1235,7 +1265,7 @@ export class StateManager {
       try {
         existingObjects = await this.adapter.getObjectViewAsync("system", "device", {
           startkey: `${this.adapter.namespace}.${folder}.`,
-          endkey: `${this.adapter.namespace}.${folder}.\u9999`,
+          endkey: `${this.adapter.namespace}.${folder}.${SORT_KEY_END}`,
         });
       } catch (e) {
         this.adapter.log.debug(
@@ -1258,7 +1288,7 @@ export class StateManager {
           const stateRows = await this.adapter
             .getObjectViewAsync("system", "state", {
               startkey: `${row.id}.`,
-              endkey: `${row.id}.香`,
+              endkey: `${row.id}.${SORT_KEY_END}`,
             })
             .catch(() => undefined);
           if (stateRows?.rows) {
@@ -1294,7 +1324,7 @@ export class StateManager {
     try {
       existing = await this.adapter.getObjectViewAsync("system", "device", {
         startkey: `${this.adapter.namespace}.devices.samemodegroup_`,
-        endkey: `${this.adapter.namespace}.devices.samemodegroup_香`,
+        endkey: `${this.adapter.namespace}.devices.samemodegroup_${SORT_KEY_END}`,
       });
     } catch (e) {
       this.adapter.log.debug(
@@ -1312,7 +1342,7 @@ export class StateManager {
       const stateRows = await this.adapter
         .getObjectViewAsync("system", "state", {
           startkey: `${row.id}.`,
-          endkey: `${row.id}.香`,
+          endkey: `${row.id}.${SORT_KEY_END}`,
         })
         .catch(() => undefined);
       if (stateRows?.rows) {
@@ -1361,7 +1391,7 @@ export class StateManager {
     const devicePrefix = `${this.adapter.namespace}.${prefix}.`;
     const existing = await this.adapter.getObjectViewAsync("system", "state", {
       startkey: devicePrefix,
-      endkey: `${devicePrefix}\u9999`,
+      endkey: `${devicePrefix}${SORT_KEY_END}`,
     });
     if (!existing?.rows) {
       return 0;
@@ -1434,6 +1464,7 @@ export class StateManager {
    * @param prefix Device prefix that was removed
    */
   private forgetPrefix(prefix: string): void {
+    this.onlineMarkerCache?.delete(`${prefix}.info.online`);
     for (const key of this.prefixMap.keys()) {
       if (this.prefixMap.get(key) === prefix) {
         this.prefixMap.delete(key);

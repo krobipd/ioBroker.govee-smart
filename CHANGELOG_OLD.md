@@ -1,4 +1,8 @@
 # Older Changes
+## 2.23.1 (2026-08-04)
+
+- Test release during the move to ioBroker Admin 8.
+
 ## 2.23.0 (2026-08-04)
 
 - Test release during the move to ioBroker Admin 8.

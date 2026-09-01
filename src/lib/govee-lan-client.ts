@@ -349,6 +349,9 @@ export class GoveeLanClient {
     // cycles in the same process (correctness unaffected, but the
     // discovery-log info on an IP change would be lost).
     this.seenDeviceIps.clear();
+    // Same for the per-IP command timestamps — symmetric teardown so a
+    // start/stop cycle doesn't carry stale Δt annotations into the next run.
+    this.lastCommandSentMs.clear();
     this.multicastBind = undefined;
   }
 
@@ -747,6 +750,9 @@ export class GoveeLanClient {
       for (const existing of this.seenDeviceIps) {
         if (existing.startsWith(staleSuffix) && existing !== key) {
           this.seenDeviceIps.delete(existing);
+          // The command-timestamp map is keyed by IP — drop the entry for the
+          // device's abandoned IP so the map stays bounded by live addresses.
+          this.lastCommandSentMs.delete(existing.slice(staleSuffix.length));
         }
       }
       this.seenDeviceIps.add(key);

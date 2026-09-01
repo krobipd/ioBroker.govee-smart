@@ -18,7 +18,8 @@ var __copyProps = (to, from, except, desc) => {
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var device_baseline_exports = {};
 __export(device_baseline_exports, {
-  readDeviceBaseline: () => readDeviceBaseline
+  readDeviceBaseline: () => readDeviceBaseline,
+  restoreSegmentsGrouped: () => restoreSegmentsGrouped
 });
 module.exports = __toCommonJS(device_baseline_exports);
 async function readDeviceBaseline(surface, device, segDefault) {
@@ -54,8 +55,27 @@ async function readDeviceBaseline(surface, device, segDefault) {
     segments
   };
 }
+async function restoreSegmentsGrouped(sendCommand, device, segments) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const seg of segments) {
+    const hex = typeof seg.color === "string" && /^#?[0-9a-fA-F]{6}$/.test(seg.color) ? seg.color : "#000000";
+    const color = parseInt(hex.replace("#", ""), 16);
+    const brightness = typeof seg.brightness === "number" ? seg.brightness : 100;
+    const key = `${color}:${brightness}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.segments.push(seg.idx);
+    } else {
+      groups.set(key, { segments: [seg.idx], color, brightness });
+    }
+  }
+  for (const group of groups.values()) {
+    await sendCommand(device, "segmentBatch", group);
+  }
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  readDeviceBaseline
+  readDeviceBaseline,
+  restoreSegmentsGrouped
 });
 //# sourceMappingURL=device-baseline.js.map

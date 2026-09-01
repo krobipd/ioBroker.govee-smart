@@ -94,6 +94,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.27.1 (2026-09-01)
+
+- Improved: Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states
+
 ### 2.27.0 (2026-08-27)
 
 - Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
@@ -112,10 +116,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.24.0 (2026-08-04)
 
 - This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
-
-### 2.23.1 (2026-08-04)
-
-- Test release during the move to ioBroker Admin 8.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

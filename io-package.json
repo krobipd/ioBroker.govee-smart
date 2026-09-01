@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.27.0",
+    "version": "2.27.1",
     "news": {
+      "2.27.1": {
+        "en": "Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states.",
+        "de": "Deutlich geringere Datenbanklast im Hintergrund — die regelmäßige Erreichbarkeitsprüfung arbeitet jetzt wesentlich effizienter, besonders auf Systemen mit vielen Geräten und Datenpunkten.",
+        "ru": "Заметно меньшая фоновая нагрузка на базу данных — периодическая проверка доступности теперь работает гораздо эффективнее, особенно в системах с большим числом устройств.",
+        "pt": "Carga de base de dados em segundo plano visivelmente menor — a verificação periódica de acessibilidade funciona agora com muito mais eficiência, sobretudo em sistemas grandes.",
+        "nl": "Merkbaar lagere databasebelasting op de achtergrond — de periodieke bereikbaarheidscontrole werkt nu veel efficiënter, vooral op systemen met veel apparaten.",
+        "fr": "Charge de base de données en arrière-plan nettement réduite — le contrôle périodique de joignabilité fonctionne désormais bien plus efficacement, surtout sur les grandes installations.",
+        "it": "Carico del database in background notevolmente ridotto — il controllo periodico di raggiungibilità ora lavora in modo molto più efficiente, soprattutto su sistemi grandi.",
+        "es": "Carga de base de datos en segundo plano notablemente menor — la comprobación periódica de accesibilidad funciona ahora con mucha más eficiencia, sobre todo en sistemas grandes.",
+        "pl": "Wyraźnie mniejsze obciążenie bazy danych w tle — okresowa kontrola osiągalności działa teraz znacznie wydajniej, zwłaszcza w systemach z wieloma urządzeniami.",
+        "uk": "Помітно менше фонове навантаження на базу даних — періодична перевірка доступності тепер працює значно ефективніше, особливо у великих системах.",
+        "zh-cn": "后台数据库负载明显降低——周期性的可达性检查现在效率大幅提升，尤其是在设备和数据点较多的系统上。"
+      },
       "2.27.0": {
         "en": "Switching the instance off now shows every device as offline in the object tree, instead of leaving them green while the adapter is not running. Three new datapoints show how many devices there are and how many are reachable right now.",
         "de": "Beim Abschalten der Instanz werden jetzt alle Geräte im Objektbaum als offline angezeigt, statt grün stehen zu bleiben, solange der Adapter nicht läuft. Drei neue Datenpunkte zeigen, wie viele Geräte es gibt und wie viele davon gerade erreichbar sind.",
@@ -80,19 +93,6 @@
         "pl": "Czujniki podłączone przez bramę Govee pokazują teraz bramę zamiast pustego pola IP, a siedem kolejnych modeli urządzeń jest teraz w katalogu jako eksperymentalne.",
         "uk": "Датчики, під'єднані через шлюз Govee, тепер показують свій шлюз замість порожнього поля IP, і ще сім моделей пристроїв тепер у каталозі як експериментальні.",
         "zh-cn": "通过 Govee 网关连接的传感器现在会显示所使用的网关，而不再是空的 IP 字段，并且现在有七款设备型号作为实验性列入目录。"
-      },
-      "2.21.0": {
-        "en": "The segment-detection wizard for cut LED strips now has a visual admin interface: a live map of the strip that fills in as you measure and can be corrected before you apply it.",
-        "de": "Der Segment-Erkennungs-Assistent für gekürzte LED-Strips hat jetzt eine visuelle Oberfläche: eine Live-Karte des Strips, die sich beim Messen füllt und vor dem Übernehmen korrigierbar ist.",
-        "ru": "Мастер определения сегментов для обрезанных LED-лент теперь имеет визуальный интерфейс: живую карту ленты, которая заполняется при измерении и может быть исправлена перед применением.",
-        "pt": "O assistente de deteção de segmentos para fitas LED cortadas tem agora uma interface visual: um mapa ao vivo da fita que se preenche à medida que mede e pode ser corrigido antes de aplicar.",
-        "nl": "De segmentdetectie-wizard voor geknipte LED-strips heeft nu een visuele interface: een live kaart van de strip die zich vult tijdens het meten en corrigeerbaar is voordat je hem toepast.",
-        "fr": "L'assistant de détection de segments pour rubans LED coupés a maintenant une interface visuelle : une carte du ruban qui se remplit pendant la mesure, corrigeable avant application.",
-        "it": "La procedura di rilevamento segmenti per strisce LED tagliate ha ora un'interfaccia visiva: una mappa della striscia che si riempie durante la misurazione, correggibile prima di applicarla.",
-        "es": "El asistente de detección de segmentos para tiras LED cortadas ahora tiene una interfaz visual: un mapa en vivo de la tira que se rellena a medida que mides y se puede corregir antes de aplicarlo.",
-        "pl": "Kreator wykrywania segmentów dla przyciętych taśm LED ma teraz wizualny interfejs: aktualną mapę taśmy, która wypełnia się podczas pomiaru i można ją poprawić przed zastosowaniem.",
-        "uk": "Майстер визначення сегментів для обрізаних LED-стрічок тепер має візуальний інтерфейс: живу карту стрічки, яка заповнюється під час вимірювання та може бути виправлена перед застосуванням.",
-        "zh-cn": "用于剪裁 LED 灯带的分段检测向导现在有了可视化界面：一张实时灯带图，随测量逐步填充，并可在应用前进行修正。"
       }
     },
     "plugins": {

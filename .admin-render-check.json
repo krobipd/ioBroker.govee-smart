@@ -1,6 +1,22 @@
 {
   "instance": "govee-smart.0",
-  "tab": "Segment",
-  "mountSelectors": ["[data-testid=\"wiz-start\"]", "[data-testid=\"wiz-no-devices\"]"],
-  "gold": { "when": "[data-testid=\"wiz-start\"]", "value": "[data-testid=\"wiz-device-select\"]" }
+  "targets": [
+    {
+      "name": "connection",
+      "tab": "Main|Haupt",
+      "mountSelectors": ["[data-testid=\"dot-lan\"]"],
+      "probe": [
+        { "expectDisabled": "[data-testid=\"conn-connect\"]" },
+        { "fill": "[data-testid=\"conn-email\"]", "value": "render-check@example.com" },
+        { "fill": "[data-testid=\"conn-password\"]", "value": "render-check-probe" },
+        { "expectEnabled": "[data-testid=\"conn-connect\"]" }
+      ]
+    },
+    {
+      "name": "wizard",
+      "tab": "Segment",
+      "mountSelectors": ["[data-testid=\"wiz-start\"]", "[data-testid=\"wiz-no-devices\"]"],
+      "gold": { "when": "[data-testid=\"wiz-start\"]", "value": "[data-testid=\"wiz-device-select\"]" }
+    }
+  ]
 }

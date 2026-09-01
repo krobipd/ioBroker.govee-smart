@@ -329,6 +329,7 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
             label={t("gsw_conn_apikey_label")}
             value={draft.apiKey}
             onChange={e => setField("apiKey", "apiKey", e.target.value)}
+            slotProps={{ htmlInput: { "data-testid": "conn-apikey" } }}
             autoComplete="off"
           />
         </Box>
@@ -364,6 +365,7 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
               label={t("gsw_conn_email_label")}
               value={draft.email}
               onChange={e => setField("goveeEmail", "email", e.target.value)}
+              slotProps={{ htmlInput: { "data-testid": "conn-email" } }}
               autoComplete="off"
             />
             <TextField
@@ -373,12 +375,14 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
               label={t("gsw_conn_password_label")}
               value={draft.password}
               onChange={e => setField("goveePassword", "password", e.target.value)}
+              slotProps={{ htmlInput: { "data-testid": "conn-password" } }}
               autoComplete="off"
             />
             <Box>
               <Button
                 variant="contained"
                 size="small"
+                data-testid="conn-connect"
                 disabled={!hasAccount || busy !== ""}
                 onClick={() => void runLogin()}
                 startIcon={

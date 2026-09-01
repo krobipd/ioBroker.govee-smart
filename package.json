@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "2.27.0",
+  "version": "2.27.1",
   "description": "Control Govee WiFi devices via LAN, MQTT and Cloud.",
   "author": {
     "name": "krobi",
@@ -73,7 +73,7 @@
     "prebuild": "rimraf build",
     "build": "build-adapter ts",
     "build:admin": "node tasks",
-    "prepublishOnly": "node tasks",
+    "publish:manual": "node tasks && npm publish",
     "watch": "build-adapter ts --watch",
     "check": "tsc --noEmit",
     "test:ts": "vitest run",

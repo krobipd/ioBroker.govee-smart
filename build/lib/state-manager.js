@@ -28,6 +28,7 @@ var import_device_manager = require("./device-manager");
 var import_govee_constants = require("./govee-constants");
 var import_i18n = require("./i18n");
 var import_device_key = require("./device-key");
+const SORT_KEY_END = "\u9999";
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
 const CHANNEL_NAME_KEYS = {
   control: "channelControls",
@@ -135,6 +136,16 @@ class StateManager {
    * bounds the phantom-state cleanup to one existence-check per adapter run.
    */
   cleanedSyntheticStates = /* @__PURE__ */ new Set();
+  /**
+   * Cached `.info.online` marker ids (namespace-less) for the 20-second rollup
+   * round. The previous per-round full-namespace `getObjectView` scan grew
+   * linearly with the whole state tree (>1000 rows on a 30-device install,
+   * every 20 s) just to re-derive a set that only changes when a device is
+   * created, migrated or removed — exactly the places that now maintain the
+   * cache. `null` = not yet populated; {@link markAllOffline} (startup/shutdown,
+   * where the object DB is the only truth) always refreshes it from the DB.
+   */
+  onlineMarkerCache = null;
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter) {
     this.adapter = adapter;
@@ -265,7 +276,7 @@ class StateManager {
    * @returns the state ids that were set to false
    */
   async markAllOffline() {
-    const ids = await this.onlineMarkerIds();
+    const ids = await this.onlineMarkerIds(true);
     for (const id of ids) {
       await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => void 0);
     }
@@ -282,7 +293,7 @@ class StateManager {
     try {
       const view = await this.adapter.getObjectViewAsync("system", "state", {
         startkey: `${this.adapter.namespace}.`,
-        endkey: `${this.adapter.namespace}.\u9999`
+        endkey: `${this.adapter.namespace}.${SORT_KEY_END}`
       });
       return ((_a = view == null ? void 0 : view.rows) != null ? _a : []).map((row) => row.id.replace(`${this.adapter.namespace}.`, ""));
     } catch (e) {
@@ -291,12 +302,21 @@ class StateManager {
     }
   }
   /**
-   * The online markers of devices and of the group rollup.
+   * The online markers of devices and of the group rollup. Served from
+   * {@link onlineMarkerCache} on the 20-second rollup path; a DB scan runs only
+   * when the cache is cold or a refresh is forced (startup/shutdown via
+   * {@link markAllOffline}, where leftovers from a previous run must be found).
    *
+   * @param forceRefresh Rebuild the cache from the object DB
    * @returns the state ids ending in `.info.online`
    */
-  async onlineMarkerIds() {
-    return (await this.existingStateIds()).filter((id) => id.endsWith(".info.online"));
+  async onlineMarkerIds(forceRefresh = false) {
+    if (!forceRefresh && this.onlineMarkerCache) {
+      return Array.from(this.onlineMarkerCache);
+    }
+    const ids = (await this.existingStateIds()).filter((id) => id.endsWith(".info.online"));
+    this.onlineMarkerCache = new Set(ids);
+    return ids;
   }
   /**
    * Write the device rollup: how many devices exist, how many are reachable, and
@@ -461,7 +481,7 @@ class StateManager {
    * @param device Govee device
    */
   async createInfoStates(device) {
-    var _a, _b;
+    var _a, _b, _c, _d, _e;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
@@ -474,6 +494,7 @@ class StateManager {
           this.stateChannelMap.delete(mapKey2);
         }
       }
+      (_a = this.onlineMarkerCache) == null ? void 0 : _a.delete(`${oldPrefix}.info.online`);
     }
     this.prefixMap.set(key, newPrefix);
     const prefix = newPrefix;
@@ -520,6 +541,7 @@ class StateManager {
         void 0,
         false
       );
+      (_b = this.onlineMarkerCache) == null ? void 0 : _b.add(`${prefix}.info.online`);
       await this.ensureState(`${prefix}.info.model`, (0, import_i18n.tName)("model"), "string", "text", false, void 0, "");
       await this.ensureState(`${prefix}.info.serial`, (0, import_i18n.tName)("serialNumber"), "string", "text", false, void 0, "");
       if (device.gateway) {
@@ -544,7 +566,7 @@ class StateManager {
         await this.removeInfoStateOnce(prefix, "ip");
       } else {
         await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
-          val: (_a = device.lanIp) != null ? _a : "",
+          val: (_c = device.lanIp) != null ? _c : "",
           ack: true
         });
       }
@@ -554,7 +576,7 @@ class StateManager {
       });
       await this.syncInfoOnline(device);
     } else {
-      const memberIds = ((_b = device.groupMembers) != null ? _b : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
+      const memberIds = ((_d = device.groupMembers) != null ? _d : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
       await this.ensureState(`${prefix}.info.members`, (0, import_i18n.tName)("members"), "string", "text", false);
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
@@ -571,6 +593,7 @@ class StateManager {
       ]) {
         await this.safeDeleteState(`${prefix}.info.${staleId}`);
       }
+      (_e = this.onlineMarkerCache) == null ? void 0 : _e.delete(`${prefix}.info.online`);
       await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {
       });
     }
@@ -864,7 +887,7 @@ class StateManager {
     const segPrefix = `${this.adapter.namespace}.${prefix}.segments.`;
     const existing = await this.adapter.getObjectViewAsync("system", "channel", {
       startkey: segPrefix,
-      endkey: `${segPrefix}\u9999`
+      endkey: `${segPrefix}${SORT_KEY_END}`
     });
     if (!(existing == null ? void 0 : existing.rows)) {
       return;
@@ -926,6 +949,7 @@ class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online) {
+    var _a;
     await this.adapter.extendObject(
       "groups",
       {
@@ -945,6 +969,7 @@ class StateManager {
       { preserve: { common: ["name"] } }
     );
     await this.ensureState("groups.info.online", (0, import_i18n.tName)("cloudOnline"), "boolean", "indicator.reachable", false);
+    (_a = this.onlineMarkerCache) == null ? void 0 : _a.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
       val: online,
       ack: true
@@ -1001,7 +1026,7 @@ class StateManager {
       try {
         existingObjects = await this.adapter.getObjectViewAsync("system", "device", {
           startkey: `${this.adapter.namespace}.${folder}.`,
-          endkey: `${this.adapter.namespace}.${folder}.\u9999`
+          endkey: `${this.adapter.namespace}.${folder}.${SORT_KEY_END}`
         });
       } catch (e) {
         this.adapter.log.debug(
@@ -1018,7 +1043,7 @@ class StateManager {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
           const stateRows = await this.adapter.getObjectViewAsync("system", "state", {
             startkey: `${row.id}.`,
-            endkey: `${row.id}.\u9999`
+            endkey: `${row.id}.${SORT_KEY_END}`
           }).catch(() => void 0);
           if (stateRows == null ? void 0 : stateRows.rows) {
             for (const stateRow of stateRows.rows) {
@@ -1052,7 +1077,7 @@ class StateManager {
     try {
       existing = await this.adapter.getObjectViewAsync("system", "device", {
         startkey: `${this.adapter.namespace}.devices.samemodegroup_`,
-        endkey: `${this.adapter.namespace}.devices.samemodegroup_\u9999`
+        endkey: `${this.adapter.namespace}.devices.samemodegroup_${SORT_KEY_END}`
       });
     } catch (e) {
       this.adapter.log.debug(
@@ -1067,7 +1092,7 @@ class StateManager {
       const localId = row.id.replace(`${this.adapter.namespace}.`, "");
       const stateRows = await this.adapter.getObjectViewAsync("system", "state", {
         startkey: `${row.id}.`,
-        endkey: `${row.id}.\u9999`
+        endkey: `${row.id}.${SORT_KEY_END}`
       }).catch(() => void 0);
       if (stateRows == null ? void 0 : stateRows.rows) {
         for (const stateRow of stateRows.rows) {
@@ -1111,7 +1136,7 @@ class StateManager {
     const devicePrefix = `${this.adapter.namespace}.${prefix}.`;
     const existing = await this.adapter.getObjectViewAsync("system", "state", {
       startkey: devicePrefix,
-      endkey: `${devicePrefix}\u9999`
+      endkey: `${devicePrefix}${SORT_KEY_END}`
     });
     if (!(existing == null ? void 0 : existing.rows)) {
       return 0;
@@ -1175,6 +1200,8 @@ class StateManager {
    * @param prefix Device prefix that was removed
    */
   forgetPrefix(prefix) {
+    var _a;
+    (_a = this.onlineMarkerCache) == null ? void 0 : _a.delete(`${prefix}.info.online`);
     for (const key of this.prefixMap.keys()) {
       if (this.prefixMap.get(key) === prefix) {
         this.prefixMap.delete(key);

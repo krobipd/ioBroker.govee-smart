@@ -294,6 +294,7 @@ class GoveeLanClient {
       this.sendSocket = null;
     }
     this.seenDeviceIps.clear();
+    this.lastCommandSentMs.clear();
     this.multicastBind = void 0;
   }
   /**
@@ -636,6 +637,7 @@ class GoveeLanClient {
       for (const existing of this.seenDeviceIps) {
         if (existing.startsWith(staleSuffix) && existing !== key) {
           this.seenDeviceIps.delete(existing);
+          this.lastCommandSentMs.delete(existing.slice(staleSuffix.length));
         }
       }
       this.seenDeviceIps.add(key);

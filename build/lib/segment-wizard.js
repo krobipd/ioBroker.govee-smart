@@ -448,7 +448,7 @@ ${this.t("finishTreeRebuilt")}`,
     const segs = baseline.segmentColors;
     const distinctTuples = new Set(segs.map((s) => `${s.color}:${s.brightness}`)).size;
     if (total > 0 && segs.length === total && distinctTuples >= 2) {
-      await this.restoreSegmentGradient(device, segs);
+      await (0, import_device_baseline.restoreSegmentsGrouped)((d, cmd, val) => this.host.sendCommand(d, cmd, val), device, segs);
     } else if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
       const color = parseInt(baseline.colorRgb.slice(1), 16);
       const brightness = (_b = baseline.brightness) != null ? _b : 100;
@@ -463,33 +463,6 @@ ${this.t("finishTreeRebuilt")}`,
     }
     if (baseline.power === false) {
       await this.host.sendCommand(device, "power", false);
-    }
-  }
-  /**
-   * Restore a captured per-segment gradient — one segmentBatch per distinct
-   * (colour, brightness) group, so a 3-zone gradient replays in 3 batches
-   * instead of segmentCount sequential writes. Mirrors
-   * SnapshotHandler.restoreSegments (the local-snapshot restore path).
-   *
-   * @param device Target device
-   * @param segmentColors Captured per-segment colour + brightness
-   */
-  async restoreSegmentGradient(device, segmentColors) {
-    const groups = /* @__PURE__ */ new Map();
-    for (const seg of segmentColors) {
-      const hex = /^#?[0-9a-fA-F]{6}$/.test(seg.color) ? seg.color : "#000000";
-      const color = parseInt(hex.replace("#", ""), 16);
-      const brightness = typeof seg.brightness === "number" ? seg.brightness : 100;
-      const key = `${color}:${brightness}`;
-      const existing = groups.get(key);
-      if (existing) {
-        existing.segments.push(seg.idx);
-      } else {
-        groups.set(key, { segments: [seg.idx], color, brightness });
-      }
-    }
-    for (const group of groups.values()) {
-      await this.host.sendCommand(device, "segmentBatch", group);
     }
   }
 }
