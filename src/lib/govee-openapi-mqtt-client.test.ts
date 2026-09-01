@@ -81,24 +81,14 @@ const mockTimers = {
 };
 
 describe("GoveeOpenapiMqttClient", () => {
-  describe("constructor", () => {
-    it("creates a client with the given API key", () => {
+  describe("lifecycle without a broker", () => {
+    it("starts disconnected, and a disconnect() that never connected is a silent no-op", () => {
       const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
-      expect(client).toBeDefined();
       expect(client.connected).toBe(false);
-    });
-  });
-
-  describe("disconnect", () => {
-    it("handles disconnect when not connected", () => {
-      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
-      expect(() => client.disconnect()).not.toThrow();
-    });
-
-    it("leaves the connected flag false after disconnect", () => {
-      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
+      client.disconnect();
       client.disconnect();
       expect(client.connected).toBe(false);
+      expect(mqttMock.clients).toHaveLength(0); // nothing was ever opened
     });
   });
 

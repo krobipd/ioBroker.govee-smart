@@ -257,7 +257,7 @@ describe("CapabilityMapper", () => {
   });
 
   describe("getDefaultLanStates", () => {
-    it("should return power, brightness, colorRgb, colorTemperature", () => {
+    it("should return power, brightness, color_rgb, color_temperature", () => {
       const defs = getDefaultLanStates();
       expect(defs).toHaveLength(4);
       expect(defs.map(d => d.id)).toEqual(["power", "brightness", "color_rgb", "color_temperature"]);

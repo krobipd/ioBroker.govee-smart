@@ -5,12 +5,18 @@ import { vi } from "vitest";
  * handles fs.promises.open hands out — the durability test below needs to see
  * that the save really flushed, and vitest cannot spy on ESM exports.
  */
-const fsCounters = vi.hoisted(() => ({ fsync: 0 }));
+const fsCounters = vi.hoisted(() => ({ fsync: 0, failNextOpen: null as Error | null }));
 vi.mock("node:fs", async importOriginal => {
   const actual = await importOriginal<typeof import("node:fs")>();
   // save() flushes through FileHandle.sync() on a handle from fs.promises.open —
-  // wrap the handle so the durability test can see the flush happen.
+  // wrap the handle so the durability test can see the flush happen. A queued
+  // `failNextOpen` error makes exactly one open() fail (write-failure tests).
   const open: typeof actual.promises.open = async (...args) => {
+    if (fsCounters.failNextOpen) {
+      const err = fsCounters.failNextOpen;
+      fsCounters.failNextOpen = null;
+      throw err;
+    }
     const handle = await actual.promises.open(...args);
     const origSync = handle.sync.bind(handle);
     handle.sync = async (): Promise<void> => {
@@ -161,13 +167,16 @@ describe("SkuCache", () => {
     expect(cache.loadAll()).toEqual([]);
   });
 
-  it("should use normalized device ID for file naming", async () => {
+  it("normalises the device id for the file name — colon and colon-less spellings hit the same file", async () => {
     const cache = new SkuCache(dir, mockLog);
     await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
-    // Same device without colons should hit same file (loadAll finds the single entry)
-    const all = cache.loadAll();
-    expect(all).toHaveLength(1);
-    expect(all[0].sku).toBe("H61BE");
+    // The LAN discovery frame carries the id without colons; the Cloud list
+    // with colons. Both must resolve to the one cache entry, or the device is
+    // persisted twice and restored twice.
+    expect(cache.loadOne("H61BE", "AABBCCDD11223344")?.name).toBe("Test Light");
+    expect(cache.loadOne("h61be", "aa:bb:cc:dd:11:22:33:44")?.name).toBe("Test Light");
+    await cache.save(createTestData("H61BE", "AABBCCDD11223344"));
+    expect(cache.loadAll()).toHaveLength(1);
   });
 
   it("should preserve all library data types", async () => {
@@ -332,5 +341,120 @@ describe("SkuCache", () => {
     const loaded = cache.loadAll()[0];
     expect(loaded.manualMode).toBe(true);
     expect(loaded.manualSegments).toEqual([0, 1, 2, 5, 6, 7, 8]);
+  });
+});
+
+describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)", () => {
+  let dir: string;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const cacheDir = (): string => path.join(dir, "cache");
+  const warnLog = (): { log: ioBroker.Logger; warns: string[] } => {
+    const warns: string[] = [];
+    return { log: { ...mockLog, warn: (m: string) => warns.push(m) }, warns };
+  };
+
+  beforeEach(() => {
+    dir = tmpDir();
+  });
+  afterEach(() => {
+    cleanup(dir);
+  });
+
+  it("does not rewrite a byte-identical payload, nor one that differs only in cachedAt", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const data = createTestData("H6100", "DC:00:00:00:00:00:00:01");
+    await cache.save(data);
+    const flushed = fsCounters.fsync;
+    await cache.save({ ...data });
+    await cache.save({ ...data, cachedAt: data.cachedAt + 60_000 });
+    // saveDevicesToCache runs for every device twice per start — most of those
+    // carry nothing new and must not touch the disk (SD-card wear, event loop).
+    expect(fsCounters.fsync).toBe(flushed);
+    await cache.save({ ...data, name: "Renamed" });
+    expect(fsCounters.fsync).toBe(flushed + 1);
+    expect(cache.loadAll()[0].name).toBe("Renamed");
+  });
+
+  it("a pruned entry is written again by the next save of the same data (fingerprint forgotten)", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const data = createTestData("H6001", "PR:00:00:00:00:00:00:01");
+    data.lastSeenOnNetwork = Date.now() - 30 * DAY_MS;
+    await cache.save(data);
+    expect(cache.pruneStale(14)).toBe(1);
+    expect(cache.loadAll()).toHaveLength(0);
+    // Same bytes as before — without the reset the device would never be
+    // persisted again for the rest of the run.
+    await cache.save(data);
+    expect(cache.loadAll()).toHaveLength(1);
+  });
+
+  it("clear() and evictDevice() also forget the fingerprint — a later identical save writes", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const a = createTestData("H6100", "CL:00:00:00:00:00:00:01");
+    const b = createTestData("H6101", "EV:00:00:00:00:00:00:02");
+    await cache.save(a);
+    await cache.save(b);
+    cache.clear();
+    expect(cache.loadAll()).toHaveLength(0);
+    await cache.save(a);
+    expect(cache.loadAll()).toHaveLength(1);
+
+    cache.evictDevice("H6100", "CL:00:00:00:00:00:00:01", "Evicted (H6100)");
+    expect(cache.loadOne("H6100", "CL:00:00:00:00:00:00:01")).toBeNull();
+    await cache.save(a);
+    expect(cache.loadOne("H6100", "CL:00:00:00:00:00:00:01")?.sku).toBe("H6100");
+    // Evicting something that is not there is a silent no-op.
+    expect(() => cache.evictDevice("H9999", "NO:PE")).not.toThrow();
+  });
+
+  it("two overlapping saves of one device leave the LAST payload on disk and no temp file behind", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const first = createTestData("H6100", "OV:00:00:00:00:00:00:01");
+    const second = { ...first, name: "Second write" };
+    await Promise.all([cache.save(first), cache.save(second)]);
+    const files = fs.readdirSync(cacheDir());
+    expect(files.filter(f => f.endsWith(".tmp"))).toEqual([]);
+    expect(files).toHaveLength(1);
+    expect(cache.loadAll()[0].name).toBe("Second write");
+  });
+
+  it("a failed write warns, never rejects, and the next save of the same data retries", async () => {
+    const { log, warns } = warnLog();
+    const cache = new SkuCache(dir, log);
+    const data = createTestData("H6100", "FA:00:00:00:00:00:00:01");
+    fsCounters.failNextOpen = new Error("EACCES: permission denied");
+    await expect(cache.save(data)).resolves.toBeUndefined();
+    expect(warns.some(m => m.includes("Cache write failed for H6100") && m.includes("EACCES"))).toBe(true);
+    expect(cache.loadAll()).toHaveLength(0);
+    // The fingerprint was NOT kept for the failed write — the retry is a real write.
+    await cache.save(data);
+    expect(cache.loadAll()).toHaveLength(1);
+  });
+
+  it("loadOne returns the stored entry, null for an unknown device and null for a corrupt file", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    await cache.save(createTestData("H6100", "LO:00:00:00:00:00:00:01"));
+    expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:01")?.name).toBe("Test Light");
+    expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:99")).toBeNull();
+    const file = fs.readdirSync(cacheDir())[0];
+    fs.writeFileSync(path.join(cacheDir(), file), "{ not json");
+    expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:01")).toBeNull();
+  });
+
+  it("an unusable data directory disables the cache with one warning — save/load/evict become no-ops, nothing throws", async () => {
+    // The parent of the data dir is a regular file, so the cache directory can
+    // never be created (read-only or broken instance storage).
+    const blocker = path.join(dir, "not-a-dir");
+    fs.writeFileSync(blocker, "x");
+    const { log, warns } = warnLog();
+    const cache = new SkuCache(path.join(blocker, "data"), log);
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("Cache directory not writable");
+    await expect(cache.save(createTestData())).resolves.toBeUndefined();
+    expect(cache.loadAll()).toEqual([]);
+    expect(cache.loadOne("H61BE", "AA:BB:CC:DD:11:22:33:44")).toBeNull();
+    expect(() => cache.evictDevice("H61BE", "AA:BB:CC:DD:11:22:33:44")).not.toThrow();
+    expect(cache.pruneStale(14)).toBe(0);
+    expect(warns).toHaveLength(1); // the no-ops stay silent
   });
 });

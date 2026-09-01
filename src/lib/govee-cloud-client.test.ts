@@ -106,19 +106,20 @@ describe("GoveeCloudClient", () => {
   });
 
   describe("setResponseHook", () => {
-    it("should accept a callback", () => {
-      const client = new GoveeCloudClient("test-api-key", mockLog);
+    it("fires for every device list response with the whole list under the account pseudo-id, and null clears it", async () => {
+      const fake = makeFakeHttps(() => ({ data: [{ sku: "H6160", device: "AABBCC", deviceName: "Test" }] }));
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       const calls: Array<{ deviceId: string; endpoint: string; body: unknown }> = [];
       client.setResponseHook((deviceId, endpoint, body) => {
         calls.push({ deviceId, endpoint, body });
       });
-      expect(calls).toHaveLength(0);
-    });
-
-    it("should accept null to clear the hook", () => {
-      const client = new GoveeCloudClient("test-api-key", mockLog);
-      client.setResponseHook(() => {});
-      expect(() => client.setResponseHook(null)).not.toThrow();
+      await client.getDevices();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].endpoint).toBe("/router/api/v1/user/devices");
+      expect(calls[0].deviceId).toBe("AABBCC"); // per-device entry so the diag of that device carries its list row
+      client.setResponseHook(null);
+      await client.getDevices();
+      expect(calls).toHaveLength(1); // cleared — no further captures
     });
 
     it("should fire the hook on getDeviceState", async () => {

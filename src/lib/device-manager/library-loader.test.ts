@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DiagnosticsCollector } from "../diagnostics";
 import { DeviceRegistry } from "../device-registry";
+import { HttpError } from "../http-client";
 import { createTestDevice, lightCapabilities } from "../test-helpers";
 import type { CloudCapability, CloudDevice } from "../types";
 import { loadDeviceLibraries, loadDeviceScenes, type LibraryLoaderHost } from "./library-loader";
@@ -173,5 +174,63 @@ describe("library-loader — loadDeviceLibraries", () => {
     await loadDeviceLibraries(host, device, device.sku, /* force */ true);
     expect(fetchSnapshotsCallCount).toBe(1);
     expect(device.snapshotBleCmds).toEqual([[["FRESH_PACKET_1"]], [["FRESH_PACKET_2"]]]);
+  });
+});
+
+describe("library-loader — undocumented-API failures are diagnosable, not silent", () => {
+  it("a rejected library fetch lands as one debug line with endpoint, status and bearer state, and in the diag history", async () => {
+    const debugs: string[] = [];
+    const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as unknown as ioBroker.Logger;
+    const diagnostics = new DiagnosticsCollector(new DeviceRegistry({ data: { devices: {} } }));
+    const host: LibraryLoaderHost = {
+      cloudClient: setupMockCloud([]) as never,
+      apiClient: {
+        hasBearerToken: () => true,
+        fetchSceneLibrary: () => Promise.reject(new HttpError("HTTP 403", 403, {}, "forbidden")),
+        fetchMusicLibrary: () => Promise.resolve([]),
+        fetchDiyLibrary: () => Promise.resolve([]),
+        fetchSkuFeatures: () => Promise.resolve(null),
+        fetchSnapshots: () => Promise.resolve([]),
+      } as never,
+      log,
+      diagnostics,
+      runLimited: async (fn: () => Promise<void>): Promise<void> => fn(),
+    };
+    const device = createTestDevice();
+
+    await loadDeviceLibraries(host, device, device.sku, true);
+
+    const line = debugs.find(m => m.startsWith("Could not load scene library for H6160"));
+    expect(line).toBeDefined();
+    expect(line).toContain("endpoint=/light-effect-libraries?sku=H6160");
+    expect(line).toContain("httpStatus=403");
+    expect(line).toContain("bearer=yes");
+    expect(device.sceneLibrary).toEqual([]); // the old library is not replaced by garbage
+    const hist = diagnostics.generate(device, "x").apiHistory as Record<string, Array<{ ok: boolean; statusCode?: number }>>;
+    expect(hist["/light-effect-libraries?sku=H6160"][0]).toMatchObject({ ok: false, statusCode: 403 });
+  });
+
+  it("quotes the body snippet when Govee answered 200 with a non-JSON page", async () => {
+    const debugs: string[] = [];
+    const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as unknown as ioBroker.Logger;
+    const host: LibraryLoaderHost = {
+      cloudClient: setupMockCloud([]) as never,
+      apiClient: {
+        hasBearerToken: () => false,
+        fetchSceneLibrary: () =>
+          Promise.reject(new Error("Invalid JSON in HTTP 200 response: x — body starts with: <html>maintenance</html>")),
+        fetchMusicLibrary: () => Promise.resolve([]),
+        fetchDiyLibrary: () => Promise.resolve([]),
+        fetchSkuFeatures: () => Promise.resolve(null),
+        fetchSnapshots: () => Promise.resolve([]),
+      } as never,
+      log,
+      diagnostics: new DiagnosticsCollector(new DeviceRegistry({ data: { devices: {} } })),
+      runLimited: async (fn: () => Promise<void>): Promise<void> => fn(),
+    };
+    await loadDeviceLibraries(host, createTestDevice(), "H6160", true);
+    const line = debugs.find(m => m.startsWith("Could not load scene library"));
+    expect(line).toContain('body="<html>maintenance</html>"');
+    expect(line).toContain("bearer=no");
   });
 });

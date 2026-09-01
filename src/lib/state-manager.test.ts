@@ -1624,7 +1624,7 @@ describe("StateManager", () => {
 
   describe("cleanupDevices", () => {
     it("should remove devices not in current list", async () => {
-      const { adapter, calls } = createMockAdapter();
+      const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
 
       // Create two devices
@@ -1636,8 +1636,12 @@ describe("StateManager", () => {
       // Cleanup with only dev1 as current
       await sm.cleanupDevices([dev1]);
 
-      const delCalls = calls.filter(c => c.method === "delObjectAsync" && (c.args[0] as string).includes("h6161"));
-      expect(delCalls.length).toBeGreaterThan(0);
+      const delCalls = calls
+        .filter(c => c.method === "delObjectAsync" && (c.args[0] as string).includes("h6161"))
+        .map(c => c.args[0]);
+      expect(delCalls).toEqual(["devices.h6161_2222"]); // the device root, recursively — once
+      expect([...objects.keys()].filter(k => k.startsWith("devices.h6161_2222"))).toEqual([]);
+      expect(objects.has("devices.h6160_1111.info.name")).toBe(true);
     });
 
     it("should not remove devices that still exist", async () => {
@@ -1800,17 +1804,23 @@ describe("StateManager", () => {
       // Run cleanupCloudOwnedStates with empty cloudDefs — LAN states must survive
       await sm.cleanupCloudOwnedStates("devices.h6160_0011", []);
 
+      // Every LAN-owned id — taken from the real set, not a hand-written list:
+      // until 2.28.0 this filter still spelled the colour ids camelCase (pre-B2),
+      // so color_rgb / color_temperature were not guarded by this test at all.
       const lanDeletes = calls.filter(
         c =>
           c.method === "delObjectAsync" &&
           typeof c.args[0] === "string" &&
-          /control\.(power|brightness|colorRgb|colorTemperature)$/.test(c.args[0] as string),
+          [...LAN_STATE_IDS].some(id => (c.args[0] as string).endsWith(`.control.${id}`)),
       );
-      expect(lanDeletes.length).toBe(0);
+      expect(lanDeletes).toEqual([]);
+      for (const id of LAN_STATE_IDS) {
+        expect(objects.has(`devices.h6160_0011.control.${id}`), `control.${id} must survive`).toBe(true);
+      }
     });
 
     it("should remove cloud-owned channels entirely when empty (e.g. scenes leftover after cap removal)", async () => {
-      const { adapter, calls } = createMockAdapter();
+      const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
@@ -1833,10 +1843,12 @@ describe("StateManager", () => {
       // Recreate with no cloud defs — scenes channel should be removed
       await createAllStatesForTest(sm, dev, []);
 
-      const channelDeletes = calls.filter(
-        c => c.method === "delObjectAsync" && (c.args[0] as string).endsWith(".scenes"),
-      );
-      expect(channelDeletes.length).toBeGreaterThan(0);
+      const channelDeletes = calls
+        .filter(c => c.method === "delObjectAsync" && (c.args[0] as string).endsWith(".scenes"))
+        .map(c => c.args[0]);
+      expect(channelDeletes).toEqual(["devices.h6160_0011.scenes"]);
+      expect(objects.has("devices.h6160_0011.scenes")).toBe(false);
+      expect(objects.has("devices.h6160_0011.scenes.light_scene")).toBe(false);
     });
 
     it("should migrate states from old control to new channel", async () => {
@@ -1863,11 +1875,12 @@ describe("StateManager", () => {
       ];
       await createAllStatesForTest(sm, dev, defs);
 
-      // Old control.light_scene should be deleted (it's stale in control)
+      // Old control.light_scene is deleted exactly once (it's stale in control)
       const delCalls = calls.filter(
         c => c.method === "delObjectAsync" && (c.args[0] as string) === "devices.h6160_0011.control.light_scene",
       );
-      expect(delCalls.length).toBeGreaterThan(0);
+      expect(delCalls).toHaveLength(1);
+      expect(objects.has("devices.h6160_0011.control.light_scene")).toBe(false);
       // New scenes.light_scene should exist
       expect(objects.has("devices.h6160_0011.scenes.light_scene")).toBe(true);
     });
@@ -1987,12 +2000,12 @@ describe("StateManager", () => {
       expect(objects.has("devices.h6160_0011.segments.0.color")).toBe(true);
       expect(objects.has("devices.h6160_0011.segments.0.brightness")).toBe(true);
       expect(objects.has("devices.h6160_0011.segments.9")).toBe(true);
+      expect(objects.has("devices.h6160_0011.segments.10")).toBe(false); // exactly 10 channels
       expect(objects.has("devices.h6160_0011.segments.command")).toBe(true);
-      expect(dev.segmentCount).toBe(10);
     });
 
     it("should return 0 segments when field has no elementRange", async () => {
-      const { adapter } = createMockAdapter();
+      const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
@@ -2021,7 +2034,9 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(dev.segmentCount).toBe(0);
+      // No addressable range → not a single segment channel (the count itself
+      // is settled by DeviceManager.syncSegmentCount and tested there).
+      expect([...objects.keys()].filter(k => /\.segments\.\d+$/.test(k))).toEqual([]);
     });
 
     it("should remove excess segment channels from previous runs", async () => {
@@ -2059,14 +2074,19 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(dev.segmentCount).toBe(5);
-      // Segments 5-14 should be deleted
-      const delCalls = calls.filter(c => c.method === "delObjectAsync" && /segments\.\d+$/.test(c.args[0] as string));
-      expect(delCalls.length).toBe(10);
+      // Segments 5-14 are deleted, 0-4 stay.
+      const delCalls = calls
+        .filter(c => c.method === "delObjectAsync" && /segments\.\d+$/.test(c.args[0] as string))
+        .map(c => c.args[0]);
+      expect(delCalls.sort()).toEqual(
+        Array.from({ length: 10 }, (_, i) => `devices.h6160_0011.segments.${i + 5}`).sort(),
+      );
+      expect(objects.has("devices.h6160_0011.segments.4")).toBe(true);
+      expect(objects.has("devices.h6160_0011.segments.5")).toBe(false);
     });
 
     it("should return 0 segments when capability has no fields", async () => {
-      const { adapter } = createMockAdapter();
+      const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
@@ -2092,7 +2112,7 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(dev.segmentCount).toBe(0);
+      expect([...objects.keys()].filter(k => /\.segments\.\d+$/.test(k))).toEqual([]);
     });
 
     it("should prefer already-set segmentCount over capability count", async () => {
@@ -2128,9 +2148,9 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(dev.segmentCount).toBe(20);
       expect(objects.has("devices.h6160_0011.segments.19")).toBe(true);
       expect(objects.has("devices.h6160_0011.segments.14")).toBe(true);
+      expect(objects.has("devices.h6160_0011.segments.20")).toBe(false);
     });
 
     it("should write manual_mode + manual_list initial values from device", async () => {
@@ -2275,22 +2295,22 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
   it("a manual segment list may raise the segment count, never lower it", async () => {
     const { adapter, objects } = createMockAdapter();
     const sm = new StateManager(adapter as never, registry);
-    const dev = createTestDevice({
-      capabilities: [
-        {
-          type: "devices.capabilities.segment_color_setting",
-          instance: "segmentedColorRgb",
-          parameters: { dataType: "STRUCT", fields: [{ fieldName: "segment", elementRange: { min: 0, max: 9 } }] },
-        },
-      ],
-      manualMode: true,
-      // A cut strip whose user-entered list reaches beyond what Cloud reports.
-      manualSegments: [0, 5, 13],
-    });
-    const count = effectiveSegmentCount(dev, registry);
+    const segCap = {
+      type: "devices.capabilities.segment_color_setting",
+      instance: "segmentedColorRgb",
+      parameters: { dataType: "STRUCT", fields: [{ fieldName: "segment", elementRange: { min: 0, max: 9 } }] },
+    } as never;
+    // A cut strip whose user-entered list reaches beyond what Cloud reports.
+    const raised = createTestDevice({ capabilities: [segCap], manualMode: true, manualSegments: [0, 5, 13] });
+    const count = effectiveSegmentCount(raised, registry);
     expect(count).toBe(14);
-    await sm.createSegmentStates(dev, count);
+    await sm.createSegmentStates(raised, count);
     expect(objects.has("devices.h6160_0011.segments.13")).toBe(true);
+
+    // A list that only names a few of the existing indices must not shrink the
+    // tree — the other segments are still physically there, just not listed.
+    const lowered = createTestDevice({ capabilities: [segCap], manualMode: true, manualSegments: [0, 2] });
+    expect(effectiveSegmentCount(lowered, registry)).toBe(10);
   });
 
   it("ensureState writes an object once per id, not on every call", async () => {

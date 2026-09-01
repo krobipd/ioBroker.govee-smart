@@ -448,8 +448,14 @@ describe("SegmentWizard", () => {
     it("should clear the idle timer on apply", async () => {
       await wizard.start(key);
       await wizard.answer(true);
+      const clearedBefore = host.clearedTimers;
       await wizard.runStep("apply", key, { indices: [0] });
       expect(wizard.getSessionSnapshot()).toBeNull();
+      // The armed idle timer is really cancelled — a stale one firing later
+      // would run the abort path against a session that no longer exists.
+      expect(host.clearedTimers).toBeGreaterThan(clearedBefore);
+      expect(() => host.fireLatestTimer()).not.toThrow();
+      expect(host.appliedResults).toHaveLength(1); // still exactly the one apply
     });
   });
 

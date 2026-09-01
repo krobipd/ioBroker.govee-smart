@@ -423,3 +423,45 @@ describe("MessageRouter", () => {
     });
   });
 });
+
+describe("onMessage crash boundaries", () => {
+  it("a throwing sub-handler is answered with an error and warned about (inner boundary)", async () => {
+    const warns: string[] = [];
+    const { host, responses } = makeHost({});
+    host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+    host.runWizardStep = () => Promise.reject(new Error("wizard exploded"));
+    const router = new MessageRouter(host);
+    router.onMessage(makeMessage("segmentWizard", { action: "start", device: "H6160:AA:01" }));
+    await new Promise(r => setTimeout(r, 0));
+    expect(responses).toHaveLength(1);
+    expect(responses[0].data).toEqual({ error: "wizard exploded" });
+    expect(warns).toEqual(["onMessage failed for segmentWizard: wizard exploded"]);
+  });
+
+  it("a crash while answering is caught by the outer boundary — never an unhandled rejection (outer boundary)", async () => {
+    const warns: string[] = [];
+    const { host, responses } = makeHost({ segmentDevices: [{ value: "H6160:AA:01", label: "Strip" }] });
+    host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+    // The first sendResponse (the success answer) blows up — the ioBroker
+    // socket is gone; the second (the outer error answer) must still go out.
+    const original = host.sendResponse;
+    let calls = 0;
+    host.sendResponse = (obj, data) => {
+      calls += 1;
+      // The success answer AND the inner error answer both fail; only the
+      // outer boundary's answer gets through.
+      if (calls <= 2) {
+        throw new Error("socket gone");
+      }
+      original(obj, data);
+    };
+    const router = new MessageRouter(host);
+    router.onMessage(makeMessage("getSegmentDevices"));
+    await new Promise(r => setTimeout(r, 0));
+    expect(warns).toEqual([
+      "onMessage failed for getSegmentDevices: socket gone",
+      "onMessage handler crashed for getSegmentDevices: socket gone",
+    ]);
+    expect(responses).toEqual([expect.objectContaining({ data: { error: "socket gone" } })]);
+  });
+});

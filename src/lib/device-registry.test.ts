@@ -260,3 +260,26 @@ describe("DeviceRegistry", () => {
     });
   });
 });
+
+describe("isSeedAndDormant — the experimental-toggle nudge", () => {
+  it("is true only for a seed entry while the experimental toggle is OFF", () => {
+    const reg = new DeviceRegistry({ data: SAMPLE as never });
+    expect(reg.isSeedAndDormant("H60A1")).toBe(true); // seed, toggle off → user should be nudged
+    expect(reg.isSeedAndDormant("h60a1")).toBe(true); // case-insensitive
+    expect(reg.isSeedAndDormant("H61BE")).toBe(false); // verified — nothing dormant
+    expect(reg.isSeedAndDormant("H7160")).toBe(false); // reported — active without the toggle
+    expect(reg.isSeedAndDormant("HZZZZ")).toBe(false); // unknown — a different nudge, not this one
+  });
+
+  it("is never true once the toggle is ON — the seed corrections are already active", () => {
+    const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+    expect(reg.isSeedAndDormant("H60A1")).toBe(false);
+  });
+
+  it("is safe against non-string input", () => {
+    const reg = new DeviceRegistry({ data: SAMPLE as never });
+    expect(reg.isSeedAndDormant(undefined as never)).toBe(false);
+    expect(reg.isSeedAndDormant(42 as never)).toBe(false);
+    expect(reg.isSeedAndDormant("")).toBe(false);
+  });
+});

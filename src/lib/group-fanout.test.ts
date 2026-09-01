@@ -90,7 +90,7 @@ function makeHost(opts: {
   const stateToCommandMap: Record<string, string> = {
     "control.power": "power",
     "control.brightness": "brightness",
-    "control.colorRgb": "colorRgb",
+    "control.color_rgb": "colorRgb",
     "scenes.light_scene": "lightScene",
     "music.music_mode": "music",
     "music.music_sensitivity": "music",

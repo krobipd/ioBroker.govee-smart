@@ -14,6 +14,7 @@ import {
   maskSecret,
   coerceFiniteNumber,
   logDedup,
+  logRejected,
   type ErrorCategory,
 } from "./types";
 
@@ -661,5 +662,15 @@ describe("Types utilities", () => {
       logDedup(log, lastCat, "Cloud", new Error("status 401 unauthorized"));
       expect(warns).toHaveLength(2);
     });
+  });
+});
+
+describe("logRejected (the handler every best-effort write hangs on its catch)", () => {
+  it("logs the context and the error text at debug — an Error and a bare value alike", () => {
+    const debugs: string[] = [];
+    const log = { debug: (m: string) => debugs.push(m), info: () => {}, warn: () => {}, error: () => {} } as never;
+    logRejected(log, "write info.connection")(new Error("db closed"));
+    logRejected(log, "reap stale devices")("plain string");
+    expect(debugs).toEqual(["write info.connection: db closed", "reap stale devices: plain string"]);
   });
 });

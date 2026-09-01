@@ -616,9 +616,11 @@ describe("CommandRouter", () => {
       await router.sendCommand(makeDevice(), "segmentBatch", "0-2:#ff0000:50");
       // No LAN segment-set
       expect(lan.calls.find(c => c.method === "setSegmentColor")).toBeUndefined();
-      // Cloud got the segment_color_setting call
-      expect(cloud.calls.length).toBeGreaterThan(0);
-      expect(cloud.calls[0].capabilityType).toContain("segment_color_setting");
+      // Cloud got one colour + one brightness call for the same three segments.
+      expect(cloud.calls.map(c => [c.instance, c.value])).toEqual([
+        ["segmentedColorRgb", { segment: [0, 1, 2], rgb: 0xff0000 }],
+        ["segmentedBrightness", { segment: [0, 1, 2], brightness: 50 }],
+      ]);
     });
 
     it("segmentBatch=cloud + command segmentColor:5 → suffix-inherits Cloud path", async () => {
@@ -644,8 +646,10 @@ describe("CommandRouter", () => {
       await router.sendCommand(makeDevice(), "segmentColor:5", "#00FF00");
       // No LAN setSegmentColor
       expect(lan.calls.find(c => c.method === "setSegmentColor")).toBeUndefined();
-      // Cloud got it via sendCloudCommand
-      expect(cloud.calls.length).toBeGreaterThan(0);
+      // Cloud got exactly the one segment colour write
+      expect(cloud.calls.map(c => [c.instance, c.value])).toEqual([
+        ["segmentedColorRgb", { segment: [5], rgb: 0x00ff00 }],
+      ]);
     });
 
     it("unknown SKU + segmentCount=0 + lightScene → hasSegments-Heuristic fires (regression-guard)", async () => {

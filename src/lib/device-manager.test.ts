@@ -12,12 +12,12 @@ import {
   parseMqttSegmentData,
   plausibleSegmentCount,
   resolveSegmentCount as resolveSegmentCountRaw,
-  SEGMENT_HARD_MAX,
 } from "./device-manager/lookups";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { DeviceRegistry } from "./device-registry";
+import { mockLog, mockTimers } from "./test-helpers";
 import type { CloudCapability, DeviceState, GoveeDevice, LanDevice, MqttStatusUpdate } from "./types";
 
 /** A catalog with no entries — tests that don't care about quirks. */
@@ -32,12 +32,10 @@ const resolveSegmentCount = (device: GoveeDevice): number => resolveSegmentCount
  * seed-status entries to be active. Real-world default has them off.
  * beforeEach so other test files cannot leak a reset between cases.
  *
- * NOTE: these helpers are INTENTIONALLY inline rather than imported from
- * `./test-helpers`. Mocha's ESM loader breaks reproducibly when this test
- * file (alphabetically the first one that would import test-helpers.ts) does
- * the import — `device-manager` without an extension is then treated as an
- * ESM URL and a Cannot-find-module is thrown. As long as the test suite still
- * uses CJS+ts-node, the DM helpers stay inline.
+ * createTestDevice / lightCapabilities stay local on purpose: this suite pins
+ * the colon-less device id + the map key `H6160_aabbccddeeff0011` in dozens of
+ * places, and its capability fixtures carry no segment ranges (the segment
+ * tests set the count explicitly).
  */
 const QUIRK_TEST_REGISTRY = {
   devices: {
@@ -50,26 +48,6 @@ const QUIRK_TEST_REGISTRY = {
     H9999: { name: "Segment Quirk Strip", type: "light", status: "verified", quirks: { segmentCount: 5 } },
   },
 };
-
-const mockLog: ioBroker.Logger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-};
-
-const mockTimers = {
-  setInterval: () => undefined,
-  clearInterval: () => undefined,
-  setTimeout: (cb: () => void) => {
-    cb();
-    return undefined;
-  },
-  clearTimeout: () => undefined,
-  delay: () => Promise.resolve(),
-} as never;
 
 function lightCapabilities(): CloudCapability[] {
   return [
@@ -145,6 +123,25 @@ function createCallTracker(): { calls: CallRecord[]; track: (method: string) => 
         return true;
       },
   };
+}
+
+/** Build a 20-byte AA A5 packet with 4 segment slots */
+function buildAaA5Packet(packetNum: number, slots: Array<[number, number, number, number]>): string {
+  const bytes = new Uint8Array(20);
+  bytes[0] = 0xaa;
+  bytes[1] = 0xa5;
+  bytes[2] = packetNum;
+  for (let i = 0; i < slots.length && i < 4; i++) {
+    bytes[3 + i * 4] = slots[i][0]; // brightness
+    bytes[4 + i * 4] = slots[i][1]; // r
+    bytes[5 + i * 4] = slots[i][2]; // g
+    bytes[6 + i * 4] = slots[i][3]; // b
+  }
+  // XOR checksum
+  let xor = 0;
+  for (let i = 0; i < 19; i++) xor ^= bytes[i];
+  bytes[19] = xor;
+  return Buffer.from(bytes).toString("base64");
 }
 
 describe("DeviceManager", () => {
@@ -792,17 +789,20 @@ describe("DeviceManager", () => {
       expect(brightCalls[0].args[1]).toBe(80);
     });
 
-    it("should not crash on sendCommand(segmentBatch, null)", async () => {
+    it("sendCommand(segmentBatch, null/undefined) sends nothing and does not throw", async () => {
+      // Internal callers (wizard, restore) hand over objects; a null/undefined
+      // value carries no segments — dropped without a LAN frame, without a crash.
+      const lanTracker = createCallTracker();
+      dm.setLanClient({
+        setColor: lanTracker.track("setColor"),
+        setSegmentColor: lanTracker.track("setSegmentColor"),
+        setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
+      } as any);
       const device = createTestDevice();
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-      // No assertion on side effects — just that it doesn't throw
       await dm.sendCommand(device, "segmentBatch", null as any);
-    });
-
-    it("should not crash on sendCommand(segmentBatch, undefined)", async () => {
-      const device = createTestDevice();
-      (dm as any).devices.set("H6160_aabbccddeeff0011", device);
       await dm.sendCommand(device, "segmentBatch", undefined as any);
+      expect(lanTracker.calls).toHaveLength(0);
     });
 
     it("should fall back to Cloud for segment color without LAN", async () => {
@@ -1262,16 +1262,15 @@ describe("DeviceManager", () => {
     it("mergeCloudDevices should skip devices with non-string device id", () => {
       const bad = [{ sku: "H6160", device: 123, deviceName: "x", type: "devices.types.light", capabilities: [] }];
       expect(() => (dm as any).mergeCloudDevices(bad)).not.toThrow();
+      expect(dm.getDevices()).toEqual([]); // really skipped, not added under a garbage id
     });
 
     it("mergeCloudDevices should not throw when capabilities is non-array", () => {
       const bad = [{ sku: "H6160", device: "abc", deviceName: "x", type: "devices.types.light", capabilities: "oops" }];
       expect(() => (dm as any).mergeCloudDevices(bad)).not.toThrow();
-      const devices = dm.getDevices();
-      const dev = devices.find(d => d.sku === "H6160");
-      if (dev) {
-        expect(Array.isArray(dev.capabilities)).toBe(true);
-      }
+      const dev = dm.getDevices().find(d => d.sku === "H6160");
+      expect(dev, "the device is kept — only the broken capability list is normalised").toBeDefined();
+      expect(dev!.capabilities).toEqual([]);
     });
 
     it("mergeCloudDevices should not throw when cloudDevices is non-array", () => {
@@ -1707,25 +1706,6 @@ describe("DeviceManager", () => {
   });
 
   describe("parseMqttSegmentData", () => {
-    /** Build a 20-byte AA A5 packet with 4 segment slots */
-    function buildAaA5Packet(packetNum: number, slots: Array<[number, number, number, number]>): string {
-      const bytes = new Uint8Array(20);
-      bytes[0] = 0xaa;
-      bytes[1] = 0xa5;
-      bytes[2] = packetNum;
-      for (let i = 0; i < slots.length && i < 4; i++) {
-        bytes[3 + i * 4] = slots[i][0]; // brightness
-        bytes[4 + i * 4] = slots[i][1]; // r
-        bytes[5 + i * 4] = slots[i][2]; // g
-        bytes[6 + i * 4] = slots[i][3]; // b
-      }
-      // XOR checksum
-      let xor = 0;
-      for (let i = 0; i < 19; i++) xor ^= bytes[i];
-      bytes[19] = xor;
-      return Buffer.from(bytes).toString("base64");
-    }
-
     it("rejects a packet whose XOR checksum does not match (spoofed / corrupt)", () => {
       const good = buildAaA5Packet(1, [
         [100, 255, 0, 0],
@@ -2114,24 +2094,6 @@ describe("DeviceManager", () => {
       expect(dm.getDevices()[0].segmentCount).toBe(20);
     });
 
-    /** Build one AA A5 packet (num 1-5) from up to 4 [brightness,r,g,b] slots. */
-    function mkAaA5(num: number, slots: Array<[number, number, number, number]>): string {
-      const b = new Uint8Array(20);
-      b[0] = 0xaa;
-      b[1] = 0xa5;
-      b[2] = num;
-      slots.forEach((s, i) => {
-        b[3 + i * 4] = s[0];
-        b[4 + i * 4] = s[1];
-        b[5 + i * 4] = s[2];
-        b[6 + i * 4] = s[3];
-      });
-      let xor = 0;
-      for (let i = 0; i < 19; i++) xor ^= b[i];
-      b[19] = xor;
-      return Buffer.from(b).toString("base64");
-    }
-
     it("shrinks segmentCount when a COMPLETE push proves Cloud over-reported (H6076 15→7)", () => {
       const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6076" };
       dm.handleLanDiscovery(lanDevice);
@@ -2150,8 +2112,8 @@ describe("DeviceManager", () => {
 
       // 7 real segments (4 + 3) + a padding slot with brightness 146 > 100.
       const real: [number, number, number, number] = [100, 255, 206, 146];
-      const pkt1 = mkAaA5(1, [real, real, real, real]);
-      const pkt2 = mkAaA5(2, [real, real, real, [146, 100, 100, 100]]);
+      const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
+      const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
 
       dm.handleMqttStatus({ sku: "H6076", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
 
@@ -2177,7 +2139,7 @@ describe("DeviceManager", () => {
 
       // 5 full packets = 20 valid slots, NO padding → complete=false → grow-only.
       const packets = [1, 2, 3, 4, 5].map(p =>
-        mkAaA5(p, [
+        buildAaA5Packet(p, [
           [50, 255, 0, 0],
           [50, 255, 0, 0],
           [50, 255, 0, 0],
@@ -2210,8 +2172,8 @@ describe("DeviceManager", () => {
       // A complete push reporting 7 real segments — would normally grow 5→7,
       // but the segmentCount quirk is a hard override and must win.
       const real: [number, number, number, number] = [100, 255, 206, 146];
-      const pkt1 = mkAaA5(1, [real, real, real, real]);
-      const pkt2 = mkAaA5(2, [real, real, real, [146, 100, 100, 100]]);
+      const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
+      const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
 
       dm.handleMqttStatus({ sku: "H9999", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
 
@@ -2404,9 +2366,6 @@ describe("resolveSegmentCount", () => {
     expect(resolveSegmentCount(device)).toBe(0);
   });
 
-  it("SEGMENT_HARD_MAX is the protocol ceiling (55)", () => {
-    expect(SEGMENT_HARD_MAX).toBe(55);
-  });
 });
 
 describe("DeviceManager — loadFromCache merge", () => {
@@ -3542,5 +3501,99 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     } as never);
     await dm2.pollAppApi();
     expect(rebuilds).toHaveLength(2); // moved to another gateway → rebuild
+  });
+});
+
+describe("DeviceManager.syncSegmentCount — the one writer of device.segmentCount from the tree path", () => {
+  beforeEach(() => {
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+  });
+  afterEach(() => {
+    registry = emptyRegistry();
+  });
+  const segCap = (max: number): CloudCapability => ({
+    type: "devices.capabilities.segment_color_setting",
+    instance: "segmentedColorRgb",
+    parameters: { dataType: "STRUCT", fields: [{ fieldName: "segment", elementRange: { min: 0, max } }] },
+  });
+
+  it("derives the count from the capabilities and stores it on the device", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: undefined, capabilities: [segCap(9)] });
+    expect(dm.syncSegmentCount(device)).toBe(10);
+    expect(device.segmentCount).toBe(10);
+  });
+
+  it("a manual list beyond the known range raises the stored count (cut-strip case)", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: 10, manualMode: true, manualSegments: [0, 5, 13] });
+    expect(dm.syncSegmentCount(device)).toBe(14);
+    expect(device.segmentCount).toBe(14);
+  });
+
+  it("an implausible stored count is replaced by the capability-derived one, never propagated", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: 1_000_000_000, capabilities: [segCap(14)] });
+    expect(dm.syncSegmentCount(device)).toBe(15);
+    expect(device.segmentCount).toBe(15);
+  });
+
+  it("a segmentCount quirk wins over everything the device or the Cloud say", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ sku: "H9999", segmentCount: 20, capabilities: [segCap(14)] });
+    expect(dm.syncSegmentCount(device)).toBe(5);
+    expect(device.segmentCount).toBe(5);
+  });
+
+  it("returns 0 and stores 0 for a device without segments", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
+    expect(dm.syncSegmentCount(device)).toBe(0);
+    expect(device.segmentCount).toBe(0);
+  });
+});
+
+describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () => {
+  afterEach(() => {
+    registry = emptyRegistry();
+  });
+  function nudgeDm(experimental: boolean): { dm: DeviceManager; warns: string[]; infos: string[] } {
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental });
+    const warns: string[] = [];
+    const infos: string[] = [];
+    const dm = new DeviceManager(
+      { ...mockLog, warn: (m: string) => warns.push(m), info: (m: string) => infos.push(m) } as never,
+      mockTimers,
+      registry,
+    );
+    return { dm, warns, infos };
+  }
+
+  it("a seed model with the toggle OFF gets the targeted warn ONCE per model", () => {
+    const { dm, warns } = nudgeDm(false);
+    dm.maybeNudgeSeedSku("H6141", "Strip");
+    dm.maybeNudgeSeedSku("h6141", "Strip");
+    expect(warns).toEqual([
+      'Device Strip (H6141) is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.',
+    ]);
+  });
+
+  it("a seed model with the toggle ON is only mentioned on info", () => {
+    const { dm, warns, infos } = nudgeDm(true);
+    dm.maybeNudgeSeedSku("H6141", undefined);
+    expect(warns).toEqual([]);
+    expect(infos).toEqual(["Device H6141 is in beta — experimental quirks are active."]);
+  });
+
+  it("verified / reported models stay silent, an unknown model asks for a diag export", () => {
+    const { dm, warns, infos } = nudgeDm(false);
+    dm.maybeNudgeSeedSku("H61BE", "Wall");
+    dm.maybeNudgeSeedSku("H5179", "Thermo");
+    expect(warns).toEqual([]);
+    expect(infos).toEqual([]);
+    dm.maybeNudgeSeedSku("HZZZZ", "Mystery");
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("not in the supported device list");
+    expect(warns[0]).toContain("diag.export");
   });
 });

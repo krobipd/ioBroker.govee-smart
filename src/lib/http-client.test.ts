@@ -1,5 +1,5 @@
 import * as http from "node:http";
-import { extractHttpStatus, HttpError, httpsRequest, interpretOkBody } from "./http-client";
+import { extractHttpStatus, formatFallback, HttpError, httpsRequest, interpretOkBody } from "./http-client";
 import type { HttpResult } from "./http-client";
 
 /**
@@ -339,23 +339,36 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     }
   });
 
-  it("rejects with mid-stream error on response destruction (H5 fix)", async () => {
-    // Server writes partial body and kills the socket. Without the
-    // res.on("error", reject) wiring we'd hang for the full timeout.
+  it("rejects promptly with the stream error when the server drops the socket mid-body (H5 fix)", async () => {
+    // Server writes a partial body and kills the socket. Without the
+    // res.on("error") wiring the request would sit there until the timeout —
+    // so the timeout here is long, and the rejection must arrive well before it
+    // and must NOT be the timeout error.
     stub.queue.push({ statusCode: 200, destroyMidBody: true });
-    try {
-      await httpRequestPlain({
+    const started = Date.now();
+    await expect(
+      httpRequestPlain({
         method: "GET",
         url: `http://127.0.0.1:${stub.port}/mid-fail`,
         headers: {},
-        timeout: 2_000,
-      });
-      throw new Error("expected throw");
-    } catch (e) {
-      // Either a stream error or the JSON-parse on the truncated body —
-      // both are fine; the point is we reject quickly, not hang.
-      expect(e).toBeInstanceOf(Error);
-    }
+        timeout: 30_000,
+      }),
+    ).rejects.toThrow(/^(?!Timeout)/);
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
+  it("rejects with the endpoint + wait time in the message when the server never answers (timeout)", async () => {
+    // The user reads the warn line, not a stack trace — it has to say WHERE
+    // and HOW LONG the adapter waited.
+    stub.queue.push({ statusCode: 200, body: "{}", delayMs: 400 });
+    await expect(
+      httpRequestPlain({
+        method: "GET",
+        url: `http://127.0.0.1:${stub.port}/slow-endpoint`,
+        headers: {},
+        timeout: 50,
+      }),
+    ).rejects.toThrow(/^Timeout after 50ms for GET 127\.0\.0\.1\/slow-endpoint$/);
   });
 
   it("rejects on AbortSignal aborted before request", async () => {
@@ -374,9 +387,10 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     }
   });
 
-  it("rejects on AbortSignal mid-flight, removes listener afterwards", async () => {
+  it("rejects on AbortSignal mid-flight and detaches its abort listener", async () => {
     stub.queue.push({ statusCode: 200, body: "{}", delayMs: 500 });
     const ctrl = new AbortController();
+    const removed = vi.spyOn(ctrl.signal, "removeEventListener");
     const reqPromise = httpRequestPlain({
       method: "GET",
       url: `http://127.0.0.1:${stub.port}/slow`,
@@ -385,19 +399,35 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
       timeout: 5_000,
     });
     setTimeout(() => ctrl.abort(), 50);
-    try {
-      await reqPromise;
-      throw new Error("expected throw");
-    } catch (e) {
-      expect((e as Error).message).toBe("Aborted");
-    }
-    // After abort, no listener should remain on the signal — `aborted`
-    // listeners on a one-shot signal are documented as auto-removed via
-    // {once: true}, but we explicit-remove on resolve too.
+    await expect(reqPromise).rejects.toThrow("Aborted");
+    // The request's own abort handler is detached again once it fired —
+    // a signal that is re-used for many requests must not collect one dead
+    // listener per completed request.
+    expect(removed).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 
-  it("verifies real httpsRequest is exported and callable (compile-time only)", () => {
-    expect(typeof httpsRequest).toBe("function");
+  it("detaches the abort listener after a normal completion (no listener leak on a re-used signal)", async () => {
+    stub.queue.push({ statusCode: 200, body: "{}" });
+    const ctrl = new AbortController();
+    const removed = vi.spyOn(ctrl.signal, "removeEventListener");
+    await httpRequestPlain({
+      method: "GET",
+      url: `http://127.0.0.1:${stub.port}/ok`,
+      headers: {},
+      signal: ctrl.signal,
+    });
+    expect(removed).toHaveBeenCalledWith("abort", expect.any(Function));
+  });
+});
+
+describe("formatFallback", () => {
+  it("names the fallback kind, the status and (when present) the body snippet", () => {
+    expect(formatFallback({ value: null, statusCode: 200, fallback: "empty" })).toBe(
+      "empty (status=200) — treated as no data",
+    );
+    expect(
+      formatFallback({ value: null, statusCode: 200, fallback: "plain-text-status", bodySnippet: "403 Forbbiden" }),
+    ).toBe('plain-text-status (status=200, body="403 Forbbiden") — treated as no data');
   });
 });
 

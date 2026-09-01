@@ -56,8 +56,8 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
       createLanStates: async () => {
         calls.push("createLanStates");
       },
-      createCloudStates: async (_d: GoveeDevice, defs: StateDefinition[]) => {
-        calls.push("createCloudStates");
+      createCloudStates: async (_d: GoveeDevice, defs: StateDefinition[], segmentCount: number) => {
+        calls.push(`createCloudStates:${segmentCount}`);
         cloudDefs.push(defs);
       },
       migrateLegacyDiagnostics: async () => {
@@ -198,11 +198,22 @@ describe("onCloudDataReady (phase 2)", () => {
       expect.arrayContaining([
         "createInfoStates",
         "createLanStates",
-        "createCloudStates",
+        "createCloudStates:15",
         "migrateLegacyDiagnostics",
         "updateDeviceTier",
       ]),
     );
+  });
+
+  it("hands the tree builder the count the device manager settled — not 0, not its own guess", async () => {
+    // The device manager owns device.segmentCount (syncSegmentCount); the
+    // state manager only builds the tree for the number it is given. A wiring
+    // slip here (0 / undefined) silently deletes every segment channel.
+    const device = createTestDevice({ segmentCount: 7 });
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onCloudDataReady(rig.adapter, device, [device]);
+    await Promise.all(rig.queue);
+    expect(rig.calls).toContain("createCloudStates:7");
   });
 
   it("feeds local snapshots into the cloud defs (snapshot_local dropdown carries the saved entries)", async () => {

@@ -158,3 +158,49 @@ describe("buildWizardHost — atomic LAN closures", () => {
     expect(await host.restoreStripAtomic(device, 12, 0xffffff, 100)).toBe(false);
   });
 });
+
+describe("buildWizardHost — passthrough closures (the adapter ↔ wizard wiring)", () => {
+  it("every host method reaches the adapter part it stands for", async () => {
+    const device = createTestDevice({ deviceId: "AA:07", lanIp: "10.0.0.7" });
+    const { adapter, applied } = makeAdapter([device]);
+    const sent: Array<{ id: string; command: string; value: unknown }> = [];
+    const timers: Array<{ ms: number }> = [];
+    const cleared: unknown[] = [];
+    (adapter as { deviceManager: unknown }).deviceManager = {
+      getDevices: () => [device],
+      sendCommand: async (d: GoveeDevice, command: string, value: unknown) => {
+        sent.push({ id: d.deviceId, command, value });
+      },
+    };
+    (adapter as { getStateAsync: unknown }).getStateAsync = async (id: string) =>
+      id.endsWith(".control.power") ? ({ val: true, ack: true } as ioBroker.State) : null;
+    (adapter as { setTimeout: unknown }).setTimeout = (_cb: () => void, ms: number) => {
+      timers.push({ ms });
+      return { handle: timers.length } as never;
+    };
+    (adapter as { clearTimeout: unknown }).clearTimeout = (h: unknown) => cleared.push(h);
+    const host = buildWizardHost(adapter);
+
+    expect(await host.getState("govee-smart.0.devices.h6160.control.power")).toEqual({ val: true, ack: true });
+    expect(await host.getState("govee-smart.0.devices.h6160.control.brightness")).toBeNull();
+    await host.sendCommand(device, "power", true);
+    expect(sent).toEqual([{ id: "AA:07", command: "power", value: true }]);
+    expect(host.findDevice(deviceKeyFor(device))).toBe(device);
+    expect(host.findDevice("H6160:NO:PE")).toBeUndefined();
+    expect(host.devicePrefix(device)).toBe("devices.h6160");
+    const handle = host.setTimeout(() => undefined, 5_000);
+    expect(timers).toEqual([{ ms: 5_000 }]);
+    host.clearTimeout(handle);
+    expect(cleared).toEqual([handle]);
+    await host.applyWizardResult(device, { segmentCount: 5, manualList: "0-1,3-4", hasGaps: true });
+    expect(applied).toEqual([{ device, mode: true, indices: [0, 1, 3, 4] }]);
+    expect(host.namespace).toBe("govee-smart.0");
+  });
+
+  it("devicePrefix falls back to '' when the state manager is gone (teardown race)", () => {
+    const device = createTestDevice();
+    const { adapter } = makeAdapter([device]);
+    (adapter as { stateManager: unknown }).stateManager = null;
+    expect(buildWizardHost(adapter).devicePrefix(device)).toBe("");
+  });
+});

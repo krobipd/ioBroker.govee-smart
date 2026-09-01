@@ -12,7 +12,6 @@ const mockApi = vi.hoisted(() => ({
   start: vi.fn(),
   yes: vi.fn(),
   no: vi.fn(),
-  done: vi.fn(),
   abort: vi.fn(),
   apply: vi.fn(),
 }));
@@ -38,7 +37,7 @@ function renderWizard(): void {
 }
 
 describe("SegmentWizard", () => {
-  it("happy path: select → measure → review → apply, and never calls done", async () => {
+  it("happy path: select → measure → review → apply — Finished stays local, only apply reaches the backend", async () => {
     mockApi.start.mockResolvedValue({
       snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
       active: true,
@@ -58,12 +57,17 @@ describe("SegmentWizard", () => {
     fireEvent.click(await screen.findByTestId("wiz-lit"));
     await waitFor(() => expect(mockApi.yes).toHaveBeenCalledTimes(1));
 
-    // "Finished" moves to review LOCALLY — no backend done call.
+    // "Finished" moves to review LOCALLY — no backend call of any kind.
+    const callsBeforeFinish = mockApi.yes.mock.calls.length + mockApi.no.mock.calls.length + mockApi.abort.mock.calls.length;
     fireEvent.click(screen.getByTestId("wiz-finish"));
-    fireEvent.click(await screen.findByTestId("wiz-apply"));
+    await screen.findByTestId("wiz-apply");
+    expect(mockApi.yes.mock.calls.length + mockApi.no.mock.calls.length + mockApi.abort.mock.calls.length).toBe(
+      callsBeforeFinish,
+    );
+    expect(mockApi.apply).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("wiz-apply"));
 
     await waitFor(() => expect(mockApi.apply).toHaveBeenCalledWith(DEVICE, [0]));
-    expect(mockApi.done).not.toHaveBeenCalled();
     await screen.findByTestId("wiz-success");
   });
 

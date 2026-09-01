@@ -314,11 +314,15 @@ describe("onStateChange — command dispatch + ack ownership", () => {
   });
 
   it("sceneSpeed is stored on the device + persisted to cache (applies on next activation, no command)", async () => {
-    const rig = makeRig([device]);
+    // Own device instance: the shared `device` fixture must not carry a
+    // sceneSpeed into the tests that run after this one.
+    const own = createTestDevice();
+    const rig = makeRig([own]);
     await write(rig, id("scenes.scene_speed"), 3);
-    expect(device.sceneSpeed).toBe(3);
-    expect(rig.persisted).toContain(device);
+    expect(own.sceneSpeed).toBe(3);
+    expect(rig.persisted).toContain(own);
     expect(rig.commands).toHaveLength(0);
+    expect(device.sceneSpeed).toBeUndefined();
   });
 });
 

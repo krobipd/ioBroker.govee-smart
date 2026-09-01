@@ -9,22 +9,32 @@ import {
   buildSegmentBrightnessPacket,
   applySceneSpeed,
 } from "./govee-lan-client";
-import type { LanDevice, LanStatus } from "./types";
+import type { LanDevice, LanStatus, TimerAdapter } from "./types";
 
 // dgram is mocked so the interface-pinning behaviour in start() (setMulticastInterface
 // on the scan socket + bind on the command socket) is unit-testable. The rest of the
 // suite never calls start(), so these mocks stay inert for those tests.
 const dgramMock = vi.hoisted(() => {
+  interface SentDatagram {
+    buf: Buffer;
+    port: number;
+    address: string;
+  }
   const sockets: Array<{
     binds: Array<[unknown, unknown]>;
     mcastIf: unknown[];
     handlers: Record<string, Array<(...a: unknown[]) => void>>;
+    sends: SentDatagram[];
+    /** When set, every send() reports this error to its callback instead of success. */
+    sendError: Error | null;
   }> = [];
   const make = (): unknown => {
     const s = {
       binds: [] as Array<[unknown, unknown]>,
       mcastIf: [] as unknown[],
       handlers: {} as Record<string, Array<(...a: unknown[]) => void>>,
+      sends: [] as SentDatagram[],
+      sendError: null as Error | null,
       on: (ev: unknown, cb: unknown) => {
         const key = String(ev);
         (s.handlers[key] ??= []).push(cb as (...a: unknown[]) => void);
@@ -38,7 +48,12 @@ const dgramMock = vi.hoisted(() => {
       addMembership: () => {},
       dropMembership: () => {},
       setMulticastInterface: (iface: unknown) => s.mcastIf.push(iface),
-      send: () => {},
+      // Records the datagram the way node:dgram would put it on the wire and
+      // completes the callback, so the send-hook / last-sent bookkeeping runs.
+      send: (buf: Buffer, _off: number, _len: number, port: number, address: string, cb?: (e: Error | null) => void) => {
+        s.sends.push({ buf, port, address });
+        cb?.(s.sendError);
+      },
       close: () => {},
     };
     sockets.push(s);
@@ -63,7 +78,7 @@ const lanTimers = {
   setTimeout: () => undefined,
   clearTimeout: () => {},
   delay: () => Promise.resolve(),
-} as never;
+} as unknown as TimerAdapter;
 
 describe("buildScenePackets", () => {
   it("should build a single activation packet for scene code only", () => {
@@ -687,5 +702,297 @@ describe("setColorTemperature — range clamping", () => {
     client.setColorTemperature("10.0.0.1", NaN);
     client.setColorTemperature("10.0.0.1", Infinity);
     expect(sent.map(d => d.colorTemInKelvin)).toEqual([2000, 2000]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The whole UDP command path was untested until 2.28.0: every setX() built a
+// packet, but no test ever looked at what left the socket. These drive the
+// real client against the dgram mock and read the datagram back.
+// ---------------------------------------------------------------------------
+describe("GoveeLanClient — command send path (what really leaves the socket)", () => {
+  beforeEach(() => {
+    dgramMock.sockets.length = 0;
+  });
+
+  interface SendRecord {
+    ip: string;
+    cmd: string;
+    payload: unknown;
+    bytes: number;
+    error?: string;
+  }
+
+  /** Started client + the send socket the commands go out on + the diag send-hook log. */
+  function startedClient(): {
+    client: GoveeLanClient;
+    sendSock: (typeof dgramMock.sockets)[number];
+    hook: SendRecord[];
+  } {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    const hook: SendRecord[] = [];
+    client.setSendHook((ip, cmd, payload, bytes, error) => hook.push({ ip, cmd, payload, bytes, error }));
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    return { client, sendSock: dgramMock.sockets[0], hook };
+  }
+
+  const decode = (d: { buf: Buffer }): unknown => JSON.parse(d.buf.toString());
+
+  it("setPower sends the Govee `turn` envelope to port 4003 of the device and reports it to the diag hook", () => {
+    const { client, sendSock, hook } = startedClient();
+    client.setPower("10.0.0.5", true);
+    client.setPower("10.0.0.5", false);
+    expect(sendSock.sends.map(d => [d.address, d.port])).toEqual([
+      ["10.0.0.5", 4003],
+      ["10.0.0.5", 4003],
+    ]);
+    expect(decode(sendSock.sends[0])).toEqual({ msg: { cmd: "turn", data: { value: 1 } } });
+    expect(decode(sendSock.sends[1])).toEqual({ msg: { cmd: "turn", data: { value: 0 } } });
+    expect(hook).toEqual([
+      { ip: "10.0.0.5", cmd: "turn", payload: { value: 1 }, bytes: sendSock.sends[0].buf.length, error: undefined },
+      { ip: "10.0.0.5", cmd: "turn", payload: { value: 0 }, bytes: sendSock.sends[1].buf.length, error: undefined },
+    ]);
+    // A successful send stamps the per-IP last-command time (rate/diag bookkeeping).
+    expect(client.getDiagSnapshot().lastCommandSentMs["10.0.0.5"]).toBeGreaterThan(0);
+    client.stop();
+  });
+
+  it("setBrightness clamps into 0..100 before it goes on the wire", () => {
+    const { client, sendSock } = startedClient();
+    client.setBrightness("10.0.0.5", 150);
+    client.setBrightness("10.0.0.5", -5);
+    client.setBrightness("10.0.0.5", 42.6);
+    expect(sendSock.sends.map(d => (decode(d) as { msg: { cmd: string; data: { value: number } } }).msg)).toEqual([
+      { cmd: "brightness", data: { value: 100 } },
+      { cmd: "brightness", data: { value: 0 } },
+      { cmd: "brightness", data: { value: 43 } },
+    ]);
+    client.stop();
+  });
+
+  it("setColor sends colorwc with the RGB triple and colour temperature 0 (RGB mode)", () => {
+    const { client, sendSock } = startedClient();
+    client.setColor("10.0.0.5", 255, 128, 0);
+    expect(decode(sendSock.sends[0])).toEqual({
+      msg: { cmd: "colorwc", data: { color: { r: 255, g: 128, b: 0 }, colorTemInKelvin: 0 } },
+    });
+    client.stop();
+  });
+
+  it("requestStatus sends an empty devStatus query", () => {
+    const { client, sendSock } = startedClient();
+    client.requestStatus("10.0.0.7");
+    expect(decode(sendSock.sends[0])).toEqual({ msg: { cmd: "devStatus", data: {} } });
+    expect(sendSock.sends[0].address).toBe("10.0.0.7");
+    client.stop();
+  });
+
+  it("setScene wraps the scene packets in a ptReal envelope and sends nothing for a non-positive code", () => {
+    const { client, sendSock } = startedClient();
+    client.setScene("10.0.0.5", 0, "");
+    client.setScene("10.0.0.5", -3, "");
+    expect(sendSock.sends).toHaveLength(0);
+    client.setScene("10.0.0.5", 42, "");
+    expect(decode(sendSock.sends[0])).toEqual({
+      msg: { cmd: "ptReal", data: { command: buildScenePackets(42, "") } },
+    });
+    client.stop();
+  });
+
+  it("sendPtReal reports a failed datagram to the hook with the error and does NOT stamp the last-sent time", () => {
+    const warns: string[] = [];
+    const client = new GoveeLanClient({ ...lanLog, warn: (m: string) => warns.push(m) } as never, lanTimers);
+    const hook: SendRecord[] = [];
+    client.setSendHook((ip, cmd, payload, bytes, error) => hook.push({ ip, cmd, payload, bytes, error }));
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    dgramMock.sockets[0].sendError = new Error("EHOSTUNREACH");
+    client.sendPtReal("10.0.0.9", ["AAAA"]);
+    expect(hook[0]).toMatchObject({ ip: "10.0.0.9", cmd: "ptReal", error: "EHOSTUNREACH" });
+    expect(warns.some(m => m.includes("ptReal error to 10.0.0.9"))).toBe(true);
+    expect(client.getDiagSnapshot().lastCommandSentMs["10.0.0.9"]).toBeUndefined();
+    client.stop();
+  });
+
+  it("before start() a command is dropped, but the diag hook still learns about it", () => {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    const hook: SendRecord[] = [];
+    client.setSendHook((ip, cmd, payload, bytes, error) => hook.push({ ip, cmd, payload, bytes, error }));
+    client.setPower("10.0.0.5", true);
+    client.sendPtReal("10.0.0.5", ["AAAA"]);
+    expect(dgramMock.sockets).toHaveLength(0);
+    expect(hook.map(h => h.error)).toEqual(["socket not ready", "socket not ready"]);
+  });
+
+  it("restoreAllSegments sends one ptReal with colour + brightness for every segment, nothing for total 0", () => {
+    const { client, sendSock } = startedClient();
+    client.restoreAllSegments("10.0.0.5", 0, 1, 2, 3, 50);
+    expect(sendSock.sends).toHaveLength(0);
+    client.restoreAllSegments("10.0.0.5", 3, 255, 0, 0, 60);
+    const all = [0, 1, 2];
+    expect(decode(sendSock.sends[0])).toEqual({
+      msg: {
+        cmd: "ptReal",
+        data: { command: [buildSegmentColorPacket(255, 0, 0, all), buildSegmentBrightnessPacket(60, all)] },
+      },
+    });
+    client.stop();
+  });
+
+  it("flashSingleSegment forces colour mode first and fires the three-packet burst after the settle delay", () => {
+    const timeouts: Array<() => void> = [];
+    const timers = {
+      ...lanTimers,
+      setTimeout: (cb: () => void) => {
+        timeouts.push(cb);
+        return timeouts.length;
+      },
+    } as never;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[0];
+    client.flashSingleSegment("10.0.0.5", 4);
+    // Step 0 — colorwc white — is on the wire immediately; the burst waits.
+    expect(sendSock.sends).toHaveLength(1);
+    expect((decode(sendSock.sends[0]) as { msg: { cmd: string } }).msg.cmd).toBe("colorwc");
+    expect(timeouts).toHaveLength(1);
+    timeouts[0]();
+    expect(sendSock.sends).toHaveLength(2);
+    const burst = (decode(sendSock.sends[1]) as { msg: { data: { command: string[] } } }).msg.data.command;
+    const others = Array.from({ length: 56 }, (_, i) => i).filter(i => i !== 4);
+    expect(burst).toEqual([
+      buildSegmentBrightnessPacket(0, others),
+      buildSegmentColorPacket(0xff, 0xff, 0xff, [4]),
+      buildSegmentBrightnessPacket(100, [4]),
+    ]);
+    // An index the protocol cannot address sends nothing at all.
+    client.flashSingleSegment("10.0.0.5", 56);
+    client.flashSingleSegment("10.0.0.5", -1);
+    expect(sendSock.sends).toHaveLength(2);
+    expect(timeouts).toHaveLength(1);
+    client.stop();
+  });
+
+  it("a flash burst scheduled before stop() never reaches the socket", () => {
+    const timeouts: Array<() => void> = [];
+    const timers = {
+      ...lanTimers,
+      setTimeout: (cb: () => void) => {
+        timeouts.push(cb);
+        return timeouts.length;
+      },
+    } as never;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[0];
+    client.flashSingleSegment("10.0.0.5", 1);
+    client.stop();
+    timeouts[0](); // the stale burst fires into a torn-down client
+    expect(sendSock.sends).toHaveLength(1); // only the colorwc from before stop()
+  });
+});
+
+describe("GoveeLanClient — discovery loop + socket wiring", () => {
+  beforeEach(() => {
+    dgramMock.sockets.length = 0;
+  });
+
+  it("the scan interval really sends the multicast scan every tick (the callback was untested)", () => {
+    const intervals: Array<() => void> = [];
+    const timers = {
+      ...lanTimers,
+      setInterval: (cb: () => void) => {
+        intervals.push(cb);
+        return intervals.length;
+      },
+    } as never;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const scanSock = dgramMock.sockets[2];
+    const before = scanSock.sends.length;
+    expect(intervals, "the periodic scan must be armed").toHaveLength(1);
+    intervals[0]();
+    intervals[0]();
+    expect(scanSock.sends).toHaveLength(before + 2);
+    const last = scanSock.sends[scanSock.sends.length - 1];
+    expect([last.address, last.port]).toEqual(["239.255.255.250", 4001]);
+    expect(JSON.parse(last.buf.toString())).toEqual({ msg: { cmd: "scan", data: { account_topic: "reserve" } } });
+    client.stop();
+  });
+
+  it("a datagram on the listen socket reaches the discovery + status callbacks and the diag record hooks", () => {
+    const discovered: LanDevice[] = [];
+    const statuses: Array<{ ip: string; status: LanStatus }> = [];
+    const scanHook: LanDevice[] = [];
+    const statusHook: Array<{ ip: string; status: LanStatus }> = [];
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    client.setScanRecordHook(d => scanHook.push(d));
+    client.setStatusRecordHook((ip, status) => statusHook.push({ ip, status }));
+    client.start(
+      d => discovered.push(d),
+      (ip, status) => statuses.push({ ip, status }),
+      30_000,
+      "0.0.0.0",
+    );
+    const listenSock = dgramMock.sockets[1];
+    const deliver = (obj: unknown, address: string): void =>
+      listenSock.handlers["message"]?.forEach(h => h(Buffer.from(JSON.stringify(obj)), { address }));
+
+    deliver({ msg: { cmd: "scan", data: { ip: "ignored", device: "AA:BB", sku: "H61BE" } } }, "10.0.0.5");
+    deliver({ msg: { cmd: "devStatus", data: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } } }, "10.0.0.5");
+
+    expect(discovered).toEqual([{ ip: "10.0.0.5", device: "AA:BB", sku: "H61BE" }]);
+    expect(scanHook).toEqual(discovered);
+    expect(statuses).toEqual([{ ip: "10.0.0.5", status: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } }]);
+    expect(statusHook).toEqual(statuses);
+    expect(client.getDiagSnapshot().seenDeviceIps).toEqual(["AA:BB:10.0.0.5"]);
+    client.stop();
+  });
+
+  it("stop() clears the scan interval and forgets the last-sent stamps", () => {
+    let cleared = 0;
+    const timers = {
+      ...lanTimers,
+      setInterval: () => 1,
+      clearInterval: () => {
+        cleared++;
+      },
+    } as never;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    client.setPower("10.0.0.5", true);
+    expect(client.getDiagSnapshot().lastCommandSentMs["10.0.0.5"]).toBeGreaterThan(0);
+    client.stop();
+    expect(cleared).toBe(1);
+    expect(client.getDiagSnapshot().lastCommandSentMs).toEqual({});
   });
 });

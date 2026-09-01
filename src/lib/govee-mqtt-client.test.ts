@@ -63,20 +63,38 @@ describe("GoveeMqttClient", () => {
   });
 
   describe("setVerificationCode", () => {
-    it("should accept and trim verification codes", () => {
-      const client = new GoveeMqttClient("user@example.com", "password", mockLog, mockTimers);
-      expect(() => client.setVerificationCode("  123456  ")).not.toThrow();
-      expect(() => client.setVerificationCode("")).not.toThrow();
+    it("sends the trimmed code in the login body — and no code field at all while it is blank", async () => {
+      const fake = makeFakeHttps(() => new Error("stop after the login POST"));
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      client.setVerificationCode("  123456  ");
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect((fake.calls[0].body as { code?: string }).code).toBe("123456");
+      client.setVerificationCode("   ");
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect((fake.calls[1].body as { code?: string }).code).toBeUndefined();
     });
   });
 
   describe("setOnVerificationConsumed / setOnVerificationFailed", () => {
-    it("should accept callback or null", () => {
-      const client = new GoveeMqttClient("user@example.com", "password", mockLog, mockTimers);
-      expect(() => client.setOnVerificationConsumed(() => {})).not.toThrow();
-      expect(() => client.setOnVerificationConsumed(null)).not.toThrow();
-      expect(() => client.setOnVerificationFailed(_reason => {})).not.toThrow();
-      expect(() => client.setOnVerificationFailed(null)).not.toThrow();
+    it("a null callback only switches the notification off — the login outcome itself is unchanged", async () => {
+      const fake = makeFakeHttps(() => ({ status: 455, message: "verification code invalid" }));
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      client.setOnVerificationFailed(() => {
+        throw new Error("a cleared callback must never fire");
+      });
+      client.setOnVerificationFailed(null);
+      client.setOnVerificationConsumed(null);
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect(client.getFailureReason()).toBe("verification code rejected — request a fresh code");
     });
   });
 
@@ -410,8 +428,10 @@ describe("GoveeMqttClient", () => {
           lastConnFlag = connected;
         },
       );
-      // Connect bails — connection callback is invoked with false
+      // Connect bails — connection callback is invoked with false, and the
+      // probe-readable error names the malformed response.
       expect(lastConnFlag).toBe(false);
+      expect(client.getLastError()?.message).toContain("IoT key response missing endpoint");
     });
   });
 
@@ -510,9 +530,39 @@ describe("GoveeMqttClient", () => {
       expect(httpCalls).toBeGreaterThan(0);
     });
 
-    it("should accept null to clear persisted credentials", () => {
-      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers);
-      expect(() => client.setPersistedCredentials(null)).not.toThrow();
+    it("setPersistedCredentials(null) drops the cached bundle — the next connect does a fresh login", async () => {
+      let httpCalls = 0;
+      const fake = makeFakeHttps(() => {
+        httpCalls++;
+        return new Error("stop after login");
+      });
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => ({
+        on: () => undefined,
+        subscribe: () => undefined,
+        end: () => undefined,
+        removeAllListeners: () => undefined,
+      })) as never);
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      client.setPersistedCredentials({
+        bearerToken: "tok",
+        iotEndpoint: "iot.example.com",
+        p12Cert: "AAA=",
+        p12Pass: "x",
+        accountId: "acc",
+        accountTopic: "GA/topic",
+        tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      client.setPersistedCredentials(null);
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect(httpCalls).toBe(1); // no cached reuse — a real /login went out
+      client.disconnect();
     });
   });
 
@@ -916,6 +966,128 @@ describe("GoveeMqttClient", () => {
       (client as any).handleMessage(Buffer.from(JSON.stringify({ state: { onOff: 1 } })), "t"); // no sku/device
       (client as any).handleMessage(Buffer.from("{ bad"), "t"); // invalid JSON
       expect(fired).toBe(0);
+    });
+  });
+
+  // The mqtt.js event handlers installed after a successful login were never
+  // driven: message → status callback, close → reconnect, error → classified,
+  // plus the proactive bearer refresh timer. A fake broker emits them here.
+  describe("broker event wiring + bearer refresh", () => {
+    function liveClient(): {
+      client: GoveeMqttClient;
+      fake: FakeHttpsRequest;
+      fakeMqtt: { connected: boolean };
+      emit: (ev: string, ...args: unknown[]) => void;
+      scheduled: Array<{ cb: () => void; ms: number }>;
+    } {
+      const fake = makeFakeHttps((_opts, idx) =>
+        idx === 0
+          ? { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } }
+          : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
+      );
+      const handlers: Record<string, Array<(...a: unknown[]) => void>> = {};
+      const fakeMqtt = {
+        connected: false,
+        on(ev: string, cb: (...a: unknown[]) => void) {
+          (handlers[ev] ??= []).push(cb);
+          return fakeMqtt;
+        },
+        subscribe(_t: string, _o: unknown, cb: (e: Error | null) => void) {
+          cb(null);
+        },
+        end() {
+          fakeMqtt.connected = false;
+        },
+        removeAllListeners() {
+          for (const k of Object.keys(handlers)) delete handlers[k];
+        },
+      };
+      const scheduled: Array<{ cb: () => void; ms: number }> = [];
+      const timers = {
+        setInterval: () => undefined,
+        clearInterval: () => {},
+        setTimeout: (cb: () => void, ms: number) => {
+          scheduled.push({ cb, ms });
+          return scheduled.length;
+        },
+        clearTimeout: () => {},
+        delay: () => Promise.resolve(),
+      } as never;
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, timers, fake.fn, (() => fakeMqtt) as never);
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      return {
+        client,
+        fake,
+        fakeMqtt,
+        emit: (ev, ...args) => (handlers[ev] ?? []).forEach(h => h(...args)),
+        scheduled,
+      };
+    }
+
+    it("a broker message reaches the status callback as a parsed update", async () => {
+      const h = liveClient();
+      const statuses: unknown[] = [];
+      await h.client.connect(
+        s => statuses.push(s),
+        () => {},
+      );
+      h.emit("connect");
+      h.emit("message", "GA/acc/topic", Buffer.from(JSON.stringify({ sku: "H61BE", device: "AA:BB", state: { onOff: 1 } })));
+      expect(statuses).toEqual([{ sku: "H61BE", device: "AA:BB", state: { onOff: 1 } }]);
+      h.client.disconnect();
+    });
+
+    it("a broker close reports disconnected and arms the reconnect backoff", async () => {
+      const h = liveClient();
+      const flags: boolean[] = [];
+      await h.client.connect(
+        () => {},
+        c => flags.push(c),
+      );
+      h.emit("connect");
+      const armedBefore = h.scheduled.length;
+      h.emit("close");
+      expect(flags).toEqual([true, false]);
+      expect(h.scheduled.length).toBe(armedBefore + 1); // one backoff timer
+      expect(h.client.getFailureReason()).toBe("cannot reach Govee servers — will retry");
+      h.client.disconnect();
+    });
+
+    it("a broker error event is classified for the probe / failure reason without a disconnect", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      h.fakeMqtt.connected = false; // getLastError only answers while not connected
+      h.emit("error", Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }));
+      expect(h.client.getLastError()?.category).toBe("AUTH");
+      h.client.disconnect();
+    });
+
+    it("the proactive bearer refresh fires a silent re-login 5 minutes before expiry while connected", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      // token_expire_cycle 3600 s → refresh armed at 55 min.
+      const refresh = h.scheduled.find(s => s.ms > 3_000_000 && s.ms <= 3_300_000);
+      expect(refresh, "refresh timer must be armed after a login").toBeDefined();
+      const loginsBefore = h.fake.calls.length;
+      h.fakeMqtt.connected = true;
+      refresh!.cb();
+      await new Promise(r => setTimeout(r, 10));
+      expect(h.fake.calls.length).toBe(loginsBefore + 1);
+      expect(h.fake.calls[h.fake.calls.length - 1].url).toContain("/login");
+      expect(h.client.token).toBe("bearer");
+      h.client.disconnect();
     });
   });
 });

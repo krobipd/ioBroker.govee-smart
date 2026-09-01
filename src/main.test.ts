@@ -134,6 +134,7 @@ vi.mock("@iobroker/adapter-core", () => {
 });
 
 import { GoveeAdapter } from "./main";
+import { STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
 import type { GoveeDevice } from "./lib/types";
@@ -218,7 +219,6 @@ function internalOf(adapter: GoveeAdapter): {
   onMessage: (obj: unknown) => void;
   syncDevicesManually: () => Promise<void>;
   applyManualSegments: (d: GoveeDevice, mode: boolean, idx?: number[]) => Promise<void>;
-  stateToCommand: (s: string) => string | null;
   buildMessageRouterHost: () => Record<string, unknown>;
 } {
   return adapter as unknown as ReturnType<typeof internalOf>;
@@ -574,6 +574,32 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
+  it("onUnload clears every timer handle the start-up armed — none is left ticking", async () => {
+    const { adapter } = await setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
+    const i = internalOf(adapter);
+    // The stub hands out a fresh handle object per call, so identity is exact.
+    const armedIntervals = i.setInterval.mock.results.map(r => r.value);
+    const armedTimeouts = i.setTimeout.mock.results.map(r => r.value);
+    expect(armedIntervals.length).toBeGreaterThanOrEqual(3);
+    expect(armedTimeouts.length).toBeGreaterThanOrEqual(3);
+
+    i.onUnload(() => undefined);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    const clearedIntervals = i.clearInterval.mock.calls.map(c => c[0]);
+    const clearedTimeouts = i.clearTimeout.mock.calls.map(c => c[0]);
+    for (const h of armedIntervals) {
+      expect(clearedIntervals, "every armed interval is cleared").toContain(h);
+    }
+    for (const h of armedTimeouts) {
+      expect(clearedTimeouts, "every armed timeout is cleared").toContain(h);
+    }
+  });
+
   it("onUnload still calls back when a sub-client throws", async () => {
     const { adapter, f } = await setupReady();
     const i = internalOf(adapter);
@@ -621,20 +647,28 @@ describe("GoveeAdapter onReady — timers", () => {
     );
   });
 
-  it("the startup marks everything offline before anything was asked", async () => {
+  it("the startup marks everything offline BEFORE the first LAN scan can answer", async () => {
     // After a crash no shutdown code ran at all — the previous run's values would
     // stand until the 20-second sync catches up, plus 90 seconds of reply timeout
-    // for a LAN light.
+    // for a LAN light. The stamp has to land before any discovery can flip a
+    // marker back to true, i.e. before the LAN client is even started.
     // onReady builds a FRESH state manager, so the spy goes on the prototype —
     // patching the existing instance would be discarded and prove nothing.
-    const { adapter } = await setupReady();
-    const i = internalOf(adapter);
-    const marked = vi.spyOn(StateManager.prototype, "markAllOffline").mockResolvedValue([]);
+    const { adapter, f } = setup();
+    const order: string[] = [];
+    const marked = vi.spyOn(StateManager.prototype, "markAllOffline").mockImplementation(async () => {
+      order.push("markAllOffline");
+      return [];
+    });
+    f.lan.start.mockImplementation((...args: unknown[]) => {
+      f.lan.startArgs = args;
+      order.push("lan.start");
+    });
 
-    await i.onReady();
-
-    expect(marked).toHaveBeenCalled();
+    await internalOf(adapter).onReady();
     marked.mockRestore();
+
+    expect(order).toEqual(["markAllOffline", "lan.start"]);
   });
 
   it("onUnload marks the devices offline, not just the connection flags", async () => {
@@ -650,23 +684,31 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(marked).toHaveBeenCalled();
   });
 
-  it("the 20-second round refreshes the rollup right after the markers", async () => {
+  it("the 20-second round writes the rollup only AFTER every marker was re-evaluated", async () => {
     // Derived from exactly the markers that were just re-evaluated, so the count
-    // can never drift away from what the individual devices say.
-    const { adapter, f } = await setupReady();
+    // can never drift away from what the individual devices say — a rollup
+    // written before the markers would show the previous round's numbers.
+    const { adapter } = await setupReady();
     const i = internalOf(adapter);
-    const rollup = vi.fn(async () => ({ total: 0, online: 0 }));
-    i.stateManager!.writeDeviceRollup = rollup;
-    const tick = i.setInterval.mock.calls.map(c => c[0] as () => void);
-    rollup.mockClear();
+    const devices = (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices;
+    devices.set("a", makeDevice({ deviceId: "AA:01" }));
+    devices.set("b", makeDevice({ deviceId: "AA:02" }));
+    const order: string[] = [];
+    (i.stateManager as unknown as { syncInfoOnline: unknown }).syncInfoOnline = async () => {
+      order.push("marker");
+      return false;
+    };
+    i.stateManager!.writeDeviceRollup = async () => {
+      order.push("rollup");
+      return { total: 0, online: 0 };
+    };
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    expect(syncCall, "online-sync interval must be armed").toBeDefined();
 
-    for (const run of tick) {
-      run();
-    }
-    await new Promise(resolve => setTimeout(resolve, 10));
+    (syncCall![0] as () => void)();
+    await settle(6);
 
-    expect(rollup).toHaveBeenCalled();
-    void f;
+    expect(order).toEqual(["marker", "marker", "rollup"]);
   });
 
   it("onUnload writes the final states BEFORE it reports back", async () => {
@@ -1082,5 +1124,199 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     // Empty account → loadFromCloud resolves ok, so cloudConnected is true.
     expect(i.states.get("info.cloudConnected")?.val).toBe(true);
     expect(i.statesReady).toBe(true);
+  });
+});
+
+// ===========================================================================
+// Wiring. Every callback main.ts hands to a collaborator is one line of glue —
+// and one line of glue is exactly what left the manual-sync button dead for ten
+// releases. These pull the registered callbacks back out of the fakes and fire
+// them.
+// ===========================================================================
+describe("GoveeAdapter — callback wiring", () => {
+  function fullSetup(): Promise<{ adapter: GoveeAdapter; f: Fakes }> {
+    return setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
+  }
+  const firstArg = <T>(fn: ReturnType<typeof vi.fn>): T => {
+    expect(fn, "callback must have been registered").toHaveBeenCalled();
+    return fn.mock.calls[0][0] as T;
+  };
+
+  it("MQTT verification: 'pending' opens the code field + nudges, 'consumed' clears the saved code", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const onFailed = firstArg<(reason: string) => void>(f.mqtt.setOnVerificationFailed);
+    onFailed("pending");
+    await settle();
+    expect(i.states.get("info.verificationPending")).toEqual({ val: true, ack: true });
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("requires a verification code"));
+
+    // Govee accepted the code → the setting is wiped so a stale code is never re-sent.
+    i.getForeignObjectAsync.mockResolvedValue({ native: { mqttVerificationCode: "123456" } });
+    const onConsumed = firstArg<() => void>(f.mqtt.setOnVerificationConsumed);
+    onConsumed();
+    await settle();
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(
+      `system.adapter.${i.namespace}`,
+      expect.objectContaining({ native: expect.objectContaining({ mqttVerificationCode: "" }) }),
+    );
+  });
+
+  it("MQTT 'failed' verification also wipes the code and names the rejection", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValue({ native: { mqttVerificationCode: "999999" } });
+    firstArg<(reason: string) => void>(f.mqtt.setOnVerificationFailed)("failed");
+    await settle();
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("rejected the verification code"));
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(
+      `system.adapter.${i.namespace}`,
+      expect.objectContaining({ native: expect.objectContaining({ mqttVerificationCode: "" }) }),
+    );
+  });
+
+  it("MQTT auth-failed and login-blocked surface as actionable warnings", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    firstArg<() => void>(f.mqtt.setOnAuthFailed)();
+    firstArg<() => void>(f.mqtt.setOnLoginBlocked)();
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("rejected the account login"));
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("stopped accepting the account login"));
+  });
+
+  it("MQTT connection flips: connected writes the flags, resolves the problems and re-checks ready; disconnected clears", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const onConnection = f.mqtt.connect.mock.calls[0][1] as (c: boolean) => void;
+    firstArg<() => void>(f.mqtt.setOnAuthFailed)(); // an open problem to be resolved
+    onConnection(true);
+    await settle();
+    expect(i.states.get("info.mqttConnected")).toEqual({ val: true, ack: true });
+    expect(i.states.get("info.verificationPending")).toEqual({ val: false, ack: true });
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("account login accepted"));
+    onConnection(false);
+    await settle();
+    expect(i.states.get("info.mqttConnected")).toEqual({ val: false, ack: true });
+  });
+
+  it("an MQTT status push reaches the device manager and the packet hook feeds the diagnostics", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const device = makeDevice({ lanIp: "10.0.0.5", state: { online: true, power: false } });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
+    const onStatus = f.mqtt.connect.mock.calls[0][0] as (u: unknown) => void;
+    onStatus({ sku: "H6172", device: "AA:BB:CC:DD:EE:11", state: { onOff: 1, brightness: 40 } });
+    expect(device.state.power).toBe(true);
+    expect(device.state.brightness).toBe(40);
+
+    firstArg<(d: string, t: string, p: unknown) => void>(f.mqtt.setPacketHook)("AA:BB:CC:DD:EE:11", "GA/t", { hex: "aa01" });
+    const diag = (i.deviceManager as unknown as { getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> } }).getDiagnostics();
+    expect(diag.generate(device, "x").lastMqttPackets).toEqual([expect.objectContaining({ hex: "aa01", topic: "GA/t" })]);
+  });
+
+  it("a fresh bearer token from the MQTT login is handed to the App-API client", async () => {
+    const { f } = await fullSetup();
+    const onToken = f.mqtt.connect.mock.calls[0][2] as (t: string) => void;
+    onToken("fresh-bearer");
+    expect(f.api.setBearerToken).toHaveBeenCalledWith("fresh-bearer");
+  });
+
+  it("refreshed MQTT credentials are persisted to the instance data directory", async () => {
+    const { f } = await fullSetup();
+    firstArg<(c: unknown) => void>(f.mqtt.setOnCredentialsRefresh)({
+      bearerToken: "bt",
+      iotEndpoint: "iot.example",
+      p12Cert: "cert",
+      p12Pass: "pass",
+      accountId: "acc",
+      accountTopic: "GA/acc",
+      tokenExpiresAt: Date.now() + 3_600_000,
+    });
+    // The write is asynchronous (temp file + rename) — wait for the file to be complete.
+    const file = pathReal.join(currentDataDir(), "mqtt-credentials.json");
+    let stored: { bearerToken?: string } | null = null;
+    for (let attempt = 0; attempt < 50 && !stored; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+      try {
+        stored = JSON.parse(fsReal.readFileSync(file, "utf-8")) as { bearerToken?: string };
+      } catch {
+        stored = null;
+      }
+    }
+    expect(stored?.bearerToken).toBe("enc:bt"); // encrypted at rest
+  });
+
+  it("Cloud responses and Cloud-events raw payloads land in the per-device diagnostics", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const device = makeDevice({ deviceId: "AA:BB:CC:DD:EE:11" });
+    firstArg<(d: string, e: string, b: unknown) => void>(f.cloud.setResponseHook)("AA:BB:CC:DD:EE:11", "/router/x", { v: 1 });
+    const onRaw = f.openapi.connect.mock.calls[0][2] as (raw: string) => void;
+    onRaw(JSON.stringify({ sku: "H6172", device: "AA:BB:CC:DD:EE:11", capabilities: [] }));
+    onRaw("{ not json"); // must not throw
+    const diag = (i.deviceManager as unknown as { getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> } }).getDiagnostics();
+    const report = diag.generate(device, "x");
+    expect((report.apiHistory as Record<string, unknown[]>)["/router/x"]).toHaveLength(1);
+    expect(report.lastMqttPackets).toEqual([expect.objectContaining({ topic: "openapi-events" })]);
+  });
+
+  it("Cloud-events connection state is mirrored to info.openapiMqttConnected and events reach the device manager", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const onConnection = f.openapi.connect.mock.calls[0][1] as (c: boolean) => void;
+    onConnection(true);
+    await settle();
+    expect(i.states.get("info.openapiMqttConnected")).toEqual({ val: true, ack: true });
+
+    const sensor = makeDevice({ sku: "H5179", deviceId: "AA:BB:CC:DD:EE:22", type: "devices.types.thermometer", state: { online: false } });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H5179_aabbccddee22", sensor);
+    const onEvent = f.openapi.connect.mock.calls[0][0] as (e: unknown) => void;
+    onEvent({
+      sku: "H5179",
+      device: "AA:BB:CC:DD:EE:22",
+      capabilities: [{ type: "devices.capabilities.online", instance: "online", state: { value: true } }],
+    });
+    expect(sensor.state.online).toBe(true);
+  });
+
+  it("a LAN status reply is routed by source IP into the device manager", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const device = makeDevice({ lanIp: "10.0.0.5", state: { online: true } });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
+    const onStatus = f.lan.startArgs[1] as (ip: string, s: unknown) => void;
+    onStatus("10.0.0.5", { onOff: 1, brightness: 77, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 });
+    expect(device.state.brightness).toBe(77);
+    expect(device.state.colorRgb).toBe("#010203");
+  });
+
+  it("a segment-count change rebuilds the segment tree with the settled count", async () => {
+    const { adapter } = await fullSetup();
+    const i = internalOf(adapter);
+    const device = makeDevice({ lanIp: "10.0.0.5", segmentCount: 3 });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
+    const dm = i.deviceManager as unknown as { onSegmentCountChanged?: (d: GoveeDevice) => void };
+    expect(dm.onSegmentCountChanged, "count-change callback must be wired").toBeDefined();
+    dm.onSegmentCountChanged!(device);
+    await settle(5);
+    const prefix = i.stateManager!.devicePrefix(device);
+    expect(i.objects.has(`${prefix}.segments.2`)).toBe(true);
+    expect(i.objects.has(`${prefix}.segments.3`)).toBe(false);
+  });
+
+  it("the stale-device cleanup timer really reaps — object tree cleanup runs with the live list", async () => {
+    const { adapter } = await fullSetup();
+    const i = internalOf(adapter);
+    const cleanup = vi.fn(async () => [] as string[]);
+    (i.stateManager as unknown as { cleanupDevices: unknown }).cleanupDevices = cleanup;
+    const timer = i.setTimeout.mock.calls.find(c => c[1] === STALE_DEVICE_CLEANUP_DELAY_MS);
+    expect(timer, "stale-device cleanup timer must be armed").toBeDefined();
+    (timer![0] as () => void)();
+    await settle(5);
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });

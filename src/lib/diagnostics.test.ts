@@ -554,3 +554,33 @@ describe("DiagnosticsCollector", () => {
     });
   });
 });
+
+describe("pruneOrphans — buffers of removed devices are released", () => {
+  it("drops every ring buffer of a device that is no longer live and keeps the live ones intact", () => {
+    const c = new DiagnosticsCollector(registry);
+    c.addLog("gone", "warn", "old");
+    c.addMqttPacket("gone", "GA/t", "aa");
+    c.recordApiSuccess("gone", "/api/x", { v: 1 });
+    c.addLanSend("gone", "10.0.0.2", "turn", { value: 1 }, 10);
+    c.addLog("live", "info", "still here");
+    c.recordApiSuccess("live", "/api/x", { v: 2 });
+
+    c.pruneOrphans(new Set(["live"]));
+
+    const goneReport = c.generate(makeDevice({ deviceId: "gone" }), "2.0.0");
+    expect(goneReport.recentLogs).toEqual([]);
+    expect(goneReport.lastMqttPackets).toEqual([]);
+    expect(goneReport.apiHistory).toEqual({});
+    expect(goneReport.lanSends).toEqual([]);
+    const liveReport = c.generate(makeDevice({ deviceId: "live" }), "2.0.0");
+    expect(liveReport.recentLogs).toHaveLength(1);
+    expect((liveReport.apiHistory as Record<string, unknown[]>)["/api/x"]).toHaveLength(1);
+  });
+
+  it("is a no-op when every buffered device is still live", () => {
+    const c = new DiagnosticsCollector(registry);
+    c.addLog("a", "info", "x");
+    c.pruneOrphans(new Set(["a", "b"]));
+    expect(c.generate(makeDevice({ deviceId: "a" }), "2.0.0").recentLogs).toHaveLength(1);
+  });
+});
