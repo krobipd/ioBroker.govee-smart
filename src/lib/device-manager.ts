@@ -1,6 +1,6 @@
 import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter } from "./command-router";
-import { getDeviceQuirks, getDeviceTier, isSeedAndDormant } from "./device-registry";
+import type { DeviceRegistry } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
@@ -73,6 +73,8 @@ export class DeviceManager {
   public readonly log: ioBroker.Logger;
   /** Public for sub-module helpers (cache, cloud-merge, lookups). */
   public readonly devices = new Map<string, GoveeDevice>();
+  /** This instance's device catalog — public for sub-module helpers (cloud-merge). */
+  public readonly registry: DeviceRegistry;
   private readonly commandRouter: CommandRouter;
   private readonly diagnostics: DiagnosticsCollector;
   /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
@@ -130,11 +132,13 @@ export class DeviceManager {
    * @param log    ioBroker logger
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
    *   onUnload-safe delays).
+   * @param registry This instance's device catalog (quirks, trust tiers)
    */
-  constructor(log: ioBroker.Logger, timers: TimerAdapter) {
+  constructor(log: ioBroker.Logger, timers: TimerAdapter, registry: DeviceRegistry) {
     this.log = log;
-    this.commandRouter = new CommandRouter(log, timers);
-    this.diagnostics = new DiagnosticsCollector();
+    this.registry = registry;
+    this.commandRouter = new CommandRouter(log, timers, registry);
+    this.diagnostics = new DiagnosticsCollector(registry);
     // v2.9.1 — funnel command-router routing decisions into the per-device
     // diag ring buffer. Without this, "I clicked but nothing happened" was
     // not triage-able from diag JSON alone — the channel decision lived
@@ -912,14 +916,14 @@ export class DeviceManager {
       return;
     }
     this.nudgedSeedSkus.add(upper);
-    const tier = getDeviceTier(upper);
+    const tier = this.registry.getTier(upper);
     const label = displayName ? `${displayName} (${upper})` : upper;
     switch (tier) {
       case "verified":
       case "reported":
         return;
       case "seed":
-        if (isSeedAndDormant(upper)) {
+        if (this.registry.isSeedAndDormant(upper)) {
           this.log.warn(
             `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`,
           );
@@ -1037,7 +1041,7 @@ export class DeviceManager {
     // A segmentCount quirk is a hard override (a cloud-only SKU whose capability
     // count lies and which never pushes AA-A5 to self-correct) — a live packet
     // must never fight it.
-    const quirk = getDeviceQuirks(device.sku)?.segmentCount;
+    const quirk = this.registry.getQuirks(device.sku)?.segmentCount;
     const quirkLocked = typeof quirk === "number" && quirk > 0;
     // Adopt the packet count when it disagrees with the stored total: always
     // upward (a bigger real strip); downward ONLY when the push proved complete

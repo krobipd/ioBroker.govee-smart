@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DiagnosticsCollector } from "../diagnostics";
+import { DeviceRegistry } from "../device-registry";
 import { createTestDevice, lightCapabilities } from "../test-helpers";
 import type { CloudCapability, CloudDevice } from "../types";
 import { loadDeviceLibraries, loadDeviceScenes, type LibraryLoaderHost } from "./library-loader";
@@ -23,7 +24,7 @@ function makeHost(cloudClient: unknown, apiClient: unknown = null): LibraryLoade
     cloudClient: cloudClient as never,
     apiClient: apiClient as never,
     log: mockLog,
-    diagnostics: new DiagnosticsCollector(),
+    diagnostics: new DiagnosticsCollector(new DeviceRegistry({ data: { devices: {} } })),
     runLimited: async (fn: () => Promise<void>): Promise<void> => fn(),
   };
 }

@@ -1,7 +1,12 @@
 import { DiagnosticsCollector } from "./diagnostics";
-import { _resetDeviceRegistry, initDeviceRegistry } from "./device-registry";
+import { DeviceRegistry } from "./device-registry";
 import { HttpError } from "./http-client";
 import type { GoveeDevice } from "./types";
+
+/** A catalog with no entries — tests that don't care about quirks. */
+const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
+/** The catalog the constructed modules read — reassigned per suite where quirks matter. */
+let registry: DeviceRegistry = emptyRegistry();
 
 function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
   return {
@@ -26,7 +31,7 @@ function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
 describe("DiagnosticsCollector", () => {
   describe("addLog", () => {
     it("appends entries with timestamp + level + msg", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addLog("dev1", "warn", "First warning");
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const logs = result.recentLogs as Array<Record<string, unknown>>;
@@ -37,7 +42,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("bounds at 100 entries — newest 100 retained (v2.9.1 raised cap)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 120; i++) {
         c.addLog("dev1", "info", `entry ${i}`);
       }
@@ -49,7 +54,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("ignores empty/non-string deviceId", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addLog("", "info", "msg");
       c.addLog(undefined as never, "info", "msg");
       const result = c.generate(makeDevice(), "2.0.0");
@@ -57,7 +62,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("ignores non-string msg without crashing", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addLog("dev1", "info", 42 as never);
       c.addLog("dev1", "info", { obj: 1 } as never);
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
@@ -67,7 +72,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("addMqttPacket", () => {
     it("captures packets with topic + hex", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "GA/abc/123", "qqgFAQEEAAAAA=");
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
@@ -77,7 +82,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("bounds at 50 packets — newest 50 retained (v2.9.1 raised cap)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 60; i++) {
         c.addMqttPacket("dev1", "GA/topic", `hex${i}`);
       }
@@ -89,7 +94,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("rejects empty hex strings", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", "");
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       expect(result.lastMqttPackets).toEqual([]);
@@ -98,7 +103,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("recordApiSuccess / recordApiFailure", () => {
     it("stores response history per endpoint with most-recent at the end", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/api/state", { code: 200, foo: "bar" });
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const hist = result.apiHistory as Record<string, unknown[]>;
@@ -112,7 +117,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("redacts secretCode and topic from recorded API responses so they never reach the diag export (SEC-ISSUE1)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
         sku: "H5109",
         settings: {
@@ -132,7 +137,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("keeps multiple slots per endpoint (no overwrite)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/api/state", { v: 1 });
       c.recordApiSuccess("dev1", "/api/state", { v: 2 });
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
@@ -143,7 +148,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("evicts oldest entry when endpoint exceeds the per-endpoint cap (v2.9.1 cap=6)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       for (let i = 1; i <= 8; i++) {
         c.recordApiSuccess("dev1", "/api/state", { v: i });
       }
@@ -156,7 +161,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("evicts oldest endpoint when more than 24 distinct endpoints are tracked (v2.9.1 cap=24)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       // 25 distinct endpoints — first should be evicted.
       for (let i = 0; i < 25; i++) {
         c.recordApiSuccess("dev1", `/ep${i}`, { v: i });
@@ -167,7 +172,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("truncates large bodies with marker (v2.9.1 cap=65536)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       // Body must exceed MAX_BODY_BYTES (65_536) to trigger truncation. Use
       // ~70 KB so the cloneAndCap branch fires.
       const big = "x".repeat(70_000);
@@ -181,7 +186,7 @@ describe("DiagnosticsCollector", () => {
     it("keeps a device's API history under the byte budget — oldest entries anywhere go first, the newest stays", () => {
       // 24 endpoints × 6 slots × 64 KB is >9 MB per device in theory; a light with
       // a big scene library really sat at a megabyte. Budget: 512 KB per device.
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const big = "x".repeat(60_000); // ~60 KB per entry, under the per-body cap
       for (let i = 0; i < 6; i++) {
         c.recordApiSuccess("dev1", "/api/scenes", { i, big });
@@ -204,7 +209,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("caps a captured MQTT envelope and a LAN payload instead of storing them whole", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", { rawJson: "y".repeat(20_000), hex: "aa" });
       c.addLanSend("dev1", "10.0.0.5", "ptReal", { command: ["z".repeat(40_000)] });
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
@@ -218,7 +223,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("falls back to String() when body is non-serialisable", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const cyclic: Record<string, unknown> = {};
       cyclic.self = cyclic;
       c.recordApiSuccess("dev1", "/api/cycle", cyclic);
@@ -228,7 +233,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("recordApiFailure captures the error + status code so silent fetch failures become visible", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.recordApiFailure("dev1", "/light-effect-libraries", new Error("403 Forbidden"), 403);
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, Array<Record<string, unknown>>>)["/light-effect-libraries"];
@@ -241,7 +246,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("generate — output shape", () => {
     beforeEach(() => {
-      initDeviceRegistry({
+      registry = new DeviceRegistry({
         data: {
           devices: {
             H6141: {
@@ -255,10 +260,12 @@ describe("DiagnosticsCollector", () => {
         experimental: true,
       });
     });
-    afterEach(() => _resetDeviceRegistry());
+    afterEach(() => {
+      registry = emptyRegistry();
+    });
 
     it("contains all v1.x top-level fields plus the v2 ring buffers", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(makeDevice(), "2.0.0");
       const keys = Object.keys(result).sort();
       expect(keys).toEqual(
@@ -285,19 +292,19 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("attaches active quirks for known SKUs", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(makeDevice({ sku: "H6141" }), "2.0.0");
       expect(result.quirks).toEqual({ brokenPlatformApi: true });
     });
 
     it("returns null quirks for unknown SKU", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(makeDevice({ sku: "H9999" }), "2.0.0");
       expect(result.quirks).toBeNull();
     });
 
     it("yields empty buffers if no hooks fired", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(makeDevice(), "2.0.0");
       expect(result.recentLogs).toEqual([]);
       expect(result.lastMqttPackets).toEqual([]);
@@ -319,7 +326,7 @@ describe("DiagnosticsCollector", () => {
         ["MwRkAAAAAAAAAAAAAAAAAAAAAFM="],
         ["owABBEACABT/ypEAAQIDBAUGB1Q=", "owEICQoLDA0ODxAREhMBFGQAAdI=", "owIBAgMEBQYHCAkKCwwNDg8QERIToA=="],
       ];
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(
         makeDevice({
           snapshots: [{ name: "n8licht", value: 2719361 }],
@@ -335,7 +342,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("A2 — sceneLibrary surfaces scenceParam + speedInfo.config (not just hasParam)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(
         makeDevice({
           sceneLibrary: [
@@ -357,7 +364,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("A4+A5 — diyLibrary and musicLibrary surface scenceParam", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(
         makeDevice({
           diyLibrary: [{ name: "MyDIY", diyCode: 10, scenceParam: "DIY_PARAM_BASE64" }],
@@ -374,7 +381,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("v2.9.1 Class C3 — HttpError.responseBody flows into recordApiFailure", () => {
     it("captures responseBody so the diag JSON shows the body, not just the status", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const err = new HttpError("HTTP 401", 401, {}, '{"message":"API key invalid"}');
       c.recordApiFailure("dev1", "/router/api/v1/user/devices", err, 401);
       const list = (
@@ -390,7 +397,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("truncates the responseBody when it would exceed the cap", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const huge = "x".repeat(80_000);
       const err = new HttpError("HTTP 500", 500, {}, huge);
       c.recordApiFailure("dev1", "/api/oops", err, 500);
@@ -408,7 +415,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("v2.9.1 Class E — LAN UDP send capture", () => {
     it("addLanSend records outgoing ptReal payloads per-device", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1", "pkt2"] }, 572);
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
@@ -420,7 +427,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("captures error field when the UDP send fails", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1"] }, 0, "EHOSTUNREACH");
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
@@ -428,7 +435,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("bounds at 30 lan-sends — newest 30 retained", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 40; i++) {
         c.addLanSend("dev1", "192.168.1.36", "turn", { value: i }, 50);
       }
@@ -440,7 +447,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("v2.9.1 Class F1 — AWS-IoT MQTT envelope durchgereicht", () => {
     it("addMqttPacket accepts {hex, rawJson} so state-only pushes are captured too", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { hex: "abc123", rawJson: envelope });
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
@@ -450,7 +457,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("addMqttPacket accepts rawJson-only (no op.command in MQTT message)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { rawJson: envelope });
       const packets = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1").lastMqttPackets as Array<
@@ -461,7 +468,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("ignores empty payload-objects (no hex AND no rawJson)", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "GA/account", {});
       const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       expect(result.lastMqttPackets).toEqual([]);
@@ -470,7 +477,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("v2.9.1 Class G — device-runtime fields in diag.device", () => {
     it("surfaces sceneSpeed, manualMode/manualSegments, lastSeenOnNetwork, lastLanReplyAt, groupMembers", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(
         makeDevice({
           deviceId: "dev1",
@@ -495,7 +502,7 @@ describe("DiagnosticsCollector", () => {
 
   describe("v2.9.1 Class K — runtime-state provider", () => {
     it("provider returns a snapshot pulled at generate-time", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.setRuntimeStateProvider(() => ({
         deviceManagerLastErrorCategory: "TIMEOUT",
         cloudFailureReason: "Cloud request timeout",
@@ -513,13 +520,13 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("yields null runtimeState when no provider is wired", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       const result = c.generate(makeDevice(), "2.9.1");
       expect(result.runtimeState).toBeNull();
     });
 
     it("cacheSnapshotProvider returns the persisted view; clone-and-cap protects bigger payloads", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.setCacheSnapshotProvider((sku, deviceId) => ({
         cachedAt: 1700000000000,
         sceneLibrary: [{ name: "Forest", sceneCode: 212 }],
@@ -535,7 +542,7 @@ describe("DiagnosticsCollector", () => {
     });
 
     it("localSnapshotsProvider returns user-saved snapshot definitions", () => {
-      const c = new DiagnosticsCollector();
+      const c = new DiagnosticsCollector(registry);
       c.setLocalSnapshotsProvider(() => [
         { name: "Morning", power: true, brightness: 60, colorRgb: "#ffaa00", colorTemperature: 0 },
       ]);

@@ -8,6 +8,10 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { StateManager } from "./state-manager";
+import { DeviceRegistry } from "./device-registry";
+
+/** Catalog without entries — the state-manager tests do not exercise quirks. */
+const registry = new DeviceRegistry({ data: { devices: {} } });
 import type { GoveeDevice } from "./types";
 import { LAN_STATE_IDS, type StateDefinition } from "./capability-mapper";
 
@@ -208,7 +212,7 @@ describe("StateManager", () => {
   describe("forgetPrefix", () => {
     it("clears the namespace-less ensureState cache so a re-pair recreates info states (M4)", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       (sm as any).ensuredStates.add("devices.h6160_0011.info.name");
       (sm as any).ensuredStates.add("devices.h6160_0011.control.power");
       (sm as any).ensuredStates.add("devices.other_9999.info.name"); // unrelated → survives
@@ -231,7 +235,7 @@ describe("StateManager", () => {
       states.set("groups.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       states.set("devices.h6160_0011.control.power", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
 
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const touched = await sm.markAllOffline();
 
       expect(touched.sort()).toEqual([
@@ -250,7 +254,7 @@ describe("StateManager", () => {
       const { adapter, objects, states } = createMockAdapter();
       objects.set("devices.h6160_0011.info.online", { type: "state" });
       states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(await sm.markAllOffline()).toEqual(["devices.h6160_0011.info.online"]);
     });
 
@@ -260,7 +264,7 @@ describe("StateManager", () => {
       const { adapter, objects, states, calls } = createMockAdapter();
       objects.set("devices.h6160_0099.info.online", { type: "state" });
       states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline(); // startup: cold cache → one scan
       await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() })); // a device created during the run
       await sm.writeDeviceRollup();
@@ -281,7 +285,7 @@ describe("StateManager", () => {
       // The rollup rides on the same round that just resolved every marker; it
       // counts what that round wrote, it does not read the markers back.
       const { adapter, states, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline(); // startup stamp — the one moment the tree is scanned
       const fresh = Date.now();
       await sm.createInfoStates(createTestDevice({ deviceId: "AABBCCDDEEFF0011", lastLanReplyAt: fresh }));
@@ -305,7 +309,7 @@ describe("StateManager", () => {
 
     it("all reachable sets the flag", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
       await sm.writeDeviceRollup();
       expect(states.get("info.devicesAllOnline")?.val).toBe(true);
@@ -315,7 +319,7 @@ describe("StateManager", () => {
       const { adapter, objects, states } = createMockAdapter();
       objects.set("devices.h6160_0099.info.online", { type: "state" });
       states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline(); // startup stamp — the leftover is found in the DB and set false
       await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
       expect(await sm.writeDeviceRollup()).toEqual({ total: 2, online: 1 });
@@ -323,7 +327,7 @@ describe("StateManager", () => {
 
     it("no devices at all does not claim everything is fine", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(await sm.writeDeviceRollup()).toEqual({ total: 0, online: 0 });
       expect(states.get("info.devicesAllOnline")?.val).toBe(false);
     });
@@ -333,7 +337,7 @@ describe("StateManager", () => {
       const { adapter, objects, states } = createMockAdapter();
       objects.set("devices.h6160_0011.info.online", { type: "state" });
       states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.writeDeviceRollup();
       expect(states.get("info.devicesTotal")?.val).toBe(1);
 
@@ -347,7 +351,7 @@ describe("StateManager", () => {
     it("a fresh install gets no rollup it never had", async () => {
       // clearDeviceRollup only touches states that already exist.
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline();
       expect(states.has("info.devicesOnline")).toBe(false);
     });
@@ -356,7 +360,7 @@ describe("StateManager", () => {
   describe("cleanupCloudOwnedStates", () => {
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const prefix = "devices.h6160_0011";
       objects.set(`${prefix}.control`, { type: "channel" });
       objects.set(`${prefix}.control.colorRgb`, { type: "state" }); // LAN — skipped by cloud cleanup
@@ -373,7 +377,7 @@ describe("StateManager", () => {
   describe("cleanupSameModeGroupOrphansOnce", () => {
     it("deletes a leftover devices.samemodegroup_* tree but leaves real devices untouched", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       // Orphan pseudo-device left by a build that merged a SameModeGroup verbatim.
       objects.set("devices.samemodegroup_9100", { type: "device" } as never);
       objects.set("devices.samemodegroup_9100.control", { type: "channel" } as never);
@@ -392,7 +396,7 @@ describe("StateManager", () => {
 
     it("is a no-op on a clean install (no samemodegroup objects)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       objects.set("devices.h6160_0011", { type: "device" } as never);
 
       const removed = await sm.cleanupSameModeGroupOrphansOnce();
@@ -405,7 +409,7 @@ describe("StateManager", () => {
   describe("createInfoStates — gateway-connected sensors", () => {
     it("a gateway sensor gets info.gateway and never an (empty) info.ip", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         sku: "H5109",
         deviceId: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
@@ -421,7 +425,7 @@ describe("StateManager", () => {
 
     it("removes a leftover info.ip when a device becomes gateway-connected — exactly once, no re-toggle", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         sku: "H5109",
         deviceId: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
@@ -449,7 +453,7 @@ describe("StateManager", () => {
 
     it("a normal device keeps info.ip and gets no info.gateway", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "H6160", lanIp: "192.168.1.50" });
       const prefix = sm.devicePrefix(dev);
       await sm.createInfoStates(dev);
@@ -461,7 +465,7 @@ describe("StateManager", () => {
   describe("removeSyntheticStateOnce", () => {
     it("deletes an existing phantom sensor_humidity object exactly once (#31)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const path = "devices.h5109_1a.sensor.sensor_humidity"; // inferChannelFromStateId → "sensor"
       objects.set(path, { type: "state", common: {}, native: {} } as never);
 
@@ -477,7 +481,7 @@ describe("StateManager", () => {
 
     it("is a silent no-op when the state never existed (fresh install)", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
       expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
     });
@@ -486,7 +490,7 @@ describe("StateManager", () => {
   describe("migrateLegacyColorStateIds (B2 hard-cut)", () => {
     it("deletes the legacy camelCase colour objects for a device (existence-checked)", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const device = createTestDevice();
       const prefix = sm.devicePrefix(device);
       objects.set(`${prefix}.control.colorRgb`, { type: "state" });
@@ -499,7 +503,7 @@ describe("StateManager", () => {
 
     it("covers group prefixes too — groups carry fan-out colour states", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "1311" });
       const prefix = sm.devicePrefix(group); // groups.basegroup_...
       objects.set(`${prefix}.control.colorRgb`, { type: "state" });
@@ -509,7 +513,7 @@ describe("StateManager", () => {
 
     it("is a no-op on fresh installs (no legacy camelCase objects)", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.migrateLegacyColorStateIds(createTestDevice());
       expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
     });
@@ -518,28 +522,28 @@ describe("StateManager", () => {
   describe("devicePrefix", () => {
     it("should generate prefix from SKU + last 4 hex chars of device ID", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:FF:1D:6F" });
       expect(sm.devicePrefix(dev)).toBe("devices.h61be_1d6f");
     });
 
     it("should put BaseGroup under groups/ folder", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
       expect(sm.devicePrefix(dev)).toBe("groups.basegroup_1280");
     });
 
     it("should sanitize special characters in SKU", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "H6-XY.Z", deviceId: "ABCD" });
       expect(sm.devicePrefix(dev)).toBe("devices.h6-xy_z_abcd");
     });
 
     it("should handle device ID with colons", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
       expect(sm.devicePrefix(dev)).toBe("devices.h6160_525f");
     });
@@ -548,7 +552,7 @@ describe("StateManager", () => {
   describe("repairCommonStatesIfBuggy (React #31 guard)", () => {
     it("replaces a persisted buggy states map COMPLETELY — stale keys with i18n-object values must not survive", async () => {
       const { adapter, objects, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Persisted object from an old release: values are translation OBJECTS
@@ -606,7 +610,7 @@ describe("StateManager", () => {
 
     it("does not rewrite healthy plain-string maps", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const fresh: Record<string, string> = { "0": "---", "1": "Aurora" };
@@ -637,7 +641,7 @@ describe("StateManager", () => {
   describe("createDeviceStates", () => {
     it("should create device, info channel, and info states", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       await createAllStatesForTest(sm, dev, []);
@@ -656,7 +660,7 @@ describe("StateManager", () => {
 
     it("should set info state values from device", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ name: "Living Room", sku: "H612F", lanIp: "10.0.0.5" });
 
       await createAllStatesForTest(sm, dev, []);
@@ -669,7 +673,7 @@ describe("StateManager", () => {
 
     it("should create control channel and states from definitions", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       await createAllStatesForTest(sm, dev, basicControlDefs());
@@ -681,7 +685,7 @@ describe("StateManager", () => {
 
     it("should set native capabilityType/Instance on LAN-default control states", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // power/brightness/colorRgb/colorTemperature are LAN-default — createLanStates
@@ -697,7 +701,7 @@ describe("StateManager", () => {
 
     it("should set default value only if no current value exists", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // First call: should set default
@@ -714,7 +718,7 @@ describe("StateManager", () => {
 
     it("should not create control channel for sensor (no lanIp, no caps)", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       // Sensor-style device: no lanIp + no caps → no LAN-phase states + no
       // Cloud-derived control states either. control channel stays empty.
       const dev = createTestDevice({ lanIp: undefined, type: "devices.types.thermometer" });
@@ -726,7 +730,7 @@ describe("StateManager", () => {
 
     it("should include unit, min, max, states in common", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -756,7 +760,7 @@ describe("StateManager", () => {
 
     it("should route light_scene to scenes channel", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -790,7 +794,7 @@ describe("StateManager", () => {
 
     it("should route music states to music channel", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -830,7 +834,7 @@ describe("StateManager", () => {
 
     it("should route snapshot states to snapshots channel", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -892,7 +896,7 @@ describe("StateManager", () => {
 
     it("should create multiple channels simultaneously", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -942,7 +946,7 @@ describe("StateManager", () => {
 
     it("should set ip to empty string when no LAN IP", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ lanIp: undefined });
 
       await createAllStatesForTest(sm, dev, []);
@@ -952,7 +956,7 @@ describe("StateManager", () => {
 
     it("should not create model/serial/ip/online for BaseGroup", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
 
       await createAllStatesForTest(sm, dev, []);
@@ -968,7 +972,7 @@ describe("StateManager", () => {
   describe("createGroupsOnlineState", () => {
     it("should create groups.info.online state", async () => {
       const { adapter, objects, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       await sm.createGroupsOnlineState(true);
 
@@ -980,7 +984,7 @@ describe("StateManager", () => {
 
     it("should update groups online state", async () => {
       const { adapter, objects, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       await sm.createGroupsOnlineState(false);
       expect(states.get("groups.info.online")).toMatchObject({ val: false });
@@ -995,7 +999,7 @@ describe("StateManager", () => {
   describe("group members", () => {
     it("should create info.members for BaseGroup with groupMembers", async () => {
       const { adapter, objects, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         sku: "BaseGroup",
         deviceId: "6781311",
@@ -1016,7 +1020,7 @@ describe("StateManager", () => {
 
     it("should create empty info.members for BaseGroup without groupMembers", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         sku: "BaseGroup",
         deviceId: "6781280",
@@ -1032,7 +1036,7 @@ describe("StateManager", () => {
 
     it("should clean up legacy diagnostics + new diag channel for BaseGroup (when objects exist)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
       // Pre-seed legacy objects to simulate an upgrade scenario — without
       // these, safeDeleteState's existence-probe would correctly skip the
@@ -1055,7 +1059,7 @@ describe("StateManager", () => {
 
     it("should NOT trigger del-calls on fresh install when legacy objects never existed (no WARN spam)", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
 
       // No pre-seeded objects — fresh install scenario
@@ -1074,7 +1078,7 @@ describe("StateManager", () => {
   describe("updateGroupMembersUnreachable", () => {
     it("should create state and write unreachable list when members are offline", async () => {
       const { adapter, objects, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
       const m1 = createTestDevice({ sku: "H61BE", deviceId: "AABB0011", state: { online: false } });
       const m2 = createTestDevice({ sku: "H61BC", deviceId: "CCDD2233", state: { online: true } });
@@ -1088,7 +1092,7 @@ describe("StateManager", () => {
 
     it("should write empty string when all members are reachable (no delete to avoid race-condition WARN)", async () => {
       const { adapter, calls, objects, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
       const m1 = createTestDevice({ state: { online: true } });
 
@@ -1108,7 +1112,7 @@ describe("StateManager", () => {
 
     it("should not call delObjectAsync ever (race-condition prevention)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
       // Pre-seed: state existed (from previous unreachable-cycle on disk)
       objects.set("groups.basegroup_1311.info.membersUnreachable", { type: "state", common: {} });
@@ -1124,14 +1128,14 @@ describe("StateManager", () => {
   describe("resolveStatePath", () => {
     it("should route control states to control channel", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(sm.resolveStatePath("devices.h6160_0011", "power")).toBe("devices.h6160_0011.control.power");
       expect(sm.resolveStatePath("devices.h6160_0011", "brightness")).toBe("devices.h6160_0011.control.brightness");
     });
 
     it("should route scene states to scenes channel", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1175,7 +1179,7 @@ describe("StateManager", () => {
 
     it("should route music states to music channel", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1195,7 +1199,7 @@ describe("StateManager", () => {
 
     it("should route snapshot states to snapshots channel", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1229,7 +1233,7 @@ describe("StateManager", () => {
 
     it("should route diagnostics states to diag channel (top-level on device)", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1261,7 +1265,7 @@ describe("StateManager", () => {
 
     it("should route unknown states to control channel", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(sm.resolveStatePath("devices.h6160_0011", "gradient_toggle")).toBe(
         "devices.h6160_0011.control.gradient_toggle",
       );
@@ -1269,7 +1273,7 @@ describe("StateManager", () => {
 
     it("should route sensor states to sensor channel", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1316,7 +1320,7 @@ describe("StateManager", () => {
 
     it("should route event states to events channel", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
         {
@@ -1353,7 +1357,7 @@ describe("StateManager", () => {
       // sensor_temperature, sensor_humidity, sensor_battery — these MUST
       // route to sensor/ even without prior createDeviceStates run.
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(sm.resolveStatePath("devices.h5179_3c1b", "sensor_temperature")).toBe(
         "devices.h5179_3c1b.sensor.sensor_temperature",
       );
@@ -1367,7 +1371,7 @@ describe("StateManager", () => {
 
     it("should route sanitizeId-output event IDs (lack_water_event etc.) to events channel via inferChannelFromStateId", () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       expect(sm.resolveStatePath("devices.hxxxx_yy", "lack_water_event")).toBe(
         "devices.hxxxx_yy.events.lack_water_event",
       );
@@ -1380,7 +1384,7 @@ describe("StateManager", () => {
   describe("ensureSyntheticStateObject", () => {
     it("should create state under sensor/ channel for sensor_temperature", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
       // Check Channel-Object created
       expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
@@ -1396,7 +1400,7 @@ describe("StateManager", () => {
       // The App-API poll calls this every two minutes for every value; both
       // objects only have to exist, not be re-written.
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
       const first = calls.filter(c => c.method === "extendObject").length;
       expect(first).toBe(2);
@@ -1412,7 +1416,7 @@ describe("StateManager", () => {
 
     it("re-creates a synthetic state after removeSyntheticStateOnce dropped it", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
       await sm.removeSyntheticStateOnce("devices.h5179_3c1b", "sensor_humidity");
       expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(false);
@@ -1426,7 +1430,7 @@ describe("StateManager", () => {
 
     it("should be no-op for unknown stateId (not in SYNTHETIC_STATE_META)", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "unknown_state_xyz");
       const extendCalls = calls.filter(c => c.method === "extendObject");
       expect(extendCalls).toHaveLength(0);
@@ -1440,7 +1444,7 @@ describe("StateManager", () => {
         type: "state",
         common: { name: "old", type: "number" },
       });
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
       const final = objects.get("devices.h5179_3c1b.sensor.sensor_humidity") as Record<string, unknown>;
       // extendObject stores latest write — common should now be the full meta
@@ -1452,7 +1456,7 @@ describe("StateManager", () => {
   describe("updateDeviceState", () => {
     it("should update power state", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Create the object so setStateIfExists finds it
@@ -1464,7 +1468,7 @@ describe("StateManager", () => {
 
     it("should update multiple state fields at once", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
@@ -1479,7 +1483,7 @@ describe("StateManager", () => {
       // updateDeviceState writes online only for Sensors/Appliances where
       // applyOnlineCap is still the truth-source.
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ type: "devices.types.thermometer", sku: "H5179" });
       await createAllStatesForTest(sm, dev, []);
 
@@ -1492,7 +1496,7 @@ describe("StateManager", () => {
       // get periodic ts-rewrites from this path. The 20 s sync-timer and
       // direct call from onDeviceStateUpdate own the write.
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice(); // default type = devices.types.light
       await createAllStatesForTest(sm, dev, []);
       // Capture the initial info.online written via syncInfoOnline from
@@ -1510,7 +1514,7 @@ describe("StateManager", () => {
     describe("syncInfoOnline — cloud-only lights (local-first, not local-only)", () => {
       it("cloud-only light (no lanIp): info.online follows the cloud-reported online", async () => {
         const { adapter, states } = createMockAdapter();
-        const sm = new StateManager(adapter as never);
+        const sm = new StateManager(adapter as never, registry);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1524,7 +1528,7 @@ describe("StateManager", () => {
 
       it("cloud-only light reports offline when the cloud says offline", async () => {
         const { adapter, states } = createMockAdapter();
-        const sm = new StateManager(adapter as never);
+        const sm = new StateManager(adapter as never, registry);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1538,7 +1542,7 @@ describe("StateManager", () => {
 
       it("LAN-capable light still uses LAN-reply freshness, never stale cloud online (v2.9.0 guard)", async () => {
         const { adapter, states } = createMockAdapter();
-        const sm = new StateManager(adapter as never);
+        const sm = new StateManager(adapter as never, registry);
         const dev = createTestDevice({
           lanIp: "192.168.1.100",
           lastLanReplyAt: undefined,
@@ -1552,7 +1556,7 @@ describe("StateManager", () => {
 
     it("should not write anything when given an empty update", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
@@ -1564,7 +1568,7 @@ describe("StateManager", () => {
 
     it("should fire writes in parallel, not sequentially", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
@@ -1583,7 +1587,7 @@ describe("StateManager", () => {
 
     it("uses setStateChangedAsync — a repeated identical value is not re-written", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
@@ -1604,7 +1608,7 @@ describe("StateManager", () => {
   describe("cleanupDevices", () => {
     it("should remove devices not in current list", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       // Create two devices
       const dev1 = createTestDevice({ sku: "H6160", deviceId: "AABB1111" });
@@ -1621,7 +1625,7 @@ describe("StateManager", () => {
 
     it("should not remove devices that still exist", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, []);
@@ -1637,7 +1641,7 @@ describe("StateManager", () => {
 
     it("should delete state values before removing the device object", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       const survivor = createTestDevice({ sku: "H6160", deviceId: "AABB1111" });
       const stale = createTestDevice({ sku: "H6161", deviceId: "AABB2222" });
@@ -1665,7 +1669,7 @@ describe("StateManager", () => {
 
     it("should keep state values for surviving devices", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
 
       const survivor = createTestDevice({ sku: "H6160", deviceId: "AABB1111" });
       await createAllStatesForTest(sm, survivor, basicControlDefs());
@@ -1686,7 +1690,7 @@ describe("StateManager", () => {
   describe("cleanupCloudOwnedStates", () => {
     it("should remove stale cloud-owned control states not in current Cloud-phase defs", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Create with a cloud-cap state (gradient_toggle is a `toggle` capability,
@@ -1721,7 +1725,7 @@ describe("StateManager", () => {
       // used to delete them and the next poll re-created them (object churn +
       // a value gap). They are foreign-owned survivors, like the LAN ids.
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "battery");
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
@@ -1741,7 +1745,7 @@ describe("StateManager", () => {
 
     it("should NEVER remove LAN-owned states (power, brightness, colorRgb, colorTemperature)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Create with LAN-defaults populated (power, brightness, etc.)
@@ -1763,7 +1767,7 @@ describe("StateManager", () => {
 
     it("should remove cloud-owned channels entirely when empty (e.g. scenes leftover after cap removal)", async () => {
       const { adapter, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Create a scenes.light_scene state (cloud-owned)
@@ -1793,7 +1797,7 @@ describe("StateManager", () => {
 
     it("should migrate states from old control to new channel", async () => {
       const { adapter, objects, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Simulate old layout: light_scene in control channel
@@ -1826,7 +1830,7 @@ describe("StateManager", () => {
 
     it("should reset dropdown to default when current value is no longer in states map", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       // Create with 3 scenes: {0: "---", 1: "Scene A", 2: "Scene B"}
@@ -1873,7 +1877,7 @@ describe("StateManager", () => {
 
     it("should keep dropdown value when it is still valid in states map", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
       const defs: StateDefinition[] = [
@@ -1906,7 +1910,7 @@ describe("StateManager", () => {
   describe("createSegmentStates", () => {
     it("should create segment channel and per-segment states", async () => {
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
           {
@@ -1945,7 +1949,7 @@ describe("StateManager", () => {
 
     it("should return 0 segments when field has no elementRange", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
           {
@@ -1978,7 +1982,7 @@ describe("StateManager", () => {
 
     it("should remove excess segment channels from previous runs", async () => {
       const { adapter, objects, calls } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
           {
@@ -2019,7 +2023,7 @@ describe("StateManager", () => {
 
     it("should return 0 segments when capability has no fields", async () => {
       const { adapter } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         capabilities: [
           {
@@ -2051,7 +2055,7 @@ describe("StateManager", () => {
       // Cache or MQTT discovery has learned 20; capability only says 15.
       // We trust the learned value.
       const { adapter, objects } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         segmentCount: 20,
         capabilities: [
@@ -2089,7 +2093,7 @@ describe("StateManager", () => {
       // Cache-restored device with manual mode — state-manager should
       // reflect that back to the state tree (ack=true, no trigger).
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         segmentCount: 15,
         manualMode: true,
@@ -2130,7 +2134,7 @@ describe("StateManager", () => {
 
     it("should clear manual_mode + manual_list when device.manualMode=false", async () => {
       const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never);
+      const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({
         segmentCount: 10,
         manualMode: false,
@@ -2171,7 +2175,7 @@ describe("StateManager", () => {
 describe("StateManager — invariants without a test (mutation audit)", () => {
   it("a LAN light goes offline once its last LAN reply ages past the freshness window", async () => {
     const { adapter, states } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now(), state: { online: true } });
     await createAllStatesForTest(sm, dev, []);
 
@@ -2188,7 +2192,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
   it("info.online is written only when the value actually changes", async () => {
     const { adapter, calls } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now() });
     await createAllStatesForTest(sm, dev, []);
     // setStateChangedAsync is the platform's own "only on change" write — the
@@ -2217,7 +2221,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
   it("syncInfoOnline ignores groups (they have no own reachability)", async () => {
     const { adapter, calls } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const group = createTestDevice({ sku: "BaseGroup", deviceId: "9001", name: "Living room" });
     const before = calls.length;
     expect(await sm.syncInfoOnline(group)).toBe(false);
@@ -2226,7 +2230,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
   it("a manual segment list may raise the segment count, never lower it", async () => {
     const { adapter, objects } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice({
       capabilities: [
         {
@@ -2246,7 +2250,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
   it("ensureState writes an object once per id, not on every call", async () => {
     const { adapter, calls } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice();
     const ensured = (): string[] =>
       calls.filter(c => c.method === "extendObject" && String(c.args[0]).endsWith(".info.name")).map(c => String(c.args[0]));
@@ -2261,7 +2265,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
   it("creates buttons write-only (role catalogue) and everything else readable", async () => {
     const { adapter, objects } = createMockAdapter();
-    const sm = new StateManager(adapter as never);
+    const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice();
     await sm.createCloudStates(dev, [
       {

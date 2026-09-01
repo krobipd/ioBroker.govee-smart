@@ -3,8 +3,9 @@ import * as utils from "@iobroker/adapter-core";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
-import { initDeviceRegistry } from "./lib/device-registry";
-import { DeviceManager, resolveSegmentCount } from "./lib/device-manager";
+import { DeviceRegistry } from "./lib/device-registry";
+import { DeviceManager } from "./lib/device-manager";
+import { resolveSegmentCount } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
@@ -123,6 +124,15 @@ export class GoveeAdapter extends utils.Adapter {
   ) => RateLimiter = (log, timers, perMinute, perDay) => new RateLimiter(log, timers, perMinute, perDay);
   // ──────────────────────────────────────────────────────────────────────────
 
+  /**
+   * This instance's device catalog (devices.json filtered by the instance's
+   * own `experimentalQuirks` setting). Built first in onReady and handed to
+   * every module that applies quirks — never a module-level value, because in
+   * compact mode several instances share one process and the last one to
+   * start would otherwise decide the experimental toggle for all of them.
+   * Public for handler modules (device-events).
+   */
+  public deviceRegistry!: DeviceRegistry;
   /** Public for handler modules (state-change-router, group-fanout, wizard, snapshot, diagnostics). */
   public deviceManager: DeviceManager | null = null;
   /** Public for handler modules. */
@@ -372,7 +382,15 @@ export class GoveeAdapter extends utils.Adapter {
       // true here would keep the connection card's code field open forever.
       await this.setState("info.verificationPending", { val: false, ack: true });
 
-      this.stateManager = new StateManager(this);
+      // Device catalog from devices.json in the adapter package root — built
+      // before anything that applies quirks. Status filter: verified+reported
+      // active by default; seed-status entries need the experimentalQuirks toggle.
+      this.deviceRegistry = new DeviceRegistry({
+        experimental: config.experimentalQuirks === true,
+        log: this.log,
+      });
+
+      this.stateManager = new StateManager(this, this.deviceRegistry);
       // Nothing has been asked yet, so nothing may still claim to be reachable from
       // the previous run — least of all after a crash, where no shutdown code ran at
       // all and the old values would stand until the 20-second sync catches up.
@@ -384,16 +402,9 @@ export class GoveeAdapter extends utils.Adapter {
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => undefined);
       // General groups online state (reflects Cloud connection)
       await this.stateManager.createGroupsOnlineState(false);
-      this.deviceManager = new DeviceManager(this.log, this);
+      this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry);
       const dataDir = utils.getAbsoluteInstanceDataDir(this);
 
-      // Load device registry from devices.json in the adapter package root.
-      // Status filter: verified+reported active by default; seed-status entries
-      // require the experimentalQuirks config toggle.
-      initDeviceRegistry({
-        experimental: config.experimentalQuirks === true,
-        log: this.log,
-      });
       this.skuCache = new SkuCache(dataDir, this.log);
       // One-shot migration: pull pre-v2.11 snapshot files from the instance data
       // dir into the meta.user storage so they're included in iob backup. Runs
@@ -1226,10 +1237,17 @@ export class GoveeAdapter extends utils.Adapter {
       getSegmentDeviceList: () => {
         const devices = this.deviceManager?.getDevices() ?? [];
         return devices
-          .filter(d => d.sku !== "BaseGroup" && d.state?.online === true && resolveSegmentCount(d) > 0)
+          .filter(
+            d => d.sku !== "BaseGroup" && d.state?.online === true && resolveSegmentCount(d, this.deviceRegistry) > 0,
+          )
           .map(d => ({
             value: wizardHandler.deviceKeyFor(d),
-            label: resolveLabel("segmentWizardDeviceOption", d.name, d.sku, resolveSegmentCount(d)),
+            label: resolveLabel(
+              "segmentWizardDeviceOption",
+              d.name,
+              d.sku,
+              resolveSegmentCount(d, this.deviceRegistry),
+            ),
           }));
       },
       runWizardStep: (action, deviceKey, payload) => wizardHandler.runWizardStep(this, action, deviceKey, payload),

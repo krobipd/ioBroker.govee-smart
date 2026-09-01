@@ -20,9 +20,14 @@ import {
   planCloudCapabilityWrites,
   type StateDefinition,
 } from "./capability-mapper";
-import { _resetDeviceRegistry, initDeviceRegistry } from "./device-registry";
+import { DeviceRegistry } from "./device-registry";
 import { createTestDevice, mockLog } from "./test-helpers";
 import type { CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
+
+/** A catalog with no entries — tests that don't care about quirks. */
+const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
+/** The catalog the constructed modules read — reassigned per suite where quirks matter. */
+let registry: DeviceRegistry = emptyRegistry();
 
 // Test-side wrappers that auto-inject `mockLog` so the existing 60+ tests
 // don't each have to thread the logger through. The production callers
@@ -31,13 +36,13 @@ import type { CloudCapability, CloudStateCapability, GoveeDevice } from "./types
 // debug log.
 const mapCapabilities = (caps: CloudCapability[]): StateDefinition[] => mapCapabilitiesRaw(caps, mockLog);
 const applyQuirksToStates = (sku: string, states: StateDefinition[]): StateDefinition[] =>
-  applyQuirksToStatesRaw(sku, states, mockLog);
-const buildLanStateDefs = (device: GoveeDevice): StateDefinition[] => buildLanStateDefsRaw(device, mockLog);
+  applyQuirksToStatesRaw(sku, states, mockLog, registry);
+const buildLanStateDefs = (device: GoveeDevice): StateDefinition[] => buildLanStateDefsRaw(device, mockLog, registry);
 const buildCloudStateDefs = (
   device: GoveeDevice,
   localSnapshots?: { name: string }[],
   memberDevices?: GoveeDevice[],
-): StateDefinition[] => buildCloudStateDefsRaw(device, mockLog, localSnapshots, memberDevices);
+): StateDefinition[] => buildCloudStateDefsRaw(device, mockLog, registry, localSnapshots, memberDevices);
 
 /**
  * Concat helper for tests that need the full state-def set (LAN + Cloud).
@@ -73,9 +78,11 @@ const TEST_REGISTRY = {
 
 describe("CapabilityMapper", () => {
   beforeEach(() => {
-    initDeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
   });
-  afterEach(() => _resetDeviceRegistry());
+  afterEach(() => {
+    registry = emptyRegistry();
+  });
 
   describe("mapCapabilities", () => {
     it("should map on_off to boolean power state", () => {
@@ -1013,7 +1020,7 @@ describe("CapabilityMapper", () => {
     // then verify buildCloudStateDefs returns an empty/minimal list for that
     // SKU even when the device claims a full capability tree.
     it("returns empty cloud-cap states when brokenPlatformApi is active", () => {
-      initDeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
+      registry = new DeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
       const device: GoveeDevice = {
         sku: "H6141",
         deviceId: "AA:BB:CC:DD:EE:FF",
@@ -1052,7 +1059,7 @@ describe("CapabilityMapper", () => {
     });
 
     it("normal SKU without brokenPlatformApi: scene dropdown appears as expected", () => {
-      initDeviceRegistry({ data: TEST_REGISTRY as never });
+      registry = new DeviceRegistry({ data: TEST_REGISTRY as never });
       const device: GoveeDevice = {
         sku: "H61BE", // verified, no quirks
         deviceId: "AA:BB:CC:DD:EE:FF",

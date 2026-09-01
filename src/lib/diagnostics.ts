@@ -1,5 +1,5 @@
 import { HttpError } from "./http-client";
-import { getDeviceQuirks } from "./device-registry";
+import type { DeviceRegistry } from "./device-registry";
 import type { GoveeDevice } from "./types";
 
 /** Single log line captured for a device. */
@@ -258,6 +258,9 @@ export class DiagnosticsCollector {
   private runtimeStateProvider: RuntimeStateProvider | null = null;
   private cacheSnapshotProvider: CacheSnapshotProvider | null = null;
   private localSnapshotsProvider: LocalSnapshotsProvider | null = null;
+
+  /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
+  constructor(private readonly registry: DeviceRegistry) {}
 
   /**
    * Register the runtime-state provider. main.ts wires it after all
@@ -567,7 +570,7 @@ export class DiagnosticsCollector {
    * @param adapterVersion Adapter version string (e.g. "2.0.0")
    */
   generate(device: GoveeDevice, adapterVersion: string): Record<string, unknown> {
-    const quirks = getDeviceQuirks(device.sku);
+    const quirks = this.registry.getQuirks(device.sku);
     const b = this.buffers.get(device.deviceId);
 
     const runtimeState = this.runtimeStateProvider ? this.runtimeStateProvider() : null;

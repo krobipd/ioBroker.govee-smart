@@ -10,7 +10,7 @@ import {
   type ControlKind,
   type GoveeDevice,
 } from "./types";
-import { applyColorTempQuirk, getDeviceQuirks } from "./device-registry";
+import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { resolveLabel, tDesc, tName } from "./i18n";
 
@@ -856,11 +856,17 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
  * @param sku Device model (e.g. "H60A1")
  * @param states State definitions to adjust
  * @param log Adapter logger — quirk-applied events land on debug.
+ * @param registry This instance's device catalog
  */
-export function applyQuirksToStates(sku: string, states: StateDefinition[], log: ioBroker.Logger): StateDefinition[] {
+export function applyQuirksToStates(
+  sku: string,
+  states: StateDefinition[],
+  log: ioBroker.Logger,
+  registry: DeviceRegistry,
+): StateDefinition[] {
   for (const state of states) {
     if (state.id === "color_temperature" && state.min != null && state.max != null) {
-      const corrected = applyColorTempQuirk(sku, state.min, state.max);
+      const corrected = registry.applyColorTempQuirk(sku, state.min, state.max);
       if (corrected.min !== state.min || corrected.max !== state.max) {
         log.debug(
           `Quirk applied for ${sku}: color_temperature range ${state.min}-${state.max}K → ${corrected.min}-${corrected.max}K`,
@@ -1150,13 +1156,14 @@ const SCENE_DROPDOWN_RULES: ReadonlyArray<{
  *
  * @param device Govee device
  * @param log Adapter logger — forwarded to applyQuirksToStates.
+ * @param registry This instance's device catalog
  */
-export function buildLanStateDefs(device: GoveeDevice, log: ioBroker.Logger): StateDefinition[] {
+export function buildLanStateDefs(device: GoveeDevice, log: ioBroker.Logger, registry: DeviceRegistry): StateDefinition[] {
   if (!device.lanIp) {
     return [];
   }
   const stateDefs = getDefaultLanStates();
-  applyQuirksToStates(device.sku, stateDefs, log);
+  applyQuirksToStates(device.sku, stateDefs, log, registry);
   return stateDefs;
 }
 
@@ -1222,12 +1229,14 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
  *
  * @param device Govee device
  * @param log Adapter logger — forwarded to mapCapabilities / applyQuirksToStates.
+ * @param registry This instance's device catalog (quirks)
  * @param localSnapshots Optional local snapshot names
  * @param memberDevices Resolved member devices (only for BaseGroup)
  */
 export function buildCloudStateDefs(
   device: GoveeDevice,
   log: ioBroker.Logger,
+  registry: DeviceRegistry,
   localSnapshots?: { name: string }[],
   memberDevices?: GoveeDevice[],
 ): StateDefinition[] {
@@ -1240,7 +1249,7 @@ export function buildCloudStateDefs(
   // gated by hasDynamicSceneCapability which reads device.capabilities, i.e.
   // the same untrusted source). LAN-phase still creates power / brightness /
   // colorRgb / colorTemperature defaults so the device stays controllable.
-  const quirks = getDeviceQuirks(device.sku);
+  const quirks = registry.getQuirks(device.sku);
   const skipCapabilities = quirks?.brokenPlatformApi === true;
 
   // Capability-derived states. A LAN-owning light (lanIp set) lets the LAN
@@ -1262,7 +1271,7 @@ export function buildCloudStateDefs(
     log.debug(`${device.sku}: brokenPlatformApi quirk active — skipping capability-derived states + dropdowns`);
   }
 
-  applyQuirksToStates(device.sku, stateDefs, log);
+  applyQuirksToStates(device.sku, stateDefs, log, registry);
 
   // Light-only synthetic state defs — scenes / snapshots / music / scene_speed
   // only make sense for lights. Sensors and appliances would otherwise see

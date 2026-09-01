@@ -1,6 +1,6 @@
 import { normalizeDeviceId, type GoveeDevice } from "../types";
 import { mapKey } from "../device-key";
-import { getDeviceQuirks } from "../device-registry";
+import type { DeviceRegistry } from "../device-registry";
 
 /** Parsed per-segment data from MQTT BLE packets */
 export interface MqttSegmentData {
@@ -142,11 +142,12 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
  * then grow it if the real device pushes more slots.
  *
  * @param device Target device
+ * @param registry This instance's device catalog (segmentCount quirk lookup)
  */
-export function resolveSegmentCount(device: GoveeDevice): number {
+export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistry): number {
   // A segmentCount quirk is a hard override — Govee's capability count lies for
   // some SKUs; this wins over Cloud, cache and the live MQTT value.
-  const override = plausibleSegmentCount(getDeviceQuirks(device.sku)?.segmentCount);
+  const override = plausibleSegmentCount(registry.getQuirks(device.sku)?.segmentCount);
   if (override !== undefined) {
     return override;
   }

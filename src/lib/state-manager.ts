@@ -8,6 +8,7 @@ import {
 } from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
 import { resolveSegmentCount, SEGMENT_COUNT_MAX } from "./device-manager/lookups";
+import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import type { I18nKey } from "./i18n";
 import { tDesc, tName } from "./i18n";
@@ -227,10 +228,16 @@ export class StateManager {
    * round has just written exactly these values, so the two can't disagree.
    */
   private readonly resolvedOnline = new Map<string, boolean>();
+  /** This instance's device catalog — quirks for the LAN defaults + segment count. */
+  private readonly registry: DeviceRegistry;
 
-  /** @param adapter The ioBroker adapter instance */
-  constructor(adapter: utils.AdapterInstance) {
+  /**
+   * @param adapter The ioBroker adapter instance
+   * @param registry This instance's device catalog
+   */
+  constructor(adapter: utils.AdapterInstance, registry: DeviceRegistry) {
     this.adapter = adapter;
+    this.registry = registry;
   }
 
   /**
@@ -788,7 +795,7 @@ export class StateManager {
    * @param device Govee device
    */
   async createLanStates(device: GoveeDevice): Promise<void> {
-    const stateDefs = buildLanStateDefs(device, this.adapter.log);
+    const stateDefs = buildLanStateDefs(device, this.adapter.log, this.registry);
     if (stateDefs.length === 0) {
       this.adapter.log.debug(
         `buildLanStateDefs for ${device.sku} ${device.deviceId}: 0 states (no LAN IP / not a light) — LAN phase skipped`,
@@ -968,7 +975,7 @@ export class StateManager {
     // capabilities. A manual list can only grow the count (never shrink it)
     // so users editing manual_list can reveal hidden indices without losing
     // the already-learned total.
-    const resolved = resolveSegmentCount(device);
+    const resolved = resolveSegmentCount(device, this.registry);
     const manualMax =
       Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? Math.max(...device.manualSegments) + 1

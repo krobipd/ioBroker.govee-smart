@@ -1,14 +1,7 @@
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import {
-  DeviceRegistry,
-  _resetDeviceRegistry,
-  applyColorTempQuirk,
-  getDeviceQuirks,
-  getDeviceTier,
-  initDeviceRegistry,
-} from "./device-registry";
+import { DeviceRegistry } from "./device-registry";
 
 const SAMPLE = {
   devices: {
@@ -193,64 +186,41 @@ describe("DeviceRegistry", () => {
     });
   });
 
-  // applyColorTempQuirk is now only exposed as a module-level function — the
-  // class-method form was removed in v2.10.0 since it duplicated the
-  // stateless variant. See "Module-level singleton" suite below for the
-  // remaining colorTempRange coverage.
-
-  describe("Module-level singleton", () => {
-    beforeEach(() => _resetDeviceRegistry());
-    afterEach(() => _resetDeviceRegistry());
-
-    it("getDeviceQuirks returns undefined before init", () => {
-      expect(getDeviceQuirks("H5179")).toBeUndefined();
+  describe("instance helpers — one catalog per adapter instance", () => {
+    // Deliberately NO module-level registry: in compact mode several instances
+    // share one process, and a shared catalog let the instance that started
+    // last decide the experimental toggle for all of them.
+    it("applyColorTempQuirk falls through to the API range without an active quirk", () => {
+      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
+      expect(reg.applyColorTempQuirk("HZZZZ", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
     });
 
-    it("applyColorTempQuirk falls through to API range before init", () => {
-      expect(applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({
-        min: 2000,
-        max: 9000,
-      });
+    it("applyColorTempQuirk uses the catalog range once the seed entry is active", () => {
+      const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2200, max: 6500 });
     });
 
-    it("initDeviceRegistry installs the singleton", () => {
-      initDeviceRegistry({ data: SAMPLE as never });
-      expect(getDeviceQuirks("H7160")).toEqual({ brokenPlatformApi: true });
+    it("two instances with different toggles keep their own quirks", () => {
+      const plain = new DeviceRegistry({ data: SAMPLE as never });
+      const experimental = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      expect(plain.getQuirks("H6141")).toBeUndefined();
+      expect(experimental.getQuirks("H6141")).toEqual({ brokenPlatformApi: true });
+      expect(plain.getQuirks("H6141")).toBeUndefined(); // untouched by the other instance
     });
 
-    it("module-level applyColorTempQuirk uses the singleton when set", () => {
-      initDeviceRegistry({
-        data: SAMPLE as never,
-        experimental: true,
-      });
-      expect(applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({
-        min: 2200,
-        max: 6500,
-      });
+    it("getTier maps the catalog status to a tier label and collapses unknown SKUs to 'unknown'", () => {
+      const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      expect(reg.getTier("H60A1")).toBe("seed");
+      expect(reg.getTier("H61BE")).toBe("verified");
+      expect(reg.getTier("H7160")).toBe("reported");
+      expect(reg.getTier("HZZZZ")).toBe("unknown");
     });
 
-    it("_resetDeviceRegistry clears the singleton", () => {
-      initDeviceRegistry({ data: SAMPLE as never });
-      _resetDeviceRegistry();
-      expect(getDeviceQuirks("H5179")).toBeUndefined();
-    });
-
-    it("getDeviceTier returns 'unknown' before init", () => {
-      expect(getDeviceTier("H5179")).toBe("unknown");
-    });
-
-    it("getDeviceTier maps registry status to tier label after init", () => {
-      initDeviceRegistry({ data: SAMPLE as never, experimental: true });
-      // SAMPLE has H60A1=seed, H7160=verified or similar — verify the mapping
-      expect(getDeviceTier("H60A1")).toBe("seed");
-      // Unknown SKU → "unknown" sentinel, not undefined
-      expect(getDeviceTier("HZZZZ")).toBe("unknown");
-    });
-
-    it("getDeviceTier is case-insensitive on the SKU", () => {
-      initDeviceRegistry({ data: SAMPLE as never });
-      expect(getDeviceTier("h60a1")).toBe("seed");
-      expect(getDeviceTier("H60A1")).toBe("seed");
+    it("getTier is case-insensitive on the SKU", () => {
+      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      expect(reg.getTier("h60a1")).toBe("seed");
+      expect(reg.getTier("H60A1")).toBe("seed");
     });
   });
 

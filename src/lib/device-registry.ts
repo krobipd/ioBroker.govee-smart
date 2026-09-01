@@ -297,82 +297,41 @@ export class DeviceRegistry {
   getStatus(sku: string): DeviceStatus | undefined {
     return this.getEntry(sku)?.status;
   }
-}
 
-/**
- * Module-level singleton — preserves the old `device-quirks.ts` API surface
- * so capability-mapper.ts and device-manager.ts can use the registry through
- * stateless function calls. The adapter calls `initDeviceRegistry()` once
- * during onReady; tests reset it via `_resetDeviceRegistry()`.
- */
-let singleton: DeviceRegistry | undefined;
-
-/**
- * Initialize the module-level registry. Adapter calls this once during
- * `onReady` with the experimental flag from config.
- *
- * @param config Loader options
- */
-export function initDeviceRegistry(config: RegistryConfig = {}): DeviceRegistry {
-  singleton = new DeviceRegistry(config);
-  return singleton;
-}
-
-/**
- * Test-only helper — resets the singleton between mocha tests.
- * Not for production use.
- */
-export function _resetDeviceRegistry(): void {
-  singleton = undefined;
-}
-
-/**
- * Stateless quirks lookup — replacement for the old `getDeviceQuirks`.
- * Returns undefined if the registry hasn't been initialised yet (early
- * adapter startup) or the SKU is unknown / inactive.
- *
- * @param sku Govee SKU (case-insensitive)
- */
-export function getDeviceQuirks(sku: string): DeviceQuirks | undefined {
-  return singleton?.getQuirks(sku);
-}
-
-/**
- * Stateless color-temp clamp — applies a colorTempRange quirk if present,
- * otherwise returns the API-reported range unchanged. Falls through to the
- * input range if the registry hasn't been initialised yet (early startup).
- *
- * @param sku Govee SKU
- * @param min API-reported minimum
- * @param max API-reported maximum
- */
-export function applyColorTempQuirk(sku: string, min: number, max: number): { min: number; max: number } {
-  const q = singleton?.getQuirks(sku);
-  if (q?.colorTempRange) {
-    return q.colorTempRange;
+  /**
+   * Color-temperature clamp — the `colorTempRange` quirk if one is active for
+   * the SKU, otherwise the API-reported range unchanged.
+   *
+   * @param sku Govee SKU
+   * @param min API-reported minimum
+   * @param max API-reported maximum
+   */
+  applyColorTempQuirk(sku: string, min: number, max: number): { min: number; max: number } {
+    const q = this.getQuirks(sku);
+    if (q?.colorTempRange) {
+      return q.colorTempRange;
+    }
+    return { min, max };
   }
-  return { min, max };
+
+  /**
+   * Single canonical trust tier for a SKU as exposed to users via the
+   * `diag.tier` state. Unlike {@link getStatus}, this collapses the
+   * unknown-SKU case into the explicit string `"unknown"` so the value is
+   * always one of four well-known labels.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  getTier(sku: string): DeviceTier {
+    return this.getStatus(sku) ?? "unknown";
+  }
 }
 
-/**
- * Stateless check whether a SKU is recognised as `seed` and the toggle is
- * off — used by the device manager to nudge the user only for SKUs that
- * actually show up at runtime.
- *
- * @param sku Govee SKU (case-insensitive)
- */
-export function isSeedAndDormant(sku: string): boolean {
-  return singleton?.isSeedAndDormant(sku) ?? false;
-}
+/** The four labels `diag.tier` can carry — the three catalog statuses plus "unknown". */
+export type DeviceTier = DeviceStatus | "unknown";
 
-/**
- * Single canonical trust tier for a SKU as exposed to users via the
- * `diag.tier` state. Unlike `getStatus`, this collapses the
- * `undefined`-from-registry case into the explicit string `"unknown"` so
- * the value is always one of four well-known labels.
- *
- * @param sku Govee SKU (case-insensitive)
- */
-export function getDeviceTier(sku: string): "verified" | "reported" | "seed" | "unknown" {
-  return singleton?.getStatus(sku) ?? "unknown";
-}
+// There is deliberately NO module-level registry: every adapter instance builds
+// its own from its own `experimentalQuirks` setting and hands it to the modules
+// that need it. In compact mode several instances share one process (one module
+// cache), and a shared registry let the instance that started last decide the
+// experimental toggle for all of them.

@@ -1,10 +1,15 @@
 import { CommandRouter } from "./command-router";
-import { _resetDeviceRegistry, initDeviceRegistry } from "./device-registry";
+import { DeviceRegistry } from "./device-registry";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
 import { mockLog } from "./test-helpers";
 import type { GoveeDevice, TimerAdapter } from "./types";
+
+/** A catalog with no entries — tests that don't care about quirks. */
+const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
+/** The catalog the constructed modules read — reassigned per suite where quirks matter. */
+let registry: DeviceRegistry = emptyRegistry();
 
 interface LanCall {
   method: string;
@@ -120,7 +125,7 @@ describe("CommandRouter", () => {
   describe("sendCommand — LAN priority", () => {
     it("routes power to LAN setPower when device has lanIp", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "power", true);
       expect(lan.calls).toHaveLength(1);
@@ -130,7 +135,7 @@ describe("CommandRouter", () => {
 
     it("routes brightness to LAN setBrightness", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "brightness", 75);
       expect(lan.calls[0].method).toBe("setBrightness");
@@ -139,7 +144,7 @@ describe("CommandRouter", () => {
 
     it("routes colorRgb to LAN setColor with hex parsed to rgb", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "colorRgb", "#FF6600");
       expect(lan.calls[0].method).toBe("setColor");
@@ -148,7 +153,7 @@ describe("CommandRouter", () => {
 
     it("routes colorTemperature to LAN setColorTemperature", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "colorTemperature", 4000);
       expect(lan.calls[0].method).toBe("setColorTemperature");
@@ -157,7 +162,7 @@ describe("CommandRouter", () => {
 
     it("routes gradientToggle to LAN setGradient", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "gradientToggle", true);
       expect(lan.calls[0].method).toBe("setGradient");
@@ -169,7 +174,7 @@ describe("CommandRouter", () => {
     it("routes to Cloud when device has no lanIp", async () => {
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
       const device = makeDevice({ lanIp: undefined });
@@ -187,7 +192,7 @@ describe("CommandRouter", () => {
         warn: (m: string) => warns.push(m),
         debug: (m: string) => debugs.push(m),
       } as unknown as ioBroker.Logger;
-      const router = new CommandRouter(log, noopTimers);
+      const router = new CommandRouter(log, noopTimers, registry);
       // No lanClient, no cloudClient — but channel says cloud:true (init-race)
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
       await router.sendCommand(device, "power", true);
@@ -198,7 +203,7 @@ describe("CommandRouter", () => {
     it("warns when no channel available at all (L23)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
-      const router = new CommandRouter(log, noopTimers);
+      const router = new CommandRouter(log, noopTimers, registry);
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: false } });
       await router.sendCommand(device, "power", true);
       expect(warns.some(w => /no channel/i.test(w))).toBe(true);
@@ -208,7 +213,7 @@ describe("CommandRouter", () => {
   describe("segmentColor / segmentBrightness routing", () => {
     it("routes segmentColor:N to LAN setColor + setSegmentColor (forceColorMode + ptReal)", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "segmentColor:3", "#0000FF");
       // forceColorMode sends a setColor first
@@ -221,7 +226,7 @@ describe("CommandRouter", () => {
 
     it("routes segmentBrightness:N to setSegmentBrightness", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "segmentBrightness:5", 50);
       const segBrightCall = lan.calls.find(c => c.method === "setSegmentBrightness");
@@ -231,7 +236,7 @@ describe("CommandRouter", () => {
 
     it("rejects negative segment index", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "segmentColor:-1", "#FF0000");
       expect(lan.calls).toHaveLength(0);
@@ -241,7 +246,7 @@ describe("CommandRouter", () => {
       const warns: string[] = [];
       const capturingLog = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
       const lan = makeLanStub();
-      const router = new CommandRouter(capturingLog, noopTimers);
+      const router = new CommandRouter(capturingLog, noopTimers, registry);
       router.setLanClient(lan.client);
       // ';' where a ':' is required — parseSegmentBatch returns null (live: h61d5).
       await router.sendCommand(makeDevice(), "segmentBatch", "1-15;#ffca91");
@@ -251,7 +256,7 @@ describe("CommandRouter", () => {
 
     it("emits onSegmentBatchUpdate exactly once on the Cloud path (I2)", async () => {
       const cloud = makeCloudStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       let emits = 0;
       router.onSegmentBatchUpdate = () => {
@@ -265,13 +270,13 @@ describe("CommandRouter", () => {
 
   describe("parseSegmentBatch", () => {
     it("parses range syntax (0-5:#ff0000:50)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.parseSegmentBatch(makeDevice(), "0-5:#ff0000:50");
       expect(result).toEqual({ segments: [0, 1, 2, 3, 4, 5], color: 0xff0000, brightness: 50 });
     });
 
     it("clamps a pathological range so it can't block the event loop (L1/SEC-L1)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const device = makeDevice({ segmentCount: 8 });
       const started = Date.now();
       const result = router.parseSegmentBatch(device, "0-2000000000:#ff0000:50");
@@ -282,95 +287,95 @@ describe("CommandRouter", () => {
     });
 
     it("parses comma-list (0,3,7:#00ff00:100)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.parseSegmentBatch(makeDevice(), "0,3,7:#00ff00:100");
       expect(result).toEqual({ segments: [0, 3, 7], color: 0x00ff00, brightness: 100 });
     });
 
     it("parses 'all' to expanded indices", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.parseSegmentBatch(makeDevice({ segmentCount: 4 }), "all:#ffffff:75");
       expect(result?.segments).toEqual([0, 1, 2, 3]);
     });
 
     it("respects manualSegments (cut-strip)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const device = makeDevice({ manualMode: true, manualSegments: [0, 2, 4] });
       const result = router.parseSegmentBatch(device, "all:#ff0000:50");
       expect(result?.segments).toEqual([0, 2, 4]);
     });
 
     it("filters out-of-range indices", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const device = makeDevice({ segmentCount: 5 });
       const result = router.parseSegmentBatch(device, "3-10:#ff0000:50");
       expect(result?.segments).toEqual([3, 4]);
     });
 
     it("returns null for empty/invalid input", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.parseSegmentBatch(makeDevice(), "")).toBeNull();
       expect(router.parseSegmentBatch(makeDevice(), "::100")).toBeNull();
     });
 
     it("returns null when neither color nor brightness given", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.parseSegmentBatch(makeDevice(), "0-5")).toBeNull();
     });
 
     it("accepts brightness-only (no color)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.parseSegmentBatch(makeDevice(), "0-3::25");
       expect(result).toEqual({ segments: [0, 1, 2, 3], color: undefined, brightness: 25 });
     });
 
     it("rejects brightness above 100", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.parseSegmentBatch(makeDevice(), "0-3::150");
       expect(result?.brightness).toBeUndefined();
     });
 
     it("rejects non-string input", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.parseSegmentBatch(makeDevice(), 42 as unknown as string)).toBeNull();
     });
   });
 
   describe("toCloudValue", () => {
     it("converts power true → 1, false → 0", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "power", true)).toBe(1);
       expect(router.toCloudValue(makeDevice(), "power", false)).toBe(0);
     });
 
     it("converts colorRgb hex to packed int", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "colorRgb", "#FF6600")).toBe(0xff6600);
     });
 
     it("resolves lightScene index to value payload", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.toCloudValue(makeDevice(), "lightScene", "1");
       expect(result).toEqual({ paramId: 1 });
     });
 
     it("resolves diyScene index", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "diyScene", "1")).toEqual({ paramId: 2 });
     });
 
     it("resolves snapshot index", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "snapshot", "1")).toBe(7);
     });
 
     it("returns input value for invalid scene index", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "lightScene", "99")).toBe("99");
     });
 
     it("converts segmentColor:N to {segment, rgb}", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.toCloudValue(makeDevice(), "segmentColor:3", "#FF0000") as {
         segment: number[];
         rgb: number;
@@ -380,7 +385,7 @@ describe("CommandRouter", () => {
     });
 
     it("converts segmentBrightness:N to {segment, brightness}", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const result = router.toCloudValue(makeDevice(), "segmentBrightness:7", 50);
       expect(result).toEqual({ segment: [7], brightness: 50 });
     });
@@ -388,48 +393,48 @@ describe("CommandRouter", () => {
 
   describe("findCapabilityForCommand", () => {
     it("matches power → on_off", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "power");
       expect(cap?.instance).toBe("powerSwitch");
     });
 
     it("matches brightness → range/brightness", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "brightness");
       expect(cap?.instance).toBe("brightness");
     });
 
     it("matches colorRgb → color_setting/colorRgb", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "colorRgb");
       expect(cap?.instance).toBe("colorRgb");
     });
 
     it("matches lightScene → dynamic_scene/lightScene", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "lightScene");
       expect(cap?.instance).toBe("lightScene");
     });
 
     it("matches segmentColor:N → segment_color_setting (NOT brightness)", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "segmentColor:0");
       expect(cap?.instance).toBe("segmentedColorRgb");
     });
 
     it("matches segmentBrightness:N → segment_color_setting/brightness-flavour", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const cap = router.findCapabilityForCommand(makeDevice(), "segmentBrightness:0");
       expect(cap?.instance).toBe("segmentedBrightness");
     });
 
     it("returns undefined for unknown command", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.findCapabilityForCommand(makeDevice(), "xyz")).toBeUndefined();
     });
 
     it("returns undefined when capabilities is empty", () => {
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const dev = makeDevice({ capabilities: [] });
       expect(router.findCapabilityForCommand(dev, "power")).toBeUndefined();
     });
@@ -439,7 +444,7 @@ describe("CommandRouter", () => {
     it("forwards toggle as 0/1", async () => {
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
       await router.sendCapabilityCommand(makeDevice(), "devices.capabilities.toggle", "gradientToggle", true);
@@ -450,7 +455,7 @@ describe("CommandRouter", () => {
     it("forwards non-toggle value verbatim", async () => {
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
       await router.sendCapabilityCommand(makeDevice(), "devices.capabilities.dynamic_scene", "snapshot", { v: 1 });
@@ -460,7 +465,7 @@ describe("CommandRouter", () => {
     it("no-op (debug, no cloud call) when Cloud not configured (L23)", async () => {
       const debugs: string[] = [];
       const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as unknown as ioBroker.Logger;
-      const router = new CommandRouter(log, noopTimers);
+      const router = new CommandRouter(log, noopTimers, registry);
       const device = makeDevice({ channels: { lan: true, mqtt: false, cloud: false } });
       await router.sendCapabilityCommand(device, "devices.capabilities.toggle", "any", true);
       expect(debugs.some(d => /cloud not available/i.test(d))).toBe(true);
@@ -468,13 +473,17 @@ describe("CommandRouter", () => {
   });
 
   describe("transportOverrides (v2.10.0 — quirk-driven routing)", () => {
-    // The override tests stand up a registry singleton via initDeviceRegistry
+    // The override tests hand the router a catalog with transport overrides
     // with inline catalog data, then reset between tests so leakage can't
     // mask regressions. registry-aware tests live HERE, not in a separate
     // describe-each pattern, because the routing-decision is the unit
     // under test — registry presence is part of the fixture.
-    beforeEach(() => _resetDeviceRegistry());
-    afterEach(() => _resetDeviceRegistry());
+    beforeEach(() => {
+      registry = emptyRegistry();
+    });
+    afterEach(() => {
+      registry = emptyRegistry();
+    });
 
     const TEST_CATALOG = {
       devices: {
@@ -505,11 +514,11 @@ describe("CommandRouter", () => {
     }
 
     it("snapshot=cloud + Cloud ready → sendCloudCommand, no ptReal", async () => {
-      initDeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
       const lan = makeLanStub();
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
@@ -520,9 +529,9 @@ describe("CommandRouter", () => {
     });
 
     it("snapshot=cloud + device.channels.cloud=false → skip (no warn loop)", async () => {
-      initDeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
       await router.sendCommand(device, "snapshot", "1");
@@ -533,9 +542,9 @@ describe("CommandRouter", () => {
     });
 
     it("snapshot=cloud + cloudClient=null (init-race) → debug, no throw", async () => {
-      initDeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       // setCloudClient NOT called → cloudClient is null even though
       // device.channels.cloud=true
@@ -546,7 +555,7 @@ describe("CommandRouter", () => {
     it("snapshot=lan (or unset) → existing LAN ptReal path unchanged", async () => {
       // No catalog entry — default routing
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       const device = makeH70B3({ segmentCount: 22 }); // hasSegments=true so no heuristic
       await router.sendCommand(device, "snapshot", "1");
@@ -555,7 +564,7 @@ describe("CommandRouter", () => {
     });
 
     it("gradientToggle=cloud → Cloud via extended findCapabilityForCommand", async () => {
-      initDeviceRegistry({
+      registry = new DeviceRegistry({
         data: {
           devices: {
             H6160: {
@@ -570,7 +579,7 @@ describe("CommandRouter", () => {
       const lan = makeLanStub();
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
@@ -585,7 +594,7 @@ describe("CommandRouter", () => {
     });
 
     it("segmentBatch=cloud → Cloud via sendSegmentBatchParsed (not sendCloudCommand)", async () => {
-      initDeviceRegistry({
+      registry = new DeviceRegistry({
         data: {
           devices: {
             H6160: {
@@ -600,7 +609,7 @@ describe("CommandRouter", () => {
       const lan = makeLanStub();
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
@@ -613,7 +622,7 @@ describe("CommandRouter", () => {
     });
 
     it("segmentBatch=cloud + command segmentColor:5 → suffix-inherits Cloud path", async () => {
-      initDeviceRegistry({
+      registry = new DeviceRegistry({
         data: {
           devices: {
             H6160: {
@@ -628,7 +637,7 @@ describe("CommandRouter", () => {
       const lan = makeLanStub();
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
@@ -643,7 +652,7 @@ describe("CommandRouter", () => {
       // No catalog entry — heuristic is the only defense
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(makeLanStub().client);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(limiter);
@@ -659,9 +668,9 @@ describe("CommandRouter", () => {
     });
 
     it("registry not initialized → resolveTransport returns LAN default (no crash)", async () => {
-      // No initDeviceRegistry call — singleton is undefined
+      // Empty catalog — no overrides for any SKU
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       await router.sendCommand(makeDevice(), "power", true);
       expect(lan.calls).toHaveLength(1);
@@ -671,8 +680,8 @@ describe("CommandRouter", () => {
     it("dedup-map: repeated override-cloud-missing logs only once at warn level (L23)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
-      initDeviceRegistry({ data: TEST_CATALOG as never });
-      const router = new CommandRouter(log, noopTimers);
+      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
+      const router = new CommandRouter(log, noopTimers, registry);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
       // Three rapid commands in same category — first warns, the rest are debug.
       await router.sendCommand(device, "snapshot", "1");
@@ -685,7 +694,7 @@ describe("CommandRouter", () => {
   describe("resolveTransport — Light without LAN (cloud fallback)", () => {
     it("Light without LAN gets light-no-lan-fallback reason, not plain no-lan", async () => {
       const cloud = makeCloudStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       router.setRateLimiter(makeRateLimiter());
       const device = makeDevice({
@@ -700,7 +709,7 @@ describe("CommandRouter", () => {
 
     it("Appliance without LAN gets plain no-lan reason (unchanged)", async () => {
       const cloud = makeCloudStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
       const device = makeDevice({
         type: "devices.types.humidifier",
@@ -714,7 +723,7 @@ describe("CommandRouter", () => {
 
     it("Light with LAN still routes to LAN (no regression)", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(mockLog, noopTimers);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       const device = makeDevice({
         type: "devices.types.light",
@@ -736,7 +745,7 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
   it("the no-segment cloud heuristic applies to scene activation only", async () => {
     const lan = makeLanStub();
     const cloud = makeCloudStub();
-    const router = new CommandRouter(mockLog, noopTimers);
+    const router = new CommandRouter(mockLog, noopTimers, registry);
     router.setLanClient(lan.client);
     router.setCloudClient(cloud.client);
     router.setRateLimiter(makeRateLimiter());
@@ -766,7 +775,7 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
         order.push(`delay:${ms}`);
       },
     };
-    const router = new CommandRouter(mockLog, recordingTimers);
+    const router = new CommandRouter(mockLog, recordingTimers, registry);
     router.setLanClient(lan.client);
     const lanRecorder = new Proxy(lan.client as never, {
       get: (t: never, p: string) => {
@@ -800,7 +809,7 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
       },
     } as unknown as RateLimiter;
     const cloud = makeCloudStub();
-    const router = new CommandRouter(mockLog, noopTimers);
+    const router = new CommandRouter(mockLog, noopTimers, registry);
     router.setCloudClient(cloud.client);
     router.setRateLimiter(limiter);
 
@@ -816,7 +825,7 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
 
   it("a segment colour command never lands on the brightness capability", async () => {
     const cloud = makeCloudStub();
-    const router = new CommandRouter(mockLog, noopTimers);
+    const router = new CommandRouter(mockLog, noopTimers, registry);
     router.setCloudClient(cloud.client);
     router.setRateLimiter(makeRateLimiter());
     // Capability order is NOT guaranteed by Govee — list brightness first so a

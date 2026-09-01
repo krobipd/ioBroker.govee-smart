@@ -1,6 +1,6 @@
 import { buildCloudStateDefs } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
-import { getDeviceTier } from "../device-registry";
+import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
@@ -23,6 +23,8 @@ export interface DeviceEventsAdapter {
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
   readonly localSnapshots: LocalSnapshotStore | null;
+  /** This instance's device catalog (quirks + trust tier for the state-defs). */
+  readonly deviceRegistry: DeviceRegistry;
   readonly statesReady: boolean;
   readonly stateCreationQueue: Promise<void>[];
   /** Re-fired into stateManager + connection-state + groupFanout-reachability. */
@@ -142,7 +144,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   if (device.sku === "BaseGroup" && device.groupMembers) {
     memberDevices = groupFanoutHandler.resolveGroupMembers(device, allDevices);
   }
-  const cloudDefs = buildCloudStateDefs(device, adapter.log, localSnaps, memberDevices);
+  const cloudDefs = buildCloudStateDefs(device, adapter.log, adapter.deviceRegistry, localSnaps, memberDevices);
   const capN = Array.isArray(device.capabilities) ? device.capabilities.length : 0;
   adapter.log.debug(
     `buildCloudStateDefs for ${device.sku} ${device.deviceId}: ${capN} cap(s) in → ${cloudDefs.length} state def(s) out`,
@@ -152,7 +154,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
     await sm.createLanStates(device);
     await sm.createCloudStates(device, cloudDefs);
     await sm.migrateLegacyDiagnostics(device);
-    await sm.updateDeviceTier(device, getDeviceTier(device.sku));
+    await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
   })().catch(e => {
     adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
   });

@@ -11,7 +11,7 @@ import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
-import { getDeviceQuirks, type ConfigurableOverrideCommand, type TransportTarget } from "./device-registry";
+import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
@@ -37,6 +37,7 @@ export type TransportDecision =
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
+  private readonly registry: DeviceRegistry;
   private lanClient: GoveeLanClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
@@ -66,10 +67,12 @@ export class CommandRouter {
    * @param log ioBroker logger
    * @param timers Adapter timer wrapper — routed through `this.setTimeout` so
    *   pending color-mode delays get cleared on onUnload.
+   * @param registry This instance's device catalog (transportOverrides quirks)
    */
-  constructor(log: ioBroker.Logger, timers: TimerAdapter) {
+  constructor(log: ioBroker.Logger, timers: TimerAdapter, registry: DeviceRegistry) {
     this.log = log;
     this.timers = timers;
+    this.registry = registry;
   }
 
   /**
@@ -151,7 +154,7 @@ export class CommandRouter {
    * @param command Command type
    */
   private lookupOverride(device: GoveeDevice, command: string): TransportTarget | undefined {
-    const overrides = getDeviceQuirks(device.sku)?.transportOverrides;
+    const overrides = this.registry.getQuirks(device.sku)?.transportOverrides;
     if (!overrides) {
       return undefined;
     }

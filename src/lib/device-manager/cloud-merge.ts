@@ -1,4 +1,4 @@
-import { getDeviceQuirks } from "../device-registry";
+import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import type { CloudDevice, CloudStateCapability, DeviceState, GoveeDevice } from "../types";
 import { cloudDeviceToGoveeDevice } from "./mapping";
@@ -6,12 +6,13 @@ import { deviceKey } from "./lookups";
 
 /**
  * Adapter surface required by the cloud-merge helpers — DeviceManager
- * exposes `log` and `devices`, plus a few dispatch hooks the merge path
- * fires when devices change.
+ * exposes `log`, `devices` and the instance's device catalog, plus a few
+ * dispatch hooks the merge path fires when devices change.
  */
 export interface CloudMergeAdapter {
   readonly log: ioBroker.Logger;
   readonly devices: Map<string, GoveeDevice>;
+  readonly registry: DeviceRegistry;
   /** Fired when a device's cap-derived state changes (online flip etc.). */
   onDeviceUpdate?: ((device: GoveeDevice, state: Partial<DeviceState>) => void) | null;
   /** Optional one-shot SKU nudge. */
@@ -59,7 +60,7 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
       adapter.maybeNudgeSeedSku(cd.sku, cd.deviceName);
     }
 
-    const quirks = getDeviceQuirks(cd.sku);
+    const quirks = adapter.registry.getQuirks(cd.sku);
     if (quirks?.brokenPlatformApi) {
       adapter.log.debug(`${cd.sku} has known broken platform API metadata — capabilities may be incomplete`);
     }

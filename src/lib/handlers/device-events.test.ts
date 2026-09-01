@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { DeviceRegistry } from "../device-registry";
 
 // device-events pulls capability-mapper → i18n → @iobroker/adapter-core,
 // whose import-time controller lookup process.exits outside a js-controller.
@@ -68,6 +69,7 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
       updateGroupMembersUnreachable: async () => undefined,
     } as never,
     localSnapshots: { getSnapshots: () => [{ name: "Snap" }] } as never,
+    deviceRegistry: new DeviceRegistry({ data: { devices: {} } }),
     statesReady: opts.statesReady ?? false,
     stateCreationQueue: queue,
     setState: async () => undefined,
