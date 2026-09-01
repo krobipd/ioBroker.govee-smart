@@ -327,8 +327,10 @@ class StateManager {
    *
    * Counts REAL devices only — the Govee app's groups live in the tree as
    * pseudo-devices and would inflate the number beyond what the user physically
-   * owns. Works off the object database for the same reason `markAllOffline` does:
-   * it has to be right before any device is known and after the map is gone.
+   * owns. Works off the marker-id list, not off the device map — but since the
+   * cache rework that list is served from {@link onlineMarkerCache} on this
+   * 20-second path; only a cold cache falls back to the object database
+   * (`markAllOffline` still forces the DB read, it runs where the map is gone).
    *
    * @returns total and online counts, for the caller to log or assert on
    */
