@@ -28,17 +28,11 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var device_manager_exports = {};
 __export(device_manager_exports, {
-  DeviceManager: () => DeviceManager,
-  SEGMENT_HARD_MAX: () => import_lookups2.SEGMENT_HARD_MAX,
-  buildCapabilitiesFromAppEntry: () => import_mapping2.buildCapabilitiesFromAppEntry,
-  cloudDeviceToGoveeDevice: () => import_mapping2.cloudDeviceToGoveeDevice,
-  parseMqttSegmentData: () => import_lookups2.parseMqttSegmentData,
-  resolveSegmentCount: () => import_lookups2.resolveSegmentCount
+  DeviceManager: () => DeviceManager
 });
 module.exports = __toCommonJS(device_manager_exports);
 var import_capability_mapper = require("./capability-mapper");
 var import_command_router = require("./command-router");
-var import_device_registry = require("./device-registry");
 var import_diagnostics = require("./diagnostics");
 var import_govee_constants = require("./govee-constants");
 var import_log_channel_fail = require("./log-channel-fail");
@@ -50,13 +44,13 @@ var libraryLoader = __toESM(require("./device-manager/library-loader"));
 var import_reconciler = require("./device-manager/reconciler");
 var import_types = require("./types");
 var import_http_client = require("./http-client");
-var import_lookups2 = require("./device-manager/lookups");
-var import_mapping2 = require("./device-manager/mapping");
 class DeviceManager {
   /** Public for sub-module helpers (cache, cloud-merge). */
   log;
   /** Public for sub-module helpers (cache, cloud-merge, lookups). */
   devices = /* @__PURE__ */ new Map();
+  /** This instance's device catalog — public for sub-module helpers (cloud-merge). */
+  registry;
   commandRouter;
   diagnostics;
   /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
@@ -112,11 +106,13 @@ class DeviceManager {
    * @param log    ioBroker logger
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
    *   onUnload-safe delays).
+   * @param registry This instance's device catalog (quirks, trust tiers)
    */
-  constructor(log, timers) {
+  constructor(log, timers, registry) {
     this.log = log;
-    this.commandRouter = new import_command_router.CommandRouter(log, timers);
-    this.diagnostics = new import_diagnostics.DiagnosticsCollector();
+    this.registry = registry;
+    this.commandRouter = new import_command_router.CommandRouter(log, timers, registry);
+    this.diagnostics = new import_diagnostics.DiagnosticsCollector(registry);
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };
@@ -346,9 +342,9 @@ class DeviceManager {
       existing.snapshotBleCmds = entry.snapshotBleCmds;
       existing.scenesChecked = entry.scenesChecked;
       existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
-      existing.segmentCount = entry.segmentCount;
+      existing.segmentCount = (0, import_lookups.plausibleSegmentCount)(entry.segmentCount);
       existing.manualMode = entry.manualMode;
-      existing.manualSegments = entry.manualSegments;
+      existing.manualSegments = (0, import_lookups.plausibleSegmentIndices)(entry.manualSegments);
       existing.channels.cloud = entry.capabilities.length > 0;
       this.log.debug(
         `Cache merged into LAN-discovered device ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`
@@ -765,14 +761,14 @@ class DeviceManager {
       return;
     }
     this.nudgedSeedSkus.add(upper);
-    const tier = (0, import_device_registry.getDeviceTier)(upper);
+    const tier = this.registry.getTier(upper);
     const label = displayName ? `${displayName} (${upper})` : upper;
     switch (tier) {
       case "verified":
       case "reported":
         return;
       case "seed":
-        if ((0, import_device_registry.isSeedAndDormant)(upper)) {
+        if (this.registry.isSeedAndDormant(upper)) {
           this.log.warn(
             `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`
           );
@@ -870,13 +866,13 @@ class DeviceManager {
     }
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = (_a = device.segmentCount) != null ? _a : 0;
-    if (maxSeen > import_lookups.SEGMENT_HARD_MAX) {
+    if (maxSeen > import_lookups.SEGMENT_COUNT_MAX) {
       this.log.debug(
-        `${(0, import_types.deviceLabel)(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${import_lookups.SEGMENT_HARD_MAX})`
+        `${(0, import_types.deviceLabel)(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${import_lookups.SEGMENT_COUNT_MAX})`
       );
       return;
     }
-    const quirk = (_b = (0, import_device_registry.getDeviceQuirks)(device.sku)) == null ? void 0 : _b.segmentCount;
+    const quirk = (_b = this.registry.getQuirks(device.sku)) == null ? void 0 : _b.segmentCount;
     const quirkLocked = typeof quirk === "number" && quirk > 0;
     const grow = maxSeen > current;
     const shrink = maxSeen < current && complete;
@@ -886,7 +882,7 @@ class DeviceManager {
       );
       device.segmentCount = maxSeen;
       if (this.skuCache) {
-        this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
+        void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
       }
       (_c = this.onSegmentCountChanged) == null ? void 0 : _c.call(this, device);
       return;
@@ -1005,6 +1001,20 @@ class DeviceManager {
    */
   persistDeviceToCache(device) {
     cacheHelpers.persistDeviceToCache(this, device);
+  }
+  /**
+   * Settle the device's segment count from every source (catalog quirk, learned
+   * count, Cloud capabilities, manual list) and store it on the device — the
+   * one place the domain object is written. The state-tree builder receives
+   * the number and only reads it.
+   *
+   * @param device Target device
+   * @returns The count the segment tree is to be built for
+   */
+  syncSegmentCount(device) {
+    const count = (0, import_lookups.effectiveSegmentCount)(device, this.registry);
+    device.segmentCount = count;
+    return count;
   }
   /**
    * Generate diagnostics data for a device — structured JSON for GitHub
@@ -1179,11 +1189,6 @@ class DeviceManager {
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  DeviceManager,
-  SEGMENT_HARD_MAX,
-  buildCapabilitiesFromAppEntry,
-  cloudDeviceToGoveeDevice,
-  parseMqttSegmentData,
-  resolveSegmentCount
+  DeviceManager
 });
 //# sourceMappingURL=device-manager.js.map

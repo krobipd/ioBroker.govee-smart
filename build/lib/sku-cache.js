@@ -39,6 +39,15 @@ class SkuCache {
   cacheDir;
   log;
   /**
+   * Payload last written per file (without `cachedAt`) — a save that would
+   * write byte-identical device data is skipped. `saveDevicesToCache` runs for
+   * every device at start-up (twice), after each Cloud list, after a manual sync
+   * … most of those writes carried nothing new.
+   */
+  lastWritten = /* @__PURE__ */ new Map();
+  /** In-flight write per file — a second save of the same device queues behind the first. */
+  inFlight = /* @__PURE__ */ new Map();
+  /**
    * @param dataDir Adapter data directory (adapter.getDataDir())
    * @param log ioBroker logger
    */
@@ -58,32 +67,66 @@ class SkuCache {
   /** False when the cache dir is not accessible — save/load then skip. */
   dataAvailable = false;
   /**
-   * Save device data to cache.
+   * Save device data to cache. Never rejects — a failed write is a warn line,
+   * the adapter keeps running on its in-memory data.
+   *
+   * Asynchronous and flushed: the previous synchronous open/write/fsync/close
+   * blocked the event loop for the whole fsync (tens of milliseconds per file on
+   * an SD card, for every device, at least twice per start). The data still
+   * hits the disk before the promise resolves — plain writeFile only reaches the
+   * page cache, and a SIGKILL inside the ~30 s writeback window would lose the
+   * save silently. Written to a temp file and renamed into place, so a crash
+   * mid-write leaves the previous file intact instead of a torn one.
    *
    * @param data Device data to persist
    */
-  save(data) {
+  async save(data) {
+    var _a;
     if (!this.dataAvailable) {
       return;
     }
     const file = this.cacheFile(data.sku, data.deviceId);
-    try {
-      const fd = fs.openSync(file, "w");
+    const { cachedAt: _cachedAt, ...comparable } = data;
+    const fingerprint = JSON.stringify(comparable);
+    if (this.lastWritten.get(file) === fingerprint) {
+      this.log.debug(`Cache unchanged for ${data.sku} \u2014 not rewritten`);
+      return;
+    }
+    this.lastWritten.set(file, fingerprint);
+    const json = JSON.stringify(data, null, 2);
+    const write = async () => {
+      const tmp = `${file}.tmp`;
+      const handle = await fs.promises.open(tmp, "w");
       try {
-        fs.writeSync(fd, JSON.stringify(data, null, 2), 0, "utf-8");
-        fs.fsyncSync(fd);
+        await handle.writeFile(json, "utf-8");
+        await handle.sync();
       } finally {
-        fs.closeSync(fd);
+        await handle.close();
       }
-      const sceneN = Array.isArray(data.sceneLibrary) ? data.sceneLibrary.length : 0;
-      const musicN = Array.isArray(data.musicLibrary) ? data.musicLibrary.length : 0;
-      const diyN = Array.isArray(data.diyLibrary) ? data.diyLibrary.length : 0;
-      const snapN = Array.isArray(data.snapshotBleCmds) ? data.snapshotBleCmds.length : 0;
-      this.log.debug(
-        `Cache saved for ${data.sku} (scenes=${sceneN}, music=${musicN}, diy=${diyN}, snapshotBleCmds=${snapN})`
-      );
-    } catch (e) {
-      this.log.warn(`Cache write failed for ${data.sku}: ${(0, import_types.errMessage)(e)}`);
+      await fs.promises.rename(tmp, file);
+    };
+    const previous = (_a = this.inFlight.get(file)) != null ? _a : Promise.resolve();
+    const current = previous.catch(() => void 0).then(write).then(
+      () => {
+        const sceneN = Array.isArray(data.sceneLibrary) ? data.sceneLibrary.length : 0;
+        const musicN = Array.isArray(data.musicLibrary) ? data.musicLibrary.length : 0;
+        const diyN = Array.isArray(data.diyLibrary) ? data.diyLibrary.length : 0;
+        const snapN = Array.isArray(data.snapshotBleCmds) ? data.snapshotBleCmds.length : 0;
+        this.log.debug(
+          `Cache saved for ${data.sku} (scenes=${sceneN}, music=${musicN}, diy=${diyN}, snapshotBleCmds=${snapN})`
+        );
+      },
+      (e) => {
+        if (this.lastWritten.get(file) === fingerprint) {
+          this.lastWritten.delete(file);
+        }
+        this.log.warn(`Cache write failed for ${data.sku}: ${(0, import_types.errMessage)(e)}`);
+      }
+    );
+    this.inFlight.set(file, current);
+    await current;
+    if (this.inFlight.get(file) === current) {
+      this.inFlight.delete(file);
     }
   }
   /**
@@ -173,6 +216,7 @@ class SkuCache {
         if (data.lastSeenOnNetwork < cutoff) {
           const ageDays = Math.round((nowMs - data.lastSeenOnNetwork) / 864e5);
           fs.unlinkSync(full);
+          this.lastWritten.delete(full);
           pruned++;
           prunedDetails.push(`${(0, import_types.deviceLabel)(data)} ${data.deviceId} (${ageDays}d)`);
         }
@@ -202,6 +246,7 @@ class SkuCache {
       return;
     }
     const file = this.cacheFile(sku, deviceId);
+    this.lastWritten.delete(file);
     try {
       if (fs.existsSync(file)) {
         fs.unlinkSync(file);
@@ -213,6 +258,7 @@ class SkuCache {
   }
   /** Delete all cached files. */
   clear() {
+    this.lastWritten.clear();
     try {
       this.forEachCacheFile((full) => fs.unlinkSync(full));
       this.log.debug("Cache cleared");

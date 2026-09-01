@@ -28,13 +28,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 var device_registry_exports = {};
 __export(device_registry_exports, {
-  DeviceRegistry: () => DeviceRegistry,
-  _resetDeviceRegistry: () => _resetDeviceRegistry,
-  applyColorTempQuirk: () => applyColorTempQuirk,
-  getDeviceQuirks: () => getDeviceQuirks,
-  getDeviceTier: () => getDeviceTier,
-  initDeviceRegistry: () => initDeviceRegistry,
-  isSeedAndDormant: () => isSeedAndDormant
+  DeviceRegistry: () => DeviceRegistry
 });
 module.exports = __toCommonJS(device_registry_exports);
 var import_types = require("./types");
@@ -177,41 +171,36 @@ class DeviceRegistry {
     var _a;
     return (_a = this.getEntry(sku)) == null ? void 0 : _a.status;
   }
-}
-let singleton;
-function initDeviceRegistry(config = {}) {
-  singleton = new DeviceRegistry(config);
-  return singleton;
-}
-function _resetDeviceRegistry() {
-  singleton = void 0;
-}
-function getDeviceQuirks(sku) {
-  return singleton == null ? void 0 : singleton.getQuirks(sku);
-}
-function applyColorTempQuirk(sku, min, max) {
-  const q = singleton == null ? void 0 : singleton.getQuirks(sku);
-  if (q == null ? void 0 : q.colorTempRange) {
-    return q.colorTempRange;
+  /**
+   * Color-temperature clamp — the `colorTempRange` quirk if one is active for
+   * the SKU, otherwise the API-reported range unchanged.
+   *
+   * @param sku Govee SKU
+   * @param min API-reported minimum
+   * @param max API-reported maximum
+   */
+  applyColorTempQuirk(sku, min, max) {
+    const q = this.getQuirks(sku);
+    if (q == null ? void 0 : q.colorTempRange) {
+      return q.colorTempRange;
+    }
+    return { min, max };
   }
-  return { min, max };
-}
-function isSeedAndDormant(sku) {
-  var _a;
-  return (_a = singleton == null ? void 0 : singleton.isSeedAndDormant(sku)) != null ? _a : false;
-}
-function getDeviceTier(sku) {
-  var _a;
-  return (_a = singleton == null ? void 0 : singleton.getStatus(sku)) != null ? _a : "unknown";
+  /**
+   * Single canonical trust tier for a SKU as exposed to users via the
+   * `diag.tier` state. Unlike {@link getStatus}, this collapses the
+   * unknown-SKU case into the explicit string `"unknown"` so the value is
+   * always one of four well-known labels.
+   *
+   * @param sku Govee SKU (case-insensitive)
+   */
+  getTier(sku) {
+    var _a;
+    return (_a = this.getStatus(sku)) != null ? _a : "unknown";
+  }
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  DeviceRegistry,
-  _resetDeviceRegistry,
-  applyColorTempQuirk,
-  getDeviceQuirks,
-  getDeviceTier,
-  initDeviceRegistry,
-  isSeedAndDormant
+  DeviceRegistry
 });
 //# sourceMappingURL=device-registry.js.map

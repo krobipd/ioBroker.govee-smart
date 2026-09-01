@@ -24,7 +24,7 @@ __export(state_manager_exports, {
 module.exports = __toCommonJS(state_manager_exports);
 var import_capability_mapper = require("./capability-mapper");
 var import_device_icons = require("./device-icons");
-var import_device_manager = require("./device-manager");
+var import_lookups = require("./device-manager/lookups");
 var import_govee_constants = require("./govee-constants");
 var import_i18n = require("./i18n");
 var import_device_key = require("./device-key");
@@ -146,9 +146,22 @@ class StateManager {
    * where the object DB is the only truth) always refreshes it from the DB.
    */
   onlineMarkerCache = null;
-  /** @param adapter The ioBroker adapter instance */
-  constructor(adapter) {
+  /**
+   * The online value each marker was last resolved to (by {@link syncInfoOnline}
+   * or {@link markAllOffline}), keyed by marker id. The 20-second rollup counts
+   * from here instead of re-reading every marker from the state database — the
+   * round has just written exactly these values, so the two can't disagree.
+   */
+  resolvedOnline = /* @__PURE__ */ new Map();
+  /** This instance's device catalog — quirks for the LAN default states. */
+  registry;
+  /**
+   * @param adapter The ioBroker adapter instance
+   * @param registry This instance's device catalog
+   */
+  constructor(adapter, registry) {
     this.adapter = adapter;
+    this.registry = registry;
   }
   /**
    * Force-replace `common.states` on a persisted state object if any existing
@@ -196,6 +209,7 @@ class StateManager {
    * @param id Voller State-Pfad (`devices.X.info.Y`)
    */
   async safeDeleteState(id) {
+    this.ensuredStates.delete(id);
     const obj = await this.adapter.getObjectAsync(id).catch(() => null);
     if (!obj) {
       return;
@@ -268,18 +282,27 @@ class StateManager {
    * has run and the devices are known again — for a LAN light that is another 90
    * seconds of reply timeout on top.
    *
-   * Works off the object database, not off the device map: at startup no device is
+   * Works off the marker list, not off the device map: at startup no device is
    * known yet, and at shutdown the map may already be torn down. Everything that
    * carries an `info.online` state is covered in one pass, devices and the group
    * rollup alike.
    *
+   * Startup is the one moment the object database has to be scanned — the cache
+   * is cold and a previous run's leftovers are only known there. At shutdown the
+   * cache has been maintained by every create / migrate / remove since, so no
+   * scan runs and the host's one-second stop budget goes into the writes
+   * themselves, which are issued in parallel for the same reason.
+   *
    * @returns the state ids that were set to false
    */
   async markAllOffline() {
-    const ids = await this.onlineMarkerIds(true);
+    const ids = await this.onlineMarkerIds();
     for (const id of ids) {
-      await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => void 0);
+      this.resolvedOnline.set(id, false);
     }
+    await Promise.all(
+      ids.map((id) => this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => void 0))
+    );
     await this.clearDeviceRollup();
     return ids;
   }
@@ -303,15 +326,14 @@ class StateManager {
   }
   /**
    * The online markers of devices and of the group rollup. Served from
-   * {@link onlineMarkerCache} on the 20-second rollup path; a DB scan runs only
-   * when the cache is cold or a refresh is forced (startup/shutdown via
-   * {@link markAllOffline}, where leftovers from a previous run must be found).
+   * {@link onlineMarkerCache}; the object DB is scanned only while the cache is
+   * cold — i.e. once, at startup, where a previous run's leftovers must be found.
+   * Every later create / migrate / remove maintains the cache.
    *
-   * @param forceRefresh Rebuild the cache from the object DB
    * @returns the state ids ending in `.info.online`
    */
-  async onlineMarkerIds(forceRefresh = false) {
-    if (!forceRefresh && this.onlineMarkerCache) {
+  async onlineMarkerIds() {
+    if (this.onlineMarkerCache) {
       return Array.from(this.onlineMarkerCache);
     }
     const ids = (await this.existingStateIds()).filter((id) => id.endsWith(".info.online"));
@@ -327,23 +349,19 @@ class StateManager {
    *
    * Counts REAL devices only — the Govee app's groups live in the tree as
    * pseudo-devices and would inflate the number beyond what the user physically
-   * owns. Works off the marker-id list, not off the device map — but since the
-   * cache rework that list is served from {@link onlineMarkerCache} on this
-   * 20-second path; only a cold cache falls back to the object database
-   * (`markAllOffline` still forces the DB read, it runs where the map is gone).
+   * owns. Total = the marker list ({@link onlineMarkerCache}); online = the
+   * values the same round just resolved ({@link resolvedOnline}) — no marker is
+   * read back from the state database for a number the adapter wrote itself
+   * a moment ago. A marker nobody resolved this run (a device not in the map,
+   * e.g. one still waiting to be reaped) counts as offline, which is exactly
+   * what {@link markAllOffline} wrote for it at startup.
    *
    * @returns total and online counts, for the caller to log or assert on
    */
   async writeDeviceRollup() {
     const ids = await this.onlineMarkerIds();
     const deviceIds = ids.filter((id) => id.startsWith("devices."));
-    let online = 0;
-    for (const id of deviceIds) {
-      const state = await this.adapter.getStateAsync(id).catch(() => null);
-      if ((state == null ? void 0 : state.val) === true) {
-        online++;
-      }
-    }
+    const online = deviceIds.filter((id) => this.resolvedOnline.get(id) === true).length;
     const total = deviceIds.length;
     await this.ensureState("info.devicesTotal", (0, import_i18n.tName)("devicesTotal"), "number", "value", false);
     await this.ensureState("info.devicesOnline", (0, import_i18n.tName)("devicesOnline"), "number", "value", false);
@@ -365,13 +383,15 @@ class StateManager {
    * so a fresh install does not get a rollup it never had.
    */
   async clearDeviceRollup() {
-    const ids = new Set(await this.existingStateIds());
-    if (ids.has("info.devicesOnline")) {
-      await this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }).catch(() => void 0);
-    }
-    if (ids.has("info.devicesAllOnline")) {
-      await this.adapter.setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true }).catch(() => void 0);
-    }
+    const exists = async (id) => this.ensuredStates.has(id) || await this.adapter.getObjectAsync(id).catch(() => null) != null;
+    await Promise.all([
+      exists("info.devicesOnline").then(
+        (ok) => ok ? this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }) : void 0
+      ),
+      exists("info.devicesAllOnline").then(
+        (ok) => ok ? this.adapter.setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true }) : void 0
+      )
+    ]).catch(() => void 0);
   }
   /**
    * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
@@ -440,33 +460,48 @@ class StateManager {
       return;
     }
     const channel = inferChannelFromStateId(stateId);
-    await this.adapter.extendObject(
-      `${prefix}.${channel}`,
-      {
-        type: "channel",
-        common: { name: channelName(channel) },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    ).catch(() => void 0);
-    await this.adapter.extendObject(
-      `${prefix}.${channel}.${stateId}`,
-      {
-        type: "state",
-        common: {
-          name: (0, import_i18n.tName)(meta.nameKey),
-          type: meta.type,
-          role: meta.role,
-          read: true,
-          write: false,
-          ...meta.unit !== void 0 ? { unit: meta.unit } : {},
-          def: meta.type === "boolean" ? false : 0
-        },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    ).catch(() => void 0);
+    const channelId = `${prefix}.${channel}`;
+    const stateFullId = `${channelId}.${stateId}`;
     this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
+    if (!this.ensuredStates.has(channelId)) {
+      try {
+        await this.adapter.extendObject(
+          channelId,
+          {
+            type: "channel",
+            common: { name: channelName(channel) },
+            native: {}
+          },
+          { preserve: { common: ["name"] } }
+        );
+        this.ensuredStates.add(channelId);
+      } catch {
+      }
+    }
+    if (this.ensuredStates.has(stateFullId)) {
+      return;
+    }
+    try {
+      await this.adapter.extendObject(
+        stateFullId,
+        {
+          type: "state",
+          common: {
+            name: (0, import_i18n.tName)(meta.nameKey),
+            type: meta.type,
+            role: meta.role,
+            read: true,
+            write: false,
+            ...meta.unit !== void 0 ? { unit: meta.unit } : {},
+            def: meta.type === "boolean" ? false : 0
+          },
+          native: {}
+        },
+        { preserve: { common: ["name"] } }
+      );
+      this.ensuredStates.add(stateFullId);
+    } catch {
+    }
   }
   /**
    * Phase 1 — Info-States. Always-existing device metadata: info.name,
@@ -483,20 +518,14 @@ class StateManager {
    * @param device Govee device
    */
   async createInfoStates(device) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d;
     const key = this.deviceKey(device);
     const newPrefix = this.devicePrefix(device);
     const oldPrefix = this.prefixMap.get(key);
     if (oldPrefix && oldPrefix !== newPrefix) {
       this.adapter.log.debug(`Migrating device ${device.sku}: ${oldPrefix} \u2192 ${newPrefix}`);
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
-      const oldChannelKey = `${oldPrefix}.`;
-      for (const mapKey2 of this.stateChannelMap.keys()) {
-        if (mapKey2.startsWith(oldChannelKey)) {
-          this.stateChannelMap.delete(mapKey2);
-        }
-      }
-      (_a = this.onlineMarkerCache) == null ? void 0 : _a.delete(`${oldPrefix}.info.online`);
+      this.forgetPrefix(oldPrefix);
     }
     this.prefixMap.set(key, newPrefix);
     const prefix = newPrefix;
@@ -543,7 +572,7 @@ class StateManager {
         void 0,
         false
       );
-      (_b = this.onlineMarkerCache) == null ? void 0 : _b.add(`${prefix}.info.online`);
+      (_a = this.onlineMarkerCache) == null ? void 0 : _a.add(`${prefix}.info.online`);
       await this.ensureState(`${prefix}.info.model`, (0, import_i18n.tName)("model"), "string", "text", false, void 0, "");
       await this.ensureState(`${prefix}.info.serial`, (0, import_i18n.tName)("serialNumber"), "string", "text", false, void 0, "");
       if (device.gateway) {
@@ -568,7 +597,7 @@ class StateManager {
         await this.removeInfoStateOnce(prefix, "ip");
       } else {
         await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
-          val: (_c = device.lanIp) != null ? _c : "",
+          val: (_b = device.lanIp) != null ? _b : "",
           ack: true
         });
       }
@@ -578,7 +607,7 @@ class StateManager {
       });
       await this.syncInfoOnline(device);
     } else {
-      const memberIds = ((_d = device.groupMembers) != null ? _d : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
+      const memberIds = ((_c = device.groupMembers) != null ? _c : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
       await this.ensureState(`${prefix}.info.members`, (0, import_i18n.tName)("members"), "string", "text", false);
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
@@ -595,7 +624,8 @@ class StateManager {
       ]) {
         await this.safeDeleteState(`${prefix}.info.${staleId}`);
       }
-      (_e = this.onlineMarkerCache) == null ? void 0 : _e.delete(`${prefix}.info.online`);
+      (_d = this.onlineMarkerCache) == null ? void 0 : _d.delete(`${prefix}.info.online`);
+      this.resolvedOnline.delete(`${prefix}.info.online`);
       await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {
       });
     }
@@ -609,7 +639,7 @@ class StateManager {
    * @param device Govee device
    */
   async createLanStates(device) {
-    const stateDefs = (0, import_capability_mapper.buildLanStateDefs)(device, this.adapter.log);
+    const stateDefs = (0, import_capability_mapper.buildLanStateDefs)(device, this.adapter.log, this.registry);
     if (stateDefs.length === 0) {
       this.adapter.log.debug(
         `buildLanStateDefs for ${device.sku} ${device.deviceId}: 0 states (no LAN IP / not a light) \u2014 LAN phase skipped`
@@ -632,14 +662,15 @@ class StateManager {
    *
    * @param device Govee device
    * @param stateDefs Cloud-owned state definitions from buildCloudStateDefs
+   * @param segmentCount Settled segment count (DeviceManager.syncSegmentCount) for the segment tree
    */
-  async createCloudStates(device, stateDefs) {
+  async createCloudStates(device, stateDefs, segmentCount) {
     const prefix = this.devicePrefix(device);
     const nonSegmentDefs = stateDefs.filter((d) => !d.id.startsWith("_segment_"));
     await this.writeStateDefsToChannels(prefix, nonSegmentDefs, `Cloud ${device.sku}`);
     await this.cleanupCloudOwnedStates(prefix, nonSegmentDefs);
     if (stateDefs.some((d) => d.id.startsWith("_segment_"))) {
-      await this.createSegmentStates(device);
+      await this.createSegmentStates(device, segmentCount);
     }
   }
   /**
@@ -681,7 +712,7 @@ class StateManager {
           type: def.type,
           role: def.role,
           // Buttons are write-only triggers (role catalogue) — the adapter
-          // already declares its io-package button (manual_sync_devices)
+          // already declares its io-package button (manualSyncDevices)
           // with read:false; capability-driven buttons now match (LOW).
           read: def.role === "button" ? false : true,
           write: def.write
@@ -742,9 +773,15 @@ class StateManager {
   /**
    * Create segment channel with per-segment color + brightness states.
    *
+   * The count is settled by the caller (`DeviceManager.syncSegmentCount`) —
+   * this writer never decides or stores the device's segment count itself, it
+   * builds the tree for the number it is given. Never more channels than the
+   * protocol can address, whatever the caller delivered.
+   *
    * @param device Govee device
+   * @param segmentCount Settled segment count for the tree
    */
-  async createSegmentStates(device) {
+  async createSegmentStates(device, segmentCount) {
     const prefix = this.devicePrefix(device);
     await this.adapter.extendObject(
       `${prefix}.segments`,
@@ -755,10 +792,7 @@ class StateManager {
       },
       { preserve: { common: ["name"] } }
     );
-    const resolved = (0, import_device_manager.resolveSegmentCount)(device);
-    const manualMax = Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? Math.max(...device.manualSegments) + 1 : 0;
-    const segmentCount = Math.max(resolved, manualMax);
-    device.segmentCount = segmentCount;
+    segmentCount = Math.min(Math.max(0, Math.floor(segmentCount)), import_lookups.SEGMENT_COUNT_MAX);
     const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
     await this.ensureState(`${prefix}.segments.count`, (0, import_i18n.tName)("segmentCount"), "number", "value", false);
@@ -1155,7 +1189,8 @@ class StateManager {
       if (!MANAGED_CHANNELS.includes(channel)) {
         continue;
       }
-      if (channel === "control" && import_capability_mapper.LAN_STATE_IDS.has(stateId)) {
+      const foreignOwned = channel === "control" && import_capability_mapper.LAN_STATE_IDS.has(stateId) || (channel === "sensor" || channel === "events") && SYNTHETIC_STATE_META[stateId.toLowerCase()] !== void 0;
+      if (foreignOwned) {
         const survivors = (_b = totalsPerChannel.get(channel)) != null ? _b : { seen: 0, deleted: 0 };
         survivors.seen++;
         totalsPerChannel.set(channel, survivors);
@@ -1167,6 +1202,7 @@ class StateManager {
       if (!validIds.has(stateId)) {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         this.adapter.log.debug(`Removing stale state: ${localId}`);
+        this.ensuredStates.delete(localId);
         await this.adapter.delObjectAsync(localId);
         await this.adapter.delStateAsync(localId).catch(() => {
         });
@@ -1179,6 +1215,7 @@ class StateManager {
       deletedTotal += totals.deleted;
       if (totals.deleted > 0 && totals.deleted === totals.seen) {
         this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
+        this.ensuredStates.delete(`${prefix}.${channel}`);
         await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => void 0);
       }
     }
@@ -1204,6 +1241,7 @@ class StateManager {
   forgetPrefix(prefix) {
     var _a;
     (_a = this.onlineMarkerCache) == null ? void 0 : _a.delete(`${prefix}.info.online`);
+    this.resolvedOnline.delete(`${prefix}.info.online`);
     for (const key of this.prefixMap.keys()) {
       if (this.prefixMap.get(key) === prefix) {
         this.prefixMap.delete(key);
@@ -1286,8 +1324,10 @@ class StateManager {
    * `device.state.online` — set by `applyOnlineCap` from App-API / OpenAPI-MQTT
    * — is read straight through here. Local-first stays, local-only does not.
    *
-   * Writes `info.online` only when the resolved value differs from the
-   * current state — kills the 2-min ts-rewrite-spam captured 2026-05-13.
+   * Written with `setStateChangedAsync`, so an unchanged value neither rewrites
+   * the state nor bumps its timestamp (the 2-min ts-rewrite-spam captured
+   * 2026-05-13). The resolved value is also remembered per marker so the
+   * rollup of the same round can count it without reading it back.
    *
    * For Lights: when the resolved online value changes, the internal
    * `device.state.online` is also updated so downstream consumers
@@ -1314,10 +1354,8 @@ class StateManager {
     } else {
       desiredOnline = device.state.online === true;
     }
-    const current = await this.adapter.getStateAsync(stateId).catch(() => null);
-    if (!current || current.val !== desiredOnline) {
-      await this.adapter.setState(stateId, { val: desiredOnline, ack: true }).catch(() => void 0);
-    }
+    this.resolvedOnline.set(stateId, desiredOnline);
+    await this.adapter.setStateChangedAsync(stateId, { val: desiredOnline, ack: true }).catch(() => void 0);
     let lightOnlineChanged = false;
     if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.state.online !== desiredOnline) {
       device.state.online = desiredOnline;

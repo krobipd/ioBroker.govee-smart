@@ -22,7 +22,6 @@ __export(cloud_merge_exports, {
   mergeCloudDevices: () => mergeCloudDevices
 });
 module.exports = __toCommonJS(cloud_merge_exports);
-var import_device_registry = require("../device-registry");
 var import_govee_constants = require("../govee-constants");
 var import_mapping = require("./mapping");
 var import_lookups = require("./lookups");
@@ -55,7 +54,7 @@ function mergeCloudDevices(adapter, cloudDevices) {
       adapter.log.debug(`Cloud: New device ${cd.deviceName} (${cd.sku})`);
       adapter.maybeNudgeSeedSku(cd.sku, cd.deviceName);
     }
-    const quirks = (0, import_device_registry.getDeviceQuirks)(cd.sku);
+    const quirks = adapter.registry.getQuirks(cd.sku);
     if (quirks == null ? void 0 : quirks.brokenPlatformApi) {
       adapter.log.debug(`${cd.sku} has known broken platform API metadata \u2014 capabilities may be incomplete`);
     }

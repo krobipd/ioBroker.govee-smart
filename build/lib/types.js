@@ -29,6 +29,7 @@ __export(types_exports, {
   formatGatewayLabel: () => formatGatewayLabel,
   hexToRgb: () => hexToRgb,
   logDedup: () => logDedup,
+  logRejected: () => logRejected,
   maskSecret: () => maskSecret,
   normalizeDeviceId: () => normalizeDeviceId,
   parseSegmentList: () => parseSegmentList,
@@ -67,6 +68,19 @@ function classifyError(err) {
     if (code === "ETIMEDOUT" || err.message.includes("timed out")) {
       return "TIMEOUT";
     }
+    const reasonCode = err.code;
+    if (reasonCode === 4 || reasonCode === 5) {
+      return "AUTH";
+    }
+    const status = err.statusCode;
+    if (typeof status === "number") {
+      if (status === 429) {
+        return "RATE_LIMIT";
+      }
+      if (status === 401 || status === 403) {
+        return "AUTH";
+      }
+    }
   }
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("ECONNREFUSED") || msg.includes("ENOTFOUND") || msg.includes("ENETUNREACH") || msg.includes("ECONNRESET")) {
@@ -75,7 +89,7 @@ function classifyError(err) {
   if (msg.includes("Timeout")) {
     return "TIMEOUT";
   }
-  if (msg.includes("429") || msg.includes("Rate limit") || msg.includes("Rate limited")) {
+  if (/\b(rate limit(ed)?|too many requests)\b/i.test(msg)) {
     return "RATE_LIMIT";
   }
   if (msg.includes("Verification required") || msg.includes("status 454") && !msg.includes("invalid")) {
@@ -84,7 +98,7 @@ function classifyError(err) {
   if (msg.includes("Verification code invalid") || msg.includes("status 455")) {
     return "VERIFICATION_FAILED";
   }
-  if (msg.includes("401") || msg.includes("403") || msg.includes("Login failed") || msg.includes("auth")) {
+  if (msg.includes("Login failed") || /\b(unauthori[sz]ed|not authori[sz]ed|forbidden|authentication failed|bad username or password)\b/i.test(msg)) {
     return "AUTH";
   }
   return "UNKNOWN";
@@ -94,6 +108,9 @@ function errMessage(e) {
     return e.message;
   }
   return String(e);
+}
+function logRejected(log, context) {
+  return (e) => log.debug(`${context}: ${errMessage(e)}`);
 }
 function maskSecret(secret) {
   if (typeof secret !== "string" || secret.length <= 4) {
@@ -285,6 +302,7 @@ function capMatchesControl(cap, kind) {
   formatGatewayLabel,
   hexToRgb,
   logDedup,
+  logRejected,
   maskSecret,
   normalizeDeviceId,
   parseSegmentList,

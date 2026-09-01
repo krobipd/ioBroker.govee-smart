@@ -28,6 +28,7 @@ module.exports = __toCommonJS(wizard_handler_exports);
 var import_segment_wizard = require("../segment-wizard");
 var import_types = require("../types");
 var import_device_key = require("../device-key");
+var import_lookups = require("../device-manager/lookups");
 function deviceKeyFor(device) {
   return (0, import_device_key.sessionKey)(device.sku, device.deviceId);
 }
@@ -73,7 +74,12 @@ function buildWizardHost(adapter) {
   };
 }
 async function applyWizardResult(adapter, device, result) {
-  device.segmentCount = result.segmentCount;
+  const segmentCount = (0, import_lookups.plausibleSegmentCount)(result.segmentCount);
+  if (segmentCount === void 0) {
+    adapter.log.warn(`applyWizardResult: ignoring implausible segment count ${String(result.segmentCount)}`);
+    return;
+  }
+  device.segmentCount = segmentCount;
   if (result.hasGaps) {
     const parsed = (0, import_types.parseSegmentList)(result.manualList, result.segmentCount - 1);
     await adapter.applyManualSegments(device, true, parsed.error ? void 0 : parsed.indices);

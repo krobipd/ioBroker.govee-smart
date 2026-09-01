@@ -23,13 +23,13 @@ __export(command_router_exports, {
 module.exports = __toCommonJS(command_router_exports);
 var import_types = require("./types");
 var import_govee_lan_client = require("./govee-lan-client");
-var import_device_registry = require("./device-registry");
 var import_govee_constants = require("./govee-constants");
 var import_lookups = require("./device-manager/lookups");
 var import_timing_constants = require("./timing-constants");
 class CommandRouter {
   log;
   timers;
+  registry;
   lanClient = null;
   cloudClient = null;
   rateLimiter = null;
@@ -53,10 +53,12 @@ class CommandRouter {
    * @param log ioBroker logger
    * @param timers Adapter timer wrapper — routed through `this.setTimeout` so
    *   pending color-mode delays get cleared on onUnload.
+   * @param registry This instance's device catalog (transportOverrides quirks)
    */
-  constructor(log, timers) {
+  constructor(log, timers, registry) {
     this.log = log;
     this.timers = timers;
+    this.registry = registry;
   }
   /**
    * Register the LAN client
@@ -133,7 +135,7 @@ class CommandRouter {
    */
   lookupOverride(device, command) {
     var _a;
-    const overrides = (_a = (0, import_device_registry.getDeviceQuirks)(device.sku)) == null ? void 0 : _a.transportOverrides;
+    const overrides = (_a = this.registry.getQuirks(device.sku)) == null ? void 0 : _a.transportOverrides;
     if (!overrides) {
       return void 0;
     }

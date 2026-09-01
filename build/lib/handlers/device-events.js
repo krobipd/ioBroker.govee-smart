@@ -35,7 +35,6 @@ __export(device_events_exports, {
 });
 module.exports = __toCommonJS(device_events_exports);
 var import_capability_mapper = require("../capability-mapper");
-var import_device_registry = require("../device-registry");
 var import_govee_constants = require("../govee-constants");
 var import_types = require("../types");
 var connectionState = __toESM(require("./connection-state"));
@@ -43,20 +42,19 @@ var groupFanoutHandler = __toESM(require("./group-fanout-handler"));
 var dropdownReset = __toESM(require("./dropdown-reset-helpers"));
 function onDeviceStateUpdate(adapter, device, state) {
   if (adapter.statesReady && adapter.stateManager) {
-    adapter.stateManager.updateDeviceState(device, state).catch(() => {
-    });
+    adapter.stateManager.updateDeviceState(device, state).catch((0, import_types.logRejected)(adapter.log, "mirror device state"));
   }
   connectionState.updateConnectionState(adapter);
   if (state.online !== void 0) {
     groupFanoutHandler.updateGroupReachability(adapter);
     if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && adapter.stateManager) {
-      adapter.stateManager.syncInfoOnline(device).catch(() => void 0);
+      adapter.stateManager.syncInfoOnline(device).catch((0, import_types.logRejected)(adapter.log, "refresh info.online"));
     }
   }
   const powerOff = state.power === false || state.power === 0;
   if (powerOff && adapter.stateManager) {
     const prefix = adapter.stateManager.devicePrefix(device);
-    dropdownReset.resetModeDropdowns(adapter, prefix, "").catch(() => void 0);
+    dropdownReset.resetModeDropdowns(adapter, prefix, "").catch((0, import_types.logRejected)(adapter.log, "reset mode dropdowns"));
   }
 }
 function trackStateCreation(adapter, p) {
@@ -81,7 +79,7 @@ function onLanDeviceReady(adapter, device, _allDevices) {
   connectionState.updateConnectionState(adapter);
 }
 function onCloudDataReady(adapter, device, allDevices) {
-  var _a, _b;
+  var _a, _b, _c, _d;
   if (!adapter.stateManager) {
     return;
   }
@@ -91,24 +89,25 @@ function onCloudDataReady(adapter, device, allDevices) {
   if (device.sku === "BaseGroup" && device.groupMembers) {
     memberDevices = groupFanoutHandler.resolveGroupMembers(device, allDevices);
   }
-  const cloudDefs = (0, import_capability_mapper.buildCloudStateDefs)(device, adapter.log, localSnaps, memberDevices);
+  const cloudDefs = (0, import_capability_mapper.buildCloudStateDefs)(device, adapter.log, adapter.deviceRegistry, localSnaps, memberDevices);
   const capN = Array.isArray(device.capabilities) ? device.capabilities.length : 0;
   adapter.log.debug(
     `buildCloudStateDefs for ${device.sku} ${device.deviceId}: ${capN} cap(s) in \u2192 ${cloudDefs.length} state def(s) out`
   );
+  const segmentCount = (_c = (_b = adapter.deviceManager) == null ? void 0 : _b.syncSegmentCount(device)) != null ? _c : 0;
   const p = (async () => {
     await sm.createInfoStates(device);
     await sm.createLanStates(device);
-    await sm.createCloudStates(device, cloudDefs);
+    await sm.createCloudStates(device, cloudDefs, segmentCount);
     await sm.migrateLegacyDiagnostics(device);
-    await sm.updateDeviceTier(device, (0, import_device_registry.getDeviceTier)(device.sku));
+    await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
   })().catch((e) => {
     adapter.log.error(`onCloudDataReady failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
   });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
   if (adapter.statesReady) {
-    (_b = adapter.reapStaleDevices) == null ? void 0 : _b.call(adapter).catch(() => void 0);
+    (_d = adapter.reapStaleDevices) == null ? void 0 : _d.call(adapter).catch((0, import_types.logRejected)(adapter.log, "reap stale devices"));
   }
 }
 function onGroupMembersReady(adapter, group, allDevices) {

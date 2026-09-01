@@ -25,6 +25,7 @@ __export(cloud_retry_handler_exports, {
 });
 module.exports = __toCommonJS(cloud_retry_handler_exports);
 var import_cloud_retry = require("../cloud-retry");
+var import_types = require("../types");
 var import_timing_constants = require("../timing-constants");
 async function cloudInitWithTimeout(adapter) {
   if (!adapter.deviceManager) {
@@ -59,10 +60,8 @@ function buildCloudRetryHost(adapter) {
       var _a;
       adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected \u2014 API key accepted");
       adapter.cloudWasConnected = true;
-      adapter.setState("info.cloudConnected", { val: true, ack: true }).catch(() => {
-      });
-      (_a = adapter.stateManager) == null ? void 0 : _a.updateGroupsOnline(true).catch(() => {
-      });
+      adapter.setState("info.cloudConnected", { val: true, ack: true }).catch((0, import_types.logRejected)(adapter.log, "write info.cloudConnected"));
+      (_a = adapter.stateManager) == null ? void 0 : _a.updateGroupsOnline(true).catch((0, import_types.logRejected)(adapter.log, "write groups.info.online"));
       await adapter.loadCloudStates();
     }
   };

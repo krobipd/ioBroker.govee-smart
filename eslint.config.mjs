@@ -5,7 +5,7 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.ts"] },
+        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts"] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -37,7 +37,7 @@ export default [
       "test/**",
       "tools/**",
       "*.config.mjs",
-      "vitest.config.ts",
+      "vitest.config.mts",
       "build",
       // Generated coverage report (npm run coverage) — never lint it.
       "coverage",

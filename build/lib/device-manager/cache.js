@@ -27,6 +27,7 @@ __export(cache_exports, {
 module.exports = __toCommonJS(cache_exports);
 var import_govee_constants = require("../govee-constants");
 var import_types = require("../types");
+var import_lookups = require("./lookups");
 function populateScenesFromLibrary(adapter, device) {
   if (device.scenes.length === 0 && device.sceneLibrary.length > 0) {
     device.scenes = device.sceneLibrary.map((entry) => ({
@@ -51,6 +52,10 @@ function cachedToGoveeDevice(cached) {
   } = cached;
   return {
     ...rest,
+    // Host-local, editable file: a corrupt count or index list must not become
+    // the device's segment map (same gate as the Cloud/MQTT/wizard sources).
+    segmentCount: (0, import_lookups.plausibleSegmentCount)(rest.segmentCount),
+    manualSegments: (0, import_lookups.plausibleSegmentIndices)(rest.manualSegments),
     state: { online: false },
     channels: { lan: false, mqtt: false, cloud: false }
   };
@@ -88,7 +93,7 @@ function persistDeviceToCache(adapter, device) {
   if (!adapter.skuCache) {
     return;
   }
-  adapter.skuCache.save(goveeDeviceToCached(device));
+  void adapter.skuCache.save(goveeDeviceToCached(device));
 }
 function saveDevicesToCache(adapter) {
   if (!adapter.skuCache) {
@@ -102,7 +107,7 @@ function saveDevicesToCache(adapter) {
       skippedCount++;
       adapter.log.debug(`Not caching ${(0, import_types.deviceLabel)(device)} \u2014 scenes not yet checked`);
     } else {
-      adapter.skuCache.save(goveeDeviceToCached(device));
+      void adapter.skuCache.save(goveeDeviceToCached(device));
       cachedCount++;
     }
   }

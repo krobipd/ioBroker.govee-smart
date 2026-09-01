@@ -97,7 +97,7 @@ class SegmentWizard {
    * Route one wizard step from the sendTo handler and fold the current grid
    * snapshot into every response so the React admin map can redraw per step.
    *
-   * @param action "start" | "yes" | "no" | "done" | "abort" | "apply"
+   * @param action "start" | "yes" | "no" | "apply" | "abort"
    * @param deviceKey Target device — only consulted on action="start"
    * @param payload Extra data for actions that need it (apply: corrected indices)
    * @param payload.indices Review-corrected segment indices for the `apply` action
@@ -109,7 +109,7 @@ class SegmentWizard {
   /**
    * Dispatch a wizard action to its handler. The session-active guard covers
    * every action except `start` (which opens a session); `apply` shares that
-   * guard with `yes`/`no`/`done`/`abort`.
+   * guard with `yes`/`no`/`abort`.
    *
    * @param action Wizard action string
    * @param deviceKey Target device — only consulted on action="start"
@@ -126,9 +126,6 @@ class SegmentWizard {
     }
     if (action === "abort") {
       return this.abort();
-    }
-    if (action === "done") {
-      return this.done();
     }
     if (action === "apply") {
       return this.apply((_a = payload == null ? void 0 : payload.indices) != null ? _a : []);
@@ -195,15 +192,7 @@ class SegmentWizard {
     await this.host.sendCommand(device, "power", true);
     await this.host.sendCommand(device, "brightness", 100);
     await this.flashSegment(device, 0);
-    return {
-      message: `${this.t("wizardStartedFor", { name: device.name })}
-
-${this.t("segmentFlashing", { idx: 0 })}
-${this.t("canYouSeeStrip")}
-${this.t("yesNoDoneLine")}`,
-      progress: this.t("progressSegment", { idx: 0 }),
-      active: true
-    };
+    return { active: true };
   }
   /**
    * Record the user's answer for the current segment and advance.
@@ -218,7 +207,6 @@ ${this.t("yesNoDoneLine")}`,
     if (wasVisible) {
       session.visible.push(session.current);
     }
-    const answeredIdx = session.current;
     session.current += 1;
     this.scheduleIdleTimeout();
     if (session.current > import_lookups.SEGMENT_HARD_MAX) {
@@ -231,32 +219,7 @@ ${this.t("yesNoDoneLine")}`,
       return { error: this.t("errDeviceGone") };
     }
     await this.flashSegment(device, session.current);
-    const lastNote = this.t(wasVisible ? "markedVisible" : "markedDark", {
-      idx: answeredIdx
-    });
-    return {
-      message: `${lastNote}
-
-${this.t("segmentFlashing", { idx: session.current })}
-${this.t("canYouSeeShort")}
-${this.t("yesNoDoneLine")}`,
-      progress: this.t("progressSegment", { idx: session.current }),
-      active: true
-    };
-  }
-  /**
-   * User ends the session — "end of strip, no further segments".
-   * The currently-flashed segment was NOT answered, so it doesn't count.
-   */
-  async done() {
-    const session = this.session;
-    if (!session) {
-      return { error: this.t("errNoWizardShort") };
-    }
-    if (session.current === 0) {
-      return { error: this.t("errAnswerFirst") };
-    }
-    return this.finish();
+    return { active: true };
   }
   /** Abort the session and roll back to the captured baseline. */
   async abort() {
@@ -270,17 +233,13 @@ ${this.t("yesNoDoneLine")}`,
     }
     this.session = null;
     this.clearIdleTimer();
-    return {
-      message: `${this.t("abortTitle")}
-${this.t("abortRestored")}
-${this.t("abortRestart")}`,
-      done: true,
-      aborted: true
-    };
+    return { done: true, aborted: true };
   }
   /**
    * Consolidate the session into a {@link WizardResult}, hand off to the host
-   * for application, restore baseline and close the session.
+   * for application, restore baseline and close the session. Reached only when
+   * the protocol limit is hit mid-measurement — the React flow finalizes via
+   * {@link apply} with its review-corrected map.
    */
   async finish() {
     const session = this.session;
@@ -303,19 +262,7 @@ ${this.t("abortRestart")}`,
       hasGaps: !allContiguous
     };
     await this.finalize(device, session, result);
-    const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
-    return {
-      message: `${this.t("finishDone")}
-
-${this.t("finishCount", { count: segmentCount })}
-${summary}
-${this.t("finishTreeRebuilt")}`,
-      progress: this.t("progressCount", { count: segmentCount }),
-      done: true,
-      segmentCount,
-      list: manualList,
-      hasGaps: result.hasGaps
-    };
+    return { done: true, segmentCount, list: manualList, hasGaps: result.hasGaps };
   }
   /**
    * Finalize the review-corrected segment map. The React review screen may have
@@ -331,7 +278,9 @@ ${this.t("finishTreeRebuilt")}`,
     if (!session) {
       return { error: this.t("errNoWizardShort") };
     }
-    const clean = [...new Set(indices.filter((i) => Number.isInteger(i) && i >= 0))].sort((a, b) => a - b);
+    const clean = [...new Set(indices.filter((i) => Number.isInteger(i) && i >= 0 && i <= import_lookups.SEGMENT_HARD_MAX))].sort(
+      (a, b) => a - b
+    );
     if (clean.length === 0) {
       return { error: this.t("errAnswerFirst") };
     }

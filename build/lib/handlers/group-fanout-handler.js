@@ -24,6 +24,7 @@ __export(group_fanout_handler_exports, {
 });
 module.exports = __toCommonJS(group_fanout_handler_exports);
 var import_group_fanout = require("../group-fanout");
+var import_types = require("../types");
 function updateGroupReachability(adapter) {
   if (!adapter.deviceManager || !adapter.stateManager) {
     return;
@@ -34,8 +35,7 @@ function updateGroupReachability(adapter) {
       continue;
     }
     const memberDevices = (0, import_group_fanout.resolveGroupMembers)(group, devices);
-    adapter.stateManager.updateGroupMembersUnreachable(group, memberDevices).catch(() => {
-    });
+    adapter.stateManager.updateGroupMembersUnreachable(group, memberDevices).catch((0, import_types.logRejected)(adapter.log, "write group members unreachable"));
   }
 }
 function buildGroupFanoutHost(adapter) {

@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.27.1",
     "news": {
+      "NEXT": {
+        "en": "The manual device sync button works again and Cloud reconnect no longer stops on a Govee maintenance page. App sensor datapoints keep their history, shutdown is faster and memory stays bounded.",
+        "de": "Der Knopf für den manuellen Geräteabgleich funktioniert wieder, die Cloud-Wiederverbindung stoppt nicht mehr an einer Govee-Wartungsseite. App-Sensoren behalten ihre Historie, Beenden ist schneller.",
+        "ru": "Кнопка ручной синхронизации устройств снова работает, переподключение к облаку не останавливается на странице обслуживания Govee. Датчики приложения сохраняют историю, остановка стала быстрее.",
+        "pt": "O botão de sincronização manual volta a funcionar e a reconexão à nuvem já não para numa página de manutenção da Govee. Os sensores da app mantêm o histórico e a paragem é mais rápida.",
+        "nl": "De knop voor handmatige apparaatsynchronisatie werkt weer en cloud-herverbinding stopt niet meer op een Govee-onderhoudspagina. App-sensoren behouden hun geschiedenis, afsluiten gaat sneller.",
+        "fr": "Le bouton de synchronisation manuelle fonctionne à nouveau et la reconnexion au cloud ne s'arrête plus sur une page de maintenance Govee. Les capteurs de l'app gardent leur historique.",
+        "it": "Il pulsante di sincronizzazione manuale funziona di nuovo e la riconnessione al cloud non si ferma più su una pagina di manutenzione Govee. I sensori dell'app conservano la cronologia.",
+        "es": "El botón de sincronización manual vuelve a funcionar y la reconexión a la nube ya no se detiene en una página de mantenimiento de Govee. Los sensores de la app conservan su historial.",
+        "pl": "Przycisk ręcznej synchronizacji znów działa, a ponowne łączenie z chmurą nie zatrzymuje się na stronie konserwacji Govee. Czujniki z aplikacji zachowują historię, zatrzymanie jest szybsze.",
+        "uk": "Кнопка ручної синхронізації пристроїв знову працює, перепідключення до хмари не зупиняється на сторінці обслуговування Govee. Датчики застосунку зберігають історію, зупинка стала швидшою.",
+        "zh-cn": "手动设备同步按钮恢复可用，云端重连不再因 Govee 维护页面而停止。应用传感器数据点保留历史记录，停止更快，内存占用受限。"
+      },
       "2.27.1": {
         "en": "Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states.",
         "de": "Deutlich geringere Datenbanklast im Hintergrund — die regelmäßige Erreichbarkeitsprüfung arbeitet jetzt wesentlich effizienter, besonders auf Systemen mit vielen Geräten und Datenpunkten.",
@@ -80,19 +93,6 @@
         "pl": "Wersja testowa podczas przejścia na ioBroker Admin 8.",
         "uk": "Тестова версія під час переходу на ioBroker Admin 8.",
         "zh-cn": "向 ioBroker Admin 8 迁移期间的测试版本。"
-      },
-      "2.22.0": {
-        "en": "Sensors connected through a Govee gateway now show the gateway they use instead of an empty IP field, and seven more device models are now in the catalog as experimental.",
-        "de": "Sensoren, die über ein Govee-Gateway angebunden sind, zeigen jetzt das Gateway statt eines leeren IP-Feldes, und sieben weitere Gerätemodelle sind jetzt experimentell im Katalog.",
-        "ru": "Датчики, подключённые через шлюз Govee, теперь показывают свой шлюз вместо пустого поля IP, и ещё семь моделей устройств теперь в каталоге как экспериментальные.",
-        "pt": "Os sensores ligados através de um gateway Govee mostram agora o gateway em vez de um campo de IP vazio, e mais sete modelos de dispositivos estão agora no catálogo como experimentais.",
-        "nl": "Sensoren die via een Govee-gateway zijn verbonden, tonen nu de gateway in plaats van een leeg IP-veld, en zeven extra apparaatmodellen staan nu experimenteel in de catalogus.",
-        "fr": "Les capteurs reliés par une passerelle Govee affichent désormais la passerelle au lieu d'un champ IP vide, et sept modèles d'appareils supplémentaires figurent désormais au catalogue en expérimental.",
-        "it": "I sensori collegati tramite un gateway Govee ora mostrano il gateway invece di un campo IP vuoto, e altri sette modelli di dispositivi sono ora nel catalogo come sperimentali.",
-        "es": "Los sensores conectados a través de una pasarela Govee ahora muestran la pasarela en lugar de un campo IP vacío, y siete modelos de dispositivos más están ahora en el catálogo como experimentales.",
-        "pl": "Czujniki podłączone przez bramę Govee pokazują teraz bramę zamiast pustego pola IP, a siedem kolejnych modeli urządzeń jest teraz w katalogu jako eksperymentalne.",
-        "uk": "Датчики, під'єднані через шлюз Govee, тепер показують свій шлюз замість порожнього поля IP, і ще сім моделей пристроїв тепер у каталозі як експериментальні.",
-        "zh-cn": "通过 Govee 网关连接的传感器现在会显示所使用的网关，而不再是空的 IP 字段，并且现在有七款设备型号作为实验性列入目录。"
       }
     },
     "plugins": {
@@ -166,7 +166,7 @@
     ],
     "globalDependencies": [
       {
-        "admin": ">=8.0.1"
+        "admin": ">=8.0.11"
       }
     ]
   },

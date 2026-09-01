@@ -40,8 +40,7 @@ function updateConnectionState(adapter) {
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {
     adapter.lastConnectionState = connected;
-    adapter.setState("info.connection", { val: connected, ack: true }).catch(() => {
-    });
+    adapter.setState("info.connection", { val: connected, ack: true }).catch((0, import_types.logRejected)(adapter.log, "write info.connection"));
   }
   const cs = adapter.channelStatus;
   if (cs) {

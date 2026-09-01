@@ -37,7 +37,7 @@ __export(state_change_router_exports, {
 });
 module.exports = __toCommonJS(state_change_router_exports);
 var import_capability_mapper = require("../capability-mapper");
-var import_device_manager = require("../device-manager");
+var import_lookups = require("../device-manager/lookups");
 var import_govee_constants = require("../govee-constants");
 var import_types = require("../types");
 var diagnosticsHandler = __toESM(require("./diagnostics-handler"));
@@ -129,7 +129,7 @@ async function handleManualSegmentsChange(adapter, device, suffix, newValue) {
     await adapter.applyManualSegments(device, false);
     return;
   }
-  const maxIndex = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount - 1 : import_device_manager.SEGMENT_HARD_MAX;
+  const maxIndex = typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount - 1 : import_lookups.SEGMENT_HARD_MAX;
   const parsed = (0, import_types.parseSegmentList)(listVal, maxIndex);
   if (parsed.error) {
     adapter.log.warn(`${(0, import_types.deviceLabel)(device)}: manual_list invalid (${parsed.error}) \u2014 disabling manual mode`);
@@ -179,7 +179,7 @@ async function onStateChange(adapter, id, state) {
     return;
   }
   const localId = id.replace(`${adapter.namespace}.`, "");
-  if (localId === "info.manual_sync_devices") {
+  if (localId === "info.manualSyncDevices") {
     if (state.val) {
       adapter.log.info("Manual device sync requested \u2014 refreshing the device list from your Govee account");
       await ((_a = adapter.syncDevicesManually) == null ? void 0 : _a.call(adapter));

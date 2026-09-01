@@ -47,7 +47,9 @@ async function loadCloudStates(adapter, only) {
             continue;
           }
           const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId);
-          writes.push(adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => void 0));
+          writes.push(
+            adapter.setState(statePath, { val: mapped.value, ack: true }).catch((0, import_types.logRejected)(adapter.log, `write ${statePath}`))
+          );
         }
         await Promise.all(writes);
         adapter.log.debug(`Cloud state loaded for ${(0, import_types.deviceLabel)(device)}`);
@@ -83,7 +85,7 @@ async function applyCloudCapabilities(adapter, device, caps) {
   }
   const writes = planned.map((mapped) => {
     const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId);
-    return adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => void 0);
+    return adapter.setState(statePath, { val: mapped.value, ack: true }).catch((0, import_types.logRejected)(adapter.log, `write ${statePath}`));
   });
   await Promise.all(writes);
   const hasTempCap = device.capabilities.some((c) => c.instance === "sensorTemperature");

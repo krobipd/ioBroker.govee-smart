@@ -34,7 +34,6 @@ __export(capability_mapper_exports, {
 });
 module.exports = __toCommonJS(capability_mapper_exports);
 var import_types = require("./types");
-var import_device_registry = require("./device-registry");
 var import_govee_constants = require("./govee-constants");
 var import_i18n = require("./i18n");
 function coerceBool(v) {
@@ -595,10 +594,10 @@ function mapMusicSetting(cap) {
   }
   return states;
 }
-function applyQuirksToStates(sku, states, log) {
+function applyQuirksToStates(sku, states, log, registry) {
   for (const state of states) {
     if (state.id === "color_temperature" && state.min != null && state.max != null) {
-      const corrected = (0, import_device_registry.applyColorTempQuirk)(sku, state.min, state.max);
+      const corrected = registry.applyColorTempQuirk(sku, state.min, state.max);
       if (corrected.min !== state.min || corrected.max !== state.max) {
         log.debug(
           `Quirk applied for ${sku}: color_temperature range ${state.min}-${state.max}K \u2192 ${corrected.min}-${corrected.max}K`
@@ -768,12 +767,12 @@ const SCENE_DROPDOWN_RULES = [
     source: (d) => d.snapshots
   }
 ];
-function buildLanStateDefs(device, log) {
+function buildLanStateDefs(device, log, registry) {
   if (!device.lanIp) {
     return [];
   }
   const stateDefs = getDefaultLanStates();
-  applyQuirksToStates(device.sku, stateDefs, log);
+  applyQuirksToStates(device.sku, stateDefs, log, registry);
   return stateDefs;
 }
 function buildDiagStateDefs(tierDef) {
@@ -820,18 +819,18 @@ function buildDiagStateDefs(tierDef) {
   });
   return defs;
 }
-function buildCloudStateDefs(device, log, localSnapshots, memberDevices) {
+function buildCloudStateDefs(device, log, registry, localSnapshots, memberDevices) {
   if (device.sku === "BaseGroup") {
     return buildGroupStateDefs(memberDevices || []);
   }
-  const quirks = (0, import_device_registry.getDeviceQuirks)(device.sku);
+  const quirks = registry.getQuirks(device.sku);
   const skipCapabilities = (quirks == null ? void 0 : quirks.brokenPlatformApi) === true;
   const noLanPhase = !device.lanIp;
   const stateDefs = skipCapabilities ? [] : mapCapabilities(device.capabilities, log).filter((d) => noLanPhase || !LAN_STATE_IDS.has(d.id));
   if (skipCapabilities) {
     log.debug(`${device.sku}: brokenPlatformApi quirk active \u2014 skipping capability-derived states + dropdowns`);
   }
-  applyQuirksToStates(device.sku, stateDefs, log);
+  applyQuirksToStates(device.sku, stateDefs, log, registry);
   const isLight = device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT;
   for (const r of SCENE_DROPDOWN_RULES) {
     if (skipCapabilities || !isLight || !hasDynamicSceneCapability(device.capabilities, r.cap)) {

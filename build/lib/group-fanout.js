@@ -70,7 +70,7 @@ class GroupFanoutHandler {
       return true;
     }
     const devices = this.host.getDevices();
-    const members = this.resolveMembers(group, devices).filter((d) => d.state.online);
+    const members = this.resolveMembers(group, devices).filter((d) => d.state.online || d.channels.cloud && !d.lanIp);
     if (members.length === 0) {
       this.warnGroupOnce(group, "no reachable members for fan-out \u2014 command not sent");
       return false;

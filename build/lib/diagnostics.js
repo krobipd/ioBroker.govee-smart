@@ -22,13 +22,18 @@ __export(diagnostics_exports, {
 });
 module.exports = __toCommonJS(diagnostics_exports);
 var import_http_client = require("./http-client");
-var import_device_registry = require("./device-registry");
 const MAX_LOGS = 100;
 const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
 const MAX_BODY_BYTES = 65536;
+const MAX_RESPONSE_BYTES_PER_DEVICE = 512 * 1024;
+const MAX_PACKET_RAW_BYTES = 4096;
+const MAX_LAN_SEND_BYTES = 16384;
+function capText(text, max) {
+  return text.length > max ? `${text.slice(0, max)}\u2026<truncated ${text.length}b>` : text;
+}
 const SENSITIVE_KEYS = /* @__PURE__ */ new Set([
   "secretcode",
   "secret",
@@ -64,7 +69,20 @@ function pushBounded(arr, entry, max) {
     arr.splice(0, arr.length - max);
   }
 }
+function byteSize(value) {
+  try {
+    const s = JSON.stringify(value);
+    return typeof s === "string" ? s.length : 0;
+  } catch {
+    return 0;
+  }
+}
 class DiagnosticsCollector {
+  /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
+  constructor(registry) {
+    this.registry = registry;
+  }
+  registry;
   buffers = /* @__PURE__ */ new Map();
   runtimeStateProvider = null;
   cacheSnapshotProvider = null;
@@ -107,7 +125,7 @@ class DiagnosticsCollector {
   get(deviceId) {
     let b = this.buffers.get(deviceId);
     if (!b) {
-      b = { logs: [], packets: [], responses: /* @__PURE__ */ new Map(), lanSends: [] };
+      b = { logs: [], packets: [], responses: /* @__PURE__ */ new Map(), responseBytes: 0, lanSends: [] };
       this.buffers.set(deviceId, b);
     }
     return b;
@@ -148,13 +166,13 @@ class DiagnosticsCollector {
       if (!payload) {
         return;
       }
-      entry.hex = payload;
+      entry.hex = capText(payload, MAX_PACKET_RAW_BYTES);
     } else if (payload && typeof payload === "object") {
       if (typeof payload.hex === "string" && payload.hex) {
-        entry.hex = payload.hex;
+        entry.hex = capText(payload.hex, MAX_PACKET_RAW_BYTES);
       }
       if (typeof payload.rawJson === "string" && payload.rawJson) {
-        entry.rawJson = payload.rawJson;
+        entry.rawJson = capText(payload.rawJson, MAX_PACKET_RAW_BYTES);
       }
       if (!entry.hex && !entry.rawJson) {
         return;
@@ -185,7 +203,7 @@ class DiagnosticsCollector {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
       ip: String(ip),
       cmd: String(cmd),
-      payload: this.cloneAndCap(payload)
+      payload: this.cloneAndCap(payload, MAX_LAN_SEND_BYTES)
     };
     if (typeof bytes === "number" && Number.isFinite(bytes)) {
       entry.bytes = bytes;
@@ -223,7 +241,8 @@ class DiagnosticsCollector {
       endpoint,
       ok: true,
       statusCode: statusCode != null ? statusCode : 200,
-      body: stored
+      body: stored,
+      bytes: byteSize(stored)
     });
   }
   /**
@@ -256,11 +275,15 @@ class DiagnosticsCollector {
       endpoint,
       ok: false,
       statusCode,
-      body
+      body,
+      bytes: byteSize(body)
     });
   }
-  /** @param body Body to clone-via-JSON and cap at MAX_BODY_BYTES. */
-  cloneAndCap(body) {
+  /**
+   * @param body Body to clone-via-JSON and cap.
+   * @param maxBytes Size cap for the serialised clone (default {@link MAX_BODY_BYTES}).
+   */
+  cloneAndCap(body, maxBytes = MAX_BODY_BYTES) {
     try {
       const serialised = JSON.stringify(body);
       if (typeof serialised !== "string") {
@@ -269,8 +292,8 @@ class DiagnosticsCollector {
       const clone = JSON.parse(serialised);
       redactSecretsInPlace(clone);
       const capped = JSON.stringify(clone);
-      if (typeof capped === "string" && capped.length > MAX_BODY_BYTES) {
-        return `<truncated ${capped.length}b: ${capped.slice(0, MAX_BODY_BYTES)}\u2026>`;
+      if (typeof capped === "string" && capped.length > maxBytes) {
+        return `<truncated ${capped.length}b: ${capped.slice(0, maxBytes)}\u2026>`;
       }
       return clone;
     } catch {
@@ -278,18 +301,53 @@ class DiagnosticsCollector {
     }
   }
   /**
+   * Append one API entry under three bounds: the per-endpoint slot count, the
+   * distinct-endpoint count and the per-device byte budget. For the byte
+   * budget the OLDEST entry anywhere in the device's history goes first — the
+   * newest entry is always kept, so a fresh 64 KB scene list evicts stale
+   * copies of itself and of other endpoints rather than being refused.
+   *
    * @param b Device buffers
    * @param entry New API response entry (success or failure) to append
    */
   appendResponse(b, entry) {
-    var _a;
+    var _a, _b;
     const list = (_a = b.responses.get(entry.endpoint)) != null ? _a : [];
-    pushBounded(list, entry, MAX_RESPONSES_PER_ENDPOINT);
+    list.push(entry);
+    b.responseBytes += entry.bytes;
+    while (list.length > MAX_RESPONSES_PER_ENDPOINT) {
+      b.responseBytes -= list.shift().bytes;
+    }
     b.responses.set(entry.endpoint, list);
     if (b.responses.size > MAX_RESPONSE_ENDPOINTS) {
       const first = b.responses.keys().next().value;
       if (first !== void 0) {
+        for (const dropped of (_b = b.responses.get(first)) != null ? _b : []) {
+          b.responseBytes -= dropped.bytes;
+        }
         b.responses.delete(first);
+      }
+    }
+    while (b.responseBytes > MAX_RESPONSE_BYTES_PER_DEVICE) {
+      let oldestKey;
+      let oldestTs = "";
+      for (const [key, entries2] of b.responses) {
+        const head = entries2[0];
+        if (!head || head === entry) {
+          continue;
+        }
+        if (oldestKey === void 0 || head.ts < oldestTs) {
+          oldestKey = key;
+          oldestTs = head.ts;
+        }
+      }
+      if (oldestKey === void 0) {
+        break;
+      }
+      const entries = b.responses.get(oldestKey);
+      b.responseBytes -= entries.shift().bytes;
+      if (entries.length === 0) {
+        b.responses.delete(oldestKey);
       }
     }
   }
@@ -322,7 +380,7 @@ class DiagnosticsCollector {
    */
   generate(device, adapterVersion) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-    const quirks = (0, import_device_registry.getDeviceQuirks)(device.sku);
+    const quirks = this.registry.getQuirks(device.sku);
     const b = this.buffers.get(device.deviceId);
     const runtimeState = this.runtimeStateProvider ? this.runtimeStateProvider() : null;
     const cacheSnapshot = this.cacheSnapshotProvider ? this.cloneAndCap(this.cacheSnapshotProvider(device.sku, device.deviceId)) : null;

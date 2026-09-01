@@ -23,14 +23,16 @@ __export(lookups_exports, {
   SEGMENT_COUNT_MAX: () => SEGMENT_COUNT_MAX,
   SEGMENT_HARD_MAX: () => SEGMENT_HARD_MAX,
   deviceKey: () => deviceKey,
+  effectiveSegmentCount: () => effectiveSegmentCount,
   findDeviceBySkuAndId: () => findDeviceBySkuAndId,
   parseMqttSegmentData: () => parseMqttSegmentData,
+  plausibleSegmentCount: () => plausibleSegmentCount,
+  plausibleSegmentIndices: () => plausibleSegmentIndices,
   resolveSegmentCount: () => resolveSegmentCount
 });
 module.exports = __toCommonJS(lookups_exports);
 var import_types = require("../types");
 var import_device_key = require("../device-key");
-var import_device_registry = require("../device-registry");
 function parseMqttSegmentData(commands) {
   if (!Array.isArray(commands)) {
     return { segments: [], complete: false };
@@ -92,14 +94,15 @@ function parseMqttSegmentData(commands) {
   }
   return { segments, complete: strippedPadding };
 }
-function resolveSegmentCount(device) {
+function resolveSegmentCount(device, registry) {
   var _a;
-  const override = (_a = (0, import_device_registry.getDeviceQuirks)(device.sku)) == null ? void 0 : _a.segmentCount;
-  if (typeof override === "number" && override > 0) {
+  const override = plausibleSegmentCount((_a = registry.getQuirks(device.sku)) == null ? void 0 : _a.segmentCount);
+  if (override !== void 0) {
     return override;
   }
-  if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
-    return device.segmentCount;
+  const stored = plausibleSegmentCount(device.segmentCount);
+  if (stored !== void 0) {
+    return stored;
   }
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
   let min = Number.POSITIVE_INFINITY;
@@ -116,11 +119,9 @@ function resolveSegmentCount(device) {
       const fn = f.fieldName;
       const er = f.elementRange;
       const rawMax = er && typeof er.max === "number" ? er.max : -1;
-      if (fn === "segment" && rawMax >= 0) {
-        const n = rawMax + 1;
-        if (n > 0 && n < min) {
-          min = n;
-        }
+      const n = fn === "segment" && rawMax >= 0 ? plausibleSegmentCount(rawMax + 1) : void 0;
+      if (n !== void 0 && n < min) {
+        min = n;
       }
     }
   }
@@ -128,6 +129,25 @@ function resolveSegmentCount(device) {
 }
 const SEGMENT_HARD_MAX = 55;
 const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;
+function effectiveSegmentCount(device, registry) {
+  const resolved = resolveSegmentCount(device, registry);
+  const manualMax = Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? Math.max(...device.manualSegments) + 1 : 0;
+  return Math.min(Math.max(resolved, manualMax), SEGMENT_COUNT_MAX);
+}
+function plausibleSegmentCount(n) {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= SEGMENT_COUNT_MAX ? n : void 0;
+}
+function plausibleSegmentIndices(list) {
+  if (!Array.isArray(list)) {
+    return void 0;
+  }
+  const clean = [
+    ...new Set(
+      list.filter((i) => typeof i === "number" && Number.isInteger(i) && i >= 0 && i <= SEGMENT_HARD_MAX)
+    )
+  ].sort((a, b) => a - b);
+  return clean.length > 0 ? clean : void 0;
+}
 const SEGMENT_COLOR_BITMASK_BYTES = 7;
 const SEGMENT_BRIGHTNESS_BITMASK_BYTES = 14;
 function deviceKey(sku, deviceId) {
@@ -153,8 +173,11 @@ function findDeviceBySkuAndId(devices, sku, deviceId) {
   SEGMENT_COUNT_MAX,
   SEGMENT_HARD_MAX,
   deviceKey,
+  effectiveSegmentCount,
   findDeviceBySkuAndId,
   parseMqttSegmentData,
+  plausibleSegmentCount,
+  plausibleSegmentIndices,
   resolveSegmentCount
 });
 //# sourceMappingURL=lookups.js.map
