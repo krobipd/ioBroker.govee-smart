@@ -412,6 +412,16 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(real.f.calls.mqtt[0].slice(0, 2)).toEqual(["a@b.c", "pw"]);
   });
 
+  it("a pasted trailing space in the e-mail is stripped before the login, the password is not", async () => {
+    // The admin card's "Connect" test trims the e-mail; the start-up login used
+    // the raw value → "test OK, adapter says check email/password" on the same
+    // input. A password may legitimately carry spaces, so it is passed verbatim.
+    const { adapter, f } = await setupReady({ goveeEmail: " a@b.c ", goveePassword: " pw " });
+    expect(f.calls.mqtt[0].slice(0, 2)).toEqual(["a@b.c", " pw "]);
+    expect(f.api.setEmail).toHaveBeenCalledWith("a@b.c");
+    void adapter;
+  });
+
   it("warns about an API key that is not a UUID (typo / stale encryption)", async () => {
     const { adapter } = await setupReady({ apiKey: "not-a-uuid" });
     expect(internalOf(adapter).log.error).toHaveBeenCalledWith(
@@ -457,10 +467,20 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.objects.has("info.wizardStatus")).toBe(false);
   });
 
-  it("subscribes to device and group states", async () => {
+  it("subscribes to device and group states AND the manual-sync button", async () => {
+    // The button lives under `info`, outside both wildcards — without its own
+    // subscription a write never reaches onStateChange (dead from 2.17.0 to 2.27.1).
     const { adapter } = await setupReady();
     const sub = (adapter as unknown as { subscribeStatesAsync: ReturnType<typeof vi.fn> }).subscribeStatesAsync;
-    expect(sub.mock.calls.map(c => c[0])).toEqual(["devices.*", "groups.*"]);
+    expect(sub.mock.calls.map(c => c[0])).toEqual(["devices.*", "groups.*", "info.manualSyncDevices"]);
+  });
+
+  it("drops the old snake_case manual-sync object on an upgraded install", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.objects.set("info.manual_sync_devices", { type: "state" });
+    await i.onReady();
+    expect(i.objects.has("info.manual_sync_devices")).toBe(false);
   });
 
   it("logs the boot failure instead of crashing when a step throws", async () => {

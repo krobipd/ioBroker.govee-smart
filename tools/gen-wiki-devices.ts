@@ -131,8 +131,8 @@ hast du echte Daten — und unser Adapter wird mit jedem Bericht besser.
 
 Egal ob es funktioniert oder nicht — bitte einen Bericht.
 
-1. Im Object-Browser auf \`info.diagnostics_export\` deines Geräts klicken
-2. Inhalt von \`info.diagnostics_result\` kopieren (JSON-Datei)
+1. Im Object-Browser beim Gerät \`diag.export\` auf \`true\` setzen
+2. Inhalt von \`diag.result\` kopieren (JSON)
 3. Auf GitHub ein Issue eröffnen:
    [Issue erstellen](https://github.com/krobipd/ioBroker.govee-smart/issues/new)
 4. Beschreib kurz: was hast du probiert, was hat geklappt, was nicht.
@@ -191,8 +191,7 @@ real data — and the adapter improves with every report.
 ### Enable
 
 1. Open the adapter configuration (govee-smart in the ioBroker instance list)
-2. Tick **"Experimentelle Geräte-Unterstützung aktivieren"**
-   (label is German — "Enable experimental device support")
+2. Tick **"Enable experimental device support"**
 3. Save → adapter restarts
 4. After 1–2 minutes: your device appears in the object browser under
    \`govee-smart.0.devices.<sku>_<id>\`
@@ -203,8 +202,8 @@ real data — and the adapter improves with every report.
 
 Whether it works or not, please share a report.
 
-1. Click \`info.diagnostics_export\` of your device in the object browser
-2. Copy the contents of \`info.diagnostics_result\` (JSON)
+1. In the object browser set \`diag.export\` of your device to \`true\`
+2. Copy the contents of \`diag.result\` (JSON)
 3. Open a GitHub issue:
    [New issue](https://github.com/krobipd/ioBroker.govee-smart/issues/new)
 4. Describe briefly what you tried, what worked, what didn't. Attach

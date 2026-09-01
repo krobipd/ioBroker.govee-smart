@@ -95,7 +95,13 @@ export class GroupFanoutHandler {
       return true;
     }
     const devices = this.host.getDevices();
-    const members = this.resolveMembers(group, devices).filter(d => d.state.online);
+    // A member gets the command when a channel can carry it. For LAN lights the
+    // online flag is trustworthy (LAN-reply TTL) and an offline one is skipped.
+    // A cloud-only member (no local API) is always attempted: Govee's cloud
+    // online marker is known to flap while control keeps working, and a real
+    // Cloud rejection surfaces as a failed send below anyway — silently
+    // dropping the member on the flag alone left half the group dark.
+    const members = this.resolveMembers(group, devices).filter(d => d.state.online || (d.channels.cloud && !d.lanIp));
     if (members.length === 0) {
       // Used to return silently while the caller acked "success" (L3/A6). Signal
       // failure so the caller withholds the ack, and warn once so the user knows.

@@ -8,7 +8,9 @@ import {
   deviceKey as deviceKeyHelper,
   findDeviceBySkuAndId as findDeviceBySkuAndIdHelper,
   parseMqttSegmentData,
-  SEGMENT_HARD_MAX,
+  plausibleSegmentCount,
+  plausibleSegmentIndices,
+  SEGMENT_COUNT_MAX,
   type MqttSegmentData,
 } from "./device-manager/lookups";
 import {
@@ -411,9 +413,11 @@ export class DeviceManager {
       existing.snapshotBleCmds = entry.snapshotBleCmds;
       existing.scenesChecked = entry.scenesChecked;
       existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
-      existing.segmentCount = entry.segmentCount;
+      // The cache file is host-local and editable — a corrupt count must not
+      // become the device's count (same gate as the Cloud/MQTT/wizard sources).
+      existing.segmentCount = plausibleSegmentCount(entry.segmentCount);
       existing.manualMode = entry.manualMode;
-      existing.manualSegments = entry.manualSegments;
+      existing.manualSegments = plausibleSegmentIndices(entry.manualSegments);
       existing.channels.cloud = entry.capabilities.length > 0;
       this.log.debug(
         `Cache merged into LAN-discovered device ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`,
@@ -1018,15 +1022,15 @@ export class DeviceManager {
     // parseMqttSegmentData already caps it to ≤20).
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
     const current = device.segmentCount ?? 0;
-    // L6 — plausibility cap: SEGMENT_HARD_MAX (55) is the Govee protocol upper
-    // limit. Values above it only come from broken/spoofed packets. Untestable
-    // through the public path and kept anyway: the parser above only yields
-    // packet numbers 1-5 → indices 0-19, so maxSeen can never exceed 20
-    // (equivalent mutant, 2026-08-22 test audit). Guards the day the parser
-    // learns more packet numbers.
-    if (maxSeen > SEGMENT_HARD_MAX) {
+    // L6 — plausibility cap: the Govee bitmask addresses SEGMENT_COUNT_MAX slots.
+    // Values above it only come from broken/spoofed packets. Untestable through
+    // the public path and kept anyway: the parser above only yields packet
+    // numbers 1-5 → indices 0-19, so maxSeen can never exceed 20 (equivalent
+    // mutant, 2026-08-22 test audit). Guards the day the parser learns more
+    // packet numbers. Same gate as every other count source (plausibleSegmentCount).
+    if (maxSeen > SEGMENT_COUNT_MAX) {
       this.log.debug(
-        `${deviceLabel(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_HARD_MAX})`,
+        `${deviceLabel(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_COUNT_MAX})`,
       );
       return;
     }

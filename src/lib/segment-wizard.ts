@@ -476,7 +476,12 @@ export class SegmentWizard {
     if (!session) {
       return { error: this.t("errNoWizardShort") };
     }
-    const clean = [...new Set(indices.filter(i => Number.isInteger(i) && i >= 0))].sort((a, b) => a - b);
+    // Only indices the bitmask protocol can address (0..SEGMENT_HARD_MAX) — the
+    // payload comes straight from the admin socket, and an oversized index would
+    // otherwise become the device's segment count and build that many channels.
+    const clean = [...new Set(indices.filter(i => Number.isInteger(i) && i >= 0 && i <= SEGMENT_HARD_MAX))].sort(
+      (a, b) => a - b,
+    );
     if (clean.length === 0) {
       // Nothing selected — the UI prevents this, but never build a -Infinity
       // segment count from an empty map. Keep the session so the user can retry.

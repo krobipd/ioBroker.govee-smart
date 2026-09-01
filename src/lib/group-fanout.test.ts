@@ -154,6 +154,32 @@ describe("GroupFanoutHandler", () => {
       expect(commands).toHaveLength(0);
     });
 
+    it("a cloud-only member is sent to even while its (flapping) online flag is false", async () => {
+      // Govee's cloud online marker flaps for lights without the local API while
+      // control keeps working — the flag alone must not drop the member.
+      const cloudOnly = makeMember({
+        deviceId: "AA:09",
+        lanIp: undefined,
+        state: { online: false },
+        channels: { lan: false, mqtt: false, cloud: true },
+      });
+      const noChannel = makeMember({
+        deviceId: "AA:10",
+        lanIp: undefined,
+        state: { online: false },
+        channels: { lan: false, mqtt: false, cloud: false },
+      });
+      const group = makeGroup([
+        { sku: cloudOnly.sku, deviceId: cloudOnly.deviceId },
+        { sku: noChannel.sku, deviceId: noChannel.deviceId },
+      ]);
+      const { host, commands } = makeHost({ devices: [cloudOnly, noChannel] });
+      const handler = new GroupFanoutHandler(host);
+      const reached = await handler.fanOut(group, "control.power", true);
+      expect(reached).toBe(true);
+      expect(commands.map(c => c.device)).toEqual(["AA:09"]);
+    });
+
     it("no-op when group has no groupMembers", async () => {
       const group: GoveeDevice = { ...makeGroup([]), groupMembers: undefined };
       const { host, commands } = makeHost({ devices: [] });

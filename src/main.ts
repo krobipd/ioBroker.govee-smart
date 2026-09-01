@@ -281,8 +281,14 @@ export class GoveeAdapter extends utils.Adapter {
 
       // One-shot cleanup: the global info.refresh_cloud_data button was removed
       // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
-      // info.manual_sync_devices (BUG-1). Drop the dead orphan.
+      // info.manualSyncDevices (BUG-1). Drop the dead orphan.
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
+
+      // One-shot cleanup: the manual-sync button was spelled info.manual_sync_devices
+      // from v2.17.0 to v2.27.1 — the only snake_case id in the otherwise camelCase
+      // info channel. It was never subscribed either, so no script can depend on the
+      // old spelling; the instanceObjects entry now declares info.manualSyncDevices.
+      await this.delObjectAsync("info.manual_sync_devices").catch(() => undefined);
 
       // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
       // Govee-app version now self-heals in the background, so there is nothing
@@ -319,7 +325,12 @@ export class GoveeAdapter extends utils.Adapter {
       // Account credentials gate — trimmed so a stray space in a field can't
       // trip the truthy check into a login with junk data (issue #39). Drives
       // the status prefix, the startup log and the MQTT init below alike.
-      const hasAccountCreds = !!(config.goveeEmail?.trim() && config.goveePassword?.trim());
+      // The trimmed e-mail is also what the login SENDS: the admin card's
+      // "Connect" test trims it too, so a pasted trailing space must not make
+      // the test succeed and the real start-up login fail on the same value.
+      // The password stays untouched — surrounding spaces can be part of it.
+      const accountEmail = (config.goveeEmail ?? "").trim();
+      const hasAccountCreds = !!(accountEmail && config.goveePassword?.trim());
 
       // Channel-status prefix for every log line — must run BEFORE sub-libraries
       // are constructed so they pick up the wrapped adapter.log automatically.
@@ -418,7 +429,7 @@ export class GoveeAdapter extends utils.Adapter {
 
       // API client for undocumented scene/music/DIY libraries (always available)
       const apiClient = this.makeApiClient(this.log);
-      apiClient.setEmail(config.goveeEmail);
+      apiClient.setEmail(accountEmail);
       this.deviceManager.setApiClient(apiClient);
 
       this.deviceManager.setCallbacks({
@@ -596,7 +607,7 @@ export class GoveeAdapter extends utils.Adapter {
       // --- MQTT (if account credentials provided) ---
       // Initialize MQTT before Cloud so scene library can load on first cycle
       if (hasAccountCreds) {
-        this.mqttClient = this.makeMqttClient(config.goveeEmail, config.goveePassword, this.log, this);
+        this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
         // so diag.export contains the recent packets per device. v2.9.1: the
@@ -875,9 +886,13 @@ export class GoveeAdapter extends utils.Adapter {
 
       this.statesReady = true;
 
-      // Subscribe to all writable device and group states
+      // Subscribe to all writable device and group states, plus the adapter-level
+      // manual-sync button. The button lives under `info`, which the two wildcard
+      // patterns do not cover — without its own subscription the state change never
+      // reaches onStateChange and the button is dead (v2.17.0–v2.27.1).
       await this.subscribeStatesAsync("devices.*");
       await this.subscribeStatesAsync("groups.*");
+      await this.subscribeStatesAsync("info.manualSyncDevices");
 
       // Cleanup stale devices after initial discovery (30s delay for LAN scan).
       // Reaps devices from every adapter-level map that was keyed on them so the
@@ -1121,7 +1136,7 @@ export class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * Manual "sync devices" button (info.manual_sync_devices): pull the fresh
+   * Manual "sync devices" button (info.manualSyncDevices): pull the fresh
    * Govee account device list and reconcile it — new devices are onboarded,
    * devices deleted from the account are removed — without a restart. Existing
    * devices' scene/snapshot data is untouched (use the per-device refresh).

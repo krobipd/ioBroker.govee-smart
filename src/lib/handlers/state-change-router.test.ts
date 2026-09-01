@@ -601,14 +601,14 @@ describe("onStateChange — music routing branch", () => {
 describe("onStateChange — manual device sync button (BUG-1)", () => {
   it("syncs devices and resets the button on write true", async () => {
     const rig = makeRig([device]);
-    await onStateChange(rig.adapter, `${NS}.info.manual_sync_devices`, { val: true, ack: false } as ioBroker.State);
+    await onStateChange(rig.adapter, `${NS}.info.manualSyncDevices`, { val: true, ack: false } as ioBroker.State);
     expect(rig.syncCalls).toEqual([1]);
-    expect(rig.acks).toContainEqual({ id: `${NS}.info.manual_sync_devices`, val: false });
+    expect(rig.acks).toContainEqual({ id: `${NS}.info.manualSyncDevices`, val: false });
   });
 
   it("ignores an ack'd echo (no sync)", async () => {
     const rig = makeRig([device]);
-    await onStateChange(rig.adapter, `${NS}.info.manual_sync_devices`, { val: true, ack: true } as ioBroker.State);
+    await onStateChange(rig.adapter, `${NS}.info.manualSyncDevices`, { val: true, ack: true } as ioBroker.State);
     expect(rig.syncCalls).toEqual([]);
   });
 });

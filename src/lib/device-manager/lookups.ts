@@ -146,12 +146,13 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
 export function resolveSegmentCount(device: GoveeDevice): number {
   // A segmentCount quirk is a hard override — Govee's capability count lies for
   // some SKUs; this wins over Cloud, cache and the live MQTT value.
-  const override = getDeviceQuirks(device.sku)?.segmentCount;
-  if (typeof override === "number" && override > 0) {
+  const override = plausibleSegmentCount(getDeviceQuirks(device.sku)?.segmentCount);
+  if (override !== undefined) {
     return override;
   }
-  if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
-    return device.segmentCount;
+  const stored = plausibleSegmentCount(device.segmentCount);
+  if (stored !== undefined) {
+    return stored;
   }
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
   let min = Number.POSITIVE_INFINITY;
@@ -168,11 +169,11 @@ export function resolveSegmentCount(device: GoveeDevice): number {
       const fn = (f as { fieldName?: unknown }).fieldName;
       const er = (f as { elementRange?: { max?: unknown } }).elementRange;
       const rawMax = er && typeof er.max === "number" ? er.max : -1;
-      if (fn === "segment" && rawMax >= 0) {
-        const n = rawMax + 1;
-        if (n > 0 && n < min) {
-          min = n;
-        }
+      // API boundary: a Cloud capability claiming more slots than the protocol can
+      // address is a lie, not a bigger strip — ignore it like any other malformed field.
+      const n = fn === "segment" && rawMax >= 0 ? plausibleSegmentCount(rawMax + 1) : undefined;
+      if (n !== undefined && n < min) {
+        min = n;
       }
     }
   }
@@ -184,6 +185,41 @@ export const SEGMENT_HARD_MAX = 55;
 
 /** Number of addressable segment slots (SEGMENT_HARD_MAX + 1 = 56). */
 export const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;
+
+/**
+ * A segment COUNT the Govee bitmask protocol can actually address: an integer in
+ * `1..SEGMENT_COUNT_MAX`. Anything else — 0, a fraction, a corrupt cache value, a
+ * Cloud capability advertising thousands of slots, an oversized wizard payload —
+ * comes back as `undefined` so the caller treats it as "not known" instead of
+ * building that many segment channels. Single choke point for every source a
+ * count can enter from (cache, Cloud, MQTT, wizard).
+ *
+ * @param n Candidate count from any source
+ */
+export function plausibleSegmentCount(n: unknown): number | undefined {
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= SEGMENT_COUNT_MAX ? n : undefined;
+}
+
+/**
+ * The subset of a manual-segment index list the protocol can address
+ * (`0..SEGMENT_HARD_MAX`, integers, deduplicated, ascending). `undefined` when
+ * nothing usable is left — the caller then treats the device as contiguous.
+ * Used where a list enters from an untrusted store (the host-local cache file);
+ * the user-facing entry points already validate through `parseSegmentList`.
+ *
+ * @param list Candidate index list from any source
+ */
+export function plausibleSegmentIndices(list: unknown): number[] | undefined {
+  if (!Array.isArray(list)) {
+    return undefined;
+  }
+  const clean = [
+    ...new Set(
+      list.filter((i): i is number => typeof i === "number" && Number.isInteger(i) && i >= 0 && i <= SEGMENT_HARD_MAX),
+    ),
+  ].sort((a, b) => a - b);
+  return clean.length > 0 ? clean : undefined;
+}
 
 /** ptReal color-segment bitmask size (Govee protocol-fixed): one bit per segment, 56 segments → 7 bytes. */
 export const SEGMENT_COLOR_BITMASK_BYTES = 7;

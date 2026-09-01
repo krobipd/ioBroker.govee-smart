@@ -78,6 +78,14 @@ describe("applyWizardResult", () => {
     expect(applied).toEqual([{ device, mode: true, indices: [0, 1, 3, 4] }]);
   });
 
+  it("an implausible count is ignored — it never becomes the device's count", async () => {
+    const device = createTestDevice({ segmentCount: 5 });
+    const { adapter, applied } = makeAdapter([device]);
+    await applyWizardResult(adapter, device, { segmentCount: 1_000_000_000, manualList: "", hasGaps: false });
+    expect(device.segmentCount).toBe(5);
+    expect(applied).toEqual([]);
+  });
+
   it("unparseable manualList still enables manual mode but without indices (no crash, no stale list)", async () => {
     const device = createTestDevice({ segmentCount: 5 });
     const { adapter, applied } = makeAdapter([device]);

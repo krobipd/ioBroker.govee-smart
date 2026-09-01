@@ -630,6 +630,15 @@ describe("SegmentWizard", () => {
       expect(host.appliedResults).toHaveLength(0);
     });
 
+    it("apply drops indices the protocol cannot address instead of turning them into the count", async () => {
+      // The payload comes straight from the admin socket: an oversized index
+      // used to become segmentCount and build that many channels.
+      await wizard.runStep("start", key);
+      const res = await wizard.runStep("apply", key, { indices: [0, 1, 1_000_000_000, -3, 2.5] });
+      expect(res.applied).toBe(true);
+      expect(host.appliedResults[0].result).toEqual({ segmentCount: 2, manualList: "", hasGaps: false });
+    });
+
     it("apply with an empty map errors and keeps the session open", async () => {
       await wizard.runStep("start", key);
       const res = await wizard.runStep("apply", key, { indices: [] });

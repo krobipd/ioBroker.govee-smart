@@ -1360,6 +1360,38 @@ describe("StateManager", () => {
       expect(stateExtend).toBeDefined();
     });
 
+    it("creates the channel + state objects ONCE per run — a second write issues no object writes", async () => {
+      // The App-API poll calls this every two minutes for every value; both
+      // objects only have to exist, not be re-written.
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      const first = calls.filter(c => c.method === "extendObject").length;
+      expect(first).toBe(2);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity"); // same channel, new state
+      const extendIds = calls.filter(c => c.method === "extendObject").map(c => c.args[0]);
+      expect(extendIds).toEqual([
+        "devices.h5179_3c1b.sensor",
+        "devices.h5179_3c1b.sensor.sensor_temperature",
+        "devices.h5179_3c1b.sensor.sensor_humidity",
+      ]);
+    });
+
+    it("re-creates a synthetic state after removeSyntheticStateOnce dropped it", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
+      await sm.removeSyntheticStateOnce("devices.h5179_3c1b", "sensor_humidity");
+      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(false);
+      calls.length = 0;
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
+      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(true);
+      expect(calls.filter(c => c.method === "extendObject").map(c => c.args[0])).toEqual([
+        "devices.h5179_3c1b.sensor.sensor_humidity",
+      ]);
+    });
+
     it("should be no-op for unknown stateId (not in SYNTHETIC_STATE_META)", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never);
@@ -1649,6 +1681,30 @@ describe("StateManager", () => {
         c => c.method === "delObjectAsync" && (c.args[0] as string).includes("gradient_toggle"),
       );
       expect(delCalls.length).toBeGreaterThan(0);
+    });
+
+    it("keeps the App-API / Cloud-events synthetic sensor + event states across a Cloud-phase rebuild", async () => {
+      // battery / sensor_temperature / lack_water are created ad hoc by the
+      // App-API poll and never appear in a Cloud state-def — each Cloud rebuild
+      // used to delete them and the next poll re-created them (object churn +
+      // a value gap). They are foreign-owned survivors, like the LAN ids.
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "battery");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
+      calls.length = 0;
+
+      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179_3c1b", []);
+
+      expect(deleted).toBe(0);
+      expect(calls.filter(c => c.method === "delObjectAsync")).toHaveLength(0);
+      expect(objects.has("devices.h5179_3c1b.sensor.battery")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.events.lack_water")).toBe(true);
+      // The channel objects survive with their states.
+      expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.events")).toBe(true);
     });
 
     it("should NEVER remove LAN-owned states (power, brightness, colorRgb, colorTemperature)", async () => {

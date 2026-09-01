@@ -303,7 +303,7 @@ export async function onStateChange(
   // Adapter-level "manually sync devices" button — pull the fresh account
   // device list and reconcile (add new / remove deleted) without a restart.
   // Not a devices.*/groups.* path, so handle it before that gate.
-  if (localId === "info.manual_sync_devices") {
+  if (localId === "info.manualSyncDevices") {
     if (state.val) {
       adapter.log.info("Manual device sync requested — refreshing the device list from your Govee account");
       await adapter.syncDevicesManually?.();

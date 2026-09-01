@@ -7,7 +7,7 @@ import {
   type StateDefinition,
 } from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
-import { resolveSegmentCount } from "./device-manager";
+import { resolveSegmentCount, SEGMENT_COUNT_MAX } from "./device-manager/lookups";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import type { I18nKey } from "./i18n";
 import { tDesc, tName } from "./i18n";
@@ -279,6 +279,9 @@ export class StateManager {
    * @param id Voller State-Pfad (`devices.X.info.Y`)
    */
   private async safeDeleteState(id: string): Promise<void> {
+    // Whatever gets deleted must be re-creatable later — drop it from the
+    // "already ensured" cache in the same breath.
+    this.ensuredStates.delete(id);
     const obj = await this.adapter.getObjectAsync(id).catch(() => null);
     if (!obj) {
       return;
@@ -535,23 +538,42 @@ export class StateManager {
       return;
     }
     const channel = inferChannelFromStateId(stateId);
-    // Channel object first — sensors land in the new sensor/ subtree, events
-    // in events/. Without an extendObject the channel parent stays missing
-    // and Admin shows the state directly under the device root.
-    await this.adapter
-      .extendObject(
-        `${prefix}.${channel}`,
-        {
-          type: "channel",
-          common: { name: channelName(channel) },
-          native: {},
-        },
-        { preserve: { common: ["name"] } },
-      )
-      .catch(() => undefined);
-    await this.adapter
-      .extendObject(
-        `${prefix}.${channel}.${stateId}`,
+    const channelId = `${prefix}.${channel}`;
+    const stateFullId = `${channelId}.${stateId}`;
+    this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
+    // This runs on EVERY App-API poll (2 min) and every Cloud-events push, for
+    // every value. Both objects only have to be created once per adapter run —
+    // the same `ensuredStates` gate ensureState() uses for the info states.
+    // Without it a five-sensor install issued ~30 object writes every two
+    // minutes for objects that already existed. Every delete path
+    // (safeDeleteState / forgetPrefix / cleanupCloudOwnedStates) drops its
+    // ids from the cache again, so a removed object is re-created on the next
+    // write instead of being written into the void.
+    if (!this.ensuredStates.has(channelId)) {
+      // Channel object first — sensors land in the sensor/ subtree, events in
+      // events/. Without it the channel parent stays missing and Admin shows
+      // the state directly under the device root.
+      try {
+        await this.adapter.extendObject(
+          channelId,
+          {
+            type: "channel",
+            common: { name: channelName(channel) },
+            native: {},
+          },
+          { preserve: { common: ["name"] } },
+        );
+        this.ensuredStates.add(channelId);
+      } catch {
+        /* retried on the next write */
+      }
+    }
+    if (this.ensuredStates.has(stateFullId)) {
+      return;
+    }
+    try {
+      await this.adapter.extendObject(
+        stateFullId,
         {
           type: "state",
           common: {
@@ -566,9 +588,11 @@ export class StateManager {
           native: {},
         },
         { preserve: { common: ["name"] } },
-      )
-      .catch(() => undefined);
-    this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
+      );
+      this.ensuredStates.add(stateFullId);
+    } catch {
+      /* retried on the next write */
+    }
   }
 
   /**
@@ -594,15 +618,9 @@ export class StateManager {
     if (oldPrefix && oldPrefix !== newPrefix) {
       this.adapter.log.debug(`Migrating device ${device.sku}: ${oldPrefix} → ${newPrefix}`);
       await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
-      // Drop stale channel-map entries under the old prefix so they don't
-      // shadow resolveStatePath lookups after the rename.
-      const oldChannelKey = `${oldPrefix}.`;
-      for (const mapKey of this.stateChannelMap.keys()) {
-        if (mapKey.startsWith(oldChannelKey)) {
-          this.stateChannelMap.delete(mapKey);
-        }
-      }
-      this.onlineMarkerCache?.delete(`${oldPrefix}.info.online`);
+      // Drop every in-memory trace of the old prefix (channel map, ensured
+      // cache, marker cache) so nothing shadows the lookups after the rename.
+      this.forgetPrefix(oldPrefix);
     }
     this.prefixMap.set(key, newPrefix);
 
@@ -839,7 +857,7 @@ export class StateManager {
           type: def.type,
           role: def.role,
           // Buttons are write-only triggers (role catalogue) — the adapter
-          // already declares its io-package button (manual_sync_devices)
+          // already declares its io-package button (manualSyncDevices)
           // with read:false; capability-driven buttons now match (LOW).
           read: def.role === "button" ? false : true,
           write: def.write,
@@ -939,7 +957,9 @@ export class StateManager {
       Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? Math.max(...device.manualSegments) + 1
         : 0;
-    const segmentCount = Math.max(resolved, manualMax);
+    // Last line of defence in front of the channel loop: never build more segment
+    // channels than the protocol can address, whatever the sources delivered.
+    const segmentCount = Math.min(Math.max(resolved, manualMax), SEGMENT_COUNT_MAX);
     device.segmentCount = segmentCount;
 
     // Effective segment list — honor manual override if active (cut-strip support)
@@ -1411,12 +1431,20 @@ export class StateManager {
       if (!MANAGED_CHANNELS.includes(channel)) {
         continue;
       }
-      // In the control channel, LAN-default ids belong to the LAN phase —
-      // Cloud cleanup must not touch them. Other MANAGED_CHANNELS are
-      // wholly Cloud territory. Count them as seen-but-not-deleted survivors so
-      // the "empty channel" removal below doesn't delete the control channel
-      // object out from under its surviving LAN states (L9).
-      if (channel === "control" && LAN_STATE_IDS.has(stateId)) {
+      // Two owners share the managed channels with the Cloud phase and must not
+      // be swept as "stale":
+      //  - control: the LAN-default ids belong to the LAN phase (L9).
+      //  - sensor/events: the synthetic ids the App-API poll / Cloud-events push
+      //    create ad hoc (battery, sensor_temperature, lack_water, …). They are
+      //    not in any Cloud state-def, so each Cloud-phase rebuild used to delete
+      //    them ("Removing stale state") and the next poll re-created them —
+      //    object churn on every restart/refresh plus a value gap in between.
+      // Count them as seen-but-not-deleted survivors so the "empty channel"
+      // removal below doesn't delete the channel object out from under them.
+      const foreignOwned =
+        (channel === "control" && LAN_STATE_IDS.has(stateId)) ||
+        ((channel === "sensor" || channel === "events") && SYNTHETIC_STATE_META[stateId.toLowerCase()] !== undefined);
+      if (foreignOwned) {
         const survivors = totalsPerChannel.get(channel) ?? { seen: 0, deleted: 0 };
         survivors.seen++;
         totalsPerChannel.set(channel, survivors);
@@ -1428,6 +1456,7 @@ export class StateManager {
       if (!validIds.has(stateId)) {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         this.adapter.log.debug(`Removing stale state: ${localId}`);
+        this.ensuredStates.delete(localId);
         await this.adapter.delObjectAsync(localId);
         await this.adapter.delStateAsync(localId).catch(() => {});
         totals.deleted++;
@@ -1441,6 +1470,7 @@ export class StateManager {
       deletedTotal += totals.deleted;
       if (totals.deleted > 0 && totals.deleted === totals.seen) {
         this.adapter.log.debug(`Removing empty channel: ${prefix}.${channel}`);
+        this.ensuredStates.delete(`${prefix}.${channel}`);
         await this.adapter.delObjectAsync(`${prefix}.${channel}`).catch(() => undefined);
       }
     }

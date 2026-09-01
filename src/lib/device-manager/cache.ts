@@ -1,6 +1,7 @@
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { CachedDeviceData, SkuCache } from "../sku-cache";
 import { deviceLabel, type GoveeDevice } from "../types";
+import { plausibleSegmentCount, plausibleSegmentIndices } from "./lookups";
 
 /**
  * Adapter surface required by the cache helpers — DeviceManager exposes
@@ -64,6 +65,10 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     Partial<Pick<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt">>;
   return {
     ...rest,
+    // Host-local, editable file: a corrupt count or index list must not become
+    // the device's segment map (same gate as the Cloud/MQTT/wizard sources).
+    segmentCount: plausibleSegmentCount(rest.segmentCount),
+    manualSegments: plausibleSegmentIndices(rest.manualSegments),
     state: { online: false },
     channels: { lan: false, mqtt: false, cloud: false },
   };

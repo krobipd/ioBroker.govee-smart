@@ -5,6 +5,7 @@ import { SegmentWizard as SegmentWizardClass } from "../segment-wizard";
 import type { StateManager } from "../state-manager";
 import { parseSegmentList, type GoveeDevice } from "../types";
 import { sessionKey } from "../device-key";
+import { plausibleSegmentCount } from "../device-manager/lookups";
 
 /**
  * Adapter surface required by the segment-wizard glue.
@@ -91,7 +92,14 @@ export async function applyWizardResult(
   device: GoveeDevice,
   result: WizardResult,
 ): Promise<void> {
-  device.segmentCount = result.segmentCount;
+  const segmentCount = plausibleSegmentCount(result.segmentCount);
+  if (segmentCount === undefined) {
+    // The wizard already filters indices to the protocol range, so this only
+    // fires on a corrupt result — never let it become the device's count.
+    adapter.log.warn(`applyWizardResult: ignoring implausible segment count ${String(result.segmentCount)}`);
+    return;
+  }
+  device.segmentCount = segmentCount;
   if (result.hasGaps) {
     const parsed = parseSegmentList(result.manualList, result.segmentCount - 1);
     await adapter.applyManualSegments(device, true, parsed.error ? undefined : parsed.indices);

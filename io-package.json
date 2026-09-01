@@ -354,7 +354,7 @@
       "native": {}
     },
     {
-      "_id": "info.manual_sync_devices",
+      "_id": "info.manualSyncDevices",
       "type": "state",
       "common": {
         "name": {

@@ -14,6 +14,7 @@ import {
   resolveSegmentCount,
   SEGMENT_HARD_MAX,
 } from "./device-manager";
+import { plausibleSegmentCount } from "./device-manager/lookups";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { _resetDeviceRegistry, initDeviceRegistry } from "./device-registry";
@@ -2312,6 +2313,27 @@ describe("resolveSegmentCount", () => {
   it("returns device.segmentCount when already set (cache wins)", () => {
     const device = deviceWith([segCap("segmentedColorRgb", 14)], 20);
     expect(resolveSegmentCount(device)).toBe(20);
+  });
+
+  it("ignores a Cloud capability advertising more slots than the protocol has (API boundary)", () => {
+    // A lying capability is a malformed field, not a bigger strip.
+    expect(resolveSegmentCount(deviceWith([segCap("segmentedColorRgb", 4999), segCap("segmentedBrightness", 9)]))).toBe(
+      10,
+    );
+    expect(resolveSegmentCount(deviceWith([segCap("segmentedColorRgb", 4999)]))).toBe(0);
+  });
+
+  it("ignores an implausible stored count (corrupt cache) and falls back to the capabilities", () => {
+    const device = deviceWith([segCap("segmentedColorRgb", 14)], 1_000_000_000);
+    expect(resolveSegmentCount(device)).toBe(15);
+  });
+
+  it("plausibleSegmentCount accepts 1..56 and rejects everything else", () => {
+    expect(plausibleSegmentCount(1)).toBe(1);
+    expect(plausibleSegmentCount(56)).toBe(56);
+    for (const bad of [0, -1, 57, 1_000_000_000, 2.5, NaN, Infinity, "5", null, undefined]) {
+      expect(plausibleSegmentCount(bad)).toBeUndefined();
+    }
   });
 
   it("returns 0 when no segment capability and no learned count", () => {

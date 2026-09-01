@@ -164,6 +164,17 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       expect(cached.manualSegments).toBe(undefined);
       expect(cached.sceneSpeed).toBe(undefined);
     });
+
+    it("a corrupt segment count / index list in the cache file is dropped on load", () => {
+      // The cache is a host-local, editable file — an absurd count must never
+      // become the number of segment channels the adapter builds.
+      const cached = goveeDeviceToCached(makeFullDevice());
+      (cached as { segmentCount?: number }).segmentCount = 1_000_000_000;
+      (cached as { manualSegments?: unknown }).manualSegments = [0, 1_000_000_000, -1, "x", 2];
+      const restored = cachedToGoveeDevice(cached);
+      expect(restored.segmentCount).toBeUndefined();
+      expect(restored.manualSegments).toEqual([0, 2]);
+    });
   });
 
   describe("adapter glue functions", () => {
