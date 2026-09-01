@@ -36,14 +36,12 @@ describe("makeWizardApi", () => {
     expect(calls[1].data).toEqual({ action: "no", device: "H6160:AABB" });
   });
 
-  it("done() and abort() carry the current device", async () => {
+  it("abort() carries the current device", async () => {
     const { socket, calls } = recordingSocket();
     const api = makeWizardApi(socket, "govee-smart.0");
     await api.start("H61:1");
-    await api.done();
     await api.abort();
-    expect(calls[1].data).toEqual({ action: "done", device: "H61:1" });
-    expect(calls[2].data).toEqual({ action: "abort", device: "H61:1" });
+    expect(calls[1].data).toEqual({ action: "abort", device: "H61:1" });
   });
 
   it("apply(device, indices) sends the review-corrected map", async () => {

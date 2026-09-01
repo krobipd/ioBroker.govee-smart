@@ -924,13 +924,25 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Manual device sync failed"));
   });
 
-  it("stateToCommand maps plain suffixes and dynamic segment indices", async () => {
+  it("the handler view maps state suffixes to commands (plain + dynamic segment indices)", async () => {
+    // The handlers no longer reach into the adapter — they get one host object
+    // built over its private runtime. stateToCommand is one of its methods.
+    const { adapter } = await setupReady();
+    const host = (adapter as unknown as { handlerHost: { stateToCommand(s: string): string | null } }).handlerHost;
+    expect(host.stateToCommand("control.power")).toBe("power");
+    expect(host.stateToCommand("segments.7.color")).toBe("segmentColor:7");
+    expect(host.stateToCommand("segments.7.brightness")).toBe("segmentBrightness:7");
+    expect(host.stateToCommand("nope.nothing")).toBeNull();
+  });
+
+  it("the handler view exposes live values, not copies — a flag flipped later reads through", async () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
-    expect(i.stateToCommand("control.power")).toBe("power");
-    expect(i.stateToCommand("segments.7.color")).toBe("segmentColor:7");
-    expect(i.stateToCommand("segments.7.brightness")).toBe("segmentBrightness:7");
-    expect(i.stateToCommand("nope.nothing")).toBeNull();
+    const host = (adapter as unknown as { handlerHost: { readyLogged: boolean; statesReady: boolean } }).handlerHost;
+    expect(host.statesReady).toBe(true);
+    expect(host.readyLogged).toBe(i.readyLogged);
+    host.readyLogged = true; // a handler owns this flag and writes it back
+    expect(i.readyLogged).toBe(true);
   });
 });
 

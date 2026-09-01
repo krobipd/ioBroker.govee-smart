@@ -3,7 +3,7 @@ import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import type { RateLimiter } from "../rate-limiter";
 import type { StateManager } from "../state-manager";
-import { deviceLabel, type CloudStateCapability, type GoveeDevice } from "../types";
+import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice } from "../types";
 
 /**
  * Adapter surface required by the cloud-state-loader helpers. Loose
@@ -67,7 +67,11 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
           // Fire-and-forget — States are created before loadCloudStates runs;
           // a rejection here means the state was deleted out-of-band and
           // can be safely ignored.
-          writes.push(adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => undefined));
+          writes.push(
+            adapter
+              .setState(statePath, { val: mapped.value, ack: true })
+              .catch(logRejected(adapter.log, `write ${statePath}`)),
+          );
         }
         await Promise.all(writes);
         adapter.log.debug(`Cloud state loaded for ${deviceLabel(device)}`);
@@ -137,7 +141,9 @@ export async function applyCloudCapabilities(
   }
   const writes = planned.map(mapped => {
     const statePath = adapter.stateManager!.resolveStatePath(prefix, mapped.stateId);
-    return adapter.setState(statePath, { val: mapped.value, ack: true }).catch(() => undefined);
+    return adapter
+      .setState(statePath, { val: mapped.value, ack: true })
+      .catch(logRejected(adapter.log, `write ${statePath}`));
   });
   await Promise.all(writes);
 

@@ -7,14 +7,14 @@ vi.mock("@iobroker/adapter-core", () => ({
   },
 }));
 
+import { DeviceManager } from "./device-manager";
 import {
-  buildCapabilitiesFromAppEntry,
-  DeviceManager,
   parseMqttSegmentData,
+  plausibleSegmentCount,
   resolveSegmentCount as resolveSegmentCountRaw,
   SEGMENT_HARD_MAX,
-} from "./device-manager";
-import { plausibleSegmentCount } from "./device-manager/lookups";
+} from "./device-manager/lookups";
+import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { DeviceRegistry } from "./device-registry";
@@ -1979,7 +1979,7 @@ describe("DeviceManager", () => {
       const device = dm.getDevices()[0];
       device.segmentCount = 2;
 
-      let segmentUpdates: import("./device-manager").MqttSegmentData[] | null = null;
+      let segmentUpdates: import("./device-manager/lookups").MqttSegmentData[] | null = null;
       dm.setCallbacks({
         onUpdate: () => {},
         onLanDeviceReady: () => {},

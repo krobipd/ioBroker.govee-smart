@@ -7,7 +7,7 @@ import {
   type StateDefinition,
 } from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
-import { resolveSegmentCount, SEGMENT_COUNT_MAX } from "./device-manager/lookups";
+import { SEGMENT_COUNT_MAX } from "./device-manager/lookups";
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import type { I18nKey } from "./i18n";
@@ -228,7 +228,7 @@ export class StateManager {
    * round has just written exactly these values, so the two can't disagree.
    */
   private readonly resolvedOnline = new Map<string, boolean>();
-  /** This instance's device catalog — quirks for the LAN defaults + segment count. */
+  /** This instance's device catalog — quirks for the LAN default states. */
   private readonly registry: DeviceRegistry;
 
   /**
@@ -819,8 +819,9 @@ export class StateManager {
    *
    * @param device Govee device
    * @param stateDefs Cloud-owned state definitions from buildCloudStateDefs
+   * @param segmentCount Settled segment count (DeviceManager.syncSegmentCount) for the segment tree
    */
-  async createCloudStates(device: GoveeDevice, stateDefs: StateDefinition[]): Promise<void> {
+  async createCloudStates(device: GoveeDevice, stateDefs: StateDefinition[], segmentCount: number): Promise<void> {
     const prefix = this.devicePrefix(device);
 
     // Drop _segment_ marker entries — segments have their own dedicated
@@ -835,7 +836,7 @@ export class StateManager {
 
     // Segment channel if device has segment caps
     if (stateDefs.some(d => d.id.startsWith("_segment_"))) {
-      await this.createSegmentStates(device);
+      await this.createSegmentStates(device, segmentCount);
     }
   }
 
@@ -956,9 +957,15 @@ export class StateManager {
   /**
    * Create segment channel with per-segment color + brightness states.
    *
+   * The count is settled by the caller (`DeviceManager.syncSegmentCount`) —
+   * this writer never decides or stores the device's segment count itself, it
+   * builds the tree for the number it is given. Never more channels than the
+   * protocol can address, whatever the caller delivered.
+   *
    * @param device Govee device
+   * @param segmentCount Settled segment count for the tree
    */
-  async createSegmentStates(device: GoveeDevice): Promise<void> {
+  async createSegmentStates(device: GoveeDevice, segmentCount: number): Promise<void> {
     const prefix = this.devicePrefix(device);
 
     await this.adapter.extendObject(
@@ -971,19 +978,7 @@ export class StateManager {
       { preserve: { common: ["name"] } },
     );
 
-    // Resolve the authoritative count: cache/MQTT-learned wins over Cloud
-    // capabilities. A manual list can only grow the count (never shrink it)
-    // so users editing manual_list can reveal hidden indices without losing
-    // the already-learned total.
-    const resolved = resolveSegmentCount(device, this.registry);
-    const manualMax =
-      Array.isArray(device.manualSegments) && device.manualSegments.length > 0
-        ? Math.max(...device.manualSegments) + 1
-        : 0;
-    // Last line of defence in front of the channel loop: never build more segment
-    // channels than the protocol can address, whatever the sources delivered.
-    const segmentCount = Math.min(Math.max(resolved, manualMax), SEGMENT_COUNT_MAX);
-    device.segmentCount = segmentCount;
+    segmentCount = Math.min(Math.max(0, Math.floor(segmentCount)), SEGMENT_COUNT_MAX);
 
     // Effective segment list — honor manual override if active (cut-strip support)
     const validIndices =

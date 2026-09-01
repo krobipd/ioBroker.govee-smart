@@ -4,7 +4,7 @@ import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
-import { deviceLabel, errMessage, type DeviceState, type GoveeDevice } from "../types";
+import { deviceLabel, errMessage, logRejected, type DeviceState, type GoveeDevice } from "../types";
 import * as connectionState from "./connection-state";
 import * as groupFanoutHandler from "./group-fanout-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
@@ -52,7 +52,7 @@ export function onDeviceStateUpdate<
   // createLanStates declared the object ("has no existing object"). Mirrors the
   // trackStateCreation gate; the next LAN poll / MQTT push re-delivers the value.
   if (adapter.statesReady && adapter.stateManager) {
-    adapter.stateManager.updateDeviceState(device, state).catch(() => {});
+    adapter.stateManager.updateDeviceState(device, state).catch(logRejected(adapter.log, "mirror device state"));
   }
   connectionState.updateConnectionState(adapter);
 
@@ -63,7 +63,7 @@ export function onDeviceStateUpdate<
     // transition from handleLanDiscovery reflects in info.online within
     // milliseconds instead of waiting up to one sync-timer cycle (20 s).
     if (device.type === GOVEE_DEVICE_TYPE.LIGHT && adapter.stateManager) {
-      adapter.stateManager.syncInfoOnline(device).catch(() => undefined);
+      adapter.stateManager.syncInfoOnline(device).catch(logRejected(adapter.log, "refresh info.online"));
     }
   }
 
@@ -75,7 +75,7 @@ export function onDeviceStateUpdate<
   const powerOff = state.power === false || (state.power as unknown) === 0;
   if (powerOff && adapter.stateManager) {
     const prefix = adapter.stateManager.devicePrefix(device);
-    dropdownReset.resetModeDropdowns(adapter, prefix, "").catch(() => undefined);
+    dropdownReset.resetModeDropdowns(adapter, prefix, "").catch(logRejected(adapter.log, "reset mode dropdowns"));
   }
 }
 
@@ -149,10 +149,13 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   adapter.log.debug(
     `buildCloudStateDefs for ${device.sku} ${device.deviceId}: ${capN} cap(s) in → ${cloudDefs.length} state def(s) out`,
   );
+  // The device manager settles the count (and stores it on the device); the
+  // state manager only builds the tree for that number.
+  const segmentCount = adapter.deviceManager?.syncSegmentCount(device) ?? 0;
   const p = (async () => {
     await sm.createInfoStates(device);
     await sm.createLanStates(device);
-    await sm.createCloudStates(device, cloudDefs);
+    await sm.createCloudStates(device, cloudDefs, segmentCount);
     await sm.migrateLegacyDiagnostics(device);
     await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
   })().catch(e => {
@@ -161,7 +164,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
   if (adapter.statesReady) {
-    adapter.reapStaleDevices?.().catch(() => undefined);
+    adapter.reapStaleDevices?.().catch(logRejected(adapter.log, "reap stale devices"));
   }
 }
 

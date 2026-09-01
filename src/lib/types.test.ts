@@ -262,6 +262,39 @@ describe("Types utilities", () => {
       expect(classifyError(new Error("Something unexpected happened"))).toBe("UNKNOWN");
     });
 
+    it("classifies an HTTP error by its status field even when the message carries no marker", () => {
+      // http-client rejects with `HttpError("HTTP 401", 401)` — the number is
+      // a field, the message is just a label.
+      const auth = Object.assign(new Error("HTTP 401"), { statusCode: 401 });
+      const forbidden = Object.assign(new Error("HTTP 403"), { statusCode: 403 });
+      const limited = Object.assign(new Error("HTTP 429"), { statusCode: 429 });
+      const server = Object.assign(new Error("HTTP 503"), { statusCode: 503 });
+      expect(classifyError(auth)).toBe("AUTH");
+      expect(classifyError(forbidden)).toBe("AUTH");
+      expect(classifyError(limited)).toBe("RATE_LIMIT");
+      expect(classifyError(server)).toBe("UNKNOWN");
+    });
+
+    it("does NOT classify a quoted foreign body as AUTH just because it contains 'auth' or '401'", () => {
+      // An "Invalid JSON" error quotes the first 100 chars of a Govee maintenance
+      // page — treating that as AUTH stopped the Cloud retry loop for good and
+      // told the user to check a valid API key.
+      const html = new Error(
+        'Invalid JSON in HTTP 200 response: Unexpected token < — body starts with: <html><meta name="author" content="ops 401">',
+      );
+      expect(classifyError(html)).toBe("UNKNOWN");
+      expect(classifyError(new Error("device H1401 rejected the command"))).toBe("UNKNOWN");
+    });
+
+    it("classifies the mqtt.js credential-refused reason codes as AUTH", () => {
+      const notAuthorized = Object.assign(new Error("Connection refused: Not authorized"), { code: 5 });
+      const badCreds = Object.assign(new Error("Connection refused: Bad username or password"), { code: 4 });
+      expect(classifyError(notAuthorized)).toBe("AUTH");
+      expect(classifyError(badCreds)).toBe("AUTH");
+      // The same texts without a code still classify by their words.
+      expect(classifyError(new Error("Connection refused: Not authorized"))).toBe("AUTH");
+    });
+
     it("should handle string errors", () => {
       expect(classifyError("ECONNREFUSED")).toBe("NETWORK");
     });

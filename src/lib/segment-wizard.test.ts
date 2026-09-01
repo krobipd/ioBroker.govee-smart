@@ -18,7 +18,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { SegmentWizard, type WizardHost, type WizardResult } from "./segment-wizard";
-import { SEGMENT_HARD_MAX } from "./device-manager";
+import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
 import type { CloudCapability, GoveeDevice } from "./types";
 
 // A sliced test harness — mirrors enough of the adapter that the wizard
@@ -245,8 +245,7 @@ describe("SegmentWizard", () => {
       const r = await wizard.start(key);
       expect(r.error).toBeUndefined();
       expect(r.active).toBe(true);
-      expect(r.progress).toBe("Segment 0");
-      expect(wizard.getSessionSnapshot()).not.toBeNull();
+      expect(wizard.getSessionSnapshot()?.current).toBe(0);
 
       // Two segmentBatch calls: others→dim, target→bright.
       // "others" must now cover 1..SEGMENT_HARD_MAX (not just 1..4),
@@ -326,7 +325,7 @@ describe("SegmentWizard", () => {
       host.calls.length = 0;
       const r = await wizard.answer(false);
       expect(r.active).toBe(true);
-      expect(r.progress).toBe("Segment 1");
+      expect(wizard.getSessionSnapshot()?.current).toBe(1);
       const bright = host.calls[1].value as { segments: number[] };
       expect(bright.segments).toEqual([1]);
     });
@@ -353,18 +352,13 @@ describe("SegmentWizard", () => {
     });
   });
 
-  describe("done", () => {
-    it("should error when no session active", async () => {
-      const r = await wizard.done();
-      expect(typeof r.error).toBe("string");
-      expect(r.error).toContain("No wizard");
-    });
-
-    it("should error when no answer has been given yet", async () => {
+  describe("finalize (apply / protocol-limit auto-finish)", () => {
+    // The React flow ends a measurement with `apply` and its review-corrected
+    // map; the old "done" action (pre-React sendTo buttons) is gone.
+    it("rejects the retired 'done' action like any unknown action", async () => {
       await wizard.start(key);
-      const r = await wizard.done();
-      expect(typeof r.error).toBe("string");
-      expect(r.error).toContain("at least once first");
+      const r = await wizard.runStep("done", key);
+      expect(r.error).toContain("Unknown action");
       expect(wizard.getSessionSnapshot()).not.toBeNull();
     });
 
@@ -373,8 +367,8 @@ describe("SegmentWizard", () => {
       await wizard.answer(true); // 0
       await wizard.answer(true); // 1
       await wizard.answer(true); // 2
-      const r = await wizard.done();
-      expect(r.done).toBe(true);
+      const r = await wizard.runStep("apply", key, { indices: [0, 1, 2] });
+      expect(r.applied).toBe(true);
       expect(r.segmentCount).toBe(3);
       expect(r.list).toBe("");
       expect(r.hasGaps).toBe(false);
@@ -396,7 +390,9 @@ describe("SegmentWizard", () => {
       await wizard.answer(false); // 2 dark (gap)
       await wizard.answer(true); // 3 visible
       await wizard.answer(true); // 4 visible
-      const r = await wizard.done();
+      const confirmed = wizard.getSessionSnapshot()!.visible;
+      expect(confirmed).toEqual([0, 1, 3, 4]);
+      const r = await wizard.runStep("apply", key, { indices: confirmed });
       expect(r.segmentCount).toBe(5);
       expect(r.list).toBe("0-1,3-4");
       expect(r.hasGaps).toBe(true);
@@ -413,11 +409,26 @@ describe("SegmentWizard", () => {
       for (let i = 0; i < 20; i++) {
         await wizard.answer(true);
       }
-      // User sees segment 20 is dark (past end of strip) → done
-      const r = await wizard.done();
+      // User sees segment 20 is dark (past end of strip) → applies the 20 confirmed
+      const r = await wizard.runStep("apply", key, { indices: wizard.getSessionSnapshot()!.visible });
       expect(r.segmentCount).toBe(20);
       expect(r.hasGaps).toBe(false);
       expect(r.list).toBe("");
+    });
+
+    it("finalizes on its own when the measurement reaches the protocol limit", async () => {
+      await wizard.start(key);
+      let last: Record<string, unknown> = {};
+      for (let i = 0; i <= SEGMENT_HARD_MAX; i++) {
+        last = await wizard.answer(true);
+      }
+      // The answer for index 55 is the last the bitmask can address — the
+      // session closes with the measured map, no separate apply needed.
+      expect(last.done).toBe(true);
+      expect(last.segmentCount).toBe(SEGMENT_HARD_MAX + 1);
+      expect(last.hasGaps).toBe(false);
+      expect(host.appliedResults).toHaveLength(1);
+      expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
     it("should restore baseline after applying the result", async () => {
@@ -425,7 +436,7 @@ describe("SegmentWizard", () => {
       await wizard.answer(true);
       await wizard.answer(true);
       host.calls.length = 0;
-      await wizard.done();
+      await wizard.runStep("apply", key, { indices: [0, 1] });
       // Last sendCommand should be the restore segmentBatch
       const last = host.calls[host.calls.length - 1];
       expect(last.command).toBe("segmentBatch");
@@ -434,10 +445,10 @@ describe("SegmentWizard", () => {
       expect(v.brightness).toBe(75);
     });
 
-    it("should clear the idle timer on done", async () => {
+    it("should clear the idle timer on apply", async () => {
       await wizard.start(key);
       await wizard.answer(true);
-      await wizard.done();
+      await wizard.runStep("apply", key, { indices: [0] });
       expect(wizard.getSessionSnapshot()).toBeNull();
     });
   });
@@ -538,8 +549,8 @@ describe("SegmentWizard", () => {
       expect(r.active).toBe(true);
     });
 
-    it("should reject yes/no/done/abort without a session", async () => {
-      for (const a of ["yes", "no", "done", "abort"]) {
+    it("should reject yes/no/apply/abort without a session", async () => {
+      for (const a of ["yes", "no", "apply", "abort"]) {
         const r = await wizard.runStep(a, "");
         expect(r.error).toContain("No wizard");
       }
@@ -551,13 +562,13 @@ describe("SegmentWizard", () => {
       expect(r.error).toContain("Unknown action");
     });
 
-    it("should route 'yes'/'no'/'done'/'abort'", async () => {
+    it("should route 'yes'/'no'/'apply'/'abort'", async () => {
       await wizard.start(key);
       await wizard.runStep("yes", "");
       await wizard.runStep("no", "");
       await wizard.runStep("yes", "");
-      const r = await wizard.runStep("done", "");
-      expect(r.done).toBe(true);
+      const r = await wizard.runStep("apply", "", { indices: [0, 2] });
+      expect(r.applied).toBe(true);
       expect(r.list).toBe("0,2");
 
       // New session — abort works too
@@ -685,11 +696,11 @@ describe("SegmentWizard", () => {
       expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
-    it("should handle device missing at done", async () => {
+    it("should handle device missing at apply", async () => {
       await wizard.start(key);
       await wizard.answer(true);
       host.devices.delete(key);
-      const r = await wizard.done();
+      const r = await wizard.runStep("apply", key, { indices: [0] });
       expect(typeof r.error).toBe("string");
       expect(r.error).toContain("disappeared");
       expect(wizard.getSessionSnapshot()).toBeNull();
@@ -714,10 +725,11 @@ describe("SegmentWizard", () => {
     // system.config.language) — the 11-language key + placeholder coverage
     // lives in i18n.test.ts. Here the I18n mock resolves to en.json, so this
     // just asserts the wizard wires its keys through I18n + format() correctly.
-    it("renders resolved strings with interpolated placeholders", async () => {
-      const r = await wizard.start(key);
-      expect(typeof r.message).toBe("string");
-      expect(r.message).toContain("Wizard started");
+    it("renders resolved error strings with interpolated placeholders", async () => {
+      // The only localized text left in the responses are the error lines —
+      // the React component carries its own translations for everything else.
+      const r = await wizard.start("H9999:NOPE");
+      expect(r.error).toBe("Device not found: H9999:NOPE");
     });
   });
 
@@ -727,7 +739,7 @@ describe("SegmentWizard", () => {
       await wizard.answer(true);
       await wizard.answer(true);
       await wizard.answer(true);
-      await wizard.done();
+      await wizard.runStep("apply", key, { indices: [0, 1, 2] });
       for (const c of host.segmentBatchCalls()) {
         expect(c.value).toBeTypeOf("object");
         expect(typeof c.value).not.toBe("string");

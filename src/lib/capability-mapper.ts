@@ -1158,7 +1158,11 @@ const SCENE_DROPDOWN_RULES: ReadonlyArray<{
  * @param log Adapter logger — forwarded to applyQuirksToStates.
  * @param registry This instance's device catalog
  */
-export function buildLanStateDefs(device: GoveeDevice, log: ioBroker.Logger, registry: DeviceRegistry): StateDefinition[] {
+export function buildLanStateDefs(
+  device: GoveeDevice,
+  log: ioBroker.Logger,
+  registry: DeviceRegistry,
+): StateDefinition[] {
   if (!device.lanIp) {
     return [];
   }

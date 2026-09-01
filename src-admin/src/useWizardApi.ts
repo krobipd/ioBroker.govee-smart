@@ -18,8 +18,6 @@ export interface WizardSnapshot {
 /** One wizard-step response (superset — most fields are optional per action). */
 export interface WizardResponse {
   snapshot?: WizardSnapshot;
-  message?: string;
-  progress?: string;
   active?: boolean;
   done?: boolean;
   aborted?: boolean;
@@ -55,8 +53,6 @@ export interface WizardApi {
   yes(): Promise<WizardResponse>;
   /** Current segment is dark (a gap). */
   no(): Promise<WizardResponse>;
-  /** End of strip — finalize with the measured map. */
-  done(): Promise<WizardResponse>;
   /** Cancel and restore the strip. */
   abort(): Promise<WizardResponse>;
   /** Finalize with the review-corrected indices instead of the measured map. */
@@ -65,8 +61,8 @@ export interface WizardApi {
 
 /**
  * Build a {@link WizardApi} bound to one admin socket + adapter namespace.
- * `start` records the device so the follow-up steps (yes/no/done/abort) carry
- * it — the backend only reads the device on `start`, but sending it keeps the
+ * `start` records the device so the follow-up steps (yes/no/abort) carry it —
+ * the backend only reads the device on `start`, but sending it keeps the
  * payload self-describing.
  *
  * @param socket    Admin socket exposing `sendTo`
@@ -94,7 +90,6 @@ export function makeWizardApi(socket: WizardSocket, namespace: string): WizardAp
     },
     yes: () => step("yes", currentDevice),
     no: () => step("no", currentDevice),
-    done: () => step("done", currentDevice),
     abort: () => step("abort", currentDevice),
     apply: (device, indices) => step("apply", device, indices),
   };

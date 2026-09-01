@@ -7,7 +7,7 @@ import type { StateManager } from "../state-manager";
 import { httpsRequest } from "../http-client";
 import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
-import { deviceLabel, errMessage } from "../types";
+import { deviceLabel, errMessage, logRejected } from "../types";
 import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
 
 /**
@@ -63,7 +63,9 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {
     adapter.lastConnectionState = connected;
-    adapter.setState("info.connection", { val: connected, ack: true }).catch(() => {});
+    adapter
+      .setState("info.connection", { val: connected, ack: true })
+      .catch(logRejected(adapter.log, "write info.connection"));
   }
 
   // Sync the in-memory channelStatus snapshot used by the log-prefix wrapper.

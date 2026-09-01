@@ -1,6 +1,6 @@
 import { getMusicModeOptions, musicModeNameUsesRgb } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
-import { SEGMENT_HARD_MAX } from "../device-manager";
+import { SEGMENT_HARD_MAX } from "../device-manager/lookups";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";

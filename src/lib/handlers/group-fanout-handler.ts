@@ -2,7 +2,7 @@ import type { DeviceManager } from "../device-manager";
 import type { GroupFanoutHost } from "../group-fanout";
 import { resolveGroupMembers } from "../group-fanout";
 import type { StateManager } from "../state-manager";
-import type { GoveeDevice } from "../types";
+import { logRejected, type GoveeDevice } from "../types";
 
 /**
  * Adapter surface required by the group-fanout glue. Loose
@@ -42,7 +42,9 @@ export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): voi
       continue;
     }
     const memberDevices = resolveGroupMembers(group, devices);
-    adapter.stateManager.updateGroupMembersUnreachable(group, memberDevices).catch(() => {});
+    adapter.stateManager
+      .updateGroupMembersUnreachable(group, memberDevices)
+      .catch(logRejected(adapter.log, "write group members unreachable"));
   }
 }
 

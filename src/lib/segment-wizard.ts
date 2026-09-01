@@ -17,6 +17,16 @@ function format(template: string, params?: Record<string, string | number>): str
   return template.replace(/\{(\w+)\}/g, (m, key: string) => (key in params ? String(params[key]) : m));
 }
 
+/**
+ * Deliberately terse responses: the only client is the React admin component,
+ * which renders the grid from `snapshot` plus the `error` / `active` / `done`
+ * / `aborted` / `applied` flags and carries its own translations. The
+ * step-by-step prose the pre-React (sendTo-button) UI showed — "segment N is
+ * now lit white, can you see it?" — was still being built and localised for
+ * every step and discarded by the client; it is gone together with its
+ * seventeen translation keys.
+ */
+
 /** Session state for the interactive segment-detection wizard */
 export interface SegmentWizardSession {
   /** Target device key (sku:deviceId) */
@@ -139,12 +149,13 @@ function hasSegmentCapability(device: GoveeDevice): boolean {
  * Interactive segment-detection state machine.
  *
  * Flashes each segment bright white one-by-one up to the protocol limit.
- * The user steers the session with `yes` (visible) / `no` (dark) /
- * `done` (strip ended). The final result — real segment count plus any
+ * The user steers the session with `yes` (visible) / `no` (dark) and ends it
+ * with `apply` (the review-corrected map) or `abort`. Reaching the protocol
+ * limit finalizes on its own. The final result — real segment count plus any
  * gaps for cut strips — is applied via {@link WizardHost.applyWizardResult}.
  *
  * Public entry point is {@link SegmentWizard.runStep} which routes by action
- * string ("start" | "yes" | "no" | "done" | "abort"). Individual lifecycle
+ * string ("start" | "yes" | "no" | "apply" | "abort"). Individual lifecycle
  * methods are also usable directly; they're the seams that tests target.
  */
 export class SegmentWizard {
@@ -220,7 +231,7 @@ export class SegmentWizard {
    * Route one wizard step from the sendTo handler and fold the current grid
    * snapshot into every response so the React admin map can redraw per step.
    *
-   * @param action "start" | "yes" | "no" | "done" | "abort" | "apply"
+   * @param action "start" | "yes" | "no" | "apply" | "abort"
    * @param deviceKey Target device — only consulted on action="start"
    * @param payload Extra data for actions that need it (apply: corrected indices)
    * @param payload.indices Review-corrected segment indices for the `apply` action
@@ -233,7 +244,7 @@ export class SegmentWizard {
   /**
    * Dispatch a wizard action to its handler. The session-active guard covers
    * every action except `start` (which opens a session); `apply` shares that
-   * guard with `yes`/`no`/`done`/`abort`.
+   * guard with `yes`/`no`/`abort`.
    *
    * @param action Wizard action string
    * @param deviceKey Target device — only consulted on action="start"
@@ -249,9 +260,6 @@ export class SegmentWizard {
     }
     if (action === "abort") {
       return this.abort();
-    }
-    if (action === "done") {
-      return this.done();
     }
     if (action === "apply") {
       return this.apply(payload?.indices ?? []);
@@ -330,15 +338,7 @@ export class SegmentWizard {
     await this.host.sendCommand(device, "brightness", 100);
     await this.flashSegment(device, 0);
 
-    return {
-      message:
-        `${this.t("wizardStartedFor", { name: device.name })}\n\n` +
-        `${this.t("segmentFlashing", { idx: 0 })}\n` +
-        `${this.t("canYouSeeStrip")}\n` +
-        `${this.t("yesNoDoneLine")}`,
-      progress: this.t("progressSegment", { idx: 0 }),
-      active: true,
-    };
+    return { active: true };
   }
 
   /**
@@ -354,7 +354,6 @@ export class SegmentWizard {
     if (wasVisible) {
       session.visible.push(session.current);
     }
-    const answeredIdx = session.current;
     session.current += 1;
     this.scheduleIdleTimeout();
 
@@ -371,33 +370,7 @@ export class SegmentWizard {
       return { error: this.t("errDeviceGone") };
     }
     await this.flashSegment(device, session.current);
-    const lastNote = this.t(wasVisible ? "markedVisible" : "markedDark", {
-      idx: answeredIdx,
-    });
-    return {
-      message:
-        `${lastNote}\n\n` +
-        `${this.t("segmentFlashing", { idx: session.current })}\n` +
-        `${this.t("canYouSeeShort")}\n` +
-        `${this.t("yesNoDoneLine")}`,
-      progress: this.t("progressSegment", { idx: session.current }),
-      active: true,
-    };
-  }
-
-  /**
-   * User ends the session — "end of strip, no further segments".
-   * The currently-flashed segment was NOT answered, so it doesn't count.
-   */
-  public async done(): Promise<WizardResponse> {
-    const session = this.session;
-    if (!session) {
-      return { error: this.t("errNoWizardShort") };
-    }
-    if (session.current === 0) {
-      return { error: this.t("errAnswerFirst") };
-    }
-    return this.finish();
+    return { active: true };
   }
 
   /** Abort the session and roll back to the captured baseline. */
@@ -412,16 +385,14 @@ export class SegmentWizard {
     }
     this.session = null;
     this.clearIdleTimer();
-    return {
-      message: `${this.t("abortTitle")}\n` + `${this.t("abortRestored")}\n` + `${this.t("abortRestart")}`,
-      done: true,
-      aborted: true,
-    };
+    return { done: true, aborted: true };
   }
 
   /**
    * Consolidate the session into a {@link WizardResult}, hand off to the host
-   * for application, restore baseline and close the session.
+   * for application, restore baseline and close the session. Reached only when
+   * the protocol limit is hit mid-measurement — the React flow finalizes via
+   * {@link apply} with its review-corrected map.
    */
   private async finish(): Promise<WizardResponse> {
     const session = this.session;
@@ -447,19 +418,7 @@ export class SegmentWizard {
 
     await this.finalize(device, session, result);
 
-    const summary = result.hasGaps ? this.t("finishGaps", { list: manualList }) : this.t("finishNoGaps");
-    return {
-      message:
-        `${this.t("finishDone")}\n\n` +
-        `${this.t("finishCount", { count: segmentCount })}\n` +
-        `${summary}\n` +
-        `${this.t("finishTreeRebuilt")}`,
-      progress: this.t("progressCount", { count: segmentCount }),
-      done: true,
-      segmentCount,
-      list: manualList,
-      hasGaps: result.hasGaps,
-    };
+    return { done: true, segmentCount, list: manualList, hasGaps: result.hasGaps };
   }
 
   /**

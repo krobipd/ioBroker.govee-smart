@@ -188,6 +188,26 @@ export const SEGMENT_HARD_MAX = 55;
 export const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;
 
 /**
+ * The segment count the state tree is built for: the resolved count
+ * ({@link resolveSegmentCount}), grown by a manual index list that reaches
+ * beyond it (a user editing `manual_list` can reveal indices the strip never
+ * reported), never above what the protocol can address. Pure — the caller
+ * (DeviceManager) stores the result on the device; the state-tree writer only
+ * reads it.
+ *
+ * @param device Target device
+ * @param registry This instance's device catalog
+ */
+export function effectiveSegmentCount(device: GoveeDevice, registry: DeviceRegistry): number {
+  const resolved = resolveSegmentCount(device, registry);
+  const manualMax =
+    Array.isArray(device.manualSegments) && device.manualSegments.length > 0
+      ? Math.max(...device.manualSegments) + 1
+      : 0;
+  return Math.min(Math.max(resolved, manualMax), SEGMENT_COUNT_MAX);
+}
+
+/**
  * A segment COUNT the Govee bitmask protocol can actually address: an integer in
  * `1..SEGMENT_COUNT_MAX`. Anything else — 0, a fraction, a corrupt cache value, a
  * Cloud capability advertising thousands of slots, an oversized wizard payload —

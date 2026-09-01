@@ -3,7 +3,7 @@ import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import type { StateManager } from "../state-manager";
 import type { ActionableProblems } from "../actionable-problems";
-import type { CloudLoadResult } from "../types";
+import { logRejected, type CloudLoadResult } from "../types";
 import { READY_TIMEOUT_MS } from "../timing-constants";
 
 /**
@@ -70,8 +70,10 @@ export function buildCloudRetryHost(adapter: CloudRetryHandlerAdapter): CloudRet
     onCloudRestored: async () => {
       adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
       adapter.cloudWasConnected = true;
-      adapter.setState("info.cloudConnected", { val: true, ack: true }).catch(() => {});
-      adapter.stateManager?.updateGroupsOnline(true).catch(() => {});
+      adapter
+        .setState("info.cloudConnected", { val: true, ack: true })
+        .catch(logRejected(adapter.log, "write info.cloudConnected"));
+      adapter.stateManager?.updateGroupsOnline(true).catch(logRejected(adapter.log, "write groups.info.online"));
       await adapter.loadCloudStates();
     },
   };

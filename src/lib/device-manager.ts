@@ -6,6 +6,7 @@ import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
 import {
   deviceKey as deviceKeyHelper,
+  effectiveSegmentCount,
   findDeviceBySkuAndId as findDeviceBySkuAndIdHelper,
   parseMqttSegmentData,
   plausibleSegmentCount,
@@ -52,16 +53,6 @@ import {
   formatGatewayLabel,
 } from "./types";
 import { extractHttpStatus, HttpError } from "./http-client";
-
-// Re-export for backwards compat — consumers (main.ts, segment-wizard, state-manager)
-// import these directly from "./device-manager".
-export {
-  parseMqttSegmentData,
-  resolveSegmentCount,
-  SEGMENT_HARD_MAX,
-  type MqttSegmentData,
-} from "./device-manager/lookups";
-export { buildCapabilitiesFromAppEntry, cloudDeviceToGoveeDevice } from "./device-manager/mapping";
 
 /**
  * Device manager — maintains unified device list and routes commands
@@ -1219,6 +1210,21 @@ export class DeviceManager {
    */
   public persistDeviceToCache(device: GoveeDevice): void {
     cacheHelpers.persistDeviceToCache(this, device);
+  }
+
+  /**
+   * Settle the device's segment count from every source (catalog quirk, learned
+   * count, Cloud capabilities, manual list) and store it on the device — the
+   * one place the domain object is written. The state-tree builder receives
+   * the number and only reads it.
+   *
+   * @param device Target device
+   * @returns The count the segment tree is to be built for
+   */
+  public syncSegmentCount(device: GoveeDevice): number {
+    const count = effectiveSegmentCount(device, this.registry);
+    device.segmentCount = count;
+    return count;
   }
 
   /**

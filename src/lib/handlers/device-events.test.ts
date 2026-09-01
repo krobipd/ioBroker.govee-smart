@@ -40,7 +40,7 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
   const adapter = {
     log: mockLog,
     namespace: "govee-smart.0",
-    deviceManager: { getDevices: () => devices } as never,
+    deviceManager: { getDevices: () => devices, syncSegmentCount: (d: GoveeDevice) => d.segmentCount ?? 0 } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
       updateDeviceState: async (_d: GoveeDevice, s: Partial<DeviceState>) => {

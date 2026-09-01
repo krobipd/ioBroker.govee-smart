@@ -9,6 +9,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { StateManager } from "./state-manager";
 import { DeviceRegistry } from "./device-registry";
+import { effectiveSegmentCount } from "./device-manager/lookups";
 
 /** Catalog without entries — the state-manager tests do not exercise quirks. */
 const registry = new DeviceRegistry({ data: { devices: {} } });
@@ -29,7 +30,11 @@ async function createAllStatesForTest(
   await sm.createInfoStates(device);
   await sm.createLanStates(device);
   const cloudDefs = stateDefs.filter(d => !LAN_STATE_IDS.has(d.id));
-  await sm.createCloudStates(device, cloudDefs);
+  // Production settles the count in DeviceManager.syncSegmentCount and stores
+  // it on the device before the tree is built — mirror that here.
+  const segmentCount = effectiveSegmentCount(device, registry);
+  device.segmentCount = segmentCount;
+  await sm.createCloudStates(device, cloudDefs, segmentCount);
 }
 
 /** Track adapter method calls */
@@ -2243,9 +2248,10 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       // A cut strip whose user-entered list reaches beyond what Cloud reports.
       manualSegments: [0, 5, 13],
     });
-    await sm.createSegmentStates(dev);
+    const count = effectiveSegmentCount(dev, registry);
+    expect(count).toBe(14);
+    await sm.createSegmentStates(dev, count);
     expect(objects.has("devices.h6160_0011.segments.13")).toBe(true);
-    expect(dev.segmentCount).toBe(14);
   });
 
   it("ensureState writes an object once per id, not on every call", async () => {
@@ -2286,7 +2292,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
         capabilityType: "devices.capabilities.on_off",
         capabilityInstance: "powerSwitch",
       },
-    ] as StateDefinition[]);
+    ] as StateDefinition[], 0);
     expect((objects.get("devices.h6160_0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
     expect((objects.get("devices.h6160_0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
   });
