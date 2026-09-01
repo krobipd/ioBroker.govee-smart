@@ -57,7 +57,7 @@ Der Account-Login (Email/Passwort) läuft NUR, wenn beide Felder gesetzt sind (g
 - **`src/lib/device-manager/`** — Sub-Files für Cloud-Merge (`cloud-merge`), Cache (`cache`), Library-Loading (`library-loader`), Reconcile (`reconciler`) sowie die reinen `lookups.ts` + `mapping.ts`, die dadurch direkt testbar sind.
 - **Die vier API-Clients:** `govee-cloud-client` (Cloud-REST v2, API-Key) · `govee-mqtt-client` (AWS-IoT, Account-Login) · `govee-openapi-mqtt-client` (Cloud-Events, API-Key) · `govee-lan-client` (UDP) · `govee-api-client` (App-API app2.govee.com). Beide MQTT-Clients erben Reconnect/Backoff aus `reconnecting-mqtt-client`.
 
-`src-admin/` ist eine eigenständige Module-Federation-React-Komponente (Vite, Vorbild `iobroker.public-holidays`) → baut nach `admin/custom/customComponents.js` (git-getrackt, via `files[]` + `prepublishOnly` im Tarball). Eigene i18n mit `gsw_`-Keys, 11 Sprachen. Enthält `SegmentWizard`/`SegmentGrid`/`useWizardApi` + `SegmentWizardConfig` (Module-Federation-Mount).
+`src-admin/` ist eine eigenständige Module-Federation-React-Komponente (Vite, Vorbild `iobroker.public-holidays`) → baut nach `admin/custom/customComponents.js` (git-getrackt, via `files[]` im Tarball; Bau läuft als Master-Release-Schritt `npm run --if-present build:admin`, Hand-Veröffentlichung nur via `npm run publish:manual` — kein `prepublishOnly` mehr seit dem W0095-Umbau 2026-09-01). Eigene i18n mit `gsw_`-Keys, 11 Sprachen. Enthält `SegmentWizard`/`SegmentGrid`/`useWizardApi` + `SegmentWizardConfig` (Module-Federation-Mount).
 
 ## State Tree
 
