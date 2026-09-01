@@ -253,40 +253,72 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never);
       expect(await sm.markAllOffline()).toEqual(["devices.h6160_0011.info.online"]);
     });
+
+    it("at shutdown it scans nothing — the marker list is served from the cache the run maintained", async () => {
+      // The host allows one second before it kills the process; two full-tree
+      // scans plus sequential writes were spending it on things already known.
+      const { adapter, objects, states, calls } = createMockAdapter();
+      objects.set("devices.h6160_0099.info.online", { type: "state" });
+      states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const sm = new StateManager(adapter as never);
+      await sm.markAllOffline(); // startup: cold cache → one scan
+      await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() })); // a device created during the run
+      await sm.writeDeviceRollup();
+      calls.length = 0;
+
+      const touched = await sm.markAllOffline(); // shutdown
+
+      expect(touched.sort()).toEqual(["devices.h6160_0011.info.online", "devices.h6160_0099.info.online"]);
+      expect(calls.filter(c => c.method === "getObjectViewAsync")).toHaveLength(0);
+      expect(states.get("devices.h6160_0011.info.online")?.val).toBe(false);
+      expect(states.get("info.devicesOnline")?.val).toBe(0);
+      expect(states.get("info.devicesAllOnline")?.val).toBe(false);
+    });
   });
 
   describe("writeDeviceRollup", () => {
-    it("counts the real devices and how many of them are reachable", async () => {
-      const { adapter, objects, states } = createMockAdapter();
-      for (const [id, online] of [
-        ["devices.h6160_0011", true],
-        ["devices.h6160_0022", true],
-        ["devices.h6160_0033", false],
-      ] as [string, boolean][]) {
-        objects.set(`${id}.info.online`, { type: "state" });
-        states.set(`${id}.info.online`, { val: online, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      }
+    it("counts the real devices and how many of them are reachable — from the round's own results", async () => {
+      // The rollup rides on the same round that just resolved every marker; it
+      // counts what that round wrote, it does not read the markers back.
+      const { adapter, states, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never);
+      await sm.markAllOffline(); // startup stamp — the one moment the tree is scanned
+      const fresh = Date.now();
+      await sm.createInfoStates(createTestDevice({ deviceId: "AABBCCDDEEFF0011", lastLanReplyAt: fresh }));
+      await sm.createInfoStates(createTestDevice({ deviceId: "AABBCCDDEEFF0022", lastLanReplyAt: fresh }));
+      await sm.createInfoStates(createTestDevice({ deviceId: "AABBCCDDEEFF0033", lastLanReplyAt: fresh - 91_000 }));
       // The Govee app's groups sit in the tree as pseudo-devices — counting them
       // would show more devices than the user physically owns.
-      objects.set("groups.info.online", { type: "state" });
-      states.set("groups.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      await sm.createGroupsOnlineState(true);
+      calls.length = 0;
 
-      const sm = new StateManager(adapter as never);
       const result = await sm.writeDeviceRollup();
 
       expect(result).toEqual({ total: 3, online: 2 });
       expect(states.get("info.devicesTotal")?.val).toBe(3);
       expect(states.get("info.devicesOnline")?.val).toBe(2);
       expect(states.get("info.devicesAllOnline")?.val).toBe(false);
+      // No marker is read back from the database, no tree scan either.
+      expect(calls.filter(c => c.method === "getStateAsync")).toHaveLength(0);
+      expect(calls.filter(c => c.method === "getObjectViewAsync")).toHaveLength(0);
     });
 
     it("all reachable sets the flag", async () => {
-      const { adapter, objects, states } = createMockAdapter();
-      objects.set("devices.h6160_0011.info.online", { type: "state" });
-      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const { adapter, states } = createMockAdapter();
       const sm = new StateManager(adapter as never);
+      await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
       await sm.writeDeviceRollup();
       expect(states.get("info.devicesAllOnline")?.val).toBe(true);
+    });
+
+    it("a marker nobody resolved this run counts as offline (a device still waiting to be reaped)", async () => {
+      const { adapter, objects, states } = createMockAdapter();
+      objects.set("devices.h6160_0099.info.online", { type: "state" });
+      states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      const sm = new StateManager(adapter as never);
+      await sm.markAllOffline(); // startup stamp — the leftover is found in the DB and set false
+      await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
+      expect(await sm.writeDeviceRollup()).toEqual({ total: 2, online: 1 });
     });
 
     it("no devices at all does not claim everything is fine", async () => {
@@ -2159,8 +2191,15 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     const sm = new StateManager(adapter as never);
     const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now() });
     await createAllStatesForTest(sm, dev, []);
+    // setStateChangedAsync is the platform's own "only on change" write — the
+    // mock records whether the value actually changed, and only those count.
     const countWrites = (): number =>
-      calls.filter(c => c.method === "setState" && c.args[0] === "devices.h6160_0011.info.online").length;
+      calls.filter(
+        c =>
+          c.method === "setStateChangedAsync" &&
+          c.args[0] === "devices.h6160_0011.info.online" &&
+          (c.args[2] as { changed: boolean }).changed,
+      ).length;
 
     await sm.syncInfoOnline(dev); // settle whatever createInfoStates left behind
     const before = countWrites();

@@ -143,7 +143,9 @@ export function persistDeviceToCache(adapter: DeviceCacheAdapter, device: GoveeD
   if (!adapter.skuCache) {
     return;
   }
-  adapter.skuCache.save(goveeDeviceToCached(device));
+  // save() never rejects (a failed write is a warn line inside it), so the
+  // callers on the event paths don't have to wait for the disk.
+  void adapter.skuCache.save(goveeDeviceToCached(device));
 }
 
 /**
@@ -164,7 +166,7 @@ export function saveDevicesToCache(adapter: DeviceCacheAdapter): void {
       skippedCount++;
       adapter.log.debug(`Not caching ${deviceLabel(device)} — scenes not yet checked`);
     } else {
-      adapter.skuCache.save(goveeDeviceToCached(device));
+      void adapter.skuCache.save(goveeDeviceToCached(device));
       cachedCount++;
     }
   }

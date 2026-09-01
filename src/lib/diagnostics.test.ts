@@ -178,6 +178,45 @@ describe("DiagnosticsCollector", () => {
       expect(list[0].body as string).toContain("<truncated");
     });
 
+    it("keeps a device's API history under the byte budget — oldest entries anywhere go first, the newest stays", () => {
+      // 24 endpoints × 6 slots × 64 KB is >9 MB per device in theory; a light with
+      // a big scene library really sat at a megabyte. Budget: 512 KB per device.
+      const c = new DiagnosticsCollector();
+      const big = "x".repeat(60_000); // ~60 KB per entry, under the per-body cap
+      for (let i = 0; i < 6; i++) {
+        c.recordApiSuccess("dev1", "/api/scenes", { i, big });
+      }
+      for (let i = 0; i < 6; i++) {
+        c.recordApiSuccess("dev1", "/api/library", { i, big });
+      }
+      const hist = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0").apiHistory as Record<
+        string,
+        Array<{ body: { i: number }; bytes: number }>
+      >;
+      const all = [...(hist["/api/scenes"] ?? []), ...(hist["/api/library"] ?? [])];
+      const total = all.reduce((sum, e) => sum + e.bytes, 0);
+      expect(total).toBeLessThanOrEqual(512 * 1024);
+      // 12 × ~60 KB = ~720 KB were recorded — the oldest scene entries were evicted
+      // first, the newest library entry is always present.
+      expect(all.length).toBeLessThan(12);
+      expect(hist["/api/library"][hist["/api/library"].length - 1].body.i).toBe(5);
+      expect(hist["/api/scenes"]?.[0]?.body.i ?? 6).toBeGreaterThan(0);
+    });
+
+    it("caps a captured MQTT envelope and a LAN payload instead of storing them whole", () => {
+      const c = new DiagnosticsCollector();
+      c.addMqttPacket("dev1", "topic", { rawJson: "y".repeat(20_000), hex: "aa" });
+      c.addLanSend("dev1", "10.0.0.5", "ptReal", { command: ["z".repeat(40_000)] });
+      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const packet = (result.lastMqttPackets as Array<{ rawJson: string; hex: string }>)[0];
+      expect(packet.hex).toBe("aa");
+      expect(packet.rawJson.length).toBeLessThan(4_200);
+      expect(packet.rawJson).toContain("<truncated 20000b>");
+      const send = (result.lanSends as Array<{ payload: unknown }>)[0];
+      expect(typeof send.payload).toBe("string");
+      expect(send.payload as string).toContain("<truncated");
+    });
+
     it("falls back to String() when body is non-serialisable", () => {
       const c = new DiagnosticsCollector();
       const cyclic: Record<string, unknown> = {};

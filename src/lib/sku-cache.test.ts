@@ -1,18 +1,26 @@
 import { vi } from "vitest";
 
 /**
- * node:fs is passed through unchanged except for a fsyncSync counter — the
- * durability test below needs to see that the save really flushed, and vitest
- * cannot spy on ESM exports.
+ * node:fs is passed through unchanged except for a flush counter on the file
+ * handles fs.promises.open hands out — the durability test below needs to see
+ * that the save really flushed, and vitest cannot spy on ESM exports.
  */
 const fsCounters = vi.hoisted(() => ({ fsync: 0 }));
 vi.mock("node:fs", async importOriginal => {
   const actual = await importOriginal<typeof import("node:fs")>();
-  const fsyncSync = (fd: number): void => {
-    fsCounters.fsync++;
-    actual.fsyncSync(fd);
+  // save() flushes through FileHandle.sync() on a handle from fs.promises.open —
+  // wrap the handle so the durability test can see the flush happen.
+  const open: typeof actual.promises.open = async (...args) => {
+    const handle = await actual.promises.open(...args);
+    const origSync = handle.sync.bind(handle);
+    handle.sync = async (): Promise<void> => {
+      fsCounters.fsync++;
+      await origSync();
+    };
+    return handle;
   };
-  return { ...actual, default: { ...actual, fsyncSync }, fsyncSync };
+  const promises = { ...actual.promises, open };
+  return { ...actual, default: { ...actual, promises }, promises };
 });
 
 import * as fs from "node:fs";
@@ -72,20 +80,20 @@ describe("SkuCache", () => {
     cleanup(dir);
   });
 
-  it("should create cache directory on construction", () => {
+  it("should create cache directory on construction", async () => {
     new SkuCache(dir, mockLog);
     expect(fs.existsSync(path.join(dir, "cache"))).toBe(true);
   });
 
-  it("should return empty for non-existent cache", () => {
+  it("should return empty for non-existent cache", async () => {
     const cache = new SkuCache(dir, mockLog);
     expect(cache.loadAll()).toEqual([]);
   });
 
-  it("should save and load a cache entry", () => {
+  it("should save and load a cache entry", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
-    cache.save(data);
+    await cache.save(data);
     const all = cache.loadAll();
     expect(all).toHaveLength(1);
     const loaded = all[0];
@@ -101,68 +109,68 @@ describe("SkuCache", () => {
     });
   });
 
-  it("should overwrite existing cache entry", () => {
+  it("should overwrite existing cache entry", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
-    cache.save(data);
+    await cache.save(data);
     data.name = "Updated Light";
     data.scenes.push({ name: "Aurora", value: { id: 2 } });
-    cache.save(data);
+    await cache.save(data);
     const all = cache.loadAll();
     expect(all).toHaveLength(1);
     expect(all[0].name).toBe("Updated Light");
     expect(all[0].scenes).toHaveLength(2);
   });
 
-  it("should store separate entries for different devices", () => {
+  it("should store separate entries for different devices", async () => {
     const cache = new SkuCache(dir, mockLog);
-    cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
-    cache.save(createTestData("H6160", "EE:FF:00:11:22:33:44:55"));
+    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
+    await cache.save(createTestData("H6160", "EE:FF:00:11:22:33:44:55"));
     const all = cache.loadAll();
     expect(all).toHaveLength(2);
     const skus = all.map(d => d.sku).sort();
     expect(skus).toEqual(["H6160", "H61BE"]);
   });
 
-  it("should store separate entries for same SKU different devices", () => {
+  it("should store separate entries for same SKU different devices", async () => {
     const cache = new SkuCache(dir, mockLog);
-    cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:11:11"));
-    cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:22:22"));
+    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:11:11"));
+    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:22:22"));
     const all = cache.loadAll();
     expect(all).toHaveLength(2);
   });
 
-  it("should loadAll from empty cache", () => {
+  it("should loadAll from empty cache", async () => {
     const cache = new SkuCache(dir, mockLog);
     expect(cache.loadAll()).toEqual([]);
   });
 
-  it("should clear all cache entries", () => {
+  it("should clear all cache entries", async () => {
     const cache = new SkuCache(dir, mockLog);
-    cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
-    cache.save(createTestData("H6160", "EE:FF:00:11:22:33:44:55"));
+    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
+    await cache.save(createTestData("H6160", "EE:FF:00:11:22:33:44:55"));
     expect(cache.loadAll()).toHaveLength(2);
     cache.clear();
     expect(cache.loadAll()).toHaveLength(0);
   });
 
-  it("should handle corrupt JSON gracefully", () => {
+  it("should handle corrupt JSON gracefully", async () => {
     const cache = new SkuCache(dir, mockLog);
     const cacheDir = path.join(dir, "cache");
     fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
     expect(cache.loadAll()).toEqual([]);
   });
 
-  it("should use normalized device ID for file naming", () => {
+  it("should use normalized device ID for file naming", async () => {
     const cache = new SkuCache(dir, mockLog);
-    cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
+    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
     // Same device without colons should hit same file (loadAll finds the single entry)
     const all = cache.loadAll();
     expect(all).toHaveLength(1);
     expect(all[0].sku).toBe("H61BE");
   });
 
-  it("should preserve all library data types", () => {
+  it("should preserve all library data types", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     data.musicLibrary = [
@@ -170,7 +178,7 @@ describe("SkuCache", () => {
       { name: "Rhythm", musicCode: 2, mode: 1 },
     ];
     data.diyLibrary = [{ name: "My DIY", diyCode: 10, scenceParam: "BASE64DATA" }];
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.musicLibrary).toHaveLength(2);
     expect(loaded.musicLibrary[0].scenceParam).toBe("AQID");
@@ -178,34 +186,34 @@ describe("SkuCache", () => {
     expect(loaded.diyLibrary[0].scenceParam).toBe("BASE64DATA");
   });
 
-  it("should handle null skuFeatures", () => {
+  it("should handle null skuFeatures", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     data.skuFeatures = null;
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.skuFeatures).toBeNull();
   });
 
-  it("should not throw when deviceId is non-string", () => {
+  it("should not throw when deviceId is non-string", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     (data as unknown as { deviceId: unknown }).deviceId = 12345;
-    expect(() => cache.save(data)).not.toThrow();
+    await expect(cache.save(data)).resolves.toBeUndefined();
   });
 
-  it("should not throw when sku is non-string", () => {
+  it("should not throw when sku is non-string", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     (data as unknown as { sku: unknown }).sku = null;
-    expect(() => cache.save(data)).not.toThrow();
+    await expect(cache.save(data)).resolves.toBeUndefined();
   });
 
   describe("save — durability", () => {
-    it("flushes the cache file to disk instead of leaving it in the page cache", () => {
+    it("flushes the cache file to disk instead of leaving it in the page cache", async () => {
       const before = fsCounters.fsync;
       const cache = new SkuCache(dir, mockLog);
-      cache.save(createTestData("H6100", "FSY:00:00:00:00:00:00:01"));
+      await cache.save(createTestData("H6100", "FSY:00:00:00:00:00:00:01"));
       // Without the fsync a SIGKILL inside the ~30 s writeback window loses
       // the save silently and the next start reads stale device data.
       expect(fsCounters.fsync).toBeGreaterThan(before);
@@ -215,14 +223,14 @@ describe("SkuCache", () => {
   describe("pruneStale", () => {
     const DAY_MS = 24 * 60 * 60 * 1000;
 
-    it("removes entries older than maxAgeDays", () => {
+    it("removes entries older than maxAgeDays", async () => {
       const cache = new SkuCache(dir, mockLog);
       const old = createTestData("H6001", "OLD:00:00:00:00:00:00:01");
       old.lastSeenOnNetwork = Date.now() - 30 * DAY_MS; // 30 days ago
       const fresh = createTestData("H6002", "NEW:00:00:00:00:00:00:02");
       fresh.lastSeenOnNetwork = Date.now() - 2 * DAY_MS; // 2 days ago
-      cache.save(old);
-      cache.save(fresh);
+      await cache.save(old);
+      await cache.save(fresh);
 
       const pruned = cache.pruneStale(14);
       expect(pruned).toBe(1);
@@ -231,21 +239,21 @@ describe("SkuCache", () => {
       expect(remaining[0].sku).toBe("H6002");
     });
 
-    it("keeps legacy entries without lastSeenOnNetwork", () => {
+    it("keeps legacy entries without lastSeenOnNetwork", async () => {
       const cache = new SkuCache(dir, mockLog);
       const legacy = createTestData("H6003", "OLD:00:00:00:00:00:00:03");
       delete (legacy as { lastSeenOnNetwork?: number }).lastSeenOnNetwork;
-      cache.save(legacy);
+      await cache.save(legacy);
 
       const pruned = cache.pruneStale(14);
       expect(pruned).toBe(0);
       expect(cache.loadAll()).toHaveLength(1);
     });
 
-    it("keeps an entry whose timestamp is not a number (hand-edited / foreign file)", () => {
+    it("keeps an entry whose timestamp is not a number (hand-edited / foreign file)", async () => {
       const cache = new SkuCache(dir, mockLog);
       const data = createTestData("H6005", "STR:00:00:00:00:00:00:05");
-      cache.save(data);
+      await cache.save(data);
       // A string timestamp compares as `"..." < cutoff` → true, so an
       // unchecked prune would delete a perfectly current entry.
       const file = fs.readdirSync(path.join(dir, "cache"))[0];
@@ -259,16 +267,16 @@ describe("SkuCache", () => {
       expect(cache.loadAll()).toHaveLength(1);
     });
 
-    it("returns 0 on empty cache", () => {
+    it("returns 0 on empty cache", async () => {
       const cache = new SkuCache(dir, mockLog);
       expect(cache.pruneStale(14)).toBe(0);
     });
 
-    it("respects custom maxAgeDays threshold", () => {
+    it("respects custom maxAgeDays threshold", async () => {
       const cache = new SkuCache(dir, mockLog);
       const data = createTestData("H6004", "MID:00:00:00:00:00:00:04");
       data.lastSeenOnNetwork = Date.now() - 5 * DAY_MS; // 5 days ago
-      cache.save(data);
+      await cache.save(data);
 
       // With 7-day threshold: still fresh
       expect(cache.pruneStale(7)).toBe(0);
@@ -278,7 +286,7 @@ describe("SkuCache", () => {
       expect(cache.loadAll()).toHaveLength(0);
     });
 
-    it("skips corrupt cache files silently", () => {
+    it("skips corrupt cache files silently", async () => {
       const cache = new SkuCache(dir, mockLog);
       const cacheDir = path.join(dir, "cache");
       fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
@@ -286,41 +294,41 @@ describe("SkuCache", () => {
     });
   });
 
-  it("should persist scenesChecked flag", () => {
+  it("should persist scenesChecked flag", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     data.scenesChecked = true;
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.scenesChecked).toBe(true);
   });
 
-  it("should persist lastSeenOnNetwork timestamp", () => {
+  it("should persist lastSeenOnNetwork timestamp", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     const now = Date.now();
     data.lastSeenOnNetwork = now;
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.lastSeenOnNetwork).toBe(now);
   });
 
-  it("should persist segmentCount (authoritative real count)", () => {
+  it("should persist segmentCount (authoritative real count)", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     data.segmentCount = 20;
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.segmentCount).toBe(20);
   });
 
-  it("should persist manualMode + manualSegments together", () => {
+  it("should persist manualMode + manualSegments together", async () => {
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData();
     data.segmentCount = 15;
     data.manualMode = true;
     data.manualSegments = [0, 1, 2, 5, 6, 7, 8];
-    cache.save(data);
+    await cache.save(data);
     const loaded = cache.loadAll()[0];
     expect(loaded.manualMode).toBe(true);
     expect(loaded.manualSegments).toEqual([0, 1, 2, 5, 6, 7, 8]);

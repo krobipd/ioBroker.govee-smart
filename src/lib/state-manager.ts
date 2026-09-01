@@ -220,6 +220,13 @@ export class StateManager {
    * where the object DB is the only truth) always refreshes it from the DB.
    */
   private onlineMarkerCache: Set<string> | null = null;
+  /**
+   * The online value each marker was last resolved to (by {@link syncInfoOnline}
+   * or {@link markAllOffline}), keyed by marker id. The 20-second rollup counts
+   * from here instead of re-reading every marker from the state database — the
+   * round has just written exactly these values, so the two can't disagree.
+   */
+  private readonly resolvedOnline = new Map<string, boolean>();
 
   /** @param adapter The ioBroker adapter instance */
   constructor(adapter: utils.AdapterInstance) {
@@ -358,18 +365,27 @@ export class StateManager {
    * has run and the devices are known again — for a LAN light that is another 90
    * seconds of reply timeout on top.
    *
-   * Works off the object database, not off the device map: at startup no device is
+   * Works off the marker list, not off the device map: at startup no device is
    * known yet, and at shutdown the map may already be torn down. Everything that
    * carries an `info.online` state is covered in one pass, devices and the group
    * rollup alike.
    *
+   * Startup is the one moment the object database has to be scanned — the cache
+   * is cold and a previous run's leftovers are only known there. At shutdown the
+   * cache has been maintained by every create / migrate / remove since, so no
+   * scan runs and the host's one-second stop budget goes into the writes
+   * themselves, which are issued in parallel for the same reason.
+   *
    * @returns the state ids that were set to false
    */
   public async markAllOffline(): Promise<string[]> {
-    const ids = await this.onlineMarkerIds(true);
+    const ids = await this.onlineMarkerIds();
     for (const id of ids) {
-      await this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => undefined);
+      this.resolvedOnline.set(id, false);
     }
+    await Promise.all(
+      ids.map(id => this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => undefined)),
+    );
     await this.clearDeviceRollup();
     return ids;
   }
@@ -394,15 +410,14 @@ export class StateManager {
 
   /**
    * The online markers of devices and of the group rollup. Served from
-   * {@link onlineMarkerCache} on the 20-second rollup path; a DB scan runs only
-   * when the cache is cold or a refresh is forced (startup/shutdown via
-   * {@link markAllOffline}, where leftovers from a previous run must be found).
+   * {@link onlineMarkerCache}; the object DB is scanned only while the cache is
+   * cold — i.e. once, at startup, where a previous run's leftovers must be found.
+   * Every later create / migrate / remove maintains the cache.
    *
-   * @param forceRefresh Rebuild the cache from the object DB
    * @returns the state ids ending in `.info.online`
    */
-  private async onlineMarkerIds(forceRefresh = false): Promise<string[]> {
-    if (!forceRefresh && this.onlineMarkerCache) {
+  private async onlineMarkerIds(): Promise<string[]> {
+    if (this.onlineMarkerCache) {
       return Array.from(this.onlineMarkerCache);
     }
     const ids = (await this.existingStateIds()).filter(id => id.endsWith(".info.online"));
@@ -419,23 +434,19 @@ export class StateManager {
    *
    * Counts REAL devices only — the Govee app's groups live in the tree as
    * pseudo-devices and would inflate the number beyond what the user physically
-   * owns. Works off the marker-id list, not off the device map — but since the
-   * cache rework that list is served from {@link onlineMarkerCache} on this
-   * 20-second path; only a cold cache falls back to the object database
-   * (`markAllOffline` still forces the DB read, it runs where the map is gone).
+   * owns. Total = the marker list ({@link onlineMarkerCache}); online = the
+   * values the same round just resolved ({@link resolvedOnline}) — no marker is
+   * read back from the state database for a number the adapter wrote itself
+   * a moment ago. A marker nobody resolved this run (a device not in the map,
+   * e.g. one still waiting to be reaped) counts as offline, which is exactly
+   * what {@link markAllOffline} wrote for it at startup.
    *
    * @returns total and online counts, for the caller to log or assert on
    */
   public async writeDeviceRollup(): Promise<{ total: number; online: number }> {
     const ids = await this.onlineMarkerIds();
     const deviceIds = ids.filter(id => id.startsWith("devices."));
-    let online = 0;
-    for (const id of deviceIds) {
-      const state = await this.adapter.getStateAsync(id).catch(() => null);
-      if (state?.val === true) {
-        online++;
-      }
-    }
+    const online = deviceIds.filter(id => this.resolvedOnline.get(id) === true).length;
     const total = deviceIds.length;
     await this.ensureState("info.devicesTotal", tName("devicesTotal"), "number", "value", false);
     await this.ensureState("info.devicesOnline", tName("devicesOnline"), "number", "value", false);
@@ -458,15 +469,19 @@ export class StateManager {
    * so a fresh install does not get a rollup it never had.
    */
   public async clearDeviceRollup(): Promise<void> {
-    const ids = new Set(await this.existingStateIds());
-    if (ids.has("info.devicesOnline")) {
-      await this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }).catch(() => undefined);
-    }
-    if (ids.has("info.devicesAllOnline")) {
-      await this.adapter
-        .setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true })
-        .catch(() => undefined);
-    }
+    // Two targeted existence checks, not a scan of the whole tree: this runs
+    // inside the host's one-second stop budget. A state this run created is
+    // known from the ensure cache; otherwise one object read decides.
+    const exists = async (id: string): Promise<boolean> =>
+      this.ensuredStates.has(id) || (await this.adapter.getObjectAsync(id).catch(() => null)) != null;
+    await Promise.all([
+      exists("info.devicesOnline").then(ok =>
+        ok ? this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }) : undefined,
+      ),
+      exists("info.devicesAllOnline").then(ok =>
+        ok ? this.adapter.setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true }) : undefined,
+      ),
+    ]).catch(() => undefined);
   }
 
   /**
@@ -758,6 +773,7 @@ export class StateManager {
         await this.safeDeleteState(`${prefix}.info.${staleId}`);
       }
       this.onlineMarkerCache?.delete(`${prefix}.info.online`);
+      this.resolvedOnline.delete(`${prefix}.info.online`);
       // Groups never had a `diag` channel — drop any leftover from migrated installs.
       await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
     }
@@ -1497,6 +1513,7 @@ export class StateManager {
    */
   private forgetPrefix(prefix: string): void {
     this.onlineMarkerCache?.delete(`${prefix}.info.online`);
+    this.resolvedOnline.delete(`${prefix}.info.online`);
     for (const key of this.prefixMap.keys()) {
       if (this.prefixMap.get(key) === prefix) {
         this.prefixMap.delete(key);
@@ -1596,8 +1613,10 @@ export class StateManager {
    * `device.state.online` — set by `applyOnlineCap` from App-API / OpenAPI-MQTT
    * — is read straight through here. Local-first stays, local-only does not.
    *
-   * Writes `info.online` only when the resolved value differs from the
-   * current state — kills the 2-min ts-rewrite-spam captured 2026-05-13.
+   * Written with `setStateChangedAsync`, so an unchanged value neither rewrites
+   * the state nor bumps its timestamp (the 2-min ts-rewrite-spam captured
+   * 2026-05-13). The resolved value is also remembered per marker so the
+   * rollup of the same round can count it without reading it back.
    *
    * For Lights: when the resolved online value changes, the internal
    * `device.state.online` is also updated so downstream consumers
@@ -1633,10 +1652,8 @@ export class StateManager {
       desiredOnline = device.state.online === true;
     }
 
-    const current = await this.adapter.getStateAsync(stateId).catch(() => null);
-    if (!current || current.val !== desiredOnline) {
-      await this.adapter.setState(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
-    }
+    this.resolvedOnline.set(stateId, desiredOnline);
+    await this.adapter.setStateChangedAsync(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
 
     let lightOnlineChanged = false;
     if (device.type === GOVEE_DEVICE_TYPE.LIGHT && device.state.online !== desiredOnline) {

@@ -1056,7 +1056,7 @@ export class DeviceManager {
       // Persist now so a restart starts from the real value instead of
       // falling back to Cloud capabilities.
       if (this.skuCache) {
-        this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
+        void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
       }
       // Skip per-segment sync for this push — the datapoints are being rebuilt.
       // The next AA A5 push hits the fully-built tree.

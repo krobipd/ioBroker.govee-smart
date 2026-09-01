@@ -36,6 +36,8 @@ export interface ApiResponseEntry {
   statusCode?: number;
   /** Response body on success. On failure: `{ error, status?, responseBody? }`. */
   body: unknown;
+  /** Serialised size of `body` — what this entry costs against the per-device byte budget. */
+  bytes: number;
 }
 
 /**
@@ -99,6 +101,8 @@ interface DeviceBuffers {
    * call returned Y" cases — the single-slot design lost that timeline.
    */
   responses: Map<string, ApiResponseEntry[]>;
+  /** Running total of `bytes` over every entry in `responses` — kept under {@link MAX_RESPONSE_BYTES_PER_DEVICE}. */
+  responseBytes: number;
   /** Outgoing LAN datagrams — bounded ring buffer, see {@link MAX_LAN_SENDS}. */
   lanSends: LanSendEntry[];
 }
@@ -110,6 +114,15 @@ interface DeviceBuffers {
  * Coverage-Welle adds LAN sends + MQTT raw envelopes + per-fetch raw bodies
  * → previous caps would evict the first interesting frames before a user could
  * trigger the diag.export button.
+ *
+ * Entry COUNTS alone bound nothing useful: 24 endpoints × 6 slots × 64 KB plus
+ * 50 packets × 64 KB is well over 10 MB per device in theory, and a light with
+ * a 64 KB scene library and a 60 KB scene list re-fetched a few times really did
+ * sit at a megabyte for the lifetime of the process. Three byte caps keep the
+ * collector at a size a Raspberry Pi can carry for thirty devices:
+ * {@link MAX_RESPONSE_BYTES_PER_DEVICE} (oldest entries across all endpoints go
+ * first), {@link MAX_PACKET_RAW_BYTES} per MQTT envelope and
+ * {@link MAX_LAN_SEND_BYTES} per outgoing datagram payload.
  */
 const MAX_LOGS = 100;
 const MAX_PACKETS = 50;
@@ -117,6 +130,21 @@ const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
 const MAX_BODY_BYTES = 65_536;
+const MAX_RESPONSE_BYTES_PER_DEVICE = 512 * 1024;
+const MAX_PACKET_RAW_BYTES = 4_096;
+const MAX_LAN_SEND_BYTES = 16_384;
+
+/**
+ * Cut a captured text to `max` characters with a marker. Real MQTT envelopes
+ * and ptReal payloads are a few hundred bytes to a few KB — anything larger
+ * is a Govee anomaly worth seeing the head of, not worth keeping whole.
+ *
+ * @param text Captured text
+ * @param max Character cap
+ */
+function capText(text: string, max: number): string {
+  return text.length > max ? `${text.slice(0, max)}…<truncated ${text.length}b>` : text;
+}
 
 /**
  * Object keys whose values are secrets and must never reach the diagnostics
@@ -201,6 +229,22 @@ function pushBounded<T>(arr: T[], entry: T, max: number): void {
 }
 
 /**
+ * Serialised size of a stored body — the unit the per-device byte budget is
+ * kept in. Non-serialisable values were already turned into strings by
+ * cloneAndCap; anything else counts as zero rather than throwing.
+ *
+ * @param value Stored body
+ */
+function byteSize(value: unknown): number {
+  try {
+    const s = JSON.stringify(value);
+    return typeof s === "string" ? s.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Collects diagnostic context per device and produces the
  * `diag.result` JSON. Replaces the inline
  * `device-manager.generateDiagnostics()` so log/MQTT/API hooks can write
@@ -256,7 +300,7 @@ export class DiagnosticsCollector {
   private get(deviceId: string): DeviceBuffers {
     let b = this.buffers.get(deviceId);
     if (!b) {
-      b = { logs: [], packets: [], responses: new Map(), lanSends: [] };
+      b = { logs: [], packets: [], responses: new Map(), responseBytes: 0, lanSends: [] };
       this.buffers.set(deviceId, b);
     }
     return b;
@@ -299,13 +343,13 @@ export class DiagnosticsCollector {
       if (!payload) {
         return;
       }
-      entry.hex = payload;
+      entry.hex = capText(payload, MAX_PACKET_RAW_BYTES);
     } else if (payload && typeof payload === "object") {
       if (typeof payload.hex === "string" && payload.hex) {
-        entry.hex = payload.hex;
+        entry.hex = capText(payload.hex, MAX_PACKET_RAW_BYTES);
       }
       if (typeof payload.rawJson === "string" && payload.rawJson) {
-        entry.rawJson = payload.rawJson;
+        entry.rawJson = capText(payload.rawJson, MAX_PACKET_RAW_BYTES);
       }
       if (!entry.hex && !entry.rawJson) {
         return;
@@ -337,7 +381,7 @@ export class DiagnosticsCollector {
       ts: new Date().toISOString(),
       ip: String(ip),
       cmd: String(cmd),
-      payload: this.cloneAndCap(payload),
+      payload: this.cloneAndCap(payload, MAX_LAN_SEND_BYTES),
     };
     if (typeof bytes === "number" && Number.isFinite(bytes)) {
       entry.bytes = bytes;
@@ -377,6 +421,7 @@ export class DiagnosticsCollector {
       ok: true,
       statusCode: statusCode ?? 200,
       body: stored,
+      bytes: byteSize(stored),
     });
   }
 
@@ -412,11 +457,15 @@ export class DiagnosticsCollector {
       ok: false,
       statusCode,
       body,
+      bytes: byteSize(body),
     });
   }
 
-  /** @param body Body to clone-via-JSON and cap at MAX_BODY_BYTES. */
-  private cloneAndCap(body: unknown): unknown {
+  /**
+   * @param body Body to clone-via-JSON and cap.
+   * @param maxBytes Size cap for the serialised clone (default {@link MAX_BODY_BYTES}).
+   */
+  private cloneAndCap(body: unknown, maxBytes: number = MAX_BODY_BYTES): unknown {
     try {
       const serialised = JSON.stringify(body);
       if (typeof serialised !== "string") {
@@ -429,8 +478,8 @@ export class DiagnosticsCollector {
       const clone = JSON.parse(serialised) as unknown;
       redactSecretsInPlace(clone);
       const capped = JSON.stringify(clone);
-      if (typeof capped === "string" && capped.length > MAX_BODY_BYTES) {
-        return `<truncated ${capped.length}b: ${capped.slice(0, MAX_BODY_BYTES)}…>`;
+      if (typeof capped === "string" && capped.length > maxBytes) {
+        return `<truncated ${capped.length}b: ${capped.slice(0, maxBytes)}…>`;
       }
       return clone;
     } catch {
@@ -439,17 +488,52 @@ export class DiagnosticsCollector {
   }
 
   /**
+   * Append one API entry under three bounds: the per-endpoint slot count, the
+   * distinct-endpoint count and the per-device byte budget. For the byte
+   * budget the OLDEST entry anywhere in the device's history goes first — the
+   * newest entry is always kept, so a fresh 64 KB scene list evicts stale
+   * copies of itself and of other endpoints rather than being refused.
+   *
    * @param b Device buffers
    * @param entry New API response entry (success or failure) to append
    */
   private appendResponse(b: DeviceBuffers, entry: ApiResponseEntry): void {
     const list = b.responses.get(entry.endpoint) ?? [];
-    pushBounded(list, entry, MAX_RESPONSES_PER_ENDPOINT);
+    list.push(entry);
+    b.responseBytes += entry.bytes;
+    while (list.length > MAX_RESPONSES_PER_ENDPOINT) {
+      b.responseBytes -= list.shift()!.bytes;
+    }
     b.responses.set(entry.endpoint, list);
     if (b.responses.size > MAX_RESPONSE_ENDPOINTS) {
       const first = b.responses.keys().next().value;
       if (first !== undefined) {
+        for (const dropped of b.responses.get(first) ?? []) {
+          b.responseBytes -= dropped.bytes;
+        }
         b.responses.delete(first);
+      }
+    }
+    while (b.responseBytes > MAX_RESPONSE_BYTES_PER_DEVICE) {
+      let oldestKey: string | undefined;
+      let oldestTs = "";
+      for (const [key, entries] of b.responses) {
+        const head = entries[0];
+        if (!head || head === entry) {
+          continue;
+        }
+        if (oldestKey === undefined || head.ts < oldestTs) {
+          oldestKey = key;
+          oldestTs = head.ts;
+        }
+      }
+      if (oldestKey === undefined) {
+        break; // only the entry just added is left — it stays
+      }
+      const entries = b.responses.get(oldestKey)!;
+      b.responseBytes -= entries.shift()!.bytes;
+      if (entries.length === 0) {
+        b.responses.delete(oldestKey);
       }
     }
   }
