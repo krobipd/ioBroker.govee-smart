@@ -147,15 +147,15 @@ export async function applyCloudCapabilities(
   });
   await Promise.all(writes);
 
-  // Remove a phantom `sensor_humidity` datapoint on a temp-only thermometer:
+  // Remove a phantom `humidity` datapoint on a temp-only thermometer:
   // Govee reports `hum:0` for devices without a humidity sensor (e.g. H5109),
-  // which older versions turned into a permanent `sensor_humidity=0` state
+  // which older versions turned into a permanent `humidity=0` state
   // (#31 inspee). A device that declares sensorTemperature but not
   // sensorHumidity has no humidity sensor — drop the orphan once. A real
   // hygrometer (sensorHumidity capability) is never touched.
   const hasTempCap = device.capabilities.some(c => c.instance === "sensorTemperature");
   const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
   if (hasTempCap && !hasHumidityCap) {
-    await adapter.stateManager.removeSyntheticStateOnce(prefix, "sensor_humidity");
+    await adapter.stateManager.removeSyntheticStateOnce(prefix, "humidity");
   }
 }

@@ -210,7 +210,7 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     state: { value: 21.5 },
   };
 
-  it("removes the phantom sensor_humidity orphan for a temp-only thermometer (temperature but no humidity cap) — #31", async () => {
+  it("removes the phantom humidity orphan for a temp-only thermometer (temperature but no humidity cap) — #31", async () => {
     const tempOnly = createTestDevice({
       deviceId: "AA:09",
       type: "devices.types.thermometer",
@@ -219,7 +219,7 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     });
     const rig = makeRig([tempOnly]);
     await applyCloudCapabilities(rig.adapter, tempOnly, [tempCap]);
-    expect(rig.removed).toContainEqual(expect.objectContaining({ stateId: "sensor_humidity" }));
+    expect(rig.removed).toContainEqual(expect.objectContaining({ stateId: "humidity" }));
   });
 
   it("does NOT remove humidity for a real thermo-hygrometer (declares sensorHumidity)", async () => {

@@ -24,6 +24,7 @@ __export(capability_mapper_exports, {
   applyQuirksToStates: () => applyQuirksToStates,
   buildCloudStateDefs: () => buildCloudStateDefs,
   buildLanStateDefs: () => buildLanStateDefs,
+  canonicalSyntheticId: () => canonicalSyntheticId,
   getDefaultLanStates: () => getDefaultLanStates,
   getMusicModeOptions: () => getMusicModeOptions,
   hasDynamicSceneCapability: () => hasDynamicSceneCapability,
@@ -320,12 +321,6 @@ const SENSOR_ROLE_UNIT = {
   co2: { role: "value.co2", unit: "ppm" }
 };
 const EVENT_STATE_ROLES = {
-  lackwater: { role: "indicator.maintenance" },
-  lackwaterevent: { role: "indicator.maintenance" },
-  icefull: { role: "indicator.maintenance" },
-  icefullevent: { role: "indicator.maintenance" },
-  bodyappeared: { role: "sensor.motion" },
-  dirtdetected: { role: "indicator.maintenance" },
   lack_water: { role: "indicator.maintenance" },
   lack_water_event: { role: "indicator.maintenance" },
   ice_full: { role: "indicator.maintenance" },
@@ -333,6 +328,13 @@ const EVENT_STATE_ROLES = {
   body_appeared: { role: "sensor.motion" },
   dirt_detected: { role: "indicator.maintenance" }
 };
+function canonicalSyntheticId(instance) {
+  const id = sanitizeId(instance).replace(/^sensor_/, "");
+  if (id === "carbon_dioxide" || id === "carbondioxide") {
+    return "co2";
+  }
+  return id;
+}
 function mapProperty(cap) {
   var _a, _b;
   const instance = cap.instance.toLowerCase();
@@ -349,7 +351,7 @@ function mapProperty(cap) {
   }
   return [
     {
-      id: sanitizeId(cap.instance),
+      id: canonicalSyntheticId(cap.instance),
       name: humanize(cap.instance),
       type: "number",
       role,
@@ -503,7 +505,7 @@ function mapTemperatureSetting(cap) {
   ];
 }
 function mapEvent(cap) {
-  const id = sanitizeId(cap.instance);
+  const id = canonicalSyntheticId(cap.instance);
   return [
     {
       id,
@@ -714,7 +716,7 @@ function mapCloudStateValue(cap) {
     }
     case "event":
       return {
-        stateId: sanitizeId(cap.instance),
+        stateId: canonicalSyntheticId(cap.instance),
         value: coerceBool(raw)
       };
     case "music_setting":
@@ -732,7 +734,7 @@ function mapCloudStateValue(cap) {
       if (n === null) {
         return null;
       }
-      return { stateId: sanitizeId(cap.instance), value: n };
+      return { stateId: canonicalSyntheticId(cap.instance), value: n };
     }
     default:
       return null;
@@ -1017,6 +1019,7 @@ function buildGroupStateDefs(members) {
   applyQuirksToStates,
   buildCloudStateDefs,
   buildLanStateDefs,
+  canonicalSyntheticId,
   getDefaultLanStates,
   getMusicModeOptions,
   hasDynamicSceneCapability,

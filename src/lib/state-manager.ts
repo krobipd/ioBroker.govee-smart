@@ -82,11 +82,12 @@ function channelName(channel: string): ioBroker.StringOrTranslated {
  * needing a separate `createDeviceStates` pass for sensor-only devices.
  * Keep IDs lowercase; resolveStatePath calls this on the raw stateId.
  */
-// Two spellings per ID below — the "raw" form (e.g. `temperature`) for instances
-// named exactly that, and the sanitizeId output (e.g. `sensor_temperature`) for
-// camelCase instances that capability-mapper's sanitizeId converted to
-// snake_case. Without the alias the sanitized variant would fall back to the
-// safe default "control" and its state would be unreachable.
+// One spelling per ID — the canonical id from capability-mapper's
+// canonicalSyntheticId (`temperature`, not `sensor_temperature`; `lack_water`,
+// not `lackwater`). An id that is NOT in this table is not a synthetic state:
+// cleanupCloudOwnedStates treats it as stale and removes it on the next
+// Cloud-phase rebuild — that is how the pre-2.28.0 spellings leave an
+// upgraded install.
 
 /**
  * Per-stateId metadata for synthetic states (App-API/OpenAPI-MQTT pipe). The
@@ -121,37 +122,7 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   humidity: numSensor("humidity", "humidity"),
   battery: numSensor("battery", "battery"),
   co2: numSensor("co2", "co2"),
-  carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
-  lackwater: { type: "boolean", role: EVENT_STATE_ROLES.lackwater.role, nameKey: "lackOfWater", channel: "events" },
-  lackwaterevent: {
-    type: "boolean",
-    role: EVENT_STATE_ROLES.lackwaterevent.role,
-    nameKey: "lackOfWater",
-    channel: "events",
-  },
-  icefull: { type: "boolean", role: EVENT_STATE_ROLES.icefull.role, nameKey: "iceBucketFull", channel: "events" },
-  icefullevent: {
-    type: "boolean",
-    role: EVENT_STATE_ROLES.icefullevent.role,
-    nameKey: "iceBucketFull",
-    channel: "events",
-  },
-  bodyappeared: {
-    type: "boolean",
-    role: EVENT_STATE_ROLES.bodyappeared.role,
-    nameKey: "bodyDetected",
-    channel: "events",
-  },
-  dirtdetected: {
-    type: "boolean",
-    role: EVENT_STATE_ROLES.dirtdetected.role,
-    nameKey: "dirtDetected",
-    channel: "events",
-  },
-  sensor_temperature: numSensor("temperature", "temperature"),
-  sensor_humidity: numSensor("humidity", "humidity"),
-  sensor_battery: numSensor("battery", "battery"),
   lack_water: { type: "boolean", role: EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
   lack_water_event: {
     type: "boolean",
@@ -306,7 +277,7 @@ export class StateManager {
 
   /**
    * Remove a synthetic App-API/OpenAPI-MQTT sensor state (e.g. a phantom
-   * `sensor_humidity` on a temp-only thermometer) at most once per adapter run.
+   * `humidity` on a temp-only thermometer) at most once per adapter run.
    * These states are created ad-hoc by the App-API pipe and are NOT covered by
    * any def-driven cleanup, so a datapoint that should no longer exist (Govee's
    * `hum:0` sentinel on a device without a humidity capability, #31) would
@@ -314,7 +285,7 @@ export class StateManager {
    * it's a silent no-op on installs that never had the state.
    *
    * @param prefix Device object ID prefix
-   * @param stateId Synthetic state ID (e.g. "sensor_humidity")
+   * @param stateId Synthetic state ID (e.g. "humidity")
    */
   async removeSyntheticStateOnce(prefix: string, stateId: string): Promise<void> {
     const key = `${prefix}.${stateId}`;
@@ -1453,7 +1424,7 @@ export class StateManager {
       // be swept as "stale":
       //  - control: the LAN-default ids belong to the LAN phase (L9).
       //  - sensor/events: the synthetic ids the App-API poll / Cloud-events push
-      //    create ad hoc (battery, sensor_temperature, lack_water, …). They are
+      //    create ad hoc (battery, temperature, lack_water, …). They are
       //    not in any Cloud state-def, so each Cloud-phase rebuild used to delete
       //    them ("Removing stale state") and the next poll re-created them —
       //    object churn on every restart/refresh plus a value gap in between.

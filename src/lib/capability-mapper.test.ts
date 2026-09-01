@@ -10,6 +10,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import {
   applyQuirksToStates as applyQuirksToStatesRaw,
+  canonicalSyntheticId,
   buildCloudStateDefs as buildCloudStateDefsRaw,
   buildLanStateDefs as buildLanStateDefsRaw,
   getDefaultLanStates,
@@ -644,7 +645,7 @@ describe("CapabilityMapper", () => {
       ];
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
-      expect(result[0].id).toBe("sensor_temperature");
+      expect(result[0].id).toBe("temperature");
       expect(result[0].role).toBe("value.temperature");
       expect(result[0].channel).toBe("sensor");
     });
@@ -920,7 +921,7 @@ describe("CapabilityMapper", () => {
         state: { value: 22.5 },
       };
       const result = mapCloudStateValue(cap);
-      expect(result!.stateId).toBe("sensor_temperature");
+      expect(result!.stateId).toBe("temperature");
       expect(result!.value).toBe(22.5);
     });
 
@@ -2153,5 +2154,41 @@ describe("Invariant (M12-B): every value-side stateId has an owning state object
       const owned = defIds.has(mapped.stateId) || syntheticIds.has(mapped.stateId.toLowerCase());
       expect(owned, `${cap.type}/${cap.instance} → "${mapped.stateId}" has NO owning state def (B12 class)`).toBe(true);
     }
+  });
+});
+
+describe("canonicalSyntheticId — one id per reading, whichever path delivers it", () => {
+  it("drops Govee's redundant sensor prefix under the sensor channel", () => {
+    expect(canonicalSyntheticId("sensorTemperature")).toBe("temperature");
+    expect(canonicalSyntheticId("sensorHumidity")).toBe("humidity");
+    expect(canonicalSyntheticId("battery")).toBe("battery");
+  });
+
+  it("names the CO2 reading co2 whatever Govee calls it", () => {
+    expect(canonicalSyntheticId("carbonDioxide")).toBe("co2");
+    expect(canonicalSyntheticId("co2")).toBe("co2");
+  });
+
+  it("keeps events in snake_case", () => {
+    expect(canonicalSyntheticId("lackWaterEvent")).toBe("lack_water_event");
+    expect(canonicalSyntheticId("bodyAppeared")).toBe("body_appeared");
+  });
+
+  it("Cloud state-def and Cloud value write agree on the id, so the value lands on the declared object", () => {
+    // The state-def path (mapCapabilities) and the value path (mapCloudStateValue)
+    // are two functions; until 2.28.0 both used the raw sanitized instance. If one
+    // of them drifts, the reading is written next to an undeclared object.
+    const def = mapCapabilities([
+      { type: "devices.capabilities.property", instance: "sensorHumidity", parameters: { dataType: "INTEGER" } },
+    ])[0];
+    const write = mapCloudStateValue({
+      type: "devices.capabilities.property",
+      instance: "sensorHumidity",
+      state: { value: 41 },
+    });
+    expect(def.id).toBe("humidity");
+    expect(write?.stateId).toBe(def.id);
+    // and the synthetic table (App-API / Cloud-events path) knows exactly that id
+    expect(SYNTHETIC_STATE_META[def.id]).toBeDefined();
   });
 });

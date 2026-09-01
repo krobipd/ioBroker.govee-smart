@@ -4,17 +4,17 @@
     "version": "2.27.1",
     "news": {
       "NEXT": {
-        "en": "The manual device sync button works again and Cloud reconnect no longer stops on a Govee maintenance page. App sensor datapoints keep their history, shutdown is faster and memory stays bounded.",
-        "de": "Der Knopf für den manuellen Geräteabgleich funktioniert wieder, die Cloud-Wiederverbindung stoppt nicht mehr an einer Govee-Wartungsseite. App-Sensoren behalten ihre Historie, Beenden ist schneller.",
-        "ru": "Кнопка ручной синхронизации устройств снова работает, переподключение к облаку не останавливается на странице обслуживания Govee. Датчики приложения сохраняют историю, остановка стала быстрее.",
-        "pt": "O botão de sincronização manual volta a funcionar e a reconexão à nuvem já não para numa página de manutenção da Govee. Os sensores da app mantêm o histórico e a paragem é mais rápida.",
-        "nl": "De knop voor handmatige apparaatsynchronisatie werkt weer en cloud-herverbinding stopt niet meer op een Govee-onderhoudspagina. App-sensoren behouden hun geschiedenis, afsluiten gaat sneller.",
-        "fr": "Le bouton de synchronisation manuelle fonctionne à nouveau et la reconnexion au cloud ne s'arrête plus sur une page de maintenance Govee. Les capteurs de l'app gardent leur historique.",
-        "it": "Il pulsante di sincronizzazione manuale funziona di nuovo e la riconnessione al cloud non si ferma più su una pagina di manutenzione Govee. I sensori dell'app conservano la cronologia.",
-        "es": "El botón de sincronización manual vuelve a funcionar y la reconexión a la nube ya no se detiene en una página de mantenimiento de Govee. Los sensores de la app conservan su historial.",
-        "pl": "Przycisk ręcznej synchronizacji znów działa, a ponowne łączenie z chmurą nie zatrzymuje się na stronie konserwacji Govee. Czujniki z aplikacji zachowują historię, zatrzymanie jest szybsze.",
-        "uk": "Кнопка ручної синхронізації пристроїв знову працює, перепідключення до хмари не зупиняється на сторінці обслуговування Govee. Датчики застосунку зберігають історію, зупинка стала швидшою.",
-        "zh-cn": "手动设备同步按钮恢复可用，云端重连不再因 Govee 维护页面而停止。应用传感器数据点保留历史记录，停止更快，内存占用受限。"
+        "en": "Sensor and event datapoints have one name (sensor.temperature, not sensor.sensor_temperature) — adjust scripts. Manual sync works again, Cloud reconnect no longer stops on a maintenance page.",
+        "de": "Sensor- und Ereignis-Datenpunkte heißen einheitlich (sensor.temperature statt sensor.sensor_temperature) — Skripte anpassen. Manueller Abgleich geht wieder, Cloud-Wiederverbindung stoppt nicht mehr.",
+        "ru": "Датчики и события получили единые имена (sensor.temperature вместо sensor.sensor_temperature) — обновите скрипты. Ручная синхронизация снова работает, переподключение к облаку не останавливается.",
+        "pt": "Sensores e eventos têm um nome único (sensor.temperature em vez de sensor.sensor_temperature) — ajuste os scripts. Sincronização manual volta a funcionar, reconexão à nuvem não para mais.",
+        "nl": "Sensor- en gebeurtenisdatapunten hebben één naam (sensor.temperature i.p.v. sensor.sensor_temperature) — scripts aanpassen. Handmatige synchronisatie werkt weer, cloud-herverbinding stopt niet meer.",
+        "fr": "Capteurs et événements ont un nom unique (sensor.temperature au lieu de sensor.sensor_temperature) — adaptez vos scripts. Synchro manuelle rétablie, la reconnexion cloud ne s'arrête plus.",
+        "it": "Sensori ed eventi hanno un nome unico (sensor.temperature invece di sensor.sensor_temperature) — adeguare gli script. Sincronizzazione manuale ripristinata, la riconnessione cloud non si ferma più.",
+        "es": "Sensores y eventos tienen un nombre único (sensor.temperature en vez de sensor.sensor_temperature) — ajuste sus scripts. Sincronización manual restaurada, la reconexión a la nube no se detiene.",
+        "pl": "Czujniki i zdarzenia mają jedną nazwę (sensor.temperature zamiast sensor.sensor_temperature) — dostosuj skrypty. Ręczna synchronizacja znów działa, ponowne łączenie z chmurą nie zatrzymuje się.",
+        "uk": "Датчики та події отримали єдині назви (sensor.temperature замість sensor.sensor_temperature) — оновіть скрипти. Ручна синхронізація знову працює, перепідключення до хмари не зупиняється.",
+        "zh-cn": "传感器和事件数据点统一命名（sensor.temperature 取代 sensor.sensor_temperature），请调整脚本。手动同步按钮恢复可用，云端重连不再因维护页面而停止。"
       },
       "2.27.1": {
         "en": "Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states.",

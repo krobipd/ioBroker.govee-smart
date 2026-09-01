@@ -56,37 +56,7 @@ const SYNTHETIC_STATE_META = {
   humidity: numSensor("humidity", "humidity"),
   battery: numSensor("battery", "battery"),
   co2: numSensor("co2", "co2"),
-  carbondioxide: numSensor("co2", "co2"),
   online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
-  lackwater: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.lackwater.role, nameKey: "lackOfWater", channel: "events" },
-  lackwaterevent: {
-    type: "boolean",
-    role: import_capability_mapper.EVENT_STATE_ROLES.lackwaterevent.role,
-    nameKey: "lackOfWater",
-    channel: "events"
-  },
-  icefull: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.icefull.role, nameKey: "iceBucketFull", channel: "events" },
-  icefullevent: {
-    type: "boolean",
-    role: import_capability_mapper.EVENT_STATE_ROLES.icefullevent.role,
-    nameKey: "iceBucketFull",
-    channel: "events"
-  },
-  bodyappeared: {
-    type: "boolean",
-    role: import_capability_mapper.EVENT_STATE_ROLES.bodyappeared.role,
-    nameKey: "bodyDetected",
-    channel: "events"
-  },
-  dirtdetected: {
-    type: "boolean",
-    role: import_capability_mapper.EVENT_STATE_ROLES.dirtdetected.role,
-    nameKey: "dirtDetected",
-    channel: "events"
-  },
-  sensor_temperature: numSensor("temperature", "temperature"),
-  sensor_humidity: numSensor("humidity", "humidity"),
-  sensor_battery: numSensor("battery", "battery"),
   lack_water: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
   lack_water_event: {
     type: "boolean",
@@ -219,7 +189,7 @@ class StateManager {
   }
   /**
    * Remove a synthetic App-API/OpenAPI-MQTT sensor state (e.g. a phantom
-   * `sensor_humidity` on a temp-only thermometer) at most once per adapter run.
+   * `humidity` on a temp-only thermometer) at most once per adapter run.
    * These states are created ad-hoc by the App-API pipe and are NOT covered by
    * any def-driven cleanup, so a datapoint that should no longer exist (Govee's
    * `hum:0` sentinel on a device without a humidity capability, #31) would
@@ -227,7 +197,7 @@ class StateManager {
    * it's a silent no-op on installs that never had the state.
    *
    * @param prefix Device object ID prefix
-   * @param stateId Synthetic state ID (e.g. "sensor_humidity")
+   * @param stateId Synthetic state ID (e.g. "humidity")
    */
   async removeSyntheticStateOnce(prefix, stateId) {
     const key = `${prefix}.${stateId}`;

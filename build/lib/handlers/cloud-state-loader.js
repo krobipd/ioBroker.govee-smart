@@ -91,7 +91,7 @@ async function applyCloudCapabilities(adapter, device, caps) {
   const hasTempCap = device.capabilities.some((c) => c.instance === "sensorTemperature");
   const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
   if (hasTempCap && !hasHumidityCap) {
-    await adapter.stateManager.removeSyntheticStateOnce(prefix, "sensor_humidity");
+    await adapter.stateManager.removeSyntheticStateOnce(prefix, "humidity");
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

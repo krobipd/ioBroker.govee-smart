@@ -109,6 +109,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: An account e-mail with a trailing space no longer fails the account login at start-up, matching the behaviour of the login test in the settings
 - Fixed: An implausible segment count from the cache, the Cloud or the app can no longer create thousands of segment channels — the count is capped at the protocol limit of 56
 - Fixed: With several instances running in compact mode, the experimental-models switch of one instance no longer applies to all of them
+- Changed: BREAKING — sensor and event datapoints have one name: `sensor.temperature` instead of `sensor.sensor_temperature`, `events.lack_water` instead of `events.lackWater`. Adjust your scripts
 - Improved: Stopping the adapter no longer scans the whole object tree — the offline markers are written from memory, so shutdown stays well inside the host's time limit even with many devices
 - Improved: Diagnostics buffers are now bounded by size, so a chatty device can no longer let the adapter's memory grow without limit
 - Improved: The device cache is written without blocking the adapter — large installations no longer stall for a moment on every cache update

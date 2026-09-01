@@ -481,17 +481,10 @@ export const SENSOR_ROLE_UNIT = {
  * mapEvent (Cloud-capability path) AND state-manager's SYNTHETIC_STATE_META
  * (App-API / OpenAPI-MQTT path). Both paths extend the SAME state object;
  * two diverging role literals made the persisted role flap depending on
- * which path wrote last (M5). Keys are sanitized state ids — snake_case is
- * what sanitizeId produces today, the squashed forms are the pre-B2 legacy
- * ids that the synthetic table still recognises.
+ * which path wrote last (M5). Keys are the canonical state ids
+ * ({@link canonicalSyntheticId}).
  */
 export const EVENT_STATE_ROLES = {
-  lackwater: { role: "indicator.maintenance" },
-  lackwaterevent: { role: "indicator.maintenance" },
-  icefull: { role: "indicator.maintenance" },
-  icefullevent: { role: "indicator.maintenance" },
-  bodyappeared: { role: "sensor.motion" },
-  dirtdetected: { role: "indicator.maintenance" },
   lack_water: { role: "indicator.maintenance" },
   lack_water_event: { role: "indicator.maintenance" },
   ice_full: { role: "indicator.maintenance" },
@@ -499,6 +492,28 @@ export const EVENT_STATE_ROLES = {
   body_appeared: { role: "sensor.motion" },
   dirt_detected: { role: "indicator.maintenance" },
 } as const;
+
+/**
+ * The one state id for a sensor reading or an event, whichever path delivers
+ * it (Cloud capability, App-API poll, Cloud-events push). Govee names the
+ * readings `sensorTemperature` / `sensorHumidity`; under the `sensor` channel
+ * that prefix says nothing, so the id is `temperature` / `humidity`. The CO2
+ * reading is `co2` whatever Govee calls it. Events keep their snake_case name
+ * (`lackWaterEvent` → `lack_water_event`).
+ *
+ * Until 2.28.0 the id was the raw sanitized instance (`sensor_temperature`) —
+ * the old objects are swept by cleanupCloudOwnedStates on the first
+ * Cloud-phase rebuild, because they are no longer in SYNTHETIC_STATE_META.
+ *
+ * @param instance Govee capability instance name
+ */
+export function canonicalSyntheticId(instance: string): string {
+  const id = sanitizeId(instance).replace(/^sensor_/, "");
+  if (id === "carbon_dioxide" || id === "carbondioxide") {
+    return "co2";
+  }
+  return id;
+}
 
 /**
  * Map property capability (read-only sensors). Routes to the `sensor`
@@ -524,7 +539,7 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
 
   return [
     {
-      id: sanitizeId(cap.instance),
+      id: canonicalSyntheticId(cap.instance),
       name: humanize(cap.instance),
       type: "number",
       role,
@@ -711,7 +726,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
  * @param cap Cloud event capability
  */
 function mapEvent(cap: CloudCapability): StateDefinition[] {
-  const id = sanitizeId(cap.instance);
+  const id = canonicalSyntheticId(cap.instance);
   return [
     {
       id,
@@ -1049,7 +1064,7 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
 
     case "event":
       return {
-        stateId: sanitizeId(cap.instance),
+        stateId: canonicalSyntheticId(cap.instance),
         value: coerceBool(raw),
       };
 
@@ -1070,7 +1085,7 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       if (n === null) {
         return null;
       }
-      return { stateId: sanitizeId(cap.instance), value: n };
+      return { stateId: canonicalSyntheticId(cap.instance), value: n };
     }
 
     default:

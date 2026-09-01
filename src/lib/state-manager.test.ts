@@ -468,18 +468,18 @@ describe("StateManager", () => {
   });
 
   describe("removeSyntheticStateOnce", () => {
-    it("deletes an existing phantom sensor_humidity object exactly once (#31)", async () => {
+    it("deletes an existing phantom humidity object exactly once (#31)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const path = "devices.h5109_1a.sensor.sensor_humidity"; // inferChannelFromStateId → "sensor"
+      const path = "devices.h5109_1a.sensor.humidity"; // inferChannelFromStateId → "sensor"
       objects.set(path, { type: "state", common: {}, native: {} } as never);
 
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
       expect(objects.has(path)).toBe(false); // datapoint actually disappears
       expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
 
       // Once-guard: a repeat call skips even the existence-check (no per-poll round-trip)
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
       expect(calls.filter(c => c.method === "getObjectAsync" && c.args[0] === path)).toHaveLength(1);
       expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
     });
@@ -487,7 +487,7 @@ describe("StateManager", () => {
     it("is a silent no-op when the state never existed (fresh install)", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "sensor_humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
       expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
     });
   });
@@ -1355,23 +1355,35 @@ describe("StateManager", () => {
       expect(sm.resolveStatePath("devices.h6160_0011", "ice_full")).toBe("devices.h6160_0011.events.ice_full");
     });
 
-    it("should route sanitizeId-output sensor IDs (sensor_temperature etc.) to sensor channel via inferChannelFromStateId", () => {
+    it("routes the canonical sensor ids to the sensor channel without a prior createDeviceStates run", () => {
       // No createDeviceStates pre-population — inferChannelFromStateId
-      // is the fallback when stateChannelMap doesn't have the ID. Caps
-      // from App-API/OpenAPI-MQTT use sanitizeId(camelCase) which produces
-      // sensor_temperature, sensor_humidity, sensor_battery — these MUST
-      // route to sensor/ even without prior createDeviceStates run.
+      // is the fallback when stateChannelMap doesn't have the ID. The
+      // App-API poll / Cloud-events push deliver `temperature`, `humidity`,
+      // `battery` (canonicalSyntheticId) — these MUST route to sensor/.
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "sensor_temperature")).toBe(
-        "devices.h5179_3c1b.sensor.sensor_temperature",
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "temperature")).toBe(
+        "devices.h5179_3c1b.sensor.temperature",
       );
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "sensor_humidity")).toBe(
-        "devices.h5179_3c1b.sensor.sensor_humidity",
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "humidity")).toBe(
+        "devices.h5179_3c1b.sensor.humidity",
       );
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "sensor_battery")).toBe(
-        "devices.h5179_3c1b.sensor.sensor_battery",
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "battery")).toBe(
+        "devices.h5179_3c1b.sensor.battery",
       );
+    });
+
+    it("no longer knows the pre-2.28.0 spellings — they are not synthetic states any more", async () => {
+      // `sensor_temperature` (raw sanitized instance) and `lackwater` (squashed
+      // pre-B2 form) used to be aliases in SYNTHETIC_STATE_META. One spelling
+      // per datapoint now; the old ones must not be created or routed as
+      // sensors, so cleanupCloudOwnedStates can sweep them (migration).
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      for (const legacy of ["sensor_temperature", "sensor_humidity", "lackwater", "carbondioxide"]) {
+        await sm.ensureSyntheticStateObject("devices.h5179_3c1b", legacy);
+      }
+      expect(calls.filter(c => c.method === "extendObject")).toHaveLength(0);
     });
 
     it("should route sanitizeId-output event IDs (lack_water_event etc.) to events channel via inferChannelFromStateId", () => {
@@ -1387,17 +1399,17 @@ describe("StateManager", () => {
   });
 
   describe("ensureSyntheticStateObject", () => {
-    it("should create state under sensor/ channel for sensor_temperature", async () => {
+    it("should create state under sensor/ channel for temperature", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
       // Check Channel-Object created
       expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
       // Check State-Object created via extendObject (NOT setObjectNotExists)
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
       // Verify extendObject was used (idempotent + repairs partial-formed)
       const extendCalls = calls.filter(c => c.method === "extendObject");
-      const stateExtend = extendCalls.find(c => c.args[0] === "devices.h5179_3c1b.sensor.sensor_temperature");
+      const stateExtend = extendCalls.find(c => c.args[0] === "devices.h5179_3c1b.sensor.temperature");
       expect(stateExtend).toBeDefined();
     });
 
@@ -1406,30 +1418,30 @@ describe("StateManager", () => {
       // objects only have to exist, not be re-written.
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
       const first = calls.filter(c => c.method === "extendObject").length;
       expect(first).toBe(2);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity"); // same channel, new state
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity"); // same channel, new state
       const extendIds = calls.filter(c => c.method === "extendObject").map(c => c.args[0]);
       expect(extendIds).toEqual([
         "devices.h5179_3c1b.sensor",
-        "devices.h5179_3c1b.sensor.sensor_temperature",
-        "devices.h5179_3c1b.sensor.sensor_humidity",
+        "devices.h5179_3c1b.sensor.temperature",
+        "devices.h5179_3c1b.sensor.humidity",
       ]);
     });
 
     it("re-creates a synthetic state after removeSyntheticStateOnce dropped it", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
-      await sm.removeSyntheticStateOnce("devices.h5179_3c1b", "sensor_humidity");
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(false);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
+      await sm.removeSyntheticStateOnce("devices.h5179_3c1b", "humidity");
+      expect(objects.has("devices.h5179_3c1b.sensor.humidity")).toBe(false);
       calls.length = 0;
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(true);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
+      expect(objects.has("devices.h5179_3c1b.sensor.humidity")).toBe(true);
       expect(calls.filter(c => c.method === "extendObject").map(c => c.args[0])).toEqual([
-        "devices.h5179_3c1b.sensor.sensor_humidity",
+        "devices.h5179_3c1b.sensor.humidity",
       ]);
     });
 
@@ -1445,13 +1457,13 @@ describe("StateManager", () => {
       const { adapter, objects } = createMockAdapter();
       // Pre-set partial-formed object (missing role) — simulating broken
       // state from older adapter version
-      objects.set("devices.h5179_3c1b.sensor.sensor_humidity", {
+      objects.set("devices.h5179_3c1b.sensor.humidity", {
         type: "state",
         common: { name: "old", type: "number" },
       });
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_humidity");
-      const final = objects.get("devices.h5179_3c1b.sensor.sensor_humidity") as Record<string, unknown>;
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
+      const final = objects.get("devices.h5179_3c1b.sensor.humidity") as Record<string, unknown>;
       // extendObject stores latest write — common should now be the full meta
       const common = final?.common as { role?: string };
       expect(common?.role).toBe("value.humidity");
@@ -1725,14 +1737,14 @@ describe("StateManager", () => {
     });
 
     it("keeps the App-API / Cloud-events synthetic sensor + event states across a Cloud-phase rebuild", async () => {
-      // battery / sensor_temperature / lack_water are created ad hoc by the
+      // battery / temperature / lack_water are created ad hoc by the
       // App-API poll and never appear in a Cloud state-def — each Cloud rebuild
       // used to delete them and the next poll re-created them (object churn +
       // a value gap). They are foreign-owned survivors, like the LAN ids.
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "battery");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "sensor_temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
       calls.length = 0;
 
@@ -1741,9 +1753,36 @@ describe("StateManager", () => {
       expect(deleted).toBe(0);
       expect(calls.filter(c => c.method === "delObjectAsync")).toHaveLength(0);
       expect(objects.has("devices.h5179_3c1b.sensor.battery")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
       expect(objects.has("devices.h5179_3c1b.events.lack_water")).toBe(true);
       // The channel objects survive with their states.
+      expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.events")).toBe(true);
+    });
+
+    it("sweeps the pre-2.28.0 sensor/event spellings on the first Cloud-phase rebuild (migration)", async () => {
+      // An upgraded install still carries `sensor.sensor_temperature` (raw
+      // sanitized instance, 2.17–2.27) and `events.lackwater` (pre-B2). They
+      // are no synthetic ids any more, so the rebuild treats them as stale —
+      // while the canonical objects next to them survive untouched.
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
+      for (const legacy of ["sensor.sensor_temperature", "sensor.sensor_humidity", "events.lackwater"]) {
+        objects.set(`devices.h5179_3c1b.${legacy}`, { type: "state", common: {}, native: {} } as never);
+      }
+      calls.length = 0;
+
+      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179_3c1b", []);
+
+      expect(deleted).toBe(3);
+      expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(false);
+      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(false);
+      expect(objects.has("devices.h5179_3c1b.events.lackwater")).toBe(false);
+      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
+      expect(objects.has("devices.h5179_3c1b.events.lack_water")).toBe(true);
+      // Channels keep their surviving canonical states.
       expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
       expect(objects.has("devices.h5179_3c1b.events")).toBe(true);
     });
