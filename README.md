@@ -98,7 +98,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Improved: Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states
 
-### 2.27.0 (2026-08-27)
+### 2.27.0 (2026-08-27) — stable
 
 - Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
 - Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
