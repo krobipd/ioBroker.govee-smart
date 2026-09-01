@@ -51,8 +51,13 @@ async function startStubServer(): Promise<StubServer> {
           res.setHeader(k, v);
         }
         if (stub.destroyMidBody) {
+          // Announce a long body, send a fragment, kill the socket: Node then
+          // raises 'error' (aborted) on the response instead of 'end'. Without
+          // the declared length a chunked close still ends the stream and the
+          // JSON parse rejects — which would let a missing error handler pass.
+          res.setHeader("content-length", "100000");
           res.write("partial-");
-          res.socket?.destroy();
+          setTimeout(() => res.socket?.destroy(), 10);
           return;
         }
         res.end(stub.body ?? "");
