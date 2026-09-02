@@ -17,15 +17,6 @@ body:
       description: Steht auf dem Gerät und in der Govee Home App, z.B. `H7160`. Steckt auch im Diagnose-Export. / On the device and in the Govee Home app. Also part of the diagnostics export.
       placeholder: H7160
 
-  - type: input
-    id: app-name
-    attributes:
-      label: Govee-App-Name
-      description: Wie heißt das Gerät in der Govee Home App? / How is it called in the Govee Home app?
-      placeholder: Smart Space Heater
-    validations:
-      required: true
-
   - type: dropdown
     id: status-current
     attributes:
