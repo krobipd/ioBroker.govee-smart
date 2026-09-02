@@ -109,7 +109,7 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
  * Cloud states use.
  *
  * App-API and OpenAPI-MQTT deliver state IDs (battery, temperature,
- * humidity, lackWater, …) that the Cloud-capability pipeline doesn't
+ * humidity, lack_water, …) that the Cloud-capability pipeline doesn't
  * declare for sensor/appliance SKUs — the state objects therefore don't
  * exist yet on first write. ensureSyntheticStateObject creates them
  * lazily with the right channel + role + unit.

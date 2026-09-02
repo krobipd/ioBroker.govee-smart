@@ -74,7 +74,7 @@ function channelName(channel: string): ioBroker.StringOrTranslated {
  * For lights the LAN/Cloud-state pipeline pre-populates `stateChannelMap`
  * via `createDeviceStates`, so `resolveStatePath` finds the channel.
  * For thermometer/appliance state IDs that are *only* delivered via the
- * App-API path (battery, temperature, humidity, CO₂, lackWater, …) the map
+ * App-API path (battery, temperature, humidity, co2, lack_water, …) the map
  * is empty and the lookup would default to "control" — visibly wrong:
  * `info: control.battery has no existing object`.
  *
@@ -157,7 +157,7 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
  * from {@link SYNTHETIC_STATE_META}; an unknown ID falls back to the safe default
  * "control". Keep IDs lowercase — resolveStatePath calls this on the raw stateId.
  *
- * @param stateId The raw state ID (e.g. "battery", "lackWater")
+ * @param stateId The raw state ID (e.g. "battery", "lack_water")
  */
 function inferChannelFromStateId(stateId: string): string {
   return SYNTHETIC_STATE_META[stateId.toLowerCase()]?.channel ?? "control";

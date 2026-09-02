@@ -223,6 +223,8 @@ One vitest suite per Modul (`src/**/*.test.ts`), jede mit einem „Drift"-Block 
 
 `httpsRequest` nimmt einen optionalen `transport` (Default `node:https` + Keep-alive-Agent); die Tests fahren damit den ECHTEN Produktivcode über `node:http` gegen einen lokalen Stub-Server. Vorher lag in der Testdatei eine ~80-zeilige Kopie der Implementierung — sie war bereits abgedriftet und hätte einen Fehler im Produktivcode nicht bemerkt.
 
+**Drei Test-Nahtstellen aus dem Test-Audit 2.28.0:** der LAN-Client-Test ersetzt `node:dgram` durch eine Attrappe, die jede Sendung (`sends`) und einen einstellbaren Sendefehler (`sendError`) aufzeichnet — damit sind UDP-Sendeweg, Discovery-Schleife und Socket-Verdrahtung geprüft, nicht nur der Parser. Der SKU-Cache-Test stubbt `node:fs` mit `failNextOpen` (fehlgeschlagener Schreibvorgang, überlappende Saves, unbrauchbares Verzeichnis). Im HTTP-Client-Test muss ein Abbruch mitten im Body vom Stub-Server mit `content-length` und verzögertem Socket-Destroy simuliert werden — ohne den Header endet der Request regulär und `res.on("error")` ist nie der einzige Ausgang; eine entfernte Fehlerbehandlung bliebe unbemerkt.
+
 ## Konkurrenz-Lage
 
 Schwester-Adapter `iobroker.govee` ist veraltet (nur LAN, keine MQTT, keine Sensoren/Appliances). Diese Implementation ist die einzige Govee-Lösung im Latest-Repo mit voller Multi-Channel + ptReal + Wizard. Aufnahme-PR ioBroker.repositories#5824 MERGED 2026-06-06.
