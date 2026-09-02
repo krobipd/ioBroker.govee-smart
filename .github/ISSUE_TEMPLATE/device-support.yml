@@ -59,13 +59,9 @@ body:
     attributes:
       label: Diagnose-Export / Diagnostics export
       description: |
-        Im Objektbaum den Knopf `govee-smart.<Instanz>.devices.<Gerät>.diag.export` drücken und danach den Inhalt von `diag.result` kopieren. Darin stecken auch die letzten Protokollzeilen des Geräts.
+        Knopf `diag.export` am Gerät drücken, dann `diag.result` kopieren — darin stecken auch die letzten Protokollzeilen. Der Export ist lang: **am besten als Datei `diagnose.json` hier hineinziehen.**
 
-        Der Export ist meist mehrere zehntausend Zeichen lang. **Speichere ihn als Datei (z. B. `diagnose.json`) und ziehe sie in dieses Feld** — nur kurze Exporte direkt einfügen.
-
-        In the object tree press the button `govee-smart.<instance>.devices.<device>.diag.export`, then copy the contents of `diag.result`. It also contains the device's most recent log lines.
-
-        The export is usually tens of thousands of characters long. **Save it as a file (e.g. `diagnose.json`) and drag it into this field** — paste directly only for short exports.
+        Press `diag.export` on the device, then copy `diag.result` — it also contains the most recent log lines. The export is long: **best dragged in as a file `diagnose.json`.**
     validations:
       required: true
 

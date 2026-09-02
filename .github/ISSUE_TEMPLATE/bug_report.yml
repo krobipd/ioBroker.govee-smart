@@ -25,10 +25,6 @@ body:
     id: adapter-version
     attributes:
       label: Adapter-Version / Adapter version
-      description: |
-        Steht in der Adapterliste bei der installierten Version.
-
-        Shown in the adapter list as the installed version.
       placeholder: "2.28.0"
     validations:
       required: true
@@ -37,10 +33,6 @@ body:
     id: jscontroller-version
     attributes:
       label: js-controller-Version / js-controller version
-      description: |
-        In der Konsole: `iobroker version`
-
-        In the console: `iobroker version`
       placeholder: "7.0.7"
     validations:
       required: true
@@ -49,10 +41,6 @@ body:
     id: admin-version
     attributes:
       label: Admin-Version / Admin version
-      description: |
-        Version des Adapters `admin`, ebenfalls aus der Adapterliste.
-
-        Version of the `admin` adapter, also from the adapter list.
       placeholder: "8.0.11"
     validations:
       required: true
@@ -62,22 +50,10 @@ body:
     attributes:
       label: Protokoll-Auszug / Log excerpt
       description: |
-        Stelle die Protokollstufe der Instanz auf `debug`, löse den Fehler noch einmal aus und füge den passenden Ausschnitt hier ein.
-
-        Set the instance log level to `debug`, trigger the problem once more and paste the relevant excerpt here.
+        Am hilfreichsten mit Protokollstufe `debug`. / Most useful with log level `debug`.
       render: shell
     validations:
       required: true
-
-  - type: input
-    id: node-version
-    attributes:
-      label: Node.js-Version (optional)
-      description: |
-        In der Konsole: `node -v`
-
-        In the console: `node -v`
-      placeholder: "v20.18.1"
 
   - type: dropdown
     id: installation
