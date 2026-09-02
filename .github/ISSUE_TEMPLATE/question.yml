@@ -3,13 +3,6 @@ description: Etwas zum Adapter ist unklar / Something about the adapter is uncle
 title: "[Frage] kurz beschreiben"
 labels: ["question"]
 body:
-  - type: markdown
-    attributes:
-      value: |
-        Für allgemeine ioBroker-Fragen ist das [ioBroker-Forum](https://forum.iobroker.net/) der bessere Ort. Fragen zu diesem Adapter sind hier genau richtig.
-
-        For general ioBroker questions the [ioBroker forum](https://forum.iobroker.net/) is the better place. Questions about this adapter belong here.
-
   - type: textarea
     id: question
     attributes:
