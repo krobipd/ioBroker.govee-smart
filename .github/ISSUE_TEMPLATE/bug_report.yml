@@ -48,12 +48,10 @@ body:
   - type: textarea
     id: log
     attributes:
-      label: Protokoll-Auszug / Log excerpt
+      label: Protokoll-Auszug (optional) / Log excerpt (optional)
       description: |
         Am hilfreichsten mit Protokollstufe `debug`. / Most useful with log level `debug`.
       render: shell
-    validations:
-      required: true
 
   - type: dropdown
     id: installation
