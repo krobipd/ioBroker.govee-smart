@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import type * as FsModule from "node:fs";
 
 /**
  * node:fs is passed through unchanged except for a flush counter on the file
@@ -7,7 +8,7 @@ import { vi } from "vitest";
  */
 const fsCounters = vi.hoisted(() => ({ fsync: 0, failNextOpen: null as Error | null }));
 vi.mock("node:fs", async importOriginal => {
-  const actual = await importOriginal<typeof import("node:fs")>();
+  const actual = await importOriginal<typeof FsModule>();
   // save() flushes through FileHandle.sync() on a handle from fs.promises.open —
   // wrap the handle so the durability test can see the flush happen. A queued
   // `failNextOpen` error makes exactly one open() fail (write-failure tests).
@@ -86,12 +87,12 @@ describe("SkuCache", () => {
     cleanup(dir);
   });
 
-  it("should create cache directory on construction", async () => {
+  it("should create cache directory on construction", () => {
     new SkuCache(dir, mockLog);
     expect(fs.existsSync(path.join(dir, "cache"))).toBe(true);
   });
 
-  it("should return empty for non-existent cache", async () => {
+  it("should return empty for non-existent cache", () => {
     const cache = new SkuCache(dir, mockLog);
     expect(cache.loadAll()).toEqual([]);
   });
@@ -146,7 +147,7 @@ describe("SkuCache", () => {
     expect(all).toHaveLength(2);
   });
 
-  it("should loadAll from empty cache", async () => {
+  it("should loadAll from empty cache", () => {
     const cache = new SkuCache(dir, mockLog);
     expect(cache.loadAll()).toEqual([]);
   });
@@ -160,7 +161,7 @@ describe("SkuCache", () => {
     expect(cache.loadAll()).toHaveLength(0);
   });
 
-  it("should handle corrupt JSON gracefully", async () => {
+  it("should handle corrupt JSON gracefully", () => {
     const cache = new SkuCache(dir, mockLog);
     const cacheDir = path.join(dir, "cache");
     fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
@@ -276,7 +277,7 @@ describe("SkuCache", () => {
       expect(cache.loadAll()).toHaveLength(1);
     });
 
-    it("returns 0 on empty cache", async () => {
+    it("returns 0 on empty cache", () => {
       const cache = new SkuCache(dir, mockLog);
       expect(cache.pruneStale(14)).toBe(0);
     });
@@ -295,7 +296,7 @@ describe("SkuCache", () => {
       expect(cache.loadAll()).toHaveLength(0);
     });
 
-    it("skips corrupt cache files silently", async () => {
+    it("skips corrupt cache files silently", () => {
       const cache = new SkuCache(dir, mockLog);
       const cacheDir = path.join(dir, "cache");
       fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");

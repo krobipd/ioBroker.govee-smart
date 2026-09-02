@@ -22,13 +22,14 @@ function makeAdapter(devices: GoveeDevice[]): {
     deviceManager: { getDevices: () => devices } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
-      updateGroupMembersUnreachable: async (group: GoveeDevice, members: GoveeDevice[]) => {
+      updateGroupMembersUnreachable: (group: GoveeDevice, members: GoveeDevice[]) => {
         unreachableCalls.push({ group: group.deviceId, members: members.map(m => m.deviceId) });
+        return Promise.resolve();
       },
     } as never,
-    getObjectAsync: async () => null,
+    getObjectAsync: () => Promise.resolve(null),
     stateToCommand: () => null,
-    sendMusicCommand: async () => undefined,
+    sendMusicCommand: () => Promise.resolve(undefined),
   };
   return { adapter, unreachableCalls };
 }
@@ -83,8 +84,9 @@ describe("buildGroupFanoutHost — passthrough closures", () => {
     const { adapter } = makeAdapter([]);
     (adapter as { deviceManager: unknown }).deviceManager = {
       getDevices: () => [],
-      sendCommand: async (d: GoveeDevice, command: string) => {
+      sendCommand: (d: GoveeDevice, command: string) => {
         sent.push({ id: d.deviceId, command });
+        return Promise.resolve();
       },
     };
     const host = buildGroupFanoutHost(adapter);
@@ -97,8 +99,9 @@ describe("buildGroupFanoutHost — passthrough closures", () => {
   it("sendMusicCommand forwards to the adapter-owned builder (sibling-state reads live in main)", async () => {
     const music: string[] = [];
     const { adapter } = makeAdapter([]);
-    (adapter as { sendMusicCommand: unknown }).sendMusicCommand = async (_d: GoveeDevice, _p: string, suffix: string) => {
+    (adapter as { sendMusicCommand: unknown }).sendMusicCommand = (_d: GoveeDevice, _p: string, suffix: string) => {
       music.push(suffix);
+      return Promise.resolve();
     };
     const host = buildGroupFanoutHost(adapter);
     await host.sendMusicCommand(createTestDevice(), "devices.x", "music.music_mode", 1);

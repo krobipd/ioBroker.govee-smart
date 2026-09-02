@@ -45,20 +45,21 @@ class TestHost implements CloudRetryHost {
     this.clearedTimers += 1;
   }
 
-  public async loadFromCloud(): Promise<CloudLoadResult> {
+  public loadFromCloud(): Promise<CloudLoadResult> {
     this.loadCalls += 1;
     const r = this.loadResults.shift();
     if (!r) {
-      throw new Error("TestHost.loadFromCloud called with no queued result");
+      return Promise.reject(new Error("TestHost.loadFromCloud called with no queued result"));
     }
-    return r;
+    return Promise.resolve(r);
   }
 
-  public async onCloudRestored(): Promise<void> {
+  public onCloudRestored(): Promise<void> {
     this.restoredCalls += 1;
     if (this.onCloudRestoredThrows) {
-      throw this.onCloudRestoredThrows;
+      return Promise.reject(this.onCloudRestoredThrows);
     }
+    return Promise.resolve();
   }
 
   /** Fire the most-recently scheduled timer — returns its delay. */
@@ -315,7 +316,7 @@ describe("CloudRetryLoop", () => {
   });
 
   describe("stopped short-circuit", () => {
-    it("should not run loadFromCloud after auth-fail", async () => {
+    it("should not run loadFromCloud after auth-fail", () => {
       loop.handleResult({
         ok: false,
         reason: "auth-failed",

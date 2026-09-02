@@ -20,11 +20,13 @@ function makeAdapter(initial: Record<string, ioBroker.StateValue> = {}): {
     writes,
     adapter: {
       namespace: "govee-smart.0",
-      getStateAsync: async id => (states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
-      setState: async (id, state) => {
+      getStateAsync: id =>
+        Promise.resolve(states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
+      setState: (id, state) => {
         const val = (state as { val: ioBroker.StateValue }).val;
         states.set(id, val);
         writes.push({ id, val });
+        return Promise.resolve();
       },
     },
   };

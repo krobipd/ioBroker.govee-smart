@@ -66,25 +66,27 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     log: {
       ...mockLog,
       warn: (m: string) => warns.push(m),
-    } as ioBroker.Logger,
+    },
     namespace: NS,
     unloading: false,
     deviceManager: {
       getDevices: () => devices,
       getDiagnostics: () => ({ addLog: () => undefined }),
-      sendCommand: async (device: GoveeDevice, command: string, value: unknown) => {
+      sendCommand: (device: GoveeDevice, command: string, value: unknown) => {
         const err = sendFailure();
         if (err) {
-          throw err;
+          return Promise.reject(err);
         }
         commands.push({ device: device.deviceId, command, value });
+        return Promise.resolve();
       },
-      sendCapabilityCommand: async (device: GoveeDevice, type: string, instance: string, value: unknown) => {
+      sendCapabilityCommand: (device: GoveeDevice, type: string, instance: string, value: unknown) => {
         capCommands.push({ device: device.deviceId, type, instance, value });
+        return Promise.resolve();
       },
-      refreshSceneDataForDevice: async (deviceId: string) => {
+      refreshSceneDataForDevice: (deviceId: string) => {
         refreshCalls.push(deviceId);
-        return opts.refreshChanged ?? false;
+        return Promise.resolve(opts.refreshChanged ?? false);
       },
       persistDeviceToCache: (device: GoveeDevice) => {
         persisted.push(device);
@@ -96,14 +98,14 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
         d.sku === "BaseGroup" ? `groups.basegroup_${d.deviceId}` : `devices.${d.sku.toLowerCase()}_0011`,
     } as never,
     snapshotHandler: {
-      save: async (_d: GoveeDevice, name: string) => snapshotCalls.push(`save:${name}`),
-      restore: async (_d: GoveeDevice, val: unknown) => snapshotCalls.push(`restore:${String(val)}`),
-      delete: async (_d: GoveeDevice, name: string) => snapshotCalls.push(`delete:${name}`),
+      save: (_d: GoveeDevice, name: string) => Promise.resolve(snapshotCalls.push(`save:${name}`)),
+      restore: (_d: GoveeDevice, val: unknown) => Promise.resolve(snapshotCalls.push(`restore:${String(val)}`)),
+      delete: (_d: GoveeDevice, name: string) => Promise.resolve(snapshotCalls.push(`delete:${name}`)),
     } as never,
     groupFanout: {
-      fanOut: async (_g: GoveeDevice, suffix: string, value: unknown): Promise<boolean> => {
+      fanOut: (_g: GoveeDevice, suffix: string, value: unknown): Promise<boolean> => {
         fanOuts.push({ suffix, value });
-        return fanOutResult;
+        return Promise.resolve(fanOutResult);
       },
     } as never,
     lanClient: {
@@ -111,19 +113,24 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
         lanMusic.push({ ip, mode, includeRgb, r, g, b }),
     } as never,
     diagnosticsLastRun: new Map<string, number>(),
-    getStateAsync: async id => (states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
-    setState: async (id, state) => {
+    getStateAsync: id =>
+      Promise.resolve(states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
+    setState: (id, state) => {
       acks.push({ id, val: (state as { val: unknown }).val });
+      return Promise.resolve();
     },
-    getObjectAsync: async id => objects.get(id) ?? null,
-    loadCloudStates: async () => {
+    getObjectAsync: id => Promise.resolve(objects.get(id) ?? null),
+    loadCloudStates: () => {
       loadCloudStatesCalls.push(1);
+      return Promise.resolve();
     },
-    applyManualSegments: async (_device, mode, indices) => {
+    applyManualSegments: (_device, mode, indices) => {
       manualApplied.push({ mode, indices });
+      return Promise.resolve();
     },
-    syncDevicesManually: async () => {
+    syncDevicesManually: () => {
       syncCalls.push(1);
+      return Promise.resolve();
     },
   };
   return {
@@ -464,7 +471,10 @@ describe("sendMusicCommand", () => {
   it("the '---' sentinel (index 0) sends nothing even on a device WITH music modes", async () => {
     // The plain `device` above has no music library, so it would skip for that
     // reason alone — a device with real options is what makes this test bite.
-    const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
+    const lanDev = musicDeviceNamed([
+      { name: "Spectrum", value: 1 },
+      { name: "Rolling", value: 2 },
+    ]);
     const rig = makeRig([lanDev]);
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 0);
     expect(rig.lanMusic).toHaveLength(0);
@@ -477,7 +487,10 @@ describe("sendMusicCommand", () => {
   });
 
   it("LAN device + Spectrum: reads control.color_rgb and sends the mode + RGB over LAN", async () => {
-    const lanDev = musicDeviceNamed([{ name: "Spectrum", value: 1 }, { name: "Rolling", value: 2 }]);
+    const lanDev = musicDeviceNamed([
+      { name: "Spectrum", value: 1 },
+      { name: "Rolling", value: 2 },
+    ]);
     const rig = makeRig([lanDev]);
     rig.states.set(id("control.color_rgb"), "#ff8000");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Spectrum
@@ -488,7 +501,10 @@ describe("sendMusicCommand", () => {
   it("LAN + Spectrum at a NON-standard value still sends RGB — name-keyed, not value-keyed (A2)", async () => {
     // A SKU whose Spectrum is at value 6 (not 1): the old value gate (1||2)
     // withheld its colour; the name gate sends it.
-    const lanDev = musicDeviceNamed([{ name: "Energic", value: 5 }, { name: "Spectrum", value: 6 }]);
+    const lanDev = musicDeviceNamed([
+      { name: "Energic", value: 5 },
+      { name: "Spectrum", value: 6 },
+    ]);
     const rig = makeRig([lanDev]);
     rig.states.set(id("control.color_rgb"), "#00ff00");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 2); // index 2 → Spectrum(value 6)
@@ -496,7 +512,10 @@ describe("sendMusicCommand", () => {
   });
 
   it("LAN + a non-colour mode (Energic) sends no RGB even at value 1 (no value-based leak, A2)", async () => {
-    const lanDev = musicDeviceNamed([{ name: "Energic", value: 1 }, { name: "Rhythm", value: 2 }]);
+    const lanDev = musicDeviceNamed([
+      { name: "Energic", value: 1 },
+      { name: "Rhythm", value: 2 },
+    ]);
     const rig = makeRig([lanDev]);
     rig.states.set(id("control.color_rgb"), "#ff0000");
     await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_mode", 1); // index 1 → Energic(value 1)

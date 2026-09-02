@@ -19,12 +19,17 @@ import { HttpError } from "./http-client";
 import { DeviceRegistry } from "./device-registry";
 import { mockLog, mockTimers } from "./test-helpers";
 import type { CloudCapability, DeviceState, GoveeDevice, LanDevice, MqttStatusUpdate } from "./types";
+import type { MqttSegmentData } from "./device-manager/lookups";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
 /** The catalog the constructed modules read — reassigned per suite where quirks matter. */
 let registry: DeviceRegistry = emptyRegistry();
-/** resolveSegmentCount against the suite's current catalog. */
+/**
+ * resolveSegmentCount against the suite's current catalog.
+ *
+ * @param device Device whose segment count is resolved
+ */
 const resolveSegmentCount = (device: GoveeDevice): number => resolveSegmentCountRaw(device, registry);
 
 /**
@@ -125,7 +130,12 @@ function createCallTracker(): { calls: CallRecord[]; track: (method: string) => 
   };
 }
 
-/** Build a 20-byte AA A5 packet with 4 segment slots */
+/**
+ * Build a 20-byte AA A5 packet with 4 segment slots
+ *
+ * @param packetNum Packet sequence number written to byte 2
+ * @param slots Up to four [brightness, r, g, b] segment slots
+ */
 function buildAaA5Packet(packetNum: number, slots: Array<[number, number, number, number]>): string {
   const bytes = new Uint8Array(20);
   bytes[0] = 0xaa;
@@ -139,7 +149,9 @@ function buildAaA5Packet(packetNum: number, slots: Array<[number, number, number
   }
   // XOR checksum
   let xor = 0;
-  for (let i = 0; i < 19; i++) xor ^= bytes[i];
+  for (let i = 0; i < 19; i++) {
+    xor ^= bytes[i];
+  }
   bytes[19] = xor;
   return Buffer.from(bytes).toString("base64");
 }
@@ -250,7 +262,7 @@ describe("DeviceManager", () => {
       expect(dm.getDevices()[0].state.online).toBe(false);
 
       let updateCount = 0;
-      let lastUpdate: Partial<import("./types").DeviceState> | null = null;
+      let lastUpdate: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updateCount++;
@@ -314,7 +326,7 @@ describe("DeviceManager", () => {
       };
       dm.handleLanDiscovery(lanDevice);
 
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -372,7 +384,7 @@ describe("DeviceManager", () => {
       };
       dm.handleLanDiscovery(lanDevice);
 
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -611,7 +623,7 @@ describe("DeviceManager", () => {
       // group is absent → reconcilable via the group authority, evicted after N.
       dm2.setApiClient({
         hasBearerToken: () => true,
-        fetchGroupMembers: async () => [{ groupId: 8888, devices: [] }],
+        fetchGroupMembers: () => Promise.resolve([{ groupId: 8888, devices: [] }]),
       } as any);
 
       await dm2.loadGroupMembers(); // pass 1 → miss 1, kept
@@ -778,7 +790,7 @@ describe("DeviceManager", () => {
         segments: [0, 1, 2],
         color: 0xff0000,
         brightness: 80,
-      } as any);
+      });
 
       // Must not throw, must call LAN setSegmentColor + setSegmentBrightness
       const colorCalls = lanTracker.calls.filter(c => c.method === "setSegmentColor");
@@ -800,8 +812,8 @@ describe("DeviceManager", () => {
       } as any);
       const device = createTestDevice();
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-      await dm.sendCommand(device, "segmentBatch", null as any);
-      await dm.sendCommand(device, "segmentBatch", undefined as any);
+      await dm.sendCommand(device, "segmentBatch", null);
+      await dm.sendCommand(device, "segmentBatch", undefined);
       expect(lanTracker.calls).toHaveLength(0);
     });
 
@@ -1300,9 +1312,7 @@ describe("DeviceManager", () => {
           device: "9100",
           deviceName: "Living Room Same Mode",
           type: "devices.types.light",
-          capabilities: [
-            { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 0 } },
-          ],
+          capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 0 } }],
         },
         { sku: "H6160", device: "real123", deviceName: "Real Strip", type: "devices.types.light", capabilities: [] },
       ];
@@ -1325,7 +1335,7 @@ describe("DeviceManager", () => {
 
     it("should handle partial state update (power only)", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1348,7 +1358,7 @@ describe("DeviceManager", () => {
 
     it("should handle color temperature from MQTT", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1387,7 +1397,7 @@ describe("DeviceManager", () => {
 
     it("should handle empty state object", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1411,7 +1421,7 @@ describe("DeviceManager", () => {
 
     it("should coerce string brightness from spoofed Govee push", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1435,7 +1445,7 @@ describe("DeviceManager", () => {
 
     it("should drop completely garbage brightness (NaN, object, null)", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1459,7 +1469,7 @@ describe("DeviceManager", () => {
 
     it("should drop colorTemInKelvin=0 (Govee 'no colortemp mode' marker)", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1490,7 +1500,7 @@ describe("DeviceManager", () => {
 
     it("should handle zero brightness", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1511,7 +1521,7 @@ describe("DeviceManager", () => {
 
     it("should handle colorTemInKelvin 0 as no color temp", () => {
       setupDevice();
-      let updatedState: Partial<import("./types").DeviceState> | null = null;
+      let updatedState: Partial<DeviceState> | null = null;
       dm.setCallbacks({
         onUpdate: (_dev, state) => {
           updatedState = state;
@@ -1959,7 +1969,7 @@ describe("DeviceManager", () => {
       const device = dm.getDevices()[0];
       device.segmentCount = 2;
 
-      let segmentUpdates: import("./device-manager/lookups").MqttSegmentData[] | null = null;
+      let segmentUpdates: MqttSegmentData[] | null = null;
       dm.setCallbacks({
         onUpdate: () => {},
         onLanDeviceReady: () => {},
@@ -1984,7 +1994,9 @@ describe("DeviceManager", () => {
       bytes[9] = 255;
       bytes[10] = 0; // seg 1
       let xor = 0;
-      for (let i = 0; i < 19; i++) xor ^= bytes[i];
+      for (let i = 0; i < 19; i++) {
+        xor ^= bytes[i];
+      }
       bytes[19] = xor;
       const pkt = Buffer.from(bytes).toString("base64");
 
@@ -2035,7 +2047,9 @@ describe("DeviceManager", () => {
       bytes[9] = 255;
       bytes[10] = 0; // seg 1
       let xor = 0;
-      for (let i = 0; i < 19; i++) xor ^= bytes[i];
+      for (let i = 0; i < 19; i++) {
+        xor ^= bytes[i];
+      }
       bytes[19] = xor;
       const pkt = Buffer.from(bytes).toString("base64");
 
@@ -2079,7 +2093,9 @@ describe("DeviceManager", () => {
           b[3 + slot * 4 + 1] = 255; // r
         }
         let xor = 0;
-        for (let i = 0; i < 19; i++) xor ^= b[i];
+        for (let i = 0; i < 19; i++) {
+          xor ^= b[i];
+        }
         b[19] = xor;
         packets.push(Buffer.from(b).toString("base64"));
       }
@@ -2342,7 +2358,7 @@ describe("resolveSegmentCount", () => {
       {
         type: "devices.capabilities.segment_color_setting",
         instance: "x",
-      } as CloudCapability,
+      },
     ]);
     expect(resolveSegmentCount(device)).toBe(0);
   });
@@ -2361,11 +2377,10 @@ describe("resolveSegmentCount", () => {
             },
           ],
         },
-      } as CloudCapability,
+      },
     ]);
     expect(resolveSegmentCount(device)).toBe(0);
   });
-
 });
 
 describe("DeviceManager — loadFromCache merge", () => {
@@ -2387,8 +2402,15 @@ describe("DeviceManager — loadFromCache merge", () => {
    * merge dropped segmentCount, manualMode and manualSegments. Every
    * restart threw away the wizard/MQTT-learned segment state and fell
    * back to Cloud's min-advertised count.
+   *
+   * @param entries Cached device entries the mock hands back from loadAll()
    */
-  function makeMockSkuCache(entries: Array<Record<string, unknown>>) {
+  function makeMockSkuCache(entries: Array<Record<string, unknown>>): {
+    loadAll: () => never;
+    save: () => void;
+    pruneStale: () => number;
+    clear: () => void;
+  } {
     return {
       loadAll: () => entries as never,
       save: () => {},
@@ -2404,7 +2426,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       sku: "H61BE",
       device: "AA:BB:CC:DD:EE:FF:12:34",
       ip: "192.168.1.50",
-    } as LanDevice);
+    });
 
     const cached = [
       {
@@ -2489,7 +2511,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       sku: "H6102",
       device: "00:11:22:33:44:55:66:77",
       ip: "192.168.1.51",
-    } as LanDevice);
+    });
 
     const cached = [
       {
@@ -2691,11 +2713,11 @@ describe("DeviceManager — loadFromCache merge", () => {
     function makeApiMock(opts: { hasBearer?: boolean; entries?: AppDeviceEntry[]; throws?: boolean }): unknown {
       return {
         hasBearerToken: () => opts.hasBearer ?? true,
-        fetchDeviceList: async () => {
+        fetchDeviceList: () => {
           if (opts.throws) {
-            throw new Error("App API down");
+            return Promise.reject(new Error("App API down"));
           }
-          return opts.entries ?? [];
+          return Promise.resolve(opts.entries ?? []);
         },
       };
     }
@@ -2715,7 +2737,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
       // A KNOWN device so the registry isn't empty — the unknown entry must be
       // ignored on identity, not via an empty-registry early return.
-      dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer"; // pollAppApi gates on non-light
       dm2.setApiClient(
         makeApiMock({
@@ -2813,7 +2835,7 @@ describe("DeviceManager — loadFromCache merge", () => {
         ip: "192.168.1.50",
         device: "AABBCCDDEEFF0001",
         sku: "H5179",
-      } as LanDevice);
+      });
       // pollAppApi gates on a non-light device type — flip the type
       // since LAN-discovery defaults to "devices.types.light".
       const devices = dm2.getDevices();
@@ -2841,7 +2863,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
     it("flips a sensor to info.online via data-freshness even when Govee reports offline (ISSUE-2)", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.51", device: "AABBCCDDEEFF1109", sku: "H5109" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.51", device: "AABBCCDDEEFF1109", sku: "H5109" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
       dev.state.online = false; // currently flagged offline (the bug)
@@ -2872,7 +2894,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
     it("keeps a sensor offline when its last reading is stale (ISSUE-2 negative)", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.52", device: "AABBCCDDEEFF110A", sku: "H5109" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.52", device: "AABBCCDDEEFF110A", sku: "H5109" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
       dev.state.online = true; // currently online
@@ -2896,7 +2918,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     it("returns 0 on fetch error and does not throw", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
       // device must need App-API for fetch to be attempted
-      dm2.handleLanDiscovery({ ip: "192.168.1.99", device: "AABBCCDDEEFF0099", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.99", device: "AABBCCDDEEFF0099", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
       dm2.setApiClient(makeApiMock({ throws: true }) as never);
       expect(await dm2.pollAppApi()).toBe(0);
@@ -2908,19 +2930,19 @@ describe("DeviceManager — loadFromCache merge", () => {
         ...mockLog,
         warn: (msg: string) => warnings.push(msg),
       };
-      const dm2 = new DeviceManager(trackingLog as never, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H5179" } as LanDevice);
+      const dm2 = new DeviceManager(trackingLog, mockTimers, registry);
+      dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
 
       // Failing client (raises NETWORK each call)
       let fail = true;
       const failingClient = {
         hasBearerToken: () => true,
-        fetchDeviceList: async () => {
+        fetchDeviceList: () => {
           if (fail) {
-            throw new Error("ECONNRESET");
+            return Promise.reject(new Error("ECONNRESET"));
           }
-          return [];
+          return Promise.resolve([]);
         },
       };
       dm2.setApiClient(failingClient as never);
@@ -2960,7 +2982,7 @@ describe("DeviceManager — loadFromCache merge", () => {
         ip: "192.168.1.51",
         device: "AABBCCDDEEFF0002",
         sku: "H5179",
-      } as LanDevice);
+      });
       const seen: unknown[][] = [];
       dm2.setOnCloudCapabilities((_, caps) => seen.push(caps));
       dm2.handleOpenApiEvent({
@@ -2990,7 +3012,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   describe("applyOnlineCap (Pkt 12 — info.online for App-API + OpenAPI-MQTT)", () => {
     it("flips device.state.online when App-API delivers online:true", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.81", device: "AABBCCDDEEFF0081", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.81", device: "AABBCCDDEEFF0081", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
       dev.state.online = false;
@@ -3005,13 +3027,14 @@ describe("DeviceManager — loadFromCache merge", () => {
 
       const apiClient = {
         hasBearerToken: () => true,
-        fetchDeviceList: async () => [
-          {
-            sku: "H5179",
-            device: "AABBCCDDEEFF0081",
-            lastData: { online: true, tem: 2150, hum: 4500 },
-          },
-        ],
+        fetchDeviceList: () =>
+          Promise.resolve([
+            {
+              sku: "H5179",
+              device: "AABBCCDDEEFF0081",
+              lastData: { online: true, tem: 2150, hum: 4500 },
+            },
+          ]),
       };
       dm2.setApiClient(apiClient as never);
       await dm2.pollAppApi();
@@ -3025,7 +3048,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
     it("flips device.state.online when App-API delivers online:false", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.82", device: "AABBCCDDEEFF0082", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.82", device: "AABBCCDDEEFF0082", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
       dev.state.online = true;
@@ -3040,13 +3063,14 @@ describe("DeviceManager — loadFromCache merge", () => {
 
       const apiClient = {
         hasBearerToken: () => true,
-        fetchDeviceList: async () => [
-          {
-            sku: "H5179",
-            device: "AABBCCDDEEFF0082",
-            lastData: { online: false, tem: 2150 },
-          },
-        ],
+        fetchDeviceList: () =>
+          Promise.resolve([
+            {
+              sku: "H5179",
+              device: "AABBCCDDEEFF0082",
+              lastData: { online: false, tem: 2150 },
+            },
+          ]),
       };
       dm2.setApiClient(apiClient as never);
       await dm2.pollAppApi();
@@ -3060,7 +3084,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
     it("OpenAPI-MQTT events drive info.online via applyOnlineCap", () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.83", device: "AABBCCDDEEFF0083", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.83", device: "AABBCCDDEEFF0083", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       // H5179 is a thermometer — LAN-Discovery defaults type to Light because
       // Cloud-data hasn't arrived yet. In the real flow mergeCloudDevices
@@ -3095,7 +3119,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
     it("treats data-without-online-flag as online (matches LAN/MQTT convention)", () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
-      dm2.handleLanDiscovery({ ip: "192.168.1.84", device: "AABBCCDDEEFF0084", sku: "H5179" } as LanDevice);
+      dm2.handleLanDiscovery({ ip: "192.168.1.84", device: "AABBCCDDEEFF0084", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       // Same as above — set non-Light type so applyOnlineCap is not skipped.
       dev.type = "devices.types.thermometer";
@@ -3148,7 +3172,7 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
       type: "devices.capabilities.dynamic_scene",
       instance: "snapshot",
       parameters: { dataType: "ENUM", options },
-    } as CloudCapability;
+    };
   }
 
   // The loadDeviceScenes/loadDeviceLibraries behaviour tests moved to
@@ -3200,7 +3224,6 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     expect(device.snapshots.map(s => s.name)).toEqual(["OldSnap", "NewSnap"]);
     expect(changed).toBe(true);
   });
-
 });
 
 describe("DeviceManager — internal logic helpers", () => {
@@ -3213,7 +3236,6 @@ describe("DeviceManager — internal logic helpers", () => {
     expect((dm as any).devices.has(key)).toBe(false);
     expect(dm.removeDevice("H61BE", "AA:BB:CC:DD")).toBeNull(); // already gone
   });
-
 
   it("getErrorCategorySnapshot mirrors the per-source error trackers", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
@@ -3275,7 +3297,13 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
           },
           // Govee /user/devices also returns historical registrations of devices
           // the user deleted — they carry an empty capability list.
-          { sku: "H6160", device: "GHOST0001", deviceName: "Deleted Light", type: "devices.types.light", capabilities: [] },
+          {
+            sku: "H6160",
+            device: "GHOST0001",
+            deviceName: "Deleted Light",
+            type: "devices.types.light",
+            capabilities: [],
+          },
           { sku: "H6160", device: "GHOST0002", deviceName: "No caps at all", type: "devices.types.light" },
         ]),
     } as never);
@@ -3447,9 +3475,9 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     let fetches = 0;
     dm2.setApiClient({
       hasBearerToken: () => true,
-      fetchDeviceList: async () => {
+      fetchDeviceList: () => {
         fetches++;
-        return [];
+        return Promise.resolve([]);
       },
     } as never);
 
@@ -3486,7 +3514,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     });
     dm2.setApiClient({
       hasBearerToken: () => true,
-      fetchDeviceList: async () => [entry("ihoment_H5042_3795")],
+      fetchDeviceList: () => Promise.resolve([entry("ihoment_H5042_3795")]),
     } as never);
 
     await dm2.pollAppApi();
@@ -3497,7 +3525,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
 
     dm2.setApiClient({
       hasBearerToken: () => true,
-      fetchDeviceList: async () => [entry("ihoment_H5042_9999")],
+      fetchDeviceList: () => Promise.resolve([entry("ihoment_H5042_9999")]),
     } as never);
     await dm2.pollAppApi();
     expect(rebuilds).toHaveLength(2); // moved to another gateway → rebuild
@@ -3562,7 +3590,7 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     const warns: string[] = [];
     const infos: string[] = [];
     const dm = new DeviceManager(
-      { ...mockLog, warn: (m: string) => warns.push(m), info: (m: string) => infos.push(m) } as never,
+      { ...mockLog, warn: (m: string) => warns.push(m), info: (m: string) => infos.push(m) },
       mockTimers,
       registry,
     );

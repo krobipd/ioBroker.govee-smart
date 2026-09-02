@@ -11,7 +11,12 @@ const mockLog: ioBroker.Logger = {
 };
 
 /** Timer adapter that captures scheduled callbacks so a test can fire them on demand. */
-function makeCapturingTimers() {
+function makeCapturingTimers(): {
+  timers: TimerAdapter;
+  scheduled: Array<{ cb: () => void; ms: number; id: number }>;
+  cleared: number[];
+  fireLast: () => void;
+} {
   const scheduled: Array<{ cb: () => void; ms: number; id: number }> = [];
   const cleared: number[] = [];
   let nextId = 1;

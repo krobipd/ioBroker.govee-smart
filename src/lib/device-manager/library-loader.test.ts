@@ -35,7 +35,7 @@ function snapCap(options: Array<{ name: string; value: number }>): CloudCapabili
     type: "devices.capabilities.dynamic_scene",
     instance: "snapshot",
     parameters: { dataType: "ENUM", options },
-  } as CloudCapability;
+  };
 }
 
 function setupMockCloud(snapshotsFromScenes: Array<{ name: string; value: number }>): unknown {
@@ -206,7 +206,10 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
     expect(line).toContain("httpStatus=403");
     expect(line).toContain("bearer=yes");
     expect(device.sceneLibrary).toEqual([]); // the old library is not replaced by garbage
-    const hist = diagnostics.generate(device, "x").apiHistory as Record<string, Array<{ ok: boolean; statusCode?: number }>>;
+    const hist = diagnostics.generate(device, "x").apiHistory as Record<
+      string,
+      Array<{ ok: boolean; statusCode?: number }>
+    >;
     expect(hist["/light-effect-libraries?sku=H6160"][0]).toMatchObject({ ok: false, statusCode: 403 });
   });
 
@@ -218,7 +221,9 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
       apiClient: {
         hasBearerToken: () => false,
         fetchSceneLibrary: () =>
-          Promise.reject(new Error("Invalid JSON in HTTP 200 response: x — body starts with: <html>maintenance</html>")),
+          Promise.reject(
+            new Error("Invalid JSON in HTTP 200 response: x — body starts with: <html>maintenance</html>"),
+          ),
         fetchMusicLibrary: () => Promise.resolve([]),
         fetchDiyLibrary: () => Promise.resolve([]),
         fetchSkuFeatures: () => Promise.resolve(null),

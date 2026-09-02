@@ -15,12 +15,13 @@ function makeAdapter(devices: GoveeDevice[]): {
     localSnapshots: {} as never,
     deviceManager: {
       getDevices: () => devices,
-      sendCommand: async (device: GoveeDevice, command: string, value: unknown) => {
+      sendCommand: (device: GoveeDevice, command: string, value: unknown) => {
         commands.push({ device: device.deviceId, command, value });
+        return Promise.resolve();
       },
     } as never,
     stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
-    getStateAsync: async () => null,
+    getStateAsync: () => Promise.resolve(null),
     fireCloudDataReady: (device, all) => fired.push({ device, all }),
   };
   return { adapter, fired, commands };

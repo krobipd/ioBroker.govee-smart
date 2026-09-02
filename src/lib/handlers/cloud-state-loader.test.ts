@@ -27,7 +27,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
   const ensured: string[] = [];
   const removed: Array<{ prefix: string; stateId: string }> = [];
   const failures: Array<{ deviceId: string; endpoint: string }> = [];
-  let getDeviceState: (sku: string, deviceId: string) => Promise<CloudStateCapability[]> = async () => [];
+  let getDeviceState: (sku: string, deviceId: string) => Promise<CloudStateCapability[]> = () => Promise.resolve([]);
 
   const adapter: CloudStateLoaderAdapter = {
     log: mockLog,
@@ -46,15 +46,18 @@ function makeRig(devices: GoveeDevice[]): TestRig {
       // Mirror the real resolveStatePath shape: control unless known sensor id.
       resolveStatePath: (prefix: string, stateId: string) =>
         `${prefix}.${stateId === "battery" ? "sensor" : "control"}.${stateId}`,
-      ensureSyntheticStateObject: async (_prefix: string, stateId: string) => {
+      ensureSyntheticStateObject: (_prefix: string, stateId: string) => {
         ensured.push(stateId);
+        return Promise.resolve();
       },
-      removeSyntheticStateOnce: async (prefix: string, stateId: string) => {
+      removeSyntheticStateOnce: (prefix: string, stateId: string) => {
         removed.push({ prefix, stateId });
+        return Promise.resolve();
       },
     } as never,
-    setState: async (id, state) => {
+    setState: (id, state) => {
       writes.push({ id, val: (state as { val: unknown }).val });
+      return Promise.resolve();
     },
   };
   return {
@@ -82,9 +85,13 @@ const batteryCap: CloudStateCapability = {
 
 describe("loadCloudStates", () => {
   it("writes mapped values for cloud devices, filtering LAN-owned ids on LAN-capable lights (LAN-first invariant)", async () => {
-    const lanLight = createTestDevice({ deviceId: "AA:01", lanIp: "10.0.0.1", channels: { lan: true, mqtt: false, cloud: true } });
+    const lanLight = createTestDevice({
+      deviceId: "AA:01",
+      lanIp: "10.0.0.1",
+      channels: { lan: true, mqtt: false, cloud: true },
+    });
     const rig = makeRig([lanLight]);
-    rig.setDeviceState(async () => [powerCap, batteryCap]);
+    rig.setDeviceState(() => Promise.resolve([powerCap, batteryCap]));
     await loadCloudStates(rig.adapter);
     // power is LAN territory → must NOT be written from the Cloud
     expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toBeUndefined();
@@ -92,9 +99,13 @@ describe("loadCloudStates", () => {
   });
 
   it("writes the LAN-id values for cloud-only devices (no LAN phase to defer to)", async () => {
-    const cloudOnly = createTestDevice({ deviceId: "AA:02", lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+    const cloudOnly = createTestDevice({
+      deviceId: "AA:02",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
     const rig = makeRig([cloudOnly]);
-    rig.setDeviceState(async () => [powerCap]);
+    rig.setDeviceState(() => Promise.resolve([powerCap]));
     await loadCloudStates(rig.adapter);
     expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toMatchObject({ val: true });
   });
@@ -107,9 +118,9 @@ describe("loadCloudStates", () => {
     });
     const rig = makeRig([lanOnly]);
     let called = 0;
-    rig.setDeviceState(async () => {
+    rig.setDeviceState(() => {
       called++;
-      return [];
+      return Promise.resolve([]);
     });
     await loadCloudStates(rig.adapter);
     expect(called).toBe(0);
@@ -120,11 +131,11 @@ describe("loadCloudStates", () => {
     const d2 = createTestDevice({ deviceId: "AA:05", channels: { lan: true, mqtt: false, cloud: true } });
     const rig = makeRig([d1, d2]);
     let call = 0;
-    rig.setDeviceState(async () => {
+    rig.setDeviceState(() => {
       if (call++ === 0) {
-        throw Object.assign(new Error("HTTP 429"), { statusCode: 429 });
+        return Promise.reject(Object.assign(new Error("HTTP 429"), { statusCode: 429 }));
       }
-      return [batteryCap];
+      return Promise.resolve([batteryCap]);
     });
     await loadCloudStates(rig.adapter);
     expect(rig.failures).toEqual([{ deviceId: "AA:04", endpoint: "/router/api/v1/device/state" }]);
@@ -141,7 +152,7 @@ describe("loadCloudStates", () => {
     const d1 = createTestDevice({ deviceId: "AA:06", channels: { lan: false, mqtt: false, cloud: true } });
     const d2 = createTestDevice({ deviceId: "AA:07", channels: { lan: false, mqtt: false, cloud: true } });
     const rig = makeRig([d1, d2]);
-    rig.setDeviceState(async () => [batteryCap]);
+    rig.setDeviceState(() => Promise.resolve([batteryCap]));
     const dispatched: number[] = [];
     const limited = {
       ...rig.adapter,
@@ -164,9 +175,9 @@ describe("loadCloudStates", () => {
     const d2 = createTestDevice({ deviceId: "AA:09", channels: { lan: false, mqtt: false, cloud: true } });
     const rig = makeRig([d1, d2]);
     let calls = 0;
-    rig.setDeviceState(async () => {
+    rig.setDeviceState(() => {
       calls++;
-      return [batteryCap];
+      return Promise.resolve([batteryCap]);
     });
     await loadCloudStates(rig.adapter, d2);
     expect(calls).toBe(1);

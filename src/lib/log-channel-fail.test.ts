@@ -102,4 +102,3 @@ describe("logChannelFail (dedup wrapper)", () => {
     expect(warns[1].msg).toContain("authentication failed (HTTP 401)");
   });
 });
-

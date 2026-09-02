@@ -21,6 +21,10 @@ import { LAN_STATE_IDS, type StateDefinition } from "./capability-mapper";
  * for a device with pre-built stateDefs. Mirrors what the old
  * createDeviceStates used to do internally; kept as a test helper so the
  * production module stays free of legacy wrappers.
+ *
+ * @param sm State manager under test
+ * @param device Device the states belong to
+ * @param stateDefs Definitions to create below the device
  */
 async function createAllStatesForTest(
   sm: StateManager,
@@ -64,14 +68,17 @@ function createMockAdapter(): {
       silly: () => {},
       level: "debug",
     },
-    extendObject: async (id: string, obj: Record<string, unknown>, opts?: Record<string, unknown>) => {
+    extendObject: (id: string, obj: Record<string, unknown>, opts?: Record<string, unknown>) => {
       calls.push({ method: "extendObject", args: [id, obj, opts] });
       // Merge-faithful mock: js-controller extendObject deep-merges via
       // node.extend (verified against js-controller 7.2.2) — same-key values
       // are replaced (even object → string), but keys absent from the patch
       // SURVIVE. A plain objects.set() here would hide exactly the class of
       // bug repairCommonStatesIfBuggy exists for.
-      const deepExtend = (target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> => {
+      const deepExtend = (
+        target: Record<string, unknown>,
+        source: Record<string, unknown>,
+      ): Record<string, unknown> => {
         for (const [k, v] of Object.entries(source)) {
           if (v === undefined) {
             continue;
@@ -92,73 +99,83 @@ function createMockAdapter(): {
       };
       const existing = objects.get(id);
       objects.set(id, existing ? deepExtend({ ...existing }, obj) : obj);
+      return Promise.resolve();
     },
-    setObject: async (id: string, obj: Record<string, unknown>) => {
+    setObject: (id: string, obj: Record<string, unknown>) => {
       calls.push({ method: "setObject", args: [id, obj] });
       objects.set(id, obj);
+      return Promise.resolve();
     },
-    setObjectNotExistsAsync: async (id: string, obj: Record<string, unknown>) => {
+    setObjectNotExistsAsync: (id: string, obj: Record<string, unknown>) => {
       calls.push({ method: "setObjectNotExistsAsync", args: [id, obj] });
       // js-controller no-ops if the object already exists.
       if (!objects.has(id)) {
         objects.set(id, obj);
       }
+      return Promise.resolve();
     },
-    setState: async (id: string, val: Record<string, unknown>) => {
+    setState: (id: string, val: Record<string, unknown>) => {
       calls.push({ method: "setState", args: [id, val] });
       states.set(id, val as unknown as ioBroker.State);
+      return Promise.resolve();
     },
-    setStateChangedAsync: async (id: string, val: Record<string, unknown>) => {
+    setStateChangedAsync: (id: string, val: Record<string, unknown>) => {
       const prev = states.get(id) as { val?: unknown } | undefined;
       const changed = !prev || prev.val !== (val as { val?: unknown }).val;
       calls.push({ method: "setStateChangedAsync", args: [id, val, { changed }] });
       if (changed) {
         states.set(id, val as unknown as ioBroker.State);
       }
-      return { id } as never;
+      return Promise.resolve({ id } as never);
     },
-    getStateAsync: async (id: string) => {
+    getStateAsync: (id: string) => {
       calls.push({ method: "getStateAsync", args: [id] });
-      return states.get(id) ?? null;
+      return Promise.resolve(states.get(id) ?? null);
     },
-    getObjectAsync: async (id: string) => {
+    getObjectAsync: (id: string) => {
       calls.push({ method: "getObjectAsync", args: [id] });
-      return objects.get(id) ?? null;
+      return Promise.resolve(objects.get(id) ?? null);
     },
-    delObjectAsync: async (id: string, _opts?: Record<string, unknown>) => {
+    delObjectAsync: (id: string, _opts?: Record<string, unknown>) => {
       calls.push({ method: "delObjectAsync", args: [id] });
       // Remove all matching keys
       for (const key of objects.keys()) {
-        if (key === id || key.startsWith(id + ".")) {
+        if (key === id || key.startsWith(`${id}.`)) {
           objects.delete(key);
         }
       }
+      return Promise.resolve();
     },
-    delStateAsync: async (id: string) => {
+    delStateAsync: (id: string) => {
       calls.push({ method: "delStateAsync", args: [id] });
       states.delete(id);
+      return Promise.resolve();
     },
-    getObjectViewAsync: async (_type: string, viewType: string, opts: { startkey: string; endkey: string }) => {
+    getObjectViewAsync: (_type: string, viewType: string, opts: { startkey: string; endkey: string }) => {
       calls.push({ method: "getObjectViewAsync", args: [_type, viewType, opts] });
       const rows: Array<{ id: string; value: unknown }> = [];
       const prefix = opts.startkey.replace("govee-smart.0.", "");
       for (const [key, obj] of objects.entries()) {
         if (key.startsWith(prefix)) {
           // Filter by object type if viewType is specified (device, state, channel)
-          const objType = (obj as Record<string, unknown>)?.type as string;
+          const objType = obj?.type as string;
           if (objType && objType !== viewType) {
             continue;
           }
           rows.push({ id: `govee-smart.0.${key}`, value: obj });
         }
       }
-      return { rows };
+      return Promise.resolve({ rows });
     },
   };
   return { adapter, calls, objects, states };
 }
 
-/** Create a test device */
+/**
+ * Create a test device
+ *
+ * @param overrides Fields that replace the defaults of the fixture device
+ */
 function createTestDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
   return {
     sku: "H6160",
@@ -384,12 +401,12 @@ describe("StateManager", () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       // Orphan pseudo-device left by a build that merged a SameModeGroup verbatim.
-      objects.set("devices.samemodegroup_9100", { type: "device" } as never);
-      objects.set("devices.samemodegroup_9100.control", { type: "channel" } as never);
-      objects.set("devices.samemodegroup_9100.control.power", { type: "state" } as never);
+      objects.set("devices.samemodegroup_9100", { type: "device" });
+      objects.set("devices.samemodegroup_9100.control", { type: "channel" });
+      objects.set("devices.samemodegroup_9100.control.power", { type: "state" });
       // A real device that must survive.
-      objects.set("devices.h6160_0011", { type: "device" } as never);
-      objects.set("devices.h6160_0011.control.power", { type: "state" } as never);
+      objects.set("devices.h6160_0011", { type: "device" });
+      objects.set("devices.h6160_0011.control.power", { type: "state" });
 
       const removed = await sm.cleanupSameModeGroupOrphansOnce();
 
@@ -402,7 +419,7 @@ describe("StateManager", () => {
     it("is a no-op on a clean install (no samemodegroup objects)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      objects.set("devices.h6160_0011", { type: "device" } as never);
+      objects.set("devices.h6160_0011", { type: "device" });
 
       const removed = await sm.cleanupSameModeGroupOrphansOnce();
 
@@ -472,7 +489,7 @@ describe("StateManager", () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const path = "devices.h5109_1a.sensor.humidity"; // inferChannelFromStateId → "sensor"
-      objects.set(path, { type: "state", common: {}, native: {} } as never);
+      objects.set(path, { type: "state", common: {}, native: {} });
 
       await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
       expect(objects.has(path)).toBe(false); // datapoint actually disappears
@@ -571,15 +588,15 @@ describe("StateManager", () => {
           type: "mixed",
           role: "state",
           states: {
-            "0": { en: "none", de: "keine" },
-            "1": { en: "Aurora", de: "Aurora" },
-            "9": { en: "stale entry", de: "alter Eintrag" },
+            0: { en: "none", de: "keine" },
+            1: { en: "Aurora", de: "Aurora" },
+            9: { en: "stale entry", de: "alter Eintrag" },
           },
         },
         native: {},
       });
 
-      const fresh: Record<string, string> = { "0": "---", "1": "Aurora" };
+      const fresh: Record<string, string> = { 0: "---", 1: "Aurora" };
       await createAllStatesForTest(sm, dev, [
         {
           id: "light_scene",
@@ -618,7 +635,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
 
-      const fresh: Record<string, string> = { "0": "---", "1": "Aurora" };
+      const fresh: Record<string, string> = { 0: "---", 1: "Aurora" };
       await createAllStatesForTest(sm, dev, [
         {
           id: "light_scene",
@@ -775,7 +792,7 @@ describe("StateManager", () => {
           type: "string",
           role: "text",
           write: true,
-          states: { "0": "---", "1": "Sunset", "2": "Rainbow" },
+          states: { 0: "---", 1: "Sunset", 2: "Rainbow" },
           def: "0",
           capabilityType: "dynamic_scene",
           capabilityInstance: "lightScene",
@@ -995,7 +1012,7 @@ describe("StateManager", () => {
       expect(states.get("groups.info.online")).toMatchObject({ val: false });
 
       // Simulate object exists for setStateIfExists
-      objects.set("groups.info.online", { type: "state" } as never);
+      objects.set("groups.info.online", { type: "state" });
       await sm.updateGroupsOnline(true);
       expect(states.get("groups.info.online")).toMatchObject({ val: true });
     });
@@ -1362,15 +1379,9 @@ describe("StateManager", () => {
       // `battery` (canonicalSyntheticId) — these MUST route to sensor/.
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "temperature")).toBe(
-        "devices.h5179_3c1b.sensor.temperature",
-      );
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "humidity")).toBe(
-        "devices.h5179_3c1b.sensor.humidity",
-      );
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "battery")).toBe(
-        "devices.h5179_3c1b.sensor.battery",
-      );
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "temperature")).toBe("devices.h5179_3c1b.sensor.temperature");
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "humidity")).toBe("devices.h5179_3c1b.sensor.humidity");
+      expect(sm.resolveStatePath("devices.h5179_3c1b", "battery")).toBe("devices.h5179_3c1b.sensor.battery");
     });
 
     it("no longer knows the pre-2.28.0 spellings — they are not synthetic states any more", async () => {
@@ -1677,10 +1688,7 @@ describe("StateManager", () => {
       // device tree on disk.
       const stalePrefix = "devices.h6161_2222";
       const stateDeleteIdx = calls.findIndex(
-        c =>
-          c.method === "delStateAsync" &&
-          typeof c.args[0] === "string" &&
-          (c.args[0] as string).startsWith(`${stalePrefix}.`),
+        c => c.method === "delStateAsync" && typeof c.args[0] === "string" && c.args[0].startsWith(`${stalePrefix}.`),
       );
       const objectDeleteIdx = calls.findIndex(c => c.method === "delObjectAsync" && c.args[0] === stalePrefix);
       expect(stateDeleteIdx, "delStateAsync was called for the stale prefix").toBeGreaterThan(-1);
@@ -1700,9 +1708,7 @@ describe("StateManager", () => {
       const survivorPrefix = "devices.h6160_1111";
       const survivorStateDeletes = calls.filter(
         c =>
-          c.method === "delStateAsync" &&
-          typeof c.args[0] === "string" &&
-          (c.args[0] as string).startsWith(`${survivorPrefix}.`),
+          c.method === "delStateAsync" && typeof c.args[0] === "string" && c.args[0].startsWith(`${survivorPrefix}.`),
       );
       expect(survivorStateDeletes).toHaveLength(0);
     });
@@ -1774,7 +1780,7 @@ describe("StateManager", () => {
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
       await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
       for (const legacy of ["sensor.sensor_temperature", "sensor.sensor_humidity", "events.lackwater"]) {
-        objects.set(`devices.h5179_3c1b.${legacy}`, { type: "state", common: {}, native: {} } as never);
+        objects.set(`devices.h5179_3c1b.${legacy}`, { type: "state", common: {}, native: {} });
       }
       calls.length = 0;
 
@@ -2318,7 +2324,9 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice();
     const ensured = (): string[] =>
-      calls.filter(c => c.method === "extendObject" && String(c.args[0]).endsWith(".info.name")).map(c => String(c.args[0]));
+      calls
+        .filter(c => c.method === "extendObject" && String(c.args[0]).endsWith(".info.name"))
+        .map(c => String(c.args[0]));
     await sm.createInfoStates(dev);
     expect(ensured()).toHaveLength(1);
     // Called again on every cloud refresh / reconnect — without the cache this
@@ -2332,26 +2340,30 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     const { adapter, objects } = createMockAdapter();
     const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice();
-    await sm.createCloudStates(dev, [
-      {
-        id: "refresh_cloud",
-        name: "Refresh",
-        type: "boolean",
-        role: "button",
-        write: true,
-        capabilityType: "devices.capabilities.on_off",
-        capabilityInstance: "refresh",
-      },
-      {
-        id: "power_state",
-        name: "Power",
-        type: "boolean",
-        role: "switch",
-        write: true,
-        capabilityType: "devices.capabilities.on_off",
-        capabilityInstance: "powerSwitch",
-      },
-    ] as StateDefinition[], 0);
+    await sm.createCloudStates(
+      dev,
+      [
+        {
+          id: "refresh_cloud",
+          name: "Refresh",
+          type: "boolean",
+          role: "button",
+          write: true,
+          capabilityType: "devices.capabilities.on_off",
+          capabilityInstance: "refresh",
+        },
+        {
+          id: "power_state",
+          name: "Power",
+          type: "boolean",
+          role: "switch",
+          write: true,
+          capabilityType: "devices.capabilities.on_off",
+          capabilityInstance: "powerSwitch",
+        },
+      ] as StateDefinition[],
+      0,
+    );
     expect((objects.get("devices.h6160_0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
     expect((objects.get("devices.h6160_0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
   });

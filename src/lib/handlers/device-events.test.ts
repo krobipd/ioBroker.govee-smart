@@ -43,38 +43,45 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     deviceManager: { getDevices: () => devices, syncSegmentCount: (d: GoveeDevice) => d.segmentCount ?? 0 } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
-      updateDeviceState: async (_d: GoveeDevice, s: Partial<DeviceState>) => {
+      updateDeviceState: (_d: GoveeDevice, s: Partial<DeviceState>) => {
         updates.push(s);
+        return Promise.resolve();
       },
-      syncInfoOnline: async () => {
+      syncInfoOnline: () => {
         calls.push("syncInfoOnline");
-        return false;
+        return Promise.resolve(false);
       },
-      createInfoStates: async () => {
+      createInfoStates: () => {
         calls.push("createInfoStates");
+        return Promise.resolve();
       },
-      createLanStates: async () => {
+      createLanStates: () => {
         calls.push("createLanStates");
+        return Promise.resolve();
       },
-      createCloudStates: async (_d: GoveeDevice, defs: StateDefinition[], segmentCount: number) => {
+      createCloudStates: (_d: GoveeDevice, defs: StateDefinition[], segmentCount: number) => {
         calls.push(`createCloudStates:${segmentCount}`);
         cloudDefs.push(defs);
+        return Promise.resolve();
       },
-      migrateLegacyDiagnostics: async () => {
+      migrateLegacyDiagnostics: () => {
         calls.push("migrateLegacyDiagnostics");
+        return Promise.resolve();
       },
-      updateDeviceTier: async () => {
+      updateDeviceTier: () => {
         calls.push("updateDeviceTier");
+        return Promise.resolve();
       },
-      updateGroupMembersUnreachable: async () => undefined,
+      updateGroupMembersUnreachable: () => Promise.resolve(undefined),
     } as never,
     localSnapshots: { getSnapshots: () => [{ name: "Snap" }] } as never,
     deviceRegistry: new DeviceRegistry({ data: { devices: {} } }),
     statesReady: opts.statesReady ?? false,
     stateCreationQueue: queue,
-    setState: async () => undefined,
-    reapStaleDevices: async () => {
+    setState: () => Promise.resolve(undefined),
+    reapStaleDevices: () => {
       reapCalls.push(1);
+      return Promise.resolve();
     },
     // ConnectionStateAdapter surface (updateConnectionState path)
     cloudClient: null,
@@ -89,24 +96,25 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     readyLogged: true, // checkAllReady untouched by these tests
     lastConnectionState: null,
     // GroupStateHelpersAdapter (dropdown reset reads/writes)
-    getStateAsync: async (id: string) => {
+    getStateAsync: (id: string) => {
       // Pretend a scene dropdown is active so a reset write becomes observable.
       if (id.endsWith("scenes.light_scene")) {
-        return { val: "2", ack: true } as ioBroker.State;
+        return Promise.resolve({ val: "2", ack: true } as ioBroker.State);
       }
-      return null;
+      return Promise.resolve(null);
     },
     // GroupFanoutHandlerAdapter
-    getObjectAsync: async () => null,
+    getObjectAsync: () => Promise.resolve(null),
     stateToCommand: () => null,
-    sendMusicCommand: async () => undefined,
+    sendMusicCommand: () => Promise.resolve(undefined),
   } as unknown as Parameters<typeof onDeviceStateUpdate>[0];
 
   // Observe dropdown resets through the shared setState.
-  (adapter as { setState: unknown }).setState = async (id: string, state: unknown) => {
+  (adapter as { setState: unknown }).setState = (id: string, state: unknown) => {
     if ((state as { val: unknown }).val === "0") {
       dropdownResets.push(id);
     }
+    return Promise.resolve();
   };
 
   return { adapter, calls, cloudDefs, updates, dropdownResets, reapCalls, queue };
@@ -226,7 +234,7 @@ describe("onCloudDataReady (phase 2)", () => {
     expect(Object.values(localDef!.states!)).toContain("Snap");
   });
 
-  it("re-reaps stale devices only after the initial tree is ready (no churn during boot)", async () => {
+  it("re-reaps stale devices only after the initial tree is ready (no churn during boot)", () => {
     const device = createTestDevice();
     const before = makeRig({ devices: [device], statesReady: false });
     onCloudDataReady(before.adapter, device, [device]);

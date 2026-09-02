@@ -2,20 +2,20 @@ import { vi } from "vitest";
 
 // Resolve wizard strings against the real en.json so the content assertions
 // below still hold; the wizard's own format() then substitutes {placeholders}.
-const { enJson } = vi.hoisted(() => {
-  const { readFileSync } = require("node:fs");
-  const { join } = require("node:path");
+vi.mock("@iobroker/adapter-core", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const enJson = JSON.parse(readFileSync(join(__dirname, "../../admin/i18n/en.json"), "utf8")) as Record<
+    string,
+    string
+  >;
   return {
-    enJson: JSON.parse(readFileSync(join(__dirname, "../../admin/i18n/en.json"), "utf8")) as Record<string, string>,
+    I18n: {
+      getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+      translate: vi.fn((key: string) => enJson[key] ?? key),
+    },
   };
 });
-
-vi.mock("@iobroker/adapter-core", () => ({
-  I18n: {
-    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
-    translate: vi.fn((key: string) => enJson[key] ?? key),
-  },
-}));
 
 import { SegmentWizard, type WizardHost, type WizardResult } from "./segment-wizard";
 import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
@@ -62,16 +62,17 @@ class TestHost implements WizardHost {
     },
   };
 
-  public async getState(id: string): Promise<{ val: unknown } | null> {
+  public getState(id: string): Promise<{ val: unknown } | null> {
     this.stateReads.push(id);
     if (this.states.has(id)) {
-      return { val: this.states.get(id) };
+      return Promise.resolve({ val: this.states.get(id) });
     }
-    return null;
+    return Promise.resolve(null);
   }
 
-  public async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
+  public sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     this.calls.push({ kind: "sendCommand", device, command, value });
+    return Promise.resolve();
   }
 
   /** Filter host.calls down to only the segmentBatch commands. */
@@ -83,19 +84,19 @@ class TestHost implements WizardHost {
   public atomicRestoreUsed = false;
   public atomicEnabled = false;
 
-  public async flashSegmentAtomic(_device: GoveeDevice, _idx: number): Promise<boolean> {
+  public flashSegmentAtomic(_device: GoveeDevice, _idx: number): Promise<boolean> {
     this.atomicFlashUsed = true;
-    return this.atomicEnabled;
+    return Promise.resolve(this.atomicEnabled);
   }
 
-  public async restoreStripAtomic(
+  public restoreStripAtomic(
     _device: GoveeDevice,
     _total: number,
     _color: number,
     _brightness: number,
   ): Promise<boolean> {
     this.atomicRestoreUsed = true;
-    return this.atomicEnabled;
+    return Promise.resolve(this.atomicEnabled);
   }
 
   public findDevice(key: string): GoveeDevice | undefined {
@@ -126,11 +127,12 @@ class TestHost implements WizardHost {
     }
   }
 
-  public async applyWizardResult(device: GoveeDevice, result: WizardResult): Promise<void> {
+  public applyWizardResult(device: GoveeDevice, result: WizardResult): Promise<void> {
     this.appliedResults.push({ device, result });
     // Mimic the host's runtime side-effect so subsequent logic that
     // reads device.segmentCount (e.g. restoreBaseline) sees the update.
     device.segmentCount = result.segmentCount;
+    return Promise.resolve();
   }
 }
 

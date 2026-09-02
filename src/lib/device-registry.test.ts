@@ -47,7 +47,7 @@ const SAMPLE = {
 describe("DeviceRegistry", () => {
   describe("Loading", () => {
     it("loads inline data without filesystem access", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       // Verify loading via the real lookup API (no production-internal
       // enumeration): a known entry resolves with its parsed fields, an
       // unknown one stays undefined.
@@ -110,20 +110,20 @@ describe("DeviceRegistry", () => {
 
   describe("Status filter (default: experimental=false)", () => {
     it("activates verified entries (no quirks set)", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getEntry("H5179")?.status).toBe("verified");
       expect(reg.getQuirks("H5179")).toBeUndefined();
     });
 
     it("activates reported quirks", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getQuirks("H7160")).toEqual({
         brokenPlatformApi: true,
       });
     });
 
     it("hides seed quirks by default", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getQuirks("H60A1")).toBeUndefined();
       expect(reg.getQuirks("H6022")).toBeUndefined();
       expect(reg.getQuirks("H6141")).toBeUndefined();
@@ -133,7 +133,7 @@ describe("DeviceRegistry", () => {
   describe("Status filter (experimental=true)", () => {
     it("activates seed quirks when experimental flag is on", () => {
       const reg = new DeviceRegistry({
-        data: SAMPLE as never,
+        data: SAMPLE,
         experimental: true,
       });
       expect(reg.getQuirks("H60A1")).toEqual({
@@ -146,7 +146,7 @@ describe("DeviceRegistry", () => {
   });
 
   describe("Lookup helpers", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE as never });
+    const reg = new DeviceRegistry({ data: SAMPLE });
 
     it("getStatus returns the trust tier", () => {
       expect(reg.getStatus("H61BE")).toBe("verified");
@@ -191,26 +191,26 @@ describe("DeviceRegistry", () => {
     // share one process, and a shared catalog let the instance that started
     // last decide the experimental toggle for all of them.
     it("applyColorTempQuirk falls through to the API range without an active quirk", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
       expect(reg.applyColorTempQuirk("HZZZZ", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
     });
 
     it("applyColorTempQuirk uses the catalog range once the seed entry is active", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
       expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2200, max: 6500 });
     });
 
     it("two instances with different toggles keep their own quirks", () => {
-      const plain = new DeviceRegistry({ data: SAMPLE as never });
-      const experimental = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      const plain = new DeviceRegistry({ data: SAMPLE });
+      const experimental = new DeviceRegistry({ data: SAMPLE, experimental: true });
       expect(plain.getQuirks("H6141")).toBeUndefined();
       expect(experimental.getQuirks("H6141")).toEqual({ brokenPlatformApi: true });
       expect(plain.getQuirks("H6141")).toBeUndefined(); // untouched by the other instance
     });
 
     it("getTier maps the catalog status to a tier label and collapses unknown SKUs to 'unknown'", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+      const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
       expect(reg.getTier("H60A1")).toBe("seed");
       expect(reg.getTier("H61BE")).toBe("verified");
       expect(reg.getTier("H7160")).toBe("reported");
@@ -218,7 +218,7 @@ describe("DeviceRegistry", () => {
     });
 
     it("getTier is case-insensitive on the SKU", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE as never });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getTier("h60a1")).toBe("seed");
       expect(reg.getTier("H60A1")).toBe("seed");
     });
@@ -246,9 +246,11 @@ describe("DeviceRegistry", () => {
       ];
       const validTargets = ["cloud", "lan"];
       let checked = 0;
-      for (const [sku, entry] of Object.entries(realDevices.devices)) {
+      for (const entry of Object.values(realDevices.devices)) {
         const overrides = entry.quirks?.transportOverrides;
-        if (!overrides) continue;
+        if (!overrides) {
+          continue;
+        }
         for (const [cmd, target] of Object.entries(overrides)) {
           expect(validCommands).toContain(cmd);
           expect(validTargets).toContain(target);
@@ -263,7 +265,7 @@ describe("DeviceRegistry", () => {
 
 describe("isSeedAndDormant — the experimental-toggle nudge", () => {
   it("is true only for a seed entry while the experimental toggle is OFF", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE as never });
+    const reg = new DeviceRegistry({ data: SAMPLE });
     expect(reg.isSeedAndDormant("H60A1")).toBe(true); // seed, toggle off → user should be nudged
     expect(reg.isSeedAndDormant("h60a1")).toBe(true); // case-insensitive
     expect(reg.isSeedAndDormant("H61BE")).toBe(false); // verified — nothing dormant
@@ -272,12 +274,12 @@ describe("isSeedAndDormant — the experimental-toggle nudge", () => {
   });
 
   it("is never true once the toggle is ON — the seed corrections are already active", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE as never, experimental: true });
+    const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
     expect(reg.isSeedAndDormant("H60A1")).toBe(false);
   });
 
   it("is safe against non-string input", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE as never });
+    const reg = new DeviceRegistry({ data: SAMPLE });
     expect(reg.isSeedAndDormant(undefined as never)).toBe(false);
     expect(reg.isSeedAndDormant(42 as never)).toBe(false);
     expect(reg.isSeedAndDormant("")).toBe(false);

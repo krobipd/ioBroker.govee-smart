@@ -16,8 +16,12 @@ const apiLog = {
   level: "debug",
 } as unknown as ioBroker.Logger;
 
-/** Wrap a parsed body as the HttpResult envelope the walkers read via `result.value`. */
-function httpOk(data: unknown) {
+/**
+ * Wrap a parsed body as the HttpResult envelope the walkers read via `result.value`.
+ *
+ * @param data Parsed response body to wrap
+ */
+function httpOk(data: unknown): never {
   return { value: data, statusCode: 200 } as never;
 }
 

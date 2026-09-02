@@ -1,5 +1,6 @@
 import { vi } from "vitest";
 import { GoveeOpenapiMqttClient } from "./govee-openapi-mqtt-client";
+import type { TimerAdapter } from "./types";
 
 /**
  * Lifecycle tests for the OpenAPI-MQTT client (constructor + disconnect) plus
@@ -83,7 +84,7 @@ const mockTimers = {
 describe("GoveeOpenapiMqttClient", () => {
   describe("lifecycle without a broker", () => {
     it("starts disconnected, and a disconnect() that never connected is a silent no-op", () => {
-      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
+      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers);
       expect(client.connected).toBe(false);
       client.disconnect();
       client.disconnect();
@@ -96,13 +97,13 @@ describe("GoveeOpenapiMqttClient", () => {
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
     it("generates a UUID-shaped session id once per instance", () => {
-      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
+      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers);
       const sid = (client as unknown as { sessionUuid: string }).sessionUuid;
       expect(sid).toMatch(UUID_RE);
     });
 
     it("keeps the same session id for the lifetime of the instance", () => {
-      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers as never);
+      const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers);
       const before = (client as unknown as { sessionUuid: string }).sessionUuid;
       // Simulate adapter activity that previously rotated the id
       client.disconnect();
@@ -111,8 +112,8 @@ describe("GoveeOpenapiMqttClient", () => {
     });
 
     it("uses a different session id per client instance", () => {
-      const a = new GoveeOpenapiMqttClient("k", mockLog, mockTimers as never);
-      const b = new GoveeOpenapiMqttClient("k", mockLog, mockTimers as never);
+      const a = new GoveeOpenapiMqttClient("k", mockLog, mockTimers);
+      const b = new GoveeOpenapiMqttClient("k", mockLog, mockTimers);
       const sa = (a as unknown as { sessionUuid: string }).sessionUuid;
       const sb = (b as unknown as { sessionUuid: string }).sessionUuid;
       expect(sa).not.toBe(sb);
@@ -120,7 +121,7 @@ describe("GoveeOpenapiMqttClient", () => {
   });
 
   describe("connect / subscribe / reconnect (base scaffolding wiring)", () => {
-    function makeCapturingTimers() {
+    function makeCapturingTimers(): { timers: TimerAdapter; scheduled: Array<() => void> } {
       const scheduled: Array<() => void> = [];
       const timers = {
         setInterval: () => undefined,
@@ -274,8 +275,8 @@ describe("GoveeOpenapiMqttClient", () => {
   });
 
   describe("handleMessage (event parsing)", () => {
-    function makeClient() {
-      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers as never);
+    function makeClient(): { events: unknown[]; raws: string[]; feed: (obj: unknown) => void } {
+      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers);
       const events: unknown[] = [];
       const raws: string[] = [];
       (client as any).onEvent = (e: unknown) => events.push(e);
@@ -306,7 +307,7 @@ describe("GoveeOpenapiMqttClient", () => {
     });
 
     it("forwards raw JSON even when the body is unparseable, and emits no event", () => {
-      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers as never);
+      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers);
       const raws: string[] = [];
       let events = 0;
       (client as any).onRaw = (r: string) => raws.push(r);
@@ -317,7 +318,7 @@ describe("GoveeOpenapiMqttClient", () => {
     });
 
     it("drops an oversized message before forwarding raw or parsing (SEC-I2 payload cap)", () => {
-      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers as never);
+      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers);
       const raws: string[] = [];
       let events = 0;
       (client as any).onRaw = (r: string) => raws.push(r);

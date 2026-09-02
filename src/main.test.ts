@@ -43,43 +43,51 @@ vi.mock("@iobroker/adapter-core", () => {
     public subscribeStatesAsync = vi.fn(async () => {});
     public sendTo = vi.fn();
     public registerNotification = vi.fn(async () => {});
-    public setInterval = vi.fn(() => ({}) as unknown);
+    public setInterval = vi.fn(() => ({}));
     public clearInterval = vi.fn();
-    public setTimeout = vi.fn(() => ({}) as unknown);
+    public setTimeout = vi.fn(() => ({}));
     public clearTimeout = vi.fn();
     public delay = vi.fn(async () => {});
     public encrypt = (v: string): string => `enc:${v}`;
     public decrypt = (v: string): string => (v.startsWith("enc:") ? v.slice(4) : v);
 
-    public setState = vi.fn(async (id: string, state: unknown) => {
+    public setState = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
       this.states.set(id.replace(`${this.namespace}.`, ""), { val: s?.val, ack: s?.ack === true });
+      return Promise.resolve();
     });
     public setStateAsync = this.setState;
-    public setStateChangedAsync = vi.fn(async (id: string, state: unknown) => {
+    public setStateChangedAsync = vi.fn((id: string, state: unknown) => {
       const s = state as { val?: unknown; ack?: boolean };
       this.states.set(id.replace(`${this.namespace}.`, ""), { val: s?.val, ack: s?.ack === true });
+      return Promise.resolve();
     });
-    public getStateAsync = vi.fn(async (id: string) => this.states.get(id.replace(`${this.namespace}.`, "")) ?? null);
+    public getStateAsync = vi.fn((id: string) =>
+      Promise.resolve(this.states.get(id.replace(`${this.namespace}.`, "")) ?? null),
+    );
     public getState = this.getStateAsync;
-    public extendObject = vi.fn(async (id: string, obj: Record<string, unknown>) => {
+    public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       const existing = this.objects.get(key) ?? {};
       this.objects.set(key, {
         ...existing,
         ...obj,
-        common: { ...((existing.common as object) ?? {}), ...((obj.common as object) ?? {}) },
+        common: { ...(existing.common ?? {}), ...(obj.common ?? {}) },
       });
+      return Promise.resolve();
     });
     public extendObjectAsync = this.extendObject;
-    public setObjectNotExistsAsync = vi.fn(async (id: string, obj: Record<string, unknown>) => {
+    public setObjectNotExistsAsync = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       if (!this.objects.has(key)) {
         this.objects.set(key, obj);
       }
+      return Promise.resolve();
     });
-    public getObjectAsync = vi.fn(async (id: string) => this.objects.get(id.replace(`${this.namespace}.`, "")) ?? null);
-    public delObjectAsync = vi.fn(async (id: string, opts?: { recursive?: boolean }) => {
+    public getObjectAsync = vi.fn((id: string) =>
+      Promise.resolve(this.objects.get(id.replace(`${this.namespace}.`, "")) ?? null),
+    );
+    public delObjectAsync = vi.fn((id: string, opts?: { recursive?: boolean }) => {
       const key = id.replace(`${this.namespace}.`, "");
       if (opts?.recursive) {
         for (const k of [...this.objects.keys()]) {
@@ -90,11 +98,13 @@ vi.mock("@iobroker/adapter-core", () => {
       } else {
         this.objects.delete(key);
       }
+      return Promise.resolve();
     });
-    public delStateAsync = vi.fn(async (id: string) => {
+    public delStateAsync = vi.fn((id: string) => {
       this.states.delete(id.replace(`${this.namespace}.`, ""));
+      return Promise.resolve();
     });
-    public getObjectViewAsync = vi.fn(async (_d: string, type: string, p: { startkey: string; endkey: string }) => {
+    public getObjectViewAsync = vi.fn((_d: string, type: string, p: { startkey: string; endkey: string }) => {
       const prefix = p.startkey.replace(`${this.namespace}.`, "");
       const rows: Array<{ id: string; value: unknown }> = [];
       for (const [k, v] of this.objects) {
@@ -102,23 +112,25 @@ vi.mock("@iobroker/adapter-core", () => {
           rows.push({ id: `${this.namespace}.${k}`, value: v });
         }
       }
-      return { rows };
+      return Promise.resolve({ rows });
     });
-    public getForeignObjectAsync = vi.fn(async () => ({ native: {} }));
+    public getForeignObjectAsync = vi.fn(() => Promise.resolve({ native: {} }));
     public extendForeignObjectAsync = vi.fn(async () => {});
-    public readDirAsync = vi.fn(async () => [] as { file: string; isDir: boolean }[]);
-    public readFileAsync = vi.fn(async (_meta: string, name: string) => {
+    public readDirAsync = vi.fn(() => Promise.resolve([] as { file: string; isDir: boolean }[]));
+    public readFileAsync = vi.fn((_meta: string, name: string) => {
       const f = this.files.get(name);
       if (f === undefined) {
-        throw new Error("not found");
+        return Promise.reject(new Error("not found"));
       }
-      return { file: f };
+      return Promise.resolve({ file: f });
     });
-    public writeFileAsync = vi.fn(async (_meta: string, name: string, data: string | Buffer) => {
+    public writeFileAsync = vi.fn((_meta: string, name: string, data: string | Buffer) => {
       this.files.set(name, typeof data === "string" ? data : data.toString("utf-8"));
+      return Promise.resolve();
     });
-    public delFileAsync = vi.fn(async (_meta: string, name: string) => {
+    public delFileAsync = vi.fn((_meta: string, name: string) => {
       this.files.delete(name);
+      return Promise.resolve();
     });
     constructor(_opts: unknown) {}
   }
@@ -174,7 +186,11 @@ interface Fakes {
   calls: { mqtt: unknown[][]; cloud: unknown[][]; openapi: unknown[][]; limiter: unknown[][]; lan: unknown[][] };
 }
 
-/** Typed access to the private fields/methods the orchestration tests drive. */
+/**
+ * Typed access to the private fields/methods the orchestration tests drive.
+ *
+ * @param adapter Adapter instance under test
+ */
 function internalOf(adapter: GoveeAdapter): {
   objects: Map<string, Record<string, unknown>>;
   states: Map<string, { val: unknown; ack: boolean }>;
@@ -224,7 +240,11 @@ function internalOf(adapter: GoveeAdapter): {
   return adapter as unknown as ReturnType<typeof internalOf>;
 }
 
-/** Let fire-and-forget promise chains settle. */
+/**
+ * Let fire-and-forget promise chains settle.
+ *
+ * @param times How many macrotask turns to wait
+ */
 async function settle(times = 3): Promise<void> {
   for (let i = 0; i < times; i++) {
     await new Promise(r => setImmediate(r));
@@ -251,7 +271,11 @@ function makeDevice(o: Partial<GoveeDevice> = {}): GoveeDevice {
   };
 }
 
-/** Build an adapter with fake network collaborators + a config. */
+/**
+ * Build an adapter with fake network collaborators + a config.
+ *
+ * @param configOverrides Instance settings that replace the defaults
+ */
 function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeAdapter; f: Fakes } {
   const adapter = new GoveeAdapter();
   const i = internalOf(adapter);
@@ -290,8 +314,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
   );
   const openapi = Object.assign({ connect: vi.fn(), disconnect: vi.fn() }, { connected: false });
   const cloud = {
-    getDevices: vi.fn(async () => []),
-    getDeviceState: vi.fn(async () => []),
+    getDevices: vi.fn(() => Promise.resolve([])),
+    getDeviceState: vi.fn(() => Promise.resolve([])),
     setResponseHook: vi.fn(),
     getFailureReason: vi.fn(() => null),
   };
@@ -299,8 +323,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     setEmail: vi.fn(),
     setBearerToken: vi.fn(),
     hasBearerToken: vi.fn(() => false),
-    fetchDeviceList: vi.fn(async () => []),
-    fetchGroupMembers: vi.fn(async () => []),
+    fetchDeviceList: vi.fn(() => Promise.resolve([])),
+    fetchGroupMembers: vi.fn(() => Promise.resolve([])),
   };
   const limiter = {
     start: vi.fn(),
@@ -656,9 +680,9 @@ describe("GoveeAdapter onReady — timers", () => {
     // patching the existing instance would be discarded and prove nothing.
     const { adapter, f } = setup();
     const order: string[] = [];
-    const marked = vi.spyOn(StateManager.prototype, "markAllOffline").mockImplementation(async () => {
+    const marked = vi.spyOn(StateManager.prototype, "markAllOffline").mockImplementation(() => {
       order.push("markAllOffline");
-      return [];
+      return Promise.resolve([]);
     });
     f.lan.start.mockImplementation((...args: unknown[]) => {
       f.lan.startArgs = args;
@@ -675,7 +699,7 @@ describe("GoveeAdapter onReady — timers", () => {
     // Writing only the four connection flags leaves every device standing green.
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
-    const marked = vi.fn(async () => [] as string[]);
+    const marked = vi.fn(() => Promise.resolve([] as string[]));
     i.stateManager!.markAllOffline = marked;
 
     i.onUnload(() => undefined);
@@ -694,13 +718,13 @@ describe("GoveeAdapter onReady — timers", () => {
     devices.set("a", makeDevice({ deviceId: "AA:01" }));
     devices.set("b", makeDevice({ deviceId: "AA:02" }));
     const order: string[] = [];
-    (i.stateManager as unknown as { syncInfoOnline: unknown }).syncInfoOnline = async () => {
+    (i.stateManager as unknown as { syncInfoOnline: unknown }).syncInfoOnline = () => {
       order.push("marker");
-      return false;
+      return Promise.resolve(false);
     };
-    i.stateManager!.writeDeviceRollup = async () => {
+    i.stateManager!.writeDeviceRollup = () => {
       order.push("rollup");
-      return { total: 0, online: 0 };
+      return Promise.resolve({ total: 0, online: 0 });
     };
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
     expect(syncCall, "online-sync interval must be armed").toBeDefined();
@@ -777,15 +801,20 @@ describe("GoveeAdapter — LAN discovery wiring", () => {
 });
 
 describe("GoveeAdapter — segment echo caps", () => {
-  /** Wire a device into the real DeviceManager and return its state prefix. */
-  async function withSegmentDevice(
+  /**
+   * Wire a device into the real DeviceManager and return its state prefix.
+   *
+   * @param adapter Adapter whose DeviceManager receives the device
+   * @param segmentCount Learned segment count, or undefined for none
+   */
+  function withSegmentDevice(
     adapter: GoveeAdapter,
     segmentCount: number | undefined,
   ): Promise<{ device: GoveeDevice; prefix: string }> {
     const i = internalOf(adapter);
     const device = makeDevice({ lanIp: "10.0.0.5", segmentCount });
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
-    return { device, prefix: i.stateManager!.devicePrefix(device) };
+    return Promise.resolve({ device, prefix: i.stateManager!.devicePrefix(device) });
   }
 
   it("drops batch echo indices above the learned physical count", async () => {
@@ -1213,9 +1242,17 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(device.state.power).toBe(true);
     expect(device.state.brightness).toBe(40);
 
-    firstArg<(d: string, t: string, p: unknown) => void>(f.mqtt.setPacketHook)("AA:BB:CC:DD:EE:11", "GA/t", { hex: "aa01" });
-    const diag = (i.deviceManager as unknown as { getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> } }).getDiagnostics();
-    expect(diag.generate(device, "x").lastMqttPackets).toEqual([expect.objectContaining({ hex: "aa01", topic: "GA/t" })]);
+    firstArg<(d: string, t: string, p: unknown) => void>(f.mqtt.setPacketHook)("AA:BB:CC:DD:EE:11", "GA/t", {
+      hex: "aa01",
+    });
+    const diag = (
+      i.deviceManager as unknown as {
+        getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> };
+      }
+    ).getDiagnostics();
+    expect(diag.generate(device, "x").lastMqttPackets).toEqual([
+      expect.objectContaining({ hex: "aa01", topic: "GA/t" }),
+    ]);
   });
 
   it("a fresh bearer token from the MQTT login is handed to the App-API client", async () => {
@@ -1254,11 +1291,17 @@ describe("GoveeAdapter — callback wiring", () => {
     const { adapter, f } = await fullSetup();
     const i = internalOf(adapter);
     const device = makeDevice({ deviceId: "AA:BB:CC:DD:EE:11" });
-    firstArg<(d: string, e: string, b: unknown) => void>(f.cloud.setResponseHook)("AA:BB:CC:DD:EE:11", "/router/x", { v: 1 });
+    firstArg<(d: string, e: string, b: unknown) => void>(f.cloud.setResponseHook)("AA:BB:CC:DD:EE:11", "/router/x", {
+      v: 1,
+    });
     const onRaw = f.openapi.connect.mock.calls[0][2] as (raw: string) => void;
     onRaw(JSON.stringify({ sku: "H6172", device: "AA:BB:CC:DD:EE:11", capabilities: [] }));
     onRaw("{ not json"); // must not throw
-    const diag = (i.deviceManager as unknown as { getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> } }).getDiagnostics();
+    const diag = (
+      i.deviceManager as unknown as {
+        getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> };
+      }
+    ).getDiagnostics();
     const report = diag.generate(device, "x");
     expect((report.apiHistory as Record<string, unknown[]>)["/router/x"]).toHaveLength(1);
     expect(report.lastMqttPackets).toEqual([expect.objectContaining({ topic: "openapi-events" })]);
@@ -1272,7 +1315,12 @@ describe("GoveeAdapter — callback wiring", () => {
     await settle();
     expect(i.states.get("info.openapiMqttConnected")).toEqual({ val: true, ack: true });
 
-    const sensor = makeDevice({ sku: "H5179", deviceId: "AA:BB:CC:DD:EE:22", type: "devices.types.thermometer", state: { online: false } });
+    const sensor = makeDevice({
+      sku: "H5179",
+      deviceId: "AA:BB:CC:DD:EE:22",
+      type: "devices.types.thermometer",
+      state: { online: false },
+    });
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H5179_aabbccddee22", sensor);
     const onEvent = f.openapi.connect.mock.calls[0][0] as (e: unknown) => void;
     onEvent({
@@ -1311,7 +1359,7 @@ describe("GoveeAdapter — callback wiring", () => {
   it("the stale-device cleanup timer really reaps — object tree cleanup runs with the live list", async () => {
     const { adapter } = await fullSetup();
     const i = internalOf(adapter);
-    const cleanup = vi.fn(async () => [] as string[]);
+    const cleanup = vi.fn(() => Promise.resolve([] as string[]));
     (i.stateManager as unknown as { cleanupDevices: unknown }).cleanupDevices = cleanup;
     const timer = i.setTimeout.mock.calls.find(c => c[1] === STALE_DEVICE_CLEANUP_DELAY_MS);
     expect(timer, "stale-device cleanup timer must be armed").toBeDefined();

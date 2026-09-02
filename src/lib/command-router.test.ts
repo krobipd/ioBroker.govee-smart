@@ -514,7 +514,7 @@ describe("CommandRouter", () => {
     }
 
     it("snapshot=cloud + Cloud ready → sendCloudCommand, no ptReal", async () => {
-      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG });
       const lan = makeLanStub();
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
@@ -529,7 +529,7 @@ describe("CommandRouter", () => {
     });
 
     it("snapshot=cloud + device.channels.cloud=false → skip (no warn loop)", async () => {
-      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG });
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
@@ -542,7 +542,7 @@ describe("CommandRouter", () => {
     });
 
     it("snapshot=cloud + cloudClient=null (init-race) → debug, no throw", async () => {
-      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG });
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
@@ -684,7 +684,7 @@ describe("CommandRouter", () => {
     it("dedup-map: repeated override-cloud-missing logs only once at warn level (L23)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
-      registry = new DeviceRegistry({ data: TEST_CATALOG as never });
+      registry = new DeviceRegistry({ data: TEST_CATALOG });
       const router = new CommandRouter(log, noopTimers, registry);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
       // Three rapid commands in same category — first warns, the rest are debug.
@@ -696,7 +696,7 @@ describe("CommandRouter", () => {
   });
 
   describe("resolveTransport — Light without LAN (cloud fallback)", () => {
-    it("Light without LAN gets light-no-lan-fallback reason, not plain no-lan", async () => {
+    it("Light without LAN gets light-no-lan-fallback reason, not plain no-lan", () => {
       const cloud = makeCloudStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
@@ -711,7 +711,7 @@ describe("CommandRouter", () => {
       expect(decision.reason).toBe("light-no-lan-fallback");
     });
 
-    it("Appliance without LAN gets plain no-lan reason (unchanged)", async () => {
+    it("Appliance without LAN gets plain no-lan reason (unchanged)", () => {
       const cloud = makeCloudStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setCloudClient(cloud.client);
@@ -725,7 +725,7 @@ describe("CommandRouter", () => {
       expect(decision.reason).toBe("no-lan");
     });
 
-    it("Light with LAN still routes to LAN (no regression)", async () => {
+    it("Light with LAN still routes to LAN (no regression)", () => {
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
@@ -775,8 +775,9 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
     const order: string[] = [];
     const recordingTimers: TimerAdapter = {
       ...noopTimers,
-      delay: async (ms: number) => {
+      delay: (ms: number) => {
         order.push(`delay:${ms}`);
+        return Promise.resolve();
       },
     };
     const router = new CommandRouter(mockLog, recordingTimers, registry);

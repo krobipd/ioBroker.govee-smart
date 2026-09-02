@@ -1,19 +1,19 @@
 import { vi } from "vitest";
 
-const { enJson } = vi.hoisted(() => {
-  const { readFileSync } = require("node:fs");
-  const { join } = require("node:path");
+vi.mock("@iobroker/adapter-core", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const enJson = JSON.parse(readFileSync(join(__dirname, "../../../admin/i18n/en.json"), "utf8")) as Record<
+    string,
+    string
+  >;
   return {
-    enJson: JSON.parse(readFileSync(join(__dirname, "../../../admin/i18n/en.json"), "utf8")) as Record<string, string>,
+    I18n: {
+      getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+      translate: vi.fn((key: string) => enJson[key] ?? key),
+    },
   };
 });
-
-vi.mock("@iobroker/adapter-core", () => ({
-  I18n: {
-    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
-    translate: vi.fn((key: string) => enJson[key] ?? key),
-  },
-}));
 
 import {
   applyWizardResult,
@@ -35,14 +35,15 @@ function makeAdapter(devices: GoveeDevice[]): {
     log: mockLog,
     namespace: "govee-smart.0",
     lanClient: null,
-    deviceManager: { getDevices: () => devices, sendCommand: async () => undefined } as never,
+    deviceManager: { getDevices: () => devices, sendCommand: () => Promise.resolve(undefined) } as never,
     stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
     segmentWizard: null,
-    getStateAsync: async () => null,
+    getStateAsync: () => Promise.resolve(null),
     setTimeout: () => undefined,
     clearTimeout: () => undefined,
-    applyManualSegments: async (device, mode, indices) => {
+    applyManualSegments: (device, mode, indices) => {
       applied.push({ device, mode, indices });
+      return Promise.resolve();
     },
   };
   return { adapter, applied };
@@ -168,12 +169,13 @@ describe("buildWizardHost — passthrough closures (the adapter ↔ wizard wirin
     const cleared: unknown[] = [];
     (adapter as { deviceManager: unknown }).deviceManager = {
       getDevices: () => [device],
-      sendCommand: async (d: GoveeDevice, command: string, value: unknown) => {
+      sendCommand: (d: GoveeDevice, command: string, value: unknown) => {
         sent.push({ id: d.deviceId, command, value });
+        return Promise.resolve();
       },
     };
-    (adapter as { getStateAsync: unknown }).getStateAsync = async (id: string) =>
-      id.endsWith(".control.power") ? ({ val: true, ack: true } as ioBroker.State) : null;
+    (adapter as { getStateAsync: unknown }).getStateAsync = (id: string) =>
+      Promise.resolve(id.endsWith(".control.power") ? ({ val: true, ack: true } as ioBroker.State) : null);
     (adapter as { setTimeout: unknown }).setTimeout = (_cb: () => void, ms: number) => {
       timers.push({ ms });
       return { handle: timers.length } as never;

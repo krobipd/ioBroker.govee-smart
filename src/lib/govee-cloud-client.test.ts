@@ -77,7 +77,7 @@ describe("GoveeCloudClient", () => {
       try {
         await client.getDevices();
         throw new Error("expected throw");
-      } catch (_e) {
+      } catch {
         // expected
       }
       expect(client.getFailureReason()).toBe("cannot reach Govee servers — will retry");
@@ -94,7 +94,7 @@ describe("GoveeCloudClient", () => {
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       try {
         await client.getDevices();
-      } catch (_e) {
+      } catch {
         // expected
       }
       expect(client.getFailureReason()).toBe("API key rejected — check Govee API key");

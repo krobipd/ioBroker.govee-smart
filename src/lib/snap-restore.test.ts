@@ -32,18 +32,19 @@ function makeHost(opts: { initialSnapshots?: LocalSnapshot[]; initialState?: Rec
 
   const store = {
     getSnapshots: () => snapshots.slice(),
-    saveSnapshot: async (_sku: string, _id: string, snap: LocalSnapshot): Promise<void> => {
+    saveSnapshot: (_sku: string, _id: string, snap: LocalSnapshot): Promise<void> => {
       saved.push(snap);
       snapshots = snapshots.filter(s => s.name !== snap.name).concat(snap);
+      return Promise.resolve();
     },
-    deleteSnapshot: async (_sku: string, _id: string, name: string): Promise<boolean> => {
+    deleteSnapshot: (_sku: string, _id: string, name: string): Promise<boolean> => {
       const before = snapshots.length;
       snapshots = snapshots.filter(s => s.name !== name);
       const removed = before !== snapshots.length;
       if (removed) {
         deletedNames.push(name);
       }
-      return removed;
+      return Promise.resolve(removed);
     },
   } as unknown as LocalSnapshotStore;
 
@@ -53,8 +54,9 @@ function makeHost(opts: { initialSnapshots?: LocalSnapshot[]; initialState?: Rec
     namespace: "govee-smart.0",
     devicePrefix: () => "devices.h6160_dead",
     getState: id => Promise.resolve(states.get(id) ?? null),
-    sendCommand: async (_dev, command, value) => {
+    sendCommand: (_dev, command, value) => {
       commands.push({ command, value });
+      return Promise.resolve();
     },
     refreshDeviceStates: device => {
       refreshes.push(device);
@@ -252,7 +254,7 @@ describe("SnapshotHandler", () => {
       };
       const warns: string[] = [];
       const { host, commands } = makeHost({ initialSnapshots: [snap] });
-      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
       const handler = new SnapshotHandler(host);
       await handler.restore(makeDevice(), "0");
       expect(commands).toHaveLength(0);

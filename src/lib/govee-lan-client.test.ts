@@ -41,8 +41,11 @@ const dgramMock = vi.hoisted(() => {
       },
       bind: (a: unknown, b: unknown, c: unknown) => {
         s.binds.push([a, b]);
-        if (typeof b === "function") (b as () => void)();
-        else if (typeof c === "function") (c as () => void)();
+        if (typeof b === "function") {
+          (b as () => void)();
+        } else if (typeof c === "function") {
+          (c as () => void)();
+        }
       },
       setBroadcast: () => {},
       addMembership: () => {},
@@ -50,7 +53,14 @@ const dgramMock = vi.hoisted(() => {
       setMulticastInterface: (iface: unknown) => s.mcastIf.push(iface),
       // Records the datagram the way node:dgram would put it on the wire and
       // completes the callback, so the send-hook / last-sent bookkeeping runs.
-      send: (buf: Buffer, _off: number, _len: number, port: number, address: string, cb?: (e: Error | null) => void) => {
+      send: (
+        buf: Buffer,
+        _off: number,
+        _len: number,
+        port: number,
+        address: string,
+        cb?: (e: Error | null) => void,
+      ) => {
         s.sends.push({ buf, port, address });
         cb?.(s.sendError);
       },
@@ -299,10 +309,7 @@ describe("A-frame packet framing (byte-golden)", () => {
 
   it("buildScenePackets: empty / single / multi-packet are byte-exact", () => {
     expect(buildScenePackets(42, "")).toEqual(["MwUEKgAAAAAAAAAAAAAAAAAAABg="]);
-    expect(buildScenePackets(100, small)).toEqual([
-      "o/8BAQIBAgMEBQAAAAAAAAAAAF8=",
-      "MwUEZAAAAAAAAAAAAAAAAAAAAFY=",
-    ]);
+    expect(buildScenePackets(100, small)).toEqual(["o/8BAQIBAgMEBQAAAAAAAAAAAF8=", "MwUEZAAAAAAAAAAAAAAAAAAAAFY="]);
     expect(buildScenePackets(500, big)).toEqual([
       "owABAwIAAQIDBAUGBwgJCgsMDaI=",
       "owEODxAREhMUFRYXGBkaGxwdHrw=",
@@ -313,10 +320,7 @@ describe("A-frame packet framing (byte-golden)", () => {
 
   it("buildDiyPackets: empty / single / multi-packet are byte-exact", () => {
     expect(buildDiyPackets("")).toEqual(["MwUKAAAAAAAAAAAAAAAAAAAAADw="]);
-    expect(buildDiyPackets(small)).toEqual([
-      "oQL/AQECAwQFAAAAAAAAAAAAAFw=",
-      "MwUKAAAAAAAAAAAAAAAAAAAAADw=",
-    ]);
+    expect(buildDiyPackets(small)).toEqual(["oQL/AQECAwQFAAAAAAAAAAAAAFw=", "MwUKAAAAAAAAAAAAAAAAAAAAADw="]);
     expect(buildDiyPackets(big)).toEqual([
       "oQIAAwABAgMEBQYHCAkKCwwNDq8=",
       "oQIBDxAREhMUFRYXGBkaGxwdHrI=",
@@ -500,7 +504,12 @@ describe("applySceneSpeed", () => {
 });
 
 describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
-  function makeClient() {
+  function makeClient(): {
+    client: GoveeLanClient;
+    discovered: LanDevice[];
+    statuses: Array<{ ip: string; status: LanStatus }>;
+    feed: (obj: unknown, ip?: string) => void;
+  } {
     const client = new GoveeLanClient(lanLog, lanTimers);
     const discovered: LanDevice[] = [];
     const statuses: Array<{ ip: string; status: LanStatus }> = [];
@@ -550,7 +559,12 @@ describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
   it("parses a devStatus response, coercing fields to safe numbers", () => {
     const { statuses, feed } = makeClient();
     feed(
-      { msg: { cmd: "devStatus", data: { onOff: 1, brightness: 80, color: { r: 255, g: 0, b: 128 }, colorTemInKelvin: 4000 } } },
+      {
+        msg: {
+          cmd: "devStatus",
+          data: { onOff: 1, brightness: 80, color: { r: 255, g: 0, b: 128 }, colorTemInKelvin: 4000 },
+        },
+      },
       "10.0.0.1",
     );
     expect(statuses).toEqual([
@@ -617,7 +631,7 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
     const warns: string[] = [];
     const debugs: string[] = [];
     const log = { ...lanLog, warn: (m: string) => warns.push(m), debug: (m: string) => debugs.push(m) };
-    const client = new GoveeLanClient(log as never, lanTimers);
+    const client = new GoveeLanClient(log, lanTimers);
     const problems: string[] = [];
     client.onInterfaceError = m => problems.push(m);
     client.start(
@@ -628,14 +642,14 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
     );
     const listenSock = dgramMock.sockets[1];
     const err = Object.assign(new Error("bind EADDRNOTAVAIL 10.0.0.5"), { code: "EADDRNOTAVAIL" });
-    listenSock.handlers["error"]?.forEach(h => h(err));
+    listenSock.handlers.error?.forEach(h => h(err));
     // warn-once + actionable message pointing at the Network Interface setting
     expect(warns.some(m => m.includes("LAN listen socket error"))).toBe(true);
     expect(problems).toHaveLength(1);
     expect(problems[0]).toContain("10.0.0.5");
     expect(problems[0]).toContain("Network Interface setting");
     // repeat errors stay on debug (no warn spam)
-    listenSock.handlers["error"]?.forEach(h => h(err));
+    listenSock.handlers.error?.forEach(h => h(err));
     expect(warns.filter(m => m.includes("socket error"))).toHaveLength(1);
     client.stop();
   });
@@ -643,7 +657,7 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
   it("does NOT raise onInterfaceError without a pinned interface — warn only", () => {
     const warns: string[] = [];
     const log = { ...lanLog, warn: (m: string) => warns.push(m) };
-    const client = new GoveeLanClient(log as never, lanTimers);
+    const client = new GoveeLanClient(log, lanTimers);
     const problems: string[] = [];
     client.onInterfaceError = m => problems.push(m);
     client.start(
@@ -654,7 +668,7 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
     );
     const listenSock = dgramMock.sockets[1];
     const err = Object.assign(new Error("something"), { code: "EINVAL" });
-    listenSock.handlers["error"]?.forEach(h => h(err));
+    listenSock.handlers.error?.forEach(h => h(err));
     expect(warns.some(m => m.includes("LAN listen socket error"))).toBe(true);
     expect(problems).toHaveLength(0);
     client.stop();
@@ -806,7 +820,7 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
 
   it("sendPtReal reports a failed datagram to the hook with the error and does NOT stamp the last-sent time", () => {
     const warns: string[] = [];
-    const client = new GoveeLanClient({ ...lanLog, warn: (m: string) => warns.push(m) } as never, lanTimers);
+    const client = new GoveeLanClient({ ...lanLog, warn: (m: string) => warns.push(m) }, lanTimers);
     const hook: SendRecord[] = [];
     client.setSendHook((ip, cmd, payload, bytes, error) => hook.push({ ip, cmd, payload, bytes, error }));
     client.start(
@@ -960,14 +974,21 @@ describe("GoveeLanClient — discovery loop + socket wiring", () => {
     );
     const listenSock = dgramMock.sockets[1];
     const deliver = (obj: unknown, address: string): void =>
-      listenSock.handlers["message"]?.forEach(h => h(Buffer.from(JSON.stringify(obj)), { address }));
+      listenSock.handlers.message?.forEach(h => h(Buffer.from(JSON.stringify(obj)), { address }));
 
     deliver({ msg: { cmd: "scan", data: { ip: "ignored", device: "AA:BB", sku: "H61BE" } } }, "10.0.0.5");
-    deliver({ msg: { cmd: "devStatus", data: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } } }, "10.0.0.5");
+    deliver(
+      {
+        msg: { cmd: "devStatus", data: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } },
+      },
+      "10.0.0.5",
+    );
 
     expect(discovered).toEqual([{ ip: "10.0.0.5", device: "AA:BB", sku: "H61BE" }]);
     expect(scanHook).toEqual(discovered);
-    expect(statuses).toEqual([{ ip: "10.0.0.5", status: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } }]);
+    expect(statuses).toEqual([
+      { ip: "10.0.0.5", status: { onOff: 1, brightness: 20, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 } },
+    ]);
     expect(statusHook).toEqual(statuses);
     expect(client.getDiagSnapshot().seenDeviceIps).toEqual(["AA:BB:10.0.0.5"]);
     client.stop();

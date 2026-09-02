@@ -13,6 +13,8 @@ const mockLog: ioBroker.Logger = {
  * In-memory mock of the ioBroker file-storage API. The store writes/reads
  * `<namespace>.snapshots` files; the mock tracks them in a Map keyed by
  * `<meta>/<filename>`.
+ *
+ * @param namespace Adapter namespace the snapshot store files live under
  */
 function createMockAdapter(namespace = "govee-smart.0"): {
   adapter: LocalSnapshotStoreAdapter;
@@ -24,20 +26,22 @@ function createMockAdapter(namespace = "govee-smart.0"): {
     files,
     adapter: {
       namespace,
-      async readFileAsync(meta, name) {
+      readFileAsync(meta, name) {
         const k = key(meta, name);
         if (!files.has(k)) {
-          throw new Error(`ENOENT: ${k}`);
+          return Promise.reject(new Error(`ENOENT: ${k}`));
         }
-        return { file: files.get(k)!, mimeType: "application/json" };
+        return Promise.resolve({ file: files.get(k)!, mimeType: "application/json" });
       },
-      async writeFileAsync(meta, name, data) {
+      writeFileAsync(meta, name, data) {
         files.set(key(meta, name), typeof data === "string" ? data : data.toString("utf-8"));
+        return Promise.resolve();
       },
-      async delFileAsync(meta, name) {
+      delFileAsync(meta, name) {
         files.delete(key(meta, name));
+        return Promise.resolve();
       },
-      async readDirAsync(meta) {
+      readDirAsync(meta) {
         const prefix = `${meta}/`;
         const entries: { file: string; isDir: boolean }[] = [];
         for (const k of files.keys()) {
@@ -45,7 +49,7 @@ function createMockAdapter(namespace = "govee-smart.0"): {
             entries.push({ file: k.slice(prefix.length), isDir: false });
           }
         }
-        return entries;
+        return Promise.resolve(entries);
       },
     },
   };
@@ -335,7 +339,7 @@ describe("LocalSnapshotStore — storage not initialised", () => {
     const store = new LocalSnapshotStore(mock.adapter, {
       ...mockLog,
       warn: (m: string) => warns.push(m),
-    } as ioBroker.Logger);
+    });
     // init() deliberately NOT called — mirrors a start where meta.user is not
     // reachable. Saving anyway would put the snapshot in the in-memory cache
     // only: the dropdown shows it, and it is gone after the next restart.

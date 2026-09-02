@@ -19,13 +19,14 @@ function makeAdapter(native: Record<string, unknown> = {}): CloudCredsAdapter & 
     calls,
     log: noopLog,
     namespace: "govee-smart.0",
-    getStateAsync: async () => null,
-    getForeignObjectAsync: async () => ({ native }),
-    extendForeignObjectAsync: async (_id, obj) => {
+    getStateAsync: () => Promise.resolve(null),
+    getForeignObjectAsync: () => Promise.resolve({ native }),
+    extendForeignObjectAsync: (_id, obj) => {
       calls.push(`extend:${JSON.stringify(obj.native)}`);
+      return Promise.resolve();
     },
-    readFileAsync: async () => {
-      throw new Error("Not exists");
+    readFileAsync: () => {
+      return Promise.reject(new Error("Not exists"));
     },
     delFileAsync: async () => {},
     delObjectAsync: async () => {},
@@ -70,7 +71,13 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     fs.rmSync(dataDir, { recursive: true, force: true });
   });
 
-  function makeCredAdapter() {
+  function makeCredAdapter(): {
+    adapter: CloudCredsAdapter;
+    states: Map<string, string>;
+    metaFiles: Map<string, string>;
+    deletedObjects: string[];
+    deletedMetaFiles: string[];
+  } {
     const states = new Map<string, string>();
     const metaFiles = new Map<string, string>();
     const deletedObjects: string[] = [];
@@ -78,27 +85,29 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     const adapter: CloudCredsAdapter = {
       log: noopLog,
       namespace: "govee-smart.0",
-      getStateAsync: async id => (states.has(id) ? ({ val: states.get(id) } as ioBroker.State) : null),
-      getForeignObjectAsync: async () => ({ native: {} }),
-      extendForeignObjectAsync: async () => undefined,
-      readFileAsync: async (meta, name) => {
+      getStateAsync: id => Promise.resolve(states.has(id) ? ({ val: states.get(id) } as ioBroker.State) : null),
+      getForeignObjectAsync: () => Promise.resolve({ native: {} }),
+      extendForeignObjectAsync: () => Promise.resolve(undefined),
+      readFileAsync: (meta, name) => {
         const key = `${meta}/${name}`;
         if (!metaFiles.has(key)) {
-          throw new Error("Not exists"); // mirrors ioBroker: rejects when the file is absent
+          return Promise.reject(new Error("Not exists")); // mirrors ioBroker: rejects when the file is absent
         }
-        return { file: metaFiles.get(key)! };
+        return Promise.resolve({ file: metaFiles.get(key)! });
       },
-      delFileAsync: async (meta, name) => {
+      delFileAsync: (meta, name) => {
         const key = `${meta}/${name}`;
         if (!metaFiles.has(key)) {
-          throw new Error("Not exists");
+          return Promise.reject(new Error("Not exists"));
         }
         metaFiles.delete(key);
         deletedMetaFiles.push(key);
+        return Promise.resolve();
       },
-      delObjectAsync: async id => {
+      delObjectAsync: id => {
         deletedObjects.push(id);
         states.delete(id);
+        return Promise.resolve();
       },
       // reversible stand-in for the real system-secret crypto
       encrypt: v => `enc:${v}`,

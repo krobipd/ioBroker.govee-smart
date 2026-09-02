@@ -30,7 +30,9 @@ describe("ActionableProblems", () => {
     const host = makeHost();
     const mgr = new ActionableProblems(host);
     mgr.report(problem);
-    expect(host.warns).toEqual(["Govee requires a verification code → request one in the adapter settings (Govee Account)"]);
+    expect(host.warns).toEqual([
+      "Govee requires a verification code → request one in the adapter settings (Govee Account)",
+    ]);
     expect(host.notifications).toEqual(host.warns);
   });
 
@@ -48,12 +50,20 @@ describe("ActionableProblems", () => {
     const host = makeHost();
     const mgr = new ActionableProblems(host);
     mgr.report({ key: "mqtt-verification", title: "Govee requires a verification code", action: "request one" });
-    mgr.report({ key: "mqtt-verification", title: "Govee rejected the verification code", action: "request a fresh one" });
+    mgr.report({
+      key: "mqtt-verification",
+      title: "Govee rejected the verification code",
+      action: "request a fresh one",
+    });
     expect(host.warns).toHaveLength(2);
     expect(host.warns[1]).toContain("rejected");
     expect(host.notifications).toHaveLength(2);
     // ...but a true duplicate after the change is still silent
-    mgr.report({ key: "mqtt-verification", title: "Govee rejected the verification code", action: "request a fresh one" });
+    mgr.report({
+      key: "mqtt-verification",
+      title: "Govee rejected the verification code",
+      action: "request a fresh one",
+    });
     expect(host.warns).toHaveLength(2);
   });
 

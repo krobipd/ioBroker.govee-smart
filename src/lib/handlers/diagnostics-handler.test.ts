@@ -15,9 +15,10 @@ function makeAdapter(): {
       log: mockLog,
       namespace: "govee-smart.0",
       version: "9.9.9",
-      setState: async (id, state) => {
+      setState: (id, state) => {
         const s = state as { val: unknown; ack: boolean };
         writes.push({ id, val: s.val, ack: s.ack });
+        return Promise.resolve();
       },
     },
   };

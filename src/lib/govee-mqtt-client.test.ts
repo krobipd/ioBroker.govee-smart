@@ -1,6 +1,7 @@
 import { GoveeMqttClient } from "./govee-mqtt-client";
 import { type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
 import { mockLog, mockTimers } from "./test-helpers";
+import type { TimerAdapter } from "./types";
 
 /**
  * Timer mock that does NOT fire immediately — important for connect() tests,
@@ -473,7 +474,14 @@ describe("GoveeMqttClient", () => {
         end: () => undefined,
         removeAllListeners: () => undefined,
       };
-      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => fakeMqtt) as never);
+      const client = new GoveeMqttClient(
+        "u@example.com",
+        "pw",
+        mockLog,
+        noopTimers,
+        fake.fn,
+        (() => fakeMqtt) as never,
+      );
       // Valid p12 (bypass forge) + valid TTL → tryPersistedReuse succeeds → the
       // MQTT socket is opened from the cache with NO login/getIotKey HTTP.
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
@@ -613,7 +621,7 @@ describe("GoveeMqttClient", () => {
   // backoff timer to prove the cross-cutting wire: connect() catch →
   // scheduleReconnect() → base timer → reconnect() → connect() again.
   describe("reconnect cycle (base scaffolding wiring)", () => {
-    function makeCapturingTimers() {
+    function makeCapturingTimers(): { timers: TimerAdapter; scheduled: Array<() => void> } {
       const scheduled: Array<() => void> = [];
       const timers = {
         setInterval: () => undefined,
@@ -691,10 +699,19 @@ describe("GoveeMqttClient", () => {
           ended = true;
         },
         removeAllListeners() {
-          for (const k of Object.keys(handlers)) delete handlers[k];
+          for (const k of Object.keys(handlers)) {
+            delete handlers[k];
+          }
         },
       };
-      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => fakeMqtt) as never);
+      const client = new GoveeMqttClient(
+        "u@example.com",
+        "pw",
+        mockLog,
+        noopTimers,
+        fake.fn,
+        (() => fakeMqtt) as never,
+      );
       // Bypass the node-forge PKCS12 parse — not what this test exercises.
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
@@ -747,10 +764,10 @@ describe("GoveeMqttClient", () => {
         }
         return { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } };
       });
-      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, (() => {
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, () => {
         mqttConnectCalls += 1;
         return { on: () => undefined, subscribe: () => undefined, end: () => undefined } as never;
-      }) as never);
+      });
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
         cert: "c",
@@ -774,7 +791,7 @@ describe("GoveeMqttClient", () => {
     // Counts scheduleReconnect() calls but returns undefined, so `reconnectTimer`
     // stays falsy and never trips the "already armed" guard — otherwise a second
     // connect() in the same tick would no-op instead of re-arming.
-    function makeCountingTimers() {
+    function makeCountingTimers(): { timers: TimerAdapter; count: () => number } {
       let count = 0;
       const timers = {
         setInterval: () => undefined,
@@ -916,7 +933,11 @@ describe("GoveeMqttClient", () => {
   });
 
   describe("handleMessage (status push parsing)", () => {
-    function makeClient() {
+    function makeClient(): {
+      statuses: unknown[];
+      packets: Array<{ device: string; topic: string; payload: unknown }>;
+      feed: (obj: unknown, topic?: string) => void;
+    } {
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, mockTimers);
       const statuses: unknown[] = [];
       const packets: Array<{ device: string; topic: string; payload: unknown }> = [];
@@ -999,7 +1020,9 @@ describe("GoveeMqttClient", () => {
           fakeMqtt.connected = false;
         },
         removeAllListeners() {
-          for (const k of Object.keys(handlers)) delete handlers[k];
+          for (const k of Object.keys(handlers)) {
+            delete handlers[k];
+          }
         },
       };
       const scheduled: Array<{ cb: () => void; ms: number }> = [];
@@ -1036,7 +1059,11 @@ describe("GoveeMqttClient", () => {
         () => {},
       );
       h.emit("connect");
-      h.emit("message", "GA/acc/topic", Buffer.from(JSON.stringify({ sku: "H61BE", device: "AA:BB", state: { onOff: 1 } })));
+      h.emit(
+        "message",
+        "GA/acc/topic",
+        Buffer.from(JSON.stringify({ sku: "H61BE", device: "AA:BB", state: { onOff: 1 } })),
+      );
       expect(statuses).toEqual([{ sku: "H61BE", device: "AA:BB", state: { onOff: 1 } }]);
       h.client.disconnect();
     });

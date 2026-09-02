@@ -49,6 +49,10 @@ const buildCloudStateDefs = (
  * Concat helper for tests that need the full state-def set (LAN + Cloud).
  * Mirrors what the old buildDeviceStateDefs used to do — kept inline in
  * tests so we don't reintroduce a wrapper in the production module.
+ *
+ * @param device Device whose capabilities drive the state definitions
+ * @param localSnapshots Locally saved snapshots that feed the snapshot dropdown
+ * @param memberDevices Group members whose capability intersection applies
  */
 function buildAllStateDefsForTest(
   device: GoveeDevice,
@@ -180,7 +184,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("scene");
       // "" sentinel: matches def "" so the stale-dropdown reset pass converges (LOW)
-      expect(result[0].states).toEqual({ "": "---", "1": "Sunset", "2": "Rainbow", "3": "Movie" });
+      expect(result[0].states).toEqual({ "": "---", 1: "Sunset", 2: "Rainbow", 3: "Movie" });
       expect(result[0].write).toBe(true);
     });
 
@@ -471,7 +475,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("work_mode");
       expect(result[0].type).toBe("mixed");
-      expect(result[0].states).toEqual({ "1": "Manual", "2": "Auto", "3": "Sleep" });
+      expect(result[0].states).toEqual({ 1: "Manual", 2: "Auto", 3: "Sleep" });
       expect(result[0].def).toBe("1");
     });
 
@@ -504,7 +508,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(2);
       const modeValue = result.find(s => s.id === "mode_value");
       expect(modeValue).toBeDefined();
-      expect(modeValue!.states).toEqual({ "1": "Low", "2": "High" });
+      expect(modeValue!.states).toEqual({ 1: "Low", 2: "High" });
       expect(modeValue!.type).toBe("mixed");
     });
 
@@ -785,13 +789,13 @@ describe("CapabilityMapper", () => {
         type: "devices.capabilities.dynamic_scene",
         instance: "lightScene",
         state: { value: 3 },
-      } as CloudStateCapability);
+      });
       expect(ls?.stateId).toBe("light_scene"); // matches SCENE_DROPDOWN_RULES + the real state
       const diy = mapCloudStateValue({
         type: "devices.capabilities.dynamic_scene",
         instance: "diyScene",
         state: { value: 2 },
-      } as CloudStateCapability);
+      });
       expect(diy?.stateId).toBe("diy_scene");
     });
 
@@ -801,14 +805,14 @@ describe("CapabilityMapper", () => {
           type: "devices.capabilities.work_mode",
           instance: "workMode",
           state: { value: { workMode: 3 } },
-        } as CloudStateCapability),
+        }),
       ).toEqual({ stateId: "work_mode", value: 3 });
       expect(
         mapCloudStateValue({
           type: "devices.capabilities.work_mode",
           instance: "workMode",
           state: { value: 2 },
-        } as CloudStateCapability),
+        }),
       ).toEqual({ stateId: "work_mode", value: 2 });
     });
 
@@ -818,14 +822,14 @@ describe("CapabilityMapper", () => {
           type: "devices.capabilities.temperature_setting",
           instance: "targetTemperature",
           state: { value: { targetTemperature: 22 } },
-        } as CloudStateCapability),
+        }),
       ).toEqual({ stateId: "target_temperature", value: 22 });
       expect(
         mapCloudStateValue({
           type: "devices.capabilities.temperature_setting",
           instance: "targetTemperature",
           state: { value: 18 },
-        } as CloudStateCapability),
+        }),
       ).toEqual({ stateId: "target_temperature", value: 18 });
     });
 
@@ -1139,7 +1143,10 @@ describe("CapabilityMapper", () => {
     it("LAN-capable light (has lanIp): LAN phase owns control, cloud excludes them", () => {
       const defs = buildCloudStateDefs(baseLight({ lanIp: "192.168.1.50" }));
       for (const id of ["power", "brightness", "color_rgb", "color_temperature"]) {
-        expect(defs.find(d => d.id === id), `LAN light: cloud must not duplicate control.${id}`).toBeUndefined();
+        expect(
+          defs.find(d => d.id === id),
+          `LAN light: cloud must not duplicate control.${id}`,
+        ).toBeUndefined();
       }
     });
 
@@ -1166,7 +1173,10 @@ describe("CapabilityMapper", () => {
         ] as CloudCapability[],
       });
       const defs = buildCloudStateDefs(sensor);
-      expect(defs.find(d => d.id === "power"), "sensor has no on_off → no power state").toBeUndefined();
+      expect(
+        defs.find(d => d.id === "power"),
+        "sensor has no on_off → no power state",
+      ).toBeUndefined();
     });
   });
 
@@ -1707,7 +1717,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.on_off",
           instance: "powerSwitch",
-          state: { value: "1" as unknown as number },
+          state: { value: "1" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(true);
@@ -1717,7 +1727,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.on_off",
           instance: "powerSwitch",
-          state: { value: "true" as unknown as number },
+          state: { value: "true" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(true);
@@ -1727,7 +1737,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.on_off",
           instance: "powerSwitch",
-          state: { value: "0" as unknown as number },
+          state: { value: "0" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(false);
@@ -1737,7 +1747,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.toggle",
           instance: "gradientToggle",
-          state: { value: "1" as unknown as number },
+          state: { value: "1" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(true);
@@ -1747,7 +1757,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.range",
           instance: "brightness",
-          state: { value: "75" as unknown as number },
+          state: { value: "75" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(75);
@@ -1757,7 +1767,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.range",
           instance: "brightness",
-          state: { value: "abc" as unknown as number },
+          state: { value: "abc" },
         };
         const result = mapCloudStateValue(cap);
         expect(result).toBeNull();
@@ -1767,7 +1777,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.color_setting",
           instance: "colorTemperatureK",
-          state: { value: "5000" as unknown as number },
+          state: { value: "5000" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(5000);
@@ -1777,7 +1787,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.property",
           instance: "sensorTemperature",
-          state: { value: "22.5" as unknown as number },
+          state: { value: "22.5" },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe(22.5);
@@ -1787,7 +1797,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.property",
           instance: "sensorTemperature",
-          state: { value: "garbage" as unknown as number },
+          state: { value: "garbage" },
         };
         const result = mapCloudStateValue(cap);
         expect(result).toBeNull();
@@ -1822,7 +1832,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.music_setting",
           instance: "musicMode",
-          state: { value: { musicMode: "7" } as unknown as number },
+          state: { value: { musicMode: "7" } },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.stateId).toBe("music_mode");
@@ -1833,7 +1843,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.music_setting",
           instance: "musicMode",
-          state: { value: { musicMode: "abc" } as unknown as number },
+          state: { value: { musicMode: "abc" } },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe("0");
@@ -1843,7 +1853,7 @@ describe("CapabilityMapper", () => {
         const cap: CloudStateCapability = {
           type: "devices.capabilities.color_setting",
           instance: "colorRgb",
-          state: { value: String(0xff8000) as unknown as number },
+          state: { value: String(0xff8000) },
         };
         const result = mapCloudStateValue(cap);
         expect(result!.value).toBe("#ff8000");
@@ -2017,7 +2027,7 @@ describe("CapabilityMapper", () => {
         state: { online: true },
         channels: { lan: false, mqtt: false, cloud: true },
         capabilities: [],
-      } as never;
+      };
       const cloudDefs = buildCloudStateDefs(device);
       const tier = cloudDefs.find(d => d.id === "tier");
       expect(tier, "tier state-def must exist for non-group devices").toBeDefined();
@@ -2047,10 +2057,12 @@ describe("CapabilityMapper", () => {
         state: { online: true },
         channels: { lan: true, mqtt: false, cloud: true },
         capabilities: [],
-      } as never;
+      };
       const defs = buildCloudStateDefs(device);
       for (const def of defs) {
-        if (!def.states) continue;
+        if (!def.states) {
+          continue;
+        }
         for (const [k, v] of Object.entries(def.states)) {
           expect(typeof v, `${def.id} states[${k}] must be plain-string, got ${typeof v}`).toBe("string");
         }
@@ -2093,9 +2105,21 @@ describe("Invariant (M12-B): every value-side stateId has an owning state object
       { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
       { type: "devices.capabilities.toggle", instance: "gradientToggle", parameters: { dataType: "ENUM" } },
       { type: "devices.capabilities.toggle", instance: "oscillationToggle", parameters: { dataType: "ENUM" } },
-      { type: "devices.capabilities.range", instance: "brightness", parameters: { dataType: "INTEGER", range: { min: 0, max: 100, precision: 1 } } },
-      { type: "devices.capabilities.color_setting", instance: "colorRgb", parameters: { dataType: "INTEGER", range: { min: 0, max: 16777215, precision: 1 } } },
-      { type: "devices.capabilities.color_setting", instance: "colorTemperatureK", parameters: { dataType: "INTEGER", range: { min: 2000, max: 9000, precision: 1 } } },
+      {
+        type: "devices.capabilities.range",
+        instance: "brightness",
+        parameters: { dataType: "INTEGER", range: { min: 0, max: 100, precision: 1 } },
+      },
+      {
+        type: "devices.capabilities.color_setting",
+        instance: "colorRgb",
+        parameters: { dataType: "INTEGER", range: { min: 0, max: 16777215, precision: 1 } },
+      },
+      {
+        type: "devices.capabilities.color_setting",
+        instance: "colorTemperatureK",
+        parameters: { dataType: "INTEGER", range: { min: 2000, max: 9000, precision: 1 } },
+      },
       {
         type: "devices.capabilities.work_mode",
         instance: "workMode",
@@ -2119,14 +2143,30 @@ describe("Invariant (M12-B): every value-side stateId has an owning state object
           ],
         },
       },
-      { type: "devices.capabilities.dynamic_scene", instance: "lightScene", parameters: { dataType: "ENUM", options: [] } },
-      { type: "devices.capabilities.dynamic_scene", instance: "diyScene", parameters: { dataType: "ENUM", options: [] } },
-      { type: "devices.capabilities.dynamic_scene", instance: "snapshot", parameters: { dataType: "ENUM", options: [] } },
+      {
+        type: "devices.capabilities.dynamic_scene",
+        instance: "lightScene",
+        parameters: { dataType: "ENUM", options: [] },
+      },
+      {
+        type: "devices.capabilities.dynamic_scene",
+        instance: "diyScene",
+        parameters: { dataType: "ENUM", options: [] },
+      },
+      {
+        type: "devices.capabilities.dynamic_scene",
+        instance: "snapshot",
+        parameters: { dataType: "ENUM", options: [] },
+      },
       { type: "devices.capabilities.property", instance: "sensorTemperature", parameters: { dataType: "INTEGER" } },
       { type: "devices.capabilities.property", instance: "sensorHumidity", parameters: { dataType: "INTEGER" } },
       { type: "devices.capabilities.event", instance: "lackWaterEvent", parameters: { dataType: "ENUM" } },
       { type: "devices.capabilities.event", instance: "bodyAppeared", parameters: { dataType: "ENUM" } },
-      { type: "devices.capabilities.temperature_setting", instance: "targetTemperature", parameters: { dataType: "STRUCT", fields: [] } },
+      {
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        parameters: { dataType: "STRUCT", fields: [] },
+      },
       { type: "devices.capabilities.online", instance: "online", parameters: { dataType: "ENUM" } },
     ] as CloudCapability[];
 

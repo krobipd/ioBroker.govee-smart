@@ -9,6 +9,9 @@ import { normalizeDeviceId } from "./types";
  * `state-manager.devicePrefix` used the sanitize() form. If treeKey ever
  * diverges from BOTH for a real catalog SKU, existing cache/snapshot filenames
  * and state-tree object ids would orphan on upgrade.
+ *
+ * @param sku Govee model, e.g. H6160
+ * @param deviceId Colon-separated device id as Govee reports it
  */
 function legacyCacheFileForm(sku: string, deviceId: string): string {
   const shortId = deviceId.replace(/:/g, "").toLowerCase().slice(-4);

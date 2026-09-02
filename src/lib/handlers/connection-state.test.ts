@@ -59,7 +59,7 @@ function makeRig(opts: {
       error: (m: string) => logs.error.push(m),
       silly: () => {},
       level: "debug",
-    } as ioBroker.Logger,
+    },
     deviceManager: {
       getDevices: () => devices,
       hasDeviceNeedingAppApi: () => opts.needsAppApi ?? false,
@@ -81,9 +81,9 @@ function makeRig(opts: {
         : ({ connected: opts.openapiConnected } as never),
     lanClient: opts.lanClient === false ? null : ({} as never),
     stateManager: {
-      cleanupDevices: async (current: GoveeDevice[]) => {
+      cleanupDevices: (current: GoveeDevice[]) => {
         cleanupCalls.push(current);
-        return [];
+        return Promise.resolve([]);
       },
     } as never,
     lanScanDone: opts.lanScanDone ?? true,
@@ -93,9 +93,9 @@ function makeRig(opts: {
     readyLogged: false,
     lastConnectionState: null,
     channelStatus: opts.channelStatus,
-    setState: async (id, state) => {
+    setState: (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
-      return undefined;
+      return Promise.resolve(undefined);
     },
   };
   return { adapter, stateWrites, logs, saveToCacheCalls, cleanupCalls, prunedWith };
@@ -265,7 +265,7 @@ describe("refreshLiveAppVersion", () => {
   });
 
   it("keeps the bundled fallback on a malformed store response", async () => {
-    mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 } as never);
+    mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 });
     const rig = makeRig({});
     await refreshLiveAppVersion(rig.adapter);
     expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
@@ -279,8 +279,8 @@ describe("refreshLiveAppVersion", () => {
   });
 
   it("keeps the current version + logs debug on a network failure (never alarms)", async () => {
-    mockHttp.mockImplementation(async () => {
-      throw new Error("ENOTFOUND itunes.apple.com");
+    mockHttp.mockImplementation(() => {
+      return Promise.reject(new Error("ENOTFOUND itunes.apple.com"));
     });
     const rig = makeRig({});
     await refreshLiveAppVersion(rig.adapter);

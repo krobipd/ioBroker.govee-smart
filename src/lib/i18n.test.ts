@@ -34,12 +34,12 @@ describe("resolveLabel", () => {
 
 describe("i18n completeness", () => {
   const i18nDir = join(__dirname, "../../admin/i18n");
-  const files = readdirSync(i18nDir).filter((f) => f.endsWith(".json"));
-  const keysets = files.map((f) => ({
+  const files = readdirSync(i18nDir).filter(f => f.endsWith(".json"));
+  const keysets = files.map(f => ({
     lang: f.replace(".json", ""),
     keys: Object.keys(JSON.parse(readFileSync(join(i18nDir, f), "utf8"))),
   }));
-  const enKeys = keysets.find((k) => k.lang === "en")!.keys;
+  const enKeys = keysets.find(k => k.lang === "en")!.keys;
 
   it("all 11 languages have identical keysets", () => {
     expect(files).toHaveLength(11);
@@ -69,7 +69,9 @@ describe("i18n completeness", () => {
     const en = JSON.parse(readFileSync(join(i18nDir, "en.json"), "utf8")) as Record<string, string>;
     for (const f of files) {
       const lang = f.replace(".json", "");
-      if (lang === "en") continue;
+      if (lang === "en") {
+        continue;
+      }
       const data = JSON.parse(readFileSync(join(i18nDir, f), "utf8")) as Record<string, string>;
       for (const key of Object.keys(en)) {
         expect(tokens(data[key] ?? ""), `${lang}.${key} placeholder drift`).toEqual(tokens(en[key]));

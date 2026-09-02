@@ -101,8 +101,9 @@ function makeHost(opts: {
     log: mockLog,
     namespace: "govee-smart.0",
     getDevices: () => opts.devices,
-    sendCommand: async (device, command, value) => {
+    sendCommand: (device, command, value) => {
       commands.push({ device: device.deviceId, command, value });
+      return Promise.resolve();
     },
     devicePrefix: device =>
       device.sku === "BaseGroup"
@@ -110,8 +111,9 @@ function makeHost(opts: {
         : `devices.${device.sku.toLowerCase()}_${device.deviceId.replace(/:/g, "").slice(-4).toLowerCase()}`,
     stateToCommand: suffix => stateToCommandMap[suffix],
     getObject: id => Promise.resolve(objects.get(id) ?? null),
-    sendMusicCommand: async (device, devicePrefix, stateSuffix, value) => {
+    sendMusicCommand: (device, devicePrefix, stateSuffix, value) => {
       musicCalls.push({ device: device.deviceId, prefix: devicePrefix, suffix: stateSuffix, value });
+      return Promise.resolve();
     },
   };
   return { host, commands, musicCalls };
@@ -195,7 +197,7 @@ describe("GroupFanoutHandler", () => {
       const m1 = makeMember({ state: { online: false } });
       const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
       const { host } = makeHost({ devices: [m1] });
-      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
       const handler = new GroupFanoutHandler(host);
       const result = await handler.fanOut(group, "control.power", true);
       expect(result).toBe(false); // caller must NOT ack "success"
@@ -207,7 +209,7 @@ describe("GroupFanoutHandler", () => {
       const m1 = makeMember({ state: { online: false } });
       const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
       const { host } = makeHost({ devices: [m1] });
-      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
       const handler = new GroupFanoutHandler(host);
       await handler.fanOut(group, "control.power", true);
       // "all 0 member command(s) failed" would be both nonsense and useless —
@@ -220,12 +222,13 @@ describe("GroupFanoutHandler", () => {
       const m1 = makeMember({ deviceId: "AA:01" });
       const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
       const { host } = makeHost({ devices: [m1] });
-      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
       let fail = true;
-      host.sendCommand = async () => {
+      host.sendCommand = () => {
         if (fail) {
-          throw new Error("unreachable");
+          return Promise.reject(new Error("unreachable"));
         }
+        return Promise.resolve();
       };
       const handler = new GroupFanoutHandler(host);
 
@@ -250,9 +253,9 @@ describe("GroupFanoutHandler", () => {
         { sku: m2.sku, deviceId: m2.deviceId },
       ]);
       const { host } = makeHost({ devices: [m1, m2] });
-      host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
-      host.sendCommand = async () => {
-        throw new Error("unreachable");
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
+      host.sendCommand = () => {
+        return Promise.reject(new Error("unreachable"));
       };
       const handler = new GroupFanoutHandler(host);
       const result = await handler.fanOut(group, "control.power", true);

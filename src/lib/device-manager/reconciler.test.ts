@@ -27,7 +27,7 @@ function mk(over: Partial<GoveeDevice> & { sku: string; deviceId: string }): Gov
     state: { online: true },
     channels: { lan: false, mqtt: false, cloud: false },
     ...over,
-  } as GoveeDevice;
+  };
 }
 
 const src = (ok: boolean, keys: string[] = []): ReconcileSource => ({ ok, keys: new Set(keys) });
@@ -36,7 +36,12 @@ function sources(over: Partial<ReconcileSources> = {}): ReconcileSources {
   return { cloud: ABSENT_SOURCE, app: ABSENT_SOURCE, group: ABSENT_SOURCE, ...over };
 }
 
-function reconcile(devices: GoveeDevice[], s: ReconcileSources, refreshedSource: SourceKind, threshold = 2): GoveeDevice[] {
+function reconcile(
+  devices: GoveeDevice[],
+  s: ReconcileSources,
+  refreshedSource: SourceKind,
+  threshold = 2,
+): GoveeDevice[] {
   return reconcileAccountMembership({ sources: s, devices, keyOf, refreshedSource, evictThreshold: threshold });
 }
 

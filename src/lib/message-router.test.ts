@@ -1,27 +1,27 @@
 import { MessageRouter, type MessageRouterHost } from "./message-router";
 import type { GoveeMqttClient } from "./govee-mqtt-client";
 
-const { enJson } = vi.hoisted(() => {
-  const { readFileSync } = require("node:fs");
-  const { join } = require("node:path");
-  return {
-    enJson: JSON.parse(readFileSync(join(__dirname, "../../admin/i18n/en.json"), "utf8")) as Record<string, string>,
-  };
-});
-
 // MessageRouter routes mqttAuth result strings through adapter-core I18n; resolve
 // them against the real en.json with positional %s substitution (mirrors
 // I18n.translate) so the content assertions below hold without booting
 // js-controller.
-vi.mock("@iobroker/adapter-core", () => ({
-  I18n: {
-    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
-    translate: vi.fn((key: string, ...args: (string | number)[]) => {
-      let i = 0;
-      return (enJson[key] ?? key).replace(/%s/g, () => String(args[i++] ?? "%s"));
-    }),
-  },
-}));
+vi.mock("@iobroker/adapter-core", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const enJson = JSON.parse(readFileSync(join(__dirname, "../../admin/i18n/en.json"), "utf8")) as Record<
+    string,
+    string
+  >;
+  return {
+    I18n: {
+      getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+      translate: vi.fn((key: string, ...args: (string | number)[]) => {
+        let i = 0;
+        return (enJson[key] ?? key).replace(/%s/g, () => String(args[i++] ?? "%s"));
+      }),
+    },
+  };
+});
 
 const mockLog = {
   silly: () => {},
@@ -66,12 +66,13 @@ function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
       }
       return opts.lastError;
     },
-    requestVerificationCode: async (): Promise<void> => {
+    requestVerificationCode: (): Promise<void> => {
       if (opts.requestError) {
-        throw opts.requestError;
+        return Promise.reject(opts.requestError);
       }
+      return Promise.resolve();
     },
-    connect: async (_onStatus: unknown, onConnection: (connected: boolean) => void): Promise<void> => {
+    connect: (_onStatus: unknown, onConnection: (connected: boolean) => void): Promise<void> => {
       // The real client resolves connect() after the login + cert handshake and
       // only issues the MQTT connect — the "connected" edge (onConnection(true))
       // arrives asynchronously AFTER this resolves, via the mqtt "connect" event
@@ -81,6 +82,7 @@ function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
       if (opts.connected) {
         setTimeout(() => onConnection(true), 0);
       }
+      return Promise.resolve();
     },
   } as unknown as GoveeMqttClient;
   return probe;
@@ -123,7 +125,7 @@ function makeMessage(command: string, message?: unknown): ioBroker.Message {
     from: "system.adapter.test.0",
     callback: { id: 1 } as unknown as ioBroker.Message["callback"],
     _id: 1,
-  } as ioBroker.Message;
+  };
 }
 
 describe("MessageRouter", () => {
@@ -179,9 +181,7 @@ describe("MessageRouter", () => {
         return Promise.resolve({ applied: true });
       };
       const router = new MessageRouter(host);
-      router.onMessage(
-        makeMessage("segmentWizard", { action: "apply", device: "H6160:AA:01", indices: [0, 1, 2, 4] }),
-      );
+      router.onMessage(makeMessage("segmentWizard", { action: "apply", device: "H6160:AA:01", indices: [0, 1, 2, 4] }));
       await new Promise(r => setTimeout(r, 0));
       expect(calls).toHaveLength(1);
       expect(calls[0]).toEqual({
@@ -228,7 +228,10 @@ describe("MessageRouter", () => {
 
     it("disposes the probe on the error path too — no socket leak (M2)", async () => {
       let disconnects = 0;
-      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: bad" }, onDisconnect: () => (disconnects += 1) });
+      const probe = makeProbe({
+        lastError: { category: "AUTH", message: "Login failed: bad" },
+        onDisconnect: () => (disconnects += 1),
+      });
       const { host } = makeHost({ probe });
       const router = new MessageRouter(host, 20);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -237,7 +240,12 @@ describe("MessageRouter", () => {
     });
 
     it("returns 2FA hint on Verification required error", async () => {
-      const probe = makeProbe({ lastError: { category: "VERIFICATION_PENDING", message: "Verification required by Govee — request a code via Adapter settings (status 454)" } });
+      const probe = makeProbe({
+        lastError: {
+          category: "VERIFICATION_PENDING",
+          message: "Verification required by Govee — request a code via Adapter settings (status 454)",
+        },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -247,7 +255,9 @@ describe("MessageRouter", () => {
     });
 
     it("returns invalid-code hint on Verification code invalid", async () => {
-      const probe = makeProbe({ lastError: { category: "VERIFICATION_FAILED", message: "Verification code invalid or expired (status 455)" } });
+      const probe = makeProbe({
+        lastError: { category: "VERIFICATION_FAILED", message: "Verification code invalid or expired (status 455)" },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -257,7 +267,9 @@ describe("MessageRouter", () => {
     });
 
     it("returns email-not-registered on matching error", async () => {
-      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: email not registered (status 451)" } });
+      const probe = makeProbe({
+        lastError: { category: "AUTH", message: "Login failed: email not registered (status 451)" },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -267,7 +279,9 @@ describe("MessageRouter", () => {
     });
 
     it("returns rate-limit hint", async () => {
-      const probe = makeProbe({ lastError: { category: "RATE_LIMIT", message: "Rate limited by Govee: too many requests (status 429)" } });
+      const probe = makeProbe({
+        lastError: { category: "RATE_LIMIT", message: "Rate limited by Govee: too many requests (status 429)" },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -277,7 +291,9 @@ describe("MessageRouter", () => {
     });
 
     it("returns account-locked hint", async () => {
-      const probe = makeProbe({ lastError: { category: "UNKNOWN", message: "Account temporarily locked by Govee: abnormal login (status 400)" } });
+      const probe = makeProbe({
+        lastError: { category: "UNKNOWN", message: "Account temporarily locked by Govee: abnormal login (status 400)" },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
@@ -290,7 +306,9 @@ describe("MessageRouter", () => {
       // The real client never rejects from connect(); before H2 the router
       // classified in a catch that could never fire and answered
       // mqttAuthLoginNoMqtt after burning the full probe timeout.
-      const probe = makeProbe({ lastError: { category: "AUTH", message: "Login failed: wrong password (status 401)" } });
+      const probe = makeProbe({
+        lastError: { category: "AUTH", message: "Login failed: wrong password (status 401)" },
+      });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host, 5000);
       const t0 = Date.now();
@@ -428,7 +446,7 @@ describe("onMessage crash boundaries", () => {
   it("a throwing sub-handler is answered with an error and warned about (inner boundary)", async () => {
     const warns: string[] = [];
     const { host, responses } = makeHost({});
-    host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+    host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
     host.runWizardStep = () => Promise.reject(new Error("wizard exploded"));
     const router = new MessageRouter(host);
     router.onMessage(makeMessage("segmentWizard", { action: "start", device: "H6160:AA:01" }));
@@ -441,7 +459,7 @@ describe("onMessage crash boundaries", () => {
   it("a crash while answering is caught by the outer boundary — never an unhandled rejection (outer boundary)", async () => {
     const warns: string[] = [];
     const { host, responses } = makeHost({ segmentDevices: [{ value: "H6160:AA:01", label: "Strip" }] });
-    host.log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+    host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
     // The first sendResponse (the success answer) blows up — the ioBroker
     // socket is gone; the second (the outer error answer) must still go out.
     const original = host.sendResponse;

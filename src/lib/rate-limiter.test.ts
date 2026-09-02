@@ -1,4 +1,5 @@
 import { MAX_QUEUE_LENGTH, RateLimiter } from "./rate-limiter";
+import type { TimerAdapter } from "./types";
 
 const mockLog: ioBroker.Logger = {
   debug: () => {},
@@ -19,7 +20,12 @@ const mockTimers = {
 };
 
 /** Timer adapter that captures scheduled callbacks so a test can fire them. */
-function makeCapturingTimers() {
+function makeCapturingTimers(): {
+  timers: TimerAdapter;
+  intervals: Array<() => void>;
+  timeouts: Array<() => void>;
+  clears: () => number;
+} {
   const intervals: Array<() => void> = [];
   const timeouts: Array<() => void> = [];
   let clears = 0;
@@ -53,14 +59,17 @@ describe("RateLimiter", () => {
     const rl = new RateLimiter(mockLog, mockTimers, 10, 100);
     let called = 0;
 
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     });
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     });
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     });
 
     expect(called).toBe(3);
@@ -71,14 +80,17 @@ describe("RateLimiter", () => {
     const rl = new RateLimiter(mockLog, mockTimers, 2, 100);
     let called = 0;
 
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // 1 — ok
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // 2 — ok
-    const queued = await rl.tryExecute(async () => {
+    const queued = await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // 3 — queued
 
     expect(called).toBe(2);
@@ -89,14 +101,17 @@ describe("RateLimiter", () => {
     const rl = new RateLimiter(mockLog, mockTimers, 100, 2);
     let called = 0;
 
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // ok
-    await rl.tryExecute(async () => {
+    await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // ok
-    const queued = await rl.tryExecute(async () => {
+    const queued = await rl.tryExecute(() => {
       called++;
+      return Promise.resolve();
     }); // queued
 
     expect(called).toBe(2);
@@ -108,14 +123,17 @@ describe("RateLimiter", () => {
     const rl = new RateLimiter(mockLog, mockTimers, 0, 100); // minute limit 0 = all queued
     const order: number[] = [];
 
-    rl.enqueue(async () => {
+    rl.enqueue(() => {
       order.push(2);
+      return Promise.resolve();
     }, 2); // low priority
-    rl.enqueue(async () => {
+    rl.enqueue(() => {
       order.push(0);
+      return Promise.resolve();
     }, 0); // high priority
-    rl.enqueue(async () => {
+    rl.enqueue(() => {
       order.push(1);
+      return Promise.resolve();
     }, 1); // medium priority
 
     // Access internal queue to verify order
@@ -168,8 +186,9 @@ describe("RateLimiter", () => {
     it("runs immediately within budget and propagates an immediate failure", async () => {
       const rl = new RateLimiter(mockLog, mockTimers, 10, 100);
       let ran = 0;
-      await rl.executeTracked(async () => {
+      await rl.executeTracked(() => {
         ran++;
+        return Promise.resolve();
       });
       expect(ran).toBe(1);
       await expect(rl.executeTracked(async () => Promise.reject(new Error("cloud says no")))).rejects.toThrow(
@@ -181,8 +200,9 @@ describe("RateLimiter", () => {
       const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
       await rl.tryExecute(async () => {}); // burn the minute budget
       let ran = 0;
-      const tracked = rl.executeTracked(async () => {
+      const tracked = rl.executeTracked(() => {
         ran++;
+        return Promise.resolve();
       });
       expect(ran).toBe(0); // queued, not run
       (rl as any).callsThisMinute = 0; // minute reset
@@ -262,8 +282,9 @@ describe("RateLimiter — timer-driven behaviour", () => {
     const rl = new RateLimiter(mockLog, t.timers, 1, 100);
     rl.start();
     let ran = 0;
-    const inc = async (): Promise<void> => {
+    const inc = (): Promise<void> => {
       ran++;
+      return Promise.resolve();
     };
     await rl.tryExecute(inc); // 1 — immediate
     await rl.tryExecute(inc); // 2 — queued (minute limit 1)
@@ -297,8 +318,9 @@ describe("RateLimiter — timer-driven behaviour", () => {
     const t = makeCapturingTimers();
     const rl = new RateLimiter(mockLog, t.timers, 0, 100); // limit 0 → everything queues
     let ran = 0;
-    rl.enqueue(async () => {
+    rl.enqueue(() => {
       ran++;
+      return Promise.resolve();
     });
     rl.start();
     rl.stop();

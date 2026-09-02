@@ -28,22 +28,24 @@ function makeRig(): TestRig {
   const stateWrites: Array<{ id: string; val: unknown }> = [];
   const groupsOnline: boolean[] = [];
   const loadCloudStatesCalls: number[] = [];
-  let load: () => Promise<CloudLoadResult> = async () => ({ ok: true });
+  let load: () => Promise<CloudLoadResult> = () => Promise.resolve({ ok: true });
 
   const adapter: CloudRetryHandlerAdapter = {
     log: mockLog,
     deviceManager: { loadFromCloud: () => load() } as never,
     cloudClient: null,
     stateManager: {
-      updateGroupsOnline: async (v: boolean) => {
+      updateGroupsOnline: (v: boolean) => {
         groupsOnline.push(v);
+        return Promise.resolve();
       },
     } as never,
     cloudInitTimer: undefined,
     cloudRetry: undefined,
     cloudWasConnected: false,
-    setState: async (id, state) => {
+    setState: (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
+      return Promise.resolve();
     },
     setTimeout: (cb, ms) => {
       timers.push({ cb, ms });
@@ -52,8 +54,9 @@ function makeRig(): TestRig {
     clearTimeout: h => {
       cleared.push(h as unknown as number);
     },
-    loadCloudStates: async () => {
+    loadCloudStates: () => {
       loadCloudStatesCalls.push(1);
+      return Promise.resolve();
     },
     actionableProblems: {
       report: (p: { key: string; title: string }) => reports.push({ key: p.key, title: p.title }),
@@ -78,7 +81,7 @@ function makeRig(): TestRig {
 describe("cloudInitWithTimeout", () => {
   it("returns the load result and clears the safety timer when the Cloud answers in time", async () => {
     const rig = makeRig();
-    rig.setLoad(async () => ({ ok: true }));
+    rig.setLoad(() => Promise.resolve({ ok: true }));
     const result = await cloudInitWithTimeout(rig.adapter);
     expect(result).toEqual({ ok: true });
     expect(rig.cleared).toHaveLength(1);
@@ -97,8 +100,8 @@ describe("cloudInitWithTimeout", () => {
 
   it("maps a thrown loadFromCloud to transient and still clears the timer", async () => {
     const rig = makeRig();
-    rig.setLoad(async () => {
-      throw new Error("boom");
+    rig.setLoad(() => {
+      return Promise.reject(new Error("boom"));
     });
     const result = await cloudInitWithTimeout(rig.adapter);
     expect(result).toEqual({ ok: false, reason: "transient" });

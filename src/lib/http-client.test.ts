@@ -91,6 +91,14 @@ async function startStubServer(): Promise<StubServer> {
  * The tests drive the REAL httpsRequest with a node:http transport (the
  * `transport` seam added in v2.26.0). Before that this file carried a copy of
  * the implementation, so a bug in production code failed nothing here.
+ *
+ * @param options Request description handed to the production client
+ * @param options.method HTTP method
+ * @param options.url Absolute URL of the local stub server
+ * @param options.headers Request headers
+ * @param options.body Request body (JSON-serialisable)
+ * @param options.timeout Timeout in milliseconds
+ * @param options.signal Abort signal wired through to the request
  */
 function httpRequestPlain<T>(options: {
   method: "GET" | "POST";

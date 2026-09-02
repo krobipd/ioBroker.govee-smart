@@ -102,7 +102,7 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
 
     it("restored device cannot carry a forged lastLanReplyAt from a tampered cache (L11)", () => {
       const cached = { ...goveeDeviceToCached(makeFullDevice()), lastLanReplyAt: 1_700_000_000_000 };
-      const restored = cachedToGoveeDevice(cached as never);
+      const restored = cachedToGoveeDevice(cached);
       expect(restored.lastLanReplyAt).toBe(undefined);
     });
 
