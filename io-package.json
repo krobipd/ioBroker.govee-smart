@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.27.1",
+    "version": "2.28.0",
     "news": {
-      "NEXT": {
+      "2.28.0": {
         "en": "Sensor and event datapoints have one name (sensor.temperature, not sensor.sensor_temperature) — adjust scripts. Manual sync works again, Cloud reconnect no longer stops on a maintenance page.",
         "de": "Sensor- und Ereignis-Datenpunkte heißen einheitlich (sensor.temperature statt sensor.sensor_temperature) — Skripte anpassen. Manueller Abgleich geht wieder, Cloud-Wiederverbindung stoppt nicht mehr.",
         "ru": "Датчики и события получили единые имена (sensor.temperature вместо sensor.sensor_temperature) — обновите скрипты. Ручная синхронизация снова работает, переподключение к облаку не останавливается.",

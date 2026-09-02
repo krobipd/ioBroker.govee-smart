@@ -1,4 +1,8 @@
 # Older Changes
+## 2.24.0 (2026-08-04)
+
+- This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
+
 ## 2.23.1 (2026-08-04)
 
 - Test release during the move to ioBroker Admin 8.

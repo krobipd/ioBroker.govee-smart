@@ -100,7 +100,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
-### **WORK IN PROGRESS**
+### 2.28.0 (2026-09-02)
 
 - Fixed: The "Sync devices manually" button in the object tree works again — it had no effect since 2.17.0. It is now `info.manualSyncDevices`; the old `info.manual_sync_devices` is removed on start
 - Fixed: A Govee maintenance page could permanently stop the Cloud reconnect with a misleading "check your API key" hint — only real authentication failures stop the retry now
@@ -132,10 +132,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Redesigned connection setup: one card for the Cloud API key, account login and 2FA, with live connection status and a guided verification-code step.
 - Fixed light strips that showed too many segments with impossible brightness values (e.g. Govee H6076 showed 15 instead of 7); they now use the strip's real segment count.
-
-### 2.24.0 (2026-08-04)
-
-- This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
