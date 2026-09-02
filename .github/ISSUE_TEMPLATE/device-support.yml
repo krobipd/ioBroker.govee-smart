@@ -13,11 +13,9 @@ body:
   - type: input
     id: sku
     attributes:
-      label: SKU / Modell
-      description: Steht auf dem Gerät und in der Govee Home App, z.B. `H7160`. / On the device and in the Govee Home app.
+      label: SKU / Modell (optional)
+      description: Steht auf dem Gerät und in der Govee Home App, z.B. `H7160`. Steckt auch im Diagnose-Export. / On the device and in the Govee Home app. Also part of the diagnostics export.
       placeholder: H7160
-    validations:
-      required: true
 
   - type: input
     id: app-name
@@ -31,13 +29,11 @@ body:
   - type: dropdown
     id: status-current
     attributes:
-      label: Aktueller Status im Wiki / Current Wiki status
+      label: Aktueller Status im Wiki (optional) / Current Wiki status (optional)
       options:
         - "⚪ Experimentell / Experimental"
         - "🟢 User-bestätigt / User-confirmed (Folge-Bestätigung)"
         - "Nicht gelistet / Not listed yet"
-    validations:
-      required: true
 
   - type: textarea
     id: behavior
