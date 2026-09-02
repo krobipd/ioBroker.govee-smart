@@ -75,21 +75,9 @@ If your device needs a quirk that's missing here: open an issue with the diagnos
 
 ## Bug reports
 
-Issue mit:
+Nimm die [Fehler-Vorlage](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=bug_report.yml) — sie fragt genau das ab, was wir brauchen. Betrifft es ein bestimmtes Gerät, ist die [Geräte-Vorlage](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=device-support.yml) mit dem Diagnose-Export der richtige Weg.
 
-- Adapter-Version (`govee-smart` instance config zeigt sie an)
-- ioBroker-Version (`iobroker info` auf dem Server)
-- Was du erwartet hast vs. was passiert ist
-- Adapter-Log mit `loglevel=debug` falls relevant
-- Wenn ein bestimmtes Gerät betroffen ist: Diagnostics-Export wie oben
-
-Issue with:
-
-- Adapter version
-- ioBroker version
-- Expected vs actual behavior
-- Adapter log with `loglevel=debug` if relevant
-- For device-specific bugs: diagnostics export as above
+Use the [bug report form](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=bug_report.yml) — it asks for exactly what we need. If a specific device is affected, the [device form](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=device-support.yml) with the diagnostics export is the right path.
 
 ---
 

@@ -148,7 +148,7 @@ function capText(text: string, max: number): string {
 
 /**
  * Object keys whose values are secrets and must never reach the diagnostics
- * export — the adapter asks users to paste that JSON into public GitHub
+ * export — the adapter asks users to attach that JSON to public GitHub
  * issues. Matched case-insensitively. `topic` covers the gateway push topic
  * (`GD/<hash>`); non-secret device metadata (bleName, MAC address) is kept.
  */
@@ -476,7 +476,7 @@ export class DiagnosticsCollector {
       }
       // Deep-clone, then strip credentials so secrets (e.g. a gateway
       // `secretCode`) never reach the diagnostics export — which the adapter
-      // asks the user to paste publicly (SEC-ISSUE1). Redact before the size
+      // asks the user to publish (SEC-ISSUE1). Redact before the size
       // cap so a truncated body is masked too.
       const clone = JSON.parse(serialised) as unknown;
       redactSecretsInPlace(clone);

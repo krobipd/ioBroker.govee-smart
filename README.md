@@ -55,7 +55,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 Besides your devices on the LAN and the Govee servers (`openapi.api.govee.com`, `app2.govee.com`, `mqtt.openapi.govee.com` and Govee's AWS IoT endpoint), the adapter makes one more outbound call: once a day it looks up the current version of the Govee Home app in Apple's App Store directory (`itunes.apple.com`). Govee's undocumented endpoints reject requests that announce a stale app version, so the adapter keeps that version current on its own. The lookup carries no account data, no device data and no identifier of your installation.
 
-The per-device diagnostics export (`diag.export` → `diag.result`) is meant to be pasted into a public GitHub issue. It contains the device's model, its Govee device id, its LAN address, the name you gave it in the Govee Home app, recent adapter log lines and the last API responses for that device. Credentials, tokens and gateway secrets are masked before the export is written.
+The per-device diagnostics export (`diag.export` → `diag.result`) is meant to be attached to a public GitHub issue. It contains the device's model, its Govee device id, its LAN address, the name you gave it in the Govee Home app, recent adapter log lines and the last API responses for that device. Credentials, tokens and gateway secrets are masked before the export is written.
 
 ---
 
@@ -84,7 +84,7 @@ Each device shows its test status under `diag.tier`. The [Devices page](https://
 
 Common issues (no devices discovered, empty scenes dropdown, segment colors not changing, limited group commands, delayed status updates) are covered on the Wiki [Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior) / [Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten) page.
 
-For anything else, set **`diag.export`** to `true` on the affected device, copy the JSON from `diag.result`, and open a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues).
+For anything else, set **`diag.export`** to `true` on the affected device, save the JSON from `diag.result` as a file and attach it to a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues/new/choose) — the export is too long to paste into an issue.
 
 ---
 
