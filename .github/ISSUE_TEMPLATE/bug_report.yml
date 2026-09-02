@@ -1,0 +1,101 @@
+name: Fehler melden / Report a bug
+description: Etwas funktioniert nicht wie erwartet / Something does not work as expected
+title: "[Fehler] kurz beschreiben"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke, dass du dir die Zeit nimmst! Bitte schau kurz, ob es zu deinem Problem schon ein offenes Issue gibt.
+
+        Thanks for taking the time! Please have a quick look whether an issue for your problem already exists.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Was ist passiert? / What happened?
+      description: |
+        Was hast du erwartet, was passiert stattdessen? Ein, zwei Sätze reichen.
+
+        What did you expect, what happens instead? One or two sentences are enough.
+    validations:
+      required: true
+
+  - type: input
+    id: adapter-version
+    attributes:
+      label: Adapter-Version / Adapter version
+      description: |
+        Steht in der Adapterliste bei der installierten Version.
+
+        Shown in the adapter list as the installed version.
+      placeholder: "2.28.0"
+    validations:
+      required: true
+
+  - type: input
+    id: jscontroller-version
+    attributes:
+      label: js-controller-Version / js-controller version
+      description: |
+        In der Konsole: `iobroker version`
+
+        In the console: `iobroker version`
+      placeholder: "7.0.7"
+    validations:
+      required: true
+
+  - type: input
+    id: admin-version
+    attributes:
+      label: Admin-Version / Admin version
+      description: |
+        Version des Adapters `admin`, ebenfalls aus der Adapterliste.
+
+        Version of the `admin` adapter, also from the adapter list.
+      placeholder: "8.0.11"
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: Protokoll-Auszug / Log excerpt
+      description: |
+        Stelle die Protokollstufe der Instanz auf `debug`, löse den Fehler noch einmal aus und füge den passenden Ausschnitt hier ein.
+
+        Set the instance log level to `debug`, trigger the problem once more and paste the relevant excerpt here.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js-Version (optional)
+      description: |
+        In der Konsole: `node -v`
+
+        In the console: `node -v`
+      placeholder: "v20.18.1"
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installationsart (optional) / Installation type (optional)
+      options:
+        - Linux (Debian, Ubuntu, Raspberry Pi OS ...)
+        - Docker
+        - Proxmox / LXC
+        - Windows
+        - macOS
+        - Andere / Other
+
+  - type: textarea
+    id: extras
+    attributes:
+      label: Sonstiges (optional) / Anything else (optional)
+      description: |
+        Bildschirmfotos, Gerätemodell, Besonderheiten deiner Installation.
+
+        Screenshots, device model, peculiarities of your setup.

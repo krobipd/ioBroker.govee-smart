@@ -1,0 +1,29 @@
+name: Frage stellen / Ask a question
+description: Etwas zum Adapter ist unklar / Something about the adapter is unclear
+title: "[Frage] kurz beschreiben"
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Für allgemeine ioBroker-Fragen ist das [ioBroker-Forum](https://forum.iobroker.net/) der bessere Ort. Fragen zu diesem Adapter sind hier genau richtig.
+
+        For general ioBroker questions the [ioBroker forum](https://forum.iobroker.net/) is the better place. Questions about this adapter belong here.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Deine Frage / Your question
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: Was hast du schon versucht? (optional) / What have you tried already? (optional)
+
+  - type: input
+    id: adapter-version
+    attributes:
+      label: Adapter-Version (optional) / Adapter version (optional)
+      placeholder: "2.28.0"
