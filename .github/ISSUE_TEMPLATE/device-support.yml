@@ -57,12 +57,15 @@ body:
   - type: textarea
     id: diagnostics
     attributes:
-      label: Diagnostics-Export (JSON)
+      label: Diagnose-Export / Diagnostics export
       description: |
-        Im Object-Browser auf `info.diagnostics_export` deines Geräts klicken, dann den Inhalt von `info.diagnostics_result` hier einfügen oder als Datei anhängen.
+        Im Objektbaum den Knopf `govee-smart.<Instanz>.devices.<Gerät>.diag.export` drücken und danach den Inhalt von `diag.result` kopieren. Darin stecken auch die letzten Protokollzeilen des Geräts.
 
-        In the object browser click `info.diagnostics_export` of your device, then paste the contents of `info.diagnostics_result` here or attach as a file.
-      render: json
+        Der Export ist meist mehrere zehntausend Zeichen lang. **Speichere ihn als Datei (z. B. `diagnose.json`) und ziehe sie in dieses Feld** — nur kurze Exporte direkt einfügen.
+
+        In the object tree press the button `govee-smart.<instance>.devices.<device>.diag.export`, then copy the contents of `diag.result`. It also contains the device's most recent log lines.
+
+        The export is usually tens of thousands of characters long. **Save it as a file (e.g. `diagnose.json`) and drag it into this field** — paste directly only for short exports.
     validations:
       required: true
 
@@ -70,7 +73,7 @@ body:
     id: adapter-version
     attributes:
       label: govee-smart Version
-      placeholder: "2.0.0"
+      placeholder: "2.28.0"
     validations:
       required: true
 
