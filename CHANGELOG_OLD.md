@@ -1,4 +1,10 @@
 # Older Changes
+## 2.27.0 (2026-08-27) — stable
+
+- Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
+- Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
+- New: Three new datapoints under info — how many devices there are, how many are reachable right now, and whether that is all of them
+
 ## 2.26.0 (2026-08-22)
 
 - Fixed: Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints for a moment after it has shut down.

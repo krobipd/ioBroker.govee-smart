@@ -175,6 +175,7 @@ Die tragenden stehen oben in ihren eigenen Sektionen (LAN-first, Kanal-Prioritä
 
 ## Bekannte Fallstricke (govee-spezifisch)
 
+- **`preserve: { common: ["name"] }` NUR am Geräte-Objekt.** Es schont den vorhandenen Namen — genau richtig für den Namen aus der Govee-App, den ein Nutzer umbenannt haben kann. Bei jedem ADAPTER-EIGENEN Namen (Kanäle, Datenpunkte, Segment-Kanäle) verhindert es, dass eine Namensänderung eine BESTEHENDE Anlage je erreicht: 2.29.1 schrieb den übersetzten Segment-Namen und im Live-Baum stand weiter das feste englische „Segment 3". Kein Gate sieht das — das Rollen-Gate liest den Quelltext, `check-live-tree.py` prüft nur, DASS ein Name da ist. Gefunden wurde es am echten Baum (Skill-Schritt 11).
 - **Manifest-Objekte erreichen eine BESTEHENDE Anlage nur per `extendObject`.** js-controller legt `instanceObjects` nur an, wo sie fehlen — ein geänderter Name landete bis 2.29.0 ausschließlich bei Neuinstallationen, während Manifest und Namens-Gate grün aussahen. `ensureManifestObjects()` in `onReady` frischt alle elf auf, **je ein ausgeschriebener Aufruf**: eine Schleife über eine Tabelle wäre kürzer und würde verbergen, welche Objekte erreicht werden — vor dem Leser wie vor dem Konsistenz-Gate, das den wörtlichen Aufruf sucht.
 - **Namen mit laufender Nummer:** `tNameWith(key, n)` statt `tName` — `getTranslatedObject` ersetzt `%s` je Sprache, aber **nur wenn der ENGLISCHE Text den Platzhalter trägt**, und **genau einer** ist zulässig (adapter-core setzt je Argument wieder am Ursprungstext an, ein zweiter überschriebe den ersten).
 

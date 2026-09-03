@@ -100,6 +100,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.29.2 (2026-09-03)
+
+- Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text
+
 ### 2.29.1 (2026-09-03)
 
 - Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up
@@ -133,12 +137,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.27.1 (2026-09-01)
 
 - Improved: Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states
-
-### 2.27.0 (2026-08-27) — stable
-
-- Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
-- Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
-- New: Three new datapoints under info — how many devices there are, how many are reachable right now, and whether that is all of them
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

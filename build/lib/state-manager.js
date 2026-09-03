@@ -462,15 +462,11 @@ class StateManager {
     this.stateChannelMap.set(`${prefix}.${stateId}`, channel);
     if (!this.ensuredStates.has(channelId)) {
       try {
-        await this.adapter.extendObject(
-          channelId,
-          {
-            type: "channel",
-            common: { name: channelName(channel) },
-            native: {}
-          },
-          { preserve: { common: ["name"] } }
-        );
+        await this.adapter.extendObject(channelId, {
+          type: "channel",
+          common: { name: channelName(channel) },
+          native: {}
+        });
         this.ensuredStates.add(channelId);
       } catch {
       }
@@ -479,23 +475,19 @@ class StateManager {
       return;
     }
     try {
-      await this.adapter.extendObject(
-        stateFullId,
-        {
-          type: "state",
-          common: {
-            name: (0, import_i18n.tName)(meta.nameKey),
-            type: meta.type,
-            role: meta.role,
-            read: true,
-            write: false,
-            ...meta.unit !== void 0 ? { unit: meta.unit } : {},
-            def: meta.type === "boolean" ? false : 0
-          },
-          native: {}
+      await this.adapter.extendObject(stateFullId, {
+        type: "state",
+        common: {
+          name: (0, import_i18n.tName)(meta.nameKey),
+          type: meta.type,
+          role: meta.role,
+          read: true,
+          write: false,
+          ...meta.unit !== void 0 ? { unit: meta.unit } : {},
+          def: meta.type === "boolean" ? false : 0
         },
-        { preserve: { common: ["name"] } }
-      );
+        native: {}
+      });
       this.ensuredStates.add(stateFullId);
     } catch {
     }
@@ -543,17 +535,16 @@ class StateManager {
           deviceId: device.deviceId
         }
       },
+      // The ONLY name that stays preserved: this one comes from the Govee app,
+      // so a user who renamed the device there (or here) keeps it. Every other
+      // name in this file is the adapter's own and must reach existing trees.
       { preserve: { common: ["name"] } }
     );
-    await this.adapter.extendObject(
-      `${prefix}.info`,
-      {
-        type: "channel",
-        common: { name: (0, import_i18n.tName)("deviceInformation") },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    );
+    await this.adapter.extendObject(`${prefix}.info`, {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("deviceInformation") },
+      native: {}
+    });
     await this.ensureState(`${prefix}.info.name`, (0, import_i18n.tName)("stateName"), "string", "text", false);
     await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
       val: device.name,
@@ -694,15 +685,11 @@ class StateManager {
       `createStates [${logTag}] ${prefix}: ${stateDefs.length} states in ${channelGroups.size} channel(s)`
     );
     for (const [channel, defs] of channelGroups) {
-      await this.adapter.extendObject(
-        `${prefix}.${channel}`,
-        {
-          type: "channel",
-          common: { name: channelName(channel) },
-          native: {}
-        },
-        { preserve: { common: ["name"] } }
-      );
+      await this.adapter.extendObject(`${prefix}.${channel}`, {
+        type: "channel",
+        common: { name: channelName(channel) },
+        native: {}
+      });
       for (const def of defs) {
         const common = {
           name: def.name,
@@ -732,18 +719,14 @@ class StateManager {
         if (def.desc) {
           common.desc = def.desc;
         }
-        await this.adapter.extendObject(
-          `${prefix}.${channel}.${def.id}`,
-          {
-            type: "state",
-            common,
-            native: {
-              capabilityType: def.capabilityType,
-              capabilityInstance: def.capabilityInstance
-            }
-          },
-          { preserve: { common: ["name"] } }
-        );
+        await this.adapter.extendObject(`${prefix}.${channel}.${def.id}`, {
+          type: "state",
+          common,
+          native: {
+            capabilityType: def.capabilityType,
+            capabilityInstance: def.capabilityInstance
+          }
+        });
         if (def.states) {
           await this.repairCommonStatesIfBuggy(`${prefix}.${channel}.${def.id}`, def.states);
         }
@@ -780,15 +763,11 @@ class StateManager {
    */
   async createSegmentStates(device, segmentCount) {
     const prefix = this.devicePrefix(device);
-    await this.adapter.extendObject(
-      `${prefix}.segments`,
-      {
-        type: "channel",
-        common: { name: (0, import_i18n.tName)("ledSegments") },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    );
+    await this.adapter.extendObject(`${prefix}.segments`, {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("ledSegments") },
+      native: {}
+    });
     segmentCount = Math.min(Math.max(0, Math.floor(segmentCount)), import_lookups.SEGMENT_COUNT_MAX);
     const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
@@ -797,40 +776,32 @@ class StateManager {
       val: reportedCount,
       ack: true
     });
-    await this.adapter.extendObject(
-      `${prefix}.segments.manual_mode`,
-      {
-        type: "state",
-        common: {
-          name: (0, import_i18n.tName)("manualSegmentsActive"),
-          type: "boolean",
-          role: "switch",
-          read: true,
-          write: true,
-          def: false,
-          desc: (0, import_i18n.tDesc)("manualSegmentsDesc")
-        },
-        native: {}
+    await this.adapter.extendObject(`${prefix}.segments.manual_mode`, {
+      type: "state",
+      common: {
+        name: (0, import_i18n.tName)("manualSegmentsActive"),
+        type: "boolean",
+        role: "switch",
+        read: true,
+        write: true,
+        def: false,
+        desc: (0, import_i18n.tDesc)("manualSegmentsDesc")
       },
-      { preserve: { common: ["name"] } }
-    );
-    await this.adapter.extendObject(
-      `${prefix}.segments.manual_list`,
-      {
-        type: "state",
-        common: {
-          name: (0, import_i18n.tName)("manualSegmentList"),
-          type: "string",
-          role: "text",
-          read: true,
-          write: true,
-          def: "",
-          desc: (0, import_i18n.tDesc)("manualListDesc")
-        },
-        native: {}
+      native: {}
+    });
+    await this.adapter.extendObject(`${prefix}.segments.manual_list`, {
+      type: "state",
+      common: {
+        name: (0, import_i18n.tName)("manualSegmentList"),
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+        def: "",
+        desc: (0, import_i18n.tDesc)("manualListDesc")
       },
-      { preserve: { common: ["name"] } }
-    );
+      native: {}
+    });
     const manualModeVal = device.manualMode === true;
     const manualListVal = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.join(",") : "";
     await this.adapter.setState(`${prefix}.segments.manual_mode`, {
@@ -842,70 +813,54 @@ class StateManager {
       ack: true
     });
     for (const i of validIndices) {
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}`,
-        {
-          type: "channel",
-          common: { name: (0, import_i18n.tNameWith)("segmentChannel", i) },
-          native: {}
-        },
-        { preserve: { common: ["name"] } }
-      );
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}.color`,
-        {
-          type: "state",
-          common: {
-            name: (0, import_i18n.tName)("color"),
-            type: "string",
-            role: "level.color.rgb",
-            read: true,
-            write: true,
-            def: "#000000"
-            // avoid null in vis until the first write (LAN-only tier) — B6
-          },
-          native: {}
-        },
-        { preserve: { common: ["name"] } }
-      );
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}.brightness`,
-        {
-          type: "state",
-          common: {
-            name: (0, import_i18n.tName)("brightness"),
-            type: "number",
-            role: "level.brightness",
-            read: true,
-            write: true,
-            min: 0,
-            max: 100,
-            unit: "%",
-            def: 0
-            // avoid null in vis until the first write (LAN-only tier) — B6
-          },
-          native: {}
-        },
-        { preserve: { common: ["name"] } }
-      );
-    }
-    await this.adapter.extendObject(
-      `${prefix}.segments.command`,
-      {
+      await this.adapter.extendObject(`${prefix}.segments.${i}`, {
+        type: "channel",
+        common: { name: (0, import_i18n.tNameWith)("segmentChannel", i) },
+        native: {}
+      });
+      await this.adapter.extendObject(`${prefix}.segments.${i}.color`, {
         type: "state",
         common: {
-          name: (0, import_i18n.tName)("batchSegmentCommand"),
+          name: (0, import_i18n.tName)("color"),
           type: "string",
-          role: "text",
-          read: false,
+          role: "level.color.rgb",
+          read: true,
           write: true,
-          def: "",
-          desc: (0, import_i18n.tDesc)("batchCommandDesc")
+          def: "#000000"
+          // avoid null in vis until the first write (LAN-only tier) — B6
         },
         native: {}
+      });
+      await this.adapter.extendObject(`${prefix}.segments.${i}.brightness`, {
+        type: "state",
+        common: {
+          name: (0, import_i18n.tName)("brightness"),
+          type: "number",
+          role: "level.brightness",
+          read: true,
+          write: true,
+          min: 0,
+          max: 100,
+          unit: "%",
+          def: 0
+          // avoid null in vis until the first write (LAN-only tier) — B6
+        },
+        native: {}
+      });
+    }
+    await this.adapter.extendObject(`${prefix}.segments.command`, {
+      type: "state",
+      common: {
+        name: (0, import_i18n.tName)("batchSegmentCommand"),
+        type: "string",
+        role: "text",
+        read: false,
+        write: true,
+        def: "",
+        desc: (0, import_i18n.tDesc)("batchCommandDesc")
       },
-      { preserve: { common: ["name"] } }
-    );
+      native: {}
+    });
     await this.cleanupExcessSegments(prefix, validIndices);
   }
   /**
@@ -983,24 +938,16 @@ class StateManager {
    */
   async createGroupsOnlineState(online) {
     var _a;
-    await this.adapter.extendObject(
-      "groups",
-      {
-        type: "folder",
-        common: { name: (0, import_i18n.tName)("groups") },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    );
-    await this.adapter.extendObject(
-      "groups.info",
-      {
-        type: "channel",
-        common: { name: (0, import_i18n.tName)("groupsStatus") },
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    );
+    await this.adapter.extendObject("groups", {
+      type: "folder",
+      common: { name: (0, import_i18n.tName)("groups") },
+      native: {}
+    });
+    await this.adapter.extendObject("groups.info", {
+      type: "channel",
+      common: { name: (0, import_i18n.tName)("groupsStatus") },
+      native: {}
+    });
     await this.ensureState("groups.info.online", (0, import_i18n.tName)("cloudOnline"), "boolean", "indicator.reachable", false);
     (_a = this.onlineMarkerCache) == null ? void 0 : _a.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
@@ -1296,15 +1243,11 @@ class StateManager {
     if (def !== void 0) {
       common.def = def;
     }
-    await this.adapter.extendObject(
-      id,
-      {
-        type: "state",
-        common,
-        native: {}
-      },
-      { preserve: { common: ["name"] } }
-    );
+    await this.adapter.extendObject(id, {
+      type: "state",
+      common,
+      native: {}
+    });
     this.ensuredStates.add(id);
   }
   /**

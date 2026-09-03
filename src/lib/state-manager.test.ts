@@ -2487,4 +2487,41 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       expect(objects.has("groups.h6160_0011.diag.result")).toBe(true);
     });
   });
+
+  describe("names reach an existing tree", () => {
+    it("only the device object keeps its name — every adapter-owned name is rewritten", async () => {
+      // Measured on the live system after 2.29.1: the segment channels still
+      // carried the plain English "Segment 3" although the code had switched to
+      // a translation object. The write preserved the existing name, so the new
+      // one only ever reached FRESH installs — the same trap the manifest
+      // objects had, one level down and with no gate watching.
+      //
+      // The device object is the single exception: its name comes from the
+      // Govee app, so a user who renamed the device keeps that.
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      await sm.createInfoStates(dev);
+      await sm.createSegmentStates(dev, 3);
+
+      const preserving = calls
+        .filter(c => c.method === "extendObject")
+        .filter(c => {
+          const opts = c.args[2] as { preserve?: { common?: string[] } } | undefined;
+          return opts?.preserve?.common?.includes("name") === true;
+        })
+        .map(c => c.args[0] as string);
+
+      expect(preserving).toEqual(["devices.h6160_0011"]);
+    });
+
+    it("a segment channel carries a translation object, not a fixed string", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.createSegmentStates(createTestDevice(), 2);
+      const name = (objects.get("devices.h6160_0011.segments.1")?.common as { name: unknown }).name;
+      expect(typeof name).not.toBe("string");
+      expect(name).toMatchObject({ en: expect.any(String) });
+    });
+  });
 });

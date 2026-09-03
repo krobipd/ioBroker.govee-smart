@@ -581,15 +581,11 @@ export class StateManager {
       // events/. Without it the channel parent stays missing and Admin shows
       // the state directly under the device root.
       try {
-        await this.adapter.extendObject(
-          channelId,
-          {
-            type: "channel",
-            common: { name: channelName(channel) },
-            native: {},
-          },
-          { preserve: { common: ["name"] } },
-        );
+        await this.adapter.extendObject(channelId, {
+          type: "channel",
+          common: { name: channelName(channel) },
+          native: {},
+        });
         this.ensuredStates.add(channelId);
       } catch {
         /* retried on the next write */
@@ -599,23 +595,19 @@ export class StateManager {
       return;
     }
     try {
-      await this.adapter.extendObject(
-        stateFullId,
-        {
-          type: "state",
-          common: {
-            name: tName(meta.nameKey),
-            type: meta.type,
-            role: meta.role,
-            read: true,
-            write: false,
-            ...(meta.unit !== undefined ? { unit: meta.unit } : {}),
-            def: meta.type === "boolean" ? false : 0,
-          },
-          native: {},
+      await this.adapter.extendObject(stateFullId, {
+        type: "state",
+        common: {
+          name: tName(meta.nameKey),
+          type: meta.type,
+          role: meta.role,
+          read: true,
+          write: false,
+          ...(meta.unit !== undefined ? { unit: meta.unit } : {}),
+          def: meta.type === "boolean" ? false : 0,
         },
-        { preserve: { common: ["name"] } },
-      );
+        native: {},
+      });
       this.ensuredStates.add(stateFullId);
     } catch {
       /* retried on the next write */
@@ -674,19 +666,18 @@ export class StateManager {
           deviceId: device.deviceId,
         },
       },
+      // The ONLY name that stays preserved: this one comes from the Govee app,
+      // so a user who renamed the device there (or here) keeps it. Every other
+      // name in this file is the adapter's own and must reach existing trees.
       { preserve: { common: ["name"] } },
     );
 
     // Info channel — groups only get name (no individual online)
-    await this.adapter.extendObject(
-      `${prefix}.info`,
-      {
-        type: "channel",
-        common: { name: tName("deviceInformation") },
-        native: {},
-      },
-      { preserve: { common: ["name"] } },
-    );
+    await this.adapter.extendObject(`${prefix}.info`, {
+      type: "channel",
+      common: { name: tName("deviceInformation") },
+      native: {},
+    });
 
     // setStateChangedAsync (not setState) for the info metadata below:
     // createInfoStates re-runs on every phase callback (cloud refresh,
@@ -870,15 +861,11 @@ export class StateManager {
     );
 
     for (const [channel, defs] of channelGroups) {
-      await this.adapter.extendObject(
-        `${prefix}.${channel}`,
-        {
-          type: "channel",
-          common: { name: channelName(channel) },
-          native: {},
-        },
-        { preserve: { common: ["name"] } },
-      );
+      await this.adapter.extendObject(`${prefix}.${channel}`, {
+        type: "channel",
+        common: { name: channelName(channel) },
+        native: {},
+      });
 
       for (const def of defs) {
         const common: Partial<ioBroker.StateCommon> = {
@@ -911,18 +898,14 @@ export class StateManager {
           common.desc = def.desc as ioBroker.StringOrTranslated;
         }
 
-        await this.adapter.extendObject(
-          `${prefix}.${channel}.${def.id}`,
-          {
-            type: "state",
-            common: common,
-            native: {
-              capabilityType: def.capabilityType,
-              capabilityInstance: def.capabilityInstance,
-            },
+        await this.adapter.extendObject(`${prefix}.${channel}.${def.id}`, {
+          type: "state",
+          common: common,
+          native: {
+            capabilityType: def.capabilityType,
+            capabilityInstance: def.capabilityInstance,
           },
-          { preserve: { common: ["name"] } },
-        );
+        });
 
         // Existing diag.tier datapoints from v2.6.0+ may carry translation-object
         // VALUES in common.states (the old buildCloudStateDefs wrote tLabel(...)
@@ -973,15 +956,11 @@ export class StateManager {
   async createSegmentStates(device: GoveeDevice, segmentCount: number): Promise<void> {
     const prefix = this.devicePrefix(device);
 
-    await this.adapter.extendObject(
-      `${prefix}.segments`,
-      {
-        type: "channel",
-        common: { name: tName("ledSegments") },
-        native: {},
-      },
-      { preserve: { common: ["name"] } },
-    );
+    await this.adapter.extendObject(`${prefix}.segments`, {
+      type: "channel",
+      common: { name: tName("ledSegments") },
+      native: {},
+    });
 
     segmentCount = Math.min(Math.max(0, Math.floor(segmentCount)), SEGMENT_COUNT_MAX);
 
@@ -999,40 +978,32 @@ export class StateManager {
     });
 
     // Manual-mode toggle and list — user-writable for cut-strip overrides
-    await this.adapter.extendObject(
-      `${prefix}.segments.manual_mode`,
-      {
-        type: "state",
-        common: {
-          name: tName("manualSegmentsActive"),
-          type: "boolean",
-          role: "switch",
-          read: true,
-          write: true,
-          def: false,
-          desc: tDesc("manualSegmentsDesc"),
-        },
-        native: {},
+    await this.adapter.extendObject(`${prefix}.segments.manual_mode`, {
+      type: "state",
+      common: {
+        name: tName("manualSegmentsActive"),
+        type: "boolean",
+        role: "switch",
+        read: true,
+        write: true,
+        def: false,
+        desc: tDesc("manualSegmentsDesc"),
       },
-      { preserve: { common: ["name"] } },
-    );
-    await this.adapter.extendObject(
-      `${prefix}.segments.manual_list`,
-      {
-        type: "state",
-        common: {
-          name: tName("manualSegmentList"),
-          type: "string",
-          role: "text",
-          read: true,
-          write: true,
-          def: "",
-          desc: tDesc("manualListDesc"),
-        },
-        native: {},
+      native: {},
+    });
+    await this.adapter.extendObject(`${prefix}.segments.manual_list`, {
+      type: "state",
+      common: {
+        name: tName("manualSegmentList"),
+        type: "string",
+        role: "text",
+        read: true,
+        write: true,
+        def: "",
+        desc: tDesc("manualListDesc"),
       },
-      { preserve: { common: ["name"] } },
-    );
+      native: {},
+    });
 
     // Sync manual_mode / manual_list states back from the runtime device
     // (restored from cache on startup, or updated by the wizard). Using
@@ -1052,72 +1023,56 @@ export class StateManager {
     });
 
     for (const i of validIndices) {
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}`,
-        {
-          type: "channel",
-          common: { name: tNameWith("segmentChannel", i) },
-          native: {},
-        },
-        { preserve: { common: ["name"] } },
-      );
+      await this.adapter.extendObject(`${prefix}.segments.${i}`, {
+        type: "channel",
+        common: { name: tNameWith("segmentChannel", i) },
+        native: {},
+      });
 
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}.color`,
-        {
-          type: "state",
-          common: {
-            name: tName("color"),
-            type: "string",
-            role: "level.color.rgb",
-            read: true,
-            write: true,
-            def: "#000000", // avoid null in vis until the first write (LAN-only tier) — B6
-          },
-          native: {},
+      await this.adapter.extendObject(`${prefix}.segments.${i}.color`, {
+        type: "state",
+        common: {
+          name: tName("color"),
+          type: "string",
+          role: "level.color.rgb",
+          read: true,
+          write: true,
+          def: "#000000", // avoid null in vis until the first write (LAN-only tier) — B6
         },
-        { preserve: { common: ["name"] } },
-      );
+        native: {},
+      });
 
-      await this.adapter.extendObject(
-        `${prefix}.segments.${i}.brightness`,
-        {
-          type: "state",
-          common: {
-            name: tName("brightness"),
-            type: "number",
-            role: "level.brightness",
-            read: true,
-            write: true,
-            min: 0,
-            max: 100,
-            unit: "%",
-            def: 0, // avoid null in vis until the first write (LAN-only tier) — B6
-          },
-          native: {},
+      await this.adapter.extendObject(`${prefix}.segments.${i}.brightness`, {
+        type: "state",
+        common: {
+          name: tName("brightness"),
+          type: "number",
+          role: "level.brightness",
+          read: true,
+          write: true,
+          min: 0,
+          max: 100,
+          unit: "%",
+          def: 0, // avoid null in vis until the first write (LAN-only tier) — B6
         },
-        { preserve: { common: ["name"] } },
-      );
+        native: {},
+      });
     }
 
     // Comfort command state for batch segment control
-    await this.adapter.extendObject(
-      `${prefix}.segments.command`,
-      {
-        type: "state",
-        common: {
-          name: tName("batchSegmentCommand"),
-          type: "string",
-          role: "text",
-          read: false,
-          write: true,
-          def: "",
-          desc: tDesc("batchCommandDesc"),
-        },
-        native: {},
+    await this.adapter.extendObject(`${prefix}.segments.command`, {
+      type: "state",
+      common: {
+        name: tName("batchSegmentCommand"),
+        type: "string",
+        role: "text",
+        read: false,
+        write: true,
+        def: "",
+        desc: tDesc("batchCommandDesc"),
       },
-      { preserve: { common: ["name"] } },
-    );
+      native: {},
+    });
 
     // Remove segment channels that aren't in the valid list (supports gaps for manual mode)
     await this.cleanupExcessSegments(prefix, validIndices);
@@ -1219,24 +1174,16 @@ export class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online: boolean): Promise<void> {
-    await this.adapter.extendObject(
-      "groups",
-      {
-        type: "folder",
-        common: { name: tName("groups") },
-        native: {},
-      },
-      { preserve: { common: ["name"] } },
-    );
-    await this.adapter.extendObject(
-      "groups.info",
-      {
-        type: "channel",
-        common: { name: tName("groupsStatus") },
-        native: {},
-      },
-      { preserve: { common: ["name"] } },
-    );
+    await this.adapter.extendObject("groups", {
+      type: "folder",
+      common: { name: tName("groups") },
+      native: {},
+    });
+    await this.adapter.extendObject("groups.info", {
+      type: "channel",
+      common: { name: tName("groupsStatus") },
+      native: {},
+    });
     await this.ensureState("groups.info.online", tName("cloudOnline"), "boolean", "indicator.reachable", false);
     this.onlineMarkerCache?.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
@@ -1594,15 +1541,11 @@ export class StateManager {
     if (def !== undefined) {
       common.def = def;
     }
-    await this.adapter.extendObject(
-      id,
-      {
-        type: "state",
-        common: common,
-        native: {},
-      },
-      { preserve: { common: ["name"] } },
-    );
+    await this.adapter.extendObject(id, {
+      type: "state",
+      common: common,
+      native: {},
+    });
     this.ensuredStates.add(id);
   }
 

@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.29.1",
+    "version": "2.29.2",
     "news": {
+      "2.29.2": {
+        "en": "Datapoint and channel names now also update on installations that already exist — until now only fresh ones got the new wording.",
+        "de": "Datenpunkt- und Kanalnamen werden jetzt auch auf bestehenden Anlagen aktualisiert — bisher bekamen nur neue Installationen den neuen Text.",
+        "ru": "Имена точек данных и каналов теперь обновляются и на существующих установках — раньше новый текст получали только новые.",
+        "pt": "Os nomes de pontos de dados e canais passam a atualizar também em instalações existentes — até agora só as novas recebiam o novo texto.",
+        "nl": "Namen van datapunten en kanalen worden nu ook op bestaande installaties bijgewerkt — tot nu toe kregen alleen nieuwe de nieuwe tekst.",
+        "fr": "Les noms des points de données et des canaux se mettent désormais à jour aussi sur les installations existantes — seules les nouvelles en profitaient.",
+        "it": "I nomi di punti dati e canali ora si aggiornano anche sulle installazioni esistenti — finora il nuovo testo arrivava solo alle nuove.",
+        "es": "Los nombres de puntos de datos y canales ahora también se actualizan en instalaciones existentes — hasta ahora solo las nuevas recibían el texto.",
+        "pl": "Nazwy punktów danych i kanałów aktualizują się teraz także w istniejących instalacjach — dotąd nowy tekst trafiał tylko do nowych.",
+        "uk": "Назви точок даних і каналів тепер оновлюються й на наявних установках — досі новий текст отримували лише нові.",
+        "zh-cn": "数据点和通道名称现在在已有安装上也会更新——此前只有全新安装才能获得新文案。"
+      },
       "2.29.1": {
         "en": "A switched-off device is shown as not reachable again — 2.29.0 reported it as reachable. The diagnostics export works again.",
         "de": "Ein ausgeschaltetes Gerät wird wieder als nicht erreichbar angezeigt — 2.29.0 meldete es als erreichbar. Der Diagnose-Export geht wieder.",
@@ -80,19 +93,6 @@
         "pl": "Zatrzymanie lub restart instancji naprawdę kończy teraz połączenie z chmurą; po wyłączeniu adapter nie aktualizuje już punktów danych.",
         "uk": "Зупинка або перезапуск примірника тепер справді завершує хмарне з'єднання; після вимкнення адаптер більше не оновлює точки даних.",
         "zh-cn": "停止或重启实例现在会真正结束云连接；关闭之后适配器不再更新数据点。"
-      },
-      "2.25.0": {
-        "en": "Connection setup is now one card with live status for the Cloud key, account login and 2FA. Light strips also report their real segment count again.",
-        "de": "Die Verbindungs-Einrichtung ist jetzt eine Karte mit Live-Status für Cloud-Key, Konto-Login und 2FA. Lichtstreifen melden zudem wieder ihre echte Segment-Anzahl.",
-        "ru": "Настройка подключения теперь одна карточка с живым статусом для ключа облака, входа в аккаунт и 2FA. Ленты также снова сообщают реальное число сегментов.",
-        "pt": "A configuração da ligação é agora um cartão com estado em tempo real para a chave da nuvem, sessão e 2FA. As fitas voltam a indicar o número real de segmentos.",
-        "nl": "Verbinding instellen gaat nu via één kaart met live status voor de Cloud-sleutel, aanmelding en 2FA. Lichtstrips melden ook weer hun echte aantal segmenten.",
-        "fr": "La configuration de la connexion tient dans une carte avec état en direct pour la clé cloud, la connexion et la 2FA. Les rubans indiquent aussi leur vrai nombre de segments.",
-        "it": "La configurazione della connessione è ora un'unica scheda con stato in tempo reale per chiave cloud, accesso e 2FA. Le strisce indicano di nuovo il numero reale di segmenti.",
-        "es": "La configuración de la conexión es ahora una tarjeta con estado en vivo para la clave de la nube, el inicio de sesión y 2FA. Las tiras vuelven a indicar su número real de segmentos.",
-        "pl": "Konfiguracja połączenia to teraz jedna karta ze statusem na żywo dla klucza chmury, logowania i 2FA. Taśmy ponownie podają prawdziwą liczbę segmentów.",
-        "uk": "Налаштування підключення тепер одна картка зі статусом у реальному часі для ключа хмари, входу та 2FA. Стрічки також знову повідомляють реальну кількість сегментів.",
-        "zh-cn": "连接设置现在集中在一张带实时状态的卡片中，包含云密钥、账户登录和 2FA。灯带也会重新报告其真实的分段数量。"
       }
     },
     "plugins": {
