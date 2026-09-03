@@ -22,30 +22,30 @@ Die APIs (LAN-Protokoll, AWS-IoT-MQTT, ptReal BLE-over-LAN, Scene-Speed, Segment
 
 ## Kanal-Priorität pro Operation
 
-| Bereich | Primär | Fallback |
-| --- | --- | --- |
-| Lights-Steuerung (power, brightness, color_rgb, color_temperature, Segmente, Gradient) | LAN UDP | Cloud REST = **Notfall**¹ |
-| Music-Mode, Scene-Speed | LAN UDP | keiner |
-| Scene-/DIY-/Snapshot-Aktivierung | LAN UDP (ptReal) | Cloud REST (backup) |
-| Generic Capability | Cloud REST | — |
-| Lights-Status: Discovery, devStatus, `info.online`, `info.ip` | LAN UDP | — |
-| Lights-Status: Status-Push, Segment-State-Echo | AWS-IoT MQTT | — |
-| Cloud-Setup (Geräteliste+Capabilities, Scene-Library, Snapshot-BLE, Snapshot-Liste) | Cloud REST | — |
-| Group-Members | App-API | — |
-| Sensor-Werte (Temp/Hum), Battery | App-API | — |
-| Appliance-Events | OpenAPI-MQTT | — |
-| Appliance-Steuerung | Cloud REST | — |
-| Appliance `info.online` | App-API | OpenAPI-MQTT |
+| Bereich                                                                                | Primär           | Fallback                  |
+| -------------------------------------------------------------------------------------- | ---------------- | ------------------------- |
+| Lights-Steuerung (power, brightness, color_rgb, color_temperature, Segmente, Gradient) | LAN UDP          | Cloud REST = **Notfall**¹ |
+| Music-Mode, Scene-Speed                                                                | LAN UDP          | keiner                    |
+| Scene-/DIY-/Snapshot-Aktivierung                                                       | LAN UDP (ptReal) | Cloud REST (backup)       |
+| Generic Capability                                                                     | Cloud REST       | —                         |
+| Lights-Status: Discovery, devStatus, `info.online`, `info.ip`                          | LAN UDP          | —                         |
+| Lights-Status: Status-Push, Segment-State-Echo                                         | AWS-IoT MQTT     | —                         |
+| Cloud-Setup (Geräteliste+Capabilities, Scene-Library, Snapshot-BLE, Snapshot-Liste)    | Cloud REST       | —                         |
+| Group-Members                                                                          | App-API          | —                         |
+| Sensor-Werte (Temp/Hum), Battery                                                       | App-API          | —                         |
+| Appliance-Events                                                                       | OpenAPI-MQTT     | —                         |
+| Appliance-Steuerung                                                                    | Cloud REST       | —                         |
+| Appliance `info.online`                                                                | App-API          | OpenAPI-MQTT              |
 
 ¹ **Notfall-Fallback** — nur wenn lokale API nicht aktiviert (`lanIp === null`). 5–10 s Latenz pro Call, 10/min Rate-Limit. Adapter warnt beim Start („LAN ✗") mit Anleitung zur LAN-Aktivierung.
 
 ## Credential-Stufen (graceful degradation)
 
-| Eingabe | Funktionsumfang |
-| --- | --- |
-| Nichts | LAN-only: Discovery, Power, Brightness, Color, Status |
-| + API Key | + Geräteliste mit Namen, Capabilities, Szenen, Snapshots, Segmente |
-| + Email/Passwort | + Echtzeit Status-Push via AWS-IoT-MQTT |
+| Eingabe          | Funktionsumfang                                                    |
+| ---------------- | ------------------------------------------------------------------ |
+| Nichts           | LAN-only: Discovery, Power, Brightness, Color, Status              |
+| + API Key        | + Geräteliste mit Namen, Capabilities, Szenen, Snapshots, Segmente |
+| + Email/Passwort | + Echtzeit Status-Push via AWS-IoT-MQTT                            |
 
 Der Account-Login (Email/Passwort) läuft NUR, wenn beide Felder gesetzt sind (getrimmt) — sonst kein Login-Versuch (`main.ts`, Guard `hasAccountCreds`).
 
@@ -68,97 +68,27 @@ Geräte unter `devices/`, Gruppen unter `groups/`. Pro Gerät fünf Channels: `c
 
 ## Online-Kennzeichnung + Summen (ab 2.27.0)
 
-Das Symbol am Geräte-Knoten kommt aus `common.statusStates` → `<gerät>.info.online`, **nicht** aus
-`info.connection`. Bis 2.26.0 blieb beim Abschalten des Adapters jedes Gerät grün stehen. Der Marker
-braucht **vier** Teile (allgemeine Regel + Herleitung: `Entwicklung/CLAUDE_CODING.md`):
+Das Symbol am Geräte-Knoten kommt aus `common.statusStates` → `<gerät>.info.online`, **nicht** aus `info.connection`. Damit es beim Abschalten stimmt, braucht es **vier** Teile (allgemeine Herleitung: `Entwicklung/CLAUDE_CODING.md`): kein `supportedMessages.stopInstance` im Manifest (sonst läuft `onUnload` NIE) · `clearStopInstanceFlag()` als Erstes in `onReady` mit sofortigem `return`, und nur schreiben wenn gesetzt (sonst Neustart-Schleife) · `onUnload` meldet erst nach den Schreibvorgängen fertig (`.finally(callback)`) · Start-Stempel `markAllOffline()` vor dem ersten Scan, der einzige Teil, der nach Absturz/Stromausfall greift.
 
-1. **Kein `supportedMessages.stopInstance` im Manifest** — mit dem Eintrag schießt der Host den
-   Prozess bedingungslos ab und `onUnload` läuft NIE; alles darin war toter Code.
-2. **`clearStopInstanceFlag()` als erstes in `onReady`**, danach sofort `return` — der Eintrag lebt
-   als Kopie im Instanzobjekt weiter und überlebt jedes Update. Nur schreiben, wenn das Feld gesetzt
-   ist (jede Objekt-Änderung löst einen Neustart aus → sonst Neustart-Schleife).
-3. **`onUnload` meldet erst nach den Schreibvorgängen fertig** (`.finally(callback)`):
-   `stateManager.markAllOffline()` + die vier `info.*`-Verbindungs-Datenpunkte.
-4. **Start-Stempel**: `markAllOffline()` direkt nach dem Anlegen des StateManagers, VOR dem ersten
-   Scan — der einzige Teil, der auch nach Absturz und Stromausfall greift.
-
-**Die drei Summen** (`info.devicesTotal` / `devicesOnline` / `devicesAllOnline`) werden aus denselben
-Markern in derselben 20-Sekunden-Runde abgeleitet, die die Einzelnen neu bewertet
-(`onlineSyncTimer` → `writeDeviceRollup()`), damit Summe und Einzelne nicht auseinanderlaufen.
-Die Runde liest dafür NICHTS aus der Datenbank zurück: `syncInfoOnline` merkt sich den ermittelten
-Wert je Marker (`resolvedOnline`), `writeDeviceRollup` zählt aus diesem Speicher; die Marker-Liste
-selbst kommt aus `onlineMarkerCache`, der nur beim Start (kalt) per Objektbaum-Scan gefüllt und danach
-von jedem Anlegen/Migrieren/Entfernen gepflegt wird. **Beim Beenden gibt es keinen Scan** — die Marker
-werden aus dem Cache parallel geschrieben, `clearDeviceRollup` prüft zwei Objekte statt den Baum.
-
-- **Nur `devices.*` zählt.** Die App-Gerätegruppen unter `groups/` führen denselben Marker, sind aber
-  keine physischen Geräte — sie mitzuzählen würde die Zahl über das treiben, was der Nutzer besitzt.
-- **`devicesAllOnline` braucht `total > 0`** — null Geräte sind nicht „alles in Ordnung".
-- **`devicesTotal` bleibt beim Abschalten stehen**, nur `devicesOnline`/`devicesAllOnline` werden
-  zurückgesetzt: wie viele Geräte es gibt, ändert sich nicht dadurch, dass niemand hinsieht.
-- **`clearDeviceRollup()` legt nichts an**, es fasst nur vorhandene Datenpunkte an — sonst bekäme eine
-  frische Installation beim ersten Beenden eine Summe, die sie nie hatte.
+**Die drei Summen** (`info.devicesTotal`/`devicesOnline`/`devicesAllOnline`) reiten auf derselben 20-s-Runde, die die Einzelnen neu bewertet, und lesen dafür **nichts** aus der Datenbank zurück (`resolvedOnline` + `onlineMarkerCache`; der Cache wird nur beim Kaltstart per Scan gefüllt und danach von jedem Anlegen/Migrieren/Entfernen gepflegt). Nur `devices.*` zählt (App-Gruppen sind keine physischen Geräte) · `devicesAllOnline` verlangt `total > 0` · `devicesTotal` bleibt beim Abschalten stehen · `clearDeviceRollup()` legt nichts an, sonst bekäme eine frische Installation eine Summe, die sie nie hatte.
 
 ## Erreichbarkeit — EIN Auflöser für alle Gerätearten (ab 2.29.0)
 
-`resolveDeviceReachability(device, cloudOnline)` (`device-manager/lookups.ts`) beantwortet „ist das
-Gerät erreichbar" für **jede** Geräteart. Vorher trug der Adapter drei unverbundene Wahrheiten plus
-eine vierte Regel in `updateConnectionState` — mit der Folge, dass `info.connection` „ein Gerät ist
-erreichbar" sagte, während der Marker DESSELBEN Geräts das Gegenteil behauptete. Beide lesen jetzt
-dieselbe Funktion.
+`resolveDeviceReachability(device, cloudOnline)` (`device-manager/lookups.ts`, Herleitung als Kommentar dort) beantwortet „ist das Gerät erreichbar" für **jede** Geräteart. `syncInfoOnline` und `updateConnectionState` lesen dieselbe Funktion — vorher trugen sie eigene Regeln und widersprachen sich beim selben Gerät. Drei Fälle: LAN-Lampe → LAN-Antwortfrische (`LAN_REPLY_FRESHNESS_MS` 90 s, sonst nichts) · Govee meldet über das Gerät (`state.cloudReportedOnline`) → sein Wort, beide Richtungen · Govee meldet nie (Dauerfall cloud-only Lampe) → Cloud antwortet + Konto führt das Gerät.
 
-Die drei Fälle, in dieser Reihenfolge:
+**`proven` ist der Kern:** eine GEHÖRTE Erreichbarkeit darf in beide Richtungen ins Gerät zurückgeschrieben werden, eine aus dem Kanal ABGELEITETE nur anheben. Ein abgeleitetes `false` zurückzuschreiben war der Defekt — der Zwischenspeicher startet jedes Gerät offline, für cloud-only hob es nie jemand an, und die 20-s-Runde zementierte die Unwissenheit als Messwert.
 
-1. **Lampe MIT lokaler Schnittstelle** → die LAN-Antwortfrische entscheidet (`lastLanReplyAt`,
-   `LAN_REPLY_FRESHNESS_MS` = 90 s) und sonst nichts. Govees Cloud-Zwischenspeicher hinkt der echten
-   Erreichbarkeit hinterher (Messung 2026-05-13: 2× falsches `true` während eines echten Ausfalls).
-2. **Govee meldet für das Gerät** (`state.cloudReportedOnline`, gesetzt von `applyOnlineCap` aus
-   App-Abruf/Cloud-Ereignis und vom Konto-Push für Nicht-Lampen) → sein Wort gilt, in beide
-   Richtungen; ein ausdrückliches „offline" gewinnt auch bei stehender Cloud.
-3. **Govee meldet für das Gerät NIE** — der Dauerfall einer Lampe ohne lokale Schnittstelle: der
-   App-Abruf führt für Lampen keine Messwerte, und der Konto-Push ist für Lampen bewusst gesperrt
-   (der Verteiler spielt Altnachrichten nach). Dann IST die Erreichbarkeit „die Cloud antwortet und
-   das Konto führt das Gerät" — genau die Bedingung, unter der der Nutzer es steuern kann.
-
-**`proven` ist der zweite Rückgabewert und der Kern des Fixes.** Eine GEHÖRTE Erreichbarkeit (Fall 1
-und 2) darf in beide Richtungen ins Gerät zurückgeschrieben werden, eine aus dem Kanal ABGELEITETE
-(Fall 3) darf sie nur anheben. Ein abgeleitetes `false` ins Gerät zu brennen war der eigentliche
-Defekt: der Zwischenspeicher startet jedes Gerät als offline (für LAN-Lampen richtig, der Scan
-korrigiert Sekunden später), für eine cloud-only Lampe hob es nie jemand an, und die 20-s-Runde
-schrieb diese Unwissenheit als Messwert zurück — danach konnte nichts sie mehr aufheben.
-
-**Nicht vermischen:** `groups.info.online` ist KEIN Erreichbarkeits-Marker, sondern die
-Cloud-Verbindung (i18n-Schlüssel `cloudOnline`). Der Auflöser fasst ihn nicht an.
+**Nicht vermischen:** `groups.info.online` ist die Cloud-Verbindung (i18n `cloudOnline`), kein Erreichbarkeits-Marker; der Auflöser fasst ihn nicht an.
 
 ## Diagnose-Bericht = Datei, anonymisiert (ab 2.29.0)
 
-Der Bericht ist das Ferndiagnose-Werkzeug: der Melder hängt eine Datei an, daraus wird das Gerät
-eingepflegt oder der Fehler gefunden — ohne Hardware. Bis 2.28.0 lag er komplett als Text in
-`<gerät>.diag.result`; bei einem H61BE **67.917 Zeichen**, also über GitHubs 65.536-Zeichen-Grenze
-für den Issue-Text und als Zustandswert eine Last für Datenbank und jedes History-Abo am Gerät.
+Der Bericht ist das Ferndiagnose-Werkzeug (Anspruch: `feedback_diag_system_self_service`). Bis 2.28.0 lag er als Text in `diag.result` — bei einem H61BE **67.917 Zeichen**, über GitHubs Issue-Grenze und als Zustandswert eine Last für Datenbank und History-Abos.
 
-- **Ablage:** `diag.export` schreibt in das Meta-Objekt `<namespace>.diagnostics` (gleiche Bauart wie
-  `snapshots`), `diag.lastExport` nennt die Datei, `diag.result` ist **weg**. Der alte Datenpunkt
-  wird in `migrateLegacyDiagnostics` ausdrücklich entfernt — `cleanupCloudOwnedStates` erreicht ihn
-  nicht, weil `diag` kein verwalteter Kanal ist. Je Gerät bleiben `DIAGNOSTICS_KEEP_PER_DEVICE` = 3.
-- **Dateiname erklärt sich selbst:** `govee-smart_<SKU>_<kurz-id>_v<version>_<datum>_<zeit>.json` —
-  der Empfänger hat unseren Zusammenhang nicht, und ein Melder mit zwei Govee-Geräten hängt zwei an.
-- **Anonymisierung** (`anonymiser.ts`): gleichbleibende Marken statt Schwärzung, sonst ist „reden
-  diese zwei Zeilen vom selben Gerät" nicht mehr beantwortbar. Adressen → `address-local-N` /
-  `address-public-N` (Bereich bleibt sichtbar, auch `169.254/16` = DHCP fehlgeschlagen), Mail →
-  `mail-N`, Gerätename → `device-N`, Gerätekennung → letzte vier Zeichen (= Ordnername im Baum).
-  **Reihenfolge zwingend: schwärzen → anonymisieren → kappen** — die Größenbegrenzung macht aus einem
-  zu großen Körper eine flache Zeichenkette, in die danach kein Durchlauf mehr hineinkommt.
-  Fallstrick beim IPv6-Muster: nur acht volle Gruppen oder eine `::`-Form sind eine Adresse; die
-  erste Fassung („zwei oder mehr Hex-Gruppen") machte aus `AA:BB:CC` eine Adress-Marke.
-- **Inhalt über den alten Stand hinaus:** ioBroker-Umfeld (Node/js-controller/Admin/Plattform,
-  Kompaktmodus, Zugangsdaten-Stufe, Geräte- und Erreichbarkeits-Zahlen), der **echte Objektbaum** des
-  Geräts (Typ/Rolle/Einheit/Wert; strikt auf EIN Präfix begrenzt — kein Instanz-Scan), die Wirkung
-  der letzten Befehle (`commandResults`, gefüttert aus `CommandRouter.onCommandResult`) und die
-  Herkunft der Segment-Anzahl. `generate()` ist dadurch asynchron.
-- **Admin-Karte „Diagnose"** (`src-admin/DiagnosticsPanel`): Gerät wählen, ein Knopf, Browser-Download.
-  Liste bewusst UNGEFILTERT — ein Bericht wird gebraucht, wenn ein Gerät klemmt. Der Inhalt kommt mit
-  der `sendTo`-Antwort zurück; die Datei liegt trotzdem in der Instanz-Ablage.
+- **Ablage:** Meta-Objekt `<namespace>.diagnostics` (Bauart wie `snapshots`), `diag.lastExport` nennt die Datei, `diag.result` ist weg — ausdrücklich in `migrateLegacyDiagnostics` entfernt, weil `cleanupCloudOwnedStates` den Kanal `diag` nicht verwaltet. `DIAGNOSTICS_KEEP_PER_DEVICE` = 3.
+- **Dateiname erklärt sich selbst:** `govee-smart_<SKU>_<kurz-id>_v<version>_<datum>_<zeit>.json`.
+- **Anonymisierung** (`anonymiser.ts`): gleichbleibende Marken statt Schwärzung, sonst ist „reden diese zwei Zeilen vom selben Gerät" nicht mehr beantwortbar. **Reihenfolge zwingend: schwärzen → anonymisieren → kappen** — die Größenbegrenzung macht eine flache Zeichenkette daraus. Falle: nur acht volle Gruppen oder `::` sind IPv6; „zwei oder mehr Hex-Gruppen" machte aus `AA:BB:CC` eine Adress-Marke.
+- **Inhalt über 2.28.0 hinaus:** ioBroker-Umfeld, echter Objektbaum des Geräts (strikt EIN Präfix, kein Instanz-Scan), Gesamtlage, Befehlswirkung (`commandResults`), Segment-Herkunft. `generate()` ist dadurch asynchron.
+- **Admin-Karte „Diagnose"** (`src-admin/DiagnosticsPanel`): Gerät wählen, ein Knopf, Browser-Download. Liste bewusst UNGEFILTERT — gebraucht wird der Bericht, wenn ein Gerät klemmt.
 
 ## Cloud REST API v2
 
@@ -179,21 +109,11 @@ Die interne App-API liefert, was die öffentliche OpenAPI nicht kann: **Sensor-W
 
 ## AWS IoT MQTT (Echtzeit-Status-Push)
 
-**Auth-Flow (v2-Header erforderlich):**
+Auth-Flow, Header und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md` — hier nur, was den Adapter betrifft. **Wir sind subscribe-only für Status** (Befehle gehen über LAN/ptReal/Cloud).
 
-1. Login: `POST app2.govee.com/account/rest/account/v2/login` → token + accountId + topic (Headers: User-Agent, clientId=UUIDv5(email), appVersion, timezone, country, envId, iotVersion).
-2. IoT Key: `GET app2.govee.com/app/v1/account/iot/key` → endpoint + P12 cert.
-3. Connect: Mutual TLS, Client-ID `AP/<accountId>/<uuid>`.
+**Login-Sturm-Schutz (#39, Konto-24h-Sperre):** globales Cap `MQTT_MAX_AUTH_FAILURES = 3`. Jeder Versuch, der Govee **erreicht** und abgelehnt wird, zählt (`reachedGovee = category ≠ NETWORK ≠ TIMEOUT`); reine Netz-/Timeout-Fehler laufen ungedeckelt, weil sie das Konto nicht belasten. Der Zähler wird **ausschließlich bei erfolgreichem Subscribe** zurückgesetzt — sonst umgeht ein Wechsel aus Ablehnung + Netz-Blip das Cap. `refreshBearerSilently` ist ein zweiter Login-Pfad und bailt bei ausgeschöpftem Cap. Klassifizierung: Credential-Fehler → dauerhafter Stopp · 2FA (454/455) → Reconnect pausiert bis User-Code (454 = „neuer Client, einmalig verifizieren", nicht „2FA aktiviert"; Code-Anforderung mit 30-s-Drossel gegen Email-Spam) · Rate-Limit/Locked/Abnormal → zählt aufs Cap.
 
-**Topics:** Subscribe Account-Topic → Echtzeit-Status aller Geräte; Publish Device-Topic → Befehle. **Wir sind subscribe-only für Status** (Commands gehen über LAN/ptReal/Cloud, nicht MQTT-Publish).
-
-**Login-Sturm-Schutz (Issue #39, Account-24h-Sperre-Prävention):** Der Account-Login-Reconnect hat ein **globales Cap** (`MQTT_MAX_AUTH_FAILURES = 3`). Jeder Login-Versuch, der Govee **erreicht** und abgelehnt wird — falsche Zugangsdaten, Rate-Limit, Account gesperrt, unerwartete Antwort — zählt auf dieses Cap (`reachedGovee = category ≠ NETWORK ≠ TIMEOUT`). Nur reine Netz-/Timeout-Fehler (der Login-POST erreichte Govee nicht) laufen ungedeckelt weiter, weil sie den Account nicht belasten. Der Zähler wird **ausschließlich bei erfolgreichem Subscribe** zurückgesetzt (nicht im Fehlerpfad) — sonst umgeht ein Wechsel aus Ablehnung + Netz-Blip das Cap. Bei Erreichen: permanenter Stopp + eine handlungsleitende Meldung (falsche Zugangsdaten → „Email/Passwort prüfen"; sonst → „Neuversuche gestoppt, Account prüfen, Adapter neu starten"). **`refreshBearerSilently` ist ein zweiter Login-Pfad** (proaktiver Token-Refresh 5 min vor Ablauf) und bailt bei ausgeschöpftem Cap oder getrennter Session, damit er das Cap nicht umgeht. Vorbild = `cloud-retry.ts`-Disziplin.
-
-**Login-Klassifizierung:** Credential-Fehler → dauerhafter Stopp; 2FA (454/455) → Reconnect pausiert bis User-Code; Rate-Limit/Account-Locked/Abnormal → zählt jetzt aufs Cap (früher: endloser Reconnect). Verifikations-Code (2FA): 454 = „neuer Client, einmalig verifizieren", nicht „2FA aktiviert"; Code-Request mit 30-s-Throttle gegen Email-Spam.
-
-**Cert-Reuse:** persistierte Credentials (Bearer + P12) werden über Neustarts wiederverwendet (`tryPersistedReuse`) → kein 2FA-Email-Sturm bei jedem Restart; abgelaufener/ungültiger Cert fällt auf frischen Login zurück.
-
-**MQTT before Cloud:** MQTT wird vor Cloud initialisiert, damit die Scene-Library beim ersten `loadFromCloud` verfügbar ist. Erstverbindung = info-Log, Reconnect-Versuche = debug, Restored = info.
+**Cert-Reuse:** persistierte Zugangsdaten (Bearer + P12) überleben Neustarts (`tryPersistedReuse`) → kein 2FA-Email-Sturm; abgelaufener Cert fällt auf frischen Login zurück. **MQTT vor Cloud** starten, damit die Szenen-Bibliothek beim ersten `loadFromCloud` da ist.
 
 ## LAN UDP
 
@@ -241,41 +161,18 @@ Single Page: **1.** LAN (immer aktiv) · **2.** Cloud API (optional, API Key →
 
 ## Design-Prinzipien (govee-spezifisch)
 
-1. **LAN first** — schnellster Kanal, Kern des Adapters; Cloud darf LAN-States nie überschreiben.
-2. **MQTT für Echtzeit** — Status-Push only (kein Command-Sending).
-3. **Cloud nur wo nötig** — Definitionen, Szenen, Snapshots, Segmente.
-4. **Graceful degradation** — ohne Credentials funktioniert LAN-only.
-5. **Capability-driven** — States aus API generiert, nichts hardcodiert.
-6. **Szenen als echte Dropdowns** — Index-basiert, value-Payload aus Cloud; nur wenn Daten vorhanden.
-7. **Stabile Ordner** — `sku_shortid`, Cloud-Name nur in `common.name`.
-8. **Nahtlos** — User merkt nicht, welcher Kanal gerade greift.
-9. **Rate-Limited Startup** — Scene-Loading auch beim Cloud-Init über `rateLimiter.tryExecute()`.
-10. **Error-Dedup** — `classifyError()` + `lastErrorCategory` (DeviceManager, MQTT, Cloud): warn beim ersten/neuen Kategorie-Wechsel, danach debug; Recovery-Meldung bei Wiederherstellung.
-11. **Generic Capability Routing** — States mit `native.capabilityType/Instance` werden automatisch via Cloud-API geroutet (z.B. Ventilator-Speed, Toggles).
-12. **info.ip / info.gateway State** — LAN-IP pro Gerät (auto via `onLanIpChanged`); Gateway-angebundene Sensoren zeigen das Gateway statt leerem IP-Feld.
-13. **Ready-Message Ordering** — `checkAllReady()` prüft MQTT+Cloud vor dem Ready-Log; Safety-Timeout 60 s mit ehrlicher „noch im Aufbau"-Meldung. Ready-Summary zeigt Channel-Status (`LAN ✓ Cloud ✓ Lights Push ✓ Sensor Push ✓`), jedes `✗` gefolgt von einer WARN mit konkretem Grund. **Bewusst KEINE Per-Device-Counts** — zur Ready-Zeit settlen LAN-Scan + MQTT-Push noch.
-14. **SKU Cache** (`sku-cache.ts`) — persistiert Device-Daten + Libraries lokal; nach erstem Start null Cloud-Calls nötig. `scenesChecked`-Flag verhindert Endlos-Refetch bei legitim leeren Scenes; `pruneStale(14)`. `save()` ist asynchron (Temp-Datei + Flush + Rename, je Datei serialisiert) und überspringt byte-gleiche Inhalte — die frühere synchrone `fsyncSync` blockierte den Ereignis-Loop je Gerät.
-14a. **Diagnose-Puffer** (`diagnostics.ts`) sind byte-begrenzt: 512 KB API-Historie je Gerät (älteste Einträge über alle Endpunkte zuerst), 4 KB je MQTT-Umschlag, 16 KB je LAN-Payload — Zähl-Limits allein ließen >10 MB je Gerät zu.
-15. **Multi-Channel State Tree** — Channels via `def.channel`, Pfad-Auflösung über `resolveStatePath()`.
-16. **Groups Fan-Out** — Capabilities = Intersection der Mitglieder; Befehle → LAN/ptReal pro Mitglied; keine Snapshots/Diagnostics.
-17. **Dynamic Segments** — Segment-Anzahl aus Capability-Daten, überschüssige Channels werden gelöscht.
-18. **Community Quirks** — Beiträge zu `devices.json` über GitHub-Issues + PRs (CONTRIBUTING.md); keine externe Quirks-Datei.
-19. **Separated Concerns** — CommandRouter, GoveeApiClient, http-client, capability-mapper als eigenständige Module.
-20. **Shared Utilities** — `normalizeDeviceId()` + `classifyError()` in `types.ts`, nicht dupliziert.
-21. **Dropdown Dual-Write** — alle Dropdown-States sind `type: "mixed"` mit eindeutiger `common.states`-Map (`buildUniqueLabelMap`, `(2)`/`(3)`-Suffix bei Duplikaten); `resolveDropdownInput` löst Number/Number-String/Klartext case-insensitive auf den kanonischen Key. **Warum `mixed`:** unterdrückt den js-controller-Strict-Type-Check, der sonst bei Number-Schreibung ins Log schreibt. **Warum `role: "state"`:** `level.effect` würde `type:"string"` erzwingen und die bewusst gewollte Number-Eingabe loggen.
+Die tragenden stehen oben in ihren eigenen Sektionen (LAN-first, Kanal-Priorität, Credential-Stufen, Erreichbarkeit, Segmente, Szenen). Hier nur, was man dem Code **nicht** ansieht:
+
+1. **Error-Dedup** — `classifyError()` + `lastErrorCategory` (DeviceManager, MQTT, Cloud): warn beim ersten/neuen Kategorie-Wechsel, danach debug, Recovery-Meldung bei Wiederherstellung.
+2. **Ready-Summary ohne Per-Device-Zahlen** — `checkAllReady()` prüft MQTT+Cloud, Safety-Timeout 60 s. Jedes `✗` bekommt eine WARN mit konkretem Grund. Bewusst keine Gerätezahlen: zur Ready-Zeit settlen LAN-Scan und Push noch.
+3. **SKU-Cache** (`sku-cache.ts`) — nach dem ersten Start null Cloud-Aufrufe nötig. `scenesChecked` verhindert Endlos-Refetch bei legitim leeren Szenen; `pruneStale(14)`. `save()` ist asynchron (Temp-Datei + Flush + Rename, je Datei serialisiert) und überspringt byte-gleiche Inhalte — das frühere synchrone `fsyncSync` blockierte den Ereignis-Loop je Gerät.
+4. **Diagnose-Puffer sind BYTE-begrenzt** (`diagnostics.ts`): 512 KB API-Historie je Gerät (älteste Einträge zuerst), 4 KB je MQTT-Umschlag, 16 KB je LAN-Payload. Zähl-Limits allein ließen >10 MB je Gerät zu.
+5. **Dropdowns sind `type: "mixed"`** mit eindeutiger `common.states`-Map (`buildUniqueLabelMap`, `(2)`-Suffix bei Duplikaten); `resolveDropdownInput` löst Zahl/Zahl-Text/Klartext groß-klein-egal auf den kanonischen Schlüssel. **Warum `mixed`:** unterdrückt den js-controller-Typ-Check, der sonst bei Zahl-Schreibung ins Log schreibt. **Warum `role: "state"`:** `level.effect` erzwänge `type:"string"` und würde die gewollte Zahl-Eingabe loggen.
 
 ## Bekannte Fallstricke (govee-spezifisch)
 
-- **Manifest-Objekte erreichen eine BESTEHENDE Anlage nur per `extendObject`.** js-controller legt
-  `instanceObjects` nur an, wo sie fehlen — ein geänderter Name landete bis 2.29.0 ausschließlich bei
-  Neuinstallationen, während Manifest und Namens-Gate grün aussahen. `ensureManifestObjects()` in
-  `onReady` frischt alle elf auf, **je ein ausgeschriebener Aufruf**: eine Schleife über eine Tabelle
-  wäre kürzer und würde verbergen, welche Objekte erreicht werden — vor dem Leser wie vor dem
-  Konsistenz-Gate, das den wörtlichen Aufruf sucht.
-- **Namen mit laufender Nummer:** `tNameWith(key, n)` (nicht `tName`) — `getTranslatedObject` ersetzt
-  `%s` je Sprache, aber **nur wenn der ENGLISCHE Text den Platzhalter trägt**, und **genau einer**
-  ist zulässig (adapter-core setzt je Argument wieder am Ursprungstext an, ein zweiter würde den
-  ersten überschreiben).
+- **Manifest-Objekte erreichen eine BESTEHENDE Anlage nur per `extendObject`.** js-controller legt `instanceObjects` nur an, wo sie fehlen — ein geänderter Name landete bis 2.29.0 ausschließlich bei Neuinstallationen, während Manifest und Namens-Gate grün aussahen. `ensureManifestObjects()` in `onReady` frischt alle elf auf, **je ein ausgeschriebener Aufruf**: eine Schleife über eine Tabelle wäre kürzer und würde verbergen, welche Objekte erreicht werden — vor dem Leser wie vor dem Konsistenz-Gate, das den wörtlichen Aufruf sucht.
+- **Namen mit laufender Nummer:** `tNameWith(key, n)` statt `tName` — `getTranslatedObject` ersetzt `%s` je Sprache, aber **nur wenn der ENGLISCHE Text den Platzhalter trägt**, und **genau einer** ist zulässig (adapter-core setzt je Argument wieder am Ursprungstext an, ein zweiter überschriebe den ersten).
 
 - **No-Channel Init-Race:** Cloud-only-Geräte direkt nach Restart — Cloud-Client noch null → „No channel available" ist Fehlalarm. Fix: `channels.cloud === true && cloudClient === null` → debug + still verworfen. WARN nur bei permanent fehlendem Channel.
 - **Abonnements:** `devices.*` + `groups.*` + **explizit `info.manualSyncDevices`** — der Knopf liegt außerhalb beider Muster und war von 2.17.0 bis 2.27.1 tot (nie abonniert, Test pinnte die zwei Muster). Ein neuer Datenpunkt unter `info`, den der Nutzer schreibt, braucht sein eigenes Abonnement.
