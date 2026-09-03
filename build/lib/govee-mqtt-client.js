@@ -480,13 +480,15 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       const device = typeof raw.device === "string" ? raw.device : "";
       const state = raw.state && typeof raw.state === "object" ? raw.state : void 0;
       const op = raw.op && typeof raw.op === "object" ? raw.op : void 0;
+      const cmd = typeof raw.cmd === "string" ? raw.cmd : void 0;
+      const pactType = typeof raw.pactType === "number" && Number.isFinite(raw.pactType) ? raw.pactType : void 0;
       if (sku || device) {
-        (_a = this.onStatus) == null ? void 0 : _a.call(this, { sku, device, state, op });
+        (_a = this.onStatus) == null ? void 0 : _a.call(this, { sku, device, cmd, pactType, state, op });
         if (this.onPacket && device) {
           if (Array.isArray(op == null ? void 0 : op.command)) {
-            for (const cmd of op.command) {
-              if (typeof cmd === "string" && cmd) {
-                this.onPacket(device, topic, { hex: cmd, rawJson: rawText });
+            for (const cmd2 of op.command) {
+              if (typeof cmd2 === "string" && cmd2) {
+                this.onPacket(device, topic, { hex: cmd2, rawJson: rawText });
               }
             }
           } else {

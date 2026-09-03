@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.29.4",
+    "version": "2.30.0",
     "news": {
+      "2.30.0": {
+        "en": "Devices without a local API and sensors behind a gateway are no longer shown as unreachable while they work. 37 more device models recognised.",
+        "de": "Geräte ohne lokale Schnittstelle und Sensoren hinter einem Gateway werden nicht mehr als nicht erreichbar angezeigt, während sie arbeiten. 37 weitere Gerätemodelle erkannt.",
+        "ru": "Устройства без локального интерфейса и датчики за шлюзом больше не показываются как недоступные, пока работают. Распознаются ещё 37 моделей.",
+        "pt": "Dispositivos sem API local e sensores atrás de um gateway já não aparecem como inacessíveis enquanto funcionam. Mais 37 modelos reconhecidos.",
+        "nl": "Apparaten zonder lokale API en sensoren achter een gateway worden niet meer als onbereikbaar getoond terwijl ze werken. 37 extra modellen herkend.",
+        "fr": "Les appareils sans API locale et les capteurs derrière une passerelle ne sont plus indiqués injoignables alors qu'ils fonctionnent. 37 modèles de plus.",
+        "it": "I dispositivi senza API locale e i sensori dietro un gateway non sono più mostrati come irraggiungibili mentre funzionano. Altri 37 modelli riconosciuti.",
+        "es": "Los dispositivos sin API local y los sensores detrás de una pasarela ya no se muestran como inaccesibles mientras funcionan. 37 modelos más reconocidos.",
+        "pl": "Urządzenia bez lokalnego interfejsu i czujniki za bramką nie są już pokazywane jako niedostępne, gdy działają. Rozpoznano 37 kolejnych modeli.",
+        "uk": "Пристрої без локального інтерфейсу та датчики за шлюзом більше не показуються як недоступні, поки працюють. Розпізнано ще 37 моделей.",
+        "zh-cn": "没有本地接口的设备和网关后面的传感器在正常工作时不再显示为不可达。新增识别 37 个设备型号。"
+      },
       "2.29.4": {
         "en": "The diagnostics report now shows how each control is driven, where a device's reachability comes from and whether the account login worked.",
         "de": "Der Diagnosebericht zeigt jetzt, wie jede Steuerung angesprochen wird, woher die Erreichbarkeit stammt und ob die Konto-Anmeldung geklappt hat.",
@@ -80,19 +93,6 @@
         "pl": "Czujniki i zdarzenia mają jedną nazwę (sensor.temperature zamiast sensor.sensor_temperature) — dostosuj skrypty. Ręczna synchronizacja znów działa, ponowne łączenie z chmurą nie zatrzymuje się.",
         "uk": "Датчики та події отримали єдині назви (sensor.temperature замість sensor.sensor_temperature) — оновіть скрипти. Ручна синхронізація знову працює, перепідключення до хмари не зупиняється.",
         "zh-cn": "传感器和事件数据点统一命名（sensor.temperature 取代 sensor.sensor_temperature），请调整脚本。手动同步按钮恢复可用，云端重连不再因维护页面而停止。"
-      },
-      "2.27.1": {
-        "en": "Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states.",
-        "de": "Deutlich geringere Datenbanklast im Hintergrund — die regelmäßige Erreichbarkeitsprüfung arbeitet jetzt wesentlich effizienter, besonders auf Systemen mit vielen Geräten und Datenpunkten.",
-        "ru": "Заметно меньшая фоновая нагрузка на базу данных — периодическая проверка доступности теперь работает гораздо эффективнее, особенно в системах с большим числом устройств.",
-        "pt": "Carga de base de dados em segundo plano visivelmente menor — a verificação periódica de acessibilidade funciona agora com muito mais eficiência, sobretudo em sistemas grandes.",
-        "nl": "Merkbaar lagere databasebelasting op de achtergrond — de periodieke bereikbaarheidscontrole werkt nu veel efficiënter, vooral op systemen met veel apparaten.",
-        "fr": "Charge de base de données en arrière-plan nettement réduite — le contrôle périodique de joignabilité fonctionne désormais bien plus efficacement, surtout sur les grandes installations.",
-        "it": "Carico del database in background notevolmente ridotto — il controllo periodico di raggiungibilità ora lavora in modo molto più efficiente, soprattutto su sistemi grandi.",
-        "es": "Carga de base de datos en segundo plano notablemente menor — la comprobación periódica de accesibilidad funciona ahora con mucha más eficiencia, sobre todo en sistemas grandes.",
-        "pl": "Wyraźnie mniejsze obciążenie bazy danych w tle — okresowa kontrola osiągalności działa teraz znacznie wydajniej, zwłaszcza w systemach z wieloma urządzeniami.",
-        "uk": "Помітно менше фонове навантаження на базу даних — періодична перевірка доступності тепер працює значно ефективніше, особливо у великих системах.",
-        "zh-cn": "后台数据库负载明显降低——周期性的可达性检查现在效率大幅提升，尤其是在设备和数据点较多的系统上。"
       }
     },
     "plugins": {

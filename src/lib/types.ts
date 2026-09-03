@@ -198,6 +198,20 @@ export interface MqttStatusUpdate {
   sku: string;
   /** Device identifier */
   device: string;
+  /**
+   * Packet kind Govee sent. `"online"` is a dedicated reachability packet —
+   * measured on four real user reports (issues #22/#25/#26): H66A1 sends
+   * `{cmd:"online", state:{result:1}}`, H6199 `{cmd:"online",
+   * state:{connected:"true"}}`. Until 2.30.0 the client dropped this field and
+   * nothing downstream could tell a reachability packet from a state push.
+   */
+  cmd?: string;
+  /**
+   * Protocol generation. Decides WHICH field carries reachability — measured
+   * trennscharf across all 75 captured packets, no mixed case:
+   * `1` → `state.connected`, `2` → `state.result`.
+   */
+  pactType?: number;
   /** Device state values */
   state?: {
     /** Power state (1 = on, 0 = off) */
@@ -208,6 +222,17 @@ export interface MqttStatusUpdate {
     color?: { r: number; g: number; b: number };
     /** Color temperature in Kelvin */
     colorTemInKelvin?: number;
+    /**
+     * Reachability as text ("true"/"false") — pactType 1 devices. Carried in
+     * every packet kind for those (status, pt, online), so it is always usable.
+     */
+    connected?: string;
+    /**
+     * Reachability as number (1/0) — pactType 2 devices, but ONLY inside a
+     * `cmd:"online"` packet. In `cmd:"status"` / `cmd:"ptReal"` the same field
+     * is an operation result code and says nothing about reachability.
+     */
+    result?: number;
   };
   /** Operation data */
   op?: {
@@ -366,6 +391,14 @@ export interface GoveeDevice {
    */
   gateway?: string;
   /**
+   * The gateway's own device id, straight from `gatewayInfo.device`. Until
+   * 2.30.0 only `sku` + `bleName` were used (for the display label) and this was
+   * dropped — but it is the only thing that links a battery sensor to the
+   * gateway it hangs off, and krobi's rule is that the GATEWAY is the
+   * reachability device for anything behind it (2026-09-03).
+   */
+  gatewayDeviceId?: string;
+  /**
    * Timestamp (ms) when device last replied to a LAN-direct probe (multicast
    * discovery or unicast devStatus). Only set by the LAN-Discovery / LAN-Status
    * paths — NOT by MQTT-push (broker buffering risk) and NOT by Cloud caps.
@@ -373,6 +406,23 @@ export interface GoveeDevice {
    * StateManager.syncInfoOnline resolver (90s freshness window).
    */
   lastLanReplyAt?: number;
+  /**
+   * When this device last answered on the LOCAL interface — PERSISTED, unlike
+   * `lastLanReplyAt` (which is a live freshness stamp and deliberately dropped
+   * on save, see device-manager/cache.ts).
+   *
+   * Why a second stamp is needed: `lanIp` is re-discovered on every restart, so
+   * right after a start every light looks like a cloud-only device for one scan
+   * cycle. Deciding "is this LAN-driven?" on `lanIp` would hand those lights to
+   * Govee's stale cloud cache in that window — that was exactly the 2.29.0
+   * false-green. This stamp survives the restart and answers the question
+   * honestly.
+   *
+   * It expires (LAN_CAPABLE_MEMORY_MS) so a device whose local API the user
+   * switches OFF eventually moves to the cloud path instead of staying grey
+   * forever.
+   */
+  lastLanSeenAt?: number;
   /** Which channels are available */
   channels: {
     /** LAN UDP reachable */
@@ -400,6 +450,21 @@ export interface DeviceState {
    * device) so it is runtime-only and never reaches the cache.
    */
   cloudReportedOnline?: boolean;
+  /**
+   * When that report was heard. Evidence has to be able to grow old: without a
+   * timestamp a device that said "online" once would read as reachable forever,
+   * sitting unplugged in a drawer. Renewed by the account push, which arrives
+   * every few minutes for every device that has its own push topic.
+   */
+  cloudReportedOnlineAt?: number;
+  /**
+   * Reachability of this device's gateway, resolved by the DeviceManager (which
+   * is the only place that can see other devices). `false` caps this device's
+   * reachability: a sensor behind a dead gateway is not reachable no matter how
+   * fresh its last reading looked. `undefined` means no gateway, or a gateway
+   * that is not in the account list — then nothing is capped.
+   */
+  gatewayOnline?: boolean;
   /** Power on/off */
   power?: boolean;
   /** Brightness 0-100 */

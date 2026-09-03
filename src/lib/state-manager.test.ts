@@ -10,6 +10,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 import { StateManager } from "./state-manager";
 import { DeviceRegistry } from "./device-registry";
 import { effectiveSegmentCount } from "./device-manager/lookups";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS } from "./timing-constants";
 
 /** Catalog without entries — the state-manager tests do not exercise quirks. */
 const registry = new DeviceRegistry({ data: { devices: {} } });
@@ -1569,7 +1570,7 @@ describe("StateManager", () => {
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
-          state: { online: true, cloudReportedOnline: true },
+          state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
           channels: { lan: false, mqtt: false, cloud: true },
         });
         await createAllStatesForTest(sm, dev, []);
@@ -1624,12 +1625,57 @@ describe("StateManager", () => {
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
-          state: { online: true, cloudReportedOnline: true },
+          state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
           channels: { lan: false, mqtt: false, cloud: true },
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
         expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+      });
+
+      it("the report expires — a light that reported hours ago is NOT still reachable", async () => {
+        // The Weihnachtslichter case: hung up in December, reported once, then
+        // carried to the cellar. Without an expiry that single report would keep
+        // the device green for eleven months. Renewal is guaranteed (account
+        // push, plus the 2-minute account list which since 2.30.0 also runs for
+        // installations that have devices without a local interface).
+        const { adapter, states } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: {
+            online: true,
+            cloudReportedOnline: true,
+            cloudReportedOnlineAt: Date.now() - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 60_000),
+          },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+      });
+
+      it("a gateway-backed device is capped by its gateway, whatever its own reading says", async () => {
+        // krobi 2026-09-03: the gateway IS the online/offline device for
+        // anything behind it. A battery sensor has no connection of its own — a
+        // dead gateway means unreachable, even with a fresh-looking report.
+        const { adapter, states } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: {
+            online: true,
+            cloudReportedOnline: true,
+            cloudReportedOnlineAt: Date.now(),
+            gatewayOnline: false,
+          },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
       });
 
       it("a derived reachability never burns a false into the device", async () => {

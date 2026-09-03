@@ -101,6 +101,9 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
   // Remember that Govee spoke at all — `syncInfoOnline` needs to tell "Govee
   // reports offline" apart from "Govee never reports for this device kind".
   device.state.cloudReportedOnline = online;
+  // Stamped so the proof can expire (CLOUD_ONLINE_EVIDENCE_TTL_MS). Without a
+  // stamp a single "online" would read as reachable forever.
+  device.state.cloudReportedOnlineAt = Date.now();
   if (device.state.online === online && online === true) {
     device.lastSeenOnNetwork = Date.now();
     return;

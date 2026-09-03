@@ -36,6 +36,12 @@ export const GOVEE_DEVICE_TYPE = {
   KETTLE: "devices.types.kettle",
   ICE_MAKER: "devices.types.ice_maker",
   AROMA_DIFFUSER: "devices.types.aroma_diffuser",
+  /**
+   * Battery button / remote (H5125, H5126). Has no connection of its own —
+   * it wakes, chirps over the radio link to a gateway and sleeps again, so
+   * its reachability comes from that gateway (see resolveGatewayReachability).
+   */
+  BUTTON: "devices.types.button",
 } as const;
 
 /** Bundled Govee-app version — the fallback until the live lookup succeeds. */

@@ -48,6 +48,39 @@ export const SENSOR_ONLINE_FRESHNESS_MAX_MS = 90 * 60 * 1000;
 /** Default sensor data-freshness window when `uploadRate` is unknown (30 min). */
 export const SENSOR_ONLINE_FRESHNESS_DEFAULT_MS = 30 * 60 * 1000;
 
+/**
+ * How long a heard cloud reachability report stays valid.
+ *
+ * A proof without an expiry never dies: a device that reported "online" once in
+ * December would still read reachable in November while it sits in the cellar.
+ * That is the Weihnachtslichter case and it has to end.
+ *
+ * 30 minutes is safe ONLY because two sources renew it: the account push (which
+ * arrives within minutes for any device with its own push topic — measured
+ * 15 packets in 2 min, 50 in 4 min, 10 in 15 min on four real user reports) and
+ * the 2-minute account list, which since 2.30.0 also runs for installations that
+ * have devices without a local interface. Fifteen chances to renew before it
+ * expires — generous against a few missed answers, far short of "forever".
+ */
+export const CLOUD_ONLINE_EVIDENCE_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * How long "this device answered on the local interface" stays true.
+ *
+ * A device that has answered locally is decided by the LAN reply and nothing
+ * else — Govee's cloud cache lags real reachability (measured 2026-05-13: it
+ * reported `true` twice during a genuine 8-minute outage). That rule must
+ * survive a restart, because `lanIp` does not (it is re-discovered by scan), and
+ * without it every light would spend the first scan cycle after each start being
+ * judged by the stale cloud cache — the 2.29.0 false-green.
+ *
+ * It expires so the opposite case also works: a user who switches the local API
+ * OFF in the Govee app should not see that device stuck grey forever. Seven days
+ * is far longer than a holiday or a router outage, and well inside the 30-day
+ * window after which the device cache drops an entry entirely.
+ */
+export const LAN_CAPABLE_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
+
 // === Adapter lifecycle ===
 
 /** Hard timeout for cloud initialisation (60 s). */

@@ -1,4 +1,14 @@
 # Older Changes
+## 2.29.0 (2026-09-03)
+
+- Fixed: A device without the local API enabled no longer shows as unreachable after a restart while it still controls fine
+- Fixed: Datapoint names and descriptions now also reach installations that already exist — until now only new ones got them
+- Fixed: The segment channels are translated instead of always being named in English
+- Fixed: One appliance can no longer use up the whole account's daily Cloud budget — Govee grants an appliance only 100 calls a day
+- Changed: BREAKING — the diagnostics report is a file. `diag.result` is gone; download the file in the new Diagnostics tab and attach it to an issue
+- Improved: The report is anonymised and carries far more: your ioBroker versions, the device's real datapoints and what your last commands did
+- Improved: User documentation ships with the adapter, so the ioBroker doc portal shows it instead of the developer README
+
 ## 2.28.0 (2026-09-02)
 
 - Fixed: The "Sync devices manually" button in the object tree works again — it had no effect since 2.17.0. It is now `info.manualSyncDevices`; the old `info.manual_sync_devices` is removed on start

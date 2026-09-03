@@ -607,9 +607,16 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       const device = typeof raw.device === "string" ? raw.device : "";
       const state = raw.state && typeof raw.state === "object" ? (raw.state as MqttStatusUpdate["state"]) : undefined;
       const op = raw.op && typeof raw.op === "object" ? (raw.op as MqttStatusUpdate["op"]) : undefined;
+      // v2.30.0 — Govee announces reachability in its own packet kind
+      // (`cmd:"online"`), and which state field carries it depends on the
+      // protocol generation (`pactType`). Both were dropped here until now, so
+      // a device with no local API had no reachability evidence at all even
+      // though Govee kept telling us (issues #22/#25/#26, #31, #18).
+      const cmd = typeof raw.cmd === "string" ? raw.cmd : undefined;
+      const pactType = typeof raw.pactType === "number" && Number.isFinite(raw.pactType) ? raw.pactType : undefined;
 
       if (sku || device) {
-        this.onStatus?.({ sku, device, state, op });
+        this.onStatus?.({ sku, device, cmd, pactType, state, op });
         if (this.onPacket && device) {
           // v2.9.1 — always forward the raw envelope so state-only pushes
           // (state with no op.command) are visible in diag. Previously the

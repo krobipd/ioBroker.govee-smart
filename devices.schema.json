@@ -44,7 +44,7 @@
             "socket",
             "kettle",
             "ice_maker",
-            "aroma_diffuser"
+            "aroma_diffuser", "button"
           ],
           "description": "Device category — corresponds to Govee API type without the 'devices.types.' prefix."
         },

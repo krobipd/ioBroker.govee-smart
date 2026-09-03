@@ -77,6 +77,7 @@ function applyOnlineCap(adapter, device, caps) {
     return;
   }
   device.state.cloudReportedOnline = online;
+  device.state.cloudReportedOnlineAt = Date.now();
   if (device.state.online === online && online === true) {
     device.lastSeenOnNetwork = Date.now();
     return;

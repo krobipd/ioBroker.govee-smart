@@ -1,8 +1,8 @@
 # Govee Smart
 
-Steuert Govee-WLAN-Geräte aus ioBroker: LED-Streifen, Lampen und Panels, Thermo- und Hygrometer
-sowie Geräte wie Heizer, Luftbefeuchter, Wasserkocher, Eiswürfelbereiter, Ventilatoren und
-Luftreiniger.
+Steuert Govee-WLAN-Geräte aus ioBroker: LED-Streifen, Lampen und Panels, Thermo- und Hygrometer,
+Luftgüte-Monitore, Steckdosen, Batterie-Taster und Fernbedienungen sowie Geräte wie Heizer,
+Luftbefeuchter, Duftspender, Wasserkocher, Eiswürfelbereiter, Ventilatoren und Luftreiniger.
 
 Der Adapter spricht mit deinen Geräten **lokal, wann immer es geht**. Eine Lampe mit aktivierter
 lokaler Schnittstelle antwortet im eigenen Netz in Millisekunden, und die Cloud darf niemals

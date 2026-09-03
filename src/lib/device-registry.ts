@@ -98,7 +98,8 @@ export interface DeviceEntry {
     | "socket"
     | "kettle"
     | "ice_maker"
-    | "aroma_diffuser";
+    | "aroma_diffuser"
+    | "button";
   /** Trust tier (see DeviceStatus). */
   status: DeviceStatus;
   /** Adapter version when this device was first supported (semver). Optional. */

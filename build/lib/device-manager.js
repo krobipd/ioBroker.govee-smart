@@ -693,6 +693,7 @@ class DeviceManager {
     matched.channels.lan = true;
     matched.lastSeenOnNetwork = Date.now();
     matched.lastLanReplyAt = Date.now();
+    matched.lastLanSeenAt = Date.now();
     if (hadNoLanIp) {
       (_a = this.onLanDeviceReady) == null ? void 0 : _a.call(this, matched, this.getDevices());
     }
@@ -732,6 +733,7 @@ class DeviceManager {
       diyLibrary: [],
       skuFeatures: null,
       lastSeenOnNetwork: Date.now(),
+      lastLanSeenAt: Date.now(),
       state: { online: true },
       channels: { lan: true, mqtt: false, cloud: false }
     };
@@ -823,9 +825,12 @@ class DeviceManager {
    */
   parseMqttStateUpdate(device, update) {
     const state = {};
-    if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {
-      state.online = true;
-      state.cloudReportedOnline = true;
+    if (!(0, import_lookups.isLanDriven)(device)) {
+      const reported = (0, import_lookups.readReportedReachability)(update);
+      const heard = reported !== void 0 ? reported : true;
+      state.online = heard;
+      state.cloudReportedOnline = heard;
+      state.cloudReportedOnlineAt = Date.now();
     }
     if (!update.state) {
       return state;
@@ -923,6 +928,7 @@ class DeviceManager {
     }
     device.lastSeenOnNetwork = Date.now();
     device.lastLanReplyAt = Date.now();
+    device.lastLanSeenAt = Date.now();
     const { r, g, b } = status.color;
     const state = {
       power: status.onOff === 1,
@@ -1046,7 +1052,7 @@ class DeviceManager {
    * @returns Number of devices that received an update
    */
   async pollAppApi() {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     if (!this.apiClient || !this.apiClient.hasBearerToken()) {
       return 0;
     }
@@ -1087,12 +1093,16 @@ class DeviceManager {
         device.gateway = gw;
         gatewayDiscovered.push(device);
       }
+      const gwId = (_c = (_b = entry.settings) == null ? void 0 : _b.gatewayInfo) == null ? void 0 : _c.device;
+      if (typeof gwId === "string" && gwId && device.gatewayDeviceId !== gwId) {
+        device.gatewayDeviceId = gwId;
+      }
       const hasHumidityCap = device.capabilities.some((c) => c.instance === "sensorHumidity");
       const caps = (0, import_mapping.buildCapabilitiesFromAppEntry)(entry, Date.now(), hasHumidityCap);
       if (caps.length === 0) {
         continue;
       }
-      (_b = this.onCloudCapabilities) == null ? void 0 : _b.call(this, device, caps);
+      (_d = this.onCloudCapabilities) == null ? void 0 : _d.call(this, device, caps);
       this.maybeApplyCloudOnline(device, caps);
       this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
       updated++;
@@ -1101,9 +1111,10 @@ class DeviceManager {
       this.saveDevicesToCache();
       const all = this.getDevices();
       for (const device of gatewayDiscovered) {
-        (_c = this.onCloudDataReady) == null ? void 0 : _c.call(this, device, all);
+        (_e = this.onCloudDataReady) == null ? void 0 : _e.call(this, device, all);
       }
     }
+    this.resolveGatewayReachability();
     this.runAccountReconcile("app");
     return updated;
   }
@@ -1152,15 +1163,18 @@ class DeviceManager {
   }
   /**
    * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
-   * reachability signal: sensors, appliances, and cloud-only lights (no local
-   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
-   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   * reachability signal: sensors, appliances, and lights with no local
+   * interface. A LAN-driven light keeps its LAN-decided info.online — Govee's
+   * cloud cache lags real LAN reachability (2× false-positive `true` on
+   * 2026-05-13). Since 2.30.0 the test is `isLanDriven`, not `lanIp`: the
+   * address is re-discovered by scan on every restart, so judging by it would
+   * hand every light to the stale cloud cache for one cycle after each start.
    *
    * @param device Target device
    * @param caps Capability list carrying the online flag
    */
   maybeApplyCloudOnline(device, caps) {
-    if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
+    if (!(0, import_lookups.isLanDriven)(device)) {
       this.applyOnlineCap(device, caps);
     }
   }
@@ -1175,14 +1189,56 @@ class DeviceManager {
     this.onCloudCapabilities = cb;
   }
   /**
-   * Whether at least one device in the registry would consume App-API
-   * readings (sensors, appliances). Used to skip the App-API poll on
-   * Lights-only installations, and as a checkAllReady gate so "ready" is
-   * only logged once sensor values can actually arrive.
+   * Cap every gateway-backed device's reachability at its gateway's.
+   *
+   * A battery sensor or button behind a Govee gateway has no connection of its
+   * own — it wakes, chirps over the radio link and sleeps again. It cannot prove
+   * its own reachability; only the gateway can (measured: 17 of 143 devices in a
+   * real account list have no push topic, and they are exactly this group).
+   * krobi's rule 2026-09-03: the gateway IS the online/offline device.
+   *
+   * Deliberately a CAP, not a replacement: a dead gateway makes the device
+   * unreachable, but a live gateway does not make it reachable on its own. A
+   * flat battery or a device out of radio range stays silent while the gateway
+   * happily keeps reporting — believing the gateway there would be a false
+   * green, and a false green is the one nobody notices. The device's own fresh
+   * reading (isSensorDataFresh) remains the positive evidence.
+   *
+   * A gateway that is not in the account list caps nothing.
+   */
+  resolveGatewayReachability() {
+    for (const dev of this.devices.values()) {
+      if (!dev.gatewayDeviceId) {
+        continue;
+      }
+      const wanted = (0, import_types.normalizeDeviceId)(dev.gatewayDeviceId);
+      let gateway;
+      for (const candidate of this.devices.values()) {
+        if ((0, import_types.normalizeDeviceId)(candidate.deviceId) === wanted) {
+          gateway = candidate;
+          break;
+        }
+      }
+      dev.state.gatewayOnline = gateway ? gateway.state.online === true : void 0;
+    }
+  }
+  /**
+   * Whether at least one device in the registry needs the App-API call —
+   * sensors and appliances for their readings, and (since 2.30.0) any light
+   * without a local interface, for which this call is the guaranteed renewer of
+   * its reachability proof. Used to skip the poll where nothing would consume
+   * it, and as a checkAllReady gate so "ready" is only logged once those values
+   * can actually arrive.
    */
   hasDeviceNeedingAppApi() {
     for (const dev of this.devices.values()) {
-      if (dev.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && dev.sku !== "BaseGroup") {
+      if (dev.sku === "BaseGroup") {
+        continue;
+      }
+      if (dev.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {
+        return true;
+      }
+      if (!(0, import_lookups.isLanDriven)(dev)) {
         return true;
       }
     }

@@ -9,10 +9,14 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { DeviceManager } from "./device-manager";
 import {
+  isLanDriven,
   parseMqttSegmentData,
   plausibleSegmentCount,
+  readReportedReachability,
+  resolveDeviceReachability,
   resolveSegmentCount as resolveSegmentCountRaw,
 } from "./device-manager/lookups";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS, LAN_CAPABLE_MEMORY_MS } from "./timing-constants";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
@@ -3623,5 +3627,202 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     expect(warns).toHaveLength(1);
     expect(warns[0]).toContain("not in the supported device list");
     expect(warns[0]).toContain("diag.export");
+  });
+});
+
+describe("Reachability from the account push (v2.30.0)", () => {
+  // Every packet below is a real capture from the four diagnostic reports
+  // attached to issues #20/#22/#25/#26 (Joylancer, June 2026).
+
+  describe("readReportedReachability — what Govee itself says", () => {
+    it("reads the pactType-1 shape: connected as text, in any packet kind", () => {
+      // H6199 carries `connected` in all ten of its packets — status, pt, online.
+      expect(readReportedReachability({ sku: "H6199", device: "d", cmd: "online", state: { connected: "true" } })).toBe(
+        true,
+      );
+      expect(readReportedReachability({ sku: "H6199", device: "d", cmd: "status", state: { connected: "true" } })).toBe(
+        true,
+      );
+      expect(
+        readReportedReachability({ sku: "H6199", device: "d", cmd: "status", state: { connected: "false" } }),
+      ).toBe(false);
+    });
+
+    it("reads the pactType-2 shape: result as number, ONLY in an online packet", () => {
+      // H66A1 sends {cmd:"online", state:{result:1}}.
+      expect(readReportedReachability({ sku: "H66A1", device: "d", cmd: "online", state: { result: 1 } })).toBe(true);
+      expect(readReportedReachability({ sku: "H66A1", device: "d", cmd: "online", state: { result: 0 } })).toBe(false);
+    });
+
+    it("does NOT read result as reachability in a status or ptReal packet", () => {
+      // The trap: H6093 carries `result` in all 15 of its status packets and
+      // H66A1 in its ptReal packets — there it is an operation result code.
+      // Reading it as reachability would turn every command acknowledgement
+      // into a liveness claim.
+      expect(
+        readReportedReachability({ sku: "H6093", device: "d", cmd: "status", state: { result: 1 } }),
+      ).toBeUndefined();
+      expect(
+        readReportedReachability({ sku: "H66A1", device: "d", cmd: "ptReal", state: { result: 1 } }),
+      ).toBeUndefined();
+    });
+
+    it("treats anything unrecognised as NO evidence, never as reachable", () => {
+      expect(readReportedReachability({ sku: "X", device: "d", cmd: "online", state: { result: 2 } })).toBeUndefined();
+      expect(
+        readReportedReachability({ sku: "X", device: "d", cmd: "online", state: { connected: "unknown" } }),
+      ).toBeUndefined();
+      expect(readReportedReachability({ sku: "X", device: "d", cmd: "online" })).toBeUndefined();
+      expect(readReportedReachability({ sku: "X", device: "d", state: {} })).toBeUndefined();
+    });
+  });
+
+  describe("isLanDriven — survives the restart, and expires", () => {
+    it("a light with a current LAN address is LAN-driven", () => {
+      expect(isLanDriven(createTestDevice({ lanIp: "10.0.0.5" }))).toBe(true);
+    });
+
+    it("a light that answered locally stays LAN-driven with no address — the restart case", () => {
+      // lanIp is re-discovered by scan, so right after a start every light is
+      // address-less. Judging by lanIp there would hand it to Govee's stale
+      // cloud cache: the 2.29.0 false-green.
+      const dev = createTestDevice({ lanIp: undefined, lastLanSeenAt: Date.now() - 60_000 });
+      expect(isLanDriven(dev)).toBe(true);
+    });
+
+    it("the memory expires so a switched-off local API is not stuck grey forever", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: Date.now() - (LAN_CAPABLE_MEMORY_MS + 60_000),
+      });
+      expect(isLanDriven(dev)).toBe(false);
+    });
+
+    it("a device that never answered locally is not LAN-driven", () => {
+      expect(isLanDriven(createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined }))).toBe(false);
+    });
+  });
+
+  describe("resolveDeviceReachability — the cap and the expiry", () => {
+    it("a heard report counts while fresh", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: false, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({ online: true, proven: true });
+    });
+
+    it("the same report is worthless once it has aged out", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: {
+          online: false,
+          cloudReportedOnline: true,
+          cloudReportedOnlineAt: Date.now() - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 60_000),
+        },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: false });
+    });
+
+    it("a dead gateway caps the device, however fresh its own report is", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: {
+          online: true,
+          cloudReportedOnline: true,
+          cloudReportedOnlineAt: Date.now(),
+          gatewayOnline: false,
+        },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: true });
+    });
+
+    it("a live gateway alone does NOT make the device reachable — it only fails to rule it out", () => {
+      // A flat battery or a device out of radio range stays silent while the
+      // gateway keeps reporting. Believing the gateway there is a false green.
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: false, gatewayOnline: true },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: false });
+    });
+  });
+});
+
+describe("Account push drives reachability for devices without a local interface (v2.30.0)", () => {
+  /**
+   * A device the LAN scan found, then stripped of every local trace — the shape
+   * a light without a local interface has.
+   *
+   * @param dm The manager whose registry holds the device
+   */
+  function cloudOnlyLight(dm: DeviceManager): GoveeDevice {
+    dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
+    const dev = dm.getDevices()[0];
+    dev.lanIp = undefined;
+    dev.lastLanSeenAt = undefined;
+    dev.lastLanReplyAt = undefined;
+    dev.state.online = false;
+    dev.state.cloudReportedOnline = undefined;
+    dev.state.cloudReportedOnlineAt = undefined;
+    return dev;
+  }
+
+  it("an explicit offline BEATS the packet's own arrival — the order is load-bearing", () => {
+    // Without this order the fix would repair the missing-liveness half and make
+    // the other half worse: Govee's own "this device is gone" packet would be
+    // counted as a sign of life simply because it arrived.
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "online",
+      state: { connected: "false" },
+    });
+    expect(dev.state.online).toBe(false);
+    expect(dev.state.cloudReportedOnline).toBe(false);
+    expect(dev.state.cloudReportedOnlineAt).toEqual(expect.any(Number));
+  });
+
+  it("a packet with no explicit claim still counts as a sign of life", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "status", state: { onOff: 1 } });
+    expect(dev.state.online).toBe(true);
+    expect(dev.state.cloudReportedOnline).toBe(true);
+  });
+
+  it("a LAN-driven light is untouched by the push, explicit claim or not", () => {
+    // krobi 2026-09-03: the local path stays exactly as it is. Govee's cloud
+    // cache lags reality, so its word must not reach a local device at all.
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
+    const dev = dm.getDevices()[0];
+    dev.state.cloudReportedOnline = undefined;
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "online",
+      state: { connected: "false" },
+    });
+    expect(dev.state.cloudReportedOnline).toBeUndefined();
+  });
+
+  it("the 2-minute account call also runs for a light without a local interface", () => {
+    // It is the guaranteed renewer of the reachability proof: the push is
+    // event-driven, so a device that just sits there sends nothing and its
+    // proof would expire while the device is perfectly fine.
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
+    expect(dm.hasDeviceNeedingAppApi()).toBe(false);
+    const dev = dm.getDevices()[0];
+    dev.lanIp = undefined;
+    dev.lastLanSeenAt = undefined;
+    expect(dm.hasDeviceNeedingAppApi()).toBe(true);
   });
 });

@@ -1,65 +1,47 @@
 {
   "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi, transportOverrides).",
   "devices": {
-    "H5051": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.0.0"
-    },
-    "H5100": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.0.0"
-    },
-    "H5103": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.0.0"
-    },
-    "H5109": {
-      "name": "Pool Thermometer",
-      "type": "thermometer",
-      "status": "reported",
-      "since": "2.17.0"
-    },
-    "H5179": {
-      "name": "Wifi Thermometer",
-      "type": "thermometer",
-      "status": "verified",
-      "since": "2.0.0"
-    },
-    "H5107": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.18.1"
-    },
-    "H5140": {
-      "name": "Smart CO2 Monitor",
-      "type": "sensor",
-      "status": "seed",
-      "since": "2.18.1"
-    },
-    "H5171": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.18.1"
-    },
-    "H1630": {
-      "name": "Lantern Floor Lamp",
+    "H1270": {
+      "name": "Ceiling Light Ultra",
       "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H1310": {
+      "name": "Smart Ceiling Fan",
+      "type": "fan",
       "status": "reported",
-      "since": "2.17.0"
+      "since": "2.24.0"
+    },
+    "H1370": {
+      "name": "Ceiling Fan with Light",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.22.0"
     },
     "H1401": {
       "name": "Smart Bulb A21",
       "type": "light",
       "status": "seed",
       "since": "2.18.1"
+    },
+    "H14C0": {
+      "name": "Edison Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H14C1": {
+      "name": "G25 Edison Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
+    },
+    "H1630": {
+      "name": "Lantern Floor Lamp",
+      "type": "light",
+      "status": "reported",
+      "since": "2.17.0"
     },
     "H16B0": {
       "name": "Floor Lamp",
@@ -73,11 +55,89 @@
       "status": "seed",
       "since": "2.18.1"
     },
-    "H8025": {
-      "name": "Smart Outdoor String Lights",
-      "type": "light",
+    "H5051": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.0.0"
+    },
+    "H5074": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H5080": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H5082": {
+      "name": "Dual Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H5100": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.0.0"
+    },
+    "H5103": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.0.0"
+    },
+    "H5106": {
+      "name": "Smart Air Quality Monitor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H5107": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
       "status": "seed",
       "since": "2.18.1"
+    },
+    "H5109": {
+      "name": "Pool Thermometer",
+      "type": "thermometer",
+      "status": "reported",
+      "since": "2.17.0"
+    },
+    "H5125": {
+      "name": "Button Remote",
+      "type": "button",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H5126": {
+      "name": "Smart Button",
+      "type": "button",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H5140": {
+      "name": "Smart CO2 Monitor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H5171": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.18.1"
+    },
+    "H5179": {
+      "name": "Wifi Thermometer",
+      "type": "thermometer",
+      "status": "verified",
+      "since": "2.0.0"
     },
     "H6003": {
       "name": "LED Bulb",
@@ -87,6 +147,18 @@
       "quirks": {
         "brokenPlatformApi": true
       }
+    },
+    "H6008": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6010": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H6022": {
       "name": "LED Bulb (RGBWW)",
@@ -100,6 +172,24 @@
         }
       }
     },
+    "H6046": {
+      "name": "TV Backlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6051": {
+      "name": "Smart Desk Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6052": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
     "H6053": {
       "name": "LED Glide",
       "type": "light",
@@ -109,11 +199,89 @@
         "brokenPlatformApi": true
       }
     },
+    "H6056": {
+      "name": "Light Strip",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6058": {
+      "name": "StarPal Pro Portable Table Lamp",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H605C": {
+      "name": "Envisual TV Backlight T2",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H6061": {
+      "name": "Glide Hexa Light Panel",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6062": {
+      "name": "Glide Light Bar",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H6071": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6072": {
+      "name": "Lyra Floor Lamp",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H6076": {
+      "name": "RGBICW Smart Corner Floor Lamp",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
     "H607C": {
       "name": "Floor Lamp 2",
       "type": "light",
       "status": "reported",
       "since": "2.13.1"
+    },
+    "H6087": {
+      "name": "Wall Sconce",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H608B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6093": {
+      "name": "Star Light Projector",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H6099": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H609D": {
+      "name": "Galaxy Light Projector 2 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.22.0"
     },
     "H60A1": {
       "name": "LED Bulb",
@@ -135,6 +303,18 @@
       "quirks": {
         "brokenPlatformApi": true
       }
+    },
+    "H610A": {
+      "name": "Light Strip",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6110": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H6119": {
       "name": "LED Strip",
@@ -159,6 +339,18 @@
       "quirks": {
         "brokenPlatformApi": true
       }
+    },
+    "H6142": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6143": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H6159": {
       "name": "LED Strip",
@@ -196,11 +388,58 @@
         "brokenPlatformApi": true
       }
     },
+    "H6181": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H6182": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
     "H618A": {
       "name": "RGBIC Strip Lights",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H6199": {
+      "name": "DreamView T1 TV Backlight",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H619A": {
+      "name": "RGBIC LED Strip",
+      "type": "light",
+      "status": "seed",
+      "since": "2.16.0"
+    },
+    "H61A0": {
+      "name": "Light Strip",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H61A8": {
+      "name": "Outdoor Neon LED Strip 10m",
+      "type": "light",
+      "status": "verified",
+      "since": "2.5.2",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud"
+        }
+      }
+    },
+    "H61B2": {
+      "name": "TV Backlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H61BA": {
       "name": "Glide Wall Light",
@@ -214,22 +453,17 @@
       "status": "verified",
       "since": "1.0.0"
     },
-    "H61A8": {
-      "name": "Outdoor Neon LED Strip 10m",
-      "type": "light",
-      "status": "verified",
-      "since": "2.5.2",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud"
-        }
-      }
-    },
     "H61BE": {
       "name": "Glide Wall Light Wide",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H61C3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H61D5": {
       "name": "LED Strip",
@@ -237,11 +471,137 @@
       "status": "verified",
       "since": "2.1.2"
     },
+    "H61E5": {
+      "name": "COB Light Strip",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H66A1": {
+      "name": "TV Backlight 3 Pro",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0"
+    },
+    "H7020": {
+      "name": "Bulb String Lights",
+      "type": "light",
+      "status": "reported",
+      "since": "2.24.0"
+    },
+    "H7021": {
+      "name": "String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H7050": {
+      "name": "Outdoor Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H7055": {
+      "name": "Outdoor Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H705B": {
+      "name": "Outdoor Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H7060": {
+      "name": "Outdoor Floodlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H7061": {
+      "name": "Outdoor Floodlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H7065": {
+      "name": "Outdoor Spotlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H70A1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H70B1": {
+      "name": "Curtain Lights",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
     "H70B3": {
       "name": "Curtain Lights",
       "type": "light",
       "status": "verified",
       "since": "1.0.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
+    "H70B4": {
+      "name": "Curtain Lights 2 (3x2m)",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
+    "H70B5": {
+      "name": "Curtain Lights 2 (4.5x2m)",
+      "type": "light",
+      "status": "reported",
+      "since": "2.16.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
+    "H70C1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H70C2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.30.0"
+    },
+    "H70C4": {
+      "name": "Christmas String Lights 2 (20m)",
+      "type": "light",
+      "status": "seed",
+      "since": "2.16.0",
       "quirks": {
         "transportOverrides": {
           "snapshot": "cloud",
@@ -261,11 +621,65 @@
         }
       }
     },
+    "H70C7": {
+      "name": "Christmas String Lights 2 (50m)",
+      "type": "light",
+      "status": "seed",
+      "since": "2.16.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
+    "H70C9": {
+      "name": "Christmas String Lights 2 (100m)",
+      "type": "light",
+      "status": "seed",
+      "since": "2.16.0",
+      "quirks": {
+        "transportOverrides": {
+          "snapshot": "cloud",
+          "lightScene": "cloud"
+        }
+      }
+    },
     "H70D1": {
       "name": "Icicle Lights",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H7101": {
+      "name": "Smart Tower Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.16.0"
+    },
+    "H7102": {
+      "name": "Smart Tower Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.16.0"
+    },
+    "H7111": {
+      "name": "Smart Air Circulator Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.16.0"
+    },
+    "H7121": {
+      "name": "Smart Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.16.0"
+    },
+    "H7123": {
+      "name": "Smart Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.30.0"
     },
     "H7130": {
       "name": "Smart Space Heater",
@@ -321,6 +735,12 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H7161": {
+      "name": "Aroma Diffuser",
+      "type": "aroma_diffuser",
+      "status": "seed",
+      "since": "2.30.0"
+    },
     "H7170": {
       "name": "Smart Kettle",
       "type": "kettle",
@@ -345,221 +765,23 @@
       "status": "seed",
       "since": "2.0.0"
     },
-    "H5074": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H6058": {
-      "name": "StarPal Pro Portable Table Lamp",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H6072": {
-      "name": "Lyra Floor Lamp",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H6093": {
-      "name": "Star Light Projector",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H605C": {
-      "name": "Envisual TV Backlight T2",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H70B1": {
-      "name": "Curtain Lights",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H70B4": {
-      "name": "Curtain Lights 2 (3x2m)",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H70B5": {
-      "name": "Curtain Lights 2 (4.5x2m)",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H70C4": {
-      "name": "Christmas String Lights 2 (20m)",
-      "type": "light",
-      "status": "seed",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H70C7": {
-      "name": "Christmas String Lights 2 (50m)",
-      "type": "light",
-      "status": "seed",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H70C9": {
-      "name": "Christmas String Lights 2 (100m)",
-      "type": "light",
-      "status": "seed",
-      "since": "2.16.0",
-      "quirks": {
-        "transportOverrides": {
-          "snapshot": "cloud",
-          "lightScene": "cloud"
-        }
-      }
-    },
-    "H7101": {
-      "name": "Smart Tower Fan",
-      "type": "fan",
-      "status": "seed",
-      "since": "2.16.0"
-    },
-    "H7102": {
-      "name": "Smart Tower Fan",
-      "type": "fan",
-      "status": "seed",
-      "since": "2.16.0"
-    },
-    "H7111": {
-      "name": "Smart Air Circulator Fan",
-      "type": "fan",
-      "status": "seed",
-      "since": "2.16.0"
-    },
-    "H7121": {
-      "name": "Smart Air Purifier",
-      "type": "air_purifier",
-      "status": "seed",
-      "since": "2.16.0"
-    },
-    "H619A": {
-      "name": "RGBIC LED Strip",
-      "type": "light",
-      "status": "seed",
-      "since": "2.16.0"
-    },
-    "H6076": {
-      "name": "RGBICW Smart Corner Floor Lamp",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H66A1": {
-      "name": "TV Backlight 3 Pro",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H6199": {
-      "name": "DreamView T1 TV Backlight",
-      "type": "light",
-      "status": "reported",
-      "since": "2.16.0"
-    },
-    "H1270": {
-      "name": "Ceiling Light Ultra",
-      "type": "light",
-      "status": "seed",
-      "since": "2.22.0"
-    },
-    "H1370": {
-      "name": "Ceiling Fan with Light",
-      "type": "fan",
-      "status": "seed",
-      "since": "2.22.0"
-    },
-    "H14C0": {
-      "name": "Edison Bulb",
-      "type": "light",
-      "status": "seed",
-      "since": "2.22.0"
-    },
-    "H14C1": {
-      "name": "G25 Edison Bulb",
-      "type": "light",
-      "status": "seed",
-      "since": "2.22.0"
-    },
-    "H609D": {
-      "name": "Galaxy Light Projector 2 Pro",
-      "type": "light",
-      "status": "seed",
-      "since": "2.22.0"
-    },
     "H801D": {
       "name": "Recessed Downlight",
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
     },
+    "H8025": {
+      "name": "Smart Outdoor String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.18.1"
+    },
     "R16D0": {
       "name": "Smart Floor Lamp",
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
-    },
-    "H1310": {
-      "name": "Smart Ceiling Fan",
-      "type": "fan",
-      "status": "reported",
-      "since": "2.24.0"
-    },
-    "H61E5": {
-      "name": "COB Light Strip",
-      "type": "light",
-      "status": "reported",
-      "since": "2.24.0"
-    },
-    "H6062": {
-      "name": "Glide Light Bar",
-      "type": "light",
-      "status": "reported",
-      "since": "2.24.0"
-    },
-    "H7020": {
-      "name": "Bulb String Lights",
-      "type": "light",
-      "status": "reported",
-      "since": "2.24.0"
     }
   }
 }

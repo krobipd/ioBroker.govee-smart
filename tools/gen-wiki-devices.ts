@@ -46,6 +46,7 @@ const TYPE_ORDER = [
   "kettle",
   "ice_maker",
   "aroma_diffuser",
+  "button",
 ];
 
 interface Texts {
@@ -108,6 +109,7 @@ einzelne Funktionen fehlen.`,
     kettle: "Wasserkocher",
     ice_maker: "Eiswürfelbereiter",
     aroma_diffuser: "Aromadiffusoren",
+    button: "Taster und Fernbedienungen",
   },
   colSku: "SKU",
   colName: "Govee-Name",
@@ -179,6 +181,7 @@ Problems or missing functions are possible.`,
     kettle: "Kettles",
     ice_maker: "Ice makers",
     aroma_diffuser: "Aroma diffusers",
+    button: "Buttons and remotes",
   },
   colSku: "SKU",
   colName: "Govee name",

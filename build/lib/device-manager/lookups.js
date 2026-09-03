@@ -25,9 +25,11 @@ __export(lookups_exports, {
   deviceKey: () => deviceKey,
   effectiveSegmentCount: () => effectiveSegmentCount,
   findDeviceBySkuAndId: () => findDeviceBySkuAndId,
+  isLanDriven: () => isLanDriven,
   parseMqttSegmentData: () => parseMqttSegmentData,
   plausibleSegmentCount: () => plausibleSegmentCount,
   plausibleSegmentIndices: () => plausibleSegmentIndices,
+  readReportedReachability: () => readReportedReachability,
   resolveDeviceReachability: () => resolveDeviceReachability,
   resolveSegmentCount: () => resolveSegmentCount
 });
@@ -131,16 +133,31 @@ function resolveSegmentCount(device, registry) {
   return Number.isFinite(min) ? min : 0;
 }
 function resolveDeviceReachability(device, now = Date.now()) {
-  if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
+  if (isLanDriven(device, now)) {
     return {
       online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < import_timing_constants.LAN_REPLY_FRESHNESS_MS),
       proven: true
     };
   }
+  if (device.state.gatewayOnline === false) {
+    return { online: false, proven: true };
+  }
   if (typeof device.state.cloudReportedOnline === "boolean") {
-    return { online: device.state.cloudReportedOnline, proven: true };
+    const at = device.state.cloudReportedOnlineAt;
+    if (typeof at === "number" && now - at < import_timing_constants.CLOUD_ONLINE_EVIDENCE_TTL_MS) {
+      return { online: device.state.cloudReportedOnline, proven: true };
+    }
   }
   return { online: false, proven: false };
+}
+function isLanDriven(device, now = Date.now()) {
+  if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {
+    return false;
+  }
+  if (device.lanIp) {
+    return true;
+  }
+  return typeof device.lastLanSeenAt === "number" && now - device.lastLanSeenAt < import_timing_constants.LAN_CAPABLE_MEMORY_MS;
 }
 const SEGMENT_HARD_MAX = 55;
 const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;
@@ -181,6 +198,20 @@ function findDeviceBySkuAndId(devices, sku, deviceId) {
   }
   return void 0;
 }
+function readReportedReachability(update) {
+  const state = update.state;
+  if (!state) {
+    return void 0;
+  }
+  if (typeof state.connected === "string") {
+    const value = state.connected.trim().toLowerCase();
+    return value === "true" ? true : value === "false" ? false : void 0;
+  }
+  if (update.cmd === "online" && typeof state.result === "number") {
+    return state.result === 1 ? true : state.result === 0 ? false : void 0;
+  }
+  return void 0;
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   SEGMENT_BRIGHTNESS_BITMASK_BYTES,
@@ -190,9 +221,11 @@ function findDeviceBySkuAndId(devices, sku, deviceId) {
   deviceKey,
   effectiveSegmentCount,
   findDeviceBySkuAndId,
+  isLanDriven,
   parseMqttSegmentData,
   plausibleSegmentCount,
   plausibleSegmentIndices,
+  readReportedReachability,
   resolveDeviceReachability,
   resolveSegmentCount
 });

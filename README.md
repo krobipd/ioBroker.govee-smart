@@ -100,6 +100,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.30.0 (2026-09-03)
+
+- Fixed: Devices without a local API were shown as unreachable although they switched and reported normally; they now show as reachable for as long as they are
+- Fixed: Sensors and buttons behind a Govee gateway were shown as unreachable although their readings kept arriving; their gateway now decides whether they are reachable
+- Fixed: Appliances stayed marked as reachable for up to two minutes after they had actually gone offline
+- Improved: A device that is unplugged and put away is reported as unreachable within half an hour, instead of staying green until the adapter is restarted
+- New: 37 additional device models are recognised, including smart plugs, a button remote, an air quality monitor and an aroma diffuser
+- New: Battery buttons and remotes are supported as their own device kind, with battery level and reachability
+
 ### 2.29.4 (2026-09-03)
 
 - New: The diagnostics report lists how each control of a device is actually driven: over the local API or over the cloud, together with the reason for that choice
@@ -122,16 +131,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up
 - Fixed: A device without the local API is now shown as reachable when Govee itself reports it — that information always arrived and was discarded
 - Fixed: The diagnostics export failed with an internal error and wrote no file; the button in the object tree and the Diagnostics tab both work now
-
-### 2.29.0 (2026-09-03)
-
-- Fixed: A device without the local API enabled no longer shows as unreachable after a restart while it still controls fine
-- Fixed: Datapoint names and descriptions now also reach installations that already exist — until now only new ones got them
-- Fixed: The segment channels are translated instead of always being named in English
-- Fixed: One appliance can no longer use up the whole account's daily Cloud budget — Govee grants an appliance only 100 calls a day
-- Changed: BREAKING — the diagnostics report is a file. `diag.result` is gone; download the file in the new Diagnostics tab and attach it to an issue
-- Improved: The report is anonymised and carries far more: your ioBroker versions, the device's real datapoints and what your last commands did
-- Improved: User documentation ships with the adapter, so the ioBroker doc portal shows it instead of the developer README
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

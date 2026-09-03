@@ -8,9 +8,11 @@ import {
   deviceKey as deviceKeyHelper,
   effectiveSegmentCount,
   findDeviceBySkuAndId as findDeviceBySkuAndIdHelper,
+  isLanDriven,
   parseMqttSegmentData,
   plausibleSegmentCount,
   plausibleSegmentIndices,
+  readReportedReachability,
   SEGMENT_COUNT_MAX,
   type MqttSegmentData,
 } from "./device-manager/lookups";
@@ -840,6 +842,9 @@ export class DeviceManager {
     matched.channels.lan = true;
     matched.lastSeenOnNetwork = Date.now();
     matched.lastLanReplyAt = Date.now();
+    // Persisted twin of lastLanReplyAt — survives the restart so this device
+    // stays LAN-decided even before the first scan of the next session.
+    matched.lastLanSeenAt = Date.now();
     if (hadNoLanIp) {
       this.onLanDeviceReady?.(matched, this.getDevices());
     }
@@ -879,6 +884,7 @@ export class DeviceManager {
       diyLibrary: [],
       skuFeatures: null,
       lastSeenOnNetwork: Date.now(),
+      lastLanSeenAt: Date.now(),
       state: { online: true },
       channels: { lan: true, mqtt: false, cloud: false },
     };
@@ -972,13 +978,22 @@ export class DeviceManager {
    */
   private parseMqttStateUpdate(device: GoveeDevice, update: MqttStatusUpdate): Partial<DeviceState> {
     const state: Partial<DeviceState> = {};
-    if (device.type !== GOVEE_DEVICE_TYPE.LIGHT) {
-      state.online = true;
-      // A push IS Govee reporting about this device — record it as heard, not
-      // just as a value. `resolveDeviceReachability` distinguishes a reported
-      // reachability from one derived off the cloud channel, and without this
-      // an appliance's push evidence would be thrown away every round.
-      state.cloudReportedOnline = true;
+    // The local interface decides alone for a LAN-driven light — no cloud claim
+    // touches its reachability, not even an explicit one. Govee's cache lags
+    // reality (measured 2026-05-13: `true` twice during a real 8-minute outage),
+    // and that path is deliberately left untouched.
+    if (!isLanDriven(device)) {
+      const reported = readReportedReachability(update);
+      // ORDER IS LOAD-BEARING: an explicit report beats mere arrival, in both
+      // directions. Counting arrival first would turn Govee's own "this device
+      // is gone" packet into a liveness sign — which is what the adapter did
+      // for appliances until 2.30.0.
+      const heard = reported !== undefined ? reported : true;
+      state.online = heard;
+      state.cloudReportedOnline = heard;
+      // Stamped so the proof can expire — an unstamped one would read as
+      // reachable forever (the Weihnachtslichter case).
+      state.cloudReportedOnlineAt = Date.now();
     }
     if (!update.state) {
       return state;
@@ -1115,6 +1130,7 @@ export class DeviceManager {
 
     device.lastSeenOnNetwork = Date.now();
     device.lastLanReplyAt = Date.now();
+    device.lastLanSeenAt = Date.now();
     const { r, g, b } = status.color;
     const state: Partial<DeviceState> = {
       power: status.onOff === 1,
@@ -1328,6 +1344,13 @@ export class DeviceManager {
         device.gateway = gw;
         gatewayDiscovered.push(device);
       }
+      // The gateway's own device id — the link that makes krobi's rule possible
+      // ("the gateway is the online/offline device", 2026-09-03). Set-only-when-
+      // present, same as the label above: a partial response must not unlink it.
+      const gwId = entry.settings?.gatewayInfo?.device;
+      if (typeof gwId === "string" && gwId && device.gatewayDeviceId !== gwId) {
+        device.gatewayDeviceId = gwId;
+      }
       const hasHumidityCap = device.capabilities.some(c => c.instance === "sensorHumidity");
       const caps = buildCapabilitiesFromAppEntryHelper(entry, Date.now(), hasHumidityCap);
       if (caps.length === 0) {
@@ -1355,6 +1378,10 @@ export class DeviceManager {
         this.onCloudDataReady?.(device, all);
       }
     }
+    // Resolve every gateway-backed device against its gateway. This is the only
+    // place that can: reachability is decided per-device everywhere else, and a
+    // sensor cannot see its gateway from there.
+    this.resolveGatewayReachability();
     // Reconcile now that the (complete) App-API account list is fresh — this is
     // what surfaces a sold sensor (absent here) for removal after the debounce.
     this.runAccountReconcile("app");
@@ -1409,15 +1436,18 @@ export class DeviceManager {
 
   /**
    * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
-   * reachability signal: sensors, appliances, and cloud-only lights (no local
-   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
-   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   * reachability signal: sensors, appliances, and lights with no local
+   * interface. A LAN-driven light keeps its LAN-decided info.online — Govee's
+   * cloud cache lags real LAN reachability (2× false-positive `true` on
+   * 2026-05-13). Since 2.30.0 the test is `isLanDriven`, not `lanIp`: the
+   * address is re-discovered by scan on every restart, so judging by it would
+   * hand every light to the stale cloud cache for one cycle after each start.
    *
    * @param device Target device
    * @param caps Capability list carrying the online flag
    */
   private maybeApplyCloudOnline(device: GoveeDevice, caps: CloudStateCapability[]): void {
-    if (device.type !== GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
+    if (!isLanDriven(device)) {
       this.applyOnlineCap(device, caps);
     }
   }
@@ -1434,14 +1464,63 @@ export class DeviceManager {
   }
 
   /**
-   * Whether at least one device in the registry would consume App-API
-   * readings (sensors, appliances). Used to skip the App-API poll on
-   * Lights-only installations, and as a checkAllReady gate so "ready" is
-   * only logged once sensor values can actually arrive.
+   * Cap every gateway-backed device's reachability at its gateway's.
+   *
+   * A battery sensor or button behind a Govee gateway has no connection of its
+   * own — it wakes, chirps over the radio link and sleeps again. It cannot prove
+   * its own reachability; only the gateway can (measured: 17 of 143 devices in a
+   * real account list have no push topic, and they are exactly this group).
+   * krobi's rule 2026-09-03: the gateway IS the online/offline device.
+   *
+   * Deliberately a CAP, not a replacement: a dead gateway makes the device
+   * unreachable, but a live gateway does not make it reachable on its own. A
+   * flat battery or a device out of radio range stays silent while the gateway
+   * happily keeps reporting — believing the gateway there would be a false
+   * green, and a false green is the one nobody notices. The device's own fresh
+   * reading (isSensorDataFresh) remains the positive evidence.
+   *
+   * A gateway that is not in the account list caps nothing.
+   */
+  private resolveGatewayReachability(): void {
+    for (const dev of this.devices.values()) {
+      if (!dev.gatewayDeviceId) {
+        continue;
+      }
+      const wanted = normalizeDeviceId(dev.gatewayDeviceId);
+      let gateway: GoveeDevice | undefined;
+      for (const candidate of this.devices.values()) {
+        if (normalizeDeviceId(candidate.deviceId) === wanted) {
+          gateway = candidate;
+          break;
+        }
+      }
+      dev.state.gatewayOnline = gateway ? gateway.state.online === true : undefined;
+    }
+  }
+
+  /**
+   * Whether at least one device in the registry needs the App-API call —
+   * sensors and appliances for their readings, and (since 2.30.0) any light
+   * without a local interface, for which this call is the guaranteed renewer of
+   * its reachability proof. Used to skip the poll where nothing would consume
+   * it, and as a checkAllReady gate so "ready" is only logged once those values
+   * can actually arrive.
    */
   public hasDeviceNeedingAppApi(): boolean {
     for (const dev of this.devices.values()) {
-      if (dev.type !== GOVEE_DEVICE_TYPE.LIGHT && dev.sku !== "BaseGroup") {
+      if (dev.sku === "BaseGroup") {
+        continue;
+      }
+      if (dev.type !== GOVEE_DEVICE_TYPE.LIGHT) {
+        return true;
+      }
+      // Since 2.30.0 a light with no local interface also needs this call — it
+      // is the guaranteed renewer of its reachability proof. The account push
+      // is event-driven: a device that simply sits there and does nothing sends
+      // nothing, so its proof would expire and the device would go grey while
+      // being perfectly fine. One account-wide call every 2 minutes, exactly the
+      // cost an installation with any sensor already pays.
+      if (!isLanDriven(dev)) {
         return true;
       }
     }

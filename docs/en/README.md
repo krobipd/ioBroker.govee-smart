@@ -1,8 +1,8 @@
 # Govee Smart
 
-Controls Govee Wi-Fi devices from ioBroker: light strips, bulbs and panels, thermometers and
-hygrometers, and appliances such as heaters, humidifiers, kettles, ice makers, fans and air
-purifiers.
+Controls Govee Wi-Fi devices from ioBroker: light strips, bulbs and panels, thermometers,
+hygrometers and air quality monitors, smart plugs, battery buttons and remotes, and appliances such
+as heaters, humidifiers, aroma diffusers, kettles, ice makers, fans and air purifiers.
 
 The adapter talks to your devices **locally whenever it can**. A light with the local API enabled
 answers on your own network in milliseconds, and the cloud is never allowed to overwrite what the

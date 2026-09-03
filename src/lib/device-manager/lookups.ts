@@ -1,7 +1,7 @@
-import { normalizeDeviceId, type GoveeDevice } from "../types";
+import { normalizeDeviceId, type GoveeDevice, type MqttStatusUpdate } from "../types";
 import { mapKey } from "../device-key";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
-import { LAN_REPLY_FRESHNESS_MS } from "../timing-constants";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS, LAN_CAPABLE_MEMORY_MS, LAN_REPLY_FRESHNESS_MS } from "../timing-constants";
 import type { DeviceRegistry } from "../device-registry";
 
 /** Parsed per-segment data from MQTT BLE packets */
@@ -222,16 +222,56 @@ export function resolveDeviceReachability(
   device: GoveeDevice,
   now: number = Date.now(),
 ): { online: boolean; proven: boolean } {
-  if (device.type === GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
+  if (isLanDriven(device, now)) {
     return {
       online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < LAN_REPLY_FRESHNESS_MS),
       proven: true,
     };
   }
+  // A device behind a gateway can be no more reachable than its gateway — it has
+  // no connection of its own to be reachable ON (krobi 2026-09-03). This is a
+  // CAP, not a source: a live gateway does not make the device reachable, it
+  // only fails to rule it out. The positive proof stays the device's own fresh
+  // reading. An unknown gateway caps nothing.
+  if (device.state.gatewayOnline === false) {
+    return { online: false, proven: true };
+  }
   if (typeof device.state.cloudReportedOnline === "boolean") {
-    return { online: device.state.cloudReportedOnline, proven: true };
+    const at = device.state.cloudReportedOnlineAt;
+    // A report with no timestamp comes from before this rule existed — treat it
+    // as expired rather than eternal. The next report re-establishes it within
+    // one poll cycle, and an eternal "online" is exactly the bug being fixed.
+    if (typeof at === "number" && now - at < CLOUD_ONLINE_EVIDENCE_TTL_MS) {
+      return { online: device.state.cloudReportedOnline, proven: true };
+    }
   }
   return { online: false, proven: false };
+}
+
+/**
+ * Whether this device's reachability is decided by the LOCAL interface alone.
+ *
+ * True for a light that either has a current LAN address or answered locally
+ * within {@link LAN_CAPABLE_MEMORY_MS}. The second half is what makes this
+ * survive a restart: `lanIp` is re-discovered by scan, so for one cycle after
+ * every start a LAN light looks address-less. Judging it by the cloud in that
+ * window is precisely the 2.29.0 false-green (two unplugged strips reported as
+ * reachable), which 2.29.1 had to undo.
+ *
+ * A LAN-driven device ignores every cloud reachability claim, in both
+ * directions — Govee's cache lags reality (measured 2026-05-13).
+ *
+ * @param device Device to classify
+ * @param now Current time in ms
+ */
+export function isLanDriven(device: GoveeDevice, now: number = Date.now()): boolean {
+  if (device.type !== GOVEE_DEVICE_TYPE.LIGHT) {
+    return false;
+  }
+  if (device.lanIp) {
+    return true;
+  }
+  return typeof device.lastLanSeenAt === "number" && now - device.lastLanSeenAt < LAN_CAPABLE_MEMORY_MS;
 }
 
 /** Protocol limit: Govee's segment bitmask is 7 bytes × 8 bits = 56 slots (0..55). */
@@ -331,6 +371,45 @@ export function findDeviceBySkuAndId(
     if (dev.sku === sku && normalizeDeviceId(dev.deviceId) === normalizedId) {
       return dev;
     }
+  }
+  return undefined;
+}
+
+/**
+ * Reachability as Govee ITSELF reported it in an account-push packet, or
+ * `undefined` when the packet carries no such claim.
+ *
+ * Measured across all 75 packets from four real user reports (issues
+ * #22/#25/#26), two shapes exist and they never mix:
+ * - `state.connected` — text "true"/"false". Present in EVERY packet kind of
+ *   those devices (status, pt, online), so it is always a valid claim.
+ * - `state.result` — number 1/0, but a reachability claim ONLY inside a
+ *   `cmd:"online"` packet. In `cmd:"status"` and `cmd:"ptReal"` the very same
+ *   field is an operation result code; reading it as reachability there would
+ *   turn every command acknowledgement into a liveness claim.
+ *
+ * Deliberately NOT keyed off `pactType`, although that also separates the two
+ * cleanly in the captures: the account list shows devices with `pactType`
+ * absent or 0 (H5106, H5125, H5126, H6181, H6110), and keying off it would drop
+ * their claim on the floor. The field shapes are unambiguous on their own.
+ *
+ * Anything unrecognised (`result: 2`, `connected: "unknown"`, missing state)
+ * returns `undefined` — no evidence, never a fallback to "reachable". An
+ * unproven value must never be written back (the 2.29.1 rule).
+ *
+ * @param update The parsed account-push packet
+ */
+export function readReportedReachability(update: MqttStatusUpdate): boolean | undefined {
+  const state = update.state;
+  if (!state) {
+    return undefined;
+  }
+  if (typeof state.connected === "string") {
+    const value = state.connected.trim().toLowerCase();
+    return value === "true" ? true : value === "false" ? false : undefined;
+  }
+  if (update.cmd === "online" && typeof state.result === "number") {
+    return state.result === 1 ? true : state.result === 0 ? false : undefined;
   }
   return undefined;
 }

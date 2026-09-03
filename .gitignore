@@ -44,6 +44,7 @@ package/
 # Claude Code local files (not published)
 .claude/settings.local.json
 .claude/dev-history.md
+.claude/plans/
 CLAUDE.local.md
 # Internal planning/spec artifacts (brainstorming output — not for the public repo)
 docs/superpowers/

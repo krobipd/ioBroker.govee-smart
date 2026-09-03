@@ -25,6 +25,7 @@ const ALLOWED_TYPES = new Set([
   "kettle",
   "ice_maker",
   "aroma_diffuser",
+  "button",
 ]);
 
 const ALLOWED_STATUS = new Set(["verified", "reported", "seed"]);
