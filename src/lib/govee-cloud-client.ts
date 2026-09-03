@@ -324,11 +324,17 @@ export class GoveeCloudClient {
         const retryAfter = String(err.headers["retry-after"] ?? "unknown");
         throw new HttpError(`Rate limited — retry after ${retryAfter}s`, 429, err.headers);
       }
-      // Classify 401/403 explicitly by status code too — classifyError only
-      // looks at err.message, so a 401/403 whose body doesn't contain
-      // "auth"/"unauthorized" (e.g. "Access denied", "Forbidden") would land as
-      // UNKNOWN and the ready hint would read "Cloud request failed" instead of
-      // the actionable "API key rejected — check Govee API key" (L26).
+      // Classify 401/403 explicitly by status code (L26) — a 401/403 whose body
+      // doesn't contain "auth"/"unauthorized" (e.g. "Access denied") must still
+      // produce the actionable "API key rejected — check Govee API key" instead
+      // of "Cloud request failed".
+      //
+      // classifyError() reads `err.statusCode` itself since the text-marker
+      // hardening, so this branch is redundant TODAY — kept as defence in depth
+      // for the one thing it owns: this class's own error category, independent
+      // of how the shared classifier evolves. Measured 2026-09-03: removing it
+      // changes no test (equivalent mutant G90). Do not re-add the old claim
+      // that classifyError only looks at the message — that stopped being true.
       if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
         this.lastErrorCategory = "AUTH";
         throw err;
