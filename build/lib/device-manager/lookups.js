@@ -130,7 +130,7 @@ function resolveSegmentCount(device, registry) {
   }
   return Number.isFinite(min) ? min : 0;
 }
-function resolveDeviceReachability(device, cloudOnline, now = Date.now()) {
+function resolveDeviceReachability(device, now = Date.now()) {
   if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
     return {
       online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < import_timing_constants.LAN_REPLY_FRESHNESS_MS),
@@ -140,7 +140,6 @@ function resolveDeviceReachability(device, cloudOnline, now = Date.now()) {
   if (typeof device.state.cloudReportedOnline === "boolean") {
     return { online: device.state.cloudReportedOnline, proven: true };
   }
-  void cloudOnline;
   return { online: false, proven: false };
 }
 const SEGMENT_HARD_MAX = 55;

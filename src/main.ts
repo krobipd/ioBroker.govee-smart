@@ -530,10 +530,6 @@ export class GoveeAdapter extends utils.Adapter {
       });
 
       this.stateManager = new StateManager(this, this.deviceRegistry);
-      // Reachability for a device with no local API is "the cloud answers and the
-      // account still lists it" — the state manager needs the live channel view
-      // for that, and a closure keeps it out of the per-device database reads.
-      this.stateManager.setCloudOnlineProvider(() => this.cloudWasConnected);
       // Nothing has been asked yet, so nothing may still claim to be reachable from
       // the previous run — least of all after a crash, where no shutdown code ran at
       // all and the old values would stand until the 20-second sync catches up.
@@ -596,7 +592,7 @@ export class GoveeAdapter extends utils.Adapter {
           compactMode: this.common?.compact === true,
           credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
           deviceCount: devices.length,
-          reachableCount: devices.filter(d => resolveDeviceReachability(d, this.cloudWasConnected).online).length,
+          reachableCount: devices.filter(d => resolveDeviceReachability(d).online).length,
           channels: { ...this.channelStatus },
         };
       });

@@ -403,7 +403,6 @@ class GoveeAdapter extends utils.Adapter {
         log: this.log
       });
       this.stateManager = new import_state_manager.StateManager(this, this.deviceRegistry);
-      this.stateManager.setCloudOnlineProvider(() => this.cloudWasConnected);
       await this.stateManager.markAllOffline().catch(() => void 0);
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => void 0);
       await this.stateManager.createGroupsOnlineState(false);
@@ -455,7 +454,7 @@ class GoveeAdapter extends utils.Adapter {
           compactMode: ((_c2 = this.common) == null ? void 0 : _c2.compact) === true,
           credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
           deviceCount: devices.length,
-          reachableCount: devices.filter((d) => (0, import_lookups.resolveDeviceReachability)(d, this.cloudWasConnected).online).length,
+          reachableCount: devices.filter((d) => (0, import_lookups.resolveDeviceReachability)(d).online).length,
           channels: { ...this.channelStatus }
         };
       });

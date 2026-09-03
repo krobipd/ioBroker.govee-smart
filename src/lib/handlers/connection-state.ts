@@ -64,7 +64,7 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   // needs evidence. 2.29.0 collapsed the two and got both wrong.
   const anyOnline = devices.some(
     d =>
-      resolveDeviceReachability(d, adapter.cloudWasConnected).online ||
+      resolveDeviceReachability(d).online ||
       (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected),
   );
   const lanRunning = adapter.lanClient !== null;

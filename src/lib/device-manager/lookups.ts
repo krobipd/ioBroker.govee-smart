@@ -208,16 +208,18 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
  * into it — that self-cementing write is what kept a device grey forever once
  * the cache had booted it to offline.
  *
+ * The Cloud CHANNEL is deliberately not an input here. That it is up says the
+ * adapter can talk to Govee, never that a device is there — 2.29.0 took it as
+ * evidence and reported unplugged strips as reachable.
+ *
  * Pure — no adapter, no I/O, no clock beyond the injected `now`.
  *
  * @param device The device to judge
- * @param cloudOnline Whether the Cloud REST channel is currently up
  * @param now Current time (ms epoch); injectable for tests
  * @returns The reachability plus whether it rests on evidence
  */
 export function resolveDeviceReachability(
   device: GoveeDevice,
-  cloudOnline: boolean,
   now: number = Date.now(),
 ): { online: boolean; proven: boolean } {
   if (device.type === GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
@@ -229,9 +231,6 @@ export function resolveDeviceReachability(
   if (typeof device.state.cloudReportedOnline === "boolean") {
     return { online: device.state.cloudReportedOnline, proven: true };
   }
-  // No evidence. `cloudOnline` is deliberately unused for the verdict: it says
-  // the CHANNEL is up, never that the DEVICE is there.
-  void cloudOnline;
   return { online: false, proven: false };
 }
 

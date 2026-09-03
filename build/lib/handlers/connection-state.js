@@ -35,7 +35,7 @@ function updateConnectionState(adapter) {
   const devices = (_b = (_a = adapter.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : [];
   const hasDevices = devices.length > 0;
   const anyOnline = devices.some(
-    (d) => (0, import_lookups.resolveDeviceReachability)(d, adapter.cloudWasConnected).online || d.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected
+    (d) => (0, import_lookups.resolveDeviceReachability)(d).online || d.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected
   );
   const lanRunning = adapter.lanClient !== null;
   const connected = hasDevices ? anyOnline : lanRunning;

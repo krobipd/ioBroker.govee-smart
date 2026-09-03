@@ -1584,7 +1584,6 @@ describe("StateManager", () => {
         // which means only Govee's own "offline" can produce the false.
         const { adapter, states } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
-        sm.setCloudOnlineProvider(() => true);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1596,15 +1595,15 @@ describe("StateManager", () => {
         expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
       });
 
-      it("a light nothing ever reported on is NOT reachable, however healthy the cloud is", async () => {
+      it("a light nothing ever reported on is NOT reachable", async () => {
         // 2.29.0 inferred reachability here from the cloud channel — "the cloud
         // answers and the account lists this device". That is a statement about
         // the account, not the device: two unplugged strips were reported as
         // reachable on the live system. A wrong green is worse than a wrong
-        // grey, because nobody notices it.
+        // grey, because nobody notices it. The channel is not even an input to
+        // the resolver any more, which is why this test needs no cloud state.
         const { adapter, states } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
-        sm.setCloudOnlineProvider(() => true);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1622,7 +1621,6 @@ describe("StateManager", () => {
         // API showable at all, without inventing anything.
         const { adapter, states } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
-        sm.setCloudOnlineProvider(() => true);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1640,7 +1638,6 @@ describe("StateManager", () => {
         // device.state.online, and no path could lift it again.
         const { adapter } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
-        sm.setCloudOnlineProvider(() => false);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,

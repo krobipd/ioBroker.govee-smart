@@ -208,25 +208,6 @@ export class StateManager {
   private readonly resolvedOnline = new Map<string, boolean>();
   /** This instance's device catalog — quirks for the LAN default states. */
   private readonly registry: DeviceRegistry;
-  /**
-   * Whether the Cloud REST channel is currently up. A provider (not a state
-   * read) because {@link syncInfoOnline} runs for every device every 20 s —
-   * reading `info.cloudConnected` back from the database per device is exactly
-   * the per-round database load v2.27.1 removed. Defaults to "no cloud" so a
-   * StateManager built before the wiring runs cannot claim reachability it
-   * has no basis for.
-   */
-  private cloudOnline: () => boolean = () => false;
-
-  /**
-   * Wire the Cloud-channel view used by {@link syncInfoOnline}. Called once
-   * from `onReady`; the closure reads main.ts's live `cloudWasConnected`.
-   *
-   * @param provider Returns whether the Cloud REST channel is up right now
-   */
-  setCloudOnlineProvider(provider: () => boolean): void {
-    this.cloudOnline = provider;
-  }
 
   /**
    * @param adapter The ioBroker adapter instance
@@ -1588,7 +1569,7 @@ export class StateManager {
     const prefix = this.devicePrefix(device);
     const stateId = `${prefix}.info.online`;
 
-    const { online: desiredOnline, proven } = resolveDeviceReachability(device, this.cloudOnline());
+    const { online: desiredOnline, proven } = resolveDeviceReachability(device);
 
     this.resolvedOnline.set(stateId, desiredOnline);
     await this.adapter.setStateChangedAsync(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
