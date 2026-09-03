@@ -526,4 +526,3 @@ describe("diagnostics command", () => {
     expect(responses[0].data).toMatchObject({ error: expect.stringContaining("nope") });
   });
 });
-
