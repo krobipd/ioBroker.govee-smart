@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "Pushkanaal voor sensor- en apparaatgebeurtenissen. Onafhankelijk van de AWS-IoT-MQTT voor de status van gewone Govee-lampen.",
   "diagnosticsFolder": "Diagnoserapporten",
   "diagnosticsLastExport": "Laatste diagnoserapport",
-  "diagnosticsLastExportDesc": "Bestandsnaam van het meest recente diagnoserapport. Download het op het tabblad Diagnose van de adapter en voeg het toe aan een GitHub-issue."
+  "diagnosticsLastExportDesc": "Bestandsnaam van het meest recente diagnoserapport. Download het op het tabblad Diagnose van de adapter en voeg het toe aan een GitHub-issue.",
+  "segmentChannel": "Segment %s",
+  "infoVerificationPending": "Verificatiecode vereist",
+  "infoVerificationPendingDesc": "Waar zolang Govee wacht op een 2FA-verificatiecode voordat de realtime-accountaanmelding kan worden voltooid. Voer de code in de verbindingskaart van de adapter in."
 }

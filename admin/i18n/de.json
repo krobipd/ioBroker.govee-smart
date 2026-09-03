@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "Push-Kanal für Sensor- und Appliance-Ereignisse. Unabhängig vom AWS-IoT-MQTT, das für Status-Push der regulären Govee-Lampen genutzt wird.",
   "diagnosticsFolder": "Diagnoseberichte",
   "diagnosticsLastExport": "Letzter Diagnosebericht",
-  "diagnosticsLastExportDesc": "Dateiname des zuletzt erzeugten Diagnoseberichts. Im Reiter „Diagnose“ des Adapters herunterladen und an ein GitHub-Issue anhängen."
+  "diagnosticsLastExportDesc": "Dateiname des zuletzt erzeugten Diagnoseberichts. Im Reiter „Diagnose“ des Adapters herunterladen und an ein GitHub-Issue anhängen.",
+  "segmentChannel": "Segment %s",
+  "infoVerificationPending": "Bestätigungscode erforderlich",
+  "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben."
 }

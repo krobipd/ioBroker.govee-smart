@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
   "diagnosticsFolder": "Diagnostics reports",
   "diagnosticsLastExport": "Last diagnostics report",
-  "diagnosticsLastExportDesc": "File name of the most recent diagnostics report. Download it from the adapter's Diagnostics tab and attach it to a GitHub issue."
+  "diagnosticsLastExportDesc": "File name of the most recent diagnostics report. Download it from the adapter's Diagnostics tab and attach it to a GitHub issue.",
+  "segmentChannel": "Segment %s",
+  "infoVerificationPending": "Verification code required",
+  "infoVerificationPendingDesc": "True while Govee is waiting for a 2FA verification code before the real-time account login can finish. Enter the code in the adapter's connection card."
 }

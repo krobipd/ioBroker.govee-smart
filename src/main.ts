@@ -29,7 +29,7 @@ import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
 import { RateLimiter } from "./lib/rate-limiter";
 import type { SegmentWizard } from "./lib/segment-wizard";
-import { resolveLabel } from "./lib/i18n";
+import { resolveLabel, tDesc, tName } from "./lib/i18n";
 import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
@@ -405,6 +405,9 @@ export class GoveeAdapter extends utils.Adapter {
       // these cannot go stale while this process lives. Failure is silent: a
       // report without them is worse, but not a reason to refuse starting.
       await this.readHostVersions();
+      // Deliver the manifest's texts to an EXISTING tree too — js-controller
+      // only creates instanceObjects that are missing.
+      await this.ensureManifestObjects();
       const config = this.config;
 
       // Fetch the live Govee-app version early (fire-and-forget) so the first
@@ -1204,6 +1207,53 @@ export class GoveeAdapter extends utils.Adapter {
    *
    * @param callback Completion callback
    */
+  /**
+   * js-controller and admin versions for the diagnostics report.
+   */
+  /**
+   * Refresh the manifest's own objects on an EXISTING installation.
+   *
+   * js-controller materialises `instanceObjects` only where they are MISSING,
+   * so a changed name or description in io-package.json reaches fresh installs
+   * only — an upgraded tree keeps the old text while the manifest and the name
+   * gate both look green. Every manifest object therefore gets an explicit
+   * extendObject here, with its text from `admin/i18n` (the same source the
+   * release gate writes the manifest from, so the two cannot drift).
+   *
+   * `preserve` is deliberately NOT used: the point is to deliver the new text.
+   */
+  private async ensureManifestObjects(): Promise<void> {
+    // Written out one call per object on purpose. A loop over a table would be
+    // shorter and would hide which objects are actually reached — from a reader
+    // and from the consistency gate, which looks for the literal call. The
+    // texts come from `admin/i18n`, the same source the release gate writes the
+    // manifest from, so the two cannot drift apart.
+    const fail = (id: string) => (e: unknown) => this.log.debug(`Could not refresh ${id}: ${errMessage(e)}`);
+    await this.extendObject("info", { common: { name: tName("information") } }).catch(fail("info"));
+    await this.extendObject("devices", { common: { name: tName("devicesFolder") } }).catch(fail("devices"));
+    await this.extendObject("groups", { common: { name: tName("groups") } }).catch(fail("groups"));
+    await this.extendObject("snapshots", { common: { name: tName("localSnapshotsFolder") } }).catch(fail("snapshots"));
+    await this.extendObject("diagnostics", { common: { name: tName("diagnosticsFolder") } }).catch(fail("diagnostics"));
+    await this.extendObject("info.connection", { common: { name: tName("infoConnection") } }).catch(
+      fail("info.connection"),
+    );
+    await this.extendObject("info.mqttConnected", { common: { name: tName("infoMqttConnected") } }).catch(
+      fail("info.mqttConnected"),
+    );
+    await this.extendObject("info.cloudConnected", { common: { name: tName("infoCloudConnected") } }).catch(
+      fail("info.cloudConnected"),
+    );
+    await this.extendObject("info.openapiMqttConnected", {
+      common: { name: tName("infoOpenapiMqttConnected"), desc: tDesc("infoOpenapiMqttConnectedDesc") },
+    }).catch(fail("info.openapiMqttConnected"));
+    await this.extendObject("info.verificationPending", {
+      common: { name: tName("infoVerificationPending"), desc: tDesc("infoVerificationPendingDesc") },
+    }).catch(fail("info.verificationPending"));
+    await this.extendObject("info.manualSyncDevices", {
+      common: { name: tName("infoManualSyncDevices"), desc: tDesc("infoManualSyncDevicesDesc") },
+    }).catch(fail("info.manualSyncDevices"));
+  }
+
   /**
    * js-controller and admin versions for the diagnostics report.
    */

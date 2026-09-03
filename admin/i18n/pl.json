@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "Kanał push dla zdarzeń czujników i urządzeń. Niezależny od MQTT AWS-IoT używanego do statusu zwykłych lamp Govee.",
   "diagnosticsFolder": "Raporty diagnostyczne",
   "diagnosticsLastExport": "Ostatni raport diagnostyczny",
-  "diagnosticsLastExportDesc": "Nazwa pliku najnowszego raportu diagnostycznego. Pobierz go na karcie Diagnostyka adaptera i dołącz do zgłoszenia na GitHubie."
+  "diagnosticsLastExportDesc": "Nazwa pliku najnowszego raportu diagnostycznego. Pobierz go na karcie Diagnostyka adaptera i dołącz do zgłoszenia na GitHubie.",
+  "segmentChannel": "Segment %s",
+  "infoVerificationPending": "Wymagany kod weryfikacyjny",
+  "infoVerificationPendingDesc": "Prawda, gdy Govee czeka na kod weryfikacyjny 2FA, aby dokończyć logowanie do konta w czasie rzeczywistym. Wpisz kod w karcie połączenia adaptera."
 }

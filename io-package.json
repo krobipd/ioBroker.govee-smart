@@ -137,6 +137,14 @@
     "icon": "govee-smart.svg",
     "extIcon": "https://cdn.jsdelivr.net/gh/krobipd/ioBroker.govee-smart@main/admin/govee-smart.svg",
     "readme": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/README.md",
+    "docs": {
+      "en": [
+        "docs/en/README.md"
+      ],
+      "de": [
+        "docs/de/README.md"
+      ]
+    },
     "enabled": true,
     "tier": 2,
     "loglevel": "info",

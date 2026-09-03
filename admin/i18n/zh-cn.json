@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "传感器和家电事件的推送通道。独立于用于常规 Govee 灯状态推送的 AWS-IoT MQTT。",
   "diagnosticsFolder": "诊断报告",
   "diagnosticsLastExport": "最近的诊断报告",
-  "diagnosticsLastExportDesc": "最近一次诊断报告的文件名。请在适配器的“诊断”标签页下载，并附加到 GitHub issue。"
+  "diagnosticsLastExportDesc": "最近一次诊断报告的文件名。请在适配器的“诊断”标签页下载，并附加到 GitHub issue。",
+  "segmentChannel": "分段 %s",
+  "infoVerificationPending": "需要验证码",
+  "infoVerificationPendingDesc": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。"
 }

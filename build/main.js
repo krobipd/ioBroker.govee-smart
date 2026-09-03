@@ -354,6 +354,7 @@ class GoveeAdapter extends utils.Adapter {
       }
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
       await this.readHostVersions();
+      await this.ensureManifestObjects();
       const config = this.config;
       void connectionState.refreshLiveAppVersion(this.handlerHost).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
@@ -884,6 +885,47 @@ class GoveeAdapter extends utils.Adapter {
    *
    * @param callback Completion callback
    */
+  /**
+   * js-controller and admin versions for the diagnostics report.
+   */
+  /**
+   * Refresh the manifest's own objects on an EXISTING installation.
+   *
+   * js-controller materialises `instanceObjects` only where they are MISSING,
+   * so a changed name or description in io-package.json reaches fresh installs
+   * only — an upgraded tree keeps the old text while the manifest and the name
+   * gate both look green. Every manifest object therefore gets an explicit
+   * extendObject here, with its text from `admin/i18n` (the same source the
+   * release gate writes the manifest from, so the two cannot drift).
+   *
+   * `preserve` is deliberately NOT used: the point is to deliver the new text.
+   */
+  async ensureManifestObjects() {
+    const fail = (id) => (e) => this.log.debug(`Could not refresh ${id}: ${(0, import_types.errMessage)(e)}`);
+    await this.extendObject("info", { common: { name: (0, import_i18n.tName)("information") } }).catch(fail("info"));
+    await this.extendObject("devices", { common: { name: (0, import_i18n.tName)("devicesFolder") } }).catch(fail("devices"));
+    await this.extendObject("groups", { common: { name: (0, import_i18n.tName)("groups") } }).catch(fail("groups"));
+    await this.extendObject("snapshots", { common: { name: (0, import_i18n.tName)("localSnapshotsFolder") } }).catch(fail("snapshots"));
+    await this.extendObject("diagnostics", { common: { name: (0, import_i18n.tName)("diagnosticsFolder") } }).catch(fail("diagnostics"));
+    await this.extendObject("info.connection", { common: { name: (0, import_i18n.tName)("infoConnection") } }).catch(
+      fail("info.connection")
+    );
+    await this.extendObject("info.mqttConnected", { common: { name: (0, import_i18n.tName)("infoMqttConnected") } }).catch(
+      fail("info.mqttConnected")
+    );
+    await this.extendObject("info.cloudConnected", { common: { name: (0, import_i18n.tName)("infoCloudConnected") } }).catch(
+      fail("info.cloudConnected")
+    );
+    await this.extendObject("info.openapiMqttConnected", {
+      common: { name: (0, import_i18n.tName)("infoOpenapiMqttConnected"), desc: (0, import_i18n.tDesc)("infoOpenapiMqttConnectedDesc") }
+    }).catch(fail("info.openapiMqttConnected"));
+    await this.extendObject("info.verificationPending", {
+      common: { name: (0, import_i18n.tName)("infoVerificationPending"), desc: (0, import_i18n.tDesc)("infoVerificationPendingDesc") }
+    }).catch(fail("info.verificationPending"));
+    await this.extendObject("info.manualSyncDevices", {
+      common: { name: (0, import_i18n.tName)("infoManualSyncDevices"), desc: (0, import_i18n.tDesc)("infoManualSyncDevicesDesc") }
+    }).catch(fail("info.manualSyncDevices"));
+  }
   /**
    * js-controller and admin versions for the diagnostics report.
    */

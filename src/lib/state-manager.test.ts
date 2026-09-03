@@ -394,6 +394,25 @@ describe("StateManager", () => {
       expect(deleted).toContain(`${prefix}.control.gradient_toggle`); // stale cloud state removed
       expect(deleted).not.toContain(`${prefix}.control`); // channel object preserved (LAN states live)
     });
+
+    it("sweeps a leftover sensor.online while real sensor readings survive", async () => {
+      // SYNTHETIC_STATE_META doubles as the "leave it alone" list for this
+      // sweep. It used to carry an `online` entry that nothing could ever
+      // create — the cloud-value translator has no `online` branch — so the
+      // only thing the entry still did was make a `sensor.online` from an old
+      // install permanently unremovable. Reachability belongs in `info.online`.
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const prefix = "devices.h5179_3c1b";
+      objects.set(`${prefix}.sensor`, { type: "channel" });
+      objects.set(`${prefix}.sensor.online`, { type: "state" }); // leftover, no longer synthetic
+      objects.set(`${prefix}.sensor.temperature`, { type: "state" }); // real reading — foreign-owned
+      await sm.cleanupCloudOwnedStates(prefix, []);
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).toContain(`${prefix}.sensor.online`);
+      expect(deleted).not.toContain(`${prefix}.sensor.temperature`);
+      expect(deleted).not.toContain(`${prefix}.sensor`);
+    });
   });
 
   describe("cleanupSameModeGroupOrphansOnce", () => {

@@ -11,7 +11,7 @@ import { SEGMENT_COUNT_MAX, resolveDeviceReachability } from "./device-manager/l
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import type { I18nKey } from "./i18n";
-import { tDesc, tName } from "./i18n";
+import { tDesc, tName, tNameWith } from "./i18n";
 import type { DeviceState, GoveeDevice } from "./types";
 import { mapKey, treeKey } from "./device-key";
 
@@ -122,7 +122,14 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   humidity: numSensor("humidity", "humidity"),
   battery: numSensor("battery", "battery"),
   co2: numSensor("co2", "co2"),
-  online: { type: "boolean", role: "indicator.connected", nameKey: "online", channel: "sensor" },
+  // No `online` entry here on purpose. Reachability lives in `info.online` and
+  // is fed by applyOnlineCap; the synthetic pipe never produces it, because the
+  // cloud-value translator has no `online` branch and the capability falls into
+  // its default. Keeping a dead entry was not free: this table doubles as the
+  // "leave it alone" list for the cloud-phase sweep, so a `sensor.online` left
+  // by an old install was exempt from cleanup and could never be removed —
+  // against the rule that the adapter owns its datapoint inventory. Without the
+  // entry that leftover leaves on the next cloud rebuild, migration-free.
   lack_water: { type: "boolean", role: EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
   lack_water_event: {
     type: "boolean",
@@ -1049,7 +1056,7 @@ export class StateManager {
         `${prefix}.segments.${i}`,
         {
           type: "channel",
-          common: { name: `Segment ${i}` },
+          common: { name: tNameWith("segmentChannel", i) },
           native: {},
         },
         { preserve: { common: ["name"] } },

@@ -13,6 +13,24 @@ export function tName(key: I18nKey): ioBroker.StringOrTranslated {
 }
 
 /**
+ * Translation object for a `common.name` that carries a running number, e.g.
+ * `Segment 3`. The plain {@link tName} cannot do it, and a template string
+ * would hard-code English into the object tree — which is what the segment
+ * channels did until 2.29.0 and what the state-role gate flags.
+ *
+ * Exactly ONE placeholder: adapter-core restarts from the untouched source
+ * text for every argument, so a second `%s` would see the first substitution
+ * overwritten. The substitution also only runs when the ENGLISH text carries
+ * the placeholder — that is the trigger condition in adapter-core.
+ *
+ * @param key I18n key whose English text contains exactly one `%s`
+ * @param arg The value to substitute
+ */
+export function tNameWith(key: I18nKey, arg: string | number): ioBroker.StringOrTranslated {
+  return I18n.getTranslatedObject(key, arg);
+}
+
+/**
  * Translation object for `common.desc`.
  *
  * @param key I18n key

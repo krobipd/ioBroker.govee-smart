@@ -20,12 +20,16 @@ var i18n_exports = {};
 __export(i18n_exports, {
   resolveLabel: () => resolveLabel,
   tDesc: () => tDesc,
-  tName: () => tName
+  tName: () => tName,
+  tNameWith: () => tNameWith
 });
 module.exports = __toCommonJS(i18n_exports);
 var import_adapter_core = require("@iobroker/adapter-core");
 function tName(key) {
   return import_adapter_core.I18n.getTranslatedObject(key);
+}
+function tNameWith(key, arg) {
+  return import_adapter_core.I18n.getTranslatedObject(key, arg);
 }
 function tDesc(key) {
   return import_adapter_core.I18n.getTranslatedObject(key);
@@ -37,6 +41,7 @@ function resolveLabel(key, ...args) {
 0 && (module.exports = {
   resolveLabel,
   tDesc,
-  tName
+  tName,
+  tNameWith
 });
 //# sourceMappingURL=i18n.js.map

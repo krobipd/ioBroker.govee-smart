@@ -121,5 +121,8 @@
   "infoOpenapiMqttConnectedDesc": "Push-канал для событий датчиков и бытовых приборов. Не зависит от AWS-IoT MQTT, используемого для статуса обычных ламп Govee.",
   "diagnosticsFolder": "Отчёты диагностики",
   "diagnosticsLastExport": "Последний отчёт диагностики",
-  "diagnosticsLastExportDesc": "Имя файла последнего отчёта диагностики. Скачайте его на вкладке «Диагностика» адаптера и приложите к issue на GitHub."
+  "diagnosticsLastExportDesc": "Имя файла последнего отчёта диагностики. Скачайте его на вкладке «Диагностика» адаптера и приложите к issue на GitHub.",
+  "segmentChannel": "Сегмент %s",
+  "infoVerificationPending": "Требуется код подтверждения",
+  "infoVerificationPendingDesc": "Истина, пока Govee ожидает код подтверждения 2FA для завершения входа в аккаунт реального времени. Введите код в карточке подключения адаптера."
 }
