@@ -64,6 +64,7 @@ var import_i18n = require("./lib/i18n");
 var import_sku_cache = require("./lib/sku-cache");
 var import_state_manager = require("./lib/state-manager");
 var import_types = require("./lib/types");
+var diagnosticsHandlerImpl = __toESM(require("./lib/handlers/diagnostics-handler"));
 var import_timing_constants = require("./lib/timing-constants");
 function physicalSegmentCap(device) {
   return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
@@ -1105,6 +1106,31 @@ class GoveeAdapter extends utils.Adapter {
         const probe = new import_govee_mqtt_client.GoveeMqttClient(email, password, this.log, this);
         probe.enableProbeMode();
         return probe;
+      },
+      getDiagnosticsDeviceList: () => {
+        var _a, _b;
+        return ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).filter((d) => d.sku !== "BaseGroup").map((d) => ({ value: `${d.sku}:${d.deviceId}`, label: (0, import_types.deviceLabel)(d), model: d.sku }));
+      },
+      buildDiagnosticsReport: async (deviceKey) => {
+        var _a, _b;
+        const device = ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).find((d) => `${d.sku}:${d.deviceId}` === deviceKey);
+        if (!device || !this.deviceManager || !this.stateManager) {
+          return { error: `Unknown device '${deviceKey}'` };
+        }
+        const prefix = this.stateManager.devicePrefix(device);
+        const fileName = await diagnosticsHandlerImpl.handleDiagnosticsExport(
+          this,
+          this.deviceManager,
+          this.diagnosticsLastRun,
+          device,
+          prefix,
+          `${this.namespace}.${prefix}.diag.export`
+        );
+        if (!fileName) {
+          return { error: "Export failed or was throttled \u2014 try again in a moment" };
+        }
+        const { file } = await this.readFileAsync(`${this.namespace}.diagnostics`, fileName);
+        return { fileName, content: typeof file === "string" ? file : file.toString("utf8") };
       },
       getSegmentDeviceList: () => {
         var _a, _b;

@@ -99,6 +99,8 @@ function makeHost(opts: {
   segmentDevices?: Array<{ value: string; label: string }>;
   wizardResponse?: Record<string, unknown>;
   probe?: GoveeMqttClient;
+  diagnosticsDevices?: Array<{ value: string; label: string; model: string }>;
+  diagnosticsReport?: { fileName: string; content: string } | { error: string };
 }): { host: MessageRouterHost; responses: RecordedResponse[] } {
   const responses: RecordedResponse[] = [];
   const host: MessageRouterHost = {
@@ -110,6 +112,9 @@ function makeHost(opts: {
     }),
     sendResponse: (obj, data) => responses.push({ obj, data }),
     createMqttProbeClient: (_email: string, _password: string) => opts.probe ?? makeProbe({ connected: false }),
+    getDiagnosticsDeviceList: () => opts.diagnosticsDevices ?? [],
+    buildDiagnosticsReport: () =>
+      Promise.resolve(opts.diagnosticsReport ?? { error: "no report configured in this test" }),
     getSegmentDeviceList: () => opts.segmentDevices ?? [],
     runWizardStep: () => Promise.resolve(opts.wizardResponse ?? { ok: true }),
     setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms) as unknown as ioBroker.Timeout,
@@ -483,3 +488,42 @@ describe("onMessage crash boundaries", () => {
     expect(responses).toEqual([expect.objectContaining({ data: { error: "socket gone" } })]);
   });
 });
+
+describe("diagnostics command", () => {
+  it("lists every real device, reachable or not", async () => {
+    // A report is wanted precisely when a device misbehaves, so filtering the
+    // list by reachability would hide the interesting ones.
+    const { host, responses } = makeHost({
+      diagnosticsDevices: [{ value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE" }],
+    });
+    const router = new MessageRouter(host);
+    router.onMessage({ command: "diagnostics", message: { action: "list" }, from: "x", callback: {} } as never);
+    await new Promise(r => setTimeout(r, 0));
+    expect((responses[0].data as { devices: unknown[] }).devices).toHaveLength(1);
+  });
+
+  it("hands the report back with its content so the card can offer a download", async () => {
+    const { host, responses } = makeHost({
+      diagnosticsReport: { fileName: "govee-smart_H61BE_1d6f_v2.29.0_2026-09-03_101500.json", content: "{}" },
+    });
+    const router = new MessageRouter(host);
+    router.onMessage({
+      command: "diagnostics",
+      message: { action: "export", device: "H61BE:AA:BB" },
+      from: "x",
+      callback: {},
+    } as never);
+    await new Promise(r => setTimeout(r, 0));
+    expect(responses[0].data).toMatchObject({ fileName: expect.stringContaining("H61BE"), content: "{}" });
+  });
+
+  it("answers an unknown action instead of leaving the caller hanging", async () => {
+    // An admin sendTo without an answer hangs until it times out.
+    const { host, responses } = makeHost({});
+    const router = new MessageRouter(host);
+    router.onMessage({ command: "diagnostics", message: { action: "nope" }, from: "x", callback: {} } as never);
+    await new Promise(r => setTimeout(r, 0));
+    expect(responses[0].data).toMatchObject({ error: expect.stringContaining("nope") });
+  });
+});
+

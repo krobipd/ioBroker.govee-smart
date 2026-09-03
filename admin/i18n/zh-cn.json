@@ -124,5 +124,6 @@
   "diagnosticsLastExportDesc": "最近一次诊断报告的文件名。请在适配器的“诊断”标签页下载，并附加到 GitHub issue。",
   "segmentChannel": "分段 %s",
   "infoVerificationPending": "需要验证码",
-  "infoVerificationPendingDesc": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。"
+  "infoVerificationPendingDesc": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。",
+  "tabDiagnostics": "诊断"
 }

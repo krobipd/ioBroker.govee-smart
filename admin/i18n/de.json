@@ -124,5 +124,6 @@
   "diagnosticsLastExportDesc": "Dateiname des zuletzt erzeugten Diagnoseberichts. Im Reiter „Diagnose“ des Adapters herunterladen und an ein GitHub-Issue anhängen.",
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Bestätigungscode erforderlich",
-  "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben."
+  "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben.",
+  "tabDiagnostics": "Diagnose"
 }

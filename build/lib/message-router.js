@@ -87,7 +87,7 @@ class MessageRouter {
    * @param obj Incoming ioBroker message
    */
   async handleMessage(obj) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     try {
       if (obj.command === "getSegmentDevices") {
         this.host.sendResponse(obj, this.host.getSegmentDeviceList());
@@ -101,9 +101,22 @@ class MessageRouter {
         this.host.sendResponse(obj, response);
         return;
       }
-      if (obj.command === "mqttAuth") {
+      if (obj.command === "diagnostics") {
         const payload = (_d = obj.message) != null ? _d : {};
-        const response = await this.runMqttAuthAction((_e = payload.action) != null ? _e : "", {
+        if (payload.action === "list") {
+          this.host.sendResponse(obj, { devices: this.host.getDiagnosticsDeviceList() });
+          return;
+        }
+        if (payload.action === "export") {
+          this.host.sendResponse(obj, await this.host.buildDiagnosticsReport((_e = payload.device) != null ? _e : ""));
+          return;
+        }
+        this.host.sendResponse(obj, { error: `Unknown diagnostics action '${(_f = payload.action) != null ? _f : ""}'` });
+        return;
+      }
+      if (obj.command === "mqttAuth") {
+        const payload = (_g = obj.message) != null ? _g : {};
+        const response = await this.runMqttAuthAction((_h = payload.action) != null ? _h : "", {
           email: payload.email,
           password: payload.password,
           code: payload.code

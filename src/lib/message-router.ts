@@ -63,6 +63,15 @@ export interface MessageRouterHost {
   createMqttProbeClient: (email: string, password: string) => GoveeMqttClient;
   /** Provides the list of devices that have segments (for getSegmentDevices). */
   getSegmentDeviceList: () => Array<{ value: string; label: string }>;
+  /** Every device, for the diagnostics card's picker. */
+  getDiagnosticsDeviceList: () => Array<{ value: string; label: string; model: string }>;
+  /**
+   * Builds the report for one device and returns it WITH its content, so the
+   * admin card can hand the user a file straight away. The report is written to
+   * the instance's file storage as well — the card is the convenient path, the
+   * file browser is the one that still works when the card is not open.
+   */
+  buildDiagnosticsReport: (deviceKey: string) => Promise<{ fileName: string; content: string } | { error: string }>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
   runWizardStep: (
     action: string,
@@ -78,10 +87,11 @@ export interface MessageRouterHost {
 /**
  * Router for ioBroker.Message events (sendTo from the admin UI).
  *
- * Dispatches 3 commands:
+ * Dispatches 4 commands:
  *  - `getSegmentDevices` — selectSendTo data source for the wizard
  *  - `segmentWizard` — wizard step (start/yes/no/done/abort)
  *  - `mqttAuth` — login test + verification-code request (with live credentials)
+ *  - `diagnostics` — device list + report build for the diagnostics card
  */
 export class MessageRouter {
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
@@ -163,6 +173,22 @@ export class MessageRouter {
           indices: payload.indices,
         });
         this.host.sendResponse(obj, response);
+        return;
+      }
+      if (obj.command === "diagnostics") {
+        const payload = (obj.message ?? {}) as { action?: string; device?: string };
+        if (payload.action === "list") {
+          this.host.sendResponse(obj, { devices: this.host.getDiagnosticsDeviceList() });
+          return;
+        }
+        if (payload.action === "export") {
+          // The content travels back with the answer so the card can put a file
+          // in the user's download folder in one click. Around 68 KB — well
+          // inside what the admin socket carries, and it happens once per press.
+          this.host.sendResponse(obj, await this.host.buildDiagnosticsReport(payload.device ?? ""));
+          return;
+        }
+        this.host.sendResponse(obj, { error: `Unknown diagnostics action '${payload.action ?? ""}'` });
         return;
       }
       if (obj.command === "mqttAuth") {

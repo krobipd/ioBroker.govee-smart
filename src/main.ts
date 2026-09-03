@@ -37,6 +37,7 @@ import { StateManager } from "./lib/state-manager";
 import { deviceLabel, errMessage, logRejected, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
 import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
+import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
@@ -1460,6 +1461,37 @@ export class GoveeAdapter extends utils.Adapter {
         // it could fire a second login against Govee inside the probe window.
         probe.enableProbeMode();
         return probe;
+      },
+      getDiagnosticsDeviceList: () => {
+        // Every real device — a report is useful precisely when a device is NOT
+        // behaving, so filtering by reachability would hide the interesting
+        // ones. Groups are out: they never had diagnostics.
+        return (this.deviceManager?.getDevices() ?? [])
+          .filter(d => d.sku !== "BaseGroup")
+          .map(d => ({ value: `${d.sku}:${d.deviceId}`, label: deviceLabel(d), model: d.sku }));
+      },
+      buildDiagnosticsReport: async (deviceKey: string) => {
+        const device = (this.deviceManager?.getDevices() ?? []).find(d => `${d.sku}:${d.deviceId}` === deviceKey);
+        if (!device || !this.deviceManager || !this.stateManager) {
+          return { error: `Unknown device '${deviceKey}'` };
+        }
+        const prefix = this.stateManager.devicePrefix(device);
+        const fileName = await diagnosticsHandlerImpl.handleDiagnosticsExport(
+          this,
+          this.deviceManager,
+          this.diagnosticsLastRun,
+          device,
+          prefix,
+          `${this.namespace}.${prefix}.diag.export`,
+        );
+        if (!fileName) {
+          return { error: "Export failed or was throttled — try again in a moment" };
+        }
+        // Read back what was written rather than generating a second time: the
+        // user gets exactly the file that is in the instance's storage, not a
+        // near-identical copy taken a moment later.
+        const { file } = await this.readFileAsync(`${this.namespace}.diagnostics`, fileName);
+        return { fileName, content: typeof file === "string" ? file : file.toString("utf8") };
       },
       getSegmentDeviceList: () => {
         const devices = this.deviceManager?.getDevices() ?? [];

@@ -152,6 +152,24 @@
           "xl": 12
         }
       }
+    },
+    "_diagnostics": {
+      "type": "panel",
+      "label": "tabDiagnostics",
+      "items": {
+        "_diagnosticsPanel": {
+          "type": "custom",
+          "i18n": true,
+          "url": "custom/customComponents.js",
+          "name": "ConfigCustomGoveeSegmentSet/Components/DiagnosticsConfig",
+          "guiApi": 2,
+          "xs": 12,
+          "sm": 12,
+          "md": 12,
+          "lg": 12,
+          "xl": 12
+        }
+      }
     }
   }
 }

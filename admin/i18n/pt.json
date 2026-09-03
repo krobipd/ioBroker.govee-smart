@@ -124,5 +124,6 @@
   "diagnosticsLastExportDesc": "Nome do ficheiro do relatório de diagnóstico mais recente. Transfira-o no separador «Diagnóstico» do adaptador e anexe-o a um issue no GitHub.",
   "segmentChannel": "Segmento %s",
   "infoVerificationPending": "Código de verificação necessário",
-  "infoVerificationPendingDesc": "Verdadeiro enquanto a Govee aguarda um código de verificação 2FA para concluir o início de sessão da conta em tempo real. Introduza o código no cartão de ligação do adaptador."
+  "infoVerificationPendingDesc": "Verdadeiro enquanto a Govee aguarda um código de verificação 2FA para concluir o início de sessão da conta em tempo real. Introduza o código no cartão de ligação do adaptador.",
+  "tabDiagnostics": "Diagnóstico"
 }
