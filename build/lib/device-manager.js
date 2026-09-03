@@ -1128,6 +1128,22 @@ class DeviceManager {
    * @param device Target device
    * @param caps Capability list carrying the online flag
    */
+  /**
+   * Public entry for the Cloud state read (`/device/state`). That response
+   * carries Govee's own reachability for the device, and until 2.29.1 the
+   * adapter threw it away: the value translator has no `online` branch, so the
+   * capability fell into its default and nothing else looked at it.
+   *
+   * That gap is why a device with no local API had no evidence at all — which
+   * 2.29.0 then papered over by inferring reachability from the cloud CHANNEL,
+   * reporting unplugged devices as reachable. This is the honest source.
+   *
+   * @param device The device the state read was for
+   * @param caps The capabilities Govee returned
+   */
+  applyCloudStateOnline(device, caps) {
+    this.maybeApplyCloudOnline(device, caps);
+  }
   maybeApplyCloudOnline(device, caps) {
     if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
       this.applyOnlineCap(device, caps);

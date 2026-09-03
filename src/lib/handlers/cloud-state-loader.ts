@@ -52,6 +52,11 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
       }
       try {
         const caps = await adapter.cloudClient.getDeviceState(device.sku, device.deviceId);
+        // Govee's own reachability rides along in this response and used to be
+        // discarded — the value translator has no `online` branch. For a device
+        // with no local API this is the ONLY evidence there is, so without it
+        // such a device could never be shown as reachable at all.
+        adapter.deviceManager?.applyCloudStateOnline(device, caps);
         const prefix = adapter.stateManager.devicePrefix(device);
 
         const writes: Promise<unknown>[] = [];

@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.29.0",
+    "version": "2.29.1",
     "news": {
+      "2.29.1": {
+        "en": "A switched-off device is shown as not reachable again — 2.29.0 reported it as reachable. The diagnostics export works again.",
+        "de": "Ein ausgeschaltetes Gerät wird wieder als nicht erreichbar angezeigt — 2.29.0 meldete es als erreichbar. Der Diagnose-Export geht wieder.",
+        "ru": "Выключенное устройство снова показывается как недоступное — 2.29.0 сообщал обратное. Экспорт диагностики снова работает.",
+        "pt": "Um dispositivo desligado volta a surgir como inacessível — a 2.29.0 dizia o contrário. O export de diagnóstico funciona de novo.",
+        "nl": "Een uitgeschakeld apparaat wordt weer als onbereikbaar getoond — 2.29.0 meldde het omgekeerde. De diagnose-export werkt weer.",
+        "fr": "Un appareil éteint est de nouveau affiché comme injoignable — la 2.29.0 disait l'inverse. L'export de diagnostic refonctionne.",
+        "it": "Un dispositivo spento torna irraggiungibile nella vista — la 2.29.0 diceva il contrario. L'export di diagnostica funziona di nuovo.",
+        "es": "Un dispositivo apagado vuelve a verse como inaccesible — la 2.29.0 decía lo contrario. La exportación de diagnóstico funciona otra vez.",
+        "pl": "Wyłączone urządzenie znów jest pokazywane jako niedostępne — 2.29.0 twierdziła inaczej. Eksport diagnostyczny znów działa.",
+        "uk": "Вимкнений пристрій знову показується як недоступний — 2.29.0 стверджувала протилежне. Експорт діагностики знову працює.",
+        "zh-cn": "已断电的设备重新显示为不可达——2.29.0 曾报告相反。诊断导出恢复正常。"
+      },
       "2.29.0": {
         "en": "Devices without the local API no longer show as unreachable while they still control fine. The diagnostics report is a file you can attach now — diag.result is gone.",
         "de": "Geräte ohne lokale Schnittstelle werden nicht mehr als nicht erreichbar angezeigt, obwohl sie sich steuern lassen. Der Diagnosebericht ist jetzt eine Datei zum Anhängen — diag.result entfällt.",
@@ -80,19 +93,6 @@
         "pl": "Konfiguracja połączenia to teraz jedna karta ze statusem na żywo dla klucza chmury, logowania i 2FA. Taśmy ponownie podają prawdziwą liczbę segmentów.",
         "uk": "Налаштування підключення тепер одна картка зі статусом у реальному часі для ключа хмари, входу та 2FA. Стрічки також знову повідомляють реальну кількість сегментів.",
         "zh-cn": "连接设置现在集中在一张带实时状态的卡片中，包含云密钥、账户登录和 2FA。灯带也会重新报告其真实的分段数量。"
-      },
-      "2.23.1": {
-        "en": "Test release during the move to ioBroker Admin 8.",
-        "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
-        "ru": "Тестовый выпуск во время перехода на ioBroker Admin 8.",
-        "pt": "Versão de teste durante a mudança para o ioBroker Admin 8.",
-        "nl": "Testversie tijdens de overstap naar ioBroker Admin 8.",
-        "fr": "Version de test pendant le passage à ioBroker Admin 8.",
-        "it": "Versione di prova durante il passaggio a ioBroker Admin 8.",
-        "es": "Versión de prueba durante el cambio a ioBroker Admin 8.",
-        "pl": "Wersja testowa podczas przejścia na ioBroker Admin 8.",
-        "uk": "Тестова версія під час переходу на ioBroker Admin 8.",
-        "zh-cn": "向 ioBroker Admin 8 迁移期间的测试版本。"
       }
     },
     "plugins": {

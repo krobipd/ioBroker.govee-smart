@@ -100,6 +100,12 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.29.1 (2026-09-03)
+
+- Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up
+- Fixed: A device without the local API is now shown as reachable when Govee itself reports it — that information always arrived and was discarded
+- Fixed: The diagnostics export failed with an internal error and wrote no file; the button in the object tree and the Diagnostics tab both work now
+
 ### 2.29.0 (2026-09-03)
 
 - Fixed: A device without the local API enabled no longer shows as unreachable after a restart while it still controls fine
@@ -133,10 +139,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running
 - Fixed: After a crash the devices no longer keep claiming to be reachable until the next status round has caught up
 - New: Three new datapoints under info — how many devices there are, how many are reachable right now, and whether that is all of them
-
-### 2.26.0 (2026-08-22)
-
-- Fixed: Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints for a moment after it has shut down.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

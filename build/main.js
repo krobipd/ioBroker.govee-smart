@@ -241,6 +241,11 @@ class GoveeAdapter extends utils.Adapter {
     );
     method("readFileAsync", (meta, name) => this.readFileAsync(meta, name));
     method("delFileAsync", (meta, name) => this.delFileAsync(meta, name));
+    method(
+      "writeFileAsync",
+      (meta, name, data) => this.writeFileAsync(meta, name, data)
+    );
+    method("readDirAsync", (meta, path2) => this.readDirAsync(meta, path2));
     method("delObjectAsync", (id) => this.delObjectAsync(id));
     method("encrypt", (value) => this.encrypt(value));
     method("decrypt", (value) => this.decrypt(value));

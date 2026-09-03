@@ -31,11 +31,13 @@ async function loadCloudStates(adapter, only) {
   const targets = adapter.deviceManager.getDevices().filter((d) => d.channels.cloud && d.capabilities.length > 0 && (!only || d === only));
   for (const device of targets) {
     const loadOne = async () => {
+      var _a;
       if (!adapter.cloudClient || !adapter.stateManager) {
         return;
       }
       try {
         const caps = await adapter.cloudClient.getDeviceState(device.sku, device.deviceId);
+        (_a = adapter.deviceManager) == null ? void 0 : _a.applyCloudStateOnline(device, caps);
         const prefix = adapter.stateManager.devicePrefix(device);
         const writes = [];
         for (const cap of caps) {

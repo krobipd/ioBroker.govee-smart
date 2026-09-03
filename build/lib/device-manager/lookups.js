@@ -140,7 +140,8 @@ function resolveDeviceReachability(device, cloudOnline, now = Date.now()) {
   if (typeof device.state.cloudReportedOnline === "boolean") {
     return { online: device.state.cloudReportedOnline, proven: true };
   }
-  return { online: cloudOnline && device.channels.cloud === true, proven: false };
+  void cloudOnline;
+  return { online: false, proven: false };
 }
 const SEGMENT_HARD_MAX = 55;
 const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;

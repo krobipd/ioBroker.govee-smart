@@ -72,13 +72,17 @@ Das Symbol am Geräte-Knoten kommt aus `common.statusStates` → `<gerät>.info.
 
 **Die drei Summen** (`info.devicesTotal`/`devicesOnline`/`devicesAllOnline`) reiten auf derselben 20-s-Runde, die die Einzelnen neu bewertet, und lesen dafür **nichts** aus der Datenbank zurück (`resolvedOnline` + `onlineMarkerCache`; der Cache wird nur beim Kaltstart per Scan gefüllt und danach von jedem Anlegen/Migrieren/Entfernen gepflegt). Nur `devices.*` zählt (App-Gruppen sind keine physischen Geräte) · `devicesAllOnline` verlangt `total > 0` · `devicesTotal` bleibt beim Abschalten stehen · `clearDeviceRollup()` legt nichts an, sonst bekäme eine frische Installation eine Summe, die sie nie hatte.
 
-## Erreichbarkeit — EIN Auflöser für alle Gerätearten (ab 2.29.0)
+## Erreichbarkeit — Beweis oder nichts (ab 2.29.1)
 
-`resolveDeviceReachability(device, cloudOnline)` (`device-manager/lookups.ts`, Herleitung als Kommentar dort) beantwortet „ist das Gerät erreichbar" für **jede** Geräteart. `syncInfoOnline` und `updateConnectionState` lesen dieselbe Funktion — vorher trugen sie eigene Regeln und widersprachen sich beim selben Gerät. Drei Fälle: LAN-Lampe → LAN-Antwortfrische (`LAN_REPLY_FRESHNESS_MS` 90 s, sonst nichts) · Govee meldet über das Gerät (`state.cloudReportedOnline`) → sein Wort, beide Richtungen · Govee meldet nie (Dauerfall cloud-only Lampe) → Cloud antwortet + Konto führt das Gerät.
+`resolveDeviceReachability(device, cloudOnline)` (`device-manager/lookups.ts`) beantwortet „ist das Gerät erreichbar" für **jede** Geräteart. Es gibt genau drei Beweise, in dieser Reihenfolge: **LAN-Lampe** → die LAN-Antwortfrische (`LAN_REPLY_FRESHNESS_MS` 90 s, sonst nichts — Govees Cloud-Zwischenspeicher hinkt hinterher, Messung 2026-05-13). **Govee hat gemeldet** (`state.cloudReportedOnline`, gesetzt von `applyOnlineCap` aus App-Abruf, Konto-Push UND — seit 2.29.1 — dem Cloud-Zustandsabruf) → sein Wort, in beide Richtungen. **Sonst** → nicht erreichbar.
 
-**`proven` ist der Kern:** eine GEHÖRTE Erreichbarkeit darf in beide Richtungen ins Gerät zurückgeschrieben werden, eine aus dem Kanal ABGELEITETE nur anheben. Ein abgeleitetes `false` zurückzuschreiben war der Defekt — der Zwischenspeicher startet jedes Gerät offline, für cloud-only hob es nie jemand an, und die 20-s-Runde zementierte die Unwissenheit als Messwert.
+**Es gibt bewusst KEINE Ableitung aus dem Kanal.** 2.29.0 hatte eine („die Cloud antwortet und das Konto führt das Gerät") — das ist eine Aussage über das KONTO, nicht über das Gerät: auf krobis Anlage wurden zwei stromlose Streifen als erreichbar gemeldet. Ein falsches Grün ist schlimmer als ein falsches Grau, weil es niemandem auffällt.
 
-**Nicht vermischen:** `groups.info.online` ist die Cloud-Verbindung (i18n `cloudOnline`), kein Erreichbarkeits-Marker; der Auflöser fasst ihn nicht an.
+**Die eigentliche Lücke war eine weggeworfene Quelle:** `/device/state` liefert Govees Erreichbarkeit mit, aber `mapCloudStateValue` hat keinen `online`-Zweig — die Fähigkeit fiel in den Standardfall und niemand sonst sah sie an. Deshalb hatte ein Gerät ohne lokale Schnittstelle überhaupt keinen Beweis. `cloud-state-loader` reicht die Antwort jetzt zusätzlich an `DeviceManager.applyCloudStateOnline`.
+
+**`proven` ist der zweite Rückgabewert:** eine GEHÖRTE Erreichbarkeit darf in beide Richtungen ins Gerät zurückgeschrieben werden, eine unbewiesene nie. Ein unbewiesenes `false` zurückzuschreiben war der ursprüngliche Dauerdefekt — der Zwischenspeicher startet jedes Gerät offline, und die 20-s-Runde zementierte diese Unwissenheit als Messwert.
+
+**`info.connection` folgt einer ANDEREN Regel und darf nicht angeglichen werden** (v2.13.0-Vertrag): der Datenpunkt beantwortet „arbeitet der Adapter", nicht „ist das Gerät da". Eine cloud-only Lampe hält ihn grün, solange die Cloud steht — 2.29.0 hat beide zusammengelegt und damit beide falsch gemacht. `groups.info.online` ist ebenfalls kein Erreichbarkeits-Marker, sondern die Cloud-Verbindung (i18n `cloudOnline`).
 
 ## Diagnose-Bericht = Datei, anonymisiert (ab 2.29.0)
 

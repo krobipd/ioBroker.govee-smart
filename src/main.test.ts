@@ -1149,17 +1149,16 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(i.cloudInitDone).toBe(true);
   });
 
-  it("a cloud-only light stays reachable across a restart from cache", async () => {
-    // The regression this pins (krobi + Joylancer, n=2, five SKUs): a light
-    // whose owner never enabled the local API shows info.online=false after the
-    // FIRST restart while it still controls fine. Fresh installs looked right,
-    // which is why it survived so long.
+  it("a light with no local API is reachable when Govee's state read says so", async () => {
+    // The reported regression (krobi + Joylancer, five models): such a light
+    // showed as unreachable while it still controlled fine. The evidence was
+    // there all along — Govee's `/device/state` response carries the device's
+    // reachability — but the value translator has no `online` branch, so the
+    // adapter discarded it and the device had no evidence at all.
     //
-    // Chain: cachedToGoveeDevice deliberately boots every device to
-    // "online:false" (a LAN light gets corrected by the next scan seconds
-    // later); mergeCloudDevices does not touch state on a known device; the
-    // App-API never yields an online cap for a light; the MQTT push is barred
-    // for lights on purpose. Nothing ever lifts it again.
+    // 2.29.0 tried to close that by inferring reachability from the cloud
+    // CHANNEL instead. That reported two unplugged strips as reachable on the
+    // live system. This is the honest source.
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
     fsReal.writeFileSync(
@@ -1183,8 +1182,6 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     );
     const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(ctx.adapter);
-    // The account still holds the device — but no LAN reply ever arrives,
-    // because the owner never switched the local API on.
     ctx.f.cloud.getDevices.mockResolvedValue([
       {
         sku: "H6172",
@@ -1194,14 +1191,16 @@ describe("GoveeAdapter — cache vs cloud start", () => {
         capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
       },
     ]);
+    // Govee says the device is online — this is the bit that used to be thrown away.
+    ctx.f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+    ]);
     await i.onReady();
     await settle();
 
     const device = i.deviceManager!.getDevices()[0];
     expect(device.lanIp).toBeFalsy();
-    expect(device.channels.cloud).toBe(true);
 
-    // Drive the 20 s round that owns info.online.
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
     (syncCall![0] as () => void)();
     await settle();
@@ -1209,11 +1208,58 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: true, ack: true });
   });
 
-  it("a cloud-only light goes offline when the cloud channel is down", async () => {
-    // The other direction of the same rule: reachability for a cloud-only
-    // device IS "the cloud answers and the account still lists it". Take the
-    // cloud away and the marker has to follow, otherwise the fix would just
-    // trade a permanent false for a permanent true.
+  it("an unplugged light with no local API stays unreachable — no evidence, no green", async () => {
+    // Measured on the live system 2026-09-03: two strips of krobi's are
+    // physically unplugged. 2.29.0 showed both as reachable.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee11.json"),
+      JSON.stringify({
+        sku: "H6172",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Unplugged Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H6172",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Unplugged Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    // Govee returns nothing about reachability — the account knows the device,
+    // the device itself says nothing.
+    ctx.f.cloud.getDeviceState.mockResolvedValue([]);
+    await i.onReady();
+    await settle();
+
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    (syncCall![0] as () => void)();
+    await settle();
+
+    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: false, ack: true });
+  });
+
+  it("an explicit offline from Govee wins over everything else", async () => {
+    // The direction that must keep working: when Govee itself says the device
+    // is offline, that is the answer — no channel state, no cache value and no
+    // later poll may talk it up.
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
     fsReal.writeFileSync(
@@ -1246,16 +1292,19 @@ describe("GoveeAdapter — cache vs cloud start", () => {
         capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
       },
     ]);
+    ctx.f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+    ]);
     await i.onReady();
     await settle();
 
-    i.states.set("info.cloudConnected", { val: false, ack: true });
-    (i as unknown as { cloudWasConnected: boolean }).cloudWasConnected = false;
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
     (syncCall![0] as () => void)();
     await settle();
 
     expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: false, ack: true });
+    // …and the device carries Govee's word, so nothing derives around it later.
+    expect(i.deviceManager!.getDevices()[0].state.cloudReportedOnline).toBe(false);
   });
 
   it("an empty cache goes to the cloud and records the outcome", async () => {
@@ -1478,5 +1527,40 @@ describe("GoveeAdapter — callback wiring", () => {
     (timer![0] as () => void)();
     await settle(5);
     expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GoveeAdapter — the diagnostics export over the REAL host object", () => {
+  it("writes a report file when the device button is pressed", async () => {
+    // 2.29.0 shipped this broken: the handlers never get `this`, only the host
+    // view `buildHost()` assembles, and the file methods were missing from it.
+    // Every test passed because each rig declared those methods on its own
+    // fake — nothing drove the real host. On the live system the export died
+    // with "writeFileAsync is not a function".
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H61BE",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    await i.syncDevicesManually();
+    await settle();
+
+    const device = i.deviceManager!.getDevices()[0];
+    const prefix = i.stateManager!.devicePrefix(device);
+    await i.onStateChange(`govee-smart.0.${prefix}.diag.export`, { val: true, ack: false });
+    await settle(6);
+
+    // The stub keys its file store by name (the meta object is a separate arg).
+    const written = [...i.files.keys()].filter(k => k.startsWith("govee-smart_"));
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatch(/^govee-smart_H61BE_ee11_v.*\.json$/);
+    // And the datapoint points at exactly that file.
+    expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toBe(written[0]);
   });
 });

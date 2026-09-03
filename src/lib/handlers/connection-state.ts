@@ -55,11 +55,18 @@ export interface ConnectionStateAdapter {
 export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const devices = adapter.deviceManager?.getDevices() ?? [];
   const hasDevices = devices.length > 0;
-  // Same rule as the per-device marker (`syncInfoOnline`), from the same
-  // resolver — before this, `info.connection` said "a device is reachable"
-  // while that very device's `info.online` said the opposite, because the two
-  // carried their own copies of the reachability logic.
-  const anyOnline = devices.some(d => resolveDeviceReachability(d, adapter.cloudWasConnected).online);
+  // This is NOT the per-device marker and must not become it. `info.connection`
+  // answers "is the adapter working?", `<device>.info.online` answers "is that
+  // device there?" — different questions, deliberately different rules
+  // (v2.13.0 contract). A device with no local API keeps the adapter's
+  // indicator green while the Cloud is up, because the adapter genuinely can
+  // reach it; whether the device itself answers is the device marker's job and
+  // needs evidence. 2.29.0 collapsed the two and got both wrong.
+  const anyOnline = devices.some(
+    d =>
+      resolveDeviceReachability(d, adapter.cloudWasConnected).online ||
+      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected),
+  );
   const lanRunning = adapter.lanClient !== null;
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {

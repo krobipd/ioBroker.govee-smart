@@ -27,6 +27,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
   const ensured: string[] = [];
   const removed: Array<{ prefix: string; stateId: string }> = [];
   const failures: Array<{ deviceId: string; endpoint: string }> = [];
+  const onlineApplied: Array<{ device: string; caps: unknown[] }> = [];
   let getDeviceState: (sku: string, deviceId: string) => Promise<CloudStateCapability[]> = () => Promise.resolve([]);
 
   const adapter: CloudStateLoaderAdapter = {
@@ -37,6 +38,10 @@ function makeRig(devices: GoveeDevice[]): TestRig {
     cloudClient: { getDeviceState: (sku: string, id: string) => getDeviceState(sku, id) } as never,
     deviceManager: {
       getDevices: () => devices,
+      // The state read carries Govee's own reachability for the device — the
+      // loader hands it straight on, so the stub has to accept it or the whole
+      // load throws before any value is written.
+      applyCloudStateOnline: (d: GoveeDevice, caps: unknown[]) => onlineApplied.push({ device: d.deviceId, caps }),
       getDiagnostics: () => ({
         recordApiFailure: (deviceId: string, endpoint: string) => failures.push({ deviceId, endpoint }),
       }),

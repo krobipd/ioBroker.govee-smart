@@ -1596,20 +1596,37 @@ describe("StateManager", () => {
         expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
       });
 
-      it("a light Govee never reports on is reachable while the cloud answers", async () => {
-        // The regression itself, at the resolver: a light whose owner never
-        // enabled the local API gets no LAN reply, no App-API reading and no
-        // account push — so nothing ever reports for it. Its reachability IS
-        // the cloud channel plus account membership, which is exactly the
-        // condition under which the user can still control it.
+      it("a light nothing ever reported on is NOT reachable, however healthy the cloud is", async () => {
+        // 2.29.0 inferred reachability here from the cloud channel — "the cloud
+        // answers and the account lists this device". That is a statement about
+        // the account, not the device: two unplugged strips were reported as
+        // reachable on the live system. A wrong green is worse than a wrong
+        // grey, because nobody notices it.
         const { adapter, states } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
         sm.setCloudOnlineProvider(() => true);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
-          // What cachedToGoveeDevice hands over after a restart.
           state: { online: false },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+      });
+
+      it("the same light IS reachable once Govee reports it as online", async () => {
+        // The evidence exists — it rides in the Cloud state read, which the
+        // adapter used to discard. That is what makes a device with no local
+        // API showable at all, without inventing anything.
+        const { adapter, states } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        sm.setCloudOnlineProvider(() => true);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: { online: true, cloudReportedOnline: true },
           channels: { lan: false, mqtt: false, cloud: true },
         });
         await createAllStatesForTest(sm, dev, []);

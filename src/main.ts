@@ -286,6 +286,15 @@ export class GoveeAdapter extends utils.Adapter {
     );
     method("readFileAsync", (meta: string, name: string) => this.readFileAsync(meta, name));
     method("delFileAsync", (meta: string, name: string) => this.delFileAsync(meta, name));
+    // The diagnostics export writes its report into the `diagnostics` meta
+    // object and prunes older ones. These were missing in 2.29.0: the handlers
+    // never get `this`, only this host view, so the export died on the live
+    // system with "writeFileAsync is not a function" while every test passed —
+    // each test rig declared the methods itself.
+    method("writeFileAsync", (meta: string, name: string, data: Buffer | string) =>
+      this.writeFileAsync(meta, name, data),
+    );
+    method("readDirAsync", (meta: string, path: string) => this.readDirAsync(meta, path));
     method("delObjectAsync", (id: string) => this.delObjectAsync(id));
     method("encrypt", (value: string) => this.encrypt(value));
     method("decrypt", (value: string) => this.decrypt(value));
