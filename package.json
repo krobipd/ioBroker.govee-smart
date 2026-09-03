@@ -88,6 +88,9 @@
     "format:check": "prettier --check .",
     "translate": "translate-adapter",
     "release": "release-script",
+    "release-patch": "release-script patch --yes --all",
+    "release-minor": "release-script minor --yes --all",
+    "release-major": "release-script major --yes --all",
     "validate-devices": "ts-node --project tools/tsconfig.json tools/validate-devices.ts",
     "gen-wiki": "ts-node --project tools/tsconfig.json tools/gen-wiki-devices.ts"
   },
