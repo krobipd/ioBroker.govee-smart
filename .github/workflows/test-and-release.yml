@@ -148,6 +148,23 @@ jobs:
       - run: npm ci
       - name: Build admin custom component (Vite / Module Federation)
         run: npm run build:admin
+      - name: Build the adapter
+        run: npm run build
+      # `build/` and `admin/custom/` are deliberately committed (see .gitignore)
+      # so a GitHub install runs without a build step. That only holds while they
+      # match `src/` — and twice after the 2.28.0 tag a commit changed a source
+      # file (once a user-facing log message) while labelled `docs:` with
+      # `[skip ci]`, so nothing rebuilt and nothing checked it. Both outputs are
+      # machine-independent (source maps carry relative paths only, verified
+      # 2026-09-03), so a difference here means the commit forgot to rebuild.
+      - name: Committed build output must match the sources
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- build admin/custom; then
+            echo "::error ::build/ or admin/custom/ is behind src/ — run 'npm run build' and 'npm run build:admin', then commit the result."
+            git --no-pager diff --stat -- build admin/custom
+            exit 1
+          fi
 
   adapter-tests:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
