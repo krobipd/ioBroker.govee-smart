@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.29.3",
     "news": {
+      "NEXT": {
+        "en": "The diagnostics report now names where a device's reachability comes from and whether the account login worked — no credentials are ever included.",
+        "de": "Der Diagnosebericht nennt jetzt, woher die Erreichbarkeit eines Geräts stammt und ob die Konto-Anmeldung geklappt hat — Zugangsdaten enthält er nie.",
+        "ru": "Отчёт диагностики теперь указывает, откуда берётся доступность устройства и удался ли вход в аккаунт — учётные данные в него не попадают.",
+        "pt": "O relatório de diagnóstico indica agora de onde vem a acessibilidade de um dispositivo e se o início de sessão funcionou — nunca inclui credenciais.",
+        "nl": "Het diagnoserapport vermeldt nu waar de bereikbaarheid van een apparaat vandaan komt en of het accountaanmelden lukte — inloggegevens staan er nooit in.",
+        "fr": "Le rapport de diagnostic indique désormais d'où vient l'accessibilité d'un appareil et si la connexion au compte a réussi — jamais d'identifiants.",
+        "it": "Il rapporto diagnostico indica ora da dove proviene la raggiungibilità di un dispositivo e se l'accesso all'account è riuscito — mai le credenziali.",
+        "es": "El informe de diagnóstico indica ahora de dónde procede la accesibilidad de un dispositivo y si el inicio de sesión funcionó — nunca incluye credenciales.",
+        "pl": "Raport diagnostyczny podaje teraz, skąd pochodzi osiągalność urządzenia i czy logowanie do konta się powiodło — nigdy nie zawiera danych logowania.",
+        "uk": "Звіт діагностики тепер вказує, звідки береться доступність пристрою та чи вдався вхід в обліковий запис — облікових даних у ньому немає.",
+        "zh-cn": "诊断报告现在会说明设备可达性的来源以及账户登录是否成功——其中绝不包含登录凭据。"
+      },
       "2.29.3": {
         "en": "Cloud datapoints like brightness are translated now; after a restart the list of unreachable group members is rebuilt right away.",
         "de": "Cloud-Datenpunkte wie Helligkeit sind jetzt übersetzt; nach einem Neustart wird die Liste nicht erreichbarer Gruppenmitglieder sofort erneuert.",
@@ -80,19 +93,6 @@
         "pl": "Wyraźnie mniejsze obciążenie bazy danych w tle — okresowa kontrola osiągalności działa teraz znacznie wydajniej, zwłaszcza w systemach z wieloma urządzeniami.",
         "uk": "Помітно менше фонове навантаження на базу даних — періодична перевірка доступності тепер працює значно ефективніше, особливо у великих системах.",
         "zh-cn": "后台数据库负载明显降低——周期性的可达性检查现在效率大幅提升，尤其是在设备和数据点较多的系统上。"
-      },
-      "2.27.0": {
-        "en": "Switching the instance off now shows every device as offline in the object tree, instead of leaving them green while the adapter is not running. Three new datapoints show how many devices there are and how many are reachable right now.",
-        "de": "Beim Abschalten der Instanz werden jetzt alle Geräte im Objektbaum als offline angezeigt, statt grün stehen zu bleiben, solange der Adapter nicht läuft. Drei neue Datenpunkte zeigen, wie viele Geräte es gibt und wie viele davon gerade erreichbar sind.",
-        "ru": "При выключении экземпляра все устройства теперь отображаются в дереве объектов как офлайн, а не остаются зелёными, пока адаптер не работает. Три новых точки данных показывают, сколько всего устройств и сколько из них сейчас доступны.",
-        "pt": "Ao desligar a instância, todos os dispositivos passam a aparecer offline na árvore de objetos, em vez de ficarem verdes enquanto o adaptador não corre. Três novos pontos de dados mostram quantos dispositivos existem e quantos estão acessíveis agora.",
-        "nl": "Bij het uitschakelen van de instantie worden alle apparaten nu offline getoond in de objectboom, in plaats van groen te blijven zolang de adapter niet draait. Drie nieuwe datapunten tonen hoeveel apparaten er zijn en hoeveel daarvan nu bereikbaar zijn.",
-        "fr": "À l'arrêt de l'instance, tous les appareils apparaissent désormais hors ligne dans l'arbre des objets, au lieu de rester verts tant que l'adaptateur ne tourne pas. Trois nouveaux points de données indiquent combien d'appareils existent et combien sont joignables actuellement.",
-        "it": "Allo spegnimento dell'istanza tutti i dispositivi vengono ora mostrati offline nell'albero degli oggetti, invece di restare verdi mentre l'adapter non è in funzione. Tre nuovi punti dati mostrano quanti dispositivi esistono e quanti sono raggiungibili in questo momento.",
-        "es": "Al apagar la instancia, todos los dispositivos se muestran ahora sin conexión en el árbol de objetos, en vez de seguir en verde mientras el adaptador no funciona. Tres nuevos puntos de datos muestran cuántos dispositivos hay y cuántos están accesibles ahora.",
-        "pl": "Po wyłączeniu instancji wszystkie urządzenia są teraz pokazywane jako offline w drzewie obiektów, zamiast pozostawać zielone, gdy adapter nie działa. Trzy nowe punkty danych pokazują, ile jest urządzeń i ile z nich jest teraz osiągalnych.",
-        "uk": "Під час вимкнення екземпляра всі пристрої тепер показуються офлайн у дереві об'єктів, а не лишаються зеленими, поки адаптер не працює. Три нові точки даних показують, скільки пристроїв є і скільки з них зараз доступні.",
-        "zh-cn": "停用实例后，所有设备现在会在对象树中显示为离线，而不再在适配器未运行时仍保持绿色。另有三个新数据点显示设备总数以及当前有多少设备可达。"
       }
     },
     "plugins": {

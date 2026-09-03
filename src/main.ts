@@ -808,6 +808,14 @@ export class GoveeAdapter extends utils.Adapter {
           this.deviceManager?.getDiagnostics().addMqttPacket(deviceId, topic, payload);
         });
 
+        // Login + IoT-key outcome into the report. Credentials never travel —
+        // only which call, whether Govee accepted it, its status and its own
+        // message. Two filed issues were exactly this case and the report could
+        // not tell them apart from "no account entered".
+        this.mqttClient.setOnAccountCall((endpoint, ok, statusCode, message) => {
+          this.deviceManager?.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
+        });
+
         // 2FA: forward optional code from settings into the next login attempt;
         // clear the field automatically once Govee has accepted it.
         this.mqttClient.setVerificationCode(config.mqttVerificationCode ?? "");

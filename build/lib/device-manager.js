@@ -1065,6 +1065,9 @@ class DeviceManager {
       } else {
         this.log.debug(msg);
       }
+      for (const dev of this.devices.values()) {
+        this.diagnostics.recordApiFailure(dev.deviceId, "/device/rest/devices/v1/list", err, (0, import_http_client.extractHttpStatus)(err));
+      }
       return 0;
     }
     this.lastAppApiErrorCategory = null;

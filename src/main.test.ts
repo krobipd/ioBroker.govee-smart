@@ -302,6 +302,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
       connect: vi.fn(async () => {}),
       disconnect: vi.fn(),
       setPacketHook: vi.fn(),
+      setOnAccountCall: vi.fn(),
       setVerificationCode: vi.fn(),
       setOnVerificationConsumed: vi.fn(),
       setOnVerificationFailed: vi.fn(),
@@ -1483,6 +1484,26 @@ describe("GoveeAdapter — callback wiring", () => {
     const onToken = f.mqtt.connect.mock.calls[0][2] as (t: string) => void;
     onToken("fresh-bearer");
     expect(f.api.setBearerToken).toHaveBeenCalledWith("fresh-bearer");
+  });
+
+  it("a rejected login reaches the diagnostics report — with the reason, never the credentials", async () => {
+    // Two filed issues are exactly this case ("email not registered with Govee",
+    // "too many logins — account blocked"). Until 2.30.0 the report showed a
+    // dead push channel and no reason at all, so the two were indistinguishable
+    // from "the user never entered an account".
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    const diag = (
+      i.deviceManager as unknown as { getDiagnostics(): { recordAccountCall: (...a: unknown[]) => void } }
+    ).getDiagnostics();
+    const rec = vi.spyOn(diag, "recordAccountCall");
+    firstArg<(ep: string, ok: boolean, s?: number, m?: string) => void>(f.mqtt.setOnAccountCall)(
+      "/account/rest/account/v2/login",
+      false,
+      400,
+      "Incorrect user name or password",
+    );
+    expect(rec).toHaveBeenCalledWith("/account/rest/account/v2/login", false, 400, "Incorrect user name or password");
   });
 
   it("refreshed MQTT credentials are persisted to the instance data directory", async () => {

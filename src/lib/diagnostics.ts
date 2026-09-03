@@ -2,6 +2,7 @@ import { HttpError } from "./http-client";
 import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
 import type { GoveeDevice } from "./types";
+import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -98,6 +99,33 @@ export interface RuntimeStateSnapshot {
  * reported back — so for "switching does not work" the chain broke off exactly
  * where the answer would be.
  */
+/**
+ * One account-level call (login / IoT key) as the report shows it. Never
+ * carries credentials — see {@link DiagnosticsCollector.recordAccountCall}.
+ */
+export interface AccountCallEntry {
+  /** ISO timestamp */
+  ts: string;
+  /** Which call — the login or the IoT-key request. */
+  endpoint: string;
+  /** Whether Govee accepted it. */
+  ok: boolean;
+  /** Govee's status — its payload status where it has one, else HTTP. */
+  statusCode?: number;
+  /** Govee's own message ("please login", "Incorrect user name or password"). */
+  message?: string;
+  /** When the same outcome was seen last — only set once it repeated. */
+  lastTs?: string;
+  /** How often this exact outcome occurred; absent means once. */
+  count?: number;
+}
+
+/**
+ * What a user-triggered command did. `lanSends` shows what went out on the
+ * wire, but not whether the write was accepted and not what the device
+ * reported back — so for "switching does not work" the chain broke off exactly
+ * where the answer would be.
+ */
 export interface CommandResultEntry {
   /** ISO timestamp */
   ts: string;
@@ -155,6 +183,8 @@ const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
 /** Recent command outcomes kept per device — enough to cover a user trying the same switch a few times. */
 const MAX_COMMAND_RESULTS = 30;
+/** Account-level calls kept — login + IoT key, a handful of attempts is plenty. */
+const MAX_ACCOUNT_CALLS = 10;
 const MAX_BODY_BYTES = 65_536;
 const MAX_RESPONSE_BYTES_PER_DEVICE = 512 * 1024;
 const MAX_PACKET_RAW_BYTES = 4_096;
@@ -360,6 +390,8 @@ export class DiagnosticsCollector {
   private cacheSnapshotProvider: CacheSnapshotProvider | null = null;
   private localSnapshotsProvider: LocalSnapshotsProvider | null = null;
   private environmentProvider: EnvironmentProvider | null = null;
+  /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
+  private readonly accountCalls: AccountCallEntry[] = [];
   private objectTreeProvider: ObjectTreeProvider | null = null;
 
   /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
@@ -408,6 +440,66 @@ export class DiagnosticsCollector {
    */
   setObjectTreeProvider(provider: ObjectTreeProvider | null): void {
     this.objectTreeProvider = provider;
+  }
+
+  /**
+   * Record what a user-triggered command actually did. Closes the gap between
+   * "the adapter sent something" and "the device did something": `lanSends`
+   * ends at the wire, this says whether the write was accepted and why not.
+   *
+   * @param deviceId Govee device id
+   * @param entry What was written, over which channel, and how it went
+   */
+  /**
+   * Record the outcome of an ACCOUNT-level call — the login and the IoT-key
+   * request. Both were invisible in the report, although two filed issues are
+   * exactly about them ("email not registered", "too many logins — account
+   * blocked"): the report showed a dead push channel and no reason.
+   *
+   * Carries NO credentials. Endpoint, verdict, status code and Govee's own
+   * message are what tell the cases apart. The message also goes through the
+   * anonymiser here — defence in depth: `generate()` runs the whole report
+   * through the same pass, so removing this call changes no output. It stays
+   * because this buffer is account-wide and a future caller might read it
+   * without going through `generate()`.
+   *
+   * Account-wide rather than per-device: these two calls belong to the account,
+   * not to a device, and every device's report needs to show them.
+   *
+   * @param endpoint Which of the two calls
+   * @param ok Whether Govee accepted it
+   * @param statusCode Govee's status (its own payload status, not just HTTP)
+   * @param message Govee's own message, if any
+   */
+  recordAccountCall(endpoint: string, ok: boolean, statusCode?: number, message?: string): void {
+    if (typeof endpoint !== "string" || !endpoint) {
+      return;
+    }
+    const text = message ? this.anon.text(String(message)) : undefined;
+    // A rejected login REPEATS — the client retries, and the 24 h lockout in
+    // issue #39 came from exactly that loop. A plain ring buffer would fill with
+    // ten identical entries and push out the FIRST one, which is the one that
+    // says when it started. So an identical outcome folds into the existing
+    // entry: first seen, last seen, how often.
+    const same = this.accountCalls.find(
+      e => e.endpoint === endpoint && e.ok === (ok === true) && e.statusCode === statusCode && e.message === text,
+    );
+    if (same) {
+      same.lastTs = new Date().toISOString();
+      same.count = (same.count ?? 1) + 1;
+      return;
+    }
+    pushBounded(
+      this.accountCalls,
+      {
+        ts: new Date().toISOString(),
+        endpoint,
+        ok: ok === true,
+        ...(typeof statusCode === "number" ? { statusCode } : {}),
+        ...(text ? { message: text } : {}),
+      },
+      MAX_ACCOUNT_CALLS,
+    );
   }
 
   /**
@@ -823,6 +915,11 @@ export class DiagnosticsCollector {
         // Where the segment count came from. It is the single most asked-back
         // question on a segment report, and the number alone never answered it.
         segmentCountSource: this.segmentCountSource(device),
+        // Same idea for reachability: `state.online` alone never answered
+        // "why does it show offline" — this names the deciding source, when it
+        // last spoke, what refreshes it, and which sources stay silent for this
+        // device kind by design.
+        reachabilitySource: this.reachabilitySource(device),
         channels: { ...device.channels },
         lanIp: device.lanIp ? this.anon.ip(device.lanIp) : null,
         gateway: device.gateway ? this.anon.text(device.gateway) : null,
@@ -918,6 +1015,9 @@ export class DiagnosticsCollector {
       // What the user's last commands actually did — `lanSends` stops at the
       // wire, this says whether the write was accepted and why not.
       commandResults: b?.commandResults.slice() ?? [],
+      // Account-wide, so it appears in every device's report: without it a dead
+      // push channel has no reason in the report at all.
+      accountCalls: this.accountCalls.slice(),
       // The datapoints as they really exist, with type, role, unit and value.
       // Null when no prefix was passed (the device has no tree yet).
       objectTree,
@@ -938,6 +1038,70 @@ export class DiagnosticsCollector {
    *
    * @param device The device being reported on
    */
+  /**
+   * Where this device's reachability comes from — and, just as important, which
+   * sources can NEVER speak for it.
+   *
+   * The report used to show `state.online` and nothing else. On a "shows offline
+   * although it works" report that is the one number that cannot answer the
+   * question, because the interesting part is which of four possible sources
+   * decided it and when that source last said anything. Measured cost of the
+   * omission (2026-09-03): tracing a single device's reachability took hours of
+   * reading the adapter's source, because the report simply did not carry it.
+   *
+   * Deliberately mirrors {@link segmentCountSource} — same question, same shape.
+   *
+   * @param device The device the report is about
+   */
+  private reachabilitySource(device: GoveeDevice): {
+    decidedBy: string;
+    lastEvidenceAt: number | null;
+    refreshedBy: string;
+    silentSources: string[];
+  } {
+    const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
+    const silent: string[] = [];
+
+    if (isLight && device.lanIp) {
+      // LAN reply freshness decides; every cloud source is barred on purpose.
+      silent.push("cloud state poll (a LAN light is never cloud-driven)");
+      silent.push("account push (barred for lights — the broker replays retained messages)");
+      return {
+        decidedBy: "LAN reply freshness",
+        lastEvidenceAt: device.lastLanReplyAt ?? null,
+        refreshedBy: "LAN scan, every 30 s",
+        silentSources: silent,
+      };
+    }
+
+    // No local API: only what Govee itself reports counts.
+    if (isLight) {
+      silent.push("LAN reply (device has no local API enabled)");
+      silent.push("account push (barred for lights — the broker replays retained messages)");
+      silent.push("app device list (only polled when a non-light exists on this account)");
+      return {
+        decidedBy:
+          typeof device.state.cloudReportedOnline === "boolean"
+            ? "Govee reported it (cloud state poll)"
+            : "nothing ever reported — reported as not reachable",
+        lastEvidenceAt: device.lastSeenOnNetwork ?? null,
+        refreshedBy: "cloud state poll — ONCE at adapter start, then only on cloud recovery or the refresh button",
+        silentSources: silent,
+      };
+    }
+
+    // Sensor / appliance: the app poll and the event push both speak.
+    return {
+      decidedBy:
+        typeof device.state.cloudReportedOnline === "boolean"
+          ? "Govee reported it (app poll or event push)"
+          : "nothing ever reported — reported as not reachable",
+      lastEvidenceAt: device.lastSeenOnNetwork ?? null,
+      refreshedBy: "app device list every 2 min, plus event pushes",
+      silentSources: ["LAN reply (not a light)"],
+    };
+  }
+
   private segmentCountSource(device: GoveeDevice): string {
     if (this.registry.getQuirks(device.sku)?.segmentCount !== undefined) {
       return "quirk (hard override for this SKU)";

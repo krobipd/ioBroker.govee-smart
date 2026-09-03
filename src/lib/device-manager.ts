@@ -1287,6 +1287,16 @@ export class DeviceManager {
       } else {
         this.log.debug(msg);
       }
+      // The report has to show a failed account-list fetch too. Sensors and
+      // appliances get their reachability and their readings from exactly this
+      // call — when it fails, the report used to look as if it had never been
+      // attempted, which is indistinguishable from "this account has no such
+      // devices" (feedback_diag_system_self_service: every swallowed API call
+      // must reach the report). Recorded once per device so it shows up in the
+      // report of whichever device the user exports.
+      for (const dev of this.devices.values()) {
+        this.diagnostics.recordApiFailure(dev.deviceId, "/device/rest/devices/v1/list", err, extractHttpStatus(err));
+      }
       return 0;
     }
     // Reset on success so the next failure warns again.

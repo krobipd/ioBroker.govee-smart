@@ -607,6 +607,10 @@ class GoveeAdapter extends utils.Adapter {
           var _a2;
           (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().addMqttPacket(deviceId, topic, payload);
         });
+        this.mqttClient.setOnAccountCall((endpoint, ok, statusCode, message) => {
+          var _a2;
+          (_a2 = this.deviceManager) == null ? void 0 : _a2.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
+        });
         this.mqttClient.setVerificationCode((_c = config.mqttVerificationCode) != null ? _c : "");
         this.mqttClient.setOnVerificationConsumed(() => {
           cloudCreds.clearVerificationCodeSetting(this.handlerHost).catch((e) => {

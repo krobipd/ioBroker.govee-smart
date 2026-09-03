@@ -247,6 +247,82 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("the report names WHY a device shows the reachability it shows", () => {
+    it("a LAN light: the LAN reply decides, and the cloud sources are named as silent", async () => {
+      // Tracing one device's reachability cost hours of reading the adapter's
+      // source (2026-09-03) because the report carried the value and nothing
+      // else. The deciding source, its last evidence and the sources that stay
+      // silent by design are what actually answer "why does it show offline".
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: 1_700_000_000_000 }),
+        "2.30.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      const src = r.device.reachabilitySource!;
+      expect(src.decidedBy).toContain("LAN");
+      expect(src.lastEvidenceAt).toBe(1_700_000_000_000);
+      expect((src.silentSources as string[]).join(" ")).toContain("account push");
+    });
+
+    it("a cloud-only light: says the poll runs ONCE at start — the fact that took hours to find", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(makeDevice({ lanIp: undefined, state: { online: false } }), "2.30.0")) as Record<
+        string,
+        { reachabilitySource?: Record<string, unknown> }
+      >;
+      const src = r.device.reachabilitySource!;
+      expect(String(src.refreshedBy)).toContain("ONCE");
+      expect((src.silentSources as string[]).join(" ")).toContain("no local API");
+    });
+  });
+
+  describe("account calls reach the report — without any credentials", () => {
+    it("records the verdict and Govee's own message, never the credentials", async () => {
+      // Two filed issues are exactly this case ("email not registered",
+      // "too many logins"). The report used to show a dead push channel and
+      // no reason at all.
+      const c = new DiagnosticsCollector(registry);
+      c.recordAccountCall("/account/rest/account/v2/login", false, 400, "Incorrect user name or password");
+      c.recordAccountCall("/app/v1/account/iot/key", true, 200);
+      const r = await c.generate(makeDevice(), "2.30.0");
+      const calls = r.accountCalls as Array<Record<string, unknown>>;
+      expect(calls).toHaveLength(2);
+      expect(calls[0]).toMatchObject({ ok: false, statusCode: 400 });
+      expect(String(calls[0].message)).toContain("Incorrect user name");
+      // The whole report must not carry a password field, however Govee answers.
+      expect(JSON.stringify(r)).not.toContain('password":');
+    });
+
+    it("a repeated rejection keeps the FIRST occurrence — the one that says when it started", async () => {
+      // The client retries a rejected login, and the 24 h lockout in issue #39
+      // came from that loop. A plain ring buffer would keep ten identical
+      // entries and drop the first — losing the only one that dates the start.
+      const c = new DiagnosticsCollector(registry);
+      for (let i = 0; i < 15; i++) {
+        c.recordAccountCall("/account/rest/account/v2/login", false, 400, "Incorrect user name or password");
+      }
+      c.recordAccountCall("/app/v1/account/iot/key", true, 200);
+      const r = await c.generate(makeDevice(), "2.29.4");
+      const calls = r.accountCalls as Array<Record<string, unknown>>;
+      // Fifteen attempts, two distinct outcomes — not fifteen entries.
+      expect(calls).toHaveLength(2);
+      expect(calls[0].count).toBe(15);
+      expect(calls[0].ts).toBeTruthy();
+      expect(calls[0].lastTs).toBeTruthy();
+    });
+
+    it("an address echoed back by Govee never reaches the finished report", async () => {
+      // Checks the OUTCOME, not the mechanism: the report-wide pass would catch
+      // it too, so a test tied to the recorder's own call would pass either way
+      // (measured — the mutation probe stayed green until this was rewritten).
+      const c = new DiagnosticsCollector(registry);
+      c.recordAccountCall("/account/rest/account/v2/login", false, 400, "no account for someone@example.com");
+      const r = await c.generate(makeDevice(), "2.30.0");
+      const calls = r.accountCalls as Array<Record<string, unknown>>;
+      expect(String(calls[0].message)).not.toContain("someone@example.com");
+    });
+  });
+
   describe("generate — output shape", () => {
     beforeEach(() => {
       registry = new DeviceRegistry({

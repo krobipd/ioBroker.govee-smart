@@ -91,6 +91,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private onStatus: MqttStatusCallback | null = null;
   private onConnection: MqttConnectionCallback | null = null;
   private onToken: MqttTokenCallback | null = null;
+  /** Diagnostics hook for the two account calls — see {@link setOnAccountCall}. */
+  private onAccountCall: ((endpoint: string, ok: boolean, statusCode?: number, message?: string) => void) | null = null;
 
   /** Channel label used in reconnect log lines. */
   protected readonly channelLabel = "MQTT";
@@ -220,6 +222,22 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   setOnLoginBlocked(cb: (() => void) | null): void {
     this.onLoginBlocked = cb;
+  }
+
+  /**
+   * Hook that reports the outcome of the two account calls (login, IoT key) to
+   * the diagnostics report.
+   *
+   * Both were invisible in the report until 2.30.0, although two of the issues
+   * filed so far are exactly about them ("email not registered with Govee",
+   * "too many logins — account blocked"): the report showed a missing MQTT
+   * channel and no reason at all. NEVER carries credentials — endpoint, status
+   * code and Govee's own message are enough to tell the cases apart.
+   *
+   * @param cb Callback receiving (endpoint, ok, statusCode, message)
+   */
+  setOnAccountCall(cb: ((endpoint: string, ok: boolean, statusCode?: number, message?: string) => void) | null): void {
+    this.onAccountCall = cb;
   }
 
   /** Bearer token from login — available after connect, used for undocumented API */
@@ -850,6 +868,14 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       headers: buildGoveeAppHeaders(this.clientId, { withTimestamp: true }),
       body,
     });
+    // Govee answers HTTP 200 even for a rejected login and puts the verdict in
+    // the payload — so the status code alone says nothing. Report both.
+    this.onAccountCall?.(
+      "/account/rest/account/v2/login",
+      typeof result.value?.status === "number" ? result.value.status === 200 : !!result.value,
+      typeof result.value?.status === "number" ? result.value.status : result.statusCode,
+      typeof result.value?.message === "string" ? result.value.message : undefined,
+    );
     if (!result.value) {
       throw new Error(
         `Govee login returned no body (status=${result.statusCode}${result.fallback ? `, fallback=${result.fallback}` : ""}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""})`,
@@ -900,6 +926,15 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       url: IOT_KEY_URL,
       headers: buildGoveeAppHeaders(this.clientId, { bearer: this._bearerToken }),
     });
+    // Second account call — invisible in the report until 2.30.0. A login that
+    // succeeds while the key request fails leaves the push channel dead with no
+    // trace at all, which reads exactly like "the user never entered an account".
+    this.onAccountCall?.(
+      "/app/v1/account/iot/key",
+      !!result.value,
+      result.statusCode,
+      result.value ? undefined : "no body",
+    );
     if (!result.value) {
       throw new Error(
         `Govee IoT-key request returned no body (status=${result.statusCode}${result.fallback ? `, fallback=${result.fallback}` : ""})`,

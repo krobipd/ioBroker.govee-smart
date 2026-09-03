@@ -91,6 +91,8 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
   onStatus = null;
   onConnection = null;
   onToken = null;
+  /** Diagnostics hook for the two account calls — see {@link setOnAccountCall}. */
+  onAccountCall = null;
   /** Channel label used in reconnect log lines. */
   channelLabel = "MQTT";
   /**
@@ -198,6 +200,21 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
    */
   setOnLoginBlocked(cb) {
     this.onLoginBlocked = cb;
+  }
+  /**
+   * Hook that reports the outcome of the two account calls (login, IoT key) to
+   * the diagnostics report.
+   *
+   * Both were invisible in the report until 2.30.0, although two of the issues
+   * filed so far are exactly about them ("email not registered with Govee",
+   * "too many logins — account blocked"): the report showed a missing MQTT
+   * channel and no reason at all. NEVER carries credentials — endpoint, status
+   * code and Govee's own message are enough to tell the cases apart.
+   *
+   * @param cb Callback receiving (endpoint, ok, statusCode, message)
+   */
+  setOnAccountCall(cb) {
+    this.onAccountCall = cb;
   }
   /** Bearer token from login — available after connect, used for undocumented API */
   get token() {
@@ -674,7 +691,7 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
   }
   /** Login to Govee account */
   async login() {
-    var _a;
+    var _a, _b, _c, _d, _e;
     const body = {
       email: this.email,
       password: this.password,
@@ -690,6 +707,13 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
       headers: (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { withTimestamp: true }),
       body
     });
+    (_e = this.onAccountCall) == null ? void 0 : _e.call(
+      this,
+      "/account/rest/account/v2/login",
+      typeof ((_b = result.value) == null ? void 0 : _b.status) === "number" ? result.value.status === 200 : !!result.value,
+      typeof ((_c = result.value) == null ? void 0 : _c.status) === "number" ? result.value.status : result.statusCode,
+      typeof ((_d = result.value) == null ? void 0 : _d.message) === "string" ? result.value.message : void 0
+    );
     if (!result.value) {
       throw new Error(
         `Govee login returned no body (status=${result.statusCode}${result.fallback ? `, fallback=${result.fallback}` : ""}${result.bodySnippet ? `, body=${JSON.stringify(result.bodySnippet)}` : ""})`
@@ -733,11 +757,19 @@ class GoveeMqttClient extends import_reconnecting_mqtt_client.ReconnectingMqttCl
   }
   /** Get IoT key (P12 certificate) */
   async getIotKey() {
+    var _a;
     const result = await this.httpsRequestImpl({
       method: "GET",
       url: IOT_KEY_URL,
       headers: (0, import_govee_constants.buildGoveeAppHeaders)(this.clientId, { bearer: this._bearerToken })
     });
+    (_a = this.onAccountCall) == null ? void 0 : _a.call(
+      this,
+      "/app/v1/account/iot/key",
+      !!result.value,
+      result.statusCode,
+      result.value ? void 0 : "no body"
+    );
     if (!result.value) {
       throw new Error(
         `Govee IoT-key request returned no body (status=${result.statusCode}${result.fallback ? `, fallback=${result.fallback}` : ""})`
