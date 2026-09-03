@@ -134,6 +134,11 @@ export class DeviceManager {
     // diag ring buffer. Without this, "I clicked but nothing happened" was
     // not triage-able from diag JSON alone — the channel decision lived
     // only in the adapter log.
+    // What a user command actually did — the diag report's answer to
+    // "switching does not work": the LAN capture ends at the wire.
+    this.commandRouter.onCommandResult = (deviceId, entry) => {
+      this.diagnostics.recordCommandResult(deviceId, entry);
+    };
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };

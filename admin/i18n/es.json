@@ -118,5 +118,8 @@
   "localSnapshotsFolder": "Instantáneas locales guardadas por el usuario",
   "infoManualSyncDevices": "Sincronizar dispositivos manualmente",
   "infoManualSyncDevicesDesc": "Establecer en true para sincronizar ahora la lista de dispositivos con la cuenta Govee: se añaden los nuevos y se eliminan los borrados de la cuenta. Sin reinicio. Las escenas/instantáneas de los dispositivos existentes no se tocan: usa el botón de actualización por dispositivo.",
-  "infoOpenapiMqttConnectedDesc": "Canal push para eventos de sensores y electrodomésticos. Independiente del MQTT AWS-IoT usado para el estado de las lámparas Govee."
+  "infoOpenapiMqttConnectedDesc": "Canal push para eventos de sensores y electrodomésticos. Independiente del MQTT AWS-IoT usado para el estado de las lámparas Govee.",
+  "diagnosticsFolder": "Informes de diagnóstico",
+  "diagnosticsLastExport": "Último informe de diagnóstico",
+  "diagnosticsLastExportDesc": "Nombre del archivo del último informe de diagnóstico. Descárgalo en la pestaña Diagnóstico del adaptador y adjúntalo a una issue de GitHub."
 }

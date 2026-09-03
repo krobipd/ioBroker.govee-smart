@@ -50,6 +50,13 @@ class CommandRouter {
    */
   onDiagLog;
   /**
+   * Outcome of a user-triggered command, for the diagnostics report. The LAN
+   * send capture ends at the wire and says nothing about whether the write was
+   * accepted — which is precisely the gap in a "switching does not work"
+   * report.
+   */
+  onCommandResult;
+  /**
    * @param log ioBroker logger
    * @param timers Adapter timer wrapper — routed through `this.setTimeout` so
    *   pending color-mode delays get cleared on onUnload.
@@ -261,8 +268,34 @@ class CommandRouter {
    * @param value Command value
    */
   async sendCommand(device, command, value) {
-    var _a;
+    var _a, _b;
     const decision = this.resolveTransport(device, command);
+    const transport = this.decisionToChannelMarker(decision);
+    try {
+      await this.dispatchCommand(device, command, value, decision);
+      (_a = this.onCommandResult) == null ? void 0 : _a.call(this, device.deviceId, { stateId: command, value, transport, ok: true });
+    } catch (e) {
+      (_b = this.onCommandResult) == null ? void 0 : _b.call(this, device.deviceId, {
+        stateId: command,
+        value,
+        transport,
+        ok: false,
+        error: (0, import_types.errMessage)(e)
+      });
+      throw e;
+    }
+  }
+  /**
+   * The actual dispatch, split out so {@link sendCommand} can wrap it once and
+   * report the outcome for every route rather than at each return.
+   *
+   * @param device Target device
+   * @param command Command type
+   * @param value Command value
+   * @param decision Routing decision from resolveTransport
+   */
+  async dispatchCommand(device, command, value, decision) {
+    var _a;
     const summary = `${command}=${JSON.stringify(value)}`;
     (_a = this.onDiagLog) == null ? void 0 : _a.call(this, device.deviceId, "debug", `sendCommand ${summary} \u2192 ${this.decisionToChannelMarker(decision)}`);
     if (decision.kind === "skip") {

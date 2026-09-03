@@ -498,6 +498,14 @@ export class StateManager {
       await this.safeDeleteState(`${prefix}.info.${stale}`);
       this.stateChannelMap.delete(`${prefix}.${stale}`);
     }
+    // 2.29.0: the report became a file, so `diag.result` — which held the whole
+    // JSON, measured 67,917 characters on an H61BE — is gone. It cannot leave
+    // on its own: `cleanupCloudOwnedStates` only sweeps the channels it manages
+    // and `diag` is not one of them, so without this the fat datapoint would
+    // sit in every upgraded install forever. The adapter owns its datapoint
+    // inventory, so it clears it itself.
+    await this.safeDeleteState(`${prefix}.diag.result`);
+    this.stateChannelMap.delete(`${prefix}.result`);
   }
 
   /**

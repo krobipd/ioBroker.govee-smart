@@ -118,5 +118,8 @@
   "localSnapshotsFolder": "Lokalne migawki zapisane przez użytkownika",
   "infoManualSyncDevices": "Ręcznie synchronizuj urządzenia",
   "infoManualSyncDevicesDesc": "Ustaw na true, aby teraz zsynchronizować listę urządzeń z kontem Govee: nowe urządzenia zostaną dodane, usunięte z konta — usunięte. Bez restartu. Sceny/migawki istniejących urządzeń pozostają nietknięte — użyj przycisku odświeżania przy urządzeniu.",
-  "infoOpenapiMqttConnectedDesc": "Kanał push dla zdarzeń czujników i urządzeń. Niezależny od MQTT AWS-IoT używanego do statusu zwykłych lamp Govee."
+  "infoOpenapiMqttConnectedDesc": "Kanał push dla zdarzeń czujników i urządzeń. Niezależny od MQTT AWS-IoT używanego do statusu zwykłych lamp Govee.",
+  "diagnosticsFolder": "Raporty diagnostyczne",
+  "diagnosticsLastExport": "Ostatni raport diagnostyczny",
+  "diagnosticsLastExportDesc": "Nazwa pliku najnowszego raportu diagnostycznego. Pobierz go na karcie Diagnostyka adaptera i dołącz do zgłoszenia na GitHubie."
 }

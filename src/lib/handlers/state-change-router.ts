@@ -28,6 +28,11 @@ export interface StateChangeRouterAdapter {
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getObjectAsync(id: string): Promise<unknown>;
+  /** File storage for diagnostics reports — see `diagnostics-handler`. */
+  writeFileAsync(meta: string, name: string, data: Buffer | string): Promise<void>;
+  readDirAsync(meta: string, path: string): Promise<{ file: string; isDir: boolean }[]>;
+  delFileAsync(meta: string, name: string): Promise<void>;
+  readonly version?: string;
   /** Owned by main.ts — reloads the Cloud-state tree after a per-device refresh. */
   loadCloudStates(only?: GoveeDevice): Promise<void>;
   /** Owned by main.ts — central entry point for manual-segment updates. */

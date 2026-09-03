@@ -1,6 +1,7 @@
 import {
   capMatchesControl,
   deviceLabel,
+  errMessage,
   hexToRgb,
   logDedup,
   type ErrorCategory,
@@ -62,6 +63,16 @@ export class CommandRouter {
    * couldn't show why a user's state-write didn't reach the device.
    */
   onDiagLog?: (deviceId: string, level: "debug" | "info" | "warn", msg: string) => void;
+  /**
+   * Outcome of a user-triggered command, for the diagnostics report. The LAN
+   * send capture ends at the wire and says nothing about whether the write was
+   * accepted — which is precisely the gap in a "switching does not work"
+   * report.
+   */
+  onCommandResult?: (
+    deviceId: string,
+    entry: { stateId: string; value: unknown; transport: string; ok: boolean; error?: string },
+  ) => void;
 
   /**
    * @param log ioBroker logger
@@ -294,7 +305,40 @@ export class CommandRouter {
    */
   async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     const decision = this.resolveTransport(device, command);
+    const transport = this.decisionToChannelMarker(decision);
+    try {
+      await this.dispatchCommand(device, command, value, decision);
+      this.onCommandResult?.(device.deviceId, { stateId: command, value, transport, ok: true });
+    } catch (e) {
+      // Report the failure, then rethrow — the caller owns the "Command failed"
+      // warn and the ack decision; this only makes the outcome visible in the
+      // diagnostics report.
+      this.onCommandResult?.(device.deviceId, {
+        stateId: command,
+        value,
+        transport,
+        ok: false,
+        error: errMessage(e),
+      });
+      throw e;
+    }
+  }
 
+  /**
+   * The actual dispatch, split out so {@link sendCommand} can wrap it once and
+   * report the outcome for every route rather than at each return.
+   *
+   * @param device Target device
+   * @param command Command type
+   * @param value Command value
+   * @param decision Routing decision from resolveTransport
+   */
+  private async dispatchCommand(
+    device: GoveeDevice,
+    command: string,
+    value: unknown,
+    decision: TransportDecision,
+  ): Promise<void> {
     // Diag-log: one line, marker derived from the actual decision (not the
     // configured channel). JSON.stringify keeps `[object Object]` out of
     // the trace for object-valued commands like segmentBatch.

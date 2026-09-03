@@ -103,6 +103,14 @@ export const TRANSIENT_RETRY_MS = 5 * 60_000;
 /** Per-device diagnostics-export throttle (2 s) — guards against button spam. */
 export const DIAGNOSTICS_EXPORT_THROTTLE_MS = 2_000;
 
+/**
+ * How many diagnostics reports are kept per device (3). The throttle guards
+ * against button spam, not against accumulation — without a cap the folder
+ * grows with every press. Three covers "export, change something, export
+ * again, compare" without turning the file list into an archive.
+ */
+export const DIAGNOSTICS_KEEP_PER_DEVICE = 3;
+
 // === Wizard ===
 
 /** Idle timeout for the segment-detection wizard (5 min). */

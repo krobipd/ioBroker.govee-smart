@@ -59,6 +59,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   const syncCalls: number[] = [];
   const objects = new Map<string, unknown>();
   const states = new Map<string, ioBroker.StateValue>();
+  /** meta.user file store — the diagnostics export writes its report here. */
+  const files = new Map<string, string>();
   let sendFailure: () => Error | null = () => null;
   let fanOutResult = true; // group fan-out reached a member (ack-worthy) by default
 
@@ -68,6 +70,21 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       warn: (m: string) => warns.push(m),
     },
     namespace: NS,
+    version: "9.9.9",
+    writeFileAsync: (meta: string, name: string, data: Buffer | string) => {
+      files.set(`${meta}/${name}`, String(data));
+      return Promise.resolve();
+    },
+    readDirAsync: (meta: string) =>
+      Promise.resolve(
+        [...files.keys()]
+          .filter(k => k.startsWith(`${meta}/`))
+          .map(k => ({ file: k.slice(meta.length + 1), isDir: false })),
+      ),
+    delFileAsync: (meta: string, name: string) => {
+      files.delete(`${meta}/${name}`);
+      return Promise.resolve();
+    },
     unloading: false,
     deviceManager: {
       getDevices: () => devices,
@@ -637,10 +654,11 @@ describe("onStateChange — manual device sync button (BUG-1)", () => {
 });
 
 describe("onStateChange — diag.export routing branch", () => {
-  it("delegates to the diagnostics handler: result JSON written + trigger reset", async () => {
+  it("delegates to the diagnostics handler: report file written + trigger reset", async () => {
     const rig = makeRig([device]);
     await write(rig, id("diag.export"), true);
-    expect(rig.acks.some(a => a.id === id("diag.result"))).toBe(true);
+    // The report is a file now; the datapoint carries its name.
+    expect(rig.acks.some(a => a.id === id("diag.lastExport"))).toBe(true);
     expect(rig.acks).toContainEqual({ id: id("diag.export"), val: false });
   });
 });

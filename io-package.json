@@ -452,6 +452,28 @@
         "role": "meta.user"
       },
       "native": {}
+    },
+    {
+      "_id": "diagnostics",
+      "type": "meta",
+      "common": {
+        "name": {
+          "en": "Diagnostics reports",
+          "de": "Diagnoseberichte",
+          "ru": "Отчёты диагностики",
+          "pt": "Relatórios de diagnóstico",
+          "nl": "Diagnoserapporten",
+          "fr": "Rapports de diagnostic",
+          "it": "Rapporti di diagnostica",
+          "es": "Informes de diagnóstico",
+          "pl": "Raporty diagnostyczne",
+          "uk": "Звіти діагностики",
+          "zh-cn": "诊断报告"
+        },
+        "type": "meta.user",
+        "role": "meta.user"
+      },
+      "native": {}
     }
   ],
   "native": {

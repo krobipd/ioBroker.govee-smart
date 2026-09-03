@@ -118,5 +118,8 @@
   "localSnapshotsFolder": "User-saved local snapshots",
   "infoManualSyncDevices": "Manually sync devices",
   "infoManualSyncDevicesDesc": "Write true to sync the device list with your Govee account now: adds newly added devices and removes ones you deleted from the account. No restart needed. Scenes/snapshots of existing devices are not touched — use the per-device refresh button for that.",
-  "infoOpenapiMqttConnectedDesc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights."
+  "infoOpenapiMqttConnectedDesc": "Push channel for sensor and appliance events. Independent of the AWS-IoT MQTT used for status push of regular Govee lights.",
+  "diagnosticsFolder": "Diagnostics reports",
+  "diagnosticsLastExport": "Last diagnostics report",
+  "diagnosticsLastExportDesc": "File name of the most recent diagnostics report. Download it from the adapter's Diagnostics tab and attach it to a GitHub issue."
 }

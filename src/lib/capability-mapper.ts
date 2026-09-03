@@ -1206,14 +1206,23 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
       channel: "diag",
     },
     {
-      id: "result",
-      name: tName("diagnosticsJson"),
+      // Until 2.29.0 this was `result` and held the ENTIRE report as text —
+      // measured 67,917 characters on an H61BE, which is both over GitHub's
+      // issue limit and a heavy value to keep in the state database and in
+      // every history subscription on the device. The report is a file now;
+      // this states which one, so the object tree still gives feedback when
+      // the button is pressed there. The old `result` is not in this list any
+      // more and therefore leaves an upgraded install on the next Cloud
+      // rebuild, the same code-free migration as the 2.28.0 renames.
+      id: "lastExport",
+      name: tName("diagnosticsLastExport"),
+      desc: tDesc("diagnosticsLastExportDesc"),
       type: "string",
-      role: "json",
+      role: "text",
       write: false,
       def: "",
       capabilityType: "local",
-      capabilityInstance: "diagnosticsResult",
+      capabilityInstance: "diagnosticsLastExport",
       channel: "diag",
     },
   ];

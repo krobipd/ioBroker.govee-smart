@@ -398,6 +398,8 @@ class StateManager {
       await this.safeDeleteState(`${prefix}.info.${stale}`);
       this.stateChannelMap.delete(`${prefix}.${stale}`);
     }
+    await this.safeDeleteState(`${prefix}.diag.result`);
+    this.stateChannelMap.delete(`${prefix}.result`);
   }
   /**
    * B2 hard-cut migration: the LAN control colour states were renamed from

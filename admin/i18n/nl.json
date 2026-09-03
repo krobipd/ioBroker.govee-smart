@@ -118,5 +118,8 @@
   "localSnapshotsFolder": "Door gebruiker opgeslagen lokale snapshots",
   "infoManualSyncDevices": "Apparaten handmatig synchroniseren",
   "infoManualSyncDevicesDesc": "Zet op true om de apparatenlijst nu met het Govee-account te synchroniseren: nieuwe apparaten worden toegevoegd, uit het account verwijderde worden verwijderd. Geen herstart nodig. Scènes/snapshots van bestaande apparaten blijven onaangeroerd — gebruik daarvoor de verversknop per apparaat.",
-  "infoOpenapiMqttConnectedDesc": "Pushkanaal voor sensor- en apparaatgebeurtenissen. Onafhankelijk van de AWS-IoT-MQTT voor de status van gewone Govee-lampen."
+  "infoOpenapiMqttConnectedDesc": "Pushkanaal voor sensor- en apparaatgebeurtenissen. Onafhankelijk van de AWS-IoT-MQTT voor de status van gewone Govee-lampen.",
+  "diagnosticsFolder": "Diagnoserapporten",
+  "diagnosticsLastExport": "Laatste diagnoserapport",
+  "diagnosticsLastExportDesc": "Bestandsnaam van het meest recente diagnoserapport. Download het op het tabblad Diagnose van de adapter en voeg het toe aan een GitHub-issue."
 }

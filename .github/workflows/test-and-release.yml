@@ -150,19 +150,25 @@ jobs:
         run: npm run build:admin
       - name: Build the adapter
         run: npm run build
-      # `build/` and `admin/custom/` are deliberately committed (see .gitignore)
-      # so a GitHub install runs without a build step. That only holds while they
-      # match `src/` — and twice after the 2.28.0 tag a commit changed a source
-      # file (once a user-facing log message) while labelled `docs:` with
-      # `[skip ci]`, so nothing rebuilt and nothing checked it. Both outputs are
-      # machine-independent (source maps carry relative paths only, verified
-      # 2026-09-03), so a difference here means the commit forgot to rebuild.
+      # `build/` is deliberately committed (see .gitignore) so a GitHub install
+      # runs without a build step. That only holds while it matches `src/` — and
+      # twice after the 2.28.0 tag a commit changed a source file (once a
+      # user-facing log message) while labelled as documentation with the CI
+      # skipped, so nothing rebuilt and nothing checked it.
+      #
+      # ONLY `build/` is compared. The TypeScript output is byte-identical
+      # anywhere (its source maps carry relative paths only), but the Vite build
+      # under `admin/custom/` names its chunks by content hash and those differ
+      # between the runner and a developer machine — comparing it would keep the
+      # job permanently red without ever pointing at a real defect. Measured on
+      # this very workflow: the first version compared both and failed on
+      # `admin/custom/` alone while `build/` matched exactly.
       - name: Committed build output must match the sources
         run: |
           set -euo pipefail
-          if ! git diff --quiet -- build admin/custom; then
-            echo "::error ::build/ or admin/custom/ is behind src/ — run 'npm run build' and 'npm run build:admin', then commit the result."
-            git --no-pager diff --stat -- build admin/custom
+          if ! git diff --quiet -- build; then
+            echo "::error ::build/ is behind src/ — run 'npm run build' and commit the result."
+            git --no-pager diff --stat -- build
             exit 1
           fi
 

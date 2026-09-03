@@ -118,5 +118,8 @@
   "localSnapshotsFolder": "用户保存的本地快照",
   "infoManualSyncDevices": "手动同步设备",
   "infoManualSyncDevicesDesc": "设置为 true 可立即将设备列表与 Govee 账户同步：新添加的设备会加入，从账户中删除的设备会被移除。无需重启。现有设备的场景/快照不受影响——请使用设备上的刷新按钮。",
-  "infoOpenapiMqttConnectedDesc": "传感器和家电事件的推送通道。独立于用于常规 Govee 灯状态推送的 AWS-IoT MQTT。"
+  "infoOpenapiMqttConnectedDesc": "传感器和家电事件的推送通道。独立于用于常规 Govee 灯状态推送的 AWS-IoT MQTT。",
+  "diagnosticsFolder": "诊断报告",
+  "diagnosticsLastExport": "最近的诊断报告",
+  "diagnosticsLastExportDesc": "最近一次诊断报告的文件名。请在适配器的“诊断”标签页下载，并附加到 GitHub issue。"
 }

@@ -2415,4 +2415,40 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     expect((objects.get("devices.h6160_0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
     expect((objects.get("devices.h6160_0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
   });
+
+  describe("migrateLegacyDiagnostics", () => {
+    it("removes the fat diag.result datapoint on an upgraded install", async () => {
+      // 2.29.0 turned the report into a file. `diag.result` held the whole JSON
+      // — 67,917 characters on an H61BE — and it cannot leave on its own:
+      // cleanupCloudOwnedStates only sweeps the channels it manages and `diag`
+      // is not one of them. Without this removal the fat datapoint would sit in
+      // every upgraded install forever, which is not the adapter owning its
+      // datapoint inventory.
+      const { adapter, objects, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      objects.set("devices.h6160_0011.diag.result", { common: { name: "Diagnostics JSON" } });
+      states.set("devices.h6160_0011.diag.result", { val: "{…}", ack: true } as ioBroker.State);
+
+      await sm.migrateLegacyDiagnostics(dev);
+
+      expect(objects.has("devices.h6160_0011.diag.result")).toBe(false);
+      expect(states.has("devices.h6160_0011.diag.result")).toBe(false);
+    });
+
+    it("is a silent no-op on an install that never had it", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await expect(sm.migrateLegacyDiagnostics(createTestDevice())).resolves.toBeUndefined();
+      expect(objects.has("devices.h6160_0011.diag.result")).toBe(false);
+    });
+
+    it("leaves groups alone — they never had diagnostics", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      objects.set("groups.h6160_0011.diag.result", { common: {} });
+      await sm.migrateLegacyDiagnostics(createTestDevice({ sku: "BaseGroup" }));
+      expect(objects.has("groups.h6160_0011.diag.result")).toBe(true);
+    });
+  });
 });

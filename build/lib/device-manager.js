@@ -113,6 +113,9 @@ class DeviceManager {
     this.registry = registry;
     this.commandRouter = new import_command_router.CommandRouter(log, timers, registry);
     this.diagnostics = new import_diagnostics.DiagnosticsCollector(registry);
+    this.commandRouter.onCommandResult = (deviceId, entry) => {
+      this.diagnostics.recordCommandResult(deviceId, entry);
+    };
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };
