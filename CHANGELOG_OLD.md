@@ -1,4 +1,10 @@
 # Older Changes
+## 2.29.1 (2026-09-03)
+
+- Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up
+- Fixed: A device without the local API is now shown as reachable when Govee itself reports it — that information always arrived and was discarded
+- Fixed: The diagnostics export failed with an internal error and wrote no file; the button in the object tree and the Diagnostics tab both work now
+
 ## 2.29.0 (2026-09-03)
 
 - Fixed: A device without the local API enabled no longer shows as unreachable after a restart while it still controls fine

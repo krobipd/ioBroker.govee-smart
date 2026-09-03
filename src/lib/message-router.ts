@@ -61,10 +61,15 @@ export interface MessageRouterHost {
    * the card, without having to save first.
    */
   createMqttProbeClient: (email: string, password: string) => GoveeMqttClient;
-  /** Provides the list of devices that have segments (for getSegmentDevices). */
-  getSegmentDeviceList: () => Array<{ value: string; label: string }>;
-  /** Every device, for the diagnostics card's picker. */
-  getDiagnosticsDeviceList: () => Array<{ value: string; label: string; model: string }>;
+  /**
+   * Every device, for the admin card's picker. One list for both halves of the
+   * Expert tab: the diagnostics picker takes it whole (a report is wanted
+   * precisely when a device misbehaves, so filtering would hide the interesting
+   * ones), and the segment wizard filters it down to what it can measure. Until
+   * 2.31.0 these were two commands returning the same devices under the same
+   * keys, differing only by a server-side filter and a label.
+   */
+  getDeviceList: () => Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
   /**
    * Builds the report for one device and returns it WITH its content, so the
    * admin card can hand the user a file straight away. The report is written to
@@ -87,8 +92,7 @@ export interface MessageRouterHost {
 /**
  * Router for ioBroker.Message events (sendTo from the admin UI).
  *
- * Dispatches 4 commands:
- *  - `getSegmentDevices` — selectSendTo data source for the wizard
+ * Dispatches 3 commands:
  *  - `segmentWizard` — wizard step (start/yes/no/done/abort)
  *  - `mqttAuth` — login test + verification-code request (with live credentials)
  *  - `diagnostics` — device list + report build for the diagnostics card
@@ -163,10 +167,6 @@ export class MessageRouter {
    */
   private async handleMessage(obj: ioBroker.Message): Promise<void> {
     try {
-      if (obj.command === "getSegmentDevices") {
-        this.host.sendResponse(obj, this.host.getSegmentDeviceList());
-        return;
-      }
       if (obj.command === "segmentWizard") {
         const payload = (obj.message ?? {}) as { action?: string; device?: string; indices?: number[] };
         const response = await this.host.runWizardStep(payload.action ?? "", payload.device ?? "", {
@@ -178,7 +178,7 @@ export class MessageRouter {
       if (obj.command === "diagnostics") {
         const payload = (obj.message ?? {}) as { action?: string; device?: string };
         if (payload.action === "list") {
-          this.host.sendResponse(obj, { devices: this.host.getDiagnosticsDeviceList() });
+          this.host.sendResponse(obj, { devices: this.host.getDeviceList() });
           return;
         }
         if (payload.action === "export") {

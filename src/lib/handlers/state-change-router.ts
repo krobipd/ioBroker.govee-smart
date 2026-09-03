@@ -7,7 +7,6 @@ import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
-import * as diagnosticsHandler from "./diagnostics-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
 
 /**
@@ -24,15 +23,9 @@ export interface StateChangeRouterAdapter {
   readonly snapshotHandler: SnapshotHandler | null;
   readonly groupFanout: GroupFanoutHandler | null;
   readonly lanClient: GoveeLanClient | null;
-  readonly diagnosticsLastRun: Map<string, number>;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getObjectAsync(id: string): Promise<unknown>;
-  /** File storage for diagnostics reports — see `diagnostics-handler`. */
-  writeFileAsync(meta: string, name: string, data: Buffer | string): Promise<void>;
-  readDirAsync(meta: string, path: string): Promise<{ file: string; isDir: boolean }[]>;
-  delFileAsync(meta: string, name: string): Promise<void>;
-  readonly version?: string;
   /** Owned by main.ts — reloads the Cloud-state tree after a per-device refresh. */
   loadCloudStates(only?: GoveeDevice): Promise<void>;
   /** Owned by main.ts — central entry point for manual-segment updates. */
@@ -277,9 +270,8 @@ export async function handleGenericCapabilityCommand(
 /**
  * Handle state changes from user (write operations). Central routing entry
  * point: refresh-button → cloud refetch; group → fan-out; snapshots → local
- * store; manual segments → handler; diagnostics → diag handler; otherwise
- * route via STATE_TO_COMMAND or generic capability path. Optimistic ack on
- * success; warn on errors.
+ * store; manual segments → handler; otherwise route via STATE_TO_COMMAND or
+ * the generic capability path. Optimistic ack on success; warn on errors.
  *
  */
 export async function onStateChange(
@@ -416,20 +408,6 @@ export async function onStateChange(
   // raw value would resurrect the rejected entry.
   if (stateSuffix === "segments.manual_mode" || stateSuffix === "segments.manual_list") {
     await handleManualSegmentsChange(adapter, device, stateSuffix, val);
-    return;
-  }
-
-  if (stateSuffix === "diag.export" && val) {
-    if (adapter.deviceManager) {
-      await diagnosticsHandler.handleDiagnosticsExport(
-        adapter,
-        adapter.deviceManager,
-        adapter.diagnosticsLastRun,
-        device,
-        prefix,
-        id,
-      );
-    }
     return;
   }
 

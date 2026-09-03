@@ -133,12 +133,12 @@ hast du echte Daten — und unser Adapter wird mit jedem Bericht besser.
 
 Egal ob es funktioniert oder nicht — bitte einen Bericht.
 
-1. Im Object-Browser beim Gerät \`diag.export\` auf \`true\` setzen
-2. Inhalt von \`diag.result\` kopieren (JSON)
+1. Im Adapter den Reiter **Experte** öffnen und auf **Diagnose** drücken
+2. Gerät wählen und den Knopf drücken — der Browser legt eine Berichtsdatei ab
 3. Auf GitHub ein Issue eröffnen:
    [Issue erstellen](https://github.com/krobipd/ioBroker.govee-smart/issues/new)
 4. Beschreib kurz: was hast du probiert, was hat geklappt, was nicht.
-   JSON anhängen oder reinkopieren.
+   Die Datei anhängen.
 
 Wenn du dich mit GitHub auskennst und gleich eine Code-Korrektur vorschlagen
 willst: gerne ein Pull-Request gegen \`devices.json\`. Details in
@@ -205,12 +205,12 @@ real data — and the adapter improves with every report.
 
 Whether it works or not, please share a report.
 
-1. In the object browser set \`diag.export\` of your device to \`true\`
-2. Copy the contents of \`diag.result\` (JSON)
+1. Open the adapter's **Expert** tab and press **Diagnostics**
+2. Pick the device and press the button — your browser saves a report file
 3. Open a GitHub issue:
    [New issue](https://github.com/krobipd/ioBroker.govee-smart/issues/new)
 4. Describe briefly what you tried, what worked, what didn't. Attach
-   or paste the JSON.
+   the file.
 
 If you're comfortable with GitHub and want to propose a fix directly,
 a pull request against \`devices.json\` is welcome — see

@@ -1,5 +1,4 @@
 {
-  "gsw_title": "Segment-Erkennung",
   "gsw_deviceLabel": "Gerät",
   "gsw_noDevices": "Keine Geräte mit Segmenten gefunden. Trage einen Cloud-API-Key in den Adaptereinstellungen ein, damit die Gerätefähigkeiten bekannt sind.",
   "gsw_start": "Messung starten",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "Gespeichert als %s.",
   "gsw_diagOpenIssue": "Issue eröffnen",
   "gsw_diagNoDevices": "Noch keine Geräte. Der Bericht gilt je Gerät — sobald der Adapter eines gefunden hat, erscheint es hier.",
-  "gsw_diagListFailed": "Geräteliste konnte nicht geladen werden. Läuft die Instanz?",
   "gsw_diagExportFailed": "Der Bericht konnte nicht erstellt werden. Warum, steht im Adapter-Log.",
-  "gsw_diagPrivacy": "Der Bericht ist anonymisiert: Adressen, E-Mail-Adressen und Gerätenamen werden durch gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, Zugangsdaten tauchen gar nicht auf. Die Datei erklärt das in ihrem eigenen Kopf."
+  "gsw_diagPrivacy": "Der Bericht ist anonymisiert: Adressen, E-Mail-Adressen und Gerätenamen werden durch gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, Zugangsdaten tauchen gar nicht auf. Die Datei erklärt das in ihrem eigenen Kopf.",
+  "gsw_loadingDevices": "Geräte werden geladen …",
+  "gsw_loadingDevicesSlow": "Lädt noch — dafür muss die Adapter-Instanz laufen.",
+  "gsw_listFailed": "Die Geräteliste konnte nicht geladen werden. Läuft die Instanz?",
+  "gsw_deviceOption": "%s — bisher %s Segmente",
+  "gsw_expertIntro": "Zwei Werkzeuge für den genaueren Blick. Eines auswählen — die Geräteliste wird dann geladen.",
+  "gsw_expertWizard": "Segment-Erkennung",
+  "gsw_expertDiagnostics": "Diagnose"
 }

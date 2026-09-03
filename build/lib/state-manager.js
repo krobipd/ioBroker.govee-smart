@@ -30,6 +30,7 @@ var import_i18n = require("./i18n");
 var import_device_key = require("./device-key");
 const SORT_KEY_END = "\u9999";
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 const CHANNEL_NAME_KEYS = {
   control: "channelControls",
   scenes: "channelScenes",
@@ -389,6 +390,27 @@ class StateManager {
     }
     await this.safeDeleteState(`${prefix}.diag.result`);
     this.stateChannelMap.delete(`${prefix}.result`);
+    await this.safeDeleteState(`${prefix}.diag.export`);
+    this.stateChannelMap.delete(`${prefix}.export`);
+    await this.resetLastExportIfNotATimestamp(prefix);
+  }
+  /**
+   * Clear a `diag.lastExport` left over from ≤2.30.0, where the value was the
+   * report's file NAME. Anything that is not an ISO timestamp is a leftover;
+   * an already-migrated (or empty) state is left alone so this stays a no-op
+   * on every start after the first.
+   *
+   * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
+   */
+  async resetLastExportIfNotATimestamp(prefix) {
+    const id = `${prefix}.diag.lastExport`;
+    const current = await this.adapter.getStateAsync(id).catch(() => null);
+    const val = current == null ? void 0 : current.val;
+    if (typeof val !== "string" || val === "" || ISO_TIMESTAMP.test(val)) {
+      return;
+    }
+    this.adapter.log.debug(`Clearing pre-2.31.0 file name from ${id}`);
+    await this.adapter.setState(id, { val: "", ack: true });
   }
   /**
    * B2 hard-cut migration: the LAN control colour states were renamed from

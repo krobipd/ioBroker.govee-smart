@@ -40,7 +40,6 @@ var import_capability_mapper = require("../capability-mapper");
 var import_lookups = require("../device-manager/lookups");
 var import_govee_constants = require("../govee-constants");
 var import_types = require("../types");
-var diagnosticsHandler = __toESM(require("./diagnostics-handler"));
 var dropdownReset = __toESM(require("./dropdown-reset-helpers"));
 function findDeviceForState(adapter, localId) {
   if (!adapter.deviceManager || !adapter.stateManager) {
@@ -257,19 +256,6 @@ async function onStateChange(adapter, id, state) {
   }
   if (stateSuffix === "segments.manual_mode" || stateSuffix === "segments.manual_list") {
     await handleManualSegmentsChange(adapter, device, stateSuffix, val);
-    return;
-  }
-  if (stateSuffix === "diag.export" && val) {
-    if (adapter.deviceManager) {
-      await diagnosticsHandler.handleDiagnosticsExport(
-        adapter,
-        adapter.deviceManager,
-        adapter.diagnosticsLastRun,
-        device,
-        prefix,
-        id
-      );
-    }
     return;
   }
   const command = dropdownReset.stateToCommand(stateSuffix);

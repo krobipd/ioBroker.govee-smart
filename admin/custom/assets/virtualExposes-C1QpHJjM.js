@@ -1,0 +1,1 @@
+import{t as e}from"./virtual_mf-exposes___mfe_internal__ConfigCustomGoveeSegmentSet__customComponents_js-DNm7FzPq.js";export{e as default};

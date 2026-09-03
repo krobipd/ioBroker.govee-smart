@@ -57,8 +57,6 @@ function makeDeviceManager(): { dm: DeviceManager; generateCalls: string[] } {
 
 const device = createTestDevice();
 const PREFIX = "devices.h6160_0011";
-const TRIGGER = `govee-smart.0.${PREFIX}.diag.export`;
-
 describe("handleDiagnosticsExport", () => {
   it("writes the report as a FILE and points the datapoint at it", async () => {
     // The whole point of the change: the report measured 67,917 characters on
@@ -67,7 +65,7 @@ describe("handleDiagnosticsExport", () => {
     // and flowed through every history subscription on the device.
     const { adapter, writes, files } = makeAdapter();
     const { dm, generateCalls } = makeDeviceManager();
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX, TRIGGER);
+    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
 
     expect(generateCalls).toEqual(["9.9.9"]);
     expect(name).toBeTruthy();
@@ -75,13 +73,18 @@ describe("handleDiagnosticsExport", () => {
     expect(stored).toBeDefined();
     expect(JSON.parse(stored!).sku).toBe("H6160");
 
-    // The datapoint carries the file name, not the report.
+    // The datapoint carries WHEN the report was taken. The name would say
+    // nothing a moment later — the card hands the file over on the spot — while
+    // "was a report taken since the fault?" stays answerable in the object tree.
     const pointer = writes.find(w => w.id === `govee-smart.0.${PREFIX}.diag.lastExport`);
-    expect(pointer).toMatchObject({ val: name, ack: true });
-    // And the old fat datapoint is not written at all any more.
+    expect(pointer?.ack).toBe(true);
+    expect(pointer?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // Neither predecessor is written any more: the fat report datapoint (≤2.28.0)
+    // nor the file name (≤2.30.0).
     expect(writes.find(w => w.id.endsWith(".diag.result"))).toBeUndefined();
-    // Trigger reset so the next click works
-    expect(writes.find(w => w.id === TRIGGER)).toMatchObject({ val: false, ack: true });
+    expect(pointer?.val).not.toBe(name);
+    // And nothing writes to the button datapoint, which no longer exists.
+    expect(writes.find(w => w.id.endsWith(".diag.export"))).toBeUndefined();
   });
 
   it("the file name tells a stranger which device it is about", async () => {
@@ -89,7 +92,7 @@ describe("handleDiagnosticsExport", () => {
     // devices attaches two of these.
     const { adapter, files } = makeAdapter();
     const { dm } = makeDeviceManager();
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX, TRIGGER);
+    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
     expect(name).toMatch(/^govee-smart_H6160_0011_v9\.9\.9_\d{4}-\d{2}-\d{2}_\d{6}\.json$/);
     expect([...files.keys()][0]).toContain("H6160_0011");
   });
@@ -100,7 +103,7 @@ describe("handleDiagnosticsExport", () => {
     const dm = {
       generateDiagnostics: () => Promise.resolve({ readMe: { privacy: "Pseudonymised: …" }, sku: "H6160" }),
     } as unknown as DeviceManager;
-    await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX, TRIGGER);
+    await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
     const stored = [...files.values()][0];
     expect(JSON.parse(stored).readMe.privacy).toContain("Pseudonymised");
   });
@@ -119,7 +122,7 @@ describe("handleDiagnosticsExport", () => {
       vi.setSystemTime(new Date("2026-09-03T10:00:00Z"));
       for (let i = 0; i < 5; i++) {
         vi.setSystemTime(new Date(Date.now() + DIAGNOSTICS_EXPORT_THROTTLE_MS + 1_000));
-        await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX, TRIGGER);
+        await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
       }
     } finally {
       vi.useRealTimers();
@@ -127,29 +130,28 @@ describe("handleDiagnosticsExport", () => {
     expect(files.size).toBe(DIAGNOSTICS_KEEP_PER_DEVICE);
   });
 
-  it("a failing export warns and still frees the button", async () => {
-    // A stuck `true` with no word on why is the same dead end as before.
+  it("a failing export answers null and leaves the timestamp alone", async () => {
+    // The card turns the null into its own error message; the datapoint must not
+    // claim a report was taken when none was.
     const { adapter, writes } = makeAdapter();
     const dm = {
       generateDiagnostics: () => Promise.reject(new Error("object db down")),
     } as unknown as DeviceManager;
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX, TRIGGER);
+    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
     expect(name).toBeNull();
-    expect(writes.find(w => w.id === TRIGGER)).toMatchObject({ val: false, ack: true });
+    expect(writes.find(w => w.id.endsWith(".diag.lastExport"))).toBeUndefined();
   });
 
-  it("throttles a second click inside the window — no diag generated, but the button is still reset", async () => {
+  it("throttles a second click inside the window — nothing generated, nothing stamped", async () => {
     const { adapter, writes } = makeAdapter();
     const { dm, generateCalls } = makeDeviceManager();
     const lastRun = new Map<string, number>();
     lastRun.set(sessionKey(device.sku, device.deviceId), Date.now() - DIAGNOSTICS_EXPORT_THROTTLE_MS / 2);
 
-    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX, TRIGGER);
+    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX);
 
     expect(generateCalls).toHaveLength(0);
     expect(writes.find(w => w.id.endsWith(".diag.lastExport"))).toBeUndefined();
-    // Button reset is unconditional — otherwise the UI button sticks at true
-    expect(writes.find(w => w.id === TRIGGER)).toMatchObject({ val: false, ack: true });
   });
 
   it("allows a re-export once the throttle window has elapsed", async () => {
@@ -158,7 +160,7 @@ describe("handleDiagnosticsExport", () => {
     const lastRun = new Map<string, number>();
     lastRun.set(sessionKey(device.sku, device.deviceId), Date.now() - DIAGNOSTICS_EXPORT_THROTTLE_MS - 1);
 
-    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX, TRIGGER);
+    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX);
     expect(generateCalls).toHaveLength(1);
   });
 
@@ -166,10 +168,10 @@ describe("handleDiagnosticsExport", () => {
     const { adapter } = makeAdapter();
     const { dm, generateCalls } = makeDeviceManager();
     const lastRun = new Map<string, number>();
-    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX, TRIGGER);
+    await handleDiagnosticsExport(adapter, dm, lastRun, device, PREFIX);
 
     const other = createTestDevice({ deviceId: "BB:22" });
-    await handleDiagnosticsExport(adapter, dm, lastRun, other, "devices.h6160_bb22", TRIGGER);
+    await handleDiagnosticsExport(adapter, dm, lastRun, other, "devices.h6160_bb22");
     expect(generateCalls).toHaveLength(2);
   });
 });

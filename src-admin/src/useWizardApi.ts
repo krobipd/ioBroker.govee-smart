@@ -3,9 +3,9 @@
 // only dependency is a `sendTo` method, injected via the WizardSocket seam.
 //
 // The response shapes MUST stay in sync with the backend
-// (src/lib/segment-wizard.ts WizardSnapshot / WizardResponse and
-// src/lib/message-router.ts getSegmentDevices). They are re-declared here
-// because src-admin is an isolated package that cannot import from ../src.
+// (src/lib/segment-wizard.ts WizardSnapshot / WizardResponse). They are
+// re-declared here because src-admin is an isolated package that cannot import
+// from ../src.
 
 /** Grid snapshot the backend folds into every wizard response. */
 export interface WizardSnapshot {
@@ -28,12 +28,6 @@ export interface WizardResponse {
   error?: string;
 }
 
-/** A segment-capable device offered by getSegmentDevices. */
-export interface DeviceOption {
-  value: string;
-  label: string;
-}
-
 /**
  * Minimal socket seam — the admin socket's `sendTo(instance, command, data)`
  * (verified against `@iobroker/socket-client` 5.x). Declared narrowly so tests
@@ -43,10 +37,8 @@ export interface WizardSocket {
   sendTo(instance: string, command: string, data: unknown): Promise<unknown>;
 }
 
-/** The wizard operations the React component drives. */
+/** The wizard operations the React component drives. The device list comes from {@link makeDeviceListApi}. */
 export interface WizardApi {
-  /** Segment-capable devices for the select screen. */
-  listDevices(): Promise<DeviceOption[]>;
   /** Begin measuring `device` (also remembered for the following steps). */
   start(device: string): Promise<WizardResponse>;
   /** Current segment is lit. */
@@ -80,10 +72,6 @@ export function makeWizardApi(socket: WizardSocket, namespace: string): WizardAp
   };
 
   return {
-    async listDevices() {
-      const res = await socket.sendTo(namespace, "getSegmentDevices", {});
-      return Array.isArray(res) ? (res as DeviceOption[]) : [];
-    },
     start(device) {
       currentDevice = device;
       return step("start", device);

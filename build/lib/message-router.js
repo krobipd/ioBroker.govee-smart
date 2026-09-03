@@ -89,10 +89,6 @@ class MessageRouter {
   async handleMessage(obj) {
     var _a, _b, _c, _d, _e, _f, _g, _h;
     try {
-      if (obj.command === "getSegmentDevices") {
-        this.host.sendResponse(obj, this.host.getSegmentDeviceList());
-        return;
-      }
       if (obj.command === "segmentWizard") {
         const payload = (_a = obj.message) != null ? _a : {};
         const response = await this.host.runWizardStep((_b = payload.action) != null ? _b : "", (_c = payload.device) != null ? _c : "", {
@@ -104,7 +100,7 @@ class MessageRouter {
       if (obj.command === "diagnostics") {
         const payload = (_d = obj.message) != null ? _d : {};
         if (payload.action === "list") {
-          this.host.sendResponse(obj, { devices: this.host.getDiagnosticsDeviceList() });
+          this.host.sendResponse(obj, { devices: this.host.getDeviceList() });
           return;
         }
         if (payload.action === "export") {

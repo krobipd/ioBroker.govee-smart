@@ -29,7 +29,7 @@ import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
 import { RateLimiter } from "./lib/rate-limiter";
 import type { SegmentWizard } from "./lib/segment-wizard";
-import { resolveLabel, tDesc, tName } from "./lib/i18n";
+import { tDesc, tName } from "./lib/i18n";
 import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
@@ -400,12 +400,22 @@ export class GoveeAdapter extends utils.Adapter {
     const id = `system.adapter.${this.namespace}`;
     try {
       const obj = await this.getForeignObjectAsync(id);
-      const supported = obj?.common?.supportedMessages as { stopInstance?: unknown } | undefined;
-      if (!supported?.stopInstance) {
+      const supported = obj?.common?.supportedMessages;
+      // Correct as soon as the key EXISTS AT ALL, not just when stopInstance is
+      // true. The earlier fix wrote `{ stopInstance: false }` here, and that is
+      // its own defect: once `supportedMessages` is an object, the host stops
+      // looking at `common.messagebox`, and an object whose values are all
+      // false means "this adapter takes no messages". Every sendTo from the
+      // admin UI then goes nowhere — the diagnostics card reports no devices,
+      // the connection test does nothing. The old guard also made that state
+      // permanent: with `false` written, it never matched again.
+      if (supported === undefined || supported === null) {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
-      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      // null DELETES the key (extend copies null, skips undefined) — anything
+      // else leaves an object behind and keeps the message box shut.
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
       this.log.debug(`Could not check the instance object: ${errMessage(e)}`);
@@ -1522,13 +1532,24 @@ export class GoveeAdapter extends utils.Adapter {
         probe.enableProbeMode();
         return probe;
       },
-      getDiagnosticsDeviceList: () => {
+      getDeviceList: () => {
         // Every real device — a report is useful precisely when a device is NOT
         // behaving, so filtering by reachability would hide the interesting
         // ones. Groups are out: they never had diagnostics.
+        //
+        // `online` and `segments` travel with each entry so the card can filter
+        // the wizard's half itself. They are what the segment list used to be
+        // filtered by on this side; the keys were already identical
+        // (`sessionKey` builds the same `sku:deviceId`), so one list serves both.
         return (this.deviceManager?.getDevices() ?? [])
           .filter(d => d.sku !== "BaseGroup")
-          .map(d => ({ value: `${d.sku}:${d.deviceId}`, label: deviceLabel(d), model: d.sku }));
+          .map(d => ({
+            value: `${d.sku}:${d.deviceId}`,
+            label: deviceLabel(d),
+            model: d.sku,
+            online: d.state?.online === true,
+            segments: resolveSegmentCount(d, this.deviceRegistry),
+          }));
       },
       buildDiagnosticsReport: async (deviceKey: string) => {
         const device = (this.deviceManager?.getDevices() ?? []).find(d => `${d.sku}:${d.deviceId}` === deviceKey);
@@ -1542,7 +1563,6 @@ export class GoveeAdapter extends utils.Adapter {
           this.diagnosticsLastRun,
           device,
           prefix,
-          `${this.namespace}.${prefix}.diag.export`,
         );
         if (!fileName) {
           return { error: "Export failed or was throttled — try again in a moment" };
@@ -1552,22 +1572,6 @@ export class GoveeAdapter extends utils.Adapter {
         // near-identical copy taken a moment later.
         const { file } = await this.readFileAsync(`${this.namespace}.diagnostics`, fileName);
         return { fileName, content: typeof file === "string" ? file : file.toString("utf8") };
-      },
-      getSegmentDeviceList: () => {
-        const devices = this.deviceManager?.getDevices() ?? [];
-        return devices
-          .filter(
-            d => d.sku !== "BaseGroup" && d.state?.online === true && resolveSegmentCount(d, this.deviceRegistry) > 0,
-          )
-          .map(d => ({
-            value: wizardHandler.deviceKeyFor(d),
-            label: resolveLabel(
-              "segmentWizardDeviceOption",
-              d.name,
-              d.sku,
-              resolveSegmentCount(d, this.deviceRegistry),
-            ),
-          }));
       },
       runWizardStep: (action, deviceKey, payload) =>
         wizardHandler.runWizardStep(this.handlerHost, action, deviceKey, payload),

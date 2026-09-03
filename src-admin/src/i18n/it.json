@@ -1,5 +1,4 @@
 {
-  "gsw_title": "Rilevamento segmenti",
   "gsw_deviceLabel": "Dispositivo",
   "gsw_noDevices": "Nessun dispositivo con segmenti trovato. Inserisci una chiave API cloud nelle impostazioni dell'adattatore per conoscere le funzionalità del dispositivo.",
   "gsw_start": "Avvia misurazione",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "Salvato come %s.",
   "gsw_diagOpenIssue": "Apri una issue",
   "gsw_diagNoDevices": "Ancora nessun dispositivo. Il rapporto è per dispositivo — appena l'adattatore ne trova uno, compare qui.",
-  "gsw_diagListFailed": "Impossibile caricare l'elenco dispositivi. L'istanza è in esecuzione?",
   "gsw_diagExportFailed": "Non è stato possibile creare il rapporto. Il log dell'adattatore spiega perché.",
-  "gsw_diagPrivacy": "Il rapporto è pseudonimizzato: indirizzi, indirizzi mail e nomi dei dispositivi sono sostituiti da marcatori stabili, gli id sono accorciati e le credenziali non compaiono mai. Il file lo spiega nella propria intestazione."
+  "gsw_diagPrivacy": "Il rapporto è pseudonimizzato: indirizzi, indirizzi mail e nomi dei dispositivi sono sostituiti da marcatori stabili, gli id sono accorciati e le credenziali non compaiono mai. Il file lo spiega nella propria intestazione.",
+  "gsw_loadingDevices": "Caricamento dispositivi …",
+  "gsw_loadingDevicesSlow": "Ancora in caricamento: l'istanza dell'adattatore deve essere in esecuzione.",
+  "gsw_listFailed": "Impossibile caricare l'elenco dei dispositivi. L'istanza è in esecuzione?",
+  "gsw_deviceOption": "%s — attualmente %s segmenti",
+  "gsw_expertIntro": "Due strumenti per quando serve uno sguardo più attento. Scegline uno: l'elenco dei dispositivi viene caricato.",
+  "gsw_expertWizard": "Rilevamento segmenti",
+  "gsw_expertDiagnostics": "Diagnostica"
 }

@@ -67,23 +67,25 @@ async function pruneOlderReports(adapter: DiagnosticsHandlerAdapter, meta: strin
 
 /**
  * Throttled (≥2 s) diagnostics export. Writes the report for `device` as a
- * FILE into the `<namespace>.diagnostics` meta object and points
- * `<prefix>.diag.lastExport` at it. The trigger state is always reset to
- * `false` so the next click works.
+ * FILE into the `<namespace>.diagnostics` meta object and stamps
+ * `<prefix>.diag.lastExport` with the time it ran.
  *
  * Why a file and not a state: the report measured 67,917 characters on an
  * H61BE. That is past GitHub's 65,536-character issue body, so it could not be
  * pasted into the very issue it exists for — and as a state value it sat in the
  * state database and flowed through every history subscription on the device.
- * As a file the user downloads it from the adapter's Diagnostics tab (or the
- * admin file browser) and attaches it.
+ * As a file the user downloads it from the adapter's Expert tab (or the admin
+ * file browser) and attaches it.
+ *
+ * Since 2.31.0 the export is started from the admin card only. The per-device
+ * button datapoint is gone: it was a second, clumsier path to the same file —
+ * flip a state, then go find the file — and the card does both in one press.
  *
  * @param adapter ioBroker adapter surface
  * @param deviceManager Device manager (caller-validated non-null)
  * @param lastRun Per-device throttle map (keyed by `sku:deviceId`)
  * @param device Target device
  * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
- * @param triggerStateId Full state id of the button that triggered the export
  * @returns The file name written, or null when the export was throttled or failed
  */
 export async function handleDiagnosticsExport(
@@ -92,14 +94,12 @@ export async function handleDiagnosticsExport(
   lastRun: Map<string, number>,
   device: GoveeDevice,
   prefix: string,
-  triggerStateId: string,
 ): Promise<string | null> {
   const deviceKey = sessionKey(device.sku, device.deviceId);
   const now = Date.now();
   const last = lastRun.get(deviceKey) ?? 0;
   if (now - last < DIAGNOSTICS_EXPORT_THROTTLE_MS) {
     adapter.log.debug(`Diagnostics export throttled for ${deviceLabel(device)} — last run ${now - last}ms ago`);
-    await adapter.setState(triggerStateId, { val: false, ack: true });
     return null;
   }
   lastRun.set(deviceKey, now);
@@ -110,18 +110,23 @@ export async function handleDiagnosticsExport(
     const diag = await deviceManager.generateDiagnostics(device, version, prefix);
     await adapter.writeFileAsync(meta, fileName, JSON.stringify(diag, null, 2));
     await pruneOlderReports(adapter, meta, device);
-    await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, { val: fileName, ack: true });
+    // WHEN, not which file: the card hands the file over on the spot, so the
+    // name says nothing a moment later — but "was a report taken since the
+    // fault?" is a question the object tree can still answer. Seconds are
+    // enough; ISO-8601 in UTC so it reads the same in every timezone and sorts.
+    await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, {
+      val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      ack: true,
+    });
     adapter.log.info(`Diagnostics report for ${deviceLabel(device)} written to ${fileName}`);
     return fileName;
   } catch (e) {
-    // The button must never leave the user with a stuck `true` and no word on
-    // why — an export that fails silently is the same dead end the old
-    // copy-out-of-a-state flow was.
+    // An export that fails silently is the same dead end the old
+    // copy-out-of-a-state flow was — say so in the log, and the card shows the
+    // caller its own error.
     adapter.log.warn(
       `Diagnostics export for ${deviceLabel(device)} failed: ${e instanceof Error ? e.message : String(e)}`,
     );
     return null;
-  } finally {
-    await adapter.setState(triggerStateId, { val: false, ack: true });
   }
 }

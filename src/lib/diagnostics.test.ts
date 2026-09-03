@@ -2,6 +2,7 @@ import { DiagnosticsCollector } from "./diagnostics";
 import { DeviceRegistry } from "./device-registry";
 import { HttpError } from "./http-client";
 import type { GoveeDevice } from "./types";
+import { resolveDeviceReachability } from "./device-manager/lookups";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
@@ -264,15 +265,74 @@ describe("DiagnosticsCollector", () => {
       expect((src.silentSources as string[]).join(" ")).toContain("account push");
     });
 
-    it("a cloud-only light: says the poll runs ONCE at start — the fact that took hours to find", async () => {
+    it("a light with no address but a recent LAN reply is still LAN-driven — the seven-day memory", async () => {
+      // The measured defect (H618A, 2026-09-03): the report tied "LAN decides"
+      // to `lanIp`, while the resolver had moved to `lastLanSeenAt` in 2.30.0.
+      // `lanIp` is re-discovered by scan, so right after a restart every local
+      // light looks address-less — and the report claimed the cloud decided.
       const c = new DiagnosticsCollector(registry);
-      const r = (await c.generate(makeDevice({ lanIp: undefined, state: { online: false } }), "2.30.0")) as Record<
+      const r = (await c.generate(
+        makeDevice({ lanIp: undefined, lastLanSeenAt: Date.now() - 60_000, lastLanReplyAt: 1_700_000_000_000 }),
+        "2.31.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      const src = r.device.reachabilitySource!;
+      expect(src.decidedBy).toContain("LAN");
+      expect(src.lastEvidenceAt).toBe(1_700_000_000_000);
+      expect(String(src.refreshedBy)).toContain("30 s");
+    });
+
+    it("a cloud-only light: the account list refreshes it every 2 minutes", async () => {
+      // Until 2.30.0 the cloud poll for such a light really did run once at
+      // start, and the report said so. `hasDeviceNeedingAppApi` changed that —
+      // a light without a local interface joins the 2-minute account call —
+      // and the hand-written report text kept telling the old story.
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
+        "2.31.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      const src = r.device.reachabilitySource!;
+      expect(String(src.refreshedBy)).toContain("2 min");
+      expect(String(src.refreshedBy)).not.toContain("ONCE");
+      expect((src.silentSources as string[]).join(" ")).toContain("no local API");
+    });
+
+    it("names the gateway as the deciding source when the gateway is down", async () => {
+      // The gateway ceiling arrived in 2.30.0 and the report had no branch for
+      // it at all: a sensor grey because its gateway is unplugged was reported
+      // as "nothing ever reported", which sends the reader hunting the wrong
+      // device entirely.
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({
+          lanIp: undefined,
+          lastLanSeenAt: undefined,
+          type: "sensor",
+          state: { online: false, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now(), gatewayOnline: false },
+        }),
+        "2.31.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      expect(String(r.device.reachabilitySource!.decidedBy)).toContain("gateway");
+    });
+
+    it("the report never decides for itself — it renders what the resolver answered", async () => {
+      // The whole class of defect: a second, hand-written copy of the rule. If
+      // the resolver says the cloud decided, the report may not say LAN did,
+      // whatever the device's fields look like to a reader of this file.
+      const device = makeDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: 1_800_000_000_000 },
+      });
+      const decision = resolveDeviceReachability(device);
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(device, "2.31.0")) as Record<
         string,
         { reachabilitySource?: Record<string, unknown> }
       >;
-      const src = r.device.reachabilitySource!;
-      expect(String(src.refreshedBy)).toContain("ONCE");
-      expect((src.silentSources as string[]).join(" ")).toContain("no local API");
+      expect(r.device.reachabilitySource!.lastEvidenceAt).toBe(decision.lastEvidenceAt);
+      expect(decision.decidedBy).toBe("cloudReport");
+      expect(String(r.device.reachabilitySource!.decidedBy)).toContain("Govee reported");
     });
   });
 

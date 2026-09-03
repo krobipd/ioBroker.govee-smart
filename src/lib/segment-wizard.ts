@@ -308,6 +308,17 @@ export class SegmentWizard {
         error: this.t("errNoSegments", { name: device.name }),
       };
     }
+    // Until 2.31.0 an unreachable device could not get this far: the wizard had
+    // its own device list and that list filtered on reachability. Now one list
+    // serves both halves of the Expert tab and the card filters it, so a device
+    // that drops off between loading the list and pressing start would reach
+    // this point — and the wizard would flash segments at something that cannot
+    // answer, with nothing on screen to explain the silence.
+    if (device.state?.online !== true) {
+      return {
+        error: this.t("errDeviceOffline", { name: device.name }),
+      };
+    }
 
     // Reserve the session slot SYNCHRONOUSLY — before the first `await`
     // (captureBaseline) — so a second start() from the fire-and-forget onMessage

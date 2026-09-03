@@ -1,5 +1,4 @@
 {
-  "gsw_title": "Wykrywanie segmentów",
   "gsw_deviceLabel": "Urządzenie",
   "gsw_noDevices": "Nie znaleziono urządzeń z segmentami. Wprowadź klucz API chmury w ustawieniach adaptera, aby poznać możliwości urządzenia.",
   "gsw_start": "Rozpocznij pomiar",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "Zapisano jako %s.",
   "gsw_diagOpenIssue": "Otwórz zgłoszenie",
   "gsw_diagNoDevices": "Brak urządzeń. Raport dotyczy pojedynczego urządzenia — gdy adapter jakieś znajdzie, pojawi się tutaj.",
-  "gsw_diagListFailed": "Nie udało się wczytać listy urządzeń. Czy instancja działa?",
   "gsw_diagExportFailed": "Nie udało się utworzyć raportu. Powód znajdziesz w logu adaptera.",
-  "gsw_diagPrivacy": "Raport jest pseudonimizowany: adresy, adresy e-mail i nazwy urządzeń zastępują stałe znaczniki, identyfikatory są skracane, a dane logowania nigdy się w nim nie pojawiają. Plik wyjaśnia to we własnym nagłówku."
+  "gsw_diagPrivacy": "Raport jest pseudonimizowany: adresy, adresy e-mail i nazwy urządzeń zastępują stałe znaczniki, identyfikatory są skracane, a dane logowania nigdy się w nim nie pojawiają. Plik wyjaśnia to we własnym nagłówku.",
+  "gsw_loadingDevices": "Wczytywanie urządzeń …",
+  "gsw_loadingDevicesSlow": "Nadal trwa wczytywanie — instancja adaptera musi być uruchomiona.",
+  "gsw_listFailed": "Nie udało się wczytać listy urządzeń. Czy instancja działa?",
+  "gsw_deviceOption": "%s — obecnie %s segmentów",
+  "gsw_expertIntro": "Dwa narzędzia, gdy coś wymaga bliższego spojrzenia. Wybierz jedno — lista urządzeń zostanie wczytana.",
+  "gsw_expertWizard": "Wykrywanie segmentów",
+  "gsw_expertDiagnostics": "Diagnostyka"
 }

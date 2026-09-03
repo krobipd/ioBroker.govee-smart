@@ -40,14 +40,13 @@ async function pruneOlderReports(adapter, meta, device) {
     await adapter.delFileAsync(meta, stale).catch(() => void 0);
   }
 }
-async function handleDiagnosticsExport(adapter, deviceManager, lastRun, device, prefix, triggerStateId) {
+async function handleDiagnosticsExport(adapter, deviceManager, lastRun, device, prefix) {
   var _a, _b;
   const deviceKey = (0, import_device_key.sessionKey)(device.sku, device.deviceId);
   const now = Date.now();
   const last = (_a = lastRun.get(deviceKey)) != null ? _a : 0;
   if (now - last < import_timing_constants.DIAGNOSTICS_EXPORT_THROTTLE_MS) {
     adapter.log.debug(`Diagnostics export throttled for ${(0, import_types.deviceLabel)(device)} \u2014 last run ${now - last}ms ago`);
-    await adapter.setState(triggerStateId, { val: false, ack: true });
     return null;
   }
   lastRun.set(deviceKey, now);
@@ -58,7 +57,10 @@ async function handleDiagnosticsExport(adapter, deviceManager, lastRun, device, 
     const diag = await deviceManager.generateDiagnostics(device, version, prefix);
     await adapter.writeFileAsync(meta, fileName, JSON.stringify(diag, null, 2));
     await pruneOlderReports(adapter, meta, device);
-    await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, { val: fileName, ack: true });
+    await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, {
+      val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
+      ack: true
+    });
     adapter.log.info(`Diagnostics report for ${(0, import_types.deviceLabel)(device)} written to ${fileName}`);
     return fileName;
   } catch (e) {
@@ -66,8 +68,6 @@ async function handleDiagnosticsExport(adapter, deviceManager, lastRun, device, 
       `Diagnostics export for ${(0, import_types.deviceLabel)(device)} failed: ${e instanceof Error ? e.message : String(e)}`
     );
     return null;
-  } finally {
-    await adapter.setState(triggerStateId, { val: false, ack: true });
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

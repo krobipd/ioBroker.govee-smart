@@ -3705,12 +3705,21 @@ describe("Reachability from the account push (v2.30.0)", () => {
 
   describe("resolveDeviceReachability — the cap and the expiry", () => {
     it("a heard report counts while fresh", () => {
+      const at = Date.now();
       const dev = createTestDevice({
         lanIp: undefined,
         lastLanSeenAt: undefined,
-        state: { online: false, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
+        state: { online: false, cloudReportedOnline: true, cloudReportedOnlineAt: at },
       });
-      expect(resolveDeviceReachability(dev)).toEqual({ online: true, proven: true });
+      // The reason travels with the answer since 2.31.0 — the diagnostics report
+      // renders it instead of restating the rule by hand, which is how it came
+      // to describe a rule the resolver had already left behind.
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: true,
+        proven: true,
+        decidedBy: "cloudReport",
+        lastEvidenceAt: at,
+      });
     });
 
     it("the same report is worthless once it has aged out", () => {
@@ -3723,7 +3732,12 @@ describe("Reachability from the account push (v2.30.0)", () => {
           cloudReportedOnlineAt: Date.now() - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 60_000),
         },
       });
-      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: false });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: false,
+        proven: false,
+        decidedBy: "noEvidence",
+        lastEvidenceAt: null,
+      });
     });
 
     it("a dead gateway caps the device, however fresh its own report is", () => {
@@ -3737,7 +3751,12 @@ describe("Reachability from the account push (v2.30.0)", () => {
           gatewayOnline: false,
         },
       });
-      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: true });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: false,
+        proven: true,
+        decidedBy: "gatewayDown",
+        lastEvidenceAt: null,
+      });
     });
 
     it("a live gateway alone does NOT make the device reachable — it only fails to rule it out", () => {
@@ -3748,7 +3767,12 @@ describe("Reachability from the account push (v2.30.0)", () => {
         lastLanSeenAt: undefined,
         state: { online: false, gatewayOnline: true },
       });
-      expect(resolveDeviceReachability(dev)).toEqual({ online: false, proven: false });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: false,
+        proven: false,
+        decidedBy: "noEvidence",
+        lastEvidenceAt: null,
+      });
     });
   });
 });

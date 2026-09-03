@@ -8,7 +8,6 @@ import enJson from "./i18n/en.json";
 // controlled responses (no socket). vi.hoisted keeps the mock stable across
 // the hoisted vi.mock factory.
 const mockApi = vi.hoisted(() => ({
-  listDevices: vi.fn(),
   start: vi.fn(),
   yes: vi.fn(),
   no: vi.fn(),
@@ -20,6 +19,15 @@ vi.mock("./useWizardApi", () => ({
   makeWizardApi: () => mockApi,
 }));
 
+// The device list is shared with the diagnostics card since 2.31.0 — the wizard
+// no longer fetches its own, it filters this one.
+const mockList = vi.hoisted(() => ({ listDevices: vi.fn() }));
+
+vi.mock("./useDeviceList", async importOriginal => ({
+  ...(await importOriginal<typeof import("./useDeviceList")>()),
+  makeDeviceListApi: () => mockList,
+}));
+
 import { SegmentWizard } from "./SegmentWizard";
 
 const DEVICE = "H6160:AABB";
@@ -28,7 +36,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   I18n.extendTranslations(enJson, "en");
   I18n.setLanguage("en");
-  mockApi.listDevices.mockResolvedValue([{ value: DEVICE, label: "Strip Living" }]);
+  mockList.listDevices.mockResolvedValue([
+    { value: DEVICE, label: "Strip Living", model: "H6160", online: true, segments: 10 },
+  ]);
   mockApi.abort.mockResolvedValue({ aborted: true, done: true });
 });
 
@@ -147,7 +157,7 @@ describe("SegmentWizard", () => {
   });
 
   it("shows a hint when no segment-capable devices exist", async () => {
-    mockApi.listDevices.mockResolvedValue([]);
+    mockList.listDevices.mockResolvedValue([]);
     renderWizard();
     expect(await screen.findByTestId("wiz-no-devices")).toBeInTheDocument();
   });

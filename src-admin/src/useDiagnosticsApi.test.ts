@@ -15,25 +15,6 @@ function socketReturning(value: unknown): { socket: DiagnosticsSocket; calls: un
 }
 
 describe("makeDiagnosticsApi", () => {
-  it("asks the adapter for the device list on the diagnostics command", async () => {
-    const { socket, calls } = socketReturning({
-      devices: [{ value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE" }],
-    });
-    const api = makeDiagnosticsApi(socket, "govee-smart.0");
-    const devices = await api.listDevices();
-    expect(calls[0]).toEqual(["govee-smart.0", "diagnostics", { action: "list" }]);
-    expect(devices).toHaveLength(1);
-  });
-
-  it("survives an answer without a device list", async () => {
-    // A stopped instance answers nothing useful; the card must show an empty
-    // list rather than throw inside a render.
-    const api = makeDiagnosticsApi(socketReturning(undefined).socket, "govee-smart.0");
-    await expect(api.listDevices()).resolves.toEqual([]);
-    const api2 = makeDiagnosticsApi(socketReturning({ devices: "nope" }).socket, "govee-smart.0");
-    await expect(api2.listDevices()).resolves.toEqual([]);
-  });
-
   it("passes the selected device through to the export action", async () => {
     const { socket, calls } = socketReturning({ fileName: "f.json", content: "{}" });
     const api = makeDiagnosticsApi(socket, "govee-smart.1");
@@ -67,6 +48,6 @@ describe("socket rejection", () => {
   it("propagates so the card can show its own message", async () => {
     const socket: DiagnosticsSocket = { sendTo: vi.fn(() => Promise.reject(new Error("no connection"))) };
     const api = makeDiagnosticsApi(socket, "govee-smart.0");
-    await expect(api.listDevices()).rejects.toThrow("no connection");
+    await expect(api.exportReport("H61BE:AA:BB")).rejects.toThrow("no connection");
   });
 });

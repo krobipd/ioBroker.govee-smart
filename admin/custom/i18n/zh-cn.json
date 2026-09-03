@@ -1,5 +1,4 @@
 {
-  "gsw_title": "分段检测",
   "gsw_deviceLabel": "设备",
   "gsw_noDevices": "未找到带分段的设备。请在适配器设置中输入云 API 密钥，以便获知设备功能。",
   "gsw_start": "开始测量",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "已保存为 %s。",
   "gsw_diagOpenIssue": "创建 issue",
   "gsw_diagNoDevices": "暂无设备。报告是按设备生成的——适配器找到设备后会显示在这里。",
-  "gsw_diagListFailed": "无法加载设备列表。实例正在运行吗？",
   "gsw_diagExportFailed": "无法生成报告。原因见适配器日志。",
-  "gsw_diagPrivacy": "报告已做匿名化处理：地址、邮件地址和设备名称被替换为固定标记，设备标识被缩短，凭据完全不会出现。文件在其头部对此作了说明。"
+  "gsw_diagPrivacy": "报告已做匿名化处理：地址、邮件地址和设备名称被替换为固定标记，设备标识被缩短，凭据完全不会出现。文件在其头部对此作了说明。",
+  "gsw_loadingDevices": "正在加载设备 …",
+  "gsw_loadingDevicesSlow": "仍在加载 — 这需要适配器实例正在运行。",
+  "gsw_listFailed": "无法加载设备列表。适配器实例正在运行吗？",
+  "gsw_deviceOption": "%s — 当前 %s 个段",
+  "gsw_expertIntro": "需要仔细查看时用的两个工具。选择其一，设备列表随即加载。",
+  "gsw_expertWizard": "分段检测",
+  "gsw_expertDiagnostics": "诊断"
 }

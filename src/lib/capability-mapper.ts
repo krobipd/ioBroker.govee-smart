@@ -1241,38 +1241,30 @@ export function buildLanStateDefs(
 }
 
 /**
- * The three diagnostics states (export button, JSON result, trust tier) for
- * real devices. Groups get none (dead button — no group handler; Pattern 33).
+ * The two diagnostics states (time of the last export, trust tier) for real
+ * devices. Groups get none (no group handler; Pattern 33).
  *
  * @param tierDef Initial value for the diag.tier state
  */
 function buildDiagStateDefs(tierDef: string): StateDefinition[] {
   const defs: StateDefinition[] = [
     {
-      id: "export",
-      name: tName("exportDiagnostics"),
-      type: "boolean",
-      role: "button",
-      write: true,
-      def: false,
-      capabilityType: "local",
-      capabilityInstance: "diagnosticsExport",
-      channel: "diag",
-    },
-    {
-      // Until 2.29.0 this was `result` and held the ENTIRE report as text —
-      // measured 67,917 characters on an H61BE, which is both over GitHub's
-      // issue limit and a heavy value to keep in the state database and in
-      // every history subscription on the device. The report is a file now;
-      // this states which one, so the object tree still gives feedback when
-      // the button is pressed there. The old `result` is not in this list any
-      // more and therefore leaves an upgraded install on the next Cloud
-      // rebuild, the same code-free migration as the 2.28.0 renames.
+      // Two predecessors, both gone:
+      //  - `result` (until 2.29.0) held the ENTIRE report as text — measured
+      //    67,917 characters on an H61BE, over GitHub's issue limit and a heavy
+      //    value to keep in the state database and in every history
+      //    subscription on the device. The report is a file now.
+      //  - the file NAME (until 2.31.0), which only repeated what the export
+      //    already handed the user.
+      // What is worth keeping is WHEN the last report was taken. Neither
+      // predecessor could leave on its own: `cleanupCloudOwnedStates` sweeps
+      // only MANAGED_CHANNELS and `diag` is not one of them, so both are
+      // removed explicitly in `migrateLegacyDiagnostics`.
       id: "lastExport",
       name: tName("diagnosticsLastExport"),
       desc: tDesc("diagnosticsLastExportDesc"),
       type: "string",
-      role: "text",
+      role: "date",
       write: false,
       def: "",
       capabilityType: "local",
@@ -1490,7 +1482,7 @@ export function buildCloudStateDefs(
     });
   }
 
-  // Diagnostics — export button, JSON result, trust tier. Default tier
+  // Diagnostics — time of the last export, trust tier. Default tier
   // "unknown" for a real device (its actual tier comes from the registry).
   stateDefs.push(...buildDiagStateDefs("unknown"));
 

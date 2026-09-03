@@ -1,27 +1,12 @@
 import React from "react";
 
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  MenuItem,
-  Select,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
+import { DeviceListStatus, useDeviceList } from "./DeviceListLoader";
 import { SegmentGrid } from "./SegmentGrid";
-import {
-  makeWizardApi,
-  type DeviceOption,
-  type WizardResponse,
-  type WizardSnapshot,
-  type WizardSocket,
-} from "./useWizardApi";
+import { segmentCapable } from "./useDeviceList";
+import { makeWizardApi, type WizardResponse, type WizardSnapshot, type WizardSocket } from "./useWizardApi";
 
 /** Props for the segment-wizard React component. */
 export interface SegmentWizardProps {
@@ -70,9 +55,14 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     [props.socket, props.namespace],
   );
 
+  const list = useDeviceList(props.socket, props.namespace);
+  // The wizard shows what it can actually measure. The filter moved here in
+  // 2.31.0 when both cards started sharing one list command; the backend still
+  // refuses an unreachable device on `start`, so this only decides what is
+  // offered.
+  const devices = React.useMemo(() => (list.status === "ready" ? segmentCapable(list.devices) : []), [list]);
+
   const [screen, setScreen] = React.useState<Screen>("select");
-  const [devices, setDevices] = React.useState<DeviceOption[]>([]);
-  const [devicesLoaded, setDevicesLoaded] = React.useState(false);
   const [device, setDevice] = React.useState("");
   const [snapshot, setSnapshot] = React.useState<WizardSnapshot | null>(null);
   const [reviewTotal, setReviewTotal] = React.useState(0);
@@ -81,19 +71,8 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
   const [error, setError] = React.useState("");
 
   React.useEffect(() => {
-    let alive = true;
-    void api.listDevices().then(list => {
-      if (!alive) {
-        return;
-      }
-      setDevices(list);
-      setDevice(list.length ? list[0].value : "");
-      setDevicesLoaded(true);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [api]);
+    setDevice(devices.length ? devices[0].value : "");
+  }, [devices]);
 
   const resetToSelect = (): void => {
     setSnapshot(null);
@@ -201,19 +180,15 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     </Alert>
   ) : null;
 
+  if (list.status !== "ready") {
+    return <DeviceListStatus state={list} />;
+  }
+
   if (screen === "select") {
     return (
       <Box sx={{ maxWidth: 520 }}>
-        <Typography
-          variant="h6"
-          sx={{ mb: 2 }}
-        >
-          {I18n.t("gsw_title")}
-        </Typography>
         {errorBanner}
-        {!devicesLoaded ? (
-          <CircularProgress size={24} />
-        ) : devices.length === 0 ? (
+        {devices.length === 0 ? (
           <Alert
             severity="info"
             data-testid="wiz-no-devices"
@@ -235,7 +210,7 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
                     key={d.value}
                     value={d.value}
                   >
-                    {d.label}
+                    {I18n.t("gsw_deviceOption", d.label, String(d.segments))}
                   </MenuItem>
                 ))}
               </Select>

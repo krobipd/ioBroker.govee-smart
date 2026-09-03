@@ -1,5 +1,4 @@
 {
-  "gsw_title": "Segment detection",
   "gsw_deviceLabel": "Device",
   "gsw_noDevices": "No segment-capable devices found. Enter a Cloud API key in the adapter settings so device capabilities are known.",
   "gsw_start": "Start measuring",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "Saved as %s.",
   "gsw_diagOpenIssue": "Open an issue",
   "gsw_diagNoDevices": "No devices yet. The report is per device — once the adapter has found one, it appears here.",
-  "gsw_diagListFailed": "Could not load the device list. Is the instance running?",
   "gsw_diagExportFailed": "The report could not be created. The adapter log says why.",
-  "gsw_diagPrivacy": "The report is pseudonymised: addresses, mail addresses and device names are replaced by stable markers, device ids are shortened, and credentials never appear. The file explains this in its own header."
+  "gsw_diagPrivacy": "The report is pseudonymised: addresses, mail addresses and device names are replaced by stable markers, device ids are shortened, and credentials never appear. The file explains this in its own header.",
+  "gsw_loadingDevices": "Loading devices …",
+  "gsw_loadingDevicesSlow": "Still loading — this needs the adapter instance to be running.",
+  "gsw_listFailed": "Could not load the device list. Is the instance running?",
+  "gsw_deviceOption": "%s — currently %s segments",
+  "gsw_expertIntro": "Two tools for when something needs a closer look. Pick one — the device list loads when you do.",
+  "gsw_expertWizard": "Segment detection",
+  "gsw_expertDiagnostics": "Diagnostics"
 }

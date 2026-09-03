@@ -59,8 +59,6 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   const syncCalls: number[] = [];
   const objects = new Map<string, unknown>();
   const states = new Map<string, ioBroker.StateValue>();
-  /** meta.user file store — the diagnostics export writes its report here. */
-  const files = new Map<string, string>();
   let sendFailure: () => Error | null = () => null;
   let fanOutResult = true; // group fan-out reached a member (ack-worthy) by default
 
@@ -70,21 +68,6 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       warn: (m: string) => warns.push(m),
     },
     namespace: NS,
-    version: "9.9.9",
-    writeFileAsync: (meta: string, name: string, data: Buffer | string) => {
-      files.set(`${meta}/${name}`, String(data));
-      return Promise.resolve();
-    },
-    readDirAsync: (meta: string) =>
-      Promise.resolve(
-        [...files.keys()]
-          .filter(k => k.startsWith(`${meta}/`))
-          .map(k => ({ file: k.slice(meta.length + 1), isDir: false })),
-      ),
-    delFileAsync: (meta: string, name: string) => {
-      files.delete(`${meta}/${name}`);
-      return Promise.resolve();
-    },
     unloading: false,
     deviceManager: {
       getDevices: () => devices,
@@ -129,7 +112,6 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       setMusicMode: (ip: string, mode: number, includeRgb: boolean, r: number, g: number, b: number) =>
         lanMusic.push({ ip, mode, includeRgb, r, g, b }),
     } as never,
-    diagnosticsLastRun: new Map<string, number>(),
     getStateAsync: id =>
       Promise.resolve(states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
     setState: (id, state) => {
@@ -653,12 +635,17 @@ describe("onStateChange — manual device sync button (BUG-1)", () => {
   });
 });
 
-describe("onStateChange — diag.export routing branch", () => {
-  it("delegates to the diagnostics handler: report file written + trigger reset", async () => {
+describe("onStateChange — the diagnostics button is gone", () => {
+  it("a write to the old diag.export id is not routed anywhere", async () => {
+    // Removed in 2.31.0: the export runs from the admin card, which hands the
+    // file over in the same press. A leftover datapoint on an upgraded install
+    // (deleted by `migrateLegacyDiagnostics`, but a script could still write the
+    // id) must not resurrect the path — it would build a report nobody receives.
     const rig = makeRig([device]);
     await write(rig, id("diag.export"), true);
-    // The report is a file now; the datapoint carries its name.
-    expect(rig.acks.some(a => a.id === id("diag.lastExport"))).toBe(true);
-    expect(rig.acks).toContainEqual({ id: id("diag.export"), val: false });
+    expect(rig.acks.some(a => a.id === id("diag.lastExport"))).toBe(false);
+    // Nothing at all happens: no report, and no ack that would make the write
+    // look accepted. Re-adding the branch would show up here as a lastExport ack.
+    expect(rig.acks).toEqual([]);
   });
 });

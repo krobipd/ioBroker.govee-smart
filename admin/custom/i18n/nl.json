@@ -1,5 +1,4 @@
 {
-  "gsw_title": "Segmentdetectie",
   "gsw_deviceLabel": "Apparaat",
   "gsw_noDevices": "Geen apparaten met segmenten gevonden. Voer een cloud-API-sleutel in bij de adapterinstellingen zodat de apparaatmogelijkheden bekend zijn.",
   "gsw_start": "Meting starten",
@@ -51,7 +50,13 @@
   "gsw_diagDone": "Opgeslagen als %s.",
   "gsw_diagOpenIssue": "Issue openen",
   "gsw_diagNoDevices": "Nog geen apparaten. Het rapport is per apparaat — zodra de adapter er een vindt, verschijnt het hier.",
-  "gsw_diagListFailed": "Kon de apparatenlijst niet laden. Draait de instantie?",
   "gsw_diagExportFailed": "Het rapport kon niet worden gemaakt. Het adapterlogboek zegt waarom.",
-  "gsw_diagPrivacy": "Het rapport is gepseudonimiseerd: adressen, mailadressen en apparaatnamen worden vervangen door vaste markeringen, apparaat-ids worden ingekort en inloggegevens komen er niet in voor. Het bestand legt dit uit in zijn eigen kop."
+  "gsw_diagPrivacy": "Het rapport is gepseudonimiseerd: adressen, mailadressen en apparaatnamen worden vervangen door vaste markeringen, apparaat-ids worden ingekort en inloggegevens komen er niet in voor. Het bestand legt dit uit in zijn eigen kop.",
+  "gsw_loadingDevices": "Apparaten laden …",
+  "gsw_loadingDevicesSlow": "Nog bezig — hiervoor moet de adapterinstantie draaien.",
+  "gsw_listFailed": "Kon de apparatenlijst niet laden. Draait de instantie?",
+  "gsw_deviceOption": "%s — momenteel %s segmenten",
+  "gsw_expertIntro": "Twee hulpmiddelen voor als iets nader bekeken moet worden. Kies er een — de apparatenlijst wordt dan geladen.",
+  "gsw_expertWizard": "Segmentdetectie",
+  "gsw_expertDiagnostics": "Diagnose"
 }

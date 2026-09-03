@@ -1,5 +1,4 @@
 import ConnectionConfig from "./ConnectionConfig";
-import DiagnosticsConfig from "./DiagnosticsConfig";
-import SegmentWizardConfig from "./SegmentWizardConfig";
+import ExpertConfig from "./ExpertConfig";
 
-export default { ConnectionConfig, DiagnosticsConfig, SegmentWizardConfig };
+export default { ConnectionConfig, ExpertConfig };

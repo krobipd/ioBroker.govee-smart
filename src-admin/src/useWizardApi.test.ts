@@ -56,18 +56,4 @@ describe("makeWizardApi", () => {
     expect(res.applied).toBe(true);
   });
 
-  it("listDevices() calls getSegmentDevices and returns the array", async () => {
-    const list = [{ value: "H61:1", label: "Strip 1" }];
-    const { socket, calls } = recordingSocket(list);
-    const api = makeWizardApi(socket, "govee-smart.0");
-    const res = await api.listDevices();
-    expect(calls[0]).toEqual({ ns: "govee-smart.0", cmd: "getSegmentDevices", data: {} });
-    expect(res).toEqual(list);
-  });
-
-  it("listDevices() returns [] when the response is not an array", async () => {
-    const { socket } = recordingSocket({ error: "boom" });
-    const api = makeWizardApi(socket, "govee-smart.0");
-    expect(await api.listDevices()).toEqual([]);
-  });
 });

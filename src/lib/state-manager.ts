@@ -32,6 +32,12 @@ const SORT_KEY_END = "香";
  */
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
 /**
+ * What `diag.lastExport` holds since 2.31.0 — an ISO-8601 instant in UTC,
+ * seconds precision. Used to tell a migrated value from the file name the
+ * datapoint carried up to 2.30.0.
+ */
+const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+/**
  * Display names used when the channel object is (re-)created. `info` is
  * listed here even though it's not in MANAGED_CHANNELS — capability-mapper
  * emits states with `channel: "info"`, and without this entry the create
@@ -494,6 +500,37 @@ export class StateManager {
     // inventory, so it clears it itself.
     await this.safeDeleteState(`${prefix}.diag.result`);
     this.stateChannelMap.delete(`${prefix}.result`);
+    // 2.31.0: same for the export BUTTON. Flipping a state and then hunting for
+    // the file was the long way round to what the admin card does in one press,
+    // and the button was the half that left users stuck (a failed export could
+    // only report itself in the log).
+    await this.safeDeleteState(`${prefix}.diag.export`);
+    this.stateChannelMap.delete(`${prefix}.export`);
+    // 2.31.0: `lastExport` stopped naming the file and now stamps WHEN the last
+    // report was taken. The type did not change, so nothing forces the old value
+    // out: `writeStateDefsToChannels` only writes the default into an EMPTY
+    // state. Without this an upgraded install keeps showing a file name under a
+    // datapoint that now reads "time of the last export".
+    await this.resetLastExportIfNotATimestamp(prefix);
+  }
+
+  /**
+   * Clear a `diag.lastExport` left over from ≤2.30.0, where the value was the
+   * report's file NAME. Anything that is not an ISO timestamp is a leftover;
+   * an already-migrated (or empty) state is left alone so this stays a no-op
+   * on every start after the first.
+   *
+   * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
+   */
+  private async resetLastExportIfNotATimestamp(prefix: string): Promise<void> {
+    const id = `${prefix}.diag.lastExport`;
+    const current = await this.adapter.getStateAsync(id).catch(() => null);
+    const val = current?.val;
+    if (typeof val !== "string" || val === "" || ISO_TIMESTAMP.test(val)) {
+      return;
+    }
+    this.adapter.log.debug(`Clearing pre-2.31.0 file name from ${id}`);
+    await this.adapter.setState(id, { val: "", ack: true });
   }
 
   /**

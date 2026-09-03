@@ -718,9 +718,51 @@ describe("GoveeAdapter onReady — timers", () => {
     await i.onReady();
 
     expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
-      common: { supportedMessages: { stopInstance: false } },
+      common: { supportedMessages: null },
     });
     expect(i.setInterval).not.toHaveBeenCalled();
+  });
+
+  it("an instance already carrying { stopInstance: false } is corrected too", async () => {
+    // This is the state the earlier fix LEFT BEHIND, and it is worse than what it
+    // replaced: once supportedMessages is an object, the host ignores
+    // common.messagebox, and an object with only false values means "takes no
+    // messages" — every sendTo from the admin UI is dropped. Measured on the live
+    // system 2026-09-03: the diagnostics card reported "no devices" for an
+    // instance running ten of them, and the connection test did nothing.
+    // The old guard (`if (!supported?.stopInstance) return`) never matched this
+    // state, so the instance stayed deaf forever.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({
+      common: { supportedMessages: { stopInstance: false } },
+    });
+    i.extendForeignObjectAsync.mockClear();
+    i.setInterval.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
+      common: { supportedMessages: null },
+    });
+    expect(i.setInterval).not.toHaveBeenCalled();
+  });
+
+  it("writing null must not loop: an already-cleared instance is left alone", async () => {
+    // After the correction the key is null. If the guard treated null as "still
+    // there", every start would write the object again and the host would restart
+    // the instance every start.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({ common: { supportedMessages: null } });
+    i.extendForeignObjectAsync.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
+      `system.adapter.${i.namespace}`,
+      expect.objectContaining({ common: expect.objectContaining({ supportedMessages: expect.anything() }) }),
+    );
   });
 
   it("no leftover flag means the startup carries on", async () => {
@@ -995,7 +1037,12 @@ describe("GoveeAdapter — message handling", () => {
     expect(i.sendTo).not.toHaveBeenCalled();
   });
 
-  it("the segment-device list offers only online devices that actually have segments", async () => {
+  it("the device list carries every real device plus what the wizard filters on", async () => {
+    // One list serves both halves of the Expert tab since 2.31.0. The
+    // diagnostics half needs EVERY device — a report is wanted precisely when
+    // one misbehaves — so reachability and segment count travel per entry
+    // instead of being filtered out here. Groups stay out: they never had
+    // diagnostics and cannot be measured.
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const devices = (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices;
@@ -1005,8 +1052,11 @@ describe("GoveeAdapter — message handling", () => {
     devices.set("d", makeDevice({ deviceId: "d", sku: "BaseGroup", name: "Group", segmentCount: 5 }));
 
     const host = i.buildMessageRouterHost();
-    const list = (host.getSegmentDeviceList as () => { value: string; label: string }[])();
-    expect(list.map(e => e.value)).toEqual(["H6172:a"]);
+    const list = (host.getDeviceList as () => { value: string; label: string; online: boolean; segments: number }[])();
+    expect(list.map(e => e.value)).toEqual(["H6172:a", "H6172:b", "H6172:c"]);
+    expect(list.find(e => e.value === "H6172:a")).toMatchObject({ online: true, segments: 10 });
+    expect(list.find(e => e.value === "H6172:b")).toMatchObject({ segments: 0 });
+    expect(list.find(e => e.value === "H6172:c")).toMatchObject({ online: false, segments: 5 });
   });
 
   it("a sendTo response is only sent when the caller expects one", async () => {
@@ -1636,12 +1686,15 @@ describe("GoveeAdapter — callback wiring", () => {
 });
 
 describe("GoveeAdapter — the diagnostics export over the REAL host object", () => {
-  it("writes a report file when the device button is pressed", async () => {
+  it("writes a report file and hands its content back, over the assembled host", async () => {
     // 2.29.0 shipped this broken: the handlers never get `this`, only the host
     // view `buildHost()` assembles, and the file methods were missing from it.
     // Every test passed because each rig declared those methods on its own
     // fake — nothing drove the real host. On the live system the export died
     // with "writeFileAsync is not a function".
+    //
+    // Since 2.31.0 the admin card is the ONLY caller, so this drives the real
+    // `buildDiagnosticsReport` — the same seam, one path fewer to be wrong on.
     const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     f.cloud.getDevices.mockResolvedValue([
@@ -1658,14 +1711,21 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
 
     const device = i.deviceManager!.getDevices()[0];
     const prefix = i.stateManager!.devicePrefix(device);
-    await i.onStateChange(`govee-smart.0.${prefix}.diag.export`, { val: true, ack: false });
+    const host = i.buildMessageRouterHost();
+    const result = await (
+      host.buildDiagnosticsReport as (key: string) => Promise<{ fileName: string; content: string }>
+    )(`${device.sku}:${device.deviceId}`);
     await settle(6);
 
     // The stub keys its file store by name (the meta object is a separate arg).
     const written = [...i.files.keys()].filter(k => k.startsWith("govee-smart_"));
     expect(written).toHaveLength(1);
     expect(written[0]).toMatch(/^govee-smart_H61BE_ee11_v.*\.json$/);
-    // And the datapoint points at exactly that file.
-    expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toBe(written[0]);
+    // The card gets the content along with the name, so one press produces the
+    // download — no second round-trip to fetch what was just written.
+    expect(result.fileName).toBe(written[0]);
+    expect(JSON.parse(result.content).device.sku).toBe("H61BE");
+    // And the datapoint says WHEN, not which file.
+    expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
 });

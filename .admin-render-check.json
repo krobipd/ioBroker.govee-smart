@@ -26,27 +26,35 @@
     },
     {
       "name": "wizard",
-      "tab": "Segment",
+      "tab": "Expert|Experte",
       "mountSelectors": [
         "[data-testid=\"wiz-start\"]",
-        "[data-testid=\"wiz-no-devices\"]"
+        "[data-testid=\"wiz-no-devices\"]",
+        "[data-testid=\"list-failed\"]"
       ],
       "gold": {
         "when": "[data-testid=\"wiz-start\"]",
         "value": "[data-testid=\"wiz-device-select\"]"
-      }
+      },
+      "reveal": [
+        "[data-testid=\"expert-tool-wizard\"]"
+      ]
     },
     {
       "name": "diagnostics",
-      "tab": "Diagnostics|Diagnose",
+      "tab": "Expert|Experte",
       "mountSelectors": [
         "[data-testid=\"diag-export\"]",
-        "[data-testid=\"diag-no-devices\"]"
+        "[data-testid=\"diag-no-devices\"]",
+        "[data-testid=\"list-failed\"]"
       ],
       "gold": {
         "when": "[data-testid=\"diag-export\"]",
         "value": "[data-testid=\"diag-device-select\"]"
-      }
+      },
+      "reveal": [
+        "[data-testid=\"expert-tool-diagnostics\"]"
+      ]
     }
   ]
 }

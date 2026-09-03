@@ -133,22 +133,30 @@ function resolveSegmentCount(device, registry) {
   return Number.isFinite(min) ? min : 0;
 }
 function resolveDeviceReachability(device, now = Date.now()) {
+  var _a;
   if (isLanDriven(device, now)) {
     return {
       online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < import_timing_constants.LAN_REPLY_FRESHNESS_MS),
-      proven: true
+      proven: true,
+      decidedBy: "lanReply",
+      lastEvidenceAt: (_a = device.lastLanReplyAt) != null ? _a : null
     };
   }
   if (device.state.gatewayOnline === false) {
-    return { online: false, proven: true };
+    return { online: false, proven: true, decidedBy: "gatewayDown", lastEvidenceAt: null };
   }
   if (typeof device.state.cloudReportedOnline === "boolean") {
     const at = device.state.cloudReportedOnlineAt;
     if (typeof at === "number" && now - at < import_timing_constants.CLOUD_ONLINE_EVIDENCE_TTL_MS) {
-      return { online: device.state.cloudReportedOnline, proven: true };
+      return {
+        online: device.state.cloudReportedOnline,
+        proven: true,
+        decidedBy: "cloudReport",
+        lastEvidenceAt: at
+      };
     }
   }
-  return { online: false, proven: false };
+  return { online: false, proven: false, decidedBy: "noEvidence", lastEvidenceAt: null };
 }
 function isLanDriven(device, now = Date.now()) {
   if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {

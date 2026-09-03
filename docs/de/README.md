@@ -42,9 +42,13 @@ dauert aber einige Sekunden je Befehl und ist von Govee mengenmäßig begrenzt.
 
 ## Ein Problem melden
 
-Jedes Gerät hat im Kanal `diag` den Knopf **Diagnose exportieren**. Nach dem Druck schreibt der
-Adapter eine Berichtsdatei. Im Reiter **Diagnose** des Adapters herunterladen und an ein
+Im Reiter **Experte** des Adapters auf **Diagnose** drücken, Gerät wählen und den Knopf drücken:
+Der Adapter erstellt einen Bericht, und der Browser legt ihn als Datei ab. Diese Datei an ein
 GitHub-Issue anhängen — die Issue-Formulare fragen genau nach dieser Datei.
+
+Die Geräteliste zeigt alle Geräte, erreichbar oder nicht — ein Bericht wird gerade dann gebraucht,
+wenn etwas klemmt. Der Datenpunkt `diag.lastExport` je Gerät hält fest, wann der letzte Bericht
+erzeugt wurde.
 
 Der Bericht ist **anonymisiert**: Adressen, E-Mail-Adressen und Gerätenamen werden durch
 gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, und Zugangsdaten tauchen gar nicht erst

@@ -215,6 +215,21 @@ describe("SegmentWizard", () => {
       expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
+    it("should refuse an unreachable device — nothing would answer the flashes", async () => {
+      // Until 2.31.0 the wizard had a device list of its own and that list
+      // filtered on reachability, so an offline device could not get here. One
+      // shared list now serves both halves of the Expert tab and the CARD
+      // filters it — which means a device that drops off between loading the
+      // list and pressing start reaches this point. Without the guard the
+      // wizard would flash segments at something that cannot answer and the
+      // user would watch a dark strip with nothing on screen to explain it.
+      host.devices.set(key, makeDevice({ state: { online: false } }));
+      const r = await wizard.start(key);
+      expect(typeof r.error).toBe("string");
+      expect(r.error).toContain("not reachable");
+      expect(wizard.getSessionSnapshot()).toBeNull();
+    });
+
     it("should start even when device.segmentCount=0 (first-measurement case)", async () => {
       // Fresh device without any learned count — wizard still runs so
       // the user CAN measure it for the first time.

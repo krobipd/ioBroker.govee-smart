@@ -2515,6 +2515,54 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       expect(states.has("devices.h6160_0011.diag.result")).toBe(false);
     });
 
+    it("removes the export BUTTON on an upgraded install", async () => {
+      // 2.31.0: the export runs from the admin card, which builds the report and
+      // hands the file over in one press. The button was the long way round —
+      // flip a state, then go find the file — and it could only report a failure
+      // to the log. Same mechanism as diag.result: the `diag` channel is not
+      // swept, so the datapoint has to be removed explicitly or it stays forever.
+      const { adapter, objects, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      objects.set("devices.h6160_0011.diag.export", { common: { name: "Export Diagnostics" } });
+      states.set("devices.h6160_0011.diag.export", { val: false, ack: true } as ioBroker.State);
+
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+
+      expect(objects.has("devices.h6160_0011.diag.export")).toBe(false);
+      expect(states.has("devices.h6160_0011.diag.export")).toBe(false);
+    });
+
+    it("clears a lastExport still holding a FILE NAME — the type change alone would not", async () => {
+      // `lastExport` stopped naming the file and now stamps when the report was
+      // taken. The type stayed `string`, so nothing forces the old value out:
+      // writeStateDefsToChannels only writes the default into an EMPTY state.
+      // Without this an upgraded install shows a file name under a datapoint
+      // that reads "time of the last export".
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      states.set("devices.h6160_0011.diag.lastExport", {
+        val: "govee-smart_H6160_0011_v2.30.0_2026-09-03_205830.json",
+        ack: true,
+      } as ioBroker.State);
+
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+
+      expect(states.get("devices.h6160_0011.diag.lastExport")?.val).toBe("");
+    });
+
+    it("leaves a timestamp alone — the migration must not undo itself on every start", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      states.set("devices.h6160_0011.diag.lastExport", {
+        val: "2026-09-03T20:58:30Z",
+        ack: true,
+      } as ioBroker.State);
+
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+
+      expect(states.get("devices.h6160_0011.diag.lastExport")?.val).toBe("2026-09-03T20:58:30Z");
+    });
+
     it("is a silent no-op on an install that never had it", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

@@ -15,7 +15,8 @@ import {
 } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
-import { isReport, makeDiagnosticsApi, type DiagnosticsDevice, type DiagnosticsSocket } from "./useDiagnosticsApi";
+import { DeviceListStatus, useDeviceList } from "./DeviceListLoader";
+import { isReport, makeDiagnosticsApi, type DiagnosticsSocket } from "./useDiagnosticsApi";
 
 /** Props for the diagnostics React component. */
 export interface DiagnosticsPanelProps {
@@ -64,37 +65,20 @@ function offerDownload(fileName: string, content: string): void {
  */
 export function DiagnosticsPanel({ socket, namespace }: DiagnosticsPanelProps): React.JSX.Element {
   const api = React.useMemo(() => makeDiagnosticsApi(socket as DiagnosticsSocket, namespace), [socket, namespace]);
-  const [devices, setDevices] = React.useState<DiagnosticsDevice[] | null>(null);
+  const list = useDeviceList(socket, namespace);
   const [selected, setSelected] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState("");
   const [done, setDone] = React.useState("");
+  const devices = list.status === "ready" ? list.devices : [];
 
   React.useEffect(() => {
-    let cancelled = false;
-    api
-      .listDevices()
-      .then(list => {
-        if (cancelled) {
-          return;
-        }
-        setDevices(list);
-        // One device is the common case — pre-select it so the card is a
-        // single click rather than a pick plus a click.
-        if (list.length === 1) {
-          setSelected(list[0].value);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setDevices([]);
-          setError(I18n.t("gsw_diagListFailed"));
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [api]);
+    // One device is the common case — pre-select it so the card is a single
+    // click rather than a pick plus a click.
+    if (devices.length === 1) {
+      setSelected(devices[0].value);
+    }
+  }, [devices]);
 
   const onExport = React.useCallback((): void => {
     setBusy(true);
@@ -114,12 +98,8 @@ export function DiagnosticsPanel({ socket, namespace }: DiagnosticsPanelProps): 
       .finally(() => setBusy(false));
   }, [api, selected]);
 
-  if (devices === null) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <CircularProgress size={24} />
-      </Box>
-    );
+  if (list.status !== "ready") {
+    return <DeviceListStatus state={list} />;
   }
 
   return (

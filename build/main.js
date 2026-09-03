@@ -351,11 +351,11 @@ class GoveeAdapter extends utils.Adapter {
     try {
       const obj = await this.getForeignObjectAsync(id);
       const supported = (_a = obj == null ? void 0 : obj.common) == null ? void 0 : _a.supportedMessages;
-      if (!(supported == null ? void 0 : supported.stopInstance)) {
+      if (supported === void 0 || supported === null) {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version \u2014 this instance restarts once");
-      await this.extendForeignObjectAsync(id, { common: { supportedMessages: { stopInstance: false } } });
+      await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
       this.log.debug(`Could not check the instance object: ${(0, import_types.errMessage)(e)}`);
@@ -1144,9 +1144,18 @@ class GoveeAdapter extends utils.Adapter {
         probe.enableProbeMode();
         return probe;
       },
-      getDiagnosticsDeviceList: () => {
+      getDeviceList: () => {
         var _a, _b;
-        return ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).filter((d) => d.sku !== "BaseGroup").map((d) => ({ value: `${d.sku}:${d.deviceId}`, label: (0, import_types.deviceLabel)(d), model: d.sku }));
+        return ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).filter((d) => d.sku !== "BaseGroup").map((d) => {
+          var _a2;
+          return {
+            value: `${d.sku}:${d.deviceId}`,
+            label: (0, import_types.deviceLabel)(d),
+            model: d.sku,
+            online: ((_a2 = d.state) == null ? void 0 : _a2.online) === true,
+            segments: (0, import_lookups.resolveSegmentCount)(d, this.deviceRegistry)
+          };
+        });
       },
       buildDiagnosticsReport: async (deviceKey) => {
         var _a, _b;
@@ -1160,32 +1169,13 @@ class GoveeAdapter extends utils.Adapter {
           this.deviceManager,
           this.diagnosticsLastRun,
           device,
-          prefix,
-          `${this.namespace}.${prefix}.diag.export`
+          prefix
         );
         if (!fileName) {
           return { error: "Export failed or was throttled \u2014 try again in a moment" };
         }
         const { file } = await this.readFileAsync(`${this.namespace}.diagnostics`, fileName);
         return { fileName, content: typeof file === "string" ? file : file.toString("utf8") };
-      },
-      getSegmentDeviceList: () => {
-        var _a, _b;
-        const devices = (_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : [];
-        return devices.filter(
-          (d) => {
-            var _a2;
-            return d.sku !== "BaseGroup" && ((_a2 = d.state) == null ? void 0 : _a2.online) === true && (0, import_lookups.resolveSegmentCount)(d, this.deviceRegistry) > 0;
-          }
-        ).map((d) => ({
-          value: wizardHandler.deviceKeyFor(d),
-          label: (0, import_i18n.resolveLabel)(
-            "segmentWizardDeviceOption",
-            d.name,
-            d.sku,
-            (0, import_lookups.resolveSegmentCount)(d, this.deviceRegistry)
-          )
-        }));
       },
       runWizardStep: (action, deviceKey, payload) => wizardHandler.runWizardStep(this.handlerHost, action, deviceKey, payload),
       setTimeout: (cb, ms) => this.setTimeout(cb, ms),

@@ -55,7 +55,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 Besides your devices on the LAN and the Govee servers (`openapi.api.govee.com`, `app2.govee.com`, `mqtt.openapi.govee.com` and Govee's AWS IoT endpoint), the adapter makes one more outbound call: once a day it looks up the current version of the Govee Home app in Apple's App Store directory (`itunes.apple.com`). Govee's undocumented endpoints reject requests that announce a stale app version, so the adapter keeps that version current on its own. The lookup carries no account data, no device data and no identifier of your installation.
 
-The per-device diagnostics export (`diag.export` → `diag.result`) is meant to be attached to a public GitHub issue. It contains the device's model, its Govee device id, its LAN address, the name you gave it in the Govee Home app, recent adapter log lines and the last API responses for that device. Credentials, tokens and gateway secrets are masked before the export is written.
+The per-device diagnostics report (Expert tab → Diagnostics) is meant to be attached to a public GitHub issue. It contains the device's model, its Govee device id, its LAN address, the name you gave it in the Govee Home app, recent adapter log lines and the last API responses for that device. Credentials, tokens and gateway secrets are masked before the report is written, and addresses, mail addresses and device names are replaced by stable markers.
 
 ---
 
@@ -84,7 +84,7 @@ Each device shows its test status under `diag.tier`. The [Devices page](https://
 
 Common issues (no devices discovered, empty scenes dropdown, segment colors not changing, limited group commands, delayed status updates) are covered on the Wiki [Behavior](https://github.com/krobipd/ioBroker.govee-smart/wiki/Behavior) / [Verhalten](https://github.com/krobipd/ioBroker.govee-smart/wiki/Verhalten) page.
 
-For anything else, set **`diag.export`** to `true` on the affected device, save the JSON from `diag.result` as a file and attach it to a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues/new/choose) — the export is too long to paste into an issue.
+For anything else, open the adapter's **Expert** tab, press **Diagnostics**, pick the affected device and press the button — your browser saves the report as a file. Attach that file to a [GitHub Issue](https://github.com/krobipd/ioBroker.govee-smart/issues/new/choose); it is far too long to paste into one.
 
 ---
 
@@ -100,6 +100,16 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.31.0 (2026-09-03)
+
+- Fixed: On instances upgraded from 2.27.0 or newer, every admin card was dead — diagnostics, segment wizard and connection test alike; affected installations repair themselves on the next start
+- Fixed: A card that could not reach the adapter reported "no devices yet" instead of the real error
+- Changed: Segment detection and diagnostics now share one **Expert** tab with a button each
+- Changed: The per-device `diag.export` button is gone; the Expert tab builds the report and hands you the file in one press
+- Changed: `diag.lastExport` now records WHEN the last report was taken, instead of naming the file
+- Improved: Both cards say "Loading devices …" while they search, and explain the wait if it takes long
+- Fixed: The diagnostics report still described the reachability rule as it was before 2.30.0
+
 ### 2.30.0 (2026-09-03)
 
 - Fixed: Devices without a local API were shown as unreachable although they switched and reported normally; they now show as reachable for as long as they are
@@ -125,12 +135,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.29.2 (2026-09-03)
 
 - Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text
-
-### 2.29.1 (2026-09-03)
-
-- Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up
-- Fixed: A device without the local API is now shown as reachable when Govee itself reports it — that information always arrived and was discarded
-- Fixed: The diagnostics export failed with an internal error and wrote no file; the button in the object tree and the Diagnostics tab both work now
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

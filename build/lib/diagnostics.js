@@ -24,6 +24,7 @@ module.exports = __toCommonJS(diagnostics_exports);
 var import_http_client = require("./http-client");
 var import_anonymiser = require("./anonymiser");
 var import_govee_constants = require("./govee-constants");
+var import_lookups = require("./device-manager/lookups");
 const MAX_LOGS = 100;
 const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
@@ -723,45 +724,49 @@ class DiagnosticsCollector {
    *
    * The report used to show `state.online` and nothing else. On a "shows offline
    * although it works" report that is the one number that cannot answer the
-   * question, because the interesting part is which of four possible sources
-   * decided it and when that source last said anything. Measured cost of the
-   * omission (2026-09-03): tracing a single device's reachability took hours of
-   * reading the adapter's source, because the report simply did not carry it.
+   * question, because the interesting part is which source decided it and when
+   * that source last said anything. Measured cost of the omission (2026-09-03):
+   * tracing a single device's reachability took hours of reading the adapter's
+   * source, because the report simply did not carry it.
    *
-   * Deliberately mirrors {@link segmentCountSource} — same question, same shape.
+   * **This method decides nothing.** It asks {@link resolveDeviceReachability}
+   * which source settled the question and only puts that into words. The first
+   * version did decide — it re-stated the rule by hand — and 2.30.0 moved the
+   * rule underneath it: measured on an H618A the same day, all four fields were
+   * wrong at once (LAN was tied to `lanIp` instead of the seven-day memory, two
+   * timestamps read fields the resolver no longer uses, and the gateway ceiling
+   * was missing entirely). A second copy of a rule is a copy that will drift.
+   *
+   * Mirrors {@link segmentCountSource} — same question, same shape.
    *
    * @param device The device the report is about
    */
   reachabilitySource(device) {
-    var _a, _b, _c;
+    const decision = (0, import_lookups.resolveDeviceReachability)(device);
     const isLight = device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT;
+    const lanDriven = (0, import_lookups.isLanDriven)(device);
     const silent = [];
-    if (isLight && device.lanIp) {
-      silent.push("cloud state poll (a LAN light is never cloud-driven)");
+    if (lanDriven) {
+      silent.push("cloud state poll (a LAN-driven light is never cloud-driven)");
       silent.push("account push (barred for lights \u2014 the broker replays retained messages)");
-      return {
-        decidedBy: "LAN reply freshness",
-        lastEvidenceAt: (_a = device.lastLanReplyAt) != null ? _a : null,
-        refreshedBy: "LAN scan, every 30 s",
-        silentSources: silent
-      };
-    }
-    if (isLight) {
+    } else if (isLight) {
       silent.push("LAN reply (device has no local API enabled)");
       silent.push("account push (barred for lights \u2014 the broker replays retained messages)");
-      silent.push("app device list (only polled when a non-light exists on this account)");
-      return {
-        decidedBy: typeof device.state.cloudReportedOnline === "boolean" ? "Govee reported it (cloud state poll)" : "nothing ever reported \u2014 reported as not reachable",
-        lastEvidenceAt: (_b = device.lastSeenOnNetwork) != null ? _b : null,
-        refreshedBy: "cloud state poll \u2014 ONCE at adapter start, then only on cloud recovery or the refresh button",
-        silentSources: silent
-      };
+    } else {
+      silent.push("LAN reply (not a light)");
     }
+    const refreshedBy = lanDriven ? "LAN scan, every 30 s" : "app device list every 2 min, plus event pushes";
+    const decidedBy = {
+      lanReply: "LAN reply freshness",
+      gatewayDown: "its gateway is down \u2014 a device behind a gateway can be no more reachable than the gateway",
+      cloudReport: isLight ? "Govee reported it (cloud state poll)" : "Govee reported it (app poll or event push)",
+      noEvidence: "nothing ever reported \u2014 reported as not reachable"
+    }[decision.decidedBy];
     return {
-      decidedBy: typeof device.state.cloudReportedOnline === "boolean" ? "Govee reported it (app poll or event push)" : "nothing ever reported \u2014 reported as not reachable",
-      lastEvidenceAt: (_c = device.lastSeenOnNetwork) != null ? _c : null,
-      refreshedBy: "app device list every 2 min, plus event pushes",
-      silentSources: ["LAN reply (not a light)"]
+      decidedBy,
+      lastEvidenceAt: decision.lastEvidenceAt,
+      refreshedBy,
+      silentSources: silent
     };
   }
   segmentCountSource(device) {

@@ -96,10 +96,9 @@ interface RecordedResponse {
 function makeHost(opts: {
   email?: string;
   password?: string;
-  segmentDevices?: Array<{ value: string; label: string }>;
   wizardResponse?: Record<string, unknown>;
   probe?: GoveeMqttClient;
-  diagnosticsDevices?: Array<{ value: string; label: string; model: string }>;
+  devices?: Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
   diagnosticsReport?: { fileName: string; content: string } | { error: string };
 }): { host: MessageRouterHost; responses: RecordedResponse[] } {
   const responses: RecordedResponse[] = [];
@@ -112,10 +111,9 @@ function makeHost(opts: {
     }),
     sendResponse: (obj, data) => responses.push({ obj, data }),
     createMqttProbeClient: (_email: string, _password: string) => opts.probe ?? makeProbe({ connected: false }),
-    getDiagnosticsDeviceList: () => opts.diagnosticsDevices ?? [],
+    getDeviceList: () => opts.devices ?? [],
     buildDiagnosticsReport: () =>
       Promise.resolve(opts.diagnosticsReport ?? { error: "no report configured in this test" }),
-    getSegmentDeviceList: () => opts.segmentDevices ?? [],
     runWizardStep: () => Promise.resolve(opts.wizardResponse ?? { ok: true }),
     setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms) as unknown as ioBroker.Timeout,
     clearTimeout: handle => globalThis.clearTimeout(handle as unknown as ReturnType<typeof globalThis.setTimeout>),
@@ -134,30 +132,6 @@ function makeMessage(command: string, message?: unknown): ioBroker.Message {
 }
 
 describe("MessageRouter", () => {
-  describe("getSegmentDevices", () => {
-    it("forwards the host's device list verbatim", async () => {
-      const list = [
-        { value: "H6160:AA:01", label: "Strip 1" },
-        { value: "H6160:AA:02", label: "Strip 2" },
-      ];
-      const { host, responses } = makeHost({ segmentDevices: list });
-      const router = new MessageRouter(host);
-      router.onMessage(makeMessage("getSegmentDevices"));
-      // Allow the catch-then chain to settle (sync in fact)
-      await new Promise(r => setTimeout(r, 0));
-      expect(responses).toHaveLength(1);
-      expect(responses[0].data).toEqual(list);
-    });
-
-    it("returns empty list when host has no segment-capable devices", async () => {
-      const { host, responses } = makeHost({ segmentDevices: [] });
-      const router = new MessageRouter(host);
-      router.onMessage(makeMessage("getSegmentDevices"));
-      await new Promise(r => setTimeout(r, 0));
-      expect(responses[0].data).toEqual([]);
-    });
-  });
-
   describe("segmentWizard", () => {
     it("forwards action+device payload to runWizardStep and returns the result", async () => {
       const { host, responses } = makeHost({
@@ -463,7 +437,9 @@ describe("onMessage crash boundaries", () => {
 
   it("a crash while answering is caught by the outer boundary — never an unhandled rejection (outer boundary)", async () => {
     const warns: string[] = [];
-    const { host, responses } = makeHost({ segmentDevices: [{ value: "H6160:AA:01", label: "Strip" }] });
+    const { host, responses } = makeHost({
+      devices: [{ value: "H6160:AA:01", label: "Strip", model: "H6160", online: true, segments: 10 }],
+    });
     host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
     // The first sendResponse (the success answer) blows up — the ioBroker
     // socket is gone; the second (the outer error answer) must still go out.
@@ -479,27 +455,35 @@ describe("onMessage crash boundaries", () => {
       original(obj, data);
     };
     const router = new MessageRouter(host);
-    router.onMessage(makeMessage("getSegmentDevices"));
+    router.onMessage(makeMessage("diagnostics", { action: "list" }));
     await new Promise(r => setTimeout(r, 0));
     expect(warns).toEqual([
-      "onMessage failed for getSegmentDevices: socket gone",
-      "onMessage handler crashed for getSegmentDevices: socket gone",
+      "onMessage failed for diagnostics: socket gone",
+      "onMessage handler crashed for diagnostics: socket gone",
     ]);
     expect(responses).toEqual([expect.objectContaining({ data: { error: "socket gone" } })]);
   });
 });
 
 describe("diagnostics command", () => {
-  it("lists every real device, reachable or not", async () => {
+  it("lists every real device, reachable or not, with what the wizard needs to filter on", async () => {
     // A report is wanted precisely when a device misbehaves, so filtering the
-    // list by reachability would hide the interesting ones.
+    // list by reachability would hide the interesting ones. Since 2.31.0 this is
+    // ALSO the wizard's list: `online` and `segments` travel with each entry so
+    // the card can narrow it down to what it can measure, instead of a second
+    // command that returned the same devices under the same keys.
     const { host, responses } = makeHost({
-      diagnosticsDevices: [{ value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE" }],
+      devices: [
+        { value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE", online: false, segments: 15 },
+        { value: "H5179:CC:DD", label: "Sensor (H5179)", model: "H5179", online: true, segments: 0 },
+      ],
     });
     const router = new MessageRouter(host);
     router.onMessage({ command: "diagnostics", message: { action: "list" }, from: "x", callback: {} } as never);
     await new Promise(r => setTimeout(r, 0));
-    expect((responses[0].data as { devices: unknown[] }).devices).toHaveLength(1);
+    const devices = (responses[0].data as { devices: Array<Record<string, unknown>> }).devices;
+    expect(devices).toHaveLength(2);
+    expect(devices[0]).toMatchObject({ value: "H61BE:AA:BB", online: false, segments: 15 });
   });
 
   it("hands the report back with its content so the card can offer a download", async () => {

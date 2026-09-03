@@ -3,12 +3,12 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18n } from "@iobroker/gui-components";
 
 import enJson from "./i18n/en.json";
+import { DeviceListError } from "./useDeviceList";
 
 // Mock the sendTo wrapper so the tests drive the card through controlled
 // answers (no socket). vi.hoisted keeps the mock stable across the hoisted
 // vi.mock factory.
 const mockApi = vi.hoisted(() => ({
-  listDevices: vi.fn(),
   exportReport: vi.fn(),
 }));
 
@@ -17,10 +17,18 @@ vi.mock("./useDiagnosticsApi", async importOriginal => {
   return { ...actual, makeDiagnosticsApi: () => mockApi };
 });
 
+// The device list is shared with the segment wizard since 2.31.0.
+const mockList = vi.hoisted(() => ({ listDevices: vi.fn() }));
+
+vi.mock("./useDeviceList", async importOriginal => ({
+  ...(await importOriginal<typeof import("./useDeviceList")>()),
+  makeDeviceListApi: () => mockList,
+}));
+
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 
-const DEVICE = { value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE" };
-const OTHER = { value: "H6160:CC:DD", label: "Lamp (H6160)", model: "H6160" };
+const DEVICE = { value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE", online: true, segments: 15 };
+const OTHER = { value: "H6160:CC:DD", label: "Lamp (H6160)", model: "H6160", online: false, segments: 0 };
 
 /** Records what the browser was asked to download. */
 function captureDownloads(): { names: string[]; contents: string[] } {
@@ -59,7 +67,7 @@ beforeEach(() => {
   I18n.extendTranslations(enJson, "en");
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
-  mockApi.listDevices.mockResolvedValue([DEVICE]);
+  mockList.listDevices.mockResolvedValue([DEVICE]);
   mockApi.exportReport.mockReset();
 });
 
@@ -76,7 +84,7 @@ describe("DiagnosticsPanel", () => {
   });
 
   it("does not pre-select when there is a choice to make", async () => {
-    mockApi.listDevices.mockResolvedValue([DEVICE, OTHER]);
+    mockList.listDevices.mockResolvedValue([DEVICE, OTHER]);
     render(
       <DiagnosticsPanel
         socket={{}}
@@ -119,7 +127,7 @@ describe("DiagnosticsPanel", () => {
   });
 
   it("says so when there is nothing to report on yet", async () => {
-    mockApi.listDevices.mockResolvedValue([]);
+    mockList.listDevices.mockResolvedValue([]);
     render(
       <DiagnosticsPanel
         socket={{}}
@@ -141,14 +149,35 @@ describe("DiagnosticsPanel", () => {
     await waitFor(() => expect(screen.getByText(/pseudonymised/i)).toBeTruthy());
   });
 
-  it("survives a socket that cannot answer", async () => {
-    mockApi.listDevices.mockRejectedValue(new Error("no connection"));
+  it("a failed list shows the failure — never the 'no devices yet' message", async () => {
+    // The two must never render the same. On 2026-09-03 they did: a dead
+    // message box produced an empty array, the card said "No devices yet", and
+    // the real cause (the instance object) went unlooked-at for an hour.
+    mockList.listDevices.mockRejectedValue(new DeviceListError("no connection"));
     render(
       <DiagnosticsPanel
         socket={{}}
         namespace="govee-smart.0"
       />,
     );
-    await waitFor(() => expect(screen.getByText(/device list/i)).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("list-failed")).toBeTruthy());
+    expect(screen.queryByTestId("diag-no-devices")).toBeNull();
+    expect(screen.getByTestId("list-failed").textContent).toContain("no connection");
+  });
+
+  it("says 'loading' while it waits — a bare spinner cannot be told from a stall", async () => {
+    let release: (v: unknown[]) => void = () => {};
+    mockList.listDevices.mockReturnValue(new Promise(r => (release = r)));
+    render(
+      <DiagnosticsPanel
+        socket={{}}
+        namespace="govee-smart.0"
+      />,
+    );
+    expect(screen.getByText(/loading devices/i)).toBeTruthy();
+    // The extra hint only appears once the wait is genuinely long.
+    expect(screen.queryByTestId("list-slow-hint")).toBeNull();
+    release([DEVICE]);
+    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
   });
 });

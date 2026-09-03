@@ -41,9 +41,13 @@ seconds per command and is rate-limited by Govee.
 
 ## Reporting a problem
 
-Every device has an **Export diagnostics** button under its `diag` channel. Press it and the
-adapter writes a report file. Download it in the adapter's **Diagnostics** tab and attach it to a
-GitHub issue — the issue forms ask for exactly this file.
+Open the adapter's **Expert** tab, press **Diagnostics**, pick the device and press the button:
+the adapter builds a report and your browser saves it as a file. Attach that file to a GitHub
+issue — the issue forms ask for exactly this file.
+
+The device list offers every device, reachable or not — a report is wanted precisely when
+something misbehaves. Each device's `diag.lastExport` datapoint records when its last report was
+taken.
 
 The report is **pseudonymised**: IP addresses, mail addresses and device names are replaced by
 stable markers, device ids are shortened, and credentials never appear at all. The same real value

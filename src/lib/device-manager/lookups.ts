@@ -184,6 +184,33 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
 }
 
 /**
+ * Which source settled a device's reachability. Machine keys, not prose: the
+ * diagnostics report turns them into sentences, and keeping the wording out of
+ * here is the point — the report used to describe the rule a SECOND time, by
+ * hand, and drifted from it. Measured 2026-09-03 on an H618A: all four fields
+ * of the report's reachability section were wrong at once, because the rule had
+ * moved on in 2.30.0 and the hand-written copy had not.
+ *
+ * - `lanReply` — the local interface decided; nothing from the cloud counts.
+ * - `gatewayDown` — the device's gateway is down, so it cannot be reachable.
+ * - `cloudReport` — Govee itself reported, recently enough to still count.
+ * - `noEvidence` — nobody said anything; not reachable, and not proven.
+ */
+export type ReachabilityDecidedBy = "lanReply" | "gatewayDown" | "cloudReport" | "noEvidence";
+
+/** What {@link resolveDeviceReachability} answers. */
+export interface ReachabilityDecision {
+  /** Whether the device is reachable. */
+  online: boolean;
+  /** Whether that rests on evidence — an unproven `false` may never be written back. */
+  proven: boolean;
+  /** Which source decided. */
+  decidedBy: ReachabilityDecidedBy;
+  /** When the deciding source last spoke (ms epoch), or null when none did. */
+  lastEvidenceAt: number | null;
+}
+
+/**
  * The one answer to "is this device reachable?", for every device kind.
  *
  * Reachability is only ever `true` when something PROVED it. There is no
@@ -216,16 +243,16 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
  *
  * @param device The device to judge
  * @param now Current time (ms epoch); injectable for tests
- * @returns The reachability plus whether it rests on evidence
+ * @returns The reachability plus whether it rests on evidence, and which source
+ *          decided it — see {@link ReachabilityDecision}
  */
-export function resolveDeviceReachability(
-  device: GoveeDevice,
-  now: number = Date.now(),
-): { online: boolean; proven: boolean } {
+export function resolveDeviceReachability(device: GoveeDevice, now: number = Date.now()): ReachabilityDecision {
   if (isLanDriven(device, now)) {
     return {
       online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < LAN_REPLY_FRESHNESS_MS),
       proven: true,
+      decidedBy: "lanReply",
+      lastEvidenceAt: device.lastLanReplyAt ?? null,
     };
   }
   // A device behind a gateway can be no more reachable than its gateway — it has
@@ -234,7 +261,7 @@ export function resolveDeviceReachability(
   // only fails to rule it out. The positive proof stays the device's own fresh
   // reading. An unknown gateway caps nothing.
   if (device.state.gatewayOnline === false) {
-    return { online: false, proven: true };
+    return { online: false, proven: true, decidedBy: "gatewayDown", lastEvidenceAt: null };
   }
   if (typeof device.state.cloudReportedOnline === "boolean") {
     const at = device.state.cloudReportedOnlineAt;
@@ -242,10 +269,15 @@ export function resolveDeviceReachability(
     // as expired rather than eternal. The next report re-establishes it within
     // one poll cycle, and an eternal "online" is exactly the bug being fixed.
     if (typeof at === "number" && now - at < CLOUD_ONLINE_EVIDENCE_TTL_MS) {
-      return { online: device.state.cloudReportedOnline, proven: true };
+      return {
+        online: device.state.cloudReportedOnline,
+        proven: true,
+        decidedBy: "cloudReport",
+        lastEvidenceAt: at,
+      };
     }
   }
-  return { online: false, proven: false };
+  return { online: false, proven: false, decidedBy: "noEvidence", lastEvidenceAt: null };
 }
 
 /**
