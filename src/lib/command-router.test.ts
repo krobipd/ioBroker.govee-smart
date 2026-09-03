@@ -3,6 +3,7 @@ import { DeviceRegistry } from "./device-registry";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
+import { CLOUD_APPLIANCE_DAILY_LIMIT } from "./timing-constants";
 import { mockLog } from "./test-helpers";
 import type { GoveeDevice, TimerAdapter } from "./types";
 
@@ -850,5 +851,53 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
 
     await router.sendCommand(cloudOnly, "segmentBrightness:3", 50);
     expect(cloud.calls[1].instance).toBe("segmentedBrightness");
+  });
+});
+
+describe("per-device Cloud budget", () => {
+  /** Captures what budget (if any) each tracked send was given. */
+  function budgetCapturingLimiter(): { limiter: RateLimiter; budgets: Array<unknown> } {
+    const budgets: unknown[] = [];
+    const limiter = {
+      tryExecute: async (fn: () => Promise<void>): Promise<boolean> => {
+        await fn();
+        return true;
+      },
+      executeTracked: async (fn: () => Promise<void>, _p?: number, budget?: unknown): Promise<void> => {
+        budgets.push(budget);
+        await fn();
+      },
+    } as unknown as RateLimiter;
+    return { limiter, budgets };
+  }
+
+  it("an appliance command carries its own daily allowance", async () => {
+    // Govee gives an appliance 100 calls a day against the account's 10,000,
+    // and appliance control has no local path — every write is a cloud call.
+    const cloud = makeCloudStub();
+    const { limiter, budgets } = budgetCapturingLimiter();
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(limiter);
+    const heater = makeDevice({
+      sku: "H7131",
+      deviceId: "AA:BB:CC:DD:EE:FF:00:22",
+      type: "devices.types.heater",
+      lanIp: undefined,
+    });
+    await router.sendCommand(heater, "power", true);
+    expect(cloud.calls).toHaveLength(1);
+    expect(budgets[0]).toEqual({ key: "H7131:AA:BB:CC:DD:EE:FF:00:22", perDay: CLOUD_APPLIANCE_DAILY_LIMIT });
+  });
+
+  it("a light command carries none — its writes go over the LAN, the rest is the account budget", async () => {
+    const cloud = makeCloudStub();
+    const { limiter, budgets } = budgetCapturingLimiter();
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(limiter);
+    await router.sendCommand(makeDevice({ lanIp: undefined }), "power", true);
+    expect(cloud.calls).toHaveLength(1);
+    expect(budgets[0]).toBeUndefined();
   });
 });

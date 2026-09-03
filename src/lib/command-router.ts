@@ -8,14 +8,14 @@ import {
   type GoveeDevice,
   type TimerAdapter,
 } from "./types";
+import { CLOUD_APPLIANCE_DAILY_LIMIT, FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import type { DeviceBudget, RateLimiter } from "./rate-limiter";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
-import type { RateLimiter } from "./rate-limiter";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
-import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 
 /**
  * Outcome of `resolveTransport` — decides which channel handles a command
@@ -35,6 +35,25 @@ export type TransportDecision =
  * channel: LAN → Cloud. Quirk-driven overrides (devices.json
  * `transportOverrides`) take precedence over the LAN-first default.
  */
+
+/**
+ * The daily allowance for one device, where Govee imposes one.
+ *
+ * Only appliances have their own budget — 100 calls a day, against the
+ * account's 10,000 — and only appliances have no local path, so every write is
+ * a cloud call. Lights and groups keep the global budget: a light's writes go
+ * over the LAN, and its rare cloud fallbacks are covered by the account limit.
+ *
+ * @param device The device a command is being sent to
+ * @returns The device's allowance, or undefined when only the global one applies
+ */
+function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined {
+  if (!device || device.type === GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
+    return undefined;
+  }
+  return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
+}
+
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
@@ -53,7 +72,11 @@ export class CommandRouter {
   /** Callback for batch segment state sync */
   onSegmentBatchUpdate?: (
     device: GoveeDevice,
-    batch: { segments: number[]; color?: number; brightness?: number },
+    batch: {
+      segments: number[];
+      color?: number;
+      brightness?: number;
+    },
   ) => void;
 
   /**
@@ -71,7 +94,13 @@ export class CommandRouter {
    */
   onCommandResult?: (
     deviceId: string,
-    entry: { stateId: string; value: unknown; transport: string; ok: boolean; error?: string },
+    entry: {
+      stateId: string;
+      value: unknown;
+      transport: string;
+      ok: boolean;
+      error?: string;
+    },
   ) => void;
 
   /**
@@ -122,10 +151,11 @@ export class CommandRouter {
    * existing "Command failed" warn path fires and no false ack is written.
    *
    * @param fn The cloud send to execute
+   * @param device
    */
-  private async sendBudgeted(fn: () => Promise<void>): Promise<void> {
+  private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
     if (this.rateLimiter) {
-      await this.rateLimiter.executeTracked(fn, 0);
+      await this.rateLimiter.executeTracked(fn, 0, applianceBudget(device));
     } else {
       await fn();
     }
@@ -515,7 +545,7 @@ export class CommandRouter {
       );
     };
 
-    await this.sendBudgeted(execute);
+    await this.sendBudgeted(execute, device);
   }
 
   /**
@@ -528,7 +558,11 @@ export class CommandRouter {
   private async sendSegmentBatchParsed(
     device: GoveeDevice,
     commandStr: string,
-    parsed: { segments: number[]; color?: number; brightness?: number } | null,
+    parsed: {
+      segments: number[];
+      color?: number;
+      brightness?: number;
+    } | null,
   ): Promise<void> {
     if (!this.cloudClient) {
       return;
@@ -552,7 +586,7 @@ export class CommandRouter {
           rgb: parsed.color,
         });
       };
-      await this.sendBudgeted(execute);
+      await this.sendBudgeted(execute, device);
     }
 
     if (parsed.brightness !== undefined) {
@@ -568,7 +602,7 @@ export class CommandRouter {
           { segment: parsed.segments, brightness: parsed.brightness },
         );
       };
-      await this.sendBudgeted(execute);
+      await this.sendBudgeted(execute, device);
     }
     // NOTE: no onSegmentBatchUpdate here — dispatchSegmentBatch (the only caller)
     // already emits it once for both the LAN and Cloud paths, before dispatch.
@@ -782,7 +816,15 @@ export class CommandRouter {
    * @param device Target device
    * @param command Command type to find capability for
    */
-  findCapabilityForCommand(device: GoveeDevice, command: string): { type: string; instance: string } | undefined {
+  findCapabilityForCommand(
+    device: GoveeDevice,
+    command: string,
+  ):
+    | {
+        type: string;
+        instance: string;
+      }
+    | undefined {
     const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
     for (const cap of caps) {
       if (!cap || typeof cap.type !== "string" || typeof cap.instance !== "string") {
@@ -1000,6 +1042,6 @@ export class CommandRouter {
       await cloudClient.controlDevice(device.sku, device.deviceId, cap.type, cap.instance, cloudValue);
     };
 
-    await this.sendBudgeted(execute);
+    await this.sendBudgeted(execute, device);
   }
 }

@@ -43,6 +43,17 @@ class RateLimiter {
   stopped = false;
   /** Warn-once flag for the queue-full drop — reset when the queue drains. */
   warnedQueueFull = false;
+  /**
+   * Calls spent per device today. Cleared with the daily counter, so it follows
+   * the same reset Govee applies.
+   */
+  callsTodayPerDevice = /* @__PURE__ */ new Map();
+  /**
+   * Devices already warned about today. The message is actionable and belongs
+   * in the log once, not on every rejected write — a script hitting the limit
+   * hits it again a minute later.
+   */
+  warnedDeviceBudget = /* @__PURE__ */ new Set();
   /** Max calls per minute */
   perMinuteLimit;
   /** Max calls per day (with safety buffer) */
@@ -106,8 +117,12 @@ class RateLimiter {
   }
   /** Zero the daily counter and log. Separate so kickoff + interval share it. */
   resetDaily() {
-    this.log.debug(`Rate limiter: daily reset (used ${this.callsToday} calls today)`);
+    this.log.debug(
+      `Rate limiter: daily reset (used ${this.callsToday} calls today, ${this.callsTodayPerDevice.size} device(s) tracked)`
+    );
     this.callsToday = 0;
+    this.callsTodayPerDevice.clear();
+    this.warnedDeviceBudget.clear();
   }
   /** Milliseconds from now until the next UTC midnight tick. */
   millisUntilNextUtcMidnight() {
@@ -152,16 +167,57 @@ class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority
+   * @param budget
    */
-  async tryExecute(execute, priority = 0) {
+  async tryExecute(execute, priority = 0, budget) {
+    if (budget && this.deviceBudgetSpent(budget)) {
+      return false;
+    }
     if (this.canMakeCall()) {
-      this.callsThisMinute++;
-      this.callsToday++;
+      this.spend(budget);
       await execute();
       return true;
     }
     this.enqueue(execute, priority);
     return false;
+  }
+  /**
+   * Whether this device has used up its own daily allowance — and if so, say so
+   * once. An exhausted device budget does NOT queue the call: the allowance
+   * resets at Govee's daily rollover, not in a few seconds, so queuing would
+   * only hold a write that is hours from running and then apply it at a moment
+   * nobody asked for.
+   *
+   * @param budget The device's allowance
+   * @returns true when the call must not be made
+   */
+  deviceBudgetSpent(budget) {
+    var _a;
+    const used = (_a = this.callsTodayPerDevice.get(budget.key)) != null ? _a : 0;
+    if (used < budget.perDay) {
+      return false;
+    }
+    if (!this.warnedDeviceBudget.has(budget.key)) {
+      this.warnedDeviceBudget.add(budget.key);
+      this.log.warn(
+        `Device ${budget.key} has used its daily Govee budget (${budget.perDay} calls). Govee allows an appliance 100 calls per day and appliance control has no local path, so every write counts. Further commands for this device are skipped until Govee's daily reset \u2014 reduce how often a script writes to it.`
+      );
+    }
+    return true;
+  }
+  /**
+   * Book one call against the global counters and, where one applies, the
+   * device's own allowance.
+   *
+   * @param budget The device's allowance, when the call belongs to one
+   */
+  spend(budget) {
+    var _a;
+    this.callsThisMinute++;
+    this.callsToday++;
+    if (budget) {
+      this.callsTodayPerDevice.set(budget.key, ((_a = this.callsTodayPerDevice.get(budget.key)) != null ? _a : 0) + 1);
+    }
   }
   /**
    * Execute within the budget and settle when the call ACTUALLY ran —
@@ -175,11 +231,14 @@ class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority (0 = control)
+   * @param budget
    */
-  async executeTracked(execute, priority = 0) {
+  async executeTracked(execute, priority = 0, budget) {
+    if (budget && this.deviceBudgetSpent(budget)) {
+      throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
+    }
     if (this.canMakeCall()) {
-      this.callsThisMinute++;
-      this.callsToday++;
+      this.spend(budget);
       await execute();
       return;
     }

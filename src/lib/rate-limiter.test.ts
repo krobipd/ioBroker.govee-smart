@@ -379,3 +379,124 @@ describe("RateLimiter — queue cap (v2.16.1)", () => {
     rl.stop();
   });
 });
+
+describe("per-device daily budget", () => {
+  // Govee's limits are not one budget: the account gets 10,000 calls a day, but
+  // an APPLIANCE gets 100 for itself — and appliance control has no local path,
+  // so every write is a cloud call. The global counters cannot express that.
+  const APPLIANCE = { key: "H7160:AA:BB", perDay: 3 };
+
+  it("stops a device once it has spent its own allowance, while the global budget is untouched", async () => {
+    const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
+    let ran = 0;
+    const call = () =>
+      limiter.tryExecute(
+        () => {
+          ran += 1;
+          return Promise.resolve();
+        },
+        0,
+        APPLIANCE,
+      );
+    for (let i = 0; i < 5; i++) {
+      await call();
+    }
+    expect(ran).toBe(3);
+    // The global budget still has room — this is the device's own limit biting.
+    expect(limiter.getUsageSnapshot().usedToday).toBe(3);
+  });
+
+  it("does not queue an exhausted device — the allowance resets in hours, not seconds", async () => {
+    // Queuing would hold the write until Govee's daily rollover and then apply
+    // it at a moment nobody asked for.
+    const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
+    for (let i = 0; i < 3; i++) {
+      await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    }
+    const accepted = await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    expect(accepted).toBe(false);
+    expect(limiter.getUsageSnapshot().queueLength).toBe(0);
+  });
+
+  it("a tracked call rejects rather than silently doing nothing", async () => {
+    // User commands must not ack as if they had run.
+    const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
+    for (let i = 0; i < 3; i++) {
+      await limiter.executeTracked(() => Promise.resolve(), 0, APPLIANCE);
+    }
+    await expect(limiter.executeTracked(() => Promise.resolve(), 0, APPLIANCE)).rejects.toThrow(/budget/i);
+  });
+
+  it("warns once per device, not on every rejected write", async () => {
+    const warns: string[] = [];
+    const limiter = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, mockTimers, 100, 10_000);
+    for (let i = 0; i < 8; i++) {
+      await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    }
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("H7160:AA:BB");
+  });
+
+  it("budgets are per device — a second appliance is unaffected", async () => {
+    const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
+    let other = 0;
+    for (let i = 0; i < 5; i++) {
+      await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    }
+    await limiter.tryExecute(
+      () => {
+        other += 1;
+        return Promise.resolve();
+      },
+      0,
+      { key: "H7131:CC:DD", perDay: 3 },
+    );
+    expect(other).toBe(1);
+  });
+
+  it("a call without a budget is never blocked by one", async () => {
+    // Lights keep the global budget: their writes go over the LAN and the rare
+    // cloud fallback is covered by the account limit.
+    const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
+    let ran = 0;
+    for (let i = 0; i < 10; i++) {
+      await limiter.tryExecute(() => {
+        ran += 1;
+        return Promise.resolve();
+      });
+    }
+    expect(ran).toBe(10);
+  });
+
+  it("the daily reset frees the device allowance and re-arms the warning", async () => {
+    const warns: string[] = [];
+    const { timers, timeouts } = makeCapturingTimers();
+    const limiter = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, timers, 100, 10_000);
+    limiter.start();
+    let ran = 0;
+    const call = () =>
+      limiter.tryExecute(
+        () => {
+          ran += 1;
+          return Promise.resolve();
+        },
+        0,
+        APPLIANCE,
+      );
+    for (let i = 0; i < 5; i++) {
+      await call();
+    }
+    expect(ran).toBe(3);
+    // The daily reset is armed as a one-shot aligned to UTC midnight, which
+    // then installs the recurring interval — firing that kickoff performs the
+    // first reset.
+    timeouts[0]();
+    await call();
+    expect(ran).toBe(4);
+    for (let i = 0; i < 5; i++) {
+      await call();
+    }
+    expect(warns).toHaveLength(2);
+    limiter.stop();
+  });
+});

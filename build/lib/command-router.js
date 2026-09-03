@@ -22,10 +22,16 @@ __export(command_router_exports, {
 });
 module.exports = __toCommonJS(command_router_exports);
 var import_types = require("./types");
+var import_timing_constants = require("./timing-constants");
 var import_govee_lan_client = require("./govee-lan-client");
 var import_govee_constants = require("./govee-constants");
 var import_lookups = require("./device-manager/lookups");
-var import_timing_constants = require("./timing-constants");
+function applianceBudget(device) {
+  if (!device || device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
+    return void 0;
+  }
+  return { key: `${device.sku}:${device.deviceId}`, perDay: import_timing_constants.CLOUD_APPLIANCE_DAILY_LIMIT };
+}
 class CommandRouter {
   log;
   timers;
@@ -100,10 +106,11 @@ class CommandRouter {
    * existing "Command failed" warn path fires and no false ack is written.
    *
    * @param fn The cloud send to execute
+   * @param device
    */
-  async sendBudgeted(fn) {
+  async sendBudgeted(fn, device) {
     if (this.rateLimiter) {
-      await this.rateLimiter.executeTracked(fn, 0);
+      await this.rateLimiter.executeTracked(fn, 0, applianceBudget(device));
     } else {
       await fn();
     }
@@ -431,7 +438,7 @@ class CommandRouter {
         cloudValue
       );
     };
-    await this.sendBudgeted(execute);
+    await this.sendBudgeted(execute, device);
   }
   /**
    * Send a batch segment command with pre-parsed data.
@@ -460,7 +467,7 @@ class CommandRouter {
           rgb: parsed.color
         });
       };
-      await this.sendBudgeted(execute);
+      await this.sendBudgeted(execute, device);
     }
     if (parsed.brightness !== void 0) {
       const brightCap = this.findCapabilityForCommand(device, "segmentBrightness:0");
@@ -473,7 +480,7 @@ class CommandRouter {
           { segment: parsed.segments, brightness: parsed.brightness }
         );
       };
-      await this.sendBudgeted(execute);
+      await this.sendBudgeted(execute, device);
     }
   }
   /**
@@ -817,7 +824,7 @@ class CommandRouter {
     const execute = async () => {
       await cloudClient.controlDevice(device.sku, device.deviceId, cap.type, cap.instance, cloudValue);
     };
-    await this.sendBudgeted(execute);
+    await this.sendBudgeted(execute, device);
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

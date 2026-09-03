@@ -134,6 +134,21 @@ export const FORCE_COLOR_MODE_SETTLE_MS = 150;
  */
 export const CLOUD_FULL_LIMITS = { perMinute: 8, perDay: 9000 };
 
+/**
+ * Daily Cloud budget for ONE appliance (90 of Govee's 100). Appliances are the
+ * exception in Govee's limits: lights get the 10,000/day account budget, an
+ * appliance gets 100 per day for itself — and appliance control has no local
+ * path at all, so every write is a cloud call.
+ *
+ * The global counters cannot protect this. Per minute they can: a global 8/min
+ * is always below the 10/min a single device may use. Per day they cannot —
+ * one appliance may spend the whole 9,000, ninety times its own allowance. The
+ * adapter never does this by itself (there is no periodic per-device poll), but
+ * a script switching a humidifier every five minutes reaches 288 a day and then
+ * collects rejections until Govee's daily reset.
+ */
+export const CLOUD_APPLIANCE_DAILY_LIMIT = 90;
+
 // === OpenAPI MQTT ===
 
 /**

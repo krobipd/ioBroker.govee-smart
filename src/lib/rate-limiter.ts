@@ -23,6 +23,20 @@ interface QueuedCall {
 export const MAX_QUEUE_LENGTH = 200;
 
 /**
+ * A per-device daily allowance on top of the global budget.
+ *
+ * Govee's limits are not one budget: the account gets 10,000 calls a day, but
+ * an APPLIANCE gets 100 for itself. The global counters cannot express that —
+ * one appliance may spend the whole account budget, ninety times its own share.
+ */
+export interface DeviceBudget {
+  /** Identifies the device, e.g. `sku:deviceId`. */
+  key: string;
+  /** Calls this device may make today. */
+  perDay: number;
+}
+
+/**
  * Rate limiter for Govee Cloud API calls.
  * Respects per-minute and daily limits, queues excess calls.
  */
@@ -45,6 +59,17 @@ export class RateLimiter {
   private stopped = false;
   /** Warn-once flag for the queue-full drop — reset when the queue drains. */
   private warnedQueueFull = false;
+  /**
+   * Calls spent per device today. Cleared with the daily counter, so it follows
+   * the same reset Govee applies.
+   */
+  private readonly callsTodayPerDevice = new Map<string, number>();
+  /**
+   * Devices already warned about today. The message is actionable and belongs
+   * in the log once, not on every rejected write — a script hitting the limit
+   * hits it again a minute later.
+   */
+  private readonly warnedDeviceBudget = new Set<string>();
 
   /** Max calls per minute */
   private perMinuteLimit: number;
@@ -126,8 +151,15 @@ export class RateLimiter {
 
   /** Zero the daily counter and log. Separate so kickoff + interval share it. */
   private resetDaily(): void {
-    this.log.debug(`Rate limiter: daily reset (used ${this.callsToday} calls today)`);
+    this.log.debug(
+      `Rate limiter: daily reset (used ${this.callsToday} calls today, ${this.callsTodayPerDevice.size} device(s) tracked)`,
+    );
     this.callsToday = 0;
+    // The per-device allowances reset with the global one — Govee rolls both
+    // over at the same time. The warn-once set goes too, so a device that hit
+    // its limit yesterday says so again if it hits it today.
+    this.callsTodayPerDevice.clear();
+    this.warnedDeviceBudget.clear();
   }
 
   /** Milliseconds from now until the next UTC midnight tick. */
@@ -179,16 +211,59 @@ export class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority
+   * @param budget
    */
-  async tryExecute(execute: () => Promise<void>, priority = 0): Promise<boolean> {
+  async tryExecute(execute: () => Promise<void>, priority = 0, budget?: DeviceBudget): Promise<boolean> {
+    if (budget && this.deviceBudgetSpent(budget)) {
+      return false;
+    }
     if (this.canMakeCall()) {
-      this.callsThisMinute++;
-      this.callsToday++;
+      this.spend(budget);
       await execute();
       return true;
     }
     this.enqueue(execute, priority);
     return false;
+  }
+
+  /**
+   * Whether this device has used up its own daily allowance — and if so, say so
+   * once. An exhausted device budget does NOT queue the call: the allowance
+   * resets at Govee's daily rollover, not in a few seconds, so queuing would
+   * only hold a write that is hours from running and then apply it at a moment
+   * nobody asked for.
+   *
+   * @param budget The device's allowance
+   * @returns true when the call must not be made
+   */
+  private deviceBudgetSpent(budget: DeviceBudget): boolean {
+    const used = this.callsTodayPerDevice.get(budget.key) ?? 0;
+    if (used < budget.perDay) {
+      return false;
+    }
+    if (!this.warnedDeviceBudget.has(budget.key)) {
+      this.warnedDeviceBudget.add(budget.key);
+      this.log.warn(
+        `Device ${budget.key} has used its daily Govee budget (${budget.perDay} calls). Govee allows an appliance ` +
+          `100 calls per day and appliance control has no local path, so every write counts. Further commands for ` +
+          `this device are skipped until Govee's daily reset — reduce how often a script writes to it.`,
+      );
+    }
+    return true;
+  }
+
+  /**
+   * Book one call against the global counters and, where one applies, the
+   * device's own allowance.
+   *
+   * @param budget The device's allowance, when the call belongs to one
+   */
+  private spend(budget?: DeviceBudget): void {
+    this.callsThisMinute++;
+    this.callsToday++;
+    if (budget) {
+      this.callsTodayPerDevice.set(budget.key, (this.callsTodayPerDevice.get(budget.key) ?? 0) + 1);
+    }
   }
 
   /**
@@ -203,11 +278,14 @@ export class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority (0 = control)
+   * @param budget
    */
-  async executeTracked(execute: () => Promise<void>, priority = 0): Promise<void> {
+  async executeTracked(execute: () => Promise<void>, priority = 0, budget?: DeviceBudget): Promise<void> {
+    if (budget && this.deviceBudgetSpent(budget)) {
+      throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
+    }
     if (this.canMakeCall()) {
-      this.callsThisMinute++;
-      this.callsToday++;
+      this.spend(budget);
       await execute();
       return;
     }
