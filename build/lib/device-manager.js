@@ -778,7 +778,7 @@ class DeviceManager {
         return;
       case "unknown":
         this.log.warn(
-          `Device ${label} is not in the supported device list. Please trigger diag.export and post the resulting JSON in a GitHub issue so the SKU can be added.`
+          `Device ${label} is not in the supported device list. Please trigger diag.export and attach the resulting JSON to a GitHub issue so the SKU can be added.`
         );
         return;
     }
@@ -822,6 +822,7 @@ class DeviceManager {
     const state = {};
     if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {
       state.online = true;
+      state.cloudReportedOnline = true;
     }
     if (!update.state) {
       return state;

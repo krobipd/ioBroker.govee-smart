@@ -391,7 +391,9 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.channelStatus.lan).toBe("off");
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set(
       "H6172_aabbccddee11",
-      makeDevice({ lanIp: "10.0.0.5", state: { online: true } }),
+      // A discovered LAN light carries the reply stamp — reachability for this
+      // kind is the LAN reply, not a remembered boolean.
+      makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: Date.now(), state: { online: true } }),
     );
     connectionState.updateConnectionState(
       adapter as unknown as Parameters<typeof connectionState.updateConnectionState>[0],
@@ -401,7 +403,8 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     // All devices offline → the indicator must drop, LAN stack running or not.
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set(
       "H6172_aabbccddee11",
-      makeDevice({ lanIp: "10.0.0.5", state: { online: false } }),
+      // Silent for longer than the freshness window → unreachable.
+      makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: undefined, state: { online: false } }),
     );
     connectionState.updateConnectionState(
       adapter as unknown as Parameters<typeof connectionState.updateConnectionState>[0],
@@ -1144,6 +1147,115 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(i.cloudWasConnected).toBe(true);
     expect(i.states.get("info.cloudConnected")).toEqual({ val: true, ack: true });
     expect(i.cloudInitDone).toBe(true);
+  });
+
+  it("a cloud-only light stays reachable across a restart from cache", async () => {
+    // The regression this pins (krobi + Joylancer, n=2, five SKUs): a light
+    // whose owner never enabled the local API shows info.online=false after the
+    // FIRST restart while it still controls fine. Fresh installs looked right,
+    // which is why it survived so long.
+    //
+    // Chain: cachedToGoveeDevice deliberately boots every device to
+    // "online:false" (a LAN light gets corrected by the next scan seconds
+    // later); mergeCloudDevices does not touch state on a known device; the
+    // App-API never yields an online cap for a light; the MQTT push is barred
+    // for lights on purpose. Nothing ever lifts it again.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee11.json"),
+      JSON.stringify({
+        sku: "H6172",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Cloud Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    // The account still holds the device — but no LAN reply ever arrives,
+    // because the owner never switched the local API on.
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H6172",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Cloud Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    await i.onReady();
+    await settle();
+
+    const device = i.deviceManager!.getDevices()[0];
+    expect(device.lanIp).toBeFalsy();
+    expect(device.channels.cloud).toBe(true);
+
+    // Drive the 20 s round that owns info.online.
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    (syncCall![0] as () => void)();
+    await settle();
+
+    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: true, ack: true });
+  });
+
+  it("a cloud-only light goes offline when the cloud channel is down", async () => {
+    // The other direction of the same rule: reachability for a cloud-only
+    // device IS "the cloud answers and the account still lists it". Take the
+    // cloud away and the marker has to follow, otherwise the fix would just
+    // trade a permanent false for a permanent true.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee11.json"),
+      JSON.stringify({
+        sku: "H6172",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Cloud Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H6172",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Cloud Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    await i.onReady();
+    await settle();
+
+    i.states.set("info.cloudConnected", { val: false, ack: true });
+    (i as unknown as { cloudWasConnected: boolean }).cloudWasConnected = false;
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    (syncCall![0] as () => void)();
+    await settle();
+
+    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: false, ack: true });
   });
 
   it("an empty cache goes to the cloud and records the outcome", async () => {

@@ -102,6 +102,11 @@ function createTestDevice(overrides = {}) {
     diyLibrary: [],
     skuFeatures: null,
     lastSeenOnNetwork: Date.now(),
+    // A LAN light that counts as reachable has answered — the production paths
+    // always set both together (LAN discovery and devStatus). Without the reply
+    // stamp this factory produced a device that no real code path can create,
+    // and `resolveDeviceReachability` would rightly call it unreachable.
+    lastLanReplyAt: Date.now(),
     state: { online: true },
     channels: { lan: true, mqtt: false, cloud: false },
     segmentCount: 15,

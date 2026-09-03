@@ -9,6 +9,7 @@ import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
 import { deviceLabel, errMessage, logRejected } from "../types";
 import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
+import { resolveDeviceReachability } from "../device-manager/lookups";
 
 /**
  * Adapter surface required by the connection-state helpers — covers the
@@ -54,11 +55,11 @@ export interface ConnectionStateAdapter {
 export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const devices = adapter.deviceManager?.getDevices() ?? [];
   const hasDevices = devices.length > 0;
-  const anyOnline = devices.some(
-    d =>
-      d.state.online ||
-      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected),
-  );
+  // Same rule as the per-device marker (`syncInfoOnline`), from the same
+  // resolver — before this, `info.connection` said "a device is reachable"
+  // while that very device's `info.online` said the opposite, because the two
+  // carried their own copies of the reachability logic.
+  const anyOnline = devices.some(d => resolveDeviceReachability(d, adapter.cloudWasConnected).online);
   const lanRunning = adapter.lanClient !== null;
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {

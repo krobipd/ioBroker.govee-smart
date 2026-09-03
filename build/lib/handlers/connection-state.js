@@ -29,13 +29,12 @@ var import_http_client = require("../http-client");
 var import_device_key = require("../device-key");
 var import_types = require("../types");
 var import_govee_constants = require("../govee-constants");
+var import_lookups = require("../device-manager/lookups");
 function updateConnectionState(adapter) {
   var _a, _b, _c, _d;
   const devices = (_b = (_a = adapter.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : [];
   const hasDevices = devices.length > 0;
-  const anyOnline = devices.some(
-    (d) => d.state.online || d.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected
-  );
+  const anyOnline = devices.some((d) => (0, import_lookups.resolveDeviceReachability)(d, adapter.cloudWasConnected).online);
   const lanRunning = adapter.lanClient !== null;
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {

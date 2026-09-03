@@ -126,6 +126,24 @@ class StateManager {
   /** This instance's device catalog — quirks for the LAN default states. */
   registry;
   /**
+   * Whether the Cloud REST channel is currently up. A provider (not a state
+   * read) because {@link syncInfoOnline} runs for every device every 20 s —
+   * reading `info.cloudConnected` back from the database per device is exactly
+   * the per-round database load v2.27.1 removed. Defaults to "no cloud" so a
+   * StateManager built before the wiring runs cannot claim reachability it
+   * has no basis for.
+   */
+  cloudOnline = () => false;
+  /**
+   * Wire the Cloud-channel view used by {@link syncInfoOnline}. Called once
+   * from `onReady`; the closure reads main.ts's live `cloudWasConnected`.
+   *
+   * @param provider Returns whether the Cloud REST channel is up right now
+   */
+  setCloudOnlineProvider(provider) {
+    this.cloudOnline = provider;
+  }
+  /**
    * @param adapter The ioBroker adapter instance
    * @param registry This instance's device catalog
    */
@@ -1281,18 +1299,18 @@ class StateManager {
     this.ensuredStates.add(id);
   }
   /**
-   * Resolver-based info.online sync.
+   * Resolver-based info.online sync — one rule for every device kind, via
+   * {@link resolveDeviceReachability}.
    *
-   * For LAN-capable LED Lights (`type === light` AND `lanIp` set) the
-   * truth-source is exclusively `device.lastLanReplyAt` — set when the device
-   * replies to a LAN-Discovery multicast or LAN-Unicast devStatus. The 90 s
-   * freshness window tolerates 3 missed 30 s scans against UDP packet loss but
-   * still flips offline reasonably fast on a real outage.
-   *
-   * For cloud-only Lights (a light whose owner never enabled the local API, so
-   * `lanIp` is null) and for Sensors/Appliances there is no LAN signal:
-   * `device.state.online` — set by `applyOnlineCap` from App-API / OpenAPI-MQTT
-   * — is read straight through here. Local-first stays, local-only does not.
+   * The resolver decides; this method only writes. What it adds on top is the
+   * `proven` distinction: a reachability that was HEARD (a LAN reply, or Govee
+   * itself reporting) may be written back into `device.state.online` in both
+   * directions, but one that was merely DERIVED from the cloud channel may only
+   * ever raise it. Burning a derived `false` into the device is what made a
+   * cloud-only light stay grey forever: the cache boots every device to
+   * offline, no LAN scan and no Govee report ever lifts a cloud-only light
+   * again, and the old code then wrote that ignorance back as if it were a
+   * measurement — after which nothing could undo it.
    *
    * Written with `setStateChangedAsync`, so an unchanged value neither rewrites
    * the state nor bumps its timestamp (the 2-min ts-rewrite-spam captured
@@ -1318,16 +1336,11 @@ class StateManager {
     }
     const prefix = this.devicePrefix(device);
     const stateId = `${prefix}.info.online`;
-    let desiredOnline;
-    if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
-      desiredOnline = !!(device.lastLanReplyAt && Date.now() - device.lastLanReplyAt < 9e4);
-    } else {
-      desiredOnline = device.state.online === true;
-    }
+    const { online: desiredOnline, proven } = (0, import_lookups.resolveDeviceReachability)(device, this.cloudOnline());
     this.resolvedOnline.set(stateId, desiredOnline);
     await this.adapter.setStateChangedAsync(stateId, { val: desiredOnline, ack: true }).catch(() => void 0);
     let lightOnlineChanged = false;
-    if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.state.online !== desiredOnline) {
+    if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.state.online !== desiredOnline && (proven || desiredOnline)) {
       device.state.online = desiredOnline;
       lightOnlineChanged = true;
     }

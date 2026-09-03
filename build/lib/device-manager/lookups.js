@@ -28,11 +28,14 @@ __export(lookups_exports, {
   parseMqttSegmentData: () => parseMqttSegmentData,
   plausibleSegmentCount: () => plausibleSegmentCount,
   plausibleSegmentIndices: () => plausibleSegmentIndices,
+  resolveDeviceReachability: () => resolveDeviceReachability,
   resolveSegmentCount: () => resolveSegmentCount
 });
 module.exports = __toCommonJS(lookups_exports);
 var import_types = require("../types");
 var import_device_key = require("../device-key");
+var import_govee_constants = require("../govee-constants");
+var import_timing_constants = require("../timing-constants");
 function parseMqttSegmentData(commands) {
   if (!Array.isArray(commands)) {
     return { segments: [], complete: false };
@@ -127,6 +130,18 @@ function resolveSegmentCount(device, registry) {
   }
   return Number.isFinite(min) ? min : 0;
 }
+function resolveDeviceReachability(device, cloudOnline, now = Date.now()) {
+  if (device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
+    return {
+      online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < import_timing_constants.LAN_REPLY_FRESHNESS_MS),
+      proven: true
+    };
+  }
+  if (typeof device.state.cloudReportedOnline === "boolean") {
+    return { online: device.state.cloudReportedOnline, proven: true };
+  }
+  return { online: cloudOnline && device.channels.cloud === true, proven: false };
+}
 const SEGMENT_HARD_MAX = 55;
 const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;
 function effectiveSegmentCount(device, registry) {
@@ -178,6 +193,7 @@ function findDeviceBySkuAndId(devices, sku, deviceId) {
   parseMqttSegmentData,
   plausibleSegmentCount,
   plausibleSegmentIndices,
+  resolveDeviceReachability,
   resolveSegmentCount
 });
 //# sourceMappingURL=lookups.js.map

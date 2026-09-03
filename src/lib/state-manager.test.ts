@@ -1543,6 +1543,68 @@ describe("StateManager", () => {
       it("cloud-only light (no lanIp): info.online follows the cloud-reported online", async () => {
         const { adapter, states } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
+        // "Cloud-reported" is now carried by `state.cloudReportedOnline` — the
+        // field that separates "Govee said so" from "nobody ever said anything".
+        // `state.online` alone no longer decides, because a device booted from
+        // cache carries `online:false` without anyone having reported it.
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: { online: true, cloudReportedOnline: true },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+      });
+
+      it("an explicit offline from Govee wins even while the cloud channel is up", async () => {
+        // The title used to promise this and the test did not deliver it: with
+        // no cloud provider wired the round resolved to false anyway, so it
+        // stayed green whatever the rule did. Now the cloud is explicitly UP,
+        // which means only Govee's own "offline" can produce the false.
+        const { adapter, states } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        sm.setCloudOnlineProvider(() => true);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: { online: false, cloudReportedOnline: false },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+      });
+
+      it("a light Govee never reports on is reachable while the cloud answers", async () => {
+        // The regression itself, at the resolver: a light whose owner never
+        // enabled the local API gets no LAN reply, no App-API reading and no
+        // account push — so nothing ever reports for it. Its reachability IS
+        // the cloud channel plus account membership, which is exactly the
+        // condition under which the user can still control it.
+        const { adapter, states } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        sm.setCloudOnlineProvider(() => true);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          // What cachedToGoveeDevice hands over after a restart.
+          state: { online: false },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        await sm.syncInfoOnline(dev);
+        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+      });
+
+      it("a derived reachability never burns a false into the device", async () => {
+        // The self-cementing write that made the bug permanent: once the marker
+        // resolved to false out of ignorance, the old code wrote that back into
+        // device.state.online, and no path could lift it again.
+        const { adapter } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        sm.setCloudOnlineProvider(() => false);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
@@ -1551,21 +1613,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
-      });
-
-      it("cloud-only light reports offline when the cloud says offline", async () => {
-        const { adapter, states } = createMockAdapter();
-        const sm = new StateManager(adapter as never, registry);
-        const dev = createTestDevice({
-          lanIp: undefined,
-          lastLanReplyAt: undefined,
-          state: { online: false },
-          channels: { lan: false, mqtt: false, cloud: true },
-        });
-        await createAllStatesForTest(sm, dev, []);
-        await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(dev.state.online).toBe(true);
       });
 
       it("LAN-capable light still uses LAN-reply freshness, never stale cloud online (v2.9.0 guard)", async () => {

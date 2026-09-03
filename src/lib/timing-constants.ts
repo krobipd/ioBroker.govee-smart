@@ -80,6 +80,14 @@ export const LAN_SCAN_INTERVAL_MS = 30_000;
 /** info.online re-evaluation interval for all devices (20 s). */
 export const ONLINE_SYNC_INTERVAL_MS = 20_000;
 
+/**
+ * How long a LAN reply keeps a LAN-capable light "reachable" (90 s). Tolerates
+ * three missed 30 s scans against UDP packet loss and still flips offline
+ * reasonably fast on a real outage. Only meaningful for lights that actually
+ * have a local API — every other device kind has no LAN signal at all.
+ */
+export const LAN_REPLY_FRESHNESS_MS = 90_000;
+
 /** Safety timeout to log "ready" even if a channel is still settling (60 s). */
 export const READY_SAFETY_TIMEOUT_MS = 60_000;
 

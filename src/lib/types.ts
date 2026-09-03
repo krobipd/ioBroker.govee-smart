@@ -388,6 +388,18 @@ export interface GoveeDevice {
 export interface DeviceState {
   /** Whether device is reachable */
   online: boolean;
+  /**
+   * What Govee itself last said about reachability, via `applyOnlineCap`
+   * (App-API poll / OpenAPI-MQTT event). `undefined` means Govee has NEVER
+   * reported for this device — which is the normal, permanent case for a light
+   * whose owner did not enable the local API: the App-API carries no reading
+   * for lights, and the account push is barred for them on purpose.
+   *
+   * The distinction matters because "Govee says offline" and "nobody ever said
+   * anything" must not resolve to the same marker. Lives in `state` (not on the
+   * device) so it is runtime-only and never reaches the cache.
+   */
+  cloudReportedOnline?: boolean;
   /** Power on/off */
   power?: boolean;
   /** Brightness 0-100 */

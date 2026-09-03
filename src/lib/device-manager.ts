@@ -969,6 +969,11 @@ export class DeviceManager {
     const state: Partial<DeviceState> = {};
     if (device.type !== GOVEE_DEVICE_TYPE.LIGHT) {
       state.online = true;
+      // A push IS Govee reporting about this device — record it as heard, not
+      // just as a value. `resolveDeviceReachability` distinguishes a reported
+      // reachability from one derived off the cloud channel, and without this
+      // an appliance's push evidence would be thrown away every round.
+      state.cloudReportedOnline = true;
     }
     if (!update.state) {
       return state;

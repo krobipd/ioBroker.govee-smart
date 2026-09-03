@@ -388,6 +388,7 @@ class GoveeAdapter extends utils.Adapter {
         log: this.log
       });
       this.stateManager = new import_state_manager.StateManager(this, this.deviceRegistry);
+      this.stateManager.setCloudOnlineProvider(() => this.cloudWasConnected);
       await this.stateManager.markAllOffline().catch(() => void 0);
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => void 0);
       await this.stateManager.createGroupsOnlineState(false);

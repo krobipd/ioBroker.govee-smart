@@ -1,5 +1,7 @@
 import { normalizeDeviceId, type GoveeDevice } from "../types";
 import { mapKey } from "../device-key";
+import { GOVEE_DEVICE_TYPE } from "../govee-constants";
+import { LAN_REPLY_FRESHNESS_MS } from "../timing-constants";
 import type { DeviceRegistry } from "../device-registry";
 
 /** Parsed per-segment data from MQTT BLE packets */
@@ -179,6 +181,59 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
     }
   }
   return Number.isFinite(min) ? min : 0;
+}
+
+/**
+ * The one answer to "is this device reachable?", for every device kind.
+ *
+ * Before this existed the adapter carried three unconnected truths — LAN-reply
+ * freshness for LAN lights, a remembered boolean for everything else, and a
+ * reading age for gateway sensors — plus a fourth rule in `updateConnectionState`
+ * that already knew cloud-only lights are reachable while the cloud answers.
+ * `<device>.info.online` used the second one and therefore contradicted
+ * `info.connection` for the very same device.
+ *
+ * The three cases, in order:
+ *
+ * 1. **A light with a local API** — the LAN reply is the truth and nothing else
+ *    is (Govee's cloud cache lags real reachability; measured 2026-05-13, it
+ *    reported `true` twice during a genuine outage). Proven either way.
+ * 2. **Govee has spoken about this device** — sensors and appliances get a real
+ *    reachability flag through the App-API poll or a cloud event. Proven either
+ *    way; an explicit "offline" from Govee always wins.
+ * 3. **Govee never speaks about this device** — the permanent case for a light
+ *    whose owner did not enable the local API: the App-API carries no reading
+ *    for lights and the account push is barred for them. There is no signal to
+ *    wait for, so reachability IS "the cloud answers and the account still
+ *    lists this device" — which is exactly the condition under which the user
+ *    can control it. Reported as `proven: false`, because it is derived from
+ *    the channel rather than heard from the device: the caller may raise the
+ *    device's own flag on it, but must never burn a `false` into the device —
+ *    that self-cementing write is what made a cloud-only light stay grey
+ *    forever once the cache had booted it to offline.
+ *
+ * Pure — no adapter, no I/O, no clock beyond the injected `now`.
+ *
+ * @param device The device to judge
+ * @param cloudOnline Whether the Cloud REST channel is currently up
+ * @param now Current time (ms epoch); injectable for tests
+ * @returns The reachability plus whether it is a proven measurement
+ */
+export function resolveDeviceReachability(
+  device: GoveeDevice,
+  cloudOnline: boolean,
+  now: number = Date.now(),
+): { online: boolean; proven: boolean } {
+  if (device.type === GOVEE_DEVICE_TYPE.LIGHT && device.lanIp) {
+    return {
+      online: !!(device.lastLanReplyAt && now - device.lastLanReplyAt < LAN_REPLY_FRESHNESS_MS),
+      proven: true,
+    };
+  }
+  if (typeof device.state.cloudReportedOnline === "boolean") {
+    return { online: device.state.cloudReportedOnline, proven: true };
+  }
+  return { online: cloudOnline && device.channels.cloud === true, proven: false };
 }
 
 /** Protocol limit: Govee's segment bitmask is 7 bytes × 8 bits = 56 slots (0..55). */
