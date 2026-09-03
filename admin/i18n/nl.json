@@ -125,5 +125,16 @@
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Verificatiecode vereist",
   "infoVerificationPendingDesc": "Waar zolang Govee wacht op een 2FA-verificatiecode voordat de realtime-accountaanmelding kan worden voltooid. Voer de code in de verbindingskaart van de adapter in.",
-  "tabDiagnostics": "Diagnose"
+  "tabDiagnostics": "Diagnose",
+  "capGradientToggle": "Kleurverloop",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Nachtlampje",
+  "capOscillationToggle": "Oscillatie",
+  "capThermostatToggle": "Thermostaat",
+  "capWarmMistToggle": "Warme nevel",
+  "capNightlightScene": "Nachtlampscène",
+  "capPresetScene": "Vooraf ingestelde scène",
+  "capAirDeflectorToggle": "Luchtgeleider",
+  "capFanSpeed": "Ventilatorsnelheid",
+  "capHumidity": "Doelvochtigheid"
 }

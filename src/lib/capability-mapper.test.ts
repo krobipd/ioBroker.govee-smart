@@ -2232,3 +2232,49 @@ describe("canonicalSyntheticId — one id per reading, whichever path delivers i
     expect(SYNTHETIC_STATE_META[def.id]).toBeDefined();
   });
 });
+
+describe("capability names", () => {
+  it("a known capability gets a real translation, not the vendor wording", () => {
+    // Measured in the live tree: `control.brightness` read the plain English
+    // "Brightness" on the two cloud-only devices and the translated name on
+    // every LAN light — the same datapoint with two different labels.
+    const defs = buildCloudStateDefs(
+      createTestDevice({
+        lanIp: undefined,
+        capabilities: [
+          { type: "devices.capabilities.range", instance: "brightness", parameters: { range: { min: 1, max: 100 } } },
+          { type: "devices.capabilities.toggle", instance: "gradientToggle" },
+          { type: "devices.capabilities.toggle", instance: "dreamViewToggle" },
+        ] as never,
+      }),
+    );
+    // The i18n stub returns {en: key, de: `${key}_de`}, so a real translation is
+    // recognisable by its per-language difference — the vendor fallback repeats
+    // the same wording everywhere. Checking only "is an object" would pass on
+    // the fallback too, which is exactly what a mutation probe caught.
+    for (const [id, key] of [
+      ["brightness", "brightness"],
+      ["gradient_toggle", "capGradientToggle"],
+      // The three instances the live tree actually names — spelled the way they
+      // arrive from Govee (camelCase), not the way the state id ends up.
+      ["dream_view_toggle", "capDreamViewToggle"],
+    ] as const) {
+      const name = defs.find(d => d.id === id)?.name as Record<string, string>;
+      expect(name, `${id} must carry a real translation`).toMatchObject({ en: key, de: `${key}_de` });
+    }
+  });
+
+  it("an unknown capability keeps the vendor wording — as a translation object", () => {
+    // `common.name` is a translation object fleet-wide, and the live-tree check
+    // can then tell "vendor term" apart from "forgot to translate".
+    const defs = buildCloudStateDefs(
+      createTestDevice({
+        lanIp: undefined,
+        capabilities: [{ type: "devices.capabilities.toggle", instance: "someFutureThing" }] as never,
+      }),
+    );
+    const def = defs.find(d => d.id === "some_future_thing");
+    expect(typeof def?.name).not.toBe("string");
+    expect(def?.name).toMatchObject({ en: "Some Future Thing", de: "Some Future Thing" });
+  });
+});

@@ -125,5 +125,16 @@
   "segmentChannel": "分段 %s",
   "infoVerificationPending": "需要验证码",
   "infoVerificationPendingDesc": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。",
-  "tabDiagnostics": "诊断"
+  "tabDiagnostics": "诊断",
+  "capGradientToggle": "渐变",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "夜灯",
+  "capOscillationToggle": "摆动",
+  "capThermostatToggle": "恒温器",
+  "capWarmMistToggle": "温雾",
+  "capNightlightScene": "夜灯场景",
+  "capPresetScene": "预设场景",
+  "capAirDeflectorToggle": "导风板",
+  "capFanSpeed": "风速",
+  "capHumidity": "目标湿度"
 }

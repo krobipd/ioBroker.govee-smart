@@ -125,5 +125,16 @@
   "segmentChannel": "Сегмент %s",
   "infoVerificationPending": "Потрібен код підтвердження",
   "infoVerificationPendingDesc": "Істина, поки Govee очікує код підтвердження 2FA для завершення входу в обліковий запис у реальному часі. Введіть код у картці підключення адаптера.",
-  "tabDiagnostics": "Діагностика"
+  "tabDiagnostics": "Діагностика",
+  "capGradientToggle": "Градієнт",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Нічник",
+  "capOscillationToggle": "Коливання",
+  "capThermostatToggle": "Термостат",
+  "capWarmMistToggle": "Тепла пара",
+  "capNightlightScene": "Сцена нічника",
+  "capPresetScene": "Попередньо задана сцена",
+  "capAirDeflectorToggle": "Дефлектор",
+  "capFanSpeed": "Швидкість вентилятора",
+  "capHumidity": "Цільова вологість"
 }

@@ -176,7 +176,7 @@ function mapSingleCapability(cap) {
       return [
         {
           id: sanitizeId(cap.instance),
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "boolean",
           role: "switch",
           write: true,
@@ -195,7 +195,7 @@ function mapSingleCapability(cap) {
       return [
         {
           id: `_segment_${sanitizeId(cap.instance)}`,
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -210,7 +210,7 @@ function mapSingleCapability(cap) {
       return [
         {
           id: sanitizeId(cap.instance),
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -238,7 +238,7 @@ function mapRange(cap) {
   return [
     {
       id: sanitizeId(cap.instance),
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "number",
       role: isBrightness ? "level.brightness" : "level",
       write: true,
@@ -352,7 +352,7 @@ function mapProperty(cap) {
   return [
     {
       id: canonicalSyntheticId(cap.instance),
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "number",
       role,
       write: false,
@@ -509,7 +509,7 @@ function mapEvent(cap) {
   return [
     {
       id,
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "boolean",
       // Known events use the shared role table (M5 — same role as the
       // synthetic write path); a genuinely unknown event is an alarm.
@@ -627,6 +627,37 @@ function normalizeUnit(unit) {
 }
 function sanitizeId(str) {
   return str.replace(/([a-z])([A-Z])/g, "$1_$2").replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
+}
+const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"];
+const CAPABILITY_NAME_KEYS = {
+  // Names the adapter already owns from its LAN defaults — a cloud-only device
+  // must not end up with a different label for the same datapoint. That was
+  // measured: `control.brightness` read "Brightness" on the two cloud-only
+  // devices and the translated name everywhere else.
+  brightness: "brightness",
+  powerSwitch: "power",
+  gradientToggle: "capGradientToggle",
+  dreamViewToggle: "capDreamViewToggle",
+  nightlightToggle: "capNightlightToggle",
+  oscillationToggle: "capOscillationToggle",
+  thermostatToggle: "capThermostatToggle",
+  warmMistToggle: "capWarmMistToggle",
+  airDeflectorToggle: "capAirDeflectorToggle",
+  nightlightScene: "capNightlightScene",
+  presetScene: "capPresetScene",
+  fanSpeed: "capFanSpeed",
+  humidity: "capHumidity"
+};
+function capabilityName(instance) {
+  const key = CAPABILITY_NAME_KEYS[instance];
+  if (key) {
+    return (0, import_i18n.tName)(key);
+  }
+  const vendorText = humanize(instance);
+  return LANGUAGES.reduce((acc, lang) => {
+    acc[lang] = vendorText;
+    return acc;
+  }, {});
 }
 function humanize(str) {
   return str.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").trim().replace(/^./, (c) => c.toUpperCase());

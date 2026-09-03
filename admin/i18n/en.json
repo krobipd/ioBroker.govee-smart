@@ -125,5 +125,16 @@
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Verification code required",
   "infoVerificationPendingDesc": "True while Govee is waiting for a 2FA verification code before the real-time account login can finish. Enter the code in the adapter's connection card.",
-  "tabDiagnostics": "Diagnostics"
+  "tabDiagnostics": "Diagnostics",
+  "capGradientToggle": "Gradient",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Night light",
+  "capOscillationToggle": "Oscillation",
+  "capThermostatToggle": "Thermostat",
+  "capWarmMistToggle": "Warm mist",
+  "capNightlightScene": "Night-light scene",
+  "capPresetScene": "Preset scene",
+  "capAirDeflectorToggle": "Air deflector",
+  "capFanSpeed": "Fan speed",
+  "capHumidity": "Target humidity"
 }

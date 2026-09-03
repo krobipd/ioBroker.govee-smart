@@ -175,6 +175,16 @@ class GoveeAdapter extends utils.Adapter {
    * devices. Cleared synchronously in onUnload.
    */
   onlineSyncTimer;
+  /**
+   * False until the first online-sync round has re-evaluated the groups.
+   *
+   * The group rollup used to ride purely on CHANGES — which means a restart
+   * left `info.membersUnreachable` carrying whatever the last transition wrote,
+   * possibly hours earlier, and it only ever got corrected once some device
+   * flipped. On a stable installation that is never (measured on the live
+   * system 2026-09-03: the value's timestamp was 28 h older than the restart).
+   */
+  groupReachabilityPrimed = false;
   // === Sub-Komponenten ===
   skuCache = null;
   localSnapshots = null;
@@ -365,6 +375,7 @@ class GoveeAdapter extends utils.Adapter {
       void connectionState.refreshLiveAppVersion(this.handlerHost).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
       await this.delObjectAsync("info.manual_sync_devices").catch(() => void 0);
+      await this.delObjectAsync("info.legacyMqttCleaned").catch(() => void 0);
       await this.delObjectAsync("info.appVersionDrift").catch(() => void 0);
       await this.delObjectAsync("info.wizardStatus").catch(() => void 0);
       await cloudCreds.migrateCredentialsMetaOnce(this.handlerHost, utils.getAbsoluteInstanceDataDir(this));
@@ -799,8 +810,10 @@ class GoveeAdapter extends utils.Adapter {
               anyLightChanged = true;
             }
           }
-          if (anyLightChanged) {
-            groupFanoutHandler.updateGroupReachability(this.handlerHost);
+          if (anyLightChanged || !this.groupReachabilityPrimed) {
+            if (groupFanoutHandler.updateGroupReachability(this.handlerHost) > 0) {
+              this.groupReachabilityPrimed = true;
+            }
           }
           await this.stateManager.writeDeviceRollup().catch((e) => {
             this.log.debug(`Device rollup failed: ${(0, import_types.errMessage)(e)}`);

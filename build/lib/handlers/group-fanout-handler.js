@@ -27,16 +27,19 @@ var import_group_fanout = require("../group-fanout");
 var import_types = require("../types");
 function updateGroupReachability(adapter) {
   if (!adapter.deviceManager || !adapter.stateManager) {
-    return;
+    return 0;
   }
   const devices = adapter.deviceManager.getDevices();
+  let written = 0;
   for (const group of devices) {
     if (group.sku !== "BaseGroup" || !group.groupMembers) {
       continue;
     }
     const memberDevices = (0, import_group_fanout.resolveGroupMembers)(group, devices);
     adapter.stateManager.updateGroupMembersUnreachable(group, memberDevices).catch((0, import_types.logRejected)(adapter.log, "write group members unreachable"));
+    written++;
   }
+  return written;
 }
 function buildGroupFanoutHost(adapter) {
   return {

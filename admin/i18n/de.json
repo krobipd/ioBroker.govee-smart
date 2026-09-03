@@ -125,5 +125,16 @@
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Bestätigungscode erforderlich",
   "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben.",
-  "tabDiagnostics": "Diagnose"
+  "tabDiagnostics": "Diagnose",
+  "capGradientToggle": "Farbverlauf",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Nachtlicht",
+  "capOscillationToggle": "Schwenken",
+  "capThermostatToggle": "Thermostat",
+  "capWarmMistToggle": "Warmer Nebel",
+  "capNightlightScene": "Nachtlicht-Szene",
+  "capPresetScene": "Voreingestellte Szene",
+  "capAirDeflectorToggle": "Luftleitblech",
+  "capFanSpeed": "Lüfterstufe",
+  "capHumidity": "Ziel-Luftfeuchte"
 }

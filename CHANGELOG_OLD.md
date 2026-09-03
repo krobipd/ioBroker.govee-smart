@@ -1,4 +1,8 @@
 # Older Changes
+## 2.27.1 (2026-09-01)
+
+- Improved: Noticeably lower background database load — the periodic reachability check now works far more efficiently, especially on systems with many devices and states
+
 ## 2.27.0 (2026-08-27) — stable
 
 - Fixed: Switching the instance off now shows every device as offline in the object tree, instead of leaving them green for as long as the adapter is not running

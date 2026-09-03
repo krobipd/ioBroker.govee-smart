@@ -213,6 +213,16 @@ export class GoveeAdapter extends utils.Adapter {
    * devices. Cleared synchronously in onUnload.
    */
   private onlineSyncTimer: ioBroker.Interval | undefined;
+  /**
+   * False until the first online-sync round has re-evaluated the groups.
+   *
+   * The group rollup used to ride purely on CHANGES — which means a restart
+   * left `info.membersUnreachable` carrying whatever the last transition wrote,
+   * possibly hours earlier, and it only ever got corrected once some device
+   * flipped. On a stable installation that is never (measured on the live
+   * system 2026-09-03: the value's timestamp was 28 h older than the restart).
+   */
+  private groupReachabilityPrimed = false;
   // === Sub-Komponenten ===
   private skuCache: SkuCache | null = null;
   private localSnapshots: LocalSnapshotStore | null = null;
@@ -438,6 +448,12 @@ export class GoveeAdapter extends utils.Adapter {
       // info channel. It was never subscribed either, so no script can depend on the
       // old spelling; the instanceObjects entry now declares info.manualSyncDevices.
       await this.delObjectAsync("info.manual_sync_devices").catch(() => undefined);
+
+      // One-shot cleanup: info.legacyMqttCleaned was a migration marker from an
+      // early v2 release. No code has written or read it for many versions —
+      // it survived only because nothing removes what the adapter no longer
+      // knows about. Found in the live tree on 2026-09-03, not by any gate.
+      await this.delObjectAsync("info.legacyMqttCleaned").catch(() => undefined);
 
       // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
       // Govee-app version now self-heals in the background, so there is nothing
@@ -1102,8 +1118,16 @@ export class GoveeAdapter extends utils.Adapter {
               anyLightChanged = true;
             }
           }
-          if (anyLightChanged) {
-            groupFanoutHandler.updateGroupReachability(this.handlerHost);
+          // The first round after a start always re-evaluates the groups: their
+          // members' reachability was just read fresh, and without this the
+          // rollup would keep a value nobody has checked since the last restart.
+          if (anyLightChanged || !this.groupReachabilityPrimed) {
+            // Only a round that really wrote a group counts as primed — at the
+            // first tick the cloud device list may still be loading, and a flag
+            // spent on an empty round would put us back to change-only.
+            if (groupFanoutHandler.updateGroupReachability(this.handlerHost) > 0) {
+              this.groupReachabilityPrimed = true;
+            }
           }
           // The rollup rides on the same round: it is derived from exactly the
           // markers that were just re-evaluated, so it can never drift away from

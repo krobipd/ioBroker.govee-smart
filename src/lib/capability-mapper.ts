@@ -12,7 +12,7 @@ import {
 } from "./types";
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { resolveLabel, tDesc, tName } from "./i18n";
+import { resolveLabel, tDesc, tName, type I18nKey } from "./i18n";
 
 /** ioBroker state definition derived from a Govee capability */
 export interface StateDefinition {
@@ -285,7 +285,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       return [
         {
           id: sanitizeId(cap.instance),
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "boolean",
           role: "switch",
           write: true,
@@ -310,7 +310,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       return [
         {
           id: `_segment_${sanitizeId(cap.instance)}`,
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -329,7 +329,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       return [
         {
           id: sanitizeId(cap.instance),
-          name: humanize(cap.instance),
+          name: capabilityName(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -368,7 +368,7 @@ function mapRange(cap: CloudCapability): StateDefinition[] {
   return [
     {
       id: sanitizeId(cap.instance),
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "number",
       role: isBrightness ? "level.brightness" : "level",
       write: true,
@@ -540,7 +540,7 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
   return [
     {
       id: canonicalSyntheticId(cap.instance),
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "number",
       role,
       write: false,
@@ -730,7 +730,7 @@ function mapEvent(cap: CloudCapability): StateDefinition[] {
   return [
     {
       id,
-      name: humanize(cap.instance),
+      name: capabilityName(cap.instance),
       type: "boolean",
       // Known events use the shared role table (M5 — same role as the
       // synthetic write path); a genuinely unknown event is an alarm.
@@ -932,6 +932,60 @@ function sanitizeId(str: string): string {
  *
  * @param str camelCase input string
  */
+/** The eleven languages every ioBroker translation object carries. */
+const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
+
+/**
+ * Govee capability instances the adapter has a proper translation for. Anything
+ * not listed falls back to {@link capabilityName}'s vendor-text form.
+ *
+ * The list is written for the WHOLE Govee range, not for one household — a
+ * humidifier's warm mist and a fan's oscillation belong here even where nobody
+ * we know owns one.
+ */
+const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
+  // Names the adapter already owns from its LAN defaults — a cloud-only device
+  // must not end up with a different label for the same datapoint. That was
+  // measured: `control.brightness` read "Brightness" on the two cloud-only
+  // devices and the translated name everywhere else.
+  brightness: "brightness",
+  powerSwitch: "power",
+  gradientToggle: "capGradientToggle",
+  dreamViewToggle: "capDreamViewToggle",
+  nightlightToggle: "capNightlightToggle",
+  oscillationToggle: "capOscillationToggle",
+  thermostatToggle: "capThermostatToggle",
+  warmMistToggle: "capWarmMistToggle",
+  airDeflectorToggle: "capAirDeflectorToggle",
+  nightlightScene: "capNightlightScene",
+  presetScene: "capPresetScene",
+  fanSpeed: "capFanSpeed",
+  humidity: "capHumidity",
+};
+
+/**
+ * The display name for a Govee capability.
+ *
+ * Known instances get a real translation. An unknown one keeps the vendor's own
+ * wording — but as a translation OBJECT carrying that wording in every language,
+ * not as a bare string. Two reasons: `common.name` is a translation object
+ * fleet-wide, and the live-tree check can then tell "vendor term, untranslatable"
+ * apart from "someone forgot to translate this" instead of reporting both.
+ *
+ * @param instance Govee capability instance, e.g. `gradientToggle`
+ */
+function capabilityName(instance: string): ioBroker.StringOrTranslated {
+  const key = CAPABILITY_NAME_KEYS[instance];
+  if (key) {
+    return tName(key);
+  }
+  const vendorText = humanize(instance);
+  return LANGUAGES.reduce<Record<string, string>>((acc, lang) => {
+    acc[lang] = vendorText;
+    return acc;
+  }, {}) as ioBroker.StringOrTranslated;
+}
+
 function humanize(str: string): string {
   // Order: first underscore → space, then camelCase split, then trim +
   // uppercase the first character. Previously leading-underscore IDs

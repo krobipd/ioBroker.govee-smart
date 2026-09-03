@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.29.2",
+    "version": "2.29.3",
     "news": {
+      "2.29.3": {
+        "en": "Cloud datapoints like brightness are translated now; after a restart the list of unreachable group members is rebuilt right away.",
+        "de": "Cloud-Datenpunkte wie Helligkeit sind jetzt übersetzt; nach einem Neustart wird die Liste nicht erreichbarer Gruppenmitglieder sofort erneuert.",
+        "ru": "Облачные точки данных вроде яркости переведены; после перезапуска список недоступных участников группы сразу обновляется.",
+        "pt": "Pontos de dados da nuvem como o brilho estão traduzidos; após um reinício, a lista de membros inacessíveis é refeita de imediato.",
+        "nl": "Cloud-datapunten zoals helderheid zijn vertaald; na een herstart wordt de lijst met onbereikbare groepsleden meteen vernieuwd.",
+        "fr": "Les points de données cloud comme la luminosité sont traduits ; après un redémarrage, la liste des membres injoignables est refaite.",
+        "it": "I punti dati cloud come la luminosità sono tradotti; dopo un riavvio l'elenco dei membri non raggiungibili viene rifatto subito.",
+        "es": "Los puntos de datos de la nube como el brillo están traducidos; tras un reinicio, la lista de miembros no accesibles se rehace enseguida.",
+        "pl": "Punkty danych z chmury, jak jasność, są przetłumaczone; po restarcie lista nieosiągalnych członków grupy jest od razu odnawiana.",
+        "uk": "Хмарні точки даних, як-от яскравість, перекладені; після перезапуску список недоступних учасників групи одразу оновлюється.",
+        "zh-cn": "亮度等云端数据点已翻译；重启后会立即重建无法访问的群组成员列表。"
+      },
       "2.29.2": {
         "en": "Datapoint and channel names now also update on installations that already exist — until now only fresh ones got the new wording.",
         "de": "Datenpunkt- und Kanalnamen werden jetzt auch auf bestehenden Anlagen aktualisiert — bisher bekamen nur neue Installationen den neuen Text.",
@@ -80,19 +93,6 @@
         "pl": "Po wyłączeniu instancji wszystkie urządzenia są teraz pokazywane jako offline w drzewie obiektów, zamiast pozostawać zielone, gdy adapter nie działa. Trzy nowe punkty danych pokazują, ile jest urządzeń i ile z nich jest teraz osiągalnych.",
         "uk": "Під час вимкнення екземпляра всі пристрої тепер показуються офлайн у дереві об'єктів, а не лишаються зеленими, поки адаптер не працює. Три нові точки даних показують, скільки пристроїв є і скільки з них зараз доступні.",
         "zh-cn": "停用实例后，所有设备现在会在对象树中显示为离线，而不再在适配器未运行时仍保持绿色。另有三个新数据点显示设备总数以及当前有多少设备可达。"
-      },
-      "2.26.0": {
-        "en": "Stopping or restarting the instance now really ends the cloud connection; the adapter no longer keeps updating datapoints after it has shut down.",
-        "de": "Stoppen oder Neustarten der Instanz beendet die Cloud-Verbindung jetzt wirklich; der Adapter aktualisiert nach dem Herunterfahren keine Datenpunkte mehr.",
-        "ru": "Остановка или перезапуск экземпляра теперь действительно завершает облачное соединение; после выключения адаптер больше не обновляет точки данных.",
-        "pt": "Parar ou reiniciar a instância termina agora mesmo a ligação à nuvem; após o encerramento o adaptador já não atualiza pontos de dados.",
-        "nl": "Stoppen of herstarten van de instantie beëindigt de cloudverbinding nu echt; na het afsluiten werkt de adapter geen datapunten meer bij.",
-        "fr": "Arrêter ou redémarrer l'instance met désormais vraiment fin à la connexion cloud ; après l'arrêt, l'adaptateur ne met plus à jour de points de données.",
-        "it": "Arrestare o riavviare l'istanza ora chiude davvero la connessione cloud; dopo lo spegnimento l'adattatore non aggiorna più i punti dati.",
-        "es": "Detener o reiniciar la instancia ahora finaliza realmente la conexión a la nube; tras el apagado el adaptador ya no actualiza puntos de datos.",
-        "pl": "Zatrzymanie lub restart instancji naprawdę kończy teraz połączenie z chmurą; po wyłączeniu adapter nie aktualizuje już punktów danych.",
-        "uk": "Зупинка або перезапуск примірника тепер справді завершує хмарне з'єднання; після вимкнення адаптер більше не оновлює точки даних.",
-        "zh-cn": "停止或重启实例现在会真正结束云连接；关闭之后适配器不再更新数据点。"
       }
     },
     "plugins": {

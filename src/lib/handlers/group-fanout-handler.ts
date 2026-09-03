@@ -31,12 +31,17 @@ export { resolveGroupMembers };
  * is kept existent and just gets an empty string when no member is
  * unreachable (see device-manager-pattern #46).
  *
+ * @returns How many groups were actually written. The caller uses this to tell
+ *   a real first round apart from one that ran before the device list arrived —
+ *   a "primed" flag set on an empty round would be spent without ever having
+ *   refreshed a group, which is the very drift this is meant to end.
  */
-export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): void {
+export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): number {
   if (!adapter.deviceManager || !adapter.stateManager) {
-    return;
+    return 0;
   }
   const devices = adapter.deviceManager.getDevices();
+  let written = 0;
   for (const group of devices) {
     if (group.sku !== "BaseGroup" || !group.groupMembers) {
       continue;
@@ -45,7 +50,9 @@ export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): voi
     adapter.stateManager
       .updateGroupMembersUnreachable(group, memberDevices)
       .catch(logRejected(adapter.log, "write group members unreachable"));
+    written++;
   }
+  return written;
 }
 
 /**

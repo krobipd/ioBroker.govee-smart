@@ -125,5 +125,16 @@
   "segmentChannel": "Segmento %s",
   "infoVerificationPending": "Codice di verifica richiesto",
   "infoVerificationPendingDesc": "Vero mentre Govee attende un codice di verifica 2FA per completare l'accesso all'account in tempo reale. Inserisci il codice nella scheda di connessione dell'adattatore.",
-  "tabDiagnostics": "Diagnostica"
+  "tabDiagnostics": "Diagnostica",
+  "capGradientToggle": "Sfumatura",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Luce notturna",
+  "capOscillationToggle": "Oscillazione",
+  "capThermostatToggle": "Termostato",
+  "capWarmMistToggle": "Vapore caldo",
+  "capNightlightScene": "Scena luce notturna",
+  "capPresetScene": "Scena preimpostata",
+  "capAirDeflectorToggle": "Deflettore d'aria",
+  "capFanSpeed": "Velocità ventola",
+  "capHumidity": "Umidità target"
 }

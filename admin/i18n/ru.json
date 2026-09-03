@@ -125,5 +125,16 @@
   "segmentChannel": "Сегмент %s",
   "infoVerificationPending": "Требуется код подтверждения",
   "infoVerificationPendingDesc": "Истина, пока Govee ожидает код подтверждения 2FA для завершения входа в аккаунт реального времени. Введите код в карточке подключения адаптера.",
-  "tabDiagnostics": "Диагностика"
+  "tabDiagnostics": "Диагностика",
+  "capGradientToggle": "Градиент",
+  "capDreamViewToggle": "DreamView",
+  "capNightlightToggle": "Ночник",
+  "capOscillationToggle": "Качание",
+  "capThermostatToggle": "Термостат",
+  "capWarmMistToggle": "Тёплый пар",
+  "capNightlightScene": "Сцена ночника",
+  "capPresetScene": "Предустановленная сцена",
+  "capAirDeflectorToggle": "Дефлектор",
+  "capFanSpeed": "Скорость вентилятора",
+  "capHumidity": "Целевая влажность"
 }

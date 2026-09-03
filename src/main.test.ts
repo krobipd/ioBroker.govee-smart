@@ -215,6 +215,7 @@ function internalOf(adapter: GoveeAdapter): {
   statesReady: boolean;
   cloudInitDone: boolean;
   appApiInitialPollDone: boolean;
+  groupReachabilityPrimed: boolean;
   stateCreationQueue: Promise<void>[];
   readyLogged: boolean;
   cloudWasConnected: boolean;
@@ -574,6 +575,67 @@ describe("GoveeAdapter onReady — timers", () => {
     (syncCall![0] as () => void)();
     await settle(5);
     expect(i.states.get("devices.h6172_ee11.info.online")?.val).toBe(true);
+  });
+
+  it("the first online-sync round rebuilds the group rollup even when nothing changed", async () => {
+    // The rollup used to ride purely on CHANGES. After a restart on a stable
+    // installation nothing ever changes, so info.membersUnreachable kept
+    // whatever the last transition had written — measured live on 2026-09-03:
+    // the value's timestamp was 28 h older than the running adapter.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const devices = (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices;
+    const member = makeDevice({ deviceId: "AA:BB:CC:DD:EE:11", state: { online: false } });
+    const group = makeDevice({
+      deviceId: "g1",
+      sku: "BaseGroup",
+      name: "living",
+      groupMembers: [{ sku: "H6172", deviceId: "AA:BB:CC:DD:EE:11" }],
+    });
+    devices.set("H6172_aabbccddee11", member);
+    devices.set("BaseGroup_g1", group);
+    // A stale value from before the restart — nobody has re-checked it since.
+    i.states.set("groups.basegroup_g1.info.membersUnreachable", { val: "", ack: true });
+
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    (syncCall![0] as () => void)();
+    await settle(5);
+
+    expect(i.states.get("groups.basegroup_g1.info.membersUnreachable")?.val).toBe("h6172_ee11");
+  });
+
+  it("a first round before the device list arrived does not burn the priming", async () => {
+    // The 20 s tick can fire while the cloud list is still loading. If the flag
+    // were spent on that empty round, the group rollup would be back to
+    // change-only — the same drift, only harder to see because the code looks
+    // primed.
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const devices = (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices;
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+
+    // Round 1: no devices at all.
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.groupReachabilityPrimed, "an empty round must not count as primed").toBe(false);
+
+    // Round 2: the list has arrived, nothing has changed since — the rollup
+    // must still be rebuilt.
+    devices.set("H6172_aabbccddee11", makeDevice({ deviceId: "AA:BB:CC:DD:EE:11", state: { online: false } }));
+    devices.set(
+      "BaseGroup_g1",
+      makeDevice({
+        deviceId: "g1",
+        sku: "BaseGroup",
+        name: "living",
+        groupMembers: [{ sku: "H6172", deviceId: "AA:BB:CC:DD:EE:11" }],
+      }),
+    );
+    i.states.set("groups.basegroup_g1.info.membersUnreachable", { val: "", ack: true });
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.states.get("groups.basegroup_g1.info.membersUnreachable")?.val).toBe("h6172_ee11");
+    expect(i.groupReachabilityPrimed).toBe(true);
   });
 
   it("onUnload clears every timer, stops the sub-clients and always calls back", async () => {
