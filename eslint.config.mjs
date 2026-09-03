@@ -35,6 +35,9 @@ export default [
       "*.test.js",
       "test/**",
       "tools/**",
+      // Release-Werkzeug wie bei public-holidays: laeuft unter node, nicht Teil des
+      // Adapter-Typprojekts (sonst „not found by the project service").
+      "scripts/**",
       "*.config.mjs",
       "vitest.config.mts",
       "build",

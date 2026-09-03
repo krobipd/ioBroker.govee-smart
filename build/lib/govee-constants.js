@@ -51,7 +51,7 @@ const GOVEE_DEVICE_TYPE = {
   ICE_MAKER: "devices.types.ice_maker",
   AROMA_DIFFUSER: "devices.types.aroma_diffuser"
 };
-const GOVEE_APP_VERSION = "7.5.20";
+const GOVEE_APP_VERSION = "7.6.20";
 const GOVEE_CLIENT_TYPE = "1";
 let currentAppVersion = GOVEE_APP_VERSION;
 function getAppVersion() {

@@ -39,7 +39,7 @@ export const GOVEE_DEVICE_TYPE = {
 } as const;
 
 /** Bundled Govee-app version — the fallback until the live lookup succeeds. */
-export const GOVEE_APP_VERSION = "7.5.20";
+export const GOVEE_APP_VERSION = "7.6.20";
 export const GOVEE_CLIENT_TYPE = "1";
 
 /**
