@@ -1537,12 +1537,10 @@ export class StateManager {
    * The resolver decides; this method only writes. What it adds on top is the
    * `proven` distinction: a reachability that was HEARD (a LAN reply, or Govee
    * itself reporting) may be written back into `device.state.online` in both
-   * directions, but one that was merely DERIVED from the cloud channel may only
-   * ever raise it. Burning a derived `false` into the device is what made a
-   * cloud-only light stay grey forever: the cache boots every device to
-   * offline, no LAN scan and no Govee report ever lifts a cloud-only light
-   * again, and the old code then wrote that ignorance back as if it were a
-   * measurement — after which nothing could undo it.
+   * directions; an UNPROVEN one — nobody said anything — may only ever raise it,
+   * never lower it. Burning that ignorance in as if it were a measurement is
+   * what made a device stay grey forever: the cache boots every device to
+   * offline, and once the round had written that back, no path could undo it.
    *
    * Written with `setStateChangedAsync`, so an unchanged value neither rewrites
    * the state nor bumps its timestamp (the 2-min ts-rewrite-spam captured
