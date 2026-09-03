@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.29.3",
+    "version": "2.29.4",
     "news": {
-      "NEXT": {
+      "2.29.4": {
         "en": "The diagnostics report now shows how each control is driven, where a device's reachability comes from and whether the account login worked.",
         "de": "Der Diagnosebericht zeigt jetzt, wie jede Steuerung angesprochen wird, woher die Erreichbarkeit stammt und ob die Konto-Anmeldung geklappt hat.",
         "ru": "Отчёт диагностики теперь показывает, как управляется каждая функция, откуда берётся доступность и удался ли вход в аккаунт.",
