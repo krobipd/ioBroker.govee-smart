@@ -167,7 +167,7 @@ class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority
-   * @param budget
+   * @param budget The device's own daily allowance, when one applies
    */
   async tryExecute(execute, priority = 0, budget) {
     if (budget && this.deviceBudgetSpent(budget)) {
@@ -231,7 +231,7 @@ class RateLimiter {
    *
    * @param execute The API call to make
    * @param priority Call priority (0 = control)
-   * @param budget
+   * @param budget The device's own daily allowance, when one applies
    */
   async executeTracked(execute, priority = 0, budget) {
     if (budget && this.deviceBudgetSpent(budget)) {

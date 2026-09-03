@@ -31,12 +31,6 @@ export type TransportDecision =
   | { kind: "skip"; reason: "no-channel" | "override-cloud-missing" };
 
 /**
- * Command router — routes device commands through the fastest available
- * channel: LAN → Cloud. Quirk-driven overrides (devices.json
- * `transportOverrides`) take precedence over the LAN-first default.
- */
-
-/**
  * The daily allowance for one device, where Govee imposes one.
  *
  * Only appliances have their own budget — 100 calls a day, against the
@@ -54,6 +48,11 @@ function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined {
   return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
 }
 
+/**
+ * Command router — routes device commands through the fastest available
+ * channel: LAN → Cloud. Quirk-driven overrides (devices.json
+ * `transportOverrides`) take precedence over the LAN-first default.
+ */
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
@@ -151,7 +150,7 @@ export class CommandRouter {
    * existing "Command failed" warn path fires and no false ack is written.
    *
    * @param fn The cloud send to execute
-   * @param device
+   * @param device The target device, for its own daily allowance
    */
   private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
     if (this.rateLimiter) {

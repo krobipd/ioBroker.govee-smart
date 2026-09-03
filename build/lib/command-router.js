@@ -106,7 +106,7 @@ class CommandRouter {
    * existing "Command failed" warn path fires and no false ack is written.
    *
    * @param fn The cloud send to execute
-   * @param device
+   * @param device The target device, for its own daily allowance
    */
   async sendBudgeted(fn, device) {
     if (this.rateLimiter) {

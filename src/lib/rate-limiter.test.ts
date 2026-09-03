@@ -389,9 +389,9 @@ describe("per-device daily budget", () => {
   it("stops a device once it has spent its own allowance, while the global budget is untouched", async () => {
     const limiter = new RateLimiter(mockLog, mockTimers, 100, 10_000);
     let ran = 0;
-    const call = () =>
+    const call = (): Promise<boolean> =>
       limiter.tryExecute(
-        () => {
+        (): Promise<void> => {
           ran += 1;
           return Promise.resolve();
         },
@@ -474,9 +474,9 @@ describe("per-device daily budget", () => {
     const limiter = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, timers, 100, 10_000);
     limiter.start();
     let ran = 0;
-    const call = () =>
+    const call = (): Promise<boolean> =>
       limiter.tryExecute(
-        () => {
+        (): Promise<void> => {
           ran += 1;
           return Promise.resolve();
         },
