@@ -1240,9 +1240,10 @@ export class DeviceManager {
    *
    * @param device Target device
    * @param adapterVersion Adapter version string
+   * @param prefix Device state prefix, so the report can include the object tree
    */
-  generateDiagnostics(device: GoveeDevice, adapterVersion: string): Record<string, unknown> {
-    return this.diagnostics.generate(device, adapterVersion);
+  generateDiagnostics(device: GoveeDevice, adapterVersion: string, prefix?: string): Promise<Record<string, unknown>> {
+    return this.diagnostics.generate(device, adapterVersion, prefix);
   }
 
   /**

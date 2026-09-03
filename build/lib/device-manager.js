@@ -1025,9 +1025,10 @@ class DeviceManager {
    *
    * @param device Target device
    * @param adapterVersion Adapter version string
+   * @param prefix Device state prefix, so the report can include the object tree
    */
-  generateDiagnostics(device, adapterVersion) {
-    return this.diagnostics.generate(device, adapterVersion);
+  generateDiagnostics(device, adapterVersion, prefix) {
+    return this.diagnostics.generate(device, adapterVersion, prefix);
   }
   /**
    * Poll the undocumented app-API for sensor-like devices (H5179 et al.)

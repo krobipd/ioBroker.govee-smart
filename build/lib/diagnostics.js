@@ -22,11 +22,13 @@ __export(diagnostics_exports, {
 });
 module.exports = __toCommonJS(diagnostics_exports);
 var import_http_client = require("./http-client");
+var import_anonymiser = require("./anonymiser");
 const MAX_LOGS = 100;
 const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
+const MAX_COMMAND_RESULTS = 30;
 const MAX_BODY_BYTES = 65536;
 const MAX_RESPONSE_BYTES_PER_DEVICE = 512 * 1024;
 const MAX_PACKET_RAW_BYTES = 4096;
@@ -84,15 +86,94 @@ class DiagnosticsCollector {
   }
   registry;
   buffers = /* @__PURE__ */ new Map();
+  /**
+   * One pseudonymiser for the whole adapter run, so a marker means the same
+   * thing in every buffer and in every report exported from this run.
+   */
+  anon = new import_anonymiser.Anonymiser();
+  /**
+   * Every device name currently known, for replacing them inside free text.
+   * A name has no detectable shape, so unlike an address it cannot be found by
+   * pattern — it has to be looked up. Provider rather than a stored list so a
+   * renamed device is picked up without the collector tracking the account.
+   */
+  deviceNamesProvider = null;
   runtimeStateProvider = null;
   cacheSnapshotProvider = null;
   localSnapshotsProvider = null;
+  environmentProvider = null;
+  objectTreeProvider = null;
   /**
    * Register the runtime-state provider. main.ts wires it after all
    * sub-clients (Cloud, MQTT, Rate-limiter, LAN, Wizard) are instantiated
    * so the snapshot can pull from any of them.
    *
    * @param provider Callback returning a runtime-state snapshot (or partial)
+   */
+  /**
+   * Wire the list of known device names, so the pseudonymiser can replace them
+   * inside free text — a name has no detectable shape.
+   *
+   * @param provider Returns every device name known right now, or null to clear
+   */
+  setDeviceNamesProvider(provider) {
+    this.deviceNamesProvider = provider;
+  }
+  /** Every device name known right now; empty when nothing is wired yet. */
+  deviceNames() {
+    var _a, _b;
+    try {
+      return (_b = (_a = this.deviceNamesProvider) == null ? void 0 : _a.call(this)) != null ? _b : [];
+    } catch {
+      return [];
+    }
+  }
+  /**
+   * Wire the ioBroker-side snapshot (versions, host, credential tier, totals).
+   *
+   * @param provider Returns the environment, or null to clear
+   */
+  setEnvironmentProvider(provider) {
+    this.environmentProvider = provider;
+  }
+  /**
+   * Wire the object-tree reader. Scoped to one device prefix by contract —
+   * a full-instance scan is exactly what 2.27.1 removed from the hot path.
+   *
+   * @param provider Reads the datapoints below one device prefix
+   */
+  setObjectTreeProvider(provider) {
+    this.objectTreeProvider = provider;
+  }
+  /**
+   * Record what a user-triggered command actually did. Closes the gap between
+   * "the adapter sent something" and "the device did something": `lanSends`
+   * ends at the wire, this says whether the write was accepted and why not.
+   *
+   * @param deviceId Govee device id
+   * @param entry What was written, over which channel, and how it went
+   */
+  recordCommandResult(deviceId, entry) {
+    if (typeof deviceId !== "string" || !deviceId) {
+      return;
+    }
+    pushBounded(
+      this.get(deviceId).commandResults,
+      {
+        ts: (/* @__PURE__ */ new Date()).toISOString(),
+        stateId: String(entry.stateId),
+        value: this.anon.walk(entry.value),
+        transport: String(entry.transport),
+        ok: entry.ok === true,
+        ...entry.error ? { error: this.anon.text(String(entry.error)) } : {}
+      },
+      MAX_COMMAND_RESULTS
+    );
+  }
+  /**
+   * Wire the process-wide runtime snapshot pulled at export time.
+   *
+   * @param provider Returns the runtime state, or null to clear
    */
   setRuntimeStateProvider(provider) {
     this.runtimeStateProvider = provider;
@@ -125,7 +206,7 @@ class DiagnosticsCollector {
   get(deviceId) {
     let b = this.buffers.get(deviceId);
     if (!b) {
-      b = { logs: [], packets: [], responses: /* @__PURE__ */ new Map(), responseBytes: 0, lanSends: [] };
+      b = { logs: [], packets: [], responses: /* @__PURE__ */ new Map(), responseBytes: 0, lanSends: [], commandResults: [] };
       this.buffers.set(deviceId, b);
     }
     return b;
@@ -145,7 +226,11 @@ class DiagnosticsCollector {
     if (typeof msg !== "string") {
       return;
     }
-    pushBounded(this.get(deviceId).logs, { ts: (/* @__PURE__ */ new Date()).toISOString(), level, msg }, MAX_LOGS);
+    pushBounded(
+      this.get(deviceId).logs,
+      { ts: (/* @__PURE__ */ new Date()).toISOString(), level, msg: this.anon.text(msg, this.deviceNames()) },
+      MAX_LOGS
+    );
   }
   /**
    * Append an MQTT packet for a device. Bounded to MAX_PACKETS most-recent.
@@ -161,7 +246,7 @@ class DiagnosticsCollector {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
     }
-    const entry = { ts: (/* @__PURE__ */ new Date()).toISOString(), topic: String(topic) };
+    const entry = { ts: (/* @__PURE__ */ new Date()).toISOString(), topic: this.anon.text(String(topic)) };
     if (typeof payload === "string") {
       if (!payload) {
         return;
@@ -201,7 +286,7 @@ class DiagnosticsCollector {
     }
     const entry = {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
-      ip: String(ip),
+      ip: this.anon.ip(String(ip)),
       cmd: String(cmd),
       payload: this.cloneAndCap(payload, MAX_LAN_SEND_BYTES)
     };
@@ -264,11 +349,19 @@ class DiagnosticsCollector {
     if (typeof endpoint !== "string" || !endpoint) {
       return;
     }
-    const errMsg = error instanceof Error ? error.message : String(error);
+    const errMsg = this.anon.text(error instanceof Error ? error.message : String(error));
     const responseBody = error instanceof import_http_client.HttpError ? error.responseBody : void 0;
     const body = { error: errMsg, status: statusCode };
     if (typeof responseBody === "string" && responseBody.length > 0) {
-      body.responseBody = responseBody.length > MAX_BODY_BYTES ? `${responseBody.slice(0, MAX_BODY_BYTES)}\u2026` : responseBody;
+      let cleaned;
+      try {
+        const parsed = JSON.parse(responseBody);
+        redactSecretsInPlace(parsed);
+        cleaned = JSON.stringify(this.anon.walk(parsed));
+      } catch {
+        cleaned = this.anon.text(responseBody);
+      }
+      body.responseBody = cleaned.length > MAX_BODY_BYTES ? `${cleaned.slice(0, MAX_BODY_BYTES)}\u2026` : cleaned;
     }
     this.appendResponse(this.get(deviceId), {
       ts: (/* @__PURE__ */ new Date()).toISOString(),
@@ -291,11 +384,12 @@ class DiagnosticsCollector {
       }
       const clone = JSON.parse(serialised);
       redactSecretsInPlace(clone);
-      const capped = JSON.stringify(clone);
+      const clean = this.anon.walk(clone);
+      const capped = JSON.stringify(clean);
       if (typeof capped === "string" && capped.length > maxBytes) {
         return `<truncated ${capped.length}b: ${capped.slice(0, maxBytes)}\u2026>`;
       }
-      return clone;
+      return clean;
     } catch {
       return String(body);
     }
@@ -377,34 +471,61 @@ class DiagnosticsCollector {
    *
    * @param device Target device
    * @param adapterVersion Adapter version string (e.g. "2.0.0")
+   * @param prefix Device state prefix — enables the object-tree section
    */
-  generate(device, adapterVersion) {
+  async generate(device, adapterVersion, prefix) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     const quirks = this.registry.getQuirks(device.sku);
     const b = this.buffers.get(device.deviceId);
     const runtimeState = this.runtimeStateProvider ? this.runtimeStateProvider() : null;
     const cacheSnapshot = this.cacheSnapshotProvider ? this.cloneAndCap(this.cacheSnapshotProvider(device.sku, device.deviceId)) : null;
     const localSnapshots = this.localSnapshotsProvider ? this.cloneAndCap(this.localSnapshotsProvider(device.sku, device.deviceId)) : [];
-    return {
+    let environment = null;
+    try {
+      environment = this.environmentProvider ? this.environmentProvider() : null;
+    } catch {
+      environment = null;
+    }
+    let objectTree = null;
+    if (this.objectTreeProvider && prefix) {
+      objectTree = await this.objectTreeProvider(prefix).catch(() => null);
+    }
+    const report = {
+      // The file is read by a stranger with none of our context, so it says up
+      // front what it is and — crucially — that it has been pseudonymised.
+      // Without that line a reader takes `address-1` for a bug.
+      readMe: {
+        what: "Diagnostics export of one Govee device, for a GitHub issue.",
+        privacy: "Pseudonymised: IP addresses, mail addresses and device names are replaced by stable markers (address-local-1, device-1, \u2026), device ids are shortened to their last four characters \u2014 the same four the object tree uses as the folder name. The same real value always maps to the same marker INSIDE this file, so two lines about the same device stay recognisable. Markers are NOT comparable between two files: a second export, especially after an adapter restart, may number them differently.",
+        secrets: "Credentials, tokens and account topics are removed entirely, not marked."
+      },
       adapter: "iobroker.govee-smart",
       version: adapterVersion,
       exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
+      // What the report used to be missing entirely: which ioBroker this ran on
+      // and how the installation as a whole was doing at export time.
+      environment,
       device: {
         sku: device.sku,
-        deviceId: device.deviceId,
-        name: device.name,
+        deviceId: this.anon.deviceId(device.deviceId),
+        name: this.anon.deviceName(device.name),
         type: device.type,
+        objectPrefix: prefix != null ? prefix : null,
         segmentCount: (_a = device.segmentCount) != null ? _a : null,
+        // Where the segment count came from. It is the single most asked-back
+        // question on a segment report, and the number alone never answered it.
+        segmentCountSource: this.segmentCountSource(device),
         channels: { ...device.channels },
-        lanIp: (_b = device.lanIp) != null ? _b : null,
+        lanIp: device.lanIp ? this.anon.ip(device.lanIp) : null,
+        gateway: device.gateway ? this.anon.text(device.gateway) : null,
         // v2.9.1 — runtime flags / timestamps that were previously invisible
-        manualMode: (_c = device.manualMode) != null ? _c : false,
-        manualSegments: (_d = device.manualSegments) != null ? _d : null,
-        sceneSpeed: (_e = device.sceneSpeed) != null ? _e : null,
-        scenesChecked: (_f = device.scenesChecked) != null ? _f : false,
-        lastSeenOnNetwork: (_g = device.lastSeenOnNetwork) != null ? _g : null,
-        lastLanReplyAt: (_h = device.lastLanReplyAt) != null ? _h : null,
-        groupMembers: (_i = device.groupMembers) != null ? _i : null
+        manualMode: (_b = device.manualMode) != null ? _b : false,
+        manualSegments: (_c = device.manualSegments) != null ? _c : null,
+        sceneSpeed: (_d = device.sceneSpeed) != null ? _d : null,
+        scenesChecked: (_e = device.scenesChecked) != null ? _e : false,
+        lastSeenOnNetwork: (_f = device.lastSeenOnNetwork) != null ? _f : null,
+        lastLanReplyAt: (_g = device.lastLanReplyAt) != null ? _g : null,
+        groupMembers: (_h = device.groupMembers) != null ? _h : null
       },
       capabilities: device.capabilities,
       scenes: {
@@ -470,8 +591,8 @@ class DiagnosticsCollector {
       quirks: quirks != null ? quirks : null,
       skuFeatures: device.skuFeatures,
       state: { ...device.state },
-      recentLogs: (_j = b == null ? void 0 : b.logs.slice()) != null ? _j : [],
-      lastMqttPackets: (_k = b == null ? void 0 : b.packets.slice()) != null ? _k : [],
+      recentLogs: (_i = b == null ? void 0 : b.logs.slice()) != null ? _i : [],
+      lastMqttPackets: (_j = b == null ? void 0 : b.packets.slice()) != null ? _j : [],
       // History per endpoint (most-recent at the end). Each entry has
       // {ts, ok, statusCode, body}. body holds either the success
       // response or `{error, status, responseBody?}` for failed calls.
@@ -479,7 +600,7 @@ class DiagnosticsCollector {
       // v2.9.1 — outgoing LAN UDP datagrams. Closes the "did the adapter
       // even send anything?" diag blind spot for ptReal-driven scene /
       // snapshot / segment commands.
-      lanSends: (_l = b == null ? void 0 : b.lanSends.slice()) != null ? _l : [],
+      lanSends: (_k = b == null ? void 0 : b.lanSends.slice()) != null ? _k : [],
       // v2.9.1 — persisted-on-disk view of the SkuCache for this device.
       // Used to compare runtime state to the cache that would be reloaded
       // on next restart. Empty when no cache entry exists yet.
@@ -489,8 +610,36 @@ class DiagnosticsCollector {
       // v2.9.1 — process-wide adapter runtime state: last-error categories
       // per subsystem, rate-limiter usage, live wizard session, LAN-discovery
       // peers. Each field optional (provider may know fewer than all of them).
-      runtimeState
+      runtimeState,
+      // What the user's last commands actually did — `lanSends` stops at the
+      // wire, this says whether the write was accepted and why not.
+      commandResults: (_l = b == null ? void 0 : b.commandResults.slice()) != null ? _l : [],
+      // The datapoints as they really exist, with type, role, unit and value.
+      // Null when no prefix was passed (the device has no tree yet).
+      objectTree
     };
+    return this.anon.walk(report, this.deviceNames());
+  }
+  /**
+   * Which source settled this device's segment count. Mirrors the priority in
+   * `resolveSegmentCount` without importing it — the report states a fact about
+   * the device, it does not re-derive the number.
+   *
+   * @param device The device being reported on
+   */
+  segmentCountSource(device) {
+    var _a;
+    if (((_a = this.registry.getQuirks(device.sku)) == null ? void 0 : _a.segmentCount) !== void 0) {
+      return "quirk (hard override for this SKU)";
+    }
+    if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
+      return "learned at runtime (cache, MQTT push or wizard)";
+    }
+    const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+    if (caps.some((c) => typeof (c == null ? void 0 : c.type) === "string" && c.type.includes("segment_color_setting"))) {
+      return "smallest cloud segment capability";
+    }
+    return "unknown (no segment source)";
   }
 }
 // Annotate the CommonJS export names for ESM import in node:

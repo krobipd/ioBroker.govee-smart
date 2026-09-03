@@ -1652,7 +1652,7 @@ describe("DeviceManager", () => {
   });
 
   describe("generateDiagnostics", () => {
-    it("should include all device data in diagnostics export", () => {
+    it("should include all device data in diagnostics export", async () => {
       const device = createTestDevice({
         sceneLibrary: [
           { name: "Sunset", sceneCode: 42, speedInfo: { supSpeed: true, speedIndex: 0, config: "[{},{}]" } },
@@ -1661,7 +1661,7 @@ describe("DeviceManager", () => {
         diyLibrary: [{ name: "MyDIY", diyCode: 10 }],
       });
 
-      const result = dm.generateDiagnostics(device, "1.0.1");
+      const result = await dm.generateDiagnostics(device, "1.0.1");
       expect(result.adapter).toBe("iobroker.govee-smart");
       expect(result.version).toBe("1.0.1");
       expect(typeof result.exportedAt).toBe("string");
@@ -1679,9 +1679,9 @@ describe("DeviceManager", () => {
       expect(result.state).toEqual({ online: true });
     });
 
-    it("should include quirks for known SKU", () => {
+    it("should include quirks for known SKU", async () => {
       const device = createTestDevice({ sku: "H6141" });
-      const result = dm.generateDiagnostics(device, "1.0.1");
+      const result = await dm.generateDiagnostics(device, "1.0.1");
       expect((result.quirks as any).brokenPlatformApi).toBe(true);
     });
   });

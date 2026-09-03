@@ -1359,10 +1359,10 @@ describe("GoveeAdapter — callback wiring", () => {
     });
     const diag = (
       i.deviceManager as unknown as {
-        getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> };
+        getDiagnostics(): { generate(d: GoveeDevice, v: string): Promise<Record<string, unknown>> };
       }
     ).getDiagnostics();
-    expect(diag.generate(device, "x").lastMqttPackets).toEqual([
+    expect((await diag.generate(device, "x")).lastMqttPackets).toEqual([
       expect.objectContaining({ hex: "aa01", topic: "GA/t" }),
     ]);
   });
@@ -1411,10 +1411,10 @@ describe("GoveeAdapter — callback wiring", () => {
     onRaw("{ not json"); // must not throw
     const diag = (
       i.deviceManager as unknown as {
-        getDiagnostics(): { generate(d: GoveeDevice, v: string): Record<string, unknown> };
+        getDiagnostics(): { generate(d: GoveeDevice, v: string): Promise<Record<string, unknown>> };
       }
     ).getDiagnostics();
-    const report = diag.generate(device, "x");
+    const report = await diag.generate(device, "x");
     expect((report.apiHistory as Record<string, unknown[]>)["/router/x"]).toHaveLength(1);
     expect(report.lastMqttPackets).toEqual([expect.objectContaining({ topic: "openapi-events" })]);
   });

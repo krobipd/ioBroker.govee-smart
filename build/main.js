@@ -158,6 +158,13 @@ class GoveeAdapter extends utils.Adapter {
   readyLogged = false;
   /** Cloud was connected at least once — for the "restored" log after a down. */
   cloudWasConnected = false;
+  /**
+   * js-controller and admin versions, read once at start. The diagnostics
+   * report states them, and a bug report without them costs one round-trip
+   * every time. Read once rather than per export: they cannot change while the
+   * process runs — a controller or admin update restarts every instance.
+   */
+  hostVersions = {};
   /** Daily interval for the app-version-drift check against the app store. */
   appVersionCheckTimer;
   /**
@@ -346,6 +353,7 @@ class GoveeAdapter extends utils.Adapter {
         return;
       }
       await import_adapter_core.I18n.init(path.join(this.adapterDir, "admin"), this);
+      await this.readHostVersions();
       const config = this.config;
       void connectionState.refreshLiveAppVersion(this.handlerHost).catch((e) => this.log.debug(`App version refresh error: ${(0, import_types.errMessage)(e)}`));
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => void 0);
@@ -425,6 +433,26 @@ class GoveeAdapter extends utils.Adapter {
           lanSeenDeviceIps: (_n = (_m = this.lanClient) == null ? void 0 : _m.getDiagSnapshot().seenDeviceIps) != null ? _n : []
         };
       });
+      diag.setDeviceNamesProvider(() => {
+        var _a2, _b2;
+        return (_b2 = (_a2 = this.deviceManager) == null ? void 0 : _a2.getDevices().map((d) => d.name)) != null ? _b2 : [];
+      });
+      diag.setEnvironmentProvider(() => {
+        var _a2, _b2, _c2;
+        const devices = (_b2 = (_a2 = this.deviceManager) == null ? void 0 : _a2.getDevices()) != null ? _b2 : [];
+        return {
+          node: process.version,
+          jsController: this.hostVersions.jsController,
+          admin: this.hostVersions.admin,
+          platform: `${process.platform} ${process.arch}`,
+          compactMode: ((_c2 = this.common) == null ? void 0 : _c2.compact) === true,
+          credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
+          deviceCount: devices.length,
+          reachableCount: devices.filter((d) => (0, import_lookups.resolveDeviceReachability)(d, this.cloudWasConnected).online).length,
+          channels: { ...this.channelStatus }
+        };
+      });
+      diag.setObjectTreeProvider((prefix) => this.readObjectTree(prefix));
       const apiClient = this.makeApiClient(this.log);
       apiClient.setEmail(accountEmail);
       this.deviceManager.setApiClient(apiClient);
@@ -856,6 +884,57 @@ class GoveeAdapter extends utils.Adapter {
    *
    * @param callback Completion callback
    */
+  /**
+   * js-controller and admin versions for the diagnostics report.
+   */
+  async readHostVersions() {
+    var _a, _b;
+    const host = await this.getForeignObjectAsync(`system.host.${this.host}`).catch(() => null);
+    const admin = await this.getForeignObjectAsync("system.adapter.admin").catch(() => null);
+    this.hostVersions = {
+      jsController: (_a = host == null ? void 0 : host.common) == null ? void 0 : _a.installedVersion,
+      admin: (_b = admin == null ? void 0 : admin.common) == null ? void 0 : _b.version
+    };
+  }
+  /**
+   * The datapoints below ONE device prefix, with type, role, unit and current
+   * value — the view the user actually sees in the object tree.
+   *
+   * Deliberately scoped to a single prefix: a full-instance scan is exactly
+   * what 2.27.1 removed from the periodic round, and this runs behind a button
+   * a user can press repeatedly. One export therefore reads one device's
+   * subtree, never the whole instance.
+   *
+   * @param prefix Device prefix, e.g. `devices.h61be_1d6f`
+   * @returns One entry per datapoint, or an empty list if the tree cannot be read
+   */
+  async readObjectTree(prefix) {
+    var _a;
+    const start = `${this.namespace}.${prefix}.`;
+    const view = await this.getObjectViewAsync("system", "state", {
+      startkey: start,
+      endkey: `${start}\u9999`
+    }).catch(() => null);
+    if (!(view == null ? void 0 : view.rows)) {
+      return [];
+    }
+    const entries = [];
+    for (const row of view.rows) {
+      const localId = row.id.replace(`${this.namespace}.`, "");
+      const common = (_a = row.value) == null ? void 0 : _a.common;
+      const state = await this.getStateAsync(localId).catch(() => null);
+      entries.push({
+        id: localId.replace(`${prefix}.`, ""),
+        type: common == null ? void 0 : common.type,
+        role: common == null ? void 0 : common.role,
+        unit: common == null ? void 0 : common.unit,
+        write: common == null ? void 0 : common.write,
+        val: state == null ? void 0 : state.val,
+        ack: state == null ? void 0 : state.ack
+      });
+    }
+    return entries;
+  }
   onUnload(callback) {
     var _a, _b, _c, _d, _e, _f;
     this.unloading = true;

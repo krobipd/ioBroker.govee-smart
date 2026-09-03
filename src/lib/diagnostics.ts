@@ -1,4 +1,5 @@
 import { HttpError } from "./http-client";
+import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
 import type { GoveeDevice } from "./types";
 
@@ -91,6 +92,27 @@ export interface RuntimeStateSnapshot {
   lanSeenDeviceIps?: string[];
 }
 
+/**
+ * What a user-triggered command did. `lanSends` shows what went out on the
+ * wire, but not whether the write was accepted and not what the device
+ * reported back — so for "switching does not work" the chain broke off exactly
+ * where the answer would be.
+ */
+export interface CommandResultEntry {
+  /** ISO timestamp */
+  ts: string;
+  /** The state the user wrote, below the device prefix (e.g. "control.power"). */
+  stateId: string;
+  /** The value that was written. */
+  value: unknown;
+  /** Which channel carried it — "lan", "cloud", "ptReal", … */
+  transport: string;
+  /** Whether the command was accepted. */
+  ok: boolean;
+  /** Failure reason when it was not. */
+  error?: string;
+}
+
 /** Per-device ring buffers. */
 interface DeviceBuffers {
   logs: LogEntry[];
@@ -105,6 +127,8 @@ interface DeviceBuffers {
   responseBytes: number;
   /** Outgoing LAN datagrams — bounded ring buffer, see {@link MAX_LAN_SENDS}. */
   lanSends: LanSendEntry[];
+  /** Outcomes of user-triggered commands — bounded, see {@link MAX_COMMAND_RESULTS}. */
+  commandResults: CommandResultEntry[];
 }
 
 /**
@@ -129,6 +153,8 @@ const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
+/** Recent command outcomes kept per device — enough to cover a user trying the same switch a few times. */
+const MAX_COMMAND_RESULTS = 30;
 const MAX_BODY_BYTES = 65_536;
 const MAX_RESPONSE_BYTES_PER_DEVICE = 512 * 1024;
 const MAX_PACKET_RAW_BYTES = 4_096;
@@ -214,6 +240,69 @@ export type CacheSnapshotProvider = (sku: string, deviceId: string) => unknown;
 export type LocalSnapshotsProvider = (sku: string, deviceId: string) => unknown[];
 
 /**
+ * The ioBroker side of the installation: versions, host, whether the instance
+ * shares a process, and which credential tier is configured. Every one of these
+ * used to be a follow-up question on a bug report — and the issue forms dropped
+ * their Node field on 2026-09-02 precisely because it belongs in here.
+ */
+export interface EnvironmentSnapshot {
+  /** Node.js version the adapter runs on. */
+  node?: string;
+  /** js-controller version. */
+  jsController?: string;
+  /** Admin adapter version. */
+  admin?: string;
+  /** Host platform, e.g. "linux x64". */
+  platform?: string;
+  /** Whether this instance shares a process with others (compact mode). */
+  compactMode?: boolean;
+  /**
+   * Configured credential tier — "lan" (nothing entered), "apiKey", or
+   * "account". Never the credentials themselves; the tier alone explains why a
+   * channel is missing.
+   */
+  credentialTier?: "lan" | "apiKey" | "account";
+  /** Total devices the adapter manages. */
+  deviceCount?: number;
+  /** How many of those are currently reachable. */
+  reachableCount?: number;
+  /** Per-channel status as the ready summary shows it. */
+  channels?: Record<string, string>;
+}
+
+/** Environment provider — see {@link EnvironmentSnapshot}. */
+export type EnvironmentProvider = () => EnvironmentSnapshot;
+
+/**
+ * The device's datapoints as they actually exist in the object tree, with type,
+ * role, unit and current value. The report otherwise shows only the adapter's
+ * in-memory view, which is no help at all for the most common report class:
+ * "this datapoint is missing / has the wrong type / the wrong role".
+ *
+ * Scoped to ONE device prefix — never a full-instance scan, which is exactly
+ * the per-round tree walk removed in 2.27.1.
+ */
+export type ObjectTreeProvider = (prefix: string) => Promise<ObjectTreeEntry[]>;
+
+/** One datapoint as the object tree holds it. */
+export interface ObjectTreeEntry {
+  /** State id below the device prefix, e.g. "control.power". */
+  id: string;
+  /** Declared common.type. */
+  type?: string;
+  /** Declared common.role. */
+  role?: string;
+  /** Declared unit, when the state has one. */
+  unit?: string;
+  /** Whether the state is writable. */
+  write?: boolean;
+  /** Current value. */
+  val?: unknown;
+  /** Whether the value is acknowledged. */
+  ack?: boolean;
+}
+
+/**
  * Append to a bounded ring-buffer array — pushes `entry`, then drops the
  * oldest entries so the array never exceeds `max`.
  *
@@ -255,9 +344,23 @@ function byteSize(value: unknown): number {
  */
 export class DiagnosticsCollector {
   private readonly buffers = new Map<string, DeviceBuffers>();
+  /**
+   * One pseudonymiser for the whole adapter run, so a marker means the same
+   * thing in every buffer and in every report exported from this run.
+   */
+  private readonly anon = new Anonymiser();
+  /**
+   * Every device name currently known, for replacing them inside free text.
+   * A name has no detectable shape, so unlike an address it cannot be found by
+   * pattern — it has to be looked up. Provider rather than a stored list so a
+   * renamed device is picked up without the collector tracking the account.
+   */
+  private deviceNamesProvider: (() => string[]) | null = null;
   private runtimeStateProvider: RuntimeStateProvider | null = null;
   private cacheSnapshotProvider: CacheSnapshotProvider | null = null;
   private localSnapshotsProvider: LocalSnapshotsProvider | null = null;
+  private environmentProvider: EnvironmentProvider | null = null;
+  private objectTreeProvider: ObjectTreeProvider | null = null;
 
   /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
   constructor(private readonly registry: DeviceRegistry) {}
@@ -268,6 +371,75 @@ export class DiagnosticsCollector {
    * so the snapshot can pull from any of them.
    *
    * @param provider Callback returning a runtime-state snapshot (or partial)
+   */
+  /**
+   * Wire the list of known device names, so the pseudonymiser can replace them
+   * inside free text — a name has no detectable shape.
+   *
+   * @param provider Returns every device name known right now, or null to clear
+   */
+  setDeviceNamesProvider(provider: (() => string[]) | null): void {
+    this.deviceNamesProvider = provider;
+  }
+
+  /** Every device name known right now; empty when nothing is wired yet. */
+  private deviceNames(): string[] {
+    try {
+      return this.deviceNamesProvider?.() ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Wire the ioBroker-side snapshot (versions, host, credential tier, totals).
+   *
+   * @param provider Returns the environment, or null to clear
+   */
+  setEnvironmentProvider(provider: EnvironmentProvider | null): void {
+    this.environmentProvider = provider;
+  }
+
+  /**
+   * Wire the object-tree reader. Scoped to one device prefix by contract —
+   * a full-instance scan is exactly what 2.27.1 removed from the hot path.
+   *
+   * @param provider Reads the datapoints below one device prefix
+   */
+  setObjectTreeProvider(provider: ObjectTreeProvider | null): void {
+    this.objectTreeProvider = provider;
+  }
+
+  /**
+   * Record what a user-triggered command actually did. Closes the gap between
+   * "the adapter sent something" and "the device did something": `lanSends`
+   * ends at the wire, this says whether the write was accepted and why not.
+   *
+   * @param deviceId Govee device id
+   * @param entry What was written, over which channel, and how it went
+   */
+  recordCommandResult(deviceId: string, entry: Omit<CommandResultEntry, "ts">): void {
+    if (typeof deviceId !== "string" || !deviceId) {
+      return;
+    }
+    pushBounded(
+      this.get(deviceId).commandResults,
+      {
+        ts: new Date().toISOString(),
+        stateId: String(entry.stateId),
+        value: this.anon.walk(entry.value),
+        transport: String(entry.transport),
+        ok: entry.ok === true,
+        ...(entry.error ? { error: this.anon.text(String(entry.error)) } : {}),
+      },
+      MAX_COMMAND_RESULTS,
+    );
+  }
+
+  /**
+   * Wire the process-wide runtime snapshot pulled at export time.
+   *
+   * @param provider Returns the runtime state, or null to clear
    */
   setRuntimeStateProvider(provider: RuntimeStateProvider | null): void {
     this.runtimeStateProvider = provider;
@@ -303,7 +475,7 @@ export class DiagnosticsCollector {
   private get(deviceId: string): DeviceBuffers {
     let b = this.buffers.get(deviceId);
     if (!b) {
-      b = { logs: [], packets: [], responses: new Map(), responseBytes: 0, lanSends: [] };
+      b = { logs: [], packets: [], responses: new Map(), responseBytes: 0, lanSends: [], commandResults: [] };
       this.buffers.set(deviceId, b);
     }
     return b;
@@ -324,7 +496,11 @@ export class DiagnosticsCollector {
     if (typeof msg !== "string") {
       return;
     }
-    pushBounded(this.get(deviceId).logs, { ts: new Date().toISOString(), level, msg }, MAX_LOGS);
+    pushBounded(
+      this.get(deviceId).logs,
+      { ts: new Date().toISOString(), level, msg: this.anon.text(msg, this.deviceNames()) },
+      MAX_LOGS,
+    );
   }
 
   /**
@@ -341,7 +517,9 @@ export class DiagnosticsCollector {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
     }
-    const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: String(topic) };
+    // The topic embeds the account id (`GD/<hash>`), so it is a marker like any
+    // other identifier — and it is already in the redaction key list for bodies.
+    const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: this.anon.text(String(topic)) };
     if (typeof payload === "string") {
       if (!payload) {
         return;
@@ -382,7 +560,7 @@ export class DiagnosticsCollector {
     }
     const entry: LanSendEntry = {
       ts: new Date().toISOString(),
-      ip: String(ip),
+      ip: this.anon.ip(String(ip)),
       cmd: String(cmd),
       payload: this.cloneAndCap(payload, MAX_LAN_SEND_BYTES),
     };
@@ -447,12 +625,27 @@ export class DiagnosticsCollector {
     if (typeof endpoint !== "string" || !endpoint) {
       return;
     }
-    const errMsg = error instanceof Error ? error.message : String(error);
+    // The success path redacts and pseudonymises before capping; this one used
+    // to store the raw foreign body, only length-limited. Today's callers are
+    // device-scoped Cloud endpoints whose bodies carry no credentials, so
+    // nothing leaked — but this is the branch that captures a foreign error
+    // page verbatim, in a report whose whole purpose is being published.
+    // A body that parses as JSON goes through the same key-based redaction as
+    // a successful one; whatever it is, addresses and mail addresses inside it
+    // are replaced before the length cap can hide them in a truncated string.
+    const errMsg = this.anon.text(error instanceof Error ? error.message : String(error));
     const responseBody = error instanceof HttpError ? error.responseBody : undefined;
     const body: Record<string, unknown> = { error: errMsg, status: statusCode };
     if (typeof responseBody === "string" && responseBody.length > 0) {
-      body.responseBody =
-        responseBody.length > MAX_BODY_BYTES ? `${responseBody.slice(0, MAX_BODY_BYTES)}…` : responseBody;
+      let cleaned: string;
+      try {
+        const parsed: unknown = JSON.parse(responseBody);
+        redactSecretsInPlace(parsed);
+        cleaned = JSON.stringify(this.anon.walk(parsed));
+      } catch {
+        cleaned = this.anon.text(responseBody);
+      }
+      body.responseBody = cleaned.length > MAX_BODY_BYTES ? `${cleaned.slice(0, MAX_BODY_BYTES)}…` : cleaned;
     }
     this.appendResponse(this.get(deviceId), {
       ts: new Date().toISOString(),
@@ -480,11 +673,18 @@ export class DiagnosticsCollector {
       // cap so a truncated body is masked too.
       const clone = JSON.parse(serialised) as unknown;
       redactSecretsInPlace(clone);
-      const capped = JSON.stringify(clone);
+      // Redact, THEN pseudonymise, THEN cap — in that order. The cap turns an
+      // oversized body into a plain truncated string, and neither pass can
+      // reach inside one afterwards, so a real address would ship in the
+      // truncated remainder. Names are not replaced here: they have no
+      // detectable shape and the report-wide pass in `generate` catches them
+      // (nothing this cap truncates is short enough to be a name).
+      const clean = this.anon.walk(clone);
+      const capped = JSON.stringify(clean);
       if (typeof capped === "string" && capped.length > maxBytes) {
         return `<truncated ${capped.length}b: ${capped.slice(0, maxBytes)}…>`;
       }
-      return clone;
+      return clean;
     } catch {
       return String(body);
     }
@@ -568,8 +768,9 @@ export class DiagnosticsCollector {
    *
    * @param device Target device
    * @param adapterVersion Adapter version string (e.g. "2.0.0")
+   * @param prefix Device state prefix — enables the object-tree section
    */
-  generate(device: GoveeDevice, adapterVersion: string): Record<string, unknown> {
+  async generate(device: GoveeDevice, adapterVersion: string, prefix?: string): Promise<Record<string, unknown>> {
     const quirks = this.registry.getQuirks(device.sku);
     const b = this.buffers.get(device.deviceId);
 
@@ -580,19 +781,51 @@ export class DiagnosticsCollector {
     const localSnapshots = this.localSnapshotsProvider
       ? this.cloneAndCap(this.localSnapshotsProvider(device.sku, device.deviceId))
       : [];
+    let environment: EnvironmentSnapshot | null = null;
+    try {
+      environment = this.environmentProvider ? this.environmentProvider() : null;
+    } catch {
+      environment = null;
+    }
+    let objectTree: ObjectTreeEntry[] | null = null;
+    if (this.objectTreeProvider && prefix) {
+      objectTree = await this.objectTreeProvider(prefix).catch(() => null);
+    }
 
-    return {
+    const report: Record<string, unknown> = {
+      // The file is read by a stranger with none of our context, so it says up
+      // front what it is and — crucially — that it has been pseudonymised.
+      // Without that line a reader takes `address-1` for a bug.
+      readMe: {
+        what: "Diagnostics export of one Govee device, for a GitHub issue.",
+        privacy:
+          "Pseudonymised: IP addresses, mail addresses and device names are replaced by stable " +
+          "markers (address-local-1, device-1, …), device ids are shortened to their last four " +
+          "characters — the same four the object tree uses as the folder name. The same real " +
+          "value always maps to the same marker INSIDE this file, so two lines about the same " +
+          "device stay recognisable. Markers are NOT comparable between two files: a second " +
+          "export, especially after an adapter restart, may number them differently.",
+        secrets: "Credentials, tokens and account topics are removed entirely, not marked.",
+      },
       adapter: "iobroker.govee-smart",
       version: adapterVersion,
       exportedAt: new Date().toISOString(),
+      // What the report used to be missing entirely: which ioBroker this ran on
+      // and how the installation as a whole was doing at export time.
+      environment,
       device: {
         sku: device.sku,
-        deviceId: device.deviceId,
-        name: device.name,
+        deviceId: this.anon.deviceId(device.deviceId),
+        name: this.anon.deviceName(device.name),
         type: device.type,
+        objectPrefix: prefix ?? null,
         segmentCount: device.segmentCount ?? null,
+        // Where the segment count came from. It is the single most asked-back
+        // question on a segment report, and the number alone never answered it.
+        segmentCountSource: this.segmentCountSource(device),
         channels: { ...device.channels },
-        lanIp: device.lanIp ?? null,
+        lanIp: device.lanIp ? this.anon.ip(device.lanIp) : null,
+        gateway: device.gateway ? this.anon.text(device.gateway) : null,
         // v2.9.1 — runtime flags / timestamps that were previously invisible
         manualMode: device.manualMode ?? false,
         manualSegments: device.manualSegments ?? null,
@@ -682,6 +915,40 @@ export class DiagnosticsCollector {
       // per subsystem, rate-limiter usage, live wizard session, LAN-discovery
       // peers. Each field optional (provider may know fewer than all of them).
       runtimeState,
+      // What the user's last commands actually did — `lanSends` stops at the
+      // wire, this says whether the write was accepted and why not.
+      commandResults: b?.commandResults.slice() ?? [],
+      // The datapoints as they really exist, with type, role, unit and value.
+      // Null when no prefix was passed (the device has no tree yet).
+      objectTree,
     };
+
+    // Final report-wide pass. Device names have no detectable shape, so they can
+    // only be replaced by lookup — and the buffers were filled before some of
+    // them were even known. Re-running the pattern passes over the whole report
+    // is harmless: a marker no longer matches an address or an id, and the same
+    // mapping is reused, so markers stay stable.
+    return this.anon.walk(report, this.deviceNames()) as Record<string, unknown>;
+  }
+
+  /**
+   * Which source settled this device's segment count. Mirrors the priority in
+   * `resolveSegmentCount` without importing it — the report states a fact about
+   * the device, it does not re-derive the number.
+   *
+   * @param device The device being reported on
+   */
+  private segmentCountSource(device: GoveeDevice): string {
+    if (this.registry.getQuirks(device.sku)?.segmentCount !== undefined) {
+      return "quirk (hard override for this SKU)";
+    }
+    if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
+      return "learned at runtime (cache, MQTT push or wizard)";
+    }
+    const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+    if (caps.some(c => typeof c?.type === "string" && c.type.includes("segment_color_setting"))) {
+      return "smallest cloud segment capability";
+    }
+    return "unknown (no segment source)";
   }
 }

@@ -30,10 +30,10 @@ function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
 
 describe("DiagnosticsCollector", () => {
   describe("addLog", () => {
-    it("appends entries with timestamp + level + msg", () => {
+    it("appends entries with timestamp + level + msg", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addLog("dev1", "warn", "First warning");
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const logs = result.recentLogs as Array<Record<string, unknown>>;
       expect(logs).toHaveLength(1);
       expect(logs[0].level).toBe("warn");
@@ -41,71 +41,71 @@ describe("DiagnosticsCollector", () => {
       expect(logs[0].ts).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
-    it("bounds at 100 entries — newest 100 retained (v2.9.1 raised cap)", () => {
+    it("bounds at 100 entries — newest 100 retained (v2.9.1 raised cap)", async () => {
       const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 120; i++) {
         c.addLog("dev1", "info", `entry ${i}`);
       }
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const logs = result.recentLogs as Array<{ msg: string }>;
       expect(logs).toHaveLength(100);
       expect(logs[0].msg).toBe("entry 20");
       expect(logs[99].msg).toBe("entry 119");
     });
 
-    it("ignores empty/non-string deviceId", () => {
+    it("ignores empty/non-string deviceId", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addLog("", "info", "msg");
       c.addLog(undefined as never, "info", "msg");
-      const result = c.generate(makeDevice(), "2.0.0");
+      const result = await c.generate(makeDevice(), "2.0.0");
       expect(result.recentLogs).toEqual([]);
     });
 
-    it("ignores non-string msg without crashing", () => {
+    it("ignores non-string msg without crashing", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addLog("dev1", "info", 42 as never);
       c.addLog("dev1", "info", { obj: 1 } as never);
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       expect(result.recentLogs).toEqual([]);
     });
   });
 
   describe("addMqttPacket", () => {
-    it("captures packets with topic + hex", () => {
+    it("captures packets with topic + hex", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "GA/abc/123", "qqgFAQEEAAAAA=");
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
       expect(packets).toHaveLength(1);
       expect(packets[0].topic).toBe("GA/abc/123");
       expect(packets[0].hex).toBe("qqgFAQEEAAAAA=");
     });
 
-    it("bounds at 50 packets — newest 50 retained (v2.9.1 raised cap)", () => {
+    it("bounds at 50 packets — newest 50 retained (v2.9.1 raised cap)", async () => {
       const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 60; i++) {
         c.addMqttPacket("dev1", "GA/topic", `hex${i}`);
       }
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const packets = result.lastMqttPackets as Array<{ hex: string }>;
       expect(packets).toHaveLength(50);
       expect(packets[0].hex).toBe("hex10");
       expect(packets[49].hex).toBe("hex59");
     });
 
-    it("rejects empty hex strings", () => {
+    it("rejects empty hex strings", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", "");
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       expect(result.lastMqttPackets).toEqual([]);
     });
   });
 
   describe("recordApiSuccess / recordApiFailure", () => {
-    it("stores response history per endpoint with most-recent at the end", () => {
+    it("stores response history per endpoint with most-recent at the end", async () => {
       const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/api/state", { code: 200, foo: "bar" });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const hist = result.apiHistory as Record<string, unknown[]>;
       const list = hist["/api/state"];
       expect(list).toHaveLength(1);
@@ -116,7 +116,7 @@ describe("DiagnosticsCollector", () => {
       expect(entry.statusCode).toBe(200);
     });
 
-    it("redacts secretCode and topic from recorded API responses so they never reach the diag export (SEC-ISSUE1)", () => {
+    it("redacts secretCode and topic from recorded API responses so they never reach the diag export (SEC-ISSUE1)", async () => {
       const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
         sku: "H5109",
@@ -125,7 +125,7 @@ describe("DiagnosticsCollector", () => {
           gatewayInfo: { secretCode: "VYb5QvZVkjE=", topic: "GD/f501fb9140eaf7", bleName: "ihoment_H5042_3795" },
         },
       });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const json = JSON.stringify(result);
       expect(json).not.toContain("VYb5QvZVkjE="); // gateway secret must be masked
       expect(json).not.toContain("GD/f501fb"); // gateway push topic must be masked
@@ -136,23 +136,23 @@ describe("DiagnosticsCollector", () => {
       expect(gw.bleName).toBe("ihoment_H5042_3795");
     });
 
-    it("keeps multiple slots per endpoint (no overwrite)", () => {
+    it("keeps multiple slots per endpoint (no overwrite)", async () => {
       const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/api/state", { v: 1 });
       c.recordApiSuccess("dev1", "/api/state", { v: 2 });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, unknown[]>)["/api/state"] as Array<{ body: unknown }>;
       expect(list).toHaveLength(2);
       expect(list[0].body).toEqual({ v: 1 });
       expect(list[1].body).toEqual({ v: 2 });
     });
 
-    it("evicts oldest entry when endpoint exceeds the per-endpoint cap (v2.9.1 cap=6)", () => {
+    it("evicts oldest entry when endpoint exceeds the per-endpoint cap (v2.9.1 cap=6)", async () => {
       const c = new DiagnosticsCollector(registry);
       for (let i = 1; i <= 8; i++) {
         c.recordApiSuccess("dev1", "/api/state", { v: i });
       }
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, unknown[]>)["/api/state"] as Array<{ body: unknown }>;
       // Cap is MAX_RESPONSES_PER_ENDPOINT = 6 — oldest dropped, newest at end.
       expect(list).toHaveLength(6);
@@ -160,30 +160,33 @@ describe("DiagnosticsCollector", () => {
       expect(list[5].body).toEqual({ v: 8 });
     });
 
-    it("evicts oldest endpoint when more than 24 distinct endpoints are tracked (v2.9.1 cap=24)", () => {
+    it("evicts oldest endpoint when more than 24 distinct endpoints are tracked (v2.9.1 cap=24)", async () => {
       const c = new DiagnosticsCollector(registry);
       // 25 distinct endpoints — first should be evicted.
       for (let i = 0; i < 25; i++) {
         c.recordApiSuccess("dev1", `/ep${i}`, { v: i });
       }
-      const hist = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0").apiHistory as Record<string, unknown[]>;
+      const hist = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0")).apiHistory as Record<
+        string,
+        unknown[]
+      >;
       expect(hist["/ep0"]).toBeUndefined();
       expect(hist["/ep24"]).toBeDefined();
     });
 
-    it("truncates large bodies with marker (v2.9.1 cap=65536)", () => {
+    it("truncates large bodies with marker (v2.9.1 cap=65536)", async () => {
       const c = new DiagnosticsCollector(registry);
       // Body must exceed MAX_BODY_BYTES (65_536) to trigger truncation. Use
       // ~70 KB so the cloneAndCap branch fires.
       const big = "x".repeat(70_000);
       c.recordApiSuccess("dev1", "/api/big", { huge: big });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/api/big"];
       expect(typeof list[0].body).toBe("string");
       expect(list[0].body as string).toContain("<truncated");
     });
 
-    it("keeps a device's API history under the byte budget — oldest entries anywhere go first, the newest stays", () => {
+    it("keeps a device's API history under the byte budget — oldest entries anywhere go first, the newest stays", async () => {
       // 24 endpoints × 6 slots × 64 KB is >9 MB per device in theory; a light with
       // a big scene library really sat at a megabyte. Budget: 512 KB per device.
       const c = new DiagnosticsCollector(registry);
@@ -194,7 +197,7 @@ describe("DiagnosticsCollector", () => {
       for (let i = 0; i < 6; i++) {
         c.recordApiSuccess("dev1", "/api/library", { i, big });
       }
-      const hist = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0").apiHistory as Record<
+      const hist = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0")).apiHistory as Record<
         string,
         Array<{ body: { i: number }; bytes: number }>
       >;
@@ -208,11 +211,11 @@ describe("DiagnosticsCollector", () => {
       expect(hist["/api/scenes"]?.[0]?.body.i ?? 6).toBeGreaterThan(0);
     });
 
-    it("caps a captured MQTT envelope and a LAN payload instead of storing them whole", () => {
+    it("caps a captured MQTT envelope and a LAN payload instead of storing them whole", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", { rawJson: "y".repeat(20_000), hex: "aa" });
       c.addLanSend("dev1", "10.0.0.5", "ptReal", { command: ["z".repeat(40_000)] });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const packet = (result.lastMqttPackets as Array<{ rawJson: string; hex: string }>)[0];
       expect(packet.hex).toBe("aa");
       expect(packet.rawJson.length).toBeLessThan(4_200);
@@ -222,20 +225,20 @@ describe("DiagnosticsCollector", () => {
       expect(send.payload as string).toContain("<truncated");
     });
 
-    it("falls back to String() when body is non-serialisable", () => {
+    it("falls back to String() when body is non-serialisable", async () => {
       const c = new DiagnosticsCollector(registry);
       const cyclic: Record<string, unknown> = {};
       cyclic.self = cyclic;
       c.recordApiSuccess("dev1", "/api/cycle", cyclic);
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/api/cycle"];
       expect(typeof list[0].body).toBe("string");
     });
 
-    it("recordApiFailure captures the error + status code so silent fetch failures become visible", () => {
+    it("recordApiFailure captures the error + status code so silent fetch failures become visible", async () => {
       const c = new DiagnosticsCollector(registry);
       c.recordApiFailure("dev1", "/light-effect-libraries", new Error("403 Forbidden"), 403);
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, Array<Record<string, unknown>>>)["/light-effect-libraries"];
       expect(list).toHaveLength(1);
       expect(list[0].ok).toBe(false);
@@ -264,9 +267,9 @@ describe("DiagnosticsCollector", () => {
       registry = emptyRegistry();
     });
 
-    it("contains all v1.x top-level fields plus the v2 ring buffers", () => {
+    it("contains all v1.x top-level fields plus the v2 ring buffers", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(makeDevice(), "2.0.0");
+      const result = await c.generate(makeDevice(), "2.0.0");
       const keys = Object.keys(result).sort();
       expect(keys).toEqual(
         expect.arrayContaining([
@@ -291,21 +294,21 @@ describe("DiagnosticsCollector", () => {
       );
     });
 
-    it("attaches active quirks for known SKUs", () => {
+    it("attaches active quirks for known SKUs", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(makeDevice({ sku: "H6141" }), "2.0.0");
+      const result = await c.generate(makeDevice({ sku: "H6141" }), "2.0.0");
       expect(result.quirks).toEqual({ brokenPlatformApi: true });
     });
 
-    it("returns null quirks for unknown SKU", () => {
+    it("returns null quirks for unknown SKU", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(makeDevice({ sku: "H9999" }), "2.0.0");
+      const result = await c.generate(makeDevice({ sku: "H9999" }), "2.0.0");
       expect(result.quirks).toBeNull();
     });
 
-    it("yields empty buffers if no hooks fired", () => {
+    it("yields empty buffers if no hooks fired", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(makeDevice(), "2.0.0");
+      const result = await c.generate(makeDevice(), "2.0.0");
       expect(result.recentLogs).toEqual([]);
       expect(result.lastMqttPackets).toEqual([]);
       expect(result.apiHistory).toEqual({});
@@ -318,7 +321,7 @@ describe("DiagnosticsCollector", () => {
   // ===========================================================================
 
   describe("v2.9.1 Class A — raw Bytes in generate() (TUKEY-Blocker)", () => {
-    it("A1 — snapshotBleCmds raw packets exposed per-snapshot", () => {
+    it("A1 — snapshotBleCmds raw packets exposed per-snapshot", async () => {
       // H61BE n8licht fixture from research-snapshot-ptreal.md Z.69-86.
       // Two cmd-groups: brightness (cmdType 17) + A3 scene-data (cmdType 18).
       // Used as canonical test fixture so the test outlives Govee API drift.
@@ -327,7 +330,7 @@ describe("DiagnosticsCollector", () => {
         ["owABBEACABT/ypEAAQIDBAUGB1Q=", "owEICQoLDA0ODxAREhMBFGQAAdI=", "owIBAgMEBQYHCAkKCwwNDg8QERIToA=="],
       ];
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(
+      const result = await c.generate(
         makeDevice({
           snapshots: [{ name: "n8licht", value: 2719361 }],
           snapshotBleCmds: [N8LICHT_BLE_CMDS],
@@ -341,9 +344,9 @@ describe("DiagnosticsCollector", () => {
       expect(snaps.bleCmds[0].packets).toEqual(N8LICHT_BLE_CMDS);
     });
 
-    it("A2 — sceneLibrary surfaces scenceParam + speedInfo.config (not just hasParam)", () => {
+    it("A2 — sceneLibrary surfaces scenceParam + speedInfo.config (not just hasParam)", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(
+      const result = await c.generate(
         makeDevice({
           sceneLibrary: [
             {
@@ -363,9 +366,9 @@ describe("DiagnosticsCollector", () => {
       expect(speedInfo.config).toContain("moveIn");
     });
 
-    it("A4+A5 — diyLibrary and musicLibrary surface scenceParam", () => {
+    it("A4+A5 — diyLibrary and musicLibrary surface scenceParam", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(
+      const result = await c.generate(
         makeDevice({
           diyLibrary: [{ name: "MyDIY", diyCode: 10, scenceParam: "DIY_PARAM_BASE64" }],
           musicLibrary: [{ name: "Spectrum", musicCode: 1, scenceParam: "MUSIC_PARAM_BASE64", mode: 1 }],
@@ -380,12 +383,12 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("v2.9.1 Class C3 — HttpError.responseBody flows into recordApiFailure", () => {
-    it("captures responseBody so the diag JSON shows the body, not just the status", () => {
+    it("captures responseBody so the diag JSON shows the body, not just the status", async () => {
       const c = new DiagnosticsCollector(registry);
       const err = new HttpError("HTTP 401", 401, {}, '{"message":"API key invalid"}');
       c.recordApiFailure("dev1", "/router/api/v1/user/devices", err, 401);
       const list = (
-        c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1").apiHistory as Record<
+        (await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1")).apiHistory as Record<
           string,
           Array<Record<string, unknown>>
         >
@@ -396,13 +399,13 @@ describe("DiagnosticsCollector", () => {
       expect(body.responseBody).toBe('{"message":"API key invalid"}');
     });
 
-    it("truncates the responseBody when it would exceed the cap", () => {
+    it("truncates the responseBody when it would exceed the cap", async () => {
       const c = new DiagnosticsCollector(registry);
       const huge = "x".repeat(80_000);
       const err = new HttpError("HTTP 500", 500, {}, huge);
       c.recordApiFailure("dev1", "/api/oops", err, 500);
       const list = (
-        c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1").apiHistory as Record<
+        (await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1")).apiHistory as Record<
           string,
           Array<Record<string, unknown>>
         >
@@ -414,71 +417,75 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("v2.9.1 Class E — LAN UDP send capture", () => {
-    it("addLanSend records outgoing ptReal payloads per-device", () => {
+    it("addLanSend records outgoing ptReal payloads per-device", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1", "pkt2"] }, 572);
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
       expect(sends).toHaveLength(1);
-      expect(sends[0].ip).toBe("192.168.1.36");
+      // The destination is pseudonymised — a marker, never the real address —
+      // but it stays a stable one, so two sends to the same device remain
+      // recognisably the same device.
+      expect(sends[0].ip).toBe("address-local-1");
+      expect(JSON.stringify(result)).not.toContain("192.168.1.36");
       expect(sends[0].cmd).toBe("ptReal");
       expect(sends[0].bytes).toBe(572);
       expect((sends[0].payload as Record<string, unknown[]>).command).toEqual(["pkt1", "pkt2"]);
     });
 
-    it("captures error field when the UDP send fails", () => {
+    it("captures error field when the UDP send fails", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addLanSend("dev1", "192.168.1.36", "ptReal", { command: ["pkt1"] }, 0, "EHOSTUNREACH");
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
       expect(sends[0].error).toBe("EHOSTUNREACH");
     });
 
-    it("bounds at 30 lan-sends — newest 30 retained", () => {
+    it("bounds at 30 lan-sends — newest 30 retained", async () => {
       const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 40; i++) {
         c.addLanSend("dev1", "192.168.1.36", "turn", { value: i }, 50);
       }
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const sends = result.lanSends as Array<Record<string, unknown>>;
       expect(sends).toHaveLength(30);
     });
   });
 
   describe("v2.9.1 Class F1 — AWS-IoT MQTT envelope durchgereicht", () => {
-    it("addMqttPacket accepts {hex, rawJson} so state-only pushes are captured too", () => {
+    it("addMqttPacket accepts {hex, rawJson} so state-only pushes are captured too", async () => {
       const c = new DiagnosticsCollector(registry);
       const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { hex: "abc123", rawJson: envelope });
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
       expect(packets[0].hex).toBe("abc123");
       expect(packets[0].rawJson).toBe(envelope);
     });
 
-    it("addMqttPacket accepts rawJson-only (no op.command in MQTT message)", () => {
+    it("addMqttPacket accepts rawJson-only (no op.command in MQTT message)", async () => {
       const c = new DiagnosticsCollector(registry);
       const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
       c.addMqttPacket("dev1", "GA/account", { rawJson: envelope });
-      const packets = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1").lastMqttPackets as Array<
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1")).lastMqttPackets as Array<
         Record<string, unknown>
       >;
       expect(packets[0].hex).toBeUndefined();
       expect(packets[0].rawJson).toBe(envelope);
     });
 
-    it("ignores empty payload-objects (no hex AND no rawJson)", () => {
+    it("ignores empty payload-objects (no hex AND no rawJson)", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "GA/account", {});
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       expect(result.lastMqttPackets).toEqual([]);
     });
   });
 
   describe("v2.9.1 Class G — device-runtime fields in diag.device", () => {
-    it("surfaces sceneSpeed, manualMode/manualSegments, lastSeenOnNetwork, lastLanReplyAt, groupMembers", () => {
+    it("surfaces sceneSpeed, manualMode/manualSegments, lastSeenOnNetwork, lastLanReplyAt, groupMembers", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(
+      const result = await c.generate(
         makeDevice({
           deviceId: "dev1",
           sceneSpeed: 2,
@@ -501,7 +508,7 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("v2.9.1 Class K — runtime-state provider", () => {
-    it("provider returns a snapshot pulled at generate-time", () => {
+    it("provider returns a snapshot pulled at generate-time", async () => {
       const c = new DiagnosticsCollector(registry);
       c.setRuntimeStateProvider(() => ({
         deviceManagerLastErrorCategory: "TIMEOUT",
@@ -511,21 +518,25 @@ describe("DiagnosticsCollector", () => {
         wizardSession: null,
         lanSeenDeviceIps: ["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"],
       }));
-      const result = c.generate(makeDevice(), "2.9.1");
+      const result = await c.generate(makeDevice(), "2.9.1");
       const rt = result.runtimeState as Record<string, unknown>;
       expect(rt.deviceManagerLastErrorCategory).toBe("TIMEOUT");
       expect(rt.cloudFailureReason).toBe("Cloud request timeout");
       expect((rt.rateLimiter as Record<string, number>).usedToday).toBe(42);
-      expect(rt.lanSeenDeviceIps).toEqual(["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"]);
+      // The discovery trace lists every device seen on the network — the one
+      // field that carried addresses of devices the report is not even about.
+      expect(rt.lanSeenDeviceIps).toEqual(["id-…1d6f:address-local-1"]);
+      expect(JSON.stringify(result)).not.toContain("10.0.0.1");
+      expect(JSON.stringify(result)).not.toContain("AA:BB:CC:DD:EE:FF");
     });
 
-    it("yields null runtimeState when no provider is wired", () => {
+    it("yields null runtimeState when no provider is wired", async () => {
       const c = new DiagnosticsCollector(registry);
-      const result = c.generate(makeDevice(), "2.9.1");
+      const result = await c.generate(makeDevice(), "2.9.1");
       expect(result.runtimeState).toBeNull();
     });
 
-    it("cacheSnapshotProvider returns the persisted view; clone-and-cap protects bigger payloads", () => {
+    it("cacheSnapshotProvider returns the persisted view; clone-and-cap protects bigger payloads", async () => {
       const c = new DiagnosticsCollector(registry);
       c.setCacheSnapshotProvider((sku, deviceId) => ({
         cachedAt: 1700000000000,
@@ -534,19 +545,19 @@ describe("DiagnosticsCollector", () => {
         skuFromArg: sku,
         deviceFromArg: deviceId,
       }));
-      const result = c.generate(makeDevice({ sku: "H61BE", deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ sku: "H61BE", deviceId: "dev1" }), "2.9.1");
       const cache = result.cache as Record<string, unknown>;
       expect(cache.skuFromArg).toBe("H61BE");
       expect(cache.deviceFromArg).toBe("dev1");
       expect(cache.cachedAt).toBe(1700000000000);
     });
 
-    it("localSnapshotsProvider returns user-saved snapshot definitions", () => {
+    it("localSnapshotsProvider returns user-saved snapshot definitions", async () => {
       const c = new DiagnosticsCollector(registry);
       c.setLocalSnapshotsProvider(() => [
         { name: "Morning", power: true, brightness: 60, colorRgb: "#ffaa00", colorTemperature: 0 },
       ]);
-      const result = c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const snaps = result.localSnapshots as Array<Record<string, unknown>>;
       expect(snaps).toHaveLength(1);
       expect(snaps[0].name).toBe("Morning");
@@ -556,7 +567,7 @@ describe("DiagnosticsCollector", () => {
 });
 
 describe("pruneOrphans — buffers of removed devices are released", () => {
-  it("drops every ring buffer of a device that is no longer live and keeps the live ones intact", () => {
+  it("drops every ring buffer of a device that is no longer live and keeps the live ones intact", async () => {
     const c = new DiagnosticsCollector(registry);
     c.addLog("gone", "warn", "old");
     c.addMqttPacket("gone", "GA/t", "aa");
@@ -567,20 +578,20 @@ describe("pruneOrphans — buffers of removed devices are released", () => {
 
     c.pruneOrphans(new Set(["live"]));
 
-    const goneReport = c.generate(makeDevice({ deviceId: "gone" }), "2.0.0");
+    const goneReport = await c.generate(makeDevice({ deviceId: "gone" }), "2.0.0");
     expect(goneReport.recentLogs).toEqual([]);
     expect(goneReport.lastMqttPackets).toEqual([]);
     expect(goneReport.apiHistory).toEqual({});
     expect(goneReport.lanSends).toEqual([]);
-    const liveReport = c.generate(makeDevice({ deviceId: "live" }), "2.0.0");
+    const liveReport = await c.generate(makeDevice({ deviceId: "live" }), "2.0.0");
     expect(liveReport.recentLogs).toHaveLength(1);
     expect((liveReport.apiHistory as Record<string, unknown[]>)["/api/x"]).toHaveLength(1);
   });
 
-  it("is a no-op when every buffered device is still live", () => {
+  it("is a no-op when every buffered device is still live", async () => {
     const c = new DiagnosticsCollector(registry);
     c.addLog("a", "info", "x");
     c.pruneOrphans(new Set(["a", "b"]));
-    expect(c.generate(makeDevice({ deviceId: "a" }), "2.0.0").recentLogs).toHaveLength(1);
+    expect((await c.generate(makeDevice({ deviceId: "a" }), "2.0.0")).recentLogs).toHaveLength(1);
   });
 });

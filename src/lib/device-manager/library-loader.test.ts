@@ -206,7 +206,7 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
     expect(line).toContain("httpStatus=403");
     expect(line).toContain("bearer=yes");
     expect(device.sceneLibrary).toEqual([]); // the old library is not replaced by garbage
-    const hist = diagnostics.generate(device, "x").apiHistory as Record<
+    const hist = (await diagnostics.generate(device, "x")).apiHistory as Record<
       string,
       Array<{ ok: boolean; statusCode?: number }>
     >;

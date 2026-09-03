@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
 import { DeviceManager } from "./lib/device-manager";
-import { resolveSegmentCount } from "./lib/device-manager/lookups";
+import { resolveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
@@ -35,6 +35,7 @@ import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
 import { deviceLabel, errMessage, logRejected, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
+import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import {
   APP_API_INITIAL_DELAY_MS,
@@ -195,6 +196,13 @@ export class GoveeAdapter extends utils.Adapter {
   private readyLogged = false;
   /** Cloud was connected at least once — for the "restored" log after a down. */
   private cloudWasConnected = false;
+  /**
+   * js-controller and admin versions, read once at start. The diagnostics
+   * report states them, and a bug report without them costs one round-trip
+   * every time. Read once rather than per export: they cannot change while the
+   * process runs — a controller or admin update restarts every instance.
+   */
+  private hostVersions: { jsController?: string; admin?: string } = {};
   /** Daily interval for the app-version-drift check against the app store. */
   private appVersionCheckTimer: ioBroker.Interval | undefined;
   /**
@@ -393,6 +401,10 @@ export class GoveeAdapter extends utils.Adapter {
         return;
       }
       await I18n.init(path.join(this.adapterDir, "admin"), this);
+      // Read once — a controller or admin update restarts every instance, so
+      // these cannot go stale while this process lives. Failure is silent: a
+      // report without them is worse, but not a reason to refuse starting.
+      await this.readHostVersions();
       const config = this.config;
 
       // Fetch the live Govee-app version early (fire-and-forget) so the first
@@ -555,6 +567,30 @@ export class GoveeAdapter extends utils.Adapter {
           lanSeenDeviceIps: this.lanClient?.getDiagSnapshot().seenDeviceIps ?? [],
         };
       });
+      // Device names have no detectable shape, so the pseudonymiser can only
+      // replace the ones it is told about.
+      diag.setDeviceNamesProvider(() => this.deviceManager?.getDevices().map(d => d.name) ?? []);
+      // Which ioBroker this runs on, and how the installation as a whole is
+      // doing. Every field here used to be a follow-up question on a report —
+      // and the issue forms dropped their Node field because it belongs in here.
+      diag.setEnvironmentProvider(() => {
+        const devices = this.deviceManager?.getDevices() ?? [];
+        return {
+          node: process.version,
+          jsController: this.hostVersions.jsController,
+          admin: this.hostVersions.admin,
+          platform: `${process.platform} ${process.arch}`,
+          compactMode: this.common?.compact === true,
+          credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
+          deviceCount: devices.length,
+          reachableCount: devices.filter(d => resolveDeviceReachability(d, this.cloudWasConnected).online).length,
+          channels: { ...this.channelStatus },
+        };
+      });
+      // The datapoints as they really exist — the answer to "this datapoint is
+      // missing / has the wrong type / the wrong role", which the in-memory view
+      // cannot give. Scoped to ONE device prefix, never a full-instance scan.
+      diag.setObjectTreeProvider(prefix => this.readObjectTree(prefix));
 
       // API client for undocumented scene/music/DIY libraries (always available)
       const apiClient = this.makeApiClient(this.log);
@@ -1168,6 +1204,57 @@ export class GoveeAdapter extends utils.Adapter {
    *
    * @param callback Completion callback
    */
+  /**
+   * js-controller and admin versions for the diagnostics report.
+   */
+  private async readHostVersions(): Promise<void> {
+    const host = await this.getForeignObjectAsync(`system.host.${this.host}`).catch(() => null);
+    const admin = await this.getForeignObjectAsync("system.adapter.admin").catch(() => null);
+    this.hostVersions = {
+      jsController: (host?.common as { installedVersion?: string } | undefined)?.installedVersion,
+      admin: (admin?.common as { version?: string } | undefined)?.version,
+    };
+  }
+
+  /**
+   * The datapoints below ONE device prefix, with type, role, unit and current
+   * value — the view the user actually sees in the object tree.
+   *
+   * Deliberately scoped to a single prefix: a full-instance scan is exactly
+   * what 2.27.1 removed from the periodic round, and this runs behind a button
+   * a user can press repeatedly. One export therefore reads one device's
+   * subtree, never the whole instance.
+   *
+   * @param prefix Device prefix, e.g. `devices.h61be_1d6f`
+   * @returns One entry per datapoint, or an empty list if the tree cannot be read
+   */
+  private async readObjectTree(prefix: string): Promise<diagnostics.ObjectTreeEntry[]> {
+    const start = `${this.namespace}.${prefix}.`;
+    const view = await this.getObjectViewAsync("system", "state", {
+      startkey: start,
+      endkey: `${start}\u9999`,
+    }).catch(() => null);
+    if (!view?.rows) {
+      return [];
+    }
+    const entries: diagnostics.ObjectTreeEntry[] = [];
+    for (const row of view.rows) {
+      const localId = row.id.replace(`${this.namespace}.`, "");
+      const common = row.value?.common as ioBroker.StateCommon | undefined;
+      const state = await this.getStateAsync(localId).catch(() => null);
+      entries.push({
+        id: localId.replace(`${prefix}.`, ""),
+        type: common?.type,
+        role: common?.role,
+        unit: common?.unit,
+        write: common?.write,
+        val: state?.val,
+        ack: state?.ack,
+      });
+    }
+    return entries;
+  }
+
   private onUnload(callback: () => void): void {
     // Set first — async paths read this between awaits and bail before
     // further setState, sendCommand, etc. against a torn-down adapter.
