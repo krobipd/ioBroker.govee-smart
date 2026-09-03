@@ -1,4 +1,9 @@
 # Older Changes
+## 2.25.0 (2026-08-12)
+
+- Redesigned connection setup: one card for the Cloud API key, account login and 2FA, with live connection status and a guided verification-code step.
+- Fixed light strips that showed too many segments with impossible brightness values (e.g. Govee H6076 showed 15 instead of 7); they now use the strip's real segment count.
+
 ## 2.24.0 (2026-08-04)
 
 - This version needs ioBroker Admin 8. The segment detection wizard is built for Admin 8 and no longer runs on Admin 7, so this update is not offered there.

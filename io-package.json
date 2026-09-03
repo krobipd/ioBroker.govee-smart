@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.28.0",
+    "version": "2.29.0",
     "news": {
+      "2.29.0": {
+        "en": "Devices without the local API no longer show as unreachable while they still control fine. The diagnostics report is a file you can attach now — diag.result is gone.",
+        "de": "Geräte ohne lokale Schnittstelle werden nicht mehr als nicht erreichbar angezeigt, obwohl sie sich steuern lassen. Der Diagnosebericht ist jetzt eine Datei zum Anhängen — diag.result entfällt.",
+        "ru": "Устройства без локального API больше не отображаются как недоступные, хотя управление работает. Отчёт диагностики теперь файл для вложения — diag.result удалён.",
+        "pt": "Dispositivos sem API local deixam de aparecer como inacessíveis embora funcionem. O relatório de diagnóstico é agora um ficheiro para anexar — diag.result foi removido.",
+        "nl": "Apparaten zonder lokale API worden niet meer als onbereikbaar getoond terwijl ze gewoon werken. Het diagnoserapport is nu een bestand om toe te voegen — diag.result vervalt.",
+        "fr": "Les appareils sans API locale ne sont plus affichés comme injoignables alors qu'ils fonctionnent. Le rapport de diagnostic est désormais un fichier à joindre — diag.result disparaît.",
+        "it": "I dispositivi senza API locale non risultano più irraggiungibili pur funzionando. Il rapporto di diagnostica è ora un file da allegare — diag.result è stato rimosso.",
+        "es": "Los dispositivos sin API local ya no aparecen como inaccesibles aunque funcionen. El informe de diagnóstico es ahora un archivo para adjuntar — diag.result se ha eliminado.",
+        "pl": "Urządzenia bez lokalnego API nie są już pokazywane jako niedostępne, choć działają. Raport diagnostyczny to teraz plik do załączenia — diag.result został usunięty.",
+        "uk": "Пристрої без локального API більше не показуються як недоступні, хоча керування працює. Звіт діагностики тепер файл для вкладення — diag.result вилучено.",
+        "zh-cn": "未启用本地接口的设备不再显示为不可达，尽管其控制正常。诊断报告现在是可附加的文件——diag.result 已移除。"
+      },
       "2.28.0": {
         "en": "Sensor and event datapoints have one name (sensor.temperature, not sensor.sensor_temperature) — adjust scripts. Manual sync works again, Cloud reconnect no longer stops on a maintenance page.",
         "de": "Sensor- und Ereignis-Datenpunkte heißen einheitlich (sensor.temperature statt sensor.sensor_temperature) — Skripte anpassen. Manueller Abgleich geht wieder, Cloud-Wiederverbindung stoppt nicht mehr.",
@@ -69,19 +82,6 @@
         "zh-cn": "连接设置现在集中在一张带实时状态的卡片中，包含云密钥、账户登录和 2FA。灯带也会重新报告其真实的分段数量。"
       },
       "2.23.1": {
-        "en": "Test release during the move to ioBroker Admin 8.",
-        "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
-        "ru": "Тестовый выпуск во время перехода на ioBroker Admin 8.",
-        "pt": "Versão de teste durante a mudança para o ioBroker Admin 8.",
-        "nl": "Testversie tijdens de overstap naar ioBroker Admin 8.",
-        "fr": "Version de test pendant le passage à ioBroker Admin 8.",
-        "it": "Versione di prova durante il passaggio a ioBroker Admin 8.",
-        "es": "Versión de prueba durante el cambio a ioBroker Admin 8.",
-        "pl": "Wersja testowa podczas przejścia na ioBroker Admin 8.",
-        "uk": "Тестова версія під час переходу на ioBroker Admin 8.",
-        "zh-cn": "向 ioBroker Admin 8 迁移期间的测试版本。"
-      },
-      "2.23.0": {
         "en": "Test release during the move to ioBroker Admin 8.",
         "de": "Testversion während der Umstellung auf ioBroker Admin 8.",
         "ru": "Тестовый выпуск во время перехода на ioBroker Admin 8.",

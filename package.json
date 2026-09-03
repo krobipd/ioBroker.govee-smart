@@ -1,6 +1,6 @@
 {
   "name": "iobroker.govee-smart",
-  "version": "2.28.0",
+  "version": "2.29.0",
   "description": "Control Govee WiFi devices via LAN, MQTT and Cloud.",
   "author": {
     "name": "krobi",
