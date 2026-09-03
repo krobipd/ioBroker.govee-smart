@@ -99,11 +99,72 @@ werden aus dem Cache parallel geschrieben, `clearDeviceRollup` prüft zwei Objek
 - **`clearDeviceRollup()` legt nichts an**, es fasst nur vorhandene Datenpunkte an — sonst bekäme eine
   frische Installation beim ersten Beenden eine Summe, die sie nie hatte.
 
+## Erreichbarkeit — EIN Auflöser für alle Gerätearten (ab 2.29.0)
+
+`resolveDeviceReachability(device, cloudOnline)` (`device-manager/lookups.ts`) beantwortet „ist das
+Gerät erreichbar" für **jede** Geräteart. Vorher trug der Adapter drei unverbundene Wahrheiten plus
+eine vierte Regel in `updateConnectionState` — mit der Folge, dass `info.connection` „ein Gerät ist
+erreichbar" sagte, während der Marker DESSELBEN Geräts das Gegenteil behauptete. Beide lesen jetzt
+dieselbe Funktion.
+
+Die drei Fälle, in dieser Reihenfolge:
+
+1. **Lampe MIT lokaler Schnittstelle** → die LAN-Antwortfrische entscheidet (`lastLanReplyAt`,
+   `LAN_REPLY_FRESHNESS_MS` = 90 s) und sonst nichts. Govees Cloud-Zwischenspeicher hinkt der echten
+   Erreichbarkeit hinterher (Messung 2026-05-13: 2× falsches `true` während eines echten Ausfalls).
+2. **Govee meldet für das Gerät** (`state.cloudReportedOnline`, gesetzt von `applyOnlineCap` aus
+   App-Abruf/Cloud-Ereignis und vom Konto-Push für Nicht-Lampen) → sein Wort gilt, in beide
+   Richtungen; ein ausdrückliches „offline" gewinnt auch bei stehender Cloud.
+3. **Govee meldet für das Gerät NIE** — der Dauerfall einer Lampe ohne lokale Schnittstelle: der
+   App-Abruf führt für Lampen keine Messwerte, und der Konto-Push ist für Lampen bewusst gesperrt
+   (der Verteiler spielt Altnachrichten nach). Dann IST die Erreichbarkeit „die Cloud antwortet und
+   das Konto führt das Gerät" — genau die Bedingung, unter der der Nutzer es steuern kann.
+
+**`proven` ist der zweite Rückgabewert und der Kern des Fixes.** Eine GEHÖRTE Erreichbarkeit (Fall 1
+und 2) darf in beide Richtungen ins Gerät zurückgeschrieben werden, eine aus dem Kanal ABGELEITETE
+(Fall 3) darf sie nur anheben. Ein abgeleitetes `false` ins Gerät zu brennen war der eigentliche
+Defekt: der Zwischenspeicher startet jedes Gerät als offline (für LAN-Lampen richtig, der Scan
+korrigiert Sekunden später), für eine cloud-only Lampe hob es nie jemand an, und die 20-s-Runde
+schrieb diese Unwissenheit als Messwert zurück — danach konnte nichts sie mehr aufheben.
+
+**Nicht vermischen:** `groups.info.online` ist KEIN Erreichbarkeits-Marker, sondern die
+Cloud-Verbindung (i18n-Schlüssel `cloudOnline`). Der Auflöser fasst ihn nicht an.
+
+## Diagnose-Bericht = Datei, anonymisiert (ab 2.29.0)
+
+Der Bericht ist das Ferndiagnose-Werkzeug: der Melder hängt eine Datei an, daraus wird das Gerät
+eingepflegt oder der Fehler gefunden — ohne Hardware. Bis 2.28.0 lag er komplett als Text in
+`<gerät>.diag.result`; bei einem H61BE **67.917 Zeichen**, also über GitHubs 65.536-Zeichen-Grenze
+für den Issue-Text und als Zustandswert eine Last für Datenbank und jedes History-Abo am Gerät.
+
+- **Ablage:** `diag.export` schreibt in das Meta-Objekt `<namespace>.diagnostics` (gleiche Bauart wie
+  `snapshots`), `diag.lastExport` nennt die Datei, `diag.result` ist **weg**. Der alte Datenpunkt
+  wird in `migrateLegacyDiagnostics` ausdrücklich entfernt — `cleanupCloudOwnedStates` erreicht ihn
+  nicht, weil `diag` kein verwalteter Kanal ist. Je Gerät bleiben `DIAGNOSTICS_KEEP_PER_DEVICE` = 3.
+- **Dateiname erklärt sich selbst:** `govee-smart_<SKU>_<kurz-id>_v<version>_<datum>_<zeit>.json` —
+  der Empfänger hat unseren Zusammenhang nicht, und ein Melder mit zwei Govee-Geräten hängt zwei an.
+- **Anonymisierung** (`anonymiser.ts`): gleichbleibende Marken statt Schwärzung, sonst ist „reden
+  diese zwei Zeilen vom selben Gerät" nicht mehr beantwortbar. Adressen → `address-local-N` /
+  `address-public-N` (Bereich bleibt sichtbar, auch `169.254/16` = DHCP fehlgeschlagen), Mail →
+  `mail-N`, Gerätename → `device-N`, Gerätekennung → letzte vier Zeichen (= Ordnername im Baum).
+  **Reihenfolge zwingend: schwärzen → anonymisieren → kappen** — die Größenbegrenzung macht aus einem
+  zu großen Körper eine flache Zeichenkette, in die danach kein Durchlauf mehr hineinkommt.
+  Fallstrick beim IPv6-Muster: nur acht volle Gruppen oder eine `::`-Form sind eine Adresse; die
+  erste Fassung („zwei oder mehr Hex-Gruppen") machte aus `AA:BB:CC` eine Adress-Marke.
+- **Inhalt über den alten Stand hinaus:** ioBroker-Umfeld (Node/js-controller/Admin/Plattform,
+  Kompaktmodus, Zugangsdaten-Stufe, Geräte- und Erreichbarkeits-Zahlen), der **echte Objektbaum** des
+  Geräts (Typ/Rolle/Einheit/Wert; strikt auf EIN Präfix begrenzt — kein Instanz-Scan), die Wirkung
+  der letzten Befehle (`commandResults`, gefüttert aus `CommandRouter.onCommandResult`) und die
+  Herkunft der Segment-Anzahl. `generate()` ist dadurch asynchron.
+- **Admin-Karte „Diagnose"** (`src-admin/DiagnosticsPanel`): Gerät wählen, ein Knopf, Browser-Download.
+  Liste bewusst UNGEFILTERT — ein Bericht wird gebraucht, wenn ein Gerät klemmt. Der Inhalt kommt mit
+  der `sendTo`-Antwort zurück; die Datei liegt trotzdem in der Instanz-Ablage.
+
 ## Cloud REST API v2
 
 **Base URL:** `https://openapi.api.govee.com` · **Auth:** Header `Govee-API-Key: <key>`
 
-- Rate Limits: 10/min/Gerät, 10.000/Tag — **Appliances aber nur 100/Tag (!)**. Rate-Limiter (`rate-limiter.ts`) schützt, Cloud nur als letzter Ausweg.
+- Rate Limits: 10/min/Gerät, 10.000/Tag — **Appliances aber nur 100/Tag (!)**. Der `rate-limiter` deckt beides ab: die Minute über ein globales Dach von 8 (immer unter den 10/min eines einzelnen Geräts), den Tag zweigleisig — 9.000 global PLUS ein eigenes Tagesbudget je Appliance (90). Das Gerätebudget wandert **nicht** in die Warteschlange: es setzt sich erst beim Tageswechsel bei Govee zurück, ein wartender Befehl liefe also Stunden später los. Warum überhaupt nötig: Appliance-Steuerung hat keinen lokalen Weg, jede Schreiboperation ist ein Cloud-Aufruf, und ohne Gerätekonto könnte EIN Gerät die 9.000 des Kontos verbrauchen. Der Adapter selbst tut das nie (kein periodischer Geräte-Poll) — ein Skript schon.
 - Unit-Normalisierung: `unit.percent` → `%`, `unit.kelvin` → `K`, `unit.celsius` → `°C`.
 - **HTTP 200 mit leerem Body ≠ Fehler:** undokumentierte Govee-Endpoints liefern für unbekannte SKUs HTTP 200 mit leerem Body. `httpsRequest` resolvet das als `null` statt zu werfen; Caller mit `resp?.data?.…` + `Array.isArray`-Guards bekommen es transparent. Nur non-empty non-JSON bleibt Parse-Error.
 - **429 RATE_LIMIT:** `classifyError` hat einen expliziten Branch auf `statusCode === 429` (nicht nur Message-Match), sonst zeigt der Ready-Hint die generische statt der Rate-Limit-Meldung.
@@ -204,6 +265,17 @@ Single Page: **1.** LAN (immer aktiv) · **2.** Cloud API (optional, API Key →
 21. **Dropdown Dual-Write** — alle Dropdown-States sind `type: "mixed"` mit eindeutiger `common.states`-Map (`buildUniqueLabelMap`, `(2)`/`(3)`-Suffix bei Duplikaten); `resolveDropdownInput` löst Number/Number-String/Klartext case-insensitive auf den kanonischen Key. **Warum `mixed`:** unterdrückt den js-controller-Strict-Type-Check, der sonst bei Number-Schreibung ins Log schreibt. **Warum `role: "state"`:** `level.effect` würde `type:"string"` erzwingen und die bewusst gewollte Number-Eingabe loggen.
 
 ## Bekannte Fallstricke (govee-spezifisch)
+
+- **Manifest-Objekte erreichen eine BESTEHENDE Anlage nur per `extendObject`.** js-controller legt
+  `instanceObjects` nur an, wo sie fehlen — ein geänderter Name landete bis 2.29.0 ausschließlich bei
+  Neuinstallationen, während Manifest und Namens-Gate grün aussahen. `ensureManifestObjects()` in
+  `onReady` frischt alle elf auf, **je ein ausgeschriebener Aufruf**: eine Schleife über eine Tabelle
+  wäre kürzer und würde verbergen, welche Objekte erreicht werden — vor dem Leser wie vor dem
+  Konsistenz-Gate, das den wörtlichen Aufruf sucht.
+- **Namen mit laufender Nummer:** `tNameWith(key, n)` (nicht `tName`) — `getTranslatedObject` ersetzt
+  `%s` je Sprache, aber **nur wenn der ENGLISCHE Text den Platzhalter trägt**, und **genau einer**
+  ist zulässig (adapter-core setzt je Argument wieder am Ursprungstext an, ein zweiter würde den
+  ersten überschreiben).
 
 - **No-Channel Init-Race:** Cloud-only-Geräte direkt nach Restart — Cloud-Client noch null → „No channel available" ist Fehlalarm. Fix: `channels.cloud === true && cloudClient === null` → debug + still verworfen. WARN nur bei permanent fehlendem Channel.
 - **Abonnements:** `devices.*` + `groups.*` + **explizit `info.manualSyncDevices`** — der Knopf liegt außerhalb beider Muster und war von 2.17.0 bis 2.27.1 tot (nie abonniert, Test pinnte die zwei Muster). Ein neuer Datenpunkt unter `info`, den der Nutzer schreibt, braucht sein eigenes Abonnement.

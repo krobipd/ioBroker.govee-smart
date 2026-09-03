@@ -100,6 +100,16 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### **WORK IN PROGRESS**
+
+- Fixed: Devices without the local API enabled were shown as not reachable after the first adapter restart although they still controlled fine — reachability is now one rule for every device kind, and the adapter no longer contradicts itself between `info.connection` and a device's own marker
+- Fixed: An appliance could use up the whole account's daily Cloud budget. Govee allows an appliance 100 calls a day, and appliance control has no local path — each one now has its own allowance and says so in the log once when it is spent
+- Fixed: A changed datapoint name or description only ever reached NEW installations; existing trees kept the old text. Every datapoint of the adapter's own `info`, `devices`, `groups` and file folders is refreshed on start
+- Fixed: The segment channels were named in English regardless of the configured language — they are translated now
+- Changed: BREAKING — the diagnostics report is a FILE. `<device>.diag.result` is gone; it held the whole report as text (around 68,000 characters), which no longer fits into a GitHub issue. Press `diag.export` and download the file in the adapter's new **Diagnostics** tab, then attach it. `<device>.diag.lastExport` names the most recent file
+- Improved: The report is pseudonymised — addresses, mail addresses and device names are replaced by stable markers and device ids shortened, so it can be attached to a public issue. It also carries the ioBroker environment, the device's real datapoints, what the last commands did and where the segment count came from, which used to be follow-up questions on every report
+- Improved: User documentation now ships with the adapter, so the ioBroker doc portal shows it instead of the developer README
+
 ### 2.28.0 (2026-09-02)
 
 - Fixed: The "Sync devices manually" button in the object tree works again — it had no effect since 2.17.0. It is now `info.manualSyncDevices`; the old `info.manual_sync_devices` is removed on start
