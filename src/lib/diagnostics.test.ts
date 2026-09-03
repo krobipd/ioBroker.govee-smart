@@ -276,6 +276,40 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("the report says HOW the device is driven — the question it exists for", () => {
+    it("names the channel and the reason per writable datapoint", async () => {
+      // Adding a stranger's model means knowing which datapoint is reached over
+      // which channel and why. The report carried the capability list and the
+      // object tree — the two ends — but never the routing between them, so
+      // "this control does nothing on my model" was unanswerable from a report.
+      const c = new DiagnosticsCollector(registry);
+      c.setObjectTreeProvider(() =>
+        Promise.resolve([
+          { id: "control.power", type: "boolean", role: "switch", write: true, val: true, ack: true },
+          { id: "control.brightness", type: "number", role: "level.dimmer", write: true, val: 50, ack: true },
+          { id: "info.online", type: "boolean", role: "indicator.reachable", write: false, val: true, ack: true },
+        ]),
+      );
+      c.setControlPathProvider((_d, ids) =>
+        ids.map(id => ({ stateId: id, command: "power", transport: "lan", reason: "default" })),
+      );
+      const r = await c.generate(makeDevice({ lanIp: "10.0.0.5" }), "2.29.4", "devices.h61be_1d6f");
+      const paths = r.controlPaths as Array<Record<string, unknown>>;
+      // Only WRITABLE datapoints — a read-only marker has no control path.
+      expect(paths).toHaveLength(2);
+      expect(paths[0]).toMatchObject({ transport: "lan", reason: "default" });
+      expect(paths.map(p => p.stateId)).not.toContain("info.online");
+    });
+
+    it("stays null when nothing resolved it, instead of pretending an empty list", async () => {
+      // An empty list would read as "this device has no controls at all" — a
+      // wrong statement. Absent means "not determined".
+      const c = new DiagnosticsCollector(registry);
+      const r = await c.generate(makeDevice(), "2.29.4");
+      expect(r.controlPaths).toBeNull();
+    });
+  });
+
   describe("account calls reach the report — without any credentials", () => {
     it("records the verdict and Govee's own message, never the credentials", async () => {
       // Two filed issues are exactly this case ("email not registered",

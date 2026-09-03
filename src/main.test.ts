@@ -1486,6 +1486,28 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(f.api.setBearerToken).toHaveBeenCalledWith("fresh-bearer");
   });
 
+  it("the report's control paths come from the SAME router a real write uses", async () => {
+    // The routing must not drift from the behaviour it describes: if the report
+    // computed it separately, a quirk override would show in one and not the
+    // other — and the report would send me chasing the wrong cause.
+    const { adapter } = await fullSetup();
+    const i = internalOf(adapter);
+    const diag = (
+      i.deviceManager as unknown as {
+        getDiagnostics(): {
+          controlPathProvider: ((d: GoveeDevice, ids: string[]) => Array<Record<string, unknown>>) | null;
+        };
+      }
+    ).getDiagnostics();
+    expect(diag.controlPathProvider, "provider must be wired").toBeTruthy();
+    const dev = makeDevice({ lanIp: "10.0.0.9" });
+    const paths = diag.controlPathProvider!(dev, ["control.power", "info.online"]);
+    // "info.online" maps to no command at all — it must not appear.
+    expect(paths).toHaveLength(1);
+    expect(paths[0]).toMatchObject({ stateId: "control.power", command: "power" });
+    expect(String(paths[0].transport)).toBeTruthy();
+  });
+
   it("a rejected login reaches the diagnostics report — with the reason, never the credentials", async () => {
     // Two filed issues are exactly this case ("email not registered with Govee",
     // "too many logins — account blocked"). Until 2.30.0 the report showed a

@@ -617,6 +617,29 @@ export class GoveeAdapter extends utils.Adapter {
       // cannot give. Scoped to ONE device prefix, never a full-instance scan.
       diag.setObjectTreeProvider(prefix => this.readObjectTree(prefix));
 
+      // How each writable datapoint is actually driven. The report carried the
+      // capability list and the object tree — the two ends — but never the
+      // routing between them, so "this control does nothing on my model" could
+      // not be answered from a report. Asks the SAME function a real write asks,
+      // so the answer cannot drift from the behaviour it describes; pure
+      // decision-making, no I/O.
+      diag.setControlPathProvider((device, stateIds) => {
+        const router = this.deviceManager;
+        if (!router) {
+          return [];
+        }
+        const out: diagnostics.ControlPathEntry[] = [];
+        for (const stateId of stateIds) {
+          const command = dropdownReset.stateToCommand(stateId);
+          if (!command) {
+            continue;
+          }
+          const decision = router.resolveTransport(device, command);
+          out.push({ stateId, command, transport: decision.kind, reason: decision.reason });
+        }
+        return out;
+      });
+
       // API client for undocumented scene/music/DIY libraries (always available)
       const apiClient = this.makeApiClient(this.log);
       apiClient.setEmail(accountEmail);

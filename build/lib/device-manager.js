@@ -1123,14 +1123,17 @@ class DeviceManager {
     cloudMergeHelpers.applyOnlineCap(this, device, caps);
   }
   /**
-   * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
-   * reachability signal: sensors, appliances, and cloud-only lights (no local
-   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
-   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   * Which channel a write to this command would take, and why — the same
+   * decision a real write makes. Read-only, no I/O; the diagnostics report uses
+   * it to show HOW a device is driven, which is what a stranger's model needs
+   * before it can be added to the catalogue.
    *
    * @param device Target device
-   * @param caps Capability list carrying the online flag
+   * @param command Command token, e.g. "power" or "segmentColor:3"
    */
+  resolveTransport(device, command) {
+    return this.commandRouter.resolveTransport(device, command);
+  }
   /**
    * Public entry for the Cloud state read (`/device/state`). That response
    * carries Govee's own reachability for the device, and until 2.29.1 the
@@ -1147,6 +1150,15 @@ class DeviceManager {
   applyCloudStateOnline(device, caps) {
     this.maybeApplyCloudOnline(device, caps);
   }
+  /**
+   * Apply the cloud / App-API online cap, but ONLY where it is the authoritative
+   * reachability signal: sensors, appliances, and cloud-only lights (no local
+   * API). LAN-capable lights keep their LAN-driven info.online — Govee's Cloud
+   * cache lags real LAN reachability (2× false-positive `true` on 2026-05-13).
+   *
+   * @param device Target device
+   * @param caps Capability list carrying the online flag
+   */
   maybeApplyCloudOnline(device, caps) {
     if (device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || !device.lanIp) {
       this.applyOnlineCap(device, caps);

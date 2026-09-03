@@ -470,6 +470,22 @@ class GoveeAdapter extends utils.Adapter {
         };
       });
       diag.setObjectTreeProvider((prefix) => this.readObjectTree(prefix));
+      diag.setControlPathProvider((device, stateIds) => {
+        const router = this.deviceManager;
+        if (!router) {
+          return [];
+        }
+        const out = [];
+        for (const stateId of stateIds) {
+          const command = dropdownReset.stateToCommand(stateId);
+          if (!command) {
+            continue;
+          }
+          const decision = router.resolveTransport(device, command);
+          out.push({ stateId, command, transport: decision.kind, reason: decision.reason });
+        }
+        return out;
+      });
       const apiClient = this.makeApiClient(this.log);
       apiClient.setEmail(accountEmail);
       this.deviceManager.setApiClient(apiClient);

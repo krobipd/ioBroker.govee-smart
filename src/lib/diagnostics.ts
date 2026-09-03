@@ -94,12 +94,6 @@ export interface RuntimeStateSnapshot {
 }
 
 /**
- * What a user-triggered command did. `lanSends` shows what went out on the
- * wire, but not whether the write was accepted and not what the device
- * reported back — so for "switching does not work" the chain broke off exactly
- * where the answer would be.
- */
-/**
  * One account-level call (login / IoT key) as the report shows it. Never
  * carries credentials — see {@link DiagnosticsCollector.recordAccountCall}.
  */
@@ -304,6 +298,33 @@ export interface EnvironmentSnapshot {
 export type EnvironmentProvider = () => EnvironmentSnapshot;
 
 /**
+ * How ONE writable datapoint of this device is actually driven.
+ *
+ * This is the question the report exists for: adding a stranger's device means
+ * knowing which datapoint is reached over which channel, and why. The report
+ * carried the capability list and the object tree — the two ends — but never
+ * the routing between them, so "why does this control do nothing on my model"
+ * could not be answered from a report alone.
+ */
+export interface ControlPathEntry {
+  /** The datapoint below the device prefix, e.g. "control.power". */
+  stateId: string;
+  /** The command it maps to, e.g. "power", "segmentColor:3". */
+  command: string;
+  /** Which channel a write would take — "lan", "cloud", or "skip" (nothing would happen). */
+  transport: string;
+  /** WHY that channel: "default", "override" (a quirk forces it), "no-lan", … */
+  reason: string;
+}
+
+/**
+ * Control-path provider — resolves the routing for this device's writable
+ * datapoints. Pure decision-making, no I/O: it asks the same function a real
+ * write would ask.
+ */
+export type ControlPathProvider = (device: GoveeDevice, stateIds: string[]) => ControlPathEntry[];
+
+/**
  * The device's datapoints as they actually exist in the object tree, with type,
  * role, unit and current value. The report otherwise shows only the adapter's
  * in-memory view, which is no help at all for the most common report class:
@@ -390,6 +411,8 @@ export class DiagnosticsCollector {
   private cacheSnapshotProvider: CacheSnapshotProvider | null = null;
   private localSnapshotsProvider: LocalSnapshotsProvider | null = null;
   private environmentProvider: EnvironmentProvider | null = null;
+  /** Control-path provider — see {@link ControlPathProvider}. */
+  private controlPathProvider: ControlPathProvider | null = null;
   /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
   private readonly accountCalls: AccountCallEntry[] = [];
   private objectTreeProvider: ObjectTreeProvider | null = null;
@@ -430,6 +453,16 @@ export class DiagnosticsCollector {
    */
   setEnvironmentProvider(provider: EnvironmentProvider | null): void {
     this.environmentProvider = provider;
+  }
+
+  /**
+   * Wire the control-path resolver — the routing between a datapoint and the
+   * channel that would carry a write to it.
+   *
+   * @param provider Resolves the routing, or null to clear
+   */
+  setControlPathProvider(provider: ControlPathProvider | null): void {
+    this.controlPathProvider = provider;
   }
 
   /**
@@ -883,6 +916,18 @@ export class DiagnosticsCollector {
     if (this.objectTreeProvider && prefix) {
       objectTree = await this.objectTreeProvider(prefix).catch(() => null);
     }
+    // The routing between the two ends the report already had: which channel
+    // carries a write to each datapoint, and why that one. Derived from the
+    // writable datapoints of the real tree, so it describes THIS installation.
+    let controlPaths: ControlPathEntry[] | null = null;
+    if (this.controlPathProvider && objectTree) {
+      const writable = objectTree.filter(e => e.write === true).map(e => e.id);
+      try {
+        controlPaths = this.controlPathProvider(device, writable);
+      } catch {
+        controlPaths = null;
+      }
+    }
 
     const report: Record<string, unknown> = {
       // The file is read by a stranger with none of our context, so it says up
@@ -1018,6 +1063,9 @@ export class DiagnosticsCollector {
       // Account-wide, so it appears in every device's report: without it a dead
       // push channel has no reason in the report at all.
       accountCalls: this.accountCalls.slice(),
+      // "How is this device actually driven" — the question a report has to
+      // answer before a stranger's model can be added to the catalogue.
+      controlPaths,
       // The datapoints as they really exist, with type, role, unit and value.
       // Null when no prefix was passed (the device has no tree yet).
       objectTree,

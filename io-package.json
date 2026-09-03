@@ -4,17 +4,17 @@
     "version": "2.29.3",
     "news": {
       "NEXT": {
-        "en": "The diagnostics report now names where a device's reachability comes from and whether the account login worked — no credentials are ever included.",
-        "de": "Der Diagnosebericht nennt jetzt, woher die Erreichbarkeit eines Geräts stammt und ob die Konto-Anmeldung geklappt hat — Zugangsdaten enthält er nie.",
-        "ru": "Отчёт диагностики теперь указывает, откуда берётся доступность устройства и удался ли вход в аккаунт — учётные данные в него не попадают.",
-        "pt": "O relatório de diagnóstico indica agora de onde vem a acessibilidade de um dispositivo e se o início de sessão funcionou — nunca inclui credenciais.",
-        "nl": "Het diagnoserapport vermeldt nu waar de bereikbaarheid van een apparaat vandaan komt en of het accountaanmelden lukte — inloggegevens staan er nooit in.",
-        "fr": "Le rapport de diagnostic indique désormais d'où vient l'accessibilité d'un appareil et si la connexion au compte a réussi — jamais d'identifiants.",
-        "it": "Il rapporto diagnostico indica ora da dove proviene la raggiungibilità di un dispositivo e se l'accesso all'account è riuscito — mai le credenziali.",
-        "es": "El informe de diagnóstico indica ahora de dónde procede la accesibilidad de un dispositivo y si el inicio de sesión funcionó — nunca incluye credenciales.",
-        "pl": "Raport diagnostyczny podaje teraz, skąd pochodzi osiągalność urządzenia i czy logowanie do konta się powiodło — nigdy nie zawiera danych logowania.",
-        "uk": "Звіт діагностики тепер вказує, звідки береться доступність пристрою та чи вдався вхід в обліковий запис — облікових даних у ньому немає.",
-        "zh-cn": "诊断报告现在会说明设备可达性的来源以及账户登录是否成功——其中绝不包含登录凭据。"
+        "en": "The diagnostics report now shows how each control is driven, where a device's reachability comes from and whether the account login worked.",
+        "de": "Der Diagnosebericht zeigt jetzt, wie jede Steuerung angesprochen wird, woher die Erreichbarkeit stammt und ob die Konto-Anmeldung geklappt hat.",
+        "ru": "Отчёт диагностики теперь показывает, как управляется каждая функция, откуда берётся доступность и удался ли вход в аккаунт.",
+        "pt": "O relatório de diagnóstico mostra agora como cada controlo é acionado, de onde vem a acessibilidade e se o início de sessão funcionou.",
+        "nl": "Het diagnoserapport toont nu hoe elke bediening verloopt, waar de bereikbaarheid vandaan komt en of het accountaanmelden lukte.",
+        "fr": "Le rapport de diagnostic montre désormais comment chaque commande est acheminée, d'où vient l'accessibilité et si la connexion a réussi.",
+        "it": "Il rapporto diagnostico mostra ora come viene comandata ogni funzione, da dove proviene la raggiungibilità e se l'accesso è riuscito.",
+        "es": "El informe de diagnóstico muestra ahora cómo se controla cada función, de dónde procede la accesibilidad y si el inicio de sesión funcionó.",
+        "pl": "Raport diagnostyczny pokazuje teraz, jak sterowana jest każda funkcja, skąd pochodzi osiągalność i czy logowanie do konta się powiodło.",
+        "uk": "Звіт діагностики тепер показує, як керується кожна функція, звідки береться доступність і чи вдався вхід в обліковий запис.",
+        "zh-cn": "诊断报告现在会显示每项控制通过哪条通道下达、设备可达性的来源，以及账户登录是否成功。"
       },
       "2.29.3": {
         "en": "Cloud datapoints like brightness are translated now; after a restart the list of unreachable group members is rebuilt right away.",

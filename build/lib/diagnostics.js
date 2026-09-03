@@ -104,6 +104,8 @@ class DiagnosticsCollector {
   cacheSnapshotProvider = null;
   localSnapshotsProvider = null;
   environmentProvider = null;
+  /** Control-path provider — see {@link ControlPathProvider}. */
+  controlPathProvider = null;
   /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
   accountCalls = [];
   objectTreeProvider = null;
@@ -139,6 +141,15 @@ class DiagnosticsCollector {
    */
   setEnvironmentProvider(provider) {
     this.environmentProvider = provider;
+  }
+  /**
+   * Wire the control-path resolver — the routing between a datapoint and the
+   * channel that would carry a write to it.
+   *
+   * @param provider Resolves the routing, or null to clear
+   */
+  setControlPathProvider(provider) {
+    this.controlPathProvider = provider;
   }
   /**
    * Wire the object-tree reader. Scoped to one device prefix by contract —
@@ -549,6 +560,15 @@ class DiagnosticsCollector {
     if (this.objectTreeProvider && prefix) {
       objectTree = await this.objectTreeProvider(prefix).catch(() => null);
     }
+    let controlPaths = null;
+    if (this.controlPathProvider && objectTree) {
+      const writable = objectTree.filter((e) => e.write === true).map((e) => e.id);
+      try {
+        controlPaths = this.controlPathProvider(device, writable);
+      } catch {
+        controlPaths = null;
+      }
+    }
     const report = {
       // The file is read by a stranger with none of our context, so it says up
       // front what it is and — crucially — that it has been pseudonymised.
@@ -681,6 +701,9 @@ class DiagnosticsCollector {
       // Account-wide, so it appears in every device's report: without it a dead
       // push channel has no reason in the report at all.
       accountCalls: this.accountCalls.slice(),
+      // "How is this device actually driven" — the question a report has to
+      // answer before a stranger's model can be added to the catalogue.
+      controlPaths,
       // The datapoints as they really exist, with type, role, unit and value.
       // Null when no prefix was passed (the device has no tree yet).
       objectTree
