@@ -22,7 +22,7 @@ export type LanStatusCallback = (sourceIp: string, status: LanStatus) => void;
 
 /**
  * Callback fired for every outgoing UDP datagram. Wired to the DiagnosticsCollector
- * via main.ts so `diag.export` carries the verbatim bytes the adapter put on the
+ * via main.ts so the report carries the verbatim bytes the adapter put on the
  * wire — closes the "did the adapter even send the snapshot?" diag blind spot.
  *
  * Note: ip is the destination, not a device id. main.ts resolves to deviceId.

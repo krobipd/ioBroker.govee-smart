@@ -71,7 +71,7 @@ export class GoveeCloudClient {
   /**
    * Diagnostics hook — receives (deviceId, endpoint, body) for each
    * response. Optional; the adapter wires it to a DiagnosticsCollector
-   * for `diag.export`.
+   * for the diagnostics report.
    */
   private onResponse: ((deviceId: string, endpoint: string, body: unknown) => void) | null = null;
 

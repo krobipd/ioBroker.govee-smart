@@ -1578,9 +1578,9 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
     }
   }
 
-  // NO diag states for groups: the diag button never had a group handler
-  // (BaseGroup writes route entirely into the command fan-out, which drops
-  // diag.export silently), StateManager.createInfoStates removes a leftover
+  // NO diag states for groups: a report was never built for a group (the
+  // admin card offers real devices only), StateManager.createInfoStates
+  // removes a leftover
   // groups.*.diag channel, and Pattern 33 documents groups without
   // diagnostics. Creating the states here only produced a dead button that
   // was deleted and re-created on every group refresh.

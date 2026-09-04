@@ -51,7 +51,7 @@ class GoveeCloudClient {
   /**
    * Diagnostics hook — receives (deviceId, endpoint, body) for each
    * response. Optional; the adapter wires it to a DiagnosticsCollector
-   * for `diag.export`.
+   * for the diagnostics report.
    */
   onResponse = null;
   /**

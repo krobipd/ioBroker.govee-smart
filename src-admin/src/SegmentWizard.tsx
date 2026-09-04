@@ -36,11 +36,15 @@ function gapsUpTo(limit: number, confirmed: number[]): number[] {
 }
 
 /**
- * Interactive segment-detection wizard. Drives the tested backend
- * (getSegmentDevices + segmentWizard onMessage handlers) through
- * {@link makeWizardApi} and renders a live {@link SegmentGrid} that fills in as
- * each segment is measured and can be corrected in the review screen before it
- * is applied.
+ * Interactive segment-detection wizard. Drives the tested backend (the
+ * `segmentWizard` onMessage handler) through {@link makeWizardApi} and renders
+ * a live {@link SegmentGrid} that fills in as each segment is measured and can
+ * be corrected in the review screen before it is applied.
+ *
+ * The device list is NOT its own any more: since 2.31.0 both halves of the
+ * Expert tab share one list command and this half narrows it with
+ * {@link segmentCapable}. The backend still refuses to start on an unreachable
+ * device, so that filter only decides what is offered.
  *
  * Flow: select → measure (yes/no) → "Finished" moves to review **locally**
  * (the backend session stays open) → apply finalizes with the corrected map.

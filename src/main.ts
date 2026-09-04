@@ -584,7 +584,7 @@ export class GoveeAdapter extends utils.Adapter {
 
       // v2.9.1 — wire diag providers so generate() can render persisted-cache,
       // local-snapshots and adapter-runtime state. Providers are pulled at
-      // diag.export time, so a wizard that's running THEN gets captured even
+      // export time, so a wizard that's running THEN gets captured even
       // though the collector itself doesn't track it live.
       const diag = this.deviceManager.getDiagnostics();
       diag.setCacheSnapshotProvider((sku, deviceId) => this.skuCache?.loadOne(sku, deviceId) ?? null);
@@ -834,7 +834,7 @@ export class GoveeAdapter extends utils.Adapter {
         this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
-        // so diag.export contains the recent packets per device. v2.9.1: the
+        // so the report contains the recent packets per device. v2.9.1: the
         // hook gets both BLE-hex (op.command) and the raw JSON envelope so
         // state-only pushes are also captured.
         this.mqttClient.setPacketHook((deviceId, topic, payload) => {

@@ -160,7 +160,7 @@ interface DeviceBuffers {
  * Old sizes (20/10/3/12) were tuned for sparse Cloud-only debugging; the v2.9.1
  * Coverage-Welle adds LAN sends + MQTT raw envelopes + per-fetch raw bodies
  * → previous caps would evict the first interesting frames before a user could
- * trigger the diag.export button.
+ * ask for a report.
  *
  * Entry COUNTS alone bound nothing useful: 24 endpoints × 6 slots × 64 KB plus
  * 50 packets × 64 KB is well over 10 MB per device in theory, and a light with
@@ -386,8 +386,8 @@ function byteSize(value: unknown): number {
 }
 
 /**
- * Collects diagnostic context per device and produces the
- * `diag.result` JSON. Replaces the inline
+ * Collects diagnostic context per device and produces the report JSON that
+ * the admin card hands to the browser. Replaces the inline
  * `device-manager.generateDiagnostics()` so log/MQTT/API hooks can write
  * data without coupling to DeviceManager.
  *

@@ -783,7 +783,7 @@ class DeviceManager {
         return;
       case "unknown":
         this.log.warn(
-          `Device ${label} is not in the supported device list. Please trigger diag.export and attach the resulting JSON to a GitHub issue so the SKU can be added.`
+          `Device ${label} is not in the supported device list. Please open the adapter's Expert tab, create a diagnostics report for it and attach the file to a GitHub issue so the SKU can be added.`
         );
         return;
     }

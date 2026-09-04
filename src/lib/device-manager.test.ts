@@ -3626,7 +3626,11 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     dm.maybeNudgeSeedSku("HZZZZ", "Mystery");
     expect(warns).toHaveLength(1);
     expect(warns[0]).toContain("not in the supported device list");
-    expect(warns[0]).toContain("diag.export");
+    // The hint must name a path that EXISTS. Until 2.31.0 it told the user to
+    // trigger `diag.export` — a datapoint removed in that same release, and this
+    // assertion pinned the stale wording instead of catching it.
+    expect(warns[0]).toContain("Expert tab");
+    expect(warns[0]).not.toContain("diag.export");
   });
 });
 

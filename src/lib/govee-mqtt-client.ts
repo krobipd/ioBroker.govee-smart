@@ -641,7 +641,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   /**
    * Register a hook called for every parsed MQTT packet. Used by the
    * adapter to forward op.command hex strings + the raw JSON envelope into
-   * the DiagnosticsCollector for `diag.export`.
+   * the DiagnosticsCollector for the diagnostics report.
    *
    * @param cb Callback receiving (deviceId, topic, {hex?, rawJson?})
    */
