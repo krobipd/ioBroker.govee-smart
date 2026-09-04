@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.31.0",
+    "version": "2.31.1",
     "news": {
+      "2.31.1": {
+        "en": "Fixed: when the adapter met an unknown device model, its log asked for a button that 2.31.0 had removed — it now points at the Expert tab",
+        "de": "Behoben: Bei einem unbekannten Gerätemodell verwies das Protokoll auf einen Knopf, den 2.31.0 entfernt hatte — es nennt jetzt den Reiter „Experte“",
+        "ru": "Исправлено: при неизвестной модели устройства журнал ссылался на кнопку, удалённую в 2.31.0 — теперь он указывает на вкладку «Эксперт»",
+        "pt": "Corrigido: perante um modelo desconhecido, o registo pedia um botão removido na 2.31.0 — agora indica o separador Especialista",
+        "nl": "Opgelost: bij een onbekend apparaatmodel verwees het logboek naar een knop die 2.31.0 had verwijderd — het noemt nu het tabblad Expert",
+        "fr": "Corrigé : face à un modèle inconnu, le journal renvoyait à un bouton supprimé en 2.31.0 — il indique désormais l'onglet Expert",
+        "it": "Corretto: con un modello sconosciuto il log rimandava a un pulsante rimosso nella 2.31.0 — ora indica la scheda Esperto",
+        "es": "Corregido: ante un modelo desconocido, el registro pedía un botón eliminado en 2.31.0: ahora indica la pestaña Experto",
+        "pl": "Naprawiono: przy nieznanym modelu dziennik odsyłał do przycisku usuniętego w 2.31.0 — teraz wskazuje zakładkę Ekspert",
+        "uk": "Виправлено: для невідомої моделі журнал посилався на кнопку, вилучену в 2.31.0 — тепер він вказує на вкладку «Експерт»",
+        "zh-cn": "修复：遇到未知设备型号时，日志要求按下 2.31.0 已移除的按钮 — 现在改为指向“专家”选项卡"
+      },
       "2.31.0": {
         "en": "Fixed: on instances upgraded from 2.27.0 or newer every admin card was dead; affected installations repair themselves on the next start\nFixed: a card that could not reach the adapter reported \"no devices yet\" instead of the real error\nChanged: segment detection and diagnostics share one Expert tab with a button each\nChanged: the per-device diag.export button is gone; the Expert tab hands you the file in one press\nChanged: diag.lastExport now records WHEN the last report was taken\nImproved: both cards say \"Loading devices …\" while they search\nFixed: the diagnostics report described the reachability rule as it was before 2.30.0",
         "de": "Behoben: Auf Instanzen ab 2.27.0 war jede Admin-Karte funktionslos; betroffene Installationen reparieren sich beim nächsten Start selbst\nBehoben: Eine Karte, die den Adapter nicht erreichte, meldete „noch keine Geräte“ statt des echten Fehlers\nGeändert: Segment-Erkennung und Diagnose teilen sich einen Reiter „Experte“ mit je einem Knopf\nGeändert: Der Knopf diag.export je Gerät entfällt; der Reiter Experte liefert die Datei in einem Druck\nGeändert: diag.lastExport hält jetzt fest, WANN der letzte Bericht erzeugt wurde\nVerbessert: Beide Karten schreiben „Geräte werden geladen …“ während der Suche\nBehoben: Der Diagnosebericht beschrieb die Erreichbarkeits-Regel im Stand vor 2.30.0",
@@ -80,19 +93,6 @@
         "pl": "Wyłączone urządzenie znów jest pokazywane jako niedostępne — 2.29.0 twierdziła inaczej. Eksport diagnostyczny znów działa.",
         "uk": "Вимкнений пристрій знову показується як недоступний — 2.29.0 стверджувала протилежне. Експорт діагностики знову працює.",
         "zh-cn": "已断电的设备重新显示为不可达——2.29.0 曾报告相反。诊断导出恢复正常。"
-      },
-      "2.29.0": {
-        "en": "Devices without the local API no longer show as unreachable while they still control fine. The diagnostics report is a file you can attach now — diag.result is gone.",
-        "de": "Geräte ohne lokale Schnittstelle werden nicht mehr als nicht erreichbar angezeigt, obwohl sie sich steuern lassen. Der Diagnosebericht ist jetzt eine Datei zum Anhängen — diag.result entfällt.",
-        "ru": "Устройства без локального API больше не отображаются как недоступные, хотя управление работает. Отчёт диагностики теперь файл для вложения — diag.result удалён.",
-        "pt": "Dispositivos sem API local deixam de aparecer como inacessíveis embora funcionem. O relatório de diagnóstico é agora um ficheiro para anexar — diag.result foi removido.",
-        "nl": "Apparaten zonder lokale API worden niet meer als onbereikbaar getoond terwijl ze gewoon werken. Het diagnoserapport is nu een bestand om toe te voegen — diag.result vervalt.",
-        "fr": "Les appareils sans API locale ne sont plus affichés comme injoignables alors qu'ils fonctionnent. Le rapport de diagnostic est désormais un fichier à joindre — diag.result disparaît.",
-        "it": "I dispositivi senza API locale non risultano più irraggiungibili pur funzionando. Il rapporto di diagnostica è ora un file da allegare — diag.result è stato rimosso.",
-        "es": "Los dispositivos sin API local ya no aparecen como inaccesibles aunque funcionen. El informe de diagnóstico es ahora un archivo para adjuntar — diag.result se ha eliminado.",
-        "pl": "Urządzenia bez lokalnego API nie są już pokazywane jako niedostępne, choć działają. Raport diagnostyczny to teraz plik do załączenia — diag.result został usunięty.",
-        "uk": "Пристрої без локального API більше не показуються як недоступні, хоча керування працює. Звіт діагностики тепер файл для вкладення — diag.result вилучено.",
-        "zh-cn": "未启用本地接口的设备不再显示为不可达，尽管其控制正常。诊断报告现在是可附加的文件——diag.result 已移除。"
       }
     },
     "plugins": {

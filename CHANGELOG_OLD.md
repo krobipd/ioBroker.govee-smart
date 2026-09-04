@@ -1,4 +1,8 @@
 # Older Changes
+## 2.29.2 (2026-09-03)
+
+- Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text
+
 ## 2.29.1 (2026-09-03)
 
 - Fixed: A device that is switched off or unplugged is shown as not reachable again — 2.29.0 reported it as reachable whenever the Cloud was up

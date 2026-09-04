@@ -100,6 +100,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+### 2.31.1 (2026-09-04)
+
+- Fixed: When the adapter met a device model it does not know yet, its log asked the user to press a button that 2.31.0 had removed — it now points at the Expert tab, where the report is actually made
+
 ### 2.31.0 (2026-09-03)
 
 - Fixed: On instances upgraded from 2.27.0 or newer, every admin card was dead — diagnostics, segment wizard and connection test alike; affected installations repair themselves on the next start
@@ -131,10 +135,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: Cloud-controlled datapoints such as brightness or the gradient switch are translated instead of carrying Govee's English wording
 - Fixed: A stray datapoint left behind by an early version 2 release disappears from the object tree on the next start
 - Fixed: After a restart the list of unreachable group members is rebuilt right away instead of keeping the value from before the restart
-
-### 2.29.2 (2026-09-03)
-
-- Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
