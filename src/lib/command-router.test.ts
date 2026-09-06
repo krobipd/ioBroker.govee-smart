@@ -209,6 +209,59 @@ describe("CommandRouter", () => {
       await router.sendCommand(device, "power", true);
       expect(warns.some(w => /no channel/i.test(w))).toBe(true);
     });
+
+    it("a LAN case that falls through to a FAILING Cloud call rejects — the state may not be acked", async () => {
+      // `control.scene` has no LAN case at all, so every scene write on a LAN
+      // light lands in the default branch and goes to the cloud. This used to
+      // be fire-and-forget: sendCommand resolved, the router acked the state,
+      // and a cloud call that failed afterwards was invisible — the user saw a
+      // confirmed scene and an unchanged strip.
+      const lan = makeLanStub();
+      const limiter = makeRateLimiter();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      router.setRateLimiter(limiter);
+      router.setCloudClient({
+        controlDevice: () => Promise.reject(new Error("Govee quota exceeded")),
+      } as never);
+      await expect(router.sendCommand(makeDevice(), "scene", 3)).rejects.toThrow(/quota/i);
+    });
+
+    it("the same fallback with no API key at all rejects instead of confirming silently", async () => {
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      // No cloud client: the command cannot be sent by any route.
+      await expect(router.sendCommand(makeDevice(), "scene", 3)).rejects.toThrow(/No Cloud connection/i);
+    });
+
+    it("a failed fallback is recorded as a FAILURE in the diagnostics report", async () => {
+      // The report claimed `transport: "LAN", ok: true` for exactly this case —
+      // it is the one place a maintainer looks to see whether a command landed.
+      const results: Array<{ ok: boolean; error?: string }> = [];
+      const lan = makeLanStub();
+      const limiter = makeRateLimiter();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      router.setRateLimiter(limiter);
+      router.setCloudClient({
+        controlDevice: () => Promise.reject(new Error("Govee quota exceeded")),
+      } as never);
+      router.onCommandResult = (_, r) => results.push(r);
+      await expect(router.sendCommand(makeDevice(), "scene", 3)).rejects.toThrow();
+      expect(results).toHaveLength(1);
+      expect(results[0].ok).toBe(false);
+      expect(results[0].error).toMatch(/quota/i);
+    });
+
+    it("a cloud command for a capability the device does not have rejects", async () => {
+      const limiter = makeRateLimiter();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setRateLimiter(limiter);
+      router.setCloudClient(makeCloudStub().client);
+      const device = makeDevice({ lanIp: undefined, capabilities: [] });
+      await expect(router.sendCommand(device, "power", true)).rejects.toThrow(/no matching capability/i);
+    });
   });
 
   describe("segmentColor / segmentBrightness routing", () => {

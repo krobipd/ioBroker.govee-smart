@@ -379,7 +379,7 @@ export class CommandRouter {
 
     // Generic dispatch
     if (decision.kind === "lan") {
-      this.sendLanCommand(device, command, value);
+      await this.sendLanCommand(device, command, value);
       return;
     }
     // decision.kind === "cloud"
@@ -858,7 +858,7 @@ export class CommandRouter {
    * @param command Command type
    * @param value Command value
    */
-  private sendLanCommand(device: GoveeDevice, command: string, value: unknown): void {
+  private async sendLanCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     if (!device.lanIp || !this.lanClient) {
       return;
     }
@@ -898,7 +898,7 @@ export class CommandRouter {
           }
         }
         // No library match — fall through to Cloud
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       case "lightScene": {
@@ -936,7 +936,7 @@ export class CommandRouter {
           }
         }
         // Scene not in library — fall through to Cloud
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       case "snapshot": {
@@ -955,32 +955,45 @@ export class CommandRouter {
           }
         }
         // No BLE data — fall through to Cloud
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       default:
         // LAN doesn't support this command — fall through to Cloud
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
     }
   }
 
   /**
-   * Fire-and-forget Cloud fallback when a LAN-case can't service the
-   * command locally (library miss, no BLE data, unsupported). Dedup
-   * through the shared category map so log spam is bounded.
+   * Cloud fallback when a LAN case cannot service the command locally (library
+   * miss, no BLE data, unsupported command). Dedup through the shared category
+   * map so log spam is bounded, then RETHROW.
+   *
+   * The rethrow is the point. This used to be fire-and-forget: `sendCommand`
+   * resolved the moment the datagram path gave up, the state-change router
+   * acked the state, and a cloud call that failed afterwards — quota,
+   * rejected key, no network — was invisible. The user saw a confirmed scene
+   * and an unchanged strip, and the diagnostics report recorded the command as
+   * `transport: "LAN", ok: true`. Reachable through `control.scene` on every
+   * device (LAN has no case for it), through a scene or DIY scene missing from
+   * the library, and through a snapshot with no BLE packets.
    *
    * @param device Target device
    * @param command Command type
    * @param value Command value
+   * @throws {Error} When the cloud cannot service the command either
    */
-  private cloudFallbackForCase(device: GoveeDevice, command: string, value: unknown): void {
-    this.sendCloudCommand(device, command, value).catch(e => {
+  private async cloudFallbackForCase(device: GoveeDevice, command: string, value: unknown): Promise<void> {
+    try {
+      await this.sendCloudCommand(device, command, value);
+    } catch (e) {
       const prev = this.lastErrorByCategory.get("cloud-fallback") ?? null;
       this.lastErrorByCategory.set(
         "cloud-fallback",
         logDedup(this.log, prev, `Cloud fallback for ${deviceLabel(device)}/${command}`, e),
       );
-    });
+      throw e;
+    }
   }
 
   /**
@@ -996,7 +1009,12 @@ export class CommandRouter {
     // sendBudgeted (e.g. adapter stop mid-await).
     const cloudClient = this.cloudClient;
     if (!cloudClient) {
-      return;
+      // Throw rather than return: the command did NOT run, and a silent return
+      // let the caller ack the state as if it had. Reached when the adapter is
+      // stopping mid-command, and on a fallback in an installation with no API
+      // key at all — where the user would otherwise get a confirmation for a
+      // scene that could never be sent.
+      throw new Error(`No Cloud connection for ${deviceLabel(device)}/${command} (no API key, or adapter stopping)`);
     }
 
     // Find the matching capability
@@ -1014,7 +1032,8 @@ export class CommandRouter {
           new Error("no matching capability"),
         ),
       );
-      return;
+      // Same reason as above — nothing was sent, so nothing may be acked.
+      throw new Error(`No matching capability for ${deviceLabel(device)}/${command}`);
     }
 
     const cloudValue = this.toCloudValue(device, command, value);

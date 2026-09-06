@@ -5,6 +5,9 @@ export default [
   {
     languageOptions: {
       parserOptions: {
+        // `tools/` carries its own tsconfig, which projectService discovers on
+        // its own — the folder used to be excluded from the linter entirely,
+        // although it holds a CI gate that decides whether a release goes out.
         projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts"] },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -34,7 +37,6 @@ export default [
       ".vscode/",
       "*.test.js",
       "test/**",
-      "tools/**",
       // Release-Werkzeug wie bei public-holidays: laeuft unter node, nicht Teil des
       // Adapter-Typprojekts (sonst „not found by the project service").
       "scripts/**",

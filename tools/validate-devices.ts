@@ -30,7 +30,21 @@ const ALLOWED_TYPES = new Set([
 
 const ALLOWED_STATUS = new Set(["verified", "reported", "seed"]);
 
-const KNOWN_QUIRK_FIELDS = new Set(["colorTempRange", "brokenPlatformApi", "transportOverrides"]);
+/**
+ * Every quirk family the adapter actually consumes. `segmentCount` was missing
+ * here while it existed in the schema, the `DeviceQuirks` interface and
+ * `resolveSegmentCount` — no catalogue entry uses it yet, so CI stayed green
+ * and the gap only surfaced on the first entry that did, as
+ * "unknown quirk field 'segmentCount'".
+ */
+const KNOWN_QUIRK_FIELDS = new Set(["colorTempRange", "brokenPlatformApi", "transportOverrides", "segmentCount"]);
+
+/**
+ * The Govee segment bitmask is 7 bytes × 8 bits, so it addresses slots 0..55 —
+ * 56 of them. Mirrors `SEGMENT_COUNT_MAX` in `src/lib/device-manager/lookups.ts`;
+ * the schema said 55 and would have rejected a legitimate 56-segment strip.
+ */
+const SEGMENT_COUNT_MAX = 56;
 
 const ALLOWED_OVERRIDE_COMMANDS = new Set([
   "power",
@@ -142,6 +156,15 @@ function validate(devicesJsonPath: string): Issue[] {
         }
         if (q.brokenPlatformApi !== undefined && typeof q.brokenPlatformApi !== "boolean") {
           issues.push({ sku, msg: "'brokenPlatformApi' must be boolean" });
+        }
+        if (q.segmentCount !== undefined) {
+          const n = q.segmentCount;
+          if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > SEGMENT_COUNT_MAX) {
+            issues.push({
+              sku,
+              msg: `'segmentCount' must be an integer in 1..${SEGMENT_COUNT_MAX} (got ${JSON.stringify(n)})`,
+            });
+          }
         }
         if (q.transportOverrides !== undefined) {
           const t = q.transportOverrides;

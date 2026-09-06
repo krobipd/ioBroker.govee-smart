@@ -3,7 +3,9 @@
   "$id": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/devices.schema.json",
   "title": "Govee device support catalog",
   "type": "object",
-  "required": ["devices"],
+  "required": [
+    "devices"
+  ],
   "properties": {
     "_comment": {
       "type": "string",
@@ -23,7 +25,11 @@
   "definitions": {
     "deviceEntry": {
       "type": "object",
-      "required": ["name", "type", "status"],
+      "required": [
+        "name",
+        "type",
+        "status"
+      ],
       "properties": {
         "name": {
           "type": "string",
@@ -44,13 +50,18 @@
             "socket",
             "kettle",
             "ice_maker",
-            "aroma_diffuser", "button"
+            "aroma_diffuser",
+            "button"
           ],
           "description": "Device category — corresponds to Govee API type without the 'devices.types.' prefix."
         },
         "status": {
           "type": "string",
-          "enum": ["verified", "reported", "seed"],
+          "enum": [
+            "verified",
+            "reported",
+            "seed"
+          ],
           "description": "verified = multiple confirmed reports, reported = 1 user with diagnostics, seed = imported from external source / untested."
         },
         "since": {
@@ -69,10 +80,21 @@
       "properties": {
         "colorTempRange": {
           "type": "object",
-          "required": ["min", "max"],
+          "required": [
+            "min",
+            "max"
+          ],
           "properties": {
-            "min": { "type": "integer", "minimum": 1000, "maximum": 12000 },
-            "max": { "type": "integer", "minimum": 1000, "maximum": 12000 }
+            "min": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 12000
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 1000,
+              "maximum": 12000
+            }
           },
           "additionalProperties": false,
           "description": "Override color-temperature range — Govee API often claims pauschal 2000-9000K, real range is narrower."
@@ -80,8 +102,8 @@
         "segmentCount": {
           "type": "integer",
           "minimum": 1,
-          "maximum": 55,
-          "description": "Override segment count — Govee's segment capabilities sometimes advertise more slots than the strip physically has. Hard override of Cloud, cache and MQTT. Mainly for cloud-only SKUs that can't self-correct via AA-A5 status packets."
+          "maximum": 56,
+          "description": "Override segment count — Govee's segment capabilities sometimes advertise more slots than the strip physically has. Hard override of Cloud, cache and MQTT. Mainly for cloud-only SKUs that can't self-correct via AA-A5 status packets. Range 1..56 — the Govee bitmask is 7 bytes x 8 bits, so it addresses 56 slots (0..55)."
         },
         "brokenPlatformApi": {
           "type": "boolean",
@@ -91,15 +113,60 @@
           "type": "object",
           "description": "Per-command transport override — forces a command through Cloud or LAN regardless of the default LAN-first heuristic. Value 'lan' is a no-op (default routing).",
           "properties": {
-            "power":            { "enum": ["cloud", "lan"] },
-            "brightness":       { "enum": ["cloud", "lan"] },
-            "colorRgb":         { "enum": ["cloud", "lan"] },
-            "colorTemperature": { "enum": ["cloud", "lan"] },
-            "lightScene":       { "enum": ["cloud", "lan"] },
-            "diyScene":         { "enum": ["cloud", "lan"] },
-            "snapshot":         { "enum": ["cloud", "lan"] },
-            "gradientToggle":   { "enum": ["cloud", "lan"] },
-            "segmentBatch":     { "enum": ["cloud", "lan"] }
+            "power": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "brightness": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "colorRgb": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "colorTemperature": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "lightScene": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "diyScene": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "snapshot": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "gradientToggle": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            },
+            "segmentBatch": {
+              "enum": [
+                "cloud",
+                "lan"
+              ]
+            }
           },
           "additionalProperties": false
         }

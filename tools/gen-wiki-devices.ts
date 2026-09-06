@@ -244,7 +244,9 @@ function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
   // Group by type, ordered by TYPE_ORDER
   const byType = new Map<string, Array<[string, DeviceEntry]>>();
   for (const [sku, entry] of Object.entries(devices)) {
-    if (!byType.has(entry.type)) byType.set(entry.type, []);
+    if (!byType.has(entry.type)) {
+      byType.set(entry.type, []);
+    }
     byType.get(entry.type)!.push([sku, entry]);
   }
   for (const list of byType.values()) {
@@ -272,7 +274,9 @@ function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
   let totalCount = 0;
   for (const type of TYPE_ORDER) {
     const list = byType.get(type);
-    if (!list || !list.length) continue;
+    if (!list || !list.length) {
+      continue;
+    }
     const title = t.typeTitles[type] ?? type;
     out.push(`### ${title} (${list.length})`);
     out.push("");
@@ -283,7 +287,9 @@ function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
 
   // Any types not in TYPE_ORDER (forward-compat)
   for (const [type, list] of byType) {
-    if (TYPE_ORDER.includes(type)) continue;
+    if (TYPE_ORDER.includes(type)) {
+      continue;
+    }
     out.push(`### ${t.typeTitles[type] ?? type} (${list.length})`);
     out.push("");
     out.push(renderTable(list, t));
