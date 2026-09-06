@@ -1,4 +1,6 @@
-import { errMessage, type TimerAdapter } from "./types";
+import { errMessage, type GoveeDevice, type TimerAdapter } from "./types";
+import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { CLOUD_APPLIANCE_DAILY_LIMIT } from "./timing-constants";
 
 /** A queued API call */
 interface QueuedCall {
@@ -11,6 +13,15 @@ interface QueuedCall {
    * the call is evicted from a full queue or the limiter stops before it ran.
    */
   reject?: (err: Error) => void;
+  /**
+   * The device allowance this call belongs to, carried through the queue.
+   *
+   * Without it the per-device budget was booked ONLY on the immediate path:
+   * every call that had to wait for the per-minute limit ran later without
+   * ever being counted. The protection therefore failed exactly under the load
+   * it exists for — a burst is precisely when calls queue.
+   */
+  budget?: DeviceBudget;
 }
 
 /**
@@ -34,6 +45,29 @@ export interface DeviceBudget {
   key: string;
   /** Calls this device may make today. */
   perDay: number;
+}
+
+/**
+ * The daily allowance for one device, where Govee imposes one.
+ *
+ * Only appliances have their own budget — 100 calls a day, against the
+ * account's 10,000 — and only appliances have no local path, so every write is
+ * a cloud call. Lights and groups keep the global budget: a light's writes go
+ * over the LAN, and its rare cloud fallbacks are covered by the account limit.
+ *
+ * Lives next to the limiter rather than in the command router: the router is
+ * not the only caller that spends an appliance's allowance — the cloud state
+ * read does too, and while this helper was private to the router that call
+ * went unbudgeted while its own comment claimed otherwise.
+ *
+ * @param device The device a call is being made for
+ * @returns The device's allowance, or undefined when only the global one applies
+ */
+export function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined {
+  if (!device || device.type === GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
+    return undefined;
+  }
+  return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
 }
 
 /**
@@ -178,8 +212,9 @@ export class RateLimiter {
    * @param execute The API call to make
    * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
    * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
+   * @param budget The device's own daily allowance, when one applies — booked when the call actually runs, not when it is queued
    */
-  enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void): boolean {
+  enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void, budget?: DeviceBudget): boolean {
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
       // Queue full. The queue is sorted ascending, so the tail is the
       // lowest-priority call. Evict it in favour of the new call when the new
@@ -199,7 +234,7 @@ export class RateLimiter {
       const evicted = this.queue.pop(); // evict the lowest-priority queued call to make room
       evicted?.reject?.(new Error("Cloud call evicted — rate-limiter queue full"));
     }
-    this.queue.push({ execute, priority, reject });
+    this.queue.push({ execute, priority, reject, budget });
     // Sort by priority (lower first)
     this.queue.sort((a, b) => a.priority - b.priority);
     return true;
@@ -222,7 +257,7 @@ export class RateLimiter {
       await execute();
       return true;
     }
-    this.enqueue(execute, priority);
+    this.enqueue(execute, priority, undefined, budget);
     return false;
   }
 
@@ -301,6 +336,7 @@ export class RateLimiter {
         },
         priority,
         reject,
+        budget,
       );
       if (!accepted) {
         reject(new Error("Cloud call dropped — rate-limiter queue full"));
@@ -342,8 +378,21 @@ export class RateLimiter {
     while (this.queue.length > 0 && this.canMakeCall()) {
       const call = this.queue.shift();
       if (call) {
-        this.callsThisMinute++;
-        this.callsToday++;
+        // Re-check the device allowance HERE, not only when the call was
+        // queued: while this one waited, immediate calls for the same device
+        // may have spent the rest of its day. Running it anyway would overrun
+        // Govee's 100/day for an appliance — the exact case the allowance
+        // exists for, and the one the old code could not see because it never
+        // carried the budget into the queue.
+        if (call.budget && this.deviceBudgetSpent(call.budget)) {
+          call.reject?.(
+            new Error(`Daily Govee budget for ${call.budget.key} is used up (${call.budget.perDay} calls)`),
+          );
+          continue;
+        }
+        // spend(), not two raw increments: this was the second booking site and
+        // the only one that did not know about device allowances.
+        this.spend(call.budget);
         call.execute().catch(err => {
           this.log.debug(`Queued call failed: ${errMessage(err)}`);
         });

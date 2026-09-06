@@ -4,6 +4,7 @@ import type { DeviceRegistry } from "./device-registry";
 import type { GoveeDevice } from "./types";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { isLanDriven, resolveDeviceReachability } from "./device-manager/lookups";
+import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -1120,25 +1121,40 @@ export class DiagnosticsCollector {
     const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
     const lanDriven = isLanDriven(device);
 
-    // What stays silent follows from HOW the device is driven, not from what
-    // happened to decide this time.
+    // What stays silent, and what can renew the evidence, both follow from HOW
+    // the device is driven — not from what happened to decide this time. Each
+    // renewer names the credentials it needs, because that is the difference
+    // between "this proof gets refreshed" and "this proof expires in 30
+    // minutes and the device goes grey": every renewer but the last one needs
+    // the Govee account, and an installation with only an API key has none.
     const silent: string[] = [];
+    const renewers: string[] = [];
     if (lanDriven) {
-      silent.push("cloud state poll (a LAN-driven light is never cloud-driven)");
-      silent.push("account push (barred for lights — the broker replays retained messages)");
-    } else if (isLight) {
-      silent.push("LAN reply (device has no local API enabled)");
-      silent.push("account push (barred for lights — the broker replays retained messages)");
+      // maybeApplyCloudOnline bails on isLanDriven, so NO cloud source can
+      // speak for this device — in either direction.
+      silent.push("cloud state read (a LAN-driven light ignores every cloud claim)");
+      silent.push("account push (same reason)");
+      silent.push("app device list (same reason)");
+      silent.push("cloud event push (same reason)");
+      renewers.push("LAN scan, every 30 s");
     } else {
-      silent.push("LAN reply (not a light)");
+      silent.push(isLight ? "LAN reply (device has no local API enabled)" : "LAN reply (not a light)");
+      renewers.push("account push, event-driven (needs email + password)");
+      renewers.push("app device list, every 2 min (needs email + password)");
+      renewers.push("cloud event push, event-driven (needs the API key)");
+      renewers.push(
+        `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min (needs the API key)`,
+      );
     }
 
-    const refreshedBy = lanDriven ? "LAN scan, every 30 s" : "app device list every 2 min, plus event pushes";
+    const refreshedBy = renewers.join("; ");
 
     const decidedBy = {
       lanReply: "LAN reply freshness",
       gatewayDown: "its gateway is down — a device behind a gateway can be no more reachable than the gateway",
-      cloudReport: isLight ? "Govee reported it (cloud state poll)" : "Govee reported it (app poll or event push)",
+      cloudReport: "Govee reported it explicitly (an `online` capability)",
+      cloudLiveness:
+        "Govee delivered something for this device without reporting reachability — the payload proves it spoke",
       noEvidence: "nothing ever reported — reported as not reachable",
     }[decision.decidedBy];
 

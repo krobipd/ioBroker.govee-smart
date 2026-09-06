@@ -1,4 +1,4 @@
-import { SEGMENT_COUNT_MAX, SEGMENT_HARD_MAX } from "./device-manager/lookups";
+import { SEGMENT_COUNT_MAX, SEGMENT_HARD_MAX, resolveDeviceReachability } from "./device-manager/lookups";
 import { WIZARD_IDLE_TIMEOUT_MS } from "./timing-constants";
 import { deviceLabel, type GoveeDevice } from "./types";
 import { readDeviceBaseline, restoreSegmentsGrouped } from "./device-baseline";
@@ -314,7 +314,10 @@ export class SegmentWizard {
     // that drops off between loading the list and pressing start would reach
     // this point — and the wizard would flash segments at something that cannot
     // answer, with nothing on screen to explain the silence.
-    if (device.state?.online !== true) {
+    // The resolver, so this guard and the list the card filtered on give the
+    // same answer — the raw flag is only maintained for lights with a proven
+    // reachability and said "reachable" for devices the tree showed as grey.
+    if (!resolveDeviceReachability(device).online) {
       return {
         error: this.t("errDeviceOffline", { name: device.name }),
       };

@@ -454,6 +454,74 @@ describe("per-device daily budget", () => {
     expect(other).toBe(1);
   });
 
+  it("a QUEUED call is booked against the device allowance, not only an immediate one", async () => {
+    // The protection used to fail exactly under load: the allowance was booked
+    // only on the immediate path, so every call that had to wait for the
+    // per-minute limit ran later without ever being counted. A burst is
+    // precisely when calls queue.
+    const limiter = new RateLimiter(mockLog, mockTimers, 0, 10_000); // minute limit 0 → everything queues
+    let ran = 0;
+    for (let i = 0; i < 3; i++) {
+      await limiter.tryExecute(
+        () => {
+          ran += 1;
+          return Promise.resolve();
+        },
+        0,
+        APPLIANCE,
+      );
+    }
+    expect(limiter.getUsageSnapshot().queueLength).toBe(3);
+    // Give the queue room and drain it.
+    (limiter as unknown as { perMinuteLimit: number }).perMinuteLimit = 100;
+    (limiter as unknown as { processQueue: () => void }).processQueue();
+    await Promise.resolve();
+    expect(ran).toBe(3);
+    expect(limiter.getUsageSnapshot().usedToday).toBe(3);
+    // Booked — so the very next call for this device is refused.
+    const accepted = await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    expect(accepted).toBe(false);
+  });
+
+  it("a queued call is dropped when immediate calls spent the allowance while it waited", async () => {
+    const limiter = new RateLimiter(mockLog, mockTimers, 1, 10_000);
+    let queuedRan = 0;
+    // First call runs immediately (minute limit 1), the second queues.
+    await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    await limiter.tryExecute(
+      () => {
+        queuedRan += 1;
+        return Promise.resolve();
+      },
+      0,
+      APPLIANCE,
+    );
+    expect(limiter.getUsageSnapshot().queueLength).toBe(1);
+    // Two more immediate calls exhaust the allowance of 3 before the queue runs.
+    (limiter as unknown as { callsThisMinute: number }).callsThisMinute = 0;
+    await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    (limiter as unknown as { callsThisMinute: number }).callsThisMinute = 0;
+    await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    (limiter as unknown as { callsThisMinute: number }).callsThisMinute = 0;
+    (limiter as unknown as { processQueue: () => void }).processQueue();
+    await Promise.resolve();
+    expect(queuedRan, "the queued call must not overrun the device's day").toBe(0);
+  });
+
+  it("a queued TRACKED call rejects instead of hanging when the allowance ran out meanwhile", async () => {
+    const limiter = new RateLimiter(mockLog, mockTimers, 1, 10_000);
+    await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    const tracked = limiter.executeTracked(() => Promise.resolve(), 0, APPLIANCE);
+    // Spend the rest of the allowance while the tracked call sits in the queue.
+    for (let i = 0; i < 2; i++) {
+      (limiter as unknown as { callsThisMinute: number }).callsThisMinute = 0;
+      await limiter.tryExecute(() => Promise.resolve(), 0, APPLIANCE);
+    }
+    (limiter as unknown as { callsThisMinute: number }).callsThisMinute = 0;
+    (limiter as unknown as { processQueue: () => void }).processQueue();
+    await expect(tracked).rejects.toThrow(/budget/i);
+  });
+
   it("a call without a budget is never blocked by one", async () => {
     // Lights keep the global budget: their writes go over the LAN and the rare
     // cloud fallback is covered by the account limit.

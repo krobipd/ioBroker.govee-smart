@@ -69,14 +69,31 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
 }
 
 /**
- * Read the multi-source online indicator from a capability list and apply
- * it to the device's state. Capability list with no explicit online flag
- * is treated as „we just heard from the device" — assume online so a
- * Cloud poll-success doesn't leave a known-good device flagged offline.
+ * Read the reachability signal out of a capability list and apply it.
+ *
+ * A capability list carries two very different things, and this function keeps
+ * them apart because the resolver ranks them differently:
+ *
+ * 1. **An explicit `online` capability** — Govee STATING whether the device is
+ *    reachable. Lands in `state.cloudReportedOnline` + `…At` and counts in both
+ *    directions.
+ * 2. **No such capability, but a non-empty list** — Govee delivered a reading,
+ *    an event or a capability set, and said nothing about reachability. The
+ *    payload exists because the device spoke, so it is evidence; it is only
+ *    ever positive, and it lands in the weaker `state.cloudLivenessAt`.
+ *
+ * Both used to be written into slot 1, and that made the last writer win: an
+ * event arriving seconds after Govee reported `online:false` replaced that
+ * `false` with a fabricated `true` for the next 30 minutes. The architecture
+ * doc has always required the opposite ("an explicit report beats the mere
+ * arrival of a packet"); separate slots are what actually enforce it.
  *
  * Skip the onDeviceUpdate fire if device already-online + still-online,
  * but refresh `lastSeenOnNetwork` either way.
  *
+ * @param adapter Device-manager surface (for the update callback)
+ * @param device Target device
+ * @param caps The capability list that just arrived
  */
 export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, caps: CloudStateCapability[]): void {
   let online: boolean | undefined;
@@ -92,10 +109,21 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
       break;
     }
   }
-  if (online === undefined && caps.length > 0) {
-    online = true;
-  }
+  const now = Date.now();
   if (online === undefined) {
+    if (caps.length === 0) {
+      return;
+    }
+    // Arrival, not a statement. Never written into the report slot — see the
+    // note above. `cloudLivenessAt` expires on the same clock, so this cannot
+    // hold a device green forever either.
+    device.state.cloudLivenessAt = now;
+    device.lastSeenOnNetwork = now;
+    if (device.state.online === true) {
+      return;
+    }
+    device.state.online = true;
+    adapter.onDeviceUpdate?.(device, { online: true });
     return;
   }
   // Remember that Govee spoke at all — `syncInfoOnline` needs to tell "Govee
@@ -103,14 +131,14 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
   device.state.cloudReportedOnline = online;
   // Stamped so the proof can expire (CLOUD_ONLINE_EVIDENCE_TTL_MS). Without a
   // stamp a single "online" would read as reachable forever.
-  device.state.cloudReportedOnlineAt = Date.now();
+  device.state.cloudReportedOnlineAt = now;
   if (device.state.online === online && online === true) {
-    device.lastSeenOnNetwork = Date.now();
+    device.lastSeenOnNetwork = now;
     return;
   }
   device.state.online = online;
   if (online) {
-    device.lastSeenOnNetwork = Date.now();
+    device.lastSeenOnNetwork = now;
   }
   adapter.onDeviceUpdate?.(device, { online });
 }

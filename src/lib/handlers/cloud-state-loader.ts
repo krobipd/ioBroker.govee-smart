@@ -1,7 +1,7 @@
 import { LAN_STATE_IDS, mapCloudStateValue, planCloudCapabilityWrites } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
-import type { RateLimiter } from "../rate-limiter";
+import { applianceBudget, type RateLimiter } from "../rate-limiter";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice } from "../types";
 
@@ -96,7 +96,11 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
       }
     };
     if (adapter.rateLimiter) {
-      await adapter.rateLimiter.tryExecute(loadOne, 2);
+      // With the device's allowance — the doc comment above has always claimed
+      // these calls are covered by the 100/day appliance budget, and until now
+      // none of them were: no budget was passed, so an appliance's state reads
+      // only ever counted against the account-wide limit.
+      await adapter.rateLimiter.tryExecute(loadOne, 2, applianceBudget(device));
     } else {
       await loadOne();
     }

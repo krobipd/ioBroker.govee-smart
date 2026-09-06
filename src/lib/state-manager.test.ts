@@ -1122,7 +1122,18 @@ describe("StateManager", () => {
       const { adapter, objects, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
-      const m1 = createTestDevice({ sku: "H61BE", deviceId: "AABB0011", state: { online: false } });
+      // Genuinely unreachable: no LAN address, no LAN answer, nothing from the
+      // cloud. `state.online = false` alone would leave the base fixture's LAN
+      // stamps in place, and the resolver — which this method now asks, like
+      // every other consumer — would rightly call that device reachable.
+      const m1 = createTestDevice({
+        sku: "H61BE",
+        deviceId: "AABB0011",
+        lanIp: undefined,
+        lastLanReplyAt: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: false },
+      });
       const m2 = createTestDevice({ sku: "H61BC", deviceId: "CCDD2233", state: { online: true } });
 
       await sm.updateGroupMembersUnreachable(group, [m1, m2]);

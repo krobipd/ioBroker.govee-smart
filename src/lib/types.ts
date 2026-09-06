@@ -372,6 +372,16 @@ export interface GoveeDevice {
    */
   lastSeenOnNetwork?: number;
   /**
+   * When the reachability refresh last ISSUED a cloud state read for this
+   * device — the attempt, not its outcome.
+   *
+   * Needed because a call that answers nothing usable leaves the evidence
+   * untouched, so the age test that triggered it would trigger again on the
+   * very next tick, forever. Runtime-only: it is not persisted, and a restart
+   * simply allows one immediate attempt.
+   */
+  lastReachabilityRefreshAt?: number;
+  /**
    * Consecutive account-reconcile passes this device was missing from its
    * authoritative account list (Cloud `/user/devices` for lights/appliances,
    * App-API list for sensors, group list for BaseGroups) while not
@@ -439,24 +449,45 @@ export interface DeviceState {
   /** Whether device is reachable */
   online: boolean;
   /**
-   * What Govee itself last said about reachability, via `applyOnlineCap`
-   * (App-API poll / OpenAPI-MQTT event). `undefined` means Govee has NEVER
-   * reported for this device — which is the normal, permanent case for a light
-   * whose owner did not enable the local API: the App-API carries no reading
-   * for lights, and the account push is barred for them on purpose.
+   * What Govee itself last SAID about reachability — an explicit `online`
+   * capability and nothing else (`applyOnlineCap`: cloud state read, App-API
+   * poll, OpenAPI-MQTT event). `undefined` means Govee has never made that
+   * statement for this device.
    *
    * The distinction matters because "Govee says offline" and "nobody ever said
    * anything" must not resolve to the same marker. Lives in `state` (not on the
    * device) so it is runtime-only and never reaches the cache.
+   *
+   * Strictly separate from {@link cloudLivenessAt}: a statement and the mere
+   * arrival of a packet used to share this one slot, so whichever came LAST
+   * won. An event arriving seconds after Govee reported `online:false`
+   * overwrote that `false` with `true` for the next 30 minutes — exactly the
+   * precedence the architecture doc has always claimed to enforce ("an explicit
+   * report beats the mere arrival of a packet") and did not.
    */
   cloudReportedOnline?: boolean;
   /**
    * When that report was heard. Evidence has to be able to grow old: without a
    * timestamp a device that said "online" once would read as reachable forever,
-   * sitting unplugged in a drawer. Renewed by the account push, which arrives
-   * every few minutes for every device that has its own push topic.
+   * sitting unplugged in a drawer. Renewed by the account push, by the 2-minute
+   * account list, and by the reachability refresh
+   * ({@link DeviceManager.refreshExpiringReachability}) — which is the only
+   * renewer that needs no account credentials.
    */
   cloudReportedOnlineAt?: number;
+  /**
+   * When Govee last delivered anything at all FOR this device — a reading, an
+   * event, a capability list — without saying whether it is reachable.
+   *
+   * That arrival is real evidence: the payload exists because the device spoke.
+   * It is weaker than a report, though, and only ever positive — there is no
+   * "silence means offline" here, silence is simply the stamp growing old. Kept
+   * apart from {@link cloudReportedOnline} so an explicit `offline` can no
+   * longer be undone by the next packet that happens to arrive.
+   *
+   * Runtime-only, like the two above.
+   */
+  cloudLivenessAt?: number;
   /**
    * Reachability of this device's gateway, resolved by the DeviceManager (which
    * is the only place that can see other devices). `false` caps this device's

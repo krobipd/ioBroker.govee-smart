@@ -33,7 +33,8 @@ import {
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
-import type { RateLimiter } from "./rate-limiter";
+import { applianceBudget, type RateLimiter } from "./rate-limiter";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
   classifyError,
@@ -1389,13 +1390,102 @@ export class DeviceManager {
   }
 
   /**
-   * Pull the `devices.capabilities.online` entry (if any) out of a
-   * synthetic capability list and apply it directly to
-   * `device.state.online` plus `lastSeenOnNetwork`. Surfaces via
-   * onDeviceUpdate so the adapter's `info.online` state matches the
-   * App-API / OpenAPI-MQTT signal. If no online cap is in the list but
-   * the list is non-empty (i.e. fresh data arrived), the device is
-   * considered online — same convention as the LAN/MQTT paths.
+   * Renew the cloud reachability proof of devices that nothing else renews.
+   *
+   * A cloud proof expires after {@link CLOUD_ONLINE_EVIDENCE_TTL_MS}, and until
+   * now every renewer needed the Govee ACCOUNT: the push is an account channel,
+   * and {@link pollAppApi} returns immediately without a bearer token. On the
+   * API-key-only tier nothing renewed anything, so half an hour after start a
+   * light with no local interface went grey in the object tree and stayed grey
+   * — while it kept taking commands the whole time (user reports #18–#26).
+   *
+   * This is the renewer for that tier: one targeted `/device/state` read for
+   * exactly the devices whose evidence has aged past
+   * {@link CLOUD_REACHABILITY_REFRESH_MS}, and nothing for the rest. In a
+   * healthy installation, where push and account list keep evidence fresh, it
+   * issues no call at all. Deliberately NOT another full poll.
+   *
+   * Runs on the same 2-minute tick as the App-API poll but is wired ABOVE it,
+   * in the caller — inside `pollAppApi` it would sit behind the very
+   * bearer-token bail it exists to route around.
+   *
+   * Cost ceiling: one call per device per {@link CLOUD_REACHABILITY_REFRESH_MS}
+   * / 4, so a device whose SKU never answers this endpoint costs at most twelve
+   * calls an hour against the account's 9,000 a day, at background priority and
+   * on the appliance's own allowance where it has one.
+   *
+   * @returns Number of devices a refresh was dispatched for
+   */
+  async refreshExpiringReachability(): Promise<number> {
+    const cloudClient = this.cloudClient;
+    if (!cloudClient) {
+      return 0;
+    }
+    const now = Date.now();
+    // One attempt per device per quarter-window: enough tries to survive a few
+    // failures before the proof expires, few enough that a device which can
+    // never answer does not turn into a permanent poll.
+    const attemptFloorMs = CLOUD_REACHABILITY_REFRESH_MS / 4;
+    let dispatched = 0;
+    for (const device of this.devices.values()) {
+      if (device.sku === "BaseGroup" || !device.channels.cloud) {
+        continue;
+      }
+      // A LAN-driven light ignores every cloud claim (maybeApplyCloudOnline
+      // bails on it), so the answer would be discarded on arrival.
+      if (isLanDriven(device, now)) {
+        continue;
+      }
+      const evidenceAt = Math.max(device.state.cloudReportedOnlineAt ?? 0, device.state.cloudLivenessAt ?? 0);
+      if (now - evidenceAt < CLOUD_REACHABILITY_REFRESH_MS) {
+        continue;
+      }
+      if (
+        typeof device.lastReachabilityRefreshAt === "number" &&
+        now - device.lastReachabilityRefreshAt < attemptFloorMs
+      ) {
+        continue;
+      }
+      device.lastReachabilityRefreshAt = now;
+      dispatched++;
+      const refreshOne = async (): Promise<void> => {
+        try {
+          const caps = await cloudClient.getDeviceState(device.sku, device.deviceId);
+          this.applyCloudStateOnline(device, caps);
+          this.diagnostics.recordApiSuccess(device.deviceId, "/router/api/v1/device/state", caps);
+        } catch (e) {
+          const status =
+            e && typeof e === "object" && "statusCode" in e ? (e as { statusCode?: number }).statusCode : undefined;
+          this.diagnostics.recordApiFailure(device.deviceId, "/router/api/v1/device/state", e, status);
+          this.log.debug(`Reachability refresh failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+        }
+      };
+      // Priority 3 — below control (0) and the regular state load (2): this is
+      // a safety net, it must never crowd out a command the user just issued.
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(refreshOne, 3, applianceBudget(device));
+      } else {
+        await refreshOne();
+      }
+    }
+    if (dispatched > 0) {
+      this.log.debug(
+        `Reachability refresh dispatched for ${dispatched} device(s) whose evidence is older than ` +
+          `${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min (it expires at ` +
+          `${Math.round(CLOUD_ONLINE_EVIDENCE_TTL_MS / 60000)} min)`,
+      );
+    }
+    return dispatched;
+  }
+
+  /**
+   * Pull the reachability signal out of a capability list and apply it — an
+   * explicit `online` capability as Govee's own statement, a non-empty list
+   * without one as proof that the device spoke at all. Surfaces via
+   * onDeviceUpdate so the adapter's `info.online` matches the App-API /
+   * OpenAPI-MQTT / cloud-state signal. The two land in different slots on the
+   * device, because a statement outranks an arrival — see
+   * {@link cloudMergeHelpers.applyOnlineCap}.
    *
    * @param device Target device
    * @param caps Capability list from the source pipeline

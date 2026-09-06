@@ -8,8 +8,8 @@ import {
   type GoveeDevice,
   type TimerAdapter,
 } from "./types";
-import { CLOUD_APPLIANCE_DAILY_LIMIT, FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
-import type { DeviceBudget, RateLimiter } from "./rate-limiter";
+import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import { applianceBudget, type RateLimiter } from "./rate-limiter";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
@@ -29,24 +29,6 @@ export type TransportDecision =
       reason: "override" | "no-lan" | "no-segments-heuristic" | "light-no-lan-fallback";
     }
   | { kind: "skip"; reason: "no-channel" | "override-cloud-missing" };
-
-/**
- * The daily allowance for one device, where Govee imposes one.
- *
- * Only appliances have their own budget — 100 calls a day, against the
- * account's 10,000 — and only appliances have no local path, so every write is
- * a cloud call. Lights and groups keep the global budget: a light's writes go
- * over the LAN, and its rare cloud fallbacks are covered by the account limit.
- *
- * @param device The device a command is being sent to
- * @returns The device's allowance, or undefined when only the global one applies
- */
-function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined {
-  if (!device || device.type === GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
-    return undefined;
-  }
-  return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
-}
 
 /**
  * Command router — routes device commands through the fastest available

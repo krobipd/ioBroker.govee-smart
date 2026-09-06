@@ -168,7 +168,12 @@ function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
     musicLibrary: [],
     diyLibrary: [],
     skuFeatures: null,
-    state: { online: true },
+    // Reachable the way a cloud-driven device actually becomes reachable:
+    // Govee reported it, recently. `state.online` alone describes no device the
+    // production code can produce — every consumer asks the resolver, and the
+    // resolver wants evidence. An override that replaces `state` therefore
+    // yields a genuinely unreachable device, which is what those tests mean.
+    state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
     channels: { lan: false, mqtt: false, cloud: false },
     snapshotBleCmds: undefined,
   };

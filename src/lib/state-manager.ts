@@ -1161,11 +1161,23 @@ export class StateManager {
 
     // info.online for Lights is owned by syncInfoOnline — direct writes here
     // would re-introduce the ts-rewrite-spam (every 2 min same value) and
-    // the false-positive `true` writes from Cloud/MQTT paths. For Sensors/
-    // Appliances the existing flow stays (applyOnlineCap → onDeviceUpdate →
-    // here → info.online).
+    // the false-positive `true` writes from Cloud/MQTT paths.
+    //
+    // Sensors and appliances still get their marker updated HERE, so a fresh
+    // signal shows within a second instead of waiting up to 20 s for the next
+    // round. What is written is the RESOLVER's answer, not the raw flag: this
+    // used to write `state.online` straight through and so bypassed the
+    // gateway ceiling, which only the resolver applies. A battery sensor whose
+    // gateway is down then flipped green on every account push and back to
+    // grey on the next round. Same rule, two entry points — one answer.
     if (state.online !== undefined && device.type !== GOVEE_DEVICE_TYPE.LIGHT) {
-      set(`${prefix}.info.online`, state.online);
+      const onlineId = `${prefix}.info.online`;
+      const resolved = resolveDeviceReachability(device).online;
+      // Keep the rollup's cache in step: it counts from here rather than
+      // reading the marker back, so a stale entry would mis-count devicesOnline
+      // until the next 20 s round.
+      this.resolvedOnline.set(onlineId, resolved);
+      set(onlineId, resolved);
     }
     if (state.power !== undefined) {
       set(`${prefix}.control.power`, state.power);
@@ -1238,7 +1250,13 @@ export class StateManager {
     const prefix = this.devicePrefix(group);
     const stateId = `${prefix}.info.membersUnreachable`;
 
-    const unreachable = memberDevices.filter(m => !m.state.online).map(m => treeKey(m.sku, m.deviceId));
+    // The resolver, not the raw flag: `state.online` is only ever written back
+    // for lights and only when the answer was proven, so for every other member
+    // kind it drifted from what `info.online` shows. The group listed a device
+    // as unreachable that the tree showed as reachable, and the other way round.
+    const unreachable = memberDevices
+      .filter(m => !resolveDeviceReachability(m).online)
+      .map(m => treeKey(m.sku, m.deviceId));
 
     await this.ensureState(stateId, tName("membersUnreachable"), "string", "text", false);
     // setStateChangedAsync: reachability is re-evaluated on every online

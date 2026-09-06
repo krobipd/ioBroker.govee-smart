@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
 import { DeviceManager } from "./lib/device-manager";
-import { resolveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
+import { effectiveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
@@ -1020,7 +1020,15 @@ export class GoveeAdapter extends utils.Adapter {
         // App-API poll — every 2 minutes, pulls state for sensors like H5179
         // where OpenAPI v2 /device/state returns empty. Bearer token comes
         // from the AWS-IoT MQTT login, so a no-op until that succeeds.
+        //
+        // The same tick also renews reachability proofs that nothing else
+        // renews. It runs HERE and not inside pollAppApi on purpose: that
+        // method returns immediately without a bearer token, and an
+        // installation with only an API key is exactly the case this covers.
         const triggerAppApiPoll = (): void => {
+          this.deviceManager
+            ?.refreshExpiringReachability()
+            .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
           this.deviceManager
             ?.pollAppApi()
             .then(() => {
@@ -1547,8 +1555,17 @@ export class GoveeAdapter extends utils.Adapter {
             value: `${d.sku}:${d.deviceId}`,
             label: deviceLabel(d),
             model: d.sku,
-            online: d.state?.online === true,
-            segments: resolveSegmentCount(d, this.deviceRegistry),
+            // The resolver — the same answer `<device>.info.online` shows.
+            // Reading `state.online` here made the Expert tab list a device as
+            // reachable that the object tree showed as grey (that flag is only
+            // written back for lights, and only for a proven answer), and the
+            // wizard then happily started on it.
+            online: resolveDeviceReachability(d).online,
+            // effectiveSegmentCount — the count the state tree is actually
+            // built for. `resolveSegmentCount` omits a manual index list that
+            // reaches beyond it, so a cut strip advertised fewer segments here
+            // than the tree below it had.
+            segments: effectiveSegmentCount(d, this.deviceRegistry),
           }));
       },
       buildDiagnosticsReport: async (deviceKey: string) => {

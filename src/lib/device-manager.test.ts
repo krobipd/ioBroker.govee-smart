@@ -16,13 +16,20 @@ import {
   resolveDeviceReachability,
   resolveSegmentCount as resolveSegmentCountRaw,
 } from "./device-manager/lookups";
-import { CLOUD_ONLINE_EVIDENCE_TTL_MS, LAN_CAPABLE_MEMORY_MS } from "./timing-constants";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS, LAN_CAPABLE_MEMORY_MS } from "./timing-constants";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { DeviceRegistry } from "./device-registry";
 import { mockLog, mockTimers } from "./test-helpers";
-import type { CloudCapability, DeviceState, GoveeDevice, LanDevice, MqttStatusUpdate } from "./types";
+import type {
+  CloudCapability,
+  CloudStateCapability,
+  DeviceState,
+  GoveeDevice,
+  LanDevice,
+  MqttStatusUpdate,
+} from "./types";
 import type { MqttSegmentData } from "./device-manager/lookups";
 
 /** A catalog with no entries — tests that don't care about quirks. */
@@ -3013,6 +3020,62 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
   });
 
+  describe("applyOnlineCap — a statement and an arrival go to different slots", () => {
+    /** A cloud-driven, non-Light device the online-cap path is not gated away from. */
+    const cloudDrivenDevice = (): { dm: DeviceManager; dev: GoveeDevice } => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      dm2.handleLanDiscovery({ ip: "192.168.1.90", device: "AABBCCDDEEFF0090", sku: "H7130" });
+      const dev = dm2.getDevices()[0];
+      dev.type = "devices.types.heater";
+      dev.lanIp = undefined;
+      return { dm: dm2, dev };
+    };
+
+    it("an explicit online capability is recorded as Govee's own statement", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+      ]);
+      expect(dev.state.cloudReportedOnline).toBe(true);
+      expect(typeof dev.state.cloudReportedOnlineAt).toBe("number");
+      expect(dev.state.cloudLivenessAt, "a statement is not filed as a mere arrival").toBeUndefined();
+    });
+
+    it("a capability list without an online entry is filed as an arrival, never as a report", () => {
+      // This is the line that used to read `online = true` and then stamp it
+      // into the report slot: a guess, indistinguishable from Govee's word.
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+      ]);
+      expect(dev.state.cloudReportedOnline, "no statement was made").toBeUndefined();
+      expect(dev.state.cloudReportedOnlineAt).toBeUndefined();
+      expect(typeof dev.state.cloudLivenessAt).toBe("number");
+      expect(dev.state.online, "an arrival still raises the device's own flag").toBe(true);
+    });
+
+    it("a later arrival can no longer undo a reported offline", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+      ]);
+      expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });
+
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+      ]);
+      expect(dev.state.cloudReportedOnline, "the statement survives the packet").toBe(false);
+      expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });
+    });
+
+    it("an empty capability list changes nothing at all", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dm2.applyCloudStateOnline(dev, []);
+      expect(dev.state.cloudReportedOnline).toBeUndefined();
+      expect(dev.state.cloudLivenessAt).toBeUndefined();
+    });
+  });
+
   describe("applyOnlineCap (Pkt 12 — info.online for App-API + OpenAPI-MQTT)", () => {
     it("flips device.state.online when App-API delivers online:true", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
@@ -3778,6 +3841,190 @@ describe("Reachability from the account push (v2.30.0)", () => {
         lastEvidenceAt: null,
       });
     });
+
+    it("a fresh delivery with no report of its own proves reachability — upward only", () => {
+      const at = Date.now();
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: false, cloudLivenessAt: at },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: true,
+        proven: true,
+        decidedBy: "cloudLiveness",
+        lastEvidenceAt: at,
+      });
+    });
+
+    it("an explicit report beats the mere arrival of a packet — in BOTH directions", () => {
+      // The rule the architecture doc has always stated and the code did not
+      // enforce: while a statement and an arrival shared one slot, the LAST
+      // writer won. An event landing seconds after Govee said "offline"
+      // replaced that `false` with `true` for the next 30 minutes.
+      const now = Date.now();
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: {
+          online: true,
+          cloudReportedOnline: false,
+          cloudReportedOnlineAt: now - 10_000,
+          // Arrived AFTER the report, and still loses to it.
+          cloudLivenessAt: now,
+        },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: false,
+        proven: true,
+        decidedBy: "cloudReport",
+        lastEvidenceAt: now - 10_000,
+      });
+    });
+
+    it("an expired report falls through to a still-fresh delivery", () => {
+      const now = Date.now();
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: {
+          online: false,
+          cloudReportedOnline: true,
+          cloudReportedOnlineAt: now - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 60_000),
+          cloudLivenessAt: now,
+        },
+      });
+      expect(resolveDeviceReachability(dev)).toMatchObject({ online: true, decidedBy: "cloudLiveness" });
+    });
+
+    it("a delivery ages out on the same clock as a report", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: true, cloudLivenessAt: Date.now() - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 60_000) },
+      });
+      expect(resolveDeviceReachability(dev)).toEqual({
+        online: false,
+        proven: false,
+        decidedBy: "noEvidence",
+        lastEvidenceAt: null,
+      });
+    });
+
+    it("a dead gateway still caps a fresh delivery", () => {
+      const dev = createTestDevice({
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        state: { online: true, cloudLivenessAt: Date.now(), gatewayOnline: false },
+      });
+      expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "gatewayDown" });
+    });
+  });
+});
+
+describe("refreshExpiringReachability — the renewer for the API-key-only tier", () => {
+  /**
+   * A cloud-driven light: no local interface, in the account, evidence as old
+   * as the caller asks for. The shape of the devices in reports #18–#26.
+   *
+   * @param evidenceAgeMs How long ago Govee last said anything for this device
+   */
+  const cloudOnlyLight = (evidenceAgeMs: number): { dm: DeviceManager; dev: GoveeDevice } => {
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    dm2.handleLanDiscovery({ ip: "192.168.1.95", device: "AABBCCDDEEFF0095", sku: "H6172" });
+    const dev = dm2.getDevices()[0];
+    dev.lanIp = undefined;
+    dev.lastLanSeenAt = undefined;
+    dev.lastLanReplyAt = undefined;
+    dev.channels.cloud = true;
+    dev.state.cloudReportedOnline = true;
+    dev.state.cloudReportedOnlineAt = Date.now() - evidenceAgeMs;
+    return { dm: dm2, dev };
+  };
+
+  /**
+   * Cloud client stub that records which devices were read.
+   *
+   * @param caps What every read answers with
+   */
+  const recordingCloud = (
+    caps: CloudStateCapability[] = [
+      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+    ],
+  ): { client: unknown; reads: string[] } => {
+    const reads: string[] = [];
+    return {
+      client: {
+        getDeviceState: (sku: string, device: string) => {
+          reads.push(`${sku}:${device}`);
+          return Promise.resolve(caps);
+        },
+      },
+      reads,
+    };
+  };
+
+  it("renews a proof that is about to expire — with no account credentials anywhere", async () => {
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    // No apiClient at all: this is the tier where pollAppApi returns 0 before
+    // it does anything, which is why the refresh is wired above it.
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    expect(reads).toEqual(["H6172:AABBCCDDEEFF0095"]);
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: true, decidedBy: "cloudReport" });
+  });
+
+  it("does nothing while the evidence is still fresh — a healthy install costs no extra call", async () => {
+    const { dm: dm2 } = cloudOnlyLight(60_000);
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+    expect(reads).toEqual([]);
+  });
+
+  it("skips a LAN-driven light — its answer would be discarded on arrival", async () => {
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dev.lanIp = "192.168.1.95";
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+    expect(reads).toEqual([]);
+  });
+
+  it("skips a device that is not in the account at all", async () => {
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dev.channels.cloud = false;
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+    expect(reads).toEqual([]);
+  });
+
+  it("a device that answers nothing usable is retried, but not on every tick", async () => {
+    // Without the attempt stamp an endpoint that never answers would be polled
+    // every two minutes for the life of the adapter.
+    const { dm: dm2 } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    const { client, reads } = recordingCloud([]);
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    expect(await dm2.refreshExpiringReachability(), "second tick, same minute").toBe(0);
+    expect(reads).toHaveLength(1);
+  });
+
+  it("is a no-op without a cloud client", async () => {
+    const { dm: dm2 } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+  });
+
+  it("a device that never had any evidence is refreshed too", async () => {
+    const { dm: dm2, dev } = cloudOnlyLight(0);
+    dev.state.cloudReportedOnline = undefined;
+    dev.state.cloudReportedOnlineAt = undefined;
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    expect(reads).toHaveLength(1);
   });
 });
 

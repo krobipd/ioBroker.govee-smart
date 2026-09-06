@@ -194,9 +194,13 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
  * - `lanReply` — the local interface decided; nothing from the cloud counts.
  * - `gatewayDown` — the device's gateway is down, so it cannot be reachable.
  * - `cloudReport` — Govee itself reported, recently enough to still count.
+ * - `cloudLiveness` — no report, but Govee recently delivered something FOR
+ *   this device (a reading, an event, a capability set). The payload exists
+ *   because the device spoke, so it proves reachability — but only upward, and
+ *   it loses to a report of any direction.
  * - `noEvidence` — nobody said anything; not reachable, and not proven.
  */
-export type ReachabilityDecidedBy = "lanReply" | "gatewayDown" | "cloudReport" | "noEvidence";
+export type ReachabilityDecidedBy = "lanReply" | "gatewayDown" | "cloudReport" | "cloudLiveness" | "noEvidence";
 
 /** What {@link resolveDeviceReachability} answers. */
 export interface ReachabilityDecision {
@@ -227,7 +231,12 @@ export interface ReachabilityDecision {
  *    `true` twice during a genuine outage).
  * 2. **Govee reported for this device** — sensors, appliances, the account
  *    push, and the cloud state read. Its word decides in both directions.
- * 3. **Nothing proved anything** — not reachable. That is the honest answer
+ * 3. **Govee delivered something for this device** — a reading, an event, a
+ *    capability set, with no word on reachability. Proof, but upward only, and
+ *    it loses to a report in either direction. Kept strictly below (2): while
+ *    both shared one slot the last writer won, and a packet arriving after a
+ *    reported "offline" silently turned it green for half an hour.
+ * 4. **Nothing proved anything** — not reachable. That is the honest answer
  *    when there is no evidence, and it is what an unplugged device deserves.
  *
  * `proven` says whether the value was heard or merely absent, so the caller can
@@ -276,6 +285,15 @@ export function resolveDeviceReachability(device: GoveeDevice, now: number = Dat
         lastEvidenceAt: at,
       };
     }
+  }
+  // Weaker than a report, and checked only after it: Govee delivered something
+  // for this device without saying whether it is reachable. That payload only
+  // exists because the device spoke, so it proves reachability — upward only,
+  // and it must never outrank an explicit "offline" (which is why it sits
+  // BELOW the branch above, not beside it).
+  const liveAt = device.state.cloudLivenessAt;
+  if (typeof liveAt === "number" && now - liveAt < CLOUD_ONLINE_EVIDENCE_TTL_MS) {
+    return { online: true, proven: true, decidedBy: "cloudLiveness", lastEvidenceAt: liveAt };
   }
   return { online: false, proven: false, decidedBy: "noEvidence", lastEvidenceAt: null };
 }

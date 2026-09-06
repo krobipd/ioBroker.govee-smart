@@ -266,7 +266,11 @@ function makeDevice(o: Partial<GoveeDevice> = {}): GoveeDevice {
     musicLibrary: [],
     diyLibrary: [],
     skuFeatures: null,
-    state: { online: true },
+    // Evidence, not just the flag — every consumer asks the resolver now, and
+    // a bare `online: true` describes a device no production path can build.
+    // Overriding `state` replaces this wholesale and so yields a genuinely
+    // unreachable device, which is what the "Offline" fixtures below mean.
+    state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
     channels: { lan: false, mqtt: false, cloud: false },
     ...o,
   };

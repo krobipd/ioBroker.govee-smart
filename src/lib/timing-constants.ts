@@ -55,14 +55,30 @@ export const SENSOR_ONLINE_FRESHNESS_DEFAULT_MS = 30 * 60 * 1000;
  * December would still read reachable in November while it sits in the cellar.
  * That is the Weihnachtslichter case and it has to end.
  *
- * 30 minutes is safe ONLY because two sources renew it: the account push (which
- * arrives within minutes for any device with its own push topic — measured
- * 15 packets in 2 min, 50 in 4 min, 10 in 15 min on four real user reports) and
- * the 2-minute account list, which since 2.30.0 also runs for installations that
- * have devices without a local interface. Fifteen chances to renew before it
- * expires — generous against a few missed answers, far short of "forever".
+ * 30 minutes is only safe while something renews it, and the two renewers this
+ * comment used to name — the account push (which arrives within minutes for any
+ * device with its own push topic — measured 15 packets in 2 min, 50 in 4 min,
+ * 10 in 15 min on four real user reports) and the 2-minute account list — BOTH
+ * need email + password. On the API-key-only tier neither exists, so the proof
+ * of a light with no local interface expired half an hour after start and the
+ * device went grey while it was perfectly controllable.
+ * {@link CLOUD_REACHABILITY_REFRESH_MS} closes that: a targeted cloud state read
+ * for exactly the devices whose proof is about to expire, needing nothing but
+ * the API key.
  */
 export const CLOUD_ONLINE_EVIDENCE_TTL_MS = 30 * 60 * 1000;
+
+/**
+ * When to renew a cloud reachability proof that nothing else is renewing (20 min).
+ *
+ * Ten minutes of headroom before {@link CLOUD_ONLINE_EVIDENCE_TTL_MS} expires —
+ * five attempts on the 2-minute tick, so a couple of failed or rate-limited
+ * calls cannot make a device blink. Deliberately NOT a second full poll: only
+ * devices whose evidence is actually this old are read, so a healthy
+ * installation, where the push and the account list keep everything fresh,
+ * issues no extra call at all.
+ */
+export const CLOUD_REACHABILITY_REFRESH_MS = 20 * 60 * 1000;
 
 /**
  * How long "this device answered on the local interface" stays true.
@@ -76,8 +92,9 @@ export const CLOUD_ONLINE_EVIDENCE_TTL_MS = 30 * 60 * 1000;
  *
  * It expires so the opposite case also works: a user who switches the local API
  * OFF in the Govee app should not see that device stuck grey forever. Seven days
- * is far longer than a holiday or a router outage, and well inside the 30-day
- * window after which the device cache drops an entry entirely.
+ * is far longer than a holiday or a router outage, and comfortably inside the
+ * 14-day window after which the device cache drops an entry entirely
+ * (`SkuCache.pruneStale(14)`).
  */
 export const LAN_CAPABLE_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
 
