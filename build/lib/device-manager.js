@@ -42,6 +42,8 @@ var cacheHelpers = __toESM(require("./device-manager/cache"));
 var cloudMergeHelpers = __toESM(require("./device-manager/cloud-merge"));
 var libraryLoader = __toESM(require("./device-manager/library-loader"));
 var import_reconciler = require("./device-manager/reconciler");
+var import_rate_limiter = require("./rate-limiter");
+var import_timing_constants = require("./timing-constants");
 var import_types = require("./types");
 var import_http_client = require("./http-client");
 class DeviceManager {
@@ -1013,18 +1015,26 @@ class DeviceManager {
     cacheHelpers.persistDeviceToCache(this, device);
   }
   /**
-   * Settle the device's segment count from every source (catalog quirk, learned
-   * count, Cloud capabilities, manual list) and store it on the device — the
-   * one place the domain object is written. The state-tree builder receives
-   * the number and only reads it.
+   * Settle how many segment channels the state tree needs: the physical length
+   * (catalog quirk → learned count → Cloud capabilities) widened by a manual
+   * index list that reaches beyond it.
+   *
+   * It DERIVES, it does not store. `device.segmentCount` is the LEARNED
+   * physical length — written by the cache restore, an MQTT AA-A5 push and the
+   * wizard, which is what `physicalSegmentCap` and the diagnostics report have
+   * always said it is. Writing the settled number back into it fed a user's
+   * manual claim into the next settlement, and since the stored count is an
+   * input to that settlement the tree could only ever GROW: on a strip nothing
+   * had measured yet, the first manual list became the device's length for
+   * good. Correcting the list downward, or switching manual mode off, left the
+   * extra segment channels standing — persisted to the cache, surviving every
+   * restart — and inflated the BLE echo filter with it.
    *
    * @param device Target device
    * @returns The count the segment tree is to be built for
    */
   syncSegmentCount(device) {
-    const count = (0, import_lookups.effectiveSegmentCount)(device, this.registry);
-    device.segmentCount = count;
-    return count;
+    return (0, import_lookups.effectiveSegmentCount)(device, this.registry);
   }
   /**
    * Generate diagnostics data for a device — structured JSON for GitHub
@@ -1119,13 +1129,89 @@ class DeviceManager {
     return updated;
   }
   /**
-   * Pull the `devices.capabilities.online` entry (if any) out of a
-   * synthetic capability list and apply it directly to
-   * `device.state.online` plus `lastSeenOnNetwork`. Surfaces via
-   * onDeviceUpdate so the adapter's `info.online` state matches the
-   * App-API / OpenAPI-MQTT signal. If no online cap is in the list but
-   * the list is non-empty (i.e. fresh data arrived), the device is
-   * considered online — same convention as the LAN/MQTT paths.
+   * Renew the cloud reachability proof of devices that nothing else renews.
+   *
+   * A cloud proof expires after {@link CLOUD_ONLINE_EVIDENCE_TTL_MS}, and until
+   * now every renewer needed the Govee ACCOUNT: the push is an account channel,
+   * and {@link pollAppApi} returns immediately without a bearer token. On the
+   * API-key-only tier nothing renewed anything, so half an hour after start a
+   * light with no local interface went grey in the object tree and stayed grey
+   * — while it kept taking commands the whole time (user reports #18–#26).
+   *
+   * This is the renewer for that tier: one targeted `/device/state` read for
+   * exactly the devices whose evidence has aged past
+   * {@link CLOUD_REACHABILITY_REFRESH_MS}, and nothing for the rest. In a
+   * healthy installation, where push and account list keep evidence fresh, it
+   * issues no call at all. Deliberately NOT another full poll.
+   *
+   * Runs on the same 2-minute tick as the App-API poll but is wired ABOVE it,
+   * in the caller — inside `pollAppApi` it would sit behind the very
+   * bearer-token bail it exists to route around.
+   *
+   * Cost ceiling: one call per device per {@link CLOUD_REACHABILITY_REFRESH_MS}
+   * / 4, so a device whose SKU never answers this endpoint costs at most twelve
+   * calls an hour against the account's 9,000 a day, at background priority and
+   * on the appliance's own allowance where it has one.
+   *
+   * @returns Number of devices a refresh was dispatched for
+   */
+  async refreshExpiringReachability() {
+    var _a, _b;
+    const cloudClient = this.cloudClient;
+    if (!cloudClient) {
+      return 0;
+    }
+    const now = Date.now();
+    const attemptFloorMs = import_timing_constants.CLOUD_REACHABILITY_REFRESH_MS / 4;
+    let dispatched = 0;
+    for (const device of this.devices.values()) {
+      if (device.sku === "BaseGroup" || !device.channels.cloud) {
+        continue;
+      }
+      if ((0, import_lookups.isLanDriven)(device, now)) {
+        continue;
+      }
+      const evidenceAt = Math.max((_a = device.state.cloudReportedOnlineAt) != null ? _a : 0, (_b = device.state.cloudLivenessAt) != null ? _b : 0);
+      if (now - evidenceAt < import_timing_constants.CLOUD_REACHABILITY_REFRESH_MS) {
+        continue;
+      }
+      if (typeof device.lastReachabilityRefreshAt === "number" && now - device.lastReachabilityRefreshAt < attemptFloorMs) {
+        continue;
+      }
+      device.lastReachabilityRefreshAt = now;
+      dispatched++;
+      const refreshOne = async () => {
+        try {
+          const caps = await cloudClient.getDeviceState(device.sku, device.deviceId);
+          this.applyCloudStateOnline(device, caps);
+          this.diagnostics.recordApiSuccess(device.deviceId, "/router/api/v1/device/state", caps);
+        } catch (e) {
+          const status = e && typeof e === "object" && "statusCode" in e ? e.statusCode : void 0;
+          this.diagnostics.recordApiFailure(device.deviceId, "/router/api/v1/device/state", e, status);
+          this.log.debug(`Reachability refresh failed for ${(0, import_types.deviceLabel)(device)}: ${(0, import_types.errMessage)(e)}`);
+        }
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.tryExecute(refreshOne, 3, (0, import_rate_limiter.applianceBudget)(device));
+      } else {
+        await refreshOne();
+      }
+    }
+    if (dispatched > 0) {
+      this.log.debug(
+        `Reachability refresh dispatched for ${dispatched} device(s) whose evidence is older than ${Math.round(import_timing_constants.CLOUD_REACHABILITY_REFRESH_MS / 6e4)} min (it expires at ${Math.round(import_timing_constants.CLOUD_ONLINE_EVIDENCE_TTL_MS / 6e4)} min)`
+      );
+    }
+    return dispatched;
+  }
+  /**
+   * Pull the reachability signal out of a capability list and apply it — an
+   * explicit `online` capability as Govee's own statement, a non-empty list
+   * without one as proof that the device spoke at all. Surfaces via
+   * onDeviceUpdate so the adapter's `info.online` matches the App-API /
+   * OpenAPI-MQTT / cloud-state signal. The two land in different slots on the
+   * device, because a statement outranks an arrival — see
+   * {@link cloudMergeHelpers.applyOnlineCap}.
    *
    * @param device Target device
    * @param caps Capability list from the source pipeline

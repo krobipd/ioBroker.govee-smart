@@ -19,11 +19,20 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 var rate_limiter_exports = {};
 __export(rate_limiter_exports, {
   MAX_QUEUE_LENGTH: () => MAX_QUEUE_LENGTH,
-  RateLimiter: () => RateLimiter
+  RateLimiter: () => RateLimiter,
+  applianceBudget: () => applianceBudget
 });
 module.exports = __toCommonJS(rate_limiter_exports);
 var import_types = require("./types");
+var import_govee_constants = require("./govee-constants");
+var import_timing_constants = require("./timing-constants");
 const MAX_QUEUE_LENGTH = 200;
+function applianceBudget(device) {
+  if (!device || device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
+    return void 0;
+  }
+  return { key: `${device.sku}:${device.deviceId}`, perDay: import_timing_constants.CLOUD_APPLIANCE_DAILY_LIMIT };
+}
 class RateLimiter {
   log;
   timers;
@@ -139,8 +148,9 @@ class RateLimiter {
    * @param execute The API call to make
    * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
    * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
+   * @param budget The device's own daily allowance, when one applies — booked when the call actually runs, not when it is queued
    */
-  enqueue(execute, priority = 1, reject) {
+  enqueue(execute, priority = 1, reject, budget) {
     var _a;
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
       const tail = this.queue[this.queue.length - 1];
@@ -157,7 +167,7 @@ class RateLimiter {
       const evicted = this.queue.pop();
       (_a = evicted == null ? void 0 : evicted.reject) == null ? void 0 : _a.call(evicted, new Error("Cloud call evicted \u2014 rate-limiter queue full"));
     }
-    this.queue.push({ execute, priority, reject });
+    this.queue.push({ execute, priority, reject, budget });
     this.queue.sort((a, b) => a.priority - b.priority);
     return true;
   }
@@ -178,7 +188,7 @@ class RateLimiter {
       await execute();
       return true;
     }
-    this.enqueue(execute, priority);
+    this.enqueue(execute, priority, void 0, budget);
     return false;
   }
   /**
@@ -253,7 +263,8 @@ class RateLimiter {
           }
         },
         priority,
-        reject
+        reject,
+        budget
       );
       if (!accepted) {
         reject(new Error("Cloud call dropped \u2014 rate-limiter queue full"));
@@ -280,14 +291,21 @@ class RateLimiter {
   }
   /** Process queued calls */
   processQueue() {
+    var _a;
     if (this.stopped) {
       return;
     }
     while (this.queue.length > 0 && this.canMakeCall()) {
       const call = this.queue.shift();
       if (call) {
-        this.callsThisMinute++;
-        this.callsToday++;
+        if (call.budget && this.deviceBudgetSpent(call.budget)) {
+          (_a = call.reject) == null ? void 0 : _a.call(
+            call,
+            new Error(`Daily Govee budget for ${call.budget.key} is used up (${call.budget.perDay} calls)`)
+          );
+          continue;
+        }
+        this.spend(call.budget);
         call.execute().catch((err) => {
           this.log.debug(`Queued call failed: ${(0, import_types.errMessage)(err)}`);
         });
@@ -301,6 +319,7 @@ class RateLimiter {
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   MAX_QUEUE_LENGTH,
-  RateLimiter
+  RateLimiter,
+  applianceBudget
 });
 //# sourceMappingURL=rate-limiter.js.map

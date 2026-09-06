@@ -1,0 +1,171 @@
+{
+  "_comment": [
+    "Fixture account for the object inventory. Covers EVERY device kind the adapter",
+    "supports, not just the maintainer's own hardware (feedback_user_hardware_ist_sample):",
+    "a LAN light with segments, a cloud-only light without a local interface, a",
+    "thermometer, a gateway-backed battery sensor plus its gateway, a heater, a",
+    "humidifier, a fan, an air purifier, a kettle, an ice maker, an aroma diffuser,",
+    "a socket, a button and an app device group. Capability shapes are the ones Govee",
+    "really returns (measured captures under Ressourcen/govee-smart)."
+  ],
+  "devices": [
+    {
+      "sku": "H6172",
+      "device": "AA:BB:CC:DD:EE:FF:00:01",
+      "deviceName": "Strip Living Room",
+      "type": "devices.types.light",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.range", "instance": "brightness", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 1, "max": 100, "precision": 1 } } },
+        { "type": "devices.capabilities.color_setting", "instance": "colorRgb", "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } } },
+        { "type": "devices.capabilities.color_setting", "instance": "colorTemperatureK", "parameters": { "dataType": "INTEGER", "unit": "unit.kelvin", "range": { "min": 2000, "max": 9000, "precision": 1 } } },
+        { "type": "devices.capabilities.segment_color_setting", "instance": "segmentedColorRgb", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "segment", "dataType": "Array", "elementRange": { "min": 0, "max": 9 }, "elementType": "INTEGER" }, { "fieldName": "rgb", "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } } ] } },
+        { "type": "devices.capabilities.segment_color_setting", "instance": "segmentedBrightness", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "segment", "dataType": "Array", "elementRange": { "min": 0, "max": 9 }, "elementType": "INTEGER" }, { "fieldName": "brightness", "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 1, "max": 100, "precision": 1 } } ] } },
+        { "type": "devices.capabilities.toggle", "instance": "gradientToggle", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.music_setting", "instance": "musicMode", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "musicMode", "dataType": "ENUM", "options": [ { "name": "Energic", "value": 3 }, { "name": "Rhythm", "value": 5 } ] }, { "fieldName": "sensitivity", "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 0, "max": 100, "precision": 1 } } ] } }
+      ]
+    },
+    {
+      "sku": "H6199",
+      "device": "AA:BB:CC:DD:EE:FF:00:02",
+      "deviceName": "Bulb Hall Cloud Only",
+      "type": "devices.types.light",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.range", "instance": "brightness", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 1, "max": 100, "precision": 1 } } },
+        { "type": "devices.capabilities.color_setting", "instance": "colorRgb", "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } } }
+      ]
+    },
+    {
+      "sku": "H5179",
+      "device": "AA:BB:CC:DD:EE:FF:00:03",
+      "deviceName": "Thermo Bedroom",
+      "type": "devices.types.thermometer",
+      "capabilities": [
+        { "type": "devices.capabilities.property", "instance": "sensorTemperature", "parameters": { "dataType": "INTEGER", "unit": "unit.celsius", "range": { "min": -20, "max": 60, "precision": 1 } } },
+        { "type": "devices.capabilities.property", "instance": "sensorHumidity", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 0, "max": 100, "precision": 1 } } }
+      ]
+    },
+    {
+      "sku": "H5042",
+      "device": "AA:BB:CC:DD:EE:FF:00:04",
+      "deviceName": "Gateway Hallway",
+      "type": "devices.types.sensor",
+      "capabilities": [
+        { "type": "devices.capabilities.online", "instance": "online", "parameters": { "dataType": "ENUM", "options": [ { "name": "true", "value": 1 }, { "name": "false", "value": 0 } ] } }
+      ]
+    },
+    {
+      "sku": "H5109",
+      "device": "AA:BB:CC:DD:EE:FF:00:05",
+      "deviceName": "Battery Sensor Cellar",
+      "type": "devices.types.sensor",
+      "capabilities": [
+        { "type": "devices.capabilities.property", "instance": "sensorTemperature", "parameters": { "dataType": "INTEGER", "unit": "unit.celsius", "range": { "min": -20, "max": 60, "precision": 1 } } },
+        { "type": "devices.capabilities.property", "instance": "battery", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 0, "max": 100, "precision": 1 } } }
+      ]
+    },
+    {
+      "sku": "H7130",
+      "device": "AA:BB:CC:DD:EE:FF:00:06",
+      "deviceName": "Heater Office",
+      "type": "devices.types.heater",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.temperature_setting", "instance": "targetTemperature", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "temperature", "dataType": "INTEGER", "unit": "unit.celsius", "range": { "min": 5, "max": 30, "precision": 1 } } ] } },
+        { "type": "devices.capabilities.work_mode", "instance": "workMode", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "workMode", "dataType": "ENUM", "options": [ { "name": "Auto", "value": 1 }, { "name": "Fan", "value": 2 } ] }, { "fieldName": "modeValue", "dataType": "INTEGER", "range": { "min": 0, "max": 3, "precision": 1 } } ] } }
+      ]
+    },
+    {
+      "sku": "H7141",
+      "device": "AA:BB:CC:DD:EE:FF:00:07",
+      "deviceName": "Humidifier Nursery",
+      "type": "devices.types.humidifier",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.range", "instance": "humidity", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 0, "max": 100, "precision": 1 } } },
+        { "type": "devices.capabilities.event", "instance": "lackWaterEvent", "parameters": { "dataType": "ENUM", "options": [ { "name": "lackWater", "value": 0 } ] } }
+      ]
+    },
+    {
+      "sku": "H7102",
+      "device": "AA:BB:CC:DD:EE:FF:00:08",
+      "deviceName": "Fan Study",
+      "type": "devices.types.fan",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.work_mode", "instance": "workMode", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "workMode", "dataType": "ENUM", "options": [ { "name": "Normal", "value": 1 }, { "name": "Sleep", "value": 5 } ] }, { "fieldName": "modeValue", "dataType": "INTEGER", "range": { "min": 1, "max": 8, "precision": 1 } } ] } }
+      ]
+    },
+    {
+      "sku": "H7121",
+      "device": "AA:BB:CC:DD:EE:FF:00:09",
+      "deviceName": "Air Purifier Attic",
+      "type": "devices.types.air_purifier",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.property", "instance": "airQuality", "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 500, "precision": 1 } } },
+        { "type": "devices.capabilities.property", "instance": "filterLifeTime", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 0, "max": 100, "precision": 1 } } }
+      ]
+    },
+    {
+      "sku": "H7171",
+      "device": "AA:BB:CC:DD:EE:FF:00:0A",
+      "deviceName": "Kettle Kitchen",
+      "type": "devices.types.kettle",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.temperature_setting", "instance": "targetTemperature", "parameters": { "dataType": "STRUCT", "fields": [ { "fieldName": "temperature", "dataType": "INTEGER", "unit": "unit.celsius", "range": { "min": 40, "max": 100, "precision": 1 } } ] } }
+      ]
+    },
+    {
+      "sku": "H7172",
+      "device": "AA:BB:CC:DD:EE:FF:00:0B",
+      "deviceName": "Ice Maker Bar",
+      "type": "devices.types.ice_maker",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.event", "instance": "iceFullEvent", "parameters": { "dataType": "ENUM", "options": [ { "name": "iceFull", "value": 0 } ] } }
+      ]
+    },
+    {
+      "sku": "H7161",
+      "device": "AA:BB:CC:DD:EE:FF:00:0C",
+      "deviceName": "Aroma Diffuser Bath",
+      "type": "devices.types.aroma_diffuser",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.range", "instance": "brightness", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 1, "max": 100, "precision": 1 } } }
+      ]
+    },
+    {
+      "sku": "H5080",
+      "device": "AA:BB:CC:DD:EE:FF:00:0D",
+      "deviceName": "Socket Balcony",
+      "type": "devices.types.socket",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } }
+      ]
+    },
+    {
+      "sku": "H5085",
+      "device": "AA:BB:CC:DD:EE:FF:00:0E",
+      "deviceName": "Button Desk",
+      "type": "devices.types.button",
+      "capabilities": [
+        { "type": "devices.capabilities.event", "instance": "bodyAppearedEvent", "parameters": { "dataType": "ENUM", "options": [ { "name": "bodyAppeared", "value": 0 } ] } }
+      ]
+    },
+    {
+      "sku": "BaseGroup",
+      "device": "9900001",
+      "deviceName": "Group Ground Floor",
+      "type": "devices.types.light",
+      "capabilities": [
+        { "type": "devices.capabilities.on_off", "instance": "powerSwitch", "parameters": { "dataType": "ENUM", "options": [ { "name": "on", "value": 1 }, { "name": "off", "value": 0 } ] } },
+        { "type": "devices.capabilities.range", "instance": "brightness", "parameters": { "dataType": "INTEGER", "unit": "unit.percent", "range": { "min": 1, "max": 100, "precision": 1 } } },
+        { "type": "devices.capabilities.color_setting", "instance": "colorRgb", "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } } }
+      ]
+    }
+  ]
+}

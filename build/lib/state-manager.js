@@ -916,7 +916,10 @@ class StateManager {
       writes.push(this.adapter.setStateChangedAsync(id, { val, ack: true }).catch(() => void 0));
     };
     if (state.online !== void 0 && device.type !== import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT) {
-      set(`${prefix}.info.online`, state.online);
+      const onlineId = `${prefix}.info.online`;
+      const resolved = (0, import_lookups.resolveDeviceReachability)(device).online;
+      this.resolvedOnline.set(onlineId, resolved);
+      set(onlineId, resolved);
     }
     if (state.power !== void 0) {
       set(`${prefix}.control.power`, state.power);
@@ -985,7 +988,7 @@ class StateManager {
   async updateGroupMembersUnreachable(group, memberDevices) {
     const prefix = this.devicePrefix(group);
     const stateId = `${prefix}.info.membersUnreachable`;
-    const unreachable = memberDevices.filter((m) => !m.state.online).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId));
+    const unreachable = memberDevices.filter((m) => !(0, import_lookups.resolveDeviceReachability)(m).online).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId));
     await this.ensureState(stateId, (0, import_i18n.tName)("membersUnreachable"), "string", "text", false);
     await this.adapter.setStateChangedAsync(stateId, {
       val: unreachable.join(", "),

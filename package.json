@@ -92,7 +92,8 @@
     "release-minor": "release-script minor --yes --all",
     "release-major": "release-script major --yes --all",
     "validate-devices": "ts-node --project tools/tsconfig.json tools/validate-devices.ts",
-    "gen-wiki": "ts-node --project tools/tsconfig.json tools/gen-wiki-devices.ts"
+    "gen-wiki": "ts-node --project tools/tsconfig.json tools/gen-wiki-devices.ts",
+    "test:inventory": "mocha test/inventory.js --exit"
   },
   "bugs": {
     "url": "https://github.com/krobipd/ioBroker.govee-smart/issues"

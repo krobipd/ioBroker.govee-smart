@@ -156,6 +156,10 @@ function resolveDeviceReachability(device, now = Date.now()) {
       };
     }
   }
+  const liveAt = device.state.cloudLivenessAt;
+  if (typeof liveAt === "number" && now - liveAt < import_timing_constants.CLOUD_ONLINE_EVIDENCE_TTL_MS) {
+    return { online: true, proven: true, decidedBy: "cloudLiveness", lastEvidenceAt: liveAt };
+  }
   return { online: false, proven: false, decidedBy: "noEvidence", lastEvidenceAt: null };
 }
 function isLanDriven(device, now = Date.now()) {

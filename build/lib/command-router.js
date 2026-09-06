@@ -23,15 +23,10 @@ __export(command_router_exports, {
 module.exports = __toCommonJS(command_router_exports);
 var import_types = require("./types");
 var import_timing_constants = require("./timing-constants");
+var import_rate_limiter = require("./rate-limiter");
 var import_govee_lan_client = require("./govee-lan-client");
 var import_govee_constants = require("./govee-constants");
 var import_lookups = require("./device-manager/lookups");
-function applianceBudget(device) {
-  if (!device || device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
-    return void 0;
-  }
-  return { key: `${device.sku}:${device.deviceId}`, perDay: import_timing_constants.CLOUD_APPLIANCE_DAILY_LIMIT };
-}
 class CommandRouter {
   log;
   timers;
@@ -110,7 +105,7 @@ class CommandRouter {
    */
   async sendBudgeted(fn, device) {
     if (this.rateLimiter) {
-      await this.rateLimiter.executeTracked(fn, 0, applianceBudget(device));
+      await this.rateLimiter.executeTracked(fn, 0, (0, import_rate_limiter.applianceBudget)(device));
     } else {
       await fn();
     }
@@ -322,7 +317,7 @@ class CommandRouter {
       return;
     }
     if (decision.kind === "lan") {
-      this.sendLanCommand(device, command, value);
+      await this.sendLanCommand(device, command, value);
       return;
     }
     await this.sendCloudCommand(device, command, value);
@@ -687,7 +682,7 @@ class CommandRouter {
    * @param command Command type
    * @param value Command value
    */
-  sendLanCommand(device, command, value) {
+  async sendLanCommand(device, command, value) {
     var _a, _b, _c, _d, _e;
     if (!device.lanIp || !this.lanClient) {
       return;
@@ -725,7 +720,7 @@ class CommandRouter {
             return;
           }
         }
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       case "lightScene": {
@@ -749,7 +744,7 @@ class CommandRouter {
             return;
           }
         }
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       case "snapshot": {
@@ -767,31 +762,44 @@ class CommandRouter {
             return;
           }
         }
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
         break;
       }
       default:
-        this.cloudFallbackForCase(device, command, value);
+        await this.cloudFallbackForCase(device, command, value);
     }
   }
   /**
-   * Fire-and-forget Cloud fallback when a LAN-case can't service the
-   * command locally (library miss, no BLE data, unsupported). Dedup
-   * through the shared category map so log spam is bounded.
+   * Cloud fallback when a LAN case cannot service the command locally (library
+   * miss, no BLE data, unsupported command). Dedup through the shared category
+   * map so log spam is bounded, then RETHROW.
+   *
+   * The rethrow is the point. This used to be fire-and-forget: `sendCommand`
+   * resolved the moment the datagram path gave up, the state-change router
+   * acked the state, and a cloud call that failed afterwards — quota,
+   * rejected key, no network — was invisible. The user saw a confirmed scene
+   * and an unchanged strip, and the diagnostics report recorded the command as
+   * `transport: "LAN", ok: true`. Reachable through `control.scene` on every
+   * device (LAN has no case for it), through a scene or DIY scene missing from
+   * the library, and through a snapshot with no BLE packets.
    *
    * @param device Target device
    * @param command Command type
    * @param value Command value
+   * @throws {Error} When the cloud cannot service the command either
    */
-  cloudFallbackForCase(device, command, value) {
-    this.sendCloudCommand(device, command, value).catch((e) => {
-      var _a;
+  async cloudFallbackForCase(device, command, value) {
+    var _a;
+    try {
+      await this.sendCloudCommand(device, command, value);
+    } catch (e) {
       const prev = (_a = this.lastErrorByCategory.get("cloud-fallback")) != null ? _a : null;
       this.lastErrorByCategory.set(
         "cloud-fallback",
         (0, import_types.logDedup)(this.log, prev, `Cloud fallback for ${(0, import_types.deviceLabel)(device)}/${command}`, e)
       );
-    });
+      throw e;
+    }
   }
   /**
    * Send command via Cloud API (rate-limited)
@@ -804,7 +812,7 @@ class CommandRouter {
     var _a;
     const cloudClient = this.cloudClient;
     if (!cloudClient) {
-      return;
+      throw new Error(`No Cloud connection for ${(0, import_types.deviceLabel)(device)}/${command} (no API key, or adapter stopping)`);
     }
     const cap = this.findCapabilityForCommand(device, command);
     if (!cap) {
@@ -818,7 +826,7 @@ class CommandRouter {
           new Error("no matching capability")
         )
       );
-      return;
+      throw new Error(`No matching capability for ${(0, import_types.deviceLabel)(device)}/${command}`);
     }
     const cloudValue = this.toCloudValue(device, command, value);
     const execute = async () => {

@@ -62,7 +62,7 @@ function mergeCloudDevices(adapter, cloudDevices) {
   return changed;
 }
 function applyOnlineCap(adapter, device, caps) {
-  var _a;
+  var _a, _b;
   let online;
   for (const c of caps) {
     if (c && typeof c.type === "string" && (c.type === import_govee_constants.GOVEE_CAP_TYPE.ONLINE || c.type === "online") && c.state && typeof c.state.value === "boolean") {
@@ -70,23 +70,31 @@ function applyOnlineCap(adapter, device, caps) {
       break;
     }
   }
-  if (online === void 0 && caps.length > 0) {
-    online = true;
-  }
+  const now = Date.now();
   if (online === void 0) {
+    if (caps.length === 0) {
+      return;
+    }
+    device.state.cloudLivenessAt = now;
+    device.lastSeenOnNetwork = now;
+    if (device.state.online === true) {
+      return;
+    }
+    device.state.online = true;
+    (_a = adapter.onDeviceUpdate) == null ? void 0 : _a.call(adapter, device, { online: true });
     return;
   }
   device.state.cloudReportedOnline = online;
-  device.state.cloudReportedOnlineAt = Date.now();
+  device.state.cloudReportedOnlineAt = now;
   if (device.state.online === online && online === true) {
-    device.lastSeenOnNetwork = Date.now();
+    device.lastSeenOnNetwork = now;
     return;
   }
   device.state.online = online;
   if (online) {
-    device.lastSeenOnNetwork = Date.now();
+    device.lastSeenOnNetwork = now;
   }
-  (_a = adapter.onDeviceUpdate) == null ? void 0 : _a.call(adapter, device, { online });
+  (_b = adapter.onDeviceUpdate) == null ? void 0 : _b.call(adapter, device, { online });
 }
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {

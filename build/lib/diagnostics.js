@@ -25,6 +25,7 @@ var import_http_client = require("./http-client");
 var import_anonymiser = require("./anonymiser");
 var import_govee_constants = require("./govee-constants");
 var import_lookups = require("./device-manager/lookups");
+var import_timing_constants = require("./timing-constants");
 const MAX_LOGS = 100;
 const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
@@ -111,13 +112,6 @@ class DiagnosticsCollector {
   accountCalls = [];
   objectTreeProvider = null;
   /**
-   * Register the runtime-state provider. main.ts wires it after all
-   * sub-clients (Cloud, MQTT, Rate-limiter, LAN, Wizard) are instantiated
-   * so the snapshot can pull from any of them.
-   *
-   * @param provider Callback returning a runtime-state snapshot (or partial)
-   */
-  /**
    * Wire the list of known device names, so the pseudonymiser can replace them
    * inside free text — a name has no detectable shape.
    *
@@ -161,14 +155,6 @@ class DiagnosticsCollector {
   setObjectTreeProvider(provider) {
     this.objectTreeProvider = provider;
   }
-  /**
-   * Record what a user-triggered command actually did. Closes the gap between
-   * "the adapter sent something" and "the device did something": `lanSends`
-   * ends at the wire, this says whether the write was accepted and why not.
-   *
-   * @param deviceId Govee device id
-   * @param entry What was written, over which channel, and how it went
-   */
   /**
    * Record the outcome of an ACCOUNT-level call — the login and the IoT-key
    * request. Both were invisible in the report, although two filed issues are
@@ -545,7 +531,7 @@ class DiagnosticsCollector {
    * @param prefix Device state prefix — enables the object-tree section
    */
   async generate(device, adapterVersion, prefix) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const quirks = this.registry.getQuirks(device.sku);
     const b = this.buffers.get(device.deviceId);
     const runtimeState = this.runtimeStateProvider ? this.runtimeStateProvider() : null;
@@ -591,7 +577,15 @@ class DiagnosticsCollector {
         name: this.anon.deviceName(device.name),
         type: device.type,
         objectPrefix: prefix != null ? prefix : null,
-        segmentCount: (_a = device.segmentCount) != null ? _a : null,
+        // The strip's PHYSICAL length as the adapter settles it (quirk >
+        // learned > cloud capabilities) — not the raw learned field, which is
+        // empty for a device whose count is only known from its capabilities
+        // and would report `null` next to a tree full of segment channels.
+        segmentCount: (0, import_lookups.resolveSegmentCount)(device, this.registry),
+        // How many segment channels the tree actually has: the physical length
+        // widened by a manual index list on a cut strip. The two differ exactly
+        // in the case a segment report is usually about.
+        segmentTreeSize: (0, import_lookups.effectiveSegmentCount)(device, this.registry),
         // Where the segment count came from. It is the single most asked-back
         // question on a segment report, and the number alone never answered it.
         segmentCountSource: this.segmentCountSource(device),
@@ -604,13 +598,13 @@ class DiagnosticsCollector {
         lanIp: device.lanIp ? this.anon.ip(device.lanIp) : null,
         gateway: device.gateway ? this.anon.text(device.gateway) : null,
         // v2.9.1 — runtime flags / timestamps that were previously invisible
-        manualMode: (_b = device.manualMode) != null ? _b : false,
-        manualSegments: (_c = device.manualSegments) != null ? _c : null,
-        sceneSpeed: (_d = device.sceneSpeed) != null ? _d : null,
-        scenesChecked: (_e = device.scenesChecked) != null ? _e : false,
-        lastSeenOnNetwork: (_f = device.lastSeenOnNetwork) != null ? _f : null,
-        lastLanReplyAt: (_g = device.lastLanReplyAt) != null ? _g : null,
-        groupMembers: (_h = device.groupMembers) != null ? _h : null
+        manualMode: (_a = device.manualMode) != null ? _a : false,
+        manualSegments: (_b = device.manualSegments) != null ? _b : null,
+        sceneSpeed: (_c = device.sceneSpeed) != null ? _c : null,
+        scenesChecked: (_d = device.scenesChecked) != null ? _d : false,
+        lastSeenOnNetwork: (_e = device.lastSeenOnNetwork) != null ? _e : null,
+        lastLanReplyAt: (_f = device.lastLanReplyAt) != null ? _f : null,
+        groupMembers: (_g = device.groupMembers) != null ? _g : null
       },
       capabilities: device.capabilities,
       scenes: {
@@ -676,8 +670,8 @@ class DiagnosticsCollector {
       quirks: quirks != null ? quirks : null,
       skuFeatures: device.skuFeatures,
       state: { ...device.state },
-      recentLogs: (_i = b == null ? void 0 : b.logs.slice()) != null ? _i : [],
-      lastMqttPackets: (_j = b == null ? void 0 : b.packets.slice()) != null ? _j : [],
+      recentLogs: (_h = b == null ? void 0 : b.logs.slice()) != null ? _h : [],
+      lastMqttPackets: (_i = b == null ? void 0 : b.packets.slice()) != null ? _i : [],
       // History per endpoint (most-recent at the end). Each entry has
       // {ts, ok, statusCode, body}. body holds either the success
       // response or `{error, status, responseBody?}` for failed calls.
@@ -685,7 +679,7 @@ class DiagnosticsCollector {
       // v2.9.1 — outgoing LAN UDP datagrams. Closes the "did the adapter
       // even send anything?" diag blind spot for ptReal-driven scene /
       // snapshot / segment commands.
-      lanSends: (_k = b == null ? void 0 : b.lanSends.slice()) != null ? _k : [],
+      lanSends: (_j = b == null ? void 0 : b.lanSends.slice()) != null ? _j : [],
       // v2.9.1 — persisted-on-disk view of the SkuCache for this device.
       // Used to compare runtime state to the cache that would be reloaded
       // on next restart. Empty when no cache entry exists yet.
@@ -698,7 +692,7 @@ class DiagnosticsCollector {
       runtimeState,
       // What the user's last commands actually did — `lanSends` stops at the
       // wire, this says whether the write was accepted and why not.
-      commandResults: (_l = b == null ? void 0 : b.commandResults.slice()) != null ? _l : [],
+      commandResults: (_k = b == null ? void 0 : b.commandResults.slice()) != null ? _k : [],
       // Account-wide, so it appears in every device's report: without it a dead
       // push channel has no reason in the report at all.
       accountCalls: this.accountCalls.slice(),
@@ -711,13 +705,6 @@ class DiagnosticsCollector {
     };
     return this.anon.walk(report, this.deviceNames());
   }
-  /**
-   * Which source settled this device's segment count. Mirrors the priority in
-   * `resolveSegmentCount` without importing it — the report states a fact about
-   * the device, it does not re-derive the number.
-   *
-   * @param device The device being reported on
-   */
   /**
    * Where this device's reachability comes from — and, just as important, which
    * sources can NEVER speak for it.
@@ -746,20 +733,28 @@ class DiagnosticsCollector {
     const isLight = device.type === import_govee_constants.GOVEE_DEVICE_TYPE.LIGHT;
     const lanDriven = (0, import_lookups.isLanDriven)(device);
     const silent = [];
+    const renewers = [];
     if (lanDriven) {
-      silent.push("cloud state poll (a LAN-driven light is never cloud-driven)");
-      silent.push("account push (barred for lights \u2014 the broker replays retained messages)");
-    } else if (isLight) {
-      silent.push("LAN reply (device has no local API enabled)");
-      silent.push("account push (barred for lights \u2014 the broker replays retained messages)");
+      silent.push("cloud state read (a LAN-driven light ignores every cloud claim)");
+      silent.push("account push (same reason)");
+      silent.push("app device list (same reason)");
+      silent.push("cloud event push (same reason)");
+      renewers.push("LAN scan, every 30 s");
     } else {
-      silent.push("LAN reply (not a light)");
+      silent.push(isLight ? "LAN reply (device has no local API enabled)" : "LAN reply (not a light)");
+      renewers.push("account push, event-driven (needs email + password)");
+      renewers.push("app device list, every 2 min (needs email + password)");
+      renewers.push("cloud event push, event-driven (needs the API key)");
+      renewers.push(
+        `reachability refresh once the evidence is older than ${Math.round(import_timing_constants.CLOUD_REACHABILITY_REFRESH_MS / 6e4)} min (needs the API key)`
+      );
     }
-    const refreshedBy = lanDriven ? "LAN scan, every 30 s" : "app device list every 2 min, plus event pushes";
+    const refreshedBy = renewers.join("; ");
     const decidedBy = {
       lanReply: "LAN reply freshness",
       gatewayDown: "its gateway is down \u2014 a device behind a gateway can be no more reachable than the gateway",
-      cloudReport: isLight ? "Govee reported it (cloud state poll)" : "Govee reported it (app poll or event push)",
+      cloudReport: "Govee reported it explicitly (an `online` capability)",
+      cloudLiveness: "Govee delivered something for this device without reporting reachability \u2014 the payload proves it spoke",
       noEvidence: "nothing ever reported \u2014 reported as not reachable"
     }[decision.decidedBy];
     return {
@@ -769,6 +764,13 @@ class DiagnosticsCollector {
       silentSources: silent
     };
   }
+  /**
+   * Which source settled this device's segment count. Mirrors the priority in
+   * `resolveSegmentCount` without importing it — the report states a fact about
+   * the device, it does not re-derive the number.
+   *
+   * @param device The device being reported on
+   */
   segmentCountSource(device) {
     var _a;
     if (((_a = this.registry.getQuirks(device.sku)) == null ? void 0 : _a.segmentCount) !== void 0) {

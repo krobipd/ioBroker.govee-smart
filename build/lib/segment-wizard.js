@@ -158,7 +158,7 @@ class SegmentWizard {
    * @param deviceKey Target device key
    */
   async start(deviceKey) {
-    var _a, _b, _c;
+    var _a, _b;
     if (this.session) {
       return {
         error: this.t("errAlreadyActive", { name: this.session.name })
@@ -173,7 +173,7 @@ class SegmentWizard {
         error: this.t("errNoSegments", { name: device.name })
       };
     }
-    if (((_a = device.state) == null ? void 0 : _a.online) !== true) {
+    if (!(0, import_lookups.resolveDeviceReachability)(device).online) {
       return {
         error: this.t("errDeviceOffline", { name: device.name })
       };
@@ -191,7 +191,7 @@ class SegmentWizard {
     this.session = session;
     session.baseline = await this.captureBaseline(device);
     if (this.session !== session) {
-      return { error: this.t("errAlreadyActive", { name: (_c = (_b = this.session) == null ? void 0 : _b.name) != null ? _c : device.name }) };
+      return { error: this.t("errAlreadyActive", { name: (_b = (_a = this.session) == null ? void 0 : _a.name) != null ? _b : device.name }) };
     }
     this.scheduleIdleTimeout();
     await this.host.sendCommand(device, "power", true);

@@ -66,8 +66,9 @@ var import_state_manager = require("./lib/state-manager");
 var import_types = require("./lib/types");
 var diagnosticsHandlerImpl = __toESM(require("./lib/handlers/diagnostics-handler"));
 var import_timing_constants = require("./lib/timing-constants");
-function physicalSegmentCap(device) {
-  return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+function physicalSegmentCap(device, registry) {
+  const count = (0, import_lookups.resolveSegmentCount)(device, registry);
+  return count > 0 ? count : 0;
 }
 class GoveeAdapter extends utils.Adapter {
   // ── Test seams ────────────────────────────────────────────────────────────
@@ -507,7 +508,7 @@ class GoveeAdapter extends utils.Adapter {
       };
       this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
         const prefix = this.stateManager.devicePrefix(device);
-        const cap = physicalSegmentCap(device);
+        const cap = physicalSegmentCap(device, this.deviceRegistry);
         for (const idx of batch.segments) {
           if (cap === 0 || idx >= cap) {
             continue;
@@ -529,7 +530,7 @@ class GoveeAdapter extends utils.Adapter {
       };
       this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
         const prefix = this.stateManager.devicePrefix(device);
-        const cap = physicalSegmentCap(device);
+        const cap = physicalSegmentCap(device, this.deviceRegistry);
         for (const seg of segments) {
           if (cap === 0 || seg.index >= cap) {
             continue;
@@ -750,8 +751,9 @@ class GoveeAdapter extends utils.Adapter {
           }
         );
         const triggerAppApiPoll = () => {
-          var _a2;
-          (_a2 = this.deviceManager) == null ? void 0 : _a2.pollAppApi().then(() => {
+          var _a2, _b2;
+          (_a2 = this.deviceManager) == null ? void 0 : _a2.refreshExpiringReachability().catch((e) => this.log.debug(`Reachability refresh failed: ${(0, import_types.errMessage)(e)}`));
+          (_b2 = this.deviceManager) == null ? void 0 : _b2.pollAppApi().then(() => {
             if (!this.appApiInitialPollDone) {
               this.appApiInitialPollDone = true;
               connectionState.checkAllReady(this.handlerHost);
@@ -1146,16 +1148,22 @@ class GoveeAdapter extends utils.Adapter {
       },
       getDeviceList: () => {
         var _a, _b;
-        return ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).filter((d) => d.sku !== "BaseGroup").map((d) => {
-          var _a2;
-          return {
-            value: `${d.sku}:${d.deviceId}`,
-            label: (0, import_types.deviceLabel)(d),
-            model: d.sku,
-            online: ((_a2 = d.state) == null ? void 0 : _a2.online) === true,
-            segments: (0, import_lookups.resolveSegmentCount)(d, this.deviceRegistry)
-          };
-        });
+        return ((_b = (_a = this.deviceManager) == null ? void 0 : _a.getDevices()) != null ? _b : []).filter((d) => d.sku !== "BaseGroup").map((d) => ({
+          value: `${d.sku}:${d.deviceId}`,
+          label: (0, import_types.deviceLabel)(d),
+          model: d.sku,
+          // The resolver — the same answer `<device>.info.online` shows.
+          // Reading `state.online` here made the Expert tab list a device as
+          // reachable that the object tree showed as grey (that flag is only
+          // written back for lights, and only for a proven answer), and the
+          // wizard then happily started on it.
+          online: (0, import_lookups.resolveDeviceReachability)(d).online,
+          // effectiveSegmentCount — the count the state tree is actually
+          // built for. `resolveSegmentCount` omits a manual index list that
+          // reaches beyond it, so a cut strip advertised fewer segments here
+          // than the tree below it had.
+          segments: (0, import_lookups.effectiveSegmentCount)(d, this.deviceRegistry)
+        }));
       },
       buildDiagnosticsReport: async (deviceKey) => {
         var _a, _b;

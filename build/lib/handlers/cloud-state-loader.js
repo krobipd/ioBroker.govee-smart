@@ -23,6 +23,7 @@ __export(cloud_state_loader_exports, {
 });
 module.exports = __toCommonJS(cloud_state_loader_exports);
 var import_capability_mapper = require("../capability-mapper");
+var import_rate_limiter = require("../rate-limiter");
 var import_types = require("../types");
 async function loadCloudStates(adapter, only) {
   if (!adapter.cloudClient || !adapter.deviceManager || !adapter.stateManager) {
@@ -64,7 +65,7 @@ async function loadCloudStates(adapter, only) {
       }
     };
     if (adapter.rateLimiter) {
-      await adapter.rateLimiter.tryExecute(loadOne, 2);
+      await adapter.rateLimiter.tryExecute(loadOne, 2, (0, import_rate_limiter.applianceBudget)(device));
     } else {
       await loadOne();
     }
