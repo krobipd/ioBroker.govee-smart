@@ -3599,7 +3599,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 });
 
-describe("DeviceManager.syncSegmentCount — the one writer of device.segmentCount from the tree path", () => {
+describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothing", () => {
   beforeEach(() => {
     registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
   });
@@ -3612,39 +3612,81 @@ describe("DeviceManager.syncSegmentCount — the one writer of device.segmentCou
     parameters: { dataType: "STRUCT", fields: [{ fieldName: "segment", elementRange: { min: 0, max } }] },
   });
 
-  it("derives the count from the capabilities and stores it on the device", () => {
+  it("derives the count from the capabilities without inventing a learned value", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ segmentCount: undefined, capabilities: [segCap(9)] });
     expect(dm.syncSegmentCount(device)).toBe(10);
-    expect(device.segmentCount).toBe(10);
+    // Nothing MEASURED this strip — the number comes from the capabilities and
+    // is re-derived every time, so the learned field stays empty.
+    expect(device.segmentCount).toBeUndefined();
   });
 
-  it("a manual list beyond the known range raises the stored count (cut-strip case)", () => {
+  it("a manual list beyond the known range widens the TREE, not the learned count (cut-strip case)", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ segmentCount: 10, manualMode: true, manualSegments: [0, 5, 13] });
     expect(dm.syncSegmentCount(device)).toBe(14);
-    expect(device.segmentCount).toBe(14);
+    expect(device.segmentCount, "the user's claim is not a measurement").toBe(10);
   });
 
   it("an implausible stored count is replaced by the capability-derived one, never propagated", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ segmentCount: 1_000_000_000, capabilities: [segCap(14)] });
+    // Every reader runs the stored value through `plausibleSegmentCount`, so a
+    // corrupt one can never become the tree size — building a billion segment
+    // channels is what that guard exists to prevent.
     expect(dm.syncSegmentCount(device)).toBe(15);
-    expect(device.segmentCount).toBe(15);
   });
 
   it("a segmentCount quirk wins over everything the device or the Cloud say", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ sku: "H9999", segmentCount: 20, capabilities: [segCap(14)] });
     expect(dm.syncSegmentCount(device)).toBe(5);
-    expect(device.segmentCount).toBe(5);
+    expect(device.segmentCount, "the quirk overrules the learned value, it does not overwrite it").toBe(20);
   });
 
-  it("returns 0 and stores 0 for a device without segments", () => {
+  it("returns 0 for a device without segments", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
     expect(dm.syncSegmentCount(device)).toBe(0);
-    expect(device.segmentCount).toBe(0);
+  });
+
+  it("turning manual mode OFF gives the real count back", () => {
+    // The manual list used to be folded into the stored count, and the stored
+    // count is itself an input to the next settlement — so a list could only
+    // ever RAISE the tree. On a strip whose length nothing had measured yet
+    // the user's first list became the device's "learned" length for good:
+    // correcting it downward, or switching manual mode off entirely, left the
+    // extra segment channels standing, persisted to the cache, surviving every
+    // restart. `physicalSegmentCap` (the echo filter) was inflated with it.
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
+    device.manualMode = true;
+    device.manualSegments = Array.from({ length: 30 }, (_, i) => i);
+    expect(dm.syncSegmentCount(device), "the tree is built for the declared 30").toBe(30);
+
+    device.manualMode = false;
+    device.manualSegments = undefined;
+    expect(dm.syncSegmentCount(device), "and shrinks back when the claim is withdrawn").toBe(0);
+  });
+
+  it("a manual list shrinks the tree again when the user corrects it", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
+    device.manualMode = true;
+    device.manualSegments = Array.from({ length: 30 }, (_, i) => i);
+    expect(dm.syncSegmentCount(device)).toBe(30);
+    device.manualSegments = [0, 1, 2, 3, 4];
+    expect(dm.syncSegmentCount(device)).toBe(5);
+  });
+
+  it("the stored count stays the LEARNED length — the manual claim is not folded into it", () => {
+    // `physicalSegmentCap` reads this field to filter BLE echo indices above
+    // the real strip length, and the cache persists it. A user's claim about a
+    // cut strip is not a measurement and must not end up in either.
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const device = createTestDevice({ segmentCount: 10, manualMode: true, manualSegments: [0, 5, 13] });
+    expect(dm.syncSegmentCount(device), "the tree covers the declared index 13").toBe(14);
+    expect(device.segmentCount, "but the learned length is untouched").toBe(10);
   });
 });
 

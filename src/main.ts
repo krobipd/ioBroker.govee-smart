@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
 import { DeviceManager } from "./lib/device-manager";
-import { effectiveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
+import { effectiveSegmentCount, resolveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
@@ -54,13 +54,22 @@ import {
 // every module that touches Govee budgeting reads the same canonical values.
 
 /**
- * The device's learned physical segment count, or 0 when not yet known — the
- * cap for filtering out echo indices above the real strip length.
+ * The device's physical segment count, or 0 when not yet known — the cap for
+ * filtering out echo indices above the real strip length.
  *
- * @param device Device whose learned physical segment count to read
+ * `resolveSegmentCount`, not the raw field: the physical length can come from
+ * the catalogue quirk or the Cloud capabilities just as well as from something
+ * the device itself reported, and a device whose count is known only from its
+ * capabilities read as 0 here — which this filter treats as "drop every
+ * index". Deliberately NOT `effectiveSegmentCount`: a user's manual claim
+ * about a cut strip is not evidence about what the hardware echoes back.
+ *
+ * @param device Device whose physical segment count to read
+ * @param registry This instance's device catalog
  */
-function physicalSegmentCap(device: GoveeDevice): number {
-  return typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount : 0;
+function physicalSegmentCap(device: GoveeDevice, registry: DeviceRegistry): number {
+  const count = resolveSegmentCount(device, registry);
+  return count > 0 ? count : 0;
 }
 
 /**
@@ -690,7 +699,7 @@ export class GoveeAdapter extends utils.Adapter {
       // (e.g. segments.51..55 on a 19-segment strip).
       this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
         const prefix = this.stateManager!.devicePrefix(device);
-        const cap = physicalSegmentCap(device);
+        const cap = physicalSegmentCap(device, this.deviceRegistry);
         for (const idx of batch.segments) {
           if (cap === 0 || idx >= cap) {
             continue;
@@ -715,7 +724,7 @@ export class GoveeAdapter extends utils.Adapter {
       // Gleicher Cap-Filter wie bei batch — defensive vor stale Pakete.
       this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
         const prefix = this.stateManager!.devicePrefix(device);
-        const cap = physicalSegmentCap(device);
+        const cap = physicalSegmentCap(device, this.deviceRegistry);
         for (const seg of segments) {
           if (cap === 0 || seg.index >= cap) {
             continue;

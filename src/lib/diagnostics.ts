@@ -3,7 +3,12 @@ import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
 import type { GoveeDevice } from "./types";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { isLanDriven, resolveDeviceReachability } from "./device-manager/lookups";
+import {
+  effectiveSegmentCount,
+  isLanDriven,
+  resolveDeviceReachability,
+  resolveSegmentCount,
+} from "./device-manager/lookups";
 import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 
 /** Single log line captured for a device. */
@@ -423,13 +428,6 @@ export class DiagnosticsCollector {
   constructor(private readonly registry: DeviceRegistry) {}
 
   /**
-   * Register the runtime-state provider. main.ts wires it after all
-   * sub-clients (Cloud, MQTT, Rate-limiter, LAN, Wizard) are instantiated
-   * so the snapshot can pull from any of them.
-   *
-   * @param provider Callback returning a runtime-state snapshot (or partial)
-   */
-  /**
    * Wire the list of known device names, so the pseudonymiser can replace them
    * inside free text — a name has no detectable shape.
    *
@@ -477,14 +475,6 @@ export class DiagnosticsCollector {
     this.objectTreeProvider = provider;
   }
 
-  /**
-   * Record what a user-triggered command actually did. Closes the gap between
-   * "the adapter sent something" and "the device did something": `lanSends`
-   * ends at the wire, this says whether the write was accepted and why not.
-   *
-   * @param deviceId Govee device id
-   * @param entry What was written, over which channel, and how it went
-   */
   /**
    * Record the outcome of an ACCOUNT-level call — the login and the IoT-key
    * request. Both were invisible in the report, although two filed issues are
@@ -958,7 +948,15 @@ export class DiagnosticsCollector {
         name: this.anon.deviceName(device.name),
         type: device.type,
         objectPrefix: prefix ?? null,
-        segmentCount: device.segmentCount ?? null,
+        // The strip's PHYSICAL length as the adapter settles it (quirk >
+        // learned > cloud capabilities) — not the raw learned field, which is
+        // empty for a device whose count is only known from its capabilities
+        // and would report `null` next to a tree full of segment channels.
+        segmentCount: resolveSegmentCount(device, this.registry),
+        // How many segment channels the tree actually has: the physical length
+        // widened by a manual index list on a cut strip. The two differ exactly
+        // in the case a segment report is usually about.
+        segmentTreeSize: effectiveSegmentCount(device, this.registry),
         // Where the segment count came from. It is the single most asked-back
         // question on a segment report, and the number alone never answered it.
         segmentCountSource: this.segmentCountSource(device),
@@ -1082,13 +1080,6 @@ export class DiagnosticsCollector {
   }
 
   /**
-   * Which source settled this device's segment count. Mirrors the priority in
-   * `resolveSegmentCount` without importing it — the report states a fact about
-   * the device, it does not re-derive the number.
-   *
-   * @param device The device being reported on
-   */
-  /**
    * Where this device's reachability comes from — and, just as important, which
    * sources can NEVER speak for it.
    *
@@ -1166,6 +1157,13 @@ export class DiagnosticsCollector {
     };
   }
 
+  /**
+   * Which source settled this device's segment count. Mirrors the priority in
+   * `resolveSegmentCount` without importing it — the report states a fact about
+   * the device, it does not re-derive the number.
+   *
+   * @param device The device being reported on
+   */
   private segmentCountSource(device: GoveeDevice): string {
     if (this.registry.getQuirks(device.sku)?.segmentCount !== undefined) {
       return "quirk (hard override for this SKU)";

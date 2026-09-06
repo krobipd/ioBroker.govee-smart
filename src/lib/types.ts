@@ -206,12 +206,6 @@ export interface MqttStatusUpdate {
    * nothing downstream could tell a reachability packet from a state push.
    */
   cmd?: string;
-  /**
-   * Protocol generation. Decides WHICH field carries reachability — measured
-   * trennscharf across all 75 captured packets, no mixed case:
-   * `1` → `state.connected`, `2` → `state.result`.
-   */
-  pactType?: number;
   /** Device state values */
   state?: {
     /** Power state (1 = on, 0 = off) */
@@ -223,14 +217,23 @@ export interface MqttStatusUpdate {
     /** Color temperature in Kelvin */
     colorTemInKelvin?: number;
     /**
-     * Reachability as text ("true"/"false") — pactType 1 devices. Carried in
-     * every packet kind for those (status, pt, online), so it is always usable.
+     * Reachability as text ("true"/"false"). Carried in every packet kind for
+     * the devices that send it (status, pt, online), so it is always usable.
+     *
+     * Which of these two fields a device uses correlates with the protocol
+     * generation Govee also puts in the envelope (`pactType` 1 → this one,
+     * 2 → `result`, measured across all 75 captured packets). The adapter does
+     * NOT key off it: the account list carries devices with no `pactType` at
+     * all, so `readReportedReachability` decides on the FIELD SHAPE that is
+     * actually present. The envelope field was parsed and handed on for a
+     * version without a single reader — dropped, with the observation kept
+     * here where it explains something.
      */
     connected?: string;
     /**
-     * Reachability as number (1/0) — pactType 2 devices, but ONLY inside a
-     * `cmd:"online"` packet. In `cmd:"status"` / `cmd:"ptReal"` the same field
-     * is an operation result code and says nothing about reachability.
+     * Reachability as number (1/0), but ONLY inside a `cmd:"online"` packet.
+     * In `cmd:"status"` / `cmd:"ptReal"` the same field is an operation result
+     * code and says nothing about reachability.
      */
     result?: number;
   };

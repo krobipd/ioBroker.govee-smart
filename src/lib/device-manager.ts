@@ -1240,18 +1240,26 @@ export class DeviceManager {
   }
 
   /**
-   * Settle the device's segment count from every source (catalog quirk, learned
-   * count, Cloud capabilities, manual list) and store it on the device — the
-   * one place the domain object is written. The state-tree builder receives
-   * the number and only reads it.
+   * Settle how many segment channels the state tree needs: the physical length
+   * (catalog quirk → learned count → Cloud capabilities) widened by a manual
+   * index list that reaches beyond it.
+   *
+   * It DERIVES, it does not store. `device.segmentCount` is the LEARNED
+   * physical length — written by the cache restore, an MQTT AA-A5 push and the
+   * wizard, which is what `physicalSegmentCap` and the diagnostics report have
+   * always said it is. Writing the settled number back into it fed a user's
+   * manual claim into the next settlement, and since the stored count is an
+   * input to that settlement the tree could only ever GROW: on a strip nothing
+   * had measured yet, the first manual list became the device's length for
+   * good. Correcting the list downward, or switching manual mode off, left the
+   * extra segment channels standing — persisted to the cache, surviving every
+   * restart — and inflated the BLE echo filter with it.
    *
    * @param device Target device
    * @returns The count the segment tree is to be built for
    */
   public syncSegmentCount(device: GoveeDevice): number {
-    const count = effectiveSegmentCount(device, this.registry);
-    device.segmentCount = count;
-    return count;
+    return effectiveSegmentCount(device, this.registry);
   }
 
   /**

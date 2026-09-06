@@ -1289,31 +1289,35 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
+        // The two datapoints the diag channel actually has. This test used to
+        // route `export` and `result` — the button removed in 2.31.0 and the
+        // state removed in 2.29.0 — so it pinned the rule with names a reader
+        // would go looking for and never find.
         {
-          id: "export",
-          name: "Export",
-          type: "boolean",
-          role: "button",
-          write: true,
-          def: false,
-          capabilityType: "local",
-          capabilityInstance: "diagnosticsExport",
-          channel: "diag",
-        },
-        {
-          id: "result",
-          name: "Result",
+          id: "lastExport",
+          name: "Last export",
           type: "string",
-          role: "json",
+          role: "date",
           write: false,
           def: "",
           capabilityType: "local",
-          capabilityInstance: "diagnosticsResult",
+          capabilityInstance: "diagnosticsLastExport",
+          channel: "diag",
+        },
+        {
+          id: "tier",
+          name: "Tier",
+          type: "string",
+          role: "text",
+          write: false,
+          def: "unknown",
+          capabilityType: "local",
+          capabilityInstance: "diagnosticsTier",
           channel: "diag",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "export")).toBe("devices.h6160_0011.diag.export");
-      expect(sm.resolveStatePath("devices.h6160_0011", "result")).toBe("devices.h6160_0011.diag.result");
+      expect(sm.resolveStatePath("devices.h6160_0011", "lastExport")).toBe("devices.h6160_0011.diag.lastExport");
+      expect(sm.resolveStatePath("devices.h6160_0011", "tier")).toBe("devices.h6160_0011.diag.tier");
     });
 
     it("should route unknown states to control channel", () => {
