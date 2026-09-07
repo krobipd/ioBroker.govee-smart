@@ -3,9 +3,7 @@
   "$id": "https://github.com/krobipd/ioBroker.govee-smart/blob/main/devices.schema.json",
   "title": "Govee device support catalog",
   "type": "object",
-  "required": [
-    "devices"
-  ],
+  "required": ["devices"],
   "properties": {
     "_comment": {
       "type": "string",
@@ -25,11 +23,7 @@
   "definitions": {
     "deviceEntry": {
       "type": "object",
-      "required": [
-        "name",
-        "type",
-        "status"
-      ],
+      "required": ["name", "type", "status"],
       "properties": {
         "name": {
           "type": "string",
@@ -57,11 +51,7 @@
         },
         "status": {
           "type": "string",
-          "enum": [
-            "verified",
-            "reported",
-            "seed"
-          ],
+          "enum": ["verified", "reported", "seed"],
           "description": "verified = multiple confirmed reports, reported = 1 user with diagnostics, seed = imported from external source / untested."
         },
         "since": {
@@ -80,10 +70,7 @@
       "properties": {
         "colorTempRange": {
           "type": "object",
-          "required": [
-            "min",
-            "max"
-          ],
+          "required": ["min", "max"],
           "properties": {
             "min": {
               "type": "integer",
@@ -114,58 +101,31 @@
           "description": "Per-command transport override — forces a command through Cloud or LAN regardless of the default LAN-first heuristic. Value 'lan' is a no-op (default routing).",
           "properties": {
             "power": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "brightness": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "colorRgb": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "colorTemperature": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "lightScene": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "diyScene": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "snapshot": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "gradientToggle": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             },
             "segmentBatch": {
-              "enum": [
-                "cloud",
-                "lan"
-              ]
+              "enum": ["cloud", "lan"]
             }
           },
           "additionalProperties": false

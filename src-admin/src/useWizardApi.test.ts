@@ -55,5 +55,4 @@ describe("makeWizardApi", () => {
     });
     expect(res.applied).toBe(true);
   });
-
 });

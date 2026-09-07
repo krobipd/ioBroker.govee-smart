@@ -14,10 +14,10 @@ scenes and snapshots — and takes over control for devices that have no local A
 Everything is optional except the first line. Enter more and more becomes available; enter nothing
 and local control still works.
 
-| What you enter | What the adapter can do |
-| --- | --- |
-| Nothing | Find lights on your network and switch them: power, brightness, colour, colour temperature, status |
-| + Govee API key | Device names, capabilities, scenes, snapshots and segments |
+| What you enter                        | What the adapter can do                                                                                 |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Nothing                               | Find lights on your network and switch them: power, brightness, colour, colour temperature, status      |
+| + Govee API key                       | Device names, capabilities, scenes, snapshots and segments                                              |
 | + Govee account (e-mail and password) | Real-time status updates pushed from Govee, so changes made in the app or on the device show up at once |
 
 The API key is free and comes from the Govee Home app. The account login is what the app itself

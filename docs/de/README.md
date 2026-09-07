@@ -15,11 +15,11 @@ ohne lokale Schnittstelle.
 Alles außer der ersten Zeile ist freiwillig. Je mehr du einträgst, desto mehr steht zur Verfügung;
 trägst du nichts ein, funktioniert die lokale Steuerung trotzdem.
 
-| Was du einträgst | Was der Adapter kann |
-| --- | --- |
-| Nichts | Lampen im eigenen Netz finden und schalten: Ein/Aus, Helligkeit, Farbe, Farbtemperatur, Status |
-| + Govee-API-Schlüssel | Gerätenamen, Fähigkeiten, Szenen, Snapshots und Segmente |
-| + Govee-Konto (E-Mail und Passwort) | Echtzeit-Statusmeldungen von Govee: Änderungen aus der App oder am Gerät erscheinen sofort |
+| Was du einträgst                    | Was der Adapter kann                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Nichts                              | Lampen im eigenen Netz finden und schalten: Ein/Aus, Helligkeit, Farbe, Farbtemperatur, Status |
+| + Govee-API-Schlüssel               | Gerätenamen, Fähigkeiten, Szenen, Snapshots und Segmente                                       |
+| + Govee-Konto (E-Mail und Passwort) | Echtzeit-Statusmeldungen von Govee: Änderungen aus der App oder am Gerät erscheinen sofort     |
 
 Der API-Schlüssel ist kostenlos und kommt aus der Govee-Home-App. Die Konto-Anmeldung ist dieselbe,
 die die App benutzt; der Adapter hört darüber nur zu und schickt keine Befehle darüber.

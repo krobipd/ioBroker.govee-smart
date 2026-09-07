@@ -53,8 +53,9 @@ describe("makeDeviceListApi", () => {
   it("an empty list is a RESULT, not a failure", async () => {
     // An account really can have no devices yet. That must still render the
     // friendly "nothing here yet" message, not an error.
-    await expect(makeDeviceListApi(socketReturning({ devices: [] }).socket, "govee-smart.0").listDevices()).resolves
-      .toEqual([]);
+    await expect(
+      makeDeviceListApi(socketReturning({ devices: [] }).socket, "govee-smart.0").listDevices(),
+    ).resolves.toEqual([]);
   });
 });
 

@@ -61,10 +61,10 @@ Promotion-Pfad: ⚪ → 🟢 → ✅. Linear, jede neue Bestätigung kann hochpr
 
 Aktuelle Quirk-Felder sind die einzigen die im Code etwas bewirken:
 
-| Feld                                          | Wann verwenden                                                                                                    |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `colorTempRange: { min, max }`                | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                        |
-| `brokenPlatformApi: true`                     | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                      |
+| Feld                                                | Wann verwenden                                                                                                              |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `colorTempRange: { min, max }`                      | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                                  |
+| `brokenPlatformApi: true`                           | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                                |
 | `transportOverrides: { <command>: "cloud"\|"lan" }` | Bestimmten Transport pro Operation erzwingen (z.B. Pixel-Matrix-SKUs deren LAN-Bridge Scene-Frames verwirft — H70B3, H70C5) |
 
 Wenn dein Gerät einen Quirk braucht der hier fehlt: erst Issue mit Diagnostics-JSON aufmachen — wir entscheiden gemeinsam ob es ein neues Feld im Schema rechtfertigt oder im bestehenden Vokabular abgebildet werden kann. Schema-Erweiterungen kommen mit dem Code-Pfad der sie auswertet zusammen rein.

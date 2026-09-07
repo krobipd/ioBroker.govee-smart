@@ -4,9 +4,7 @@
     {
       "name": "connection",
       "tab": "Main|Haupt",
-      "mountSelectors": [
-        "[data-testid=\"dot-lan\"]"
-      ],
+      "mountSelectors": ["[data-testid=\"dot-lan\"]"],
       "probe": [
         {
           "expectDisabled": "[data-testid=\"conn-connect\"]"
@@ -36,9 +34,7 @@
         "when": "[data-testid=\"wiz-start\"]",
         "value": "[data-testid=\"wiz-device-select\"]"
       },
-      "reveal": [
-        "[data-testid=\"expert-tool-wizard\"]"
-      ]
+      "reveal": ["[data-testid=\"expert-tool-wizard\"]"]
     },
     {
       "name": "diagnostics",
@@ -52,9 +48,7 @@
         "when": "[data-testid=\"diag-export\"]",
         "value": "[data-testid=\"diag-device-select\"]"
       },
-      "reveal": [
-        "[data-testid=\"expert-tool-diagnostics\"]"
-      ]
+      "reveal": ["[data-testid=\"expert-tool-diagnostics\"]"]
     }
   ]
 }

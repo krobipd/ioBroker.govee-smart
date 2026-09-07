@@ -34,7 +34,10 @@ function fakeSocket(opts: { states?: Record<string, unknown>; auth?: AuthRespons
       return Promise.resolve();
     },
     unsubscribeState: (id: string, cb: Handler) => {
-      subs.set(id, (subs.get(id) ?? []).filter(h => h !== cb));
+      subs.set(
+        id,
+        (subs.get(id) ?? []).filter(h => h !== cb),
+      );
     },
   };
   const emit = (id: string, val: unknown): void => {
@@ -61,7 +64,14 @@ function renderPanel(opts?: {
     ...opts?.values,
   };
   const { socket, sent, emit } = fakeSocket({ states: opts?.states, auth: opts?.auth });
-  render(<ConnectionPanel socket={socket} namespace="govee-smart.0" values={values} onChange={onChange} />);
+  render(
+    <ConnectionPanel
+      socket={socket}
+      namespace="govee-smart.0"
+      values={values}
+      onChange={onChange}
+    />,
+  );
   return { onChange, sent, emit };
 }
 
@@ -93,12 +103,22 @@ describe("ConnectionPanel", () => {
     const { socket } = fakeSocket({});
     const base = { apiKey: "", password: "", code: "" };
     const { rerender } = render(
-      <ConnectionPanel socket={socket} namespace="govee-smart.0" values={{ ...base, email: "old@example.com" }} onChange={onChange} />,
+      <ConnectionPanel
+        socket={socket}
+        namespace="govee-smart.0"
+        values={{ ...base, email: "old@example.com" }}
+        onChange={onChange}
+      />,
     );
     const field = screen.getByLabelText(I18n.t("gsw_conn_email_label")) as HTMLInputElement;
     expect(field.value).toBe("old@example.com");
     rerender(
-      <ConnectionPanel socket={socket} namespace="govee-smart.0" values={{ ...base, email: "new@example.com" }} onChange={onChange} />,
+      <ConnectionPanel
+        socket={socket}
+        namespace="govee-smart.0"
+        values={{ ...base, email: "new@example.com" }}
+        onChange={onChange}
+      />,
     );
     expect(field.value).toBe("new@example.com");
   });

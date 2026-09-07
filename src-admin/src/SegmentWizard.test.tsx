@@ -43,7 +43,12 @@ beforeEach(() => {
 });
 
 function renderWizard(): void {
-  render(<SegmentWizard socket={{} as never} namespace="govee-smart.0" />);
+  render(
+    <SegmentWizard
+      socket={{} as never}
+      namespace="govee-smart.0"
+    />,
+  );
 }
 
 describe("SegmentWizard", () => {
@@ -68,7 +73,8 @@ describe("SegmentWizard", () => {
     await waitFor(() => expect(mockApi.yes).toHaveBeenCalledTimes(1));
 
     // "Finished" moves to review LOCALLY — no backend call of any kind.
-    const callsBeforeFinish = mockApi.yes.mock.calls.length + mockApi.no.mock.calls.length + mockApi.abort.mock.calls.length;
+    const callsBeforeFinish =
+      mockApi.yes.mock.calls.length + mockApi.no.mock.calls.length + mockApi.abort.mock.calls.length;
     fireEvent.click(screen.getByTestId("wiz-finish"));
     await screen.findByTestId("wiz-apply");
     expect(mockApi.yes.mock.calls.length + mockApi.no.mock.calls.length + mockApi.abort.mock.calls.length).toBe(
