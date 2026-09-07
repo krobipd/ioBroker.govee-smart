@@ -26,10 +26,11 @@ updates:
           - 'version-update:semver-major'
 
   # src-admin (Module-Federation admin component): hand-pinned compatibility matrix
-  # (React 18 / MUI 6 / @module-federation/vite 1.2.6 …). npm-latest breaks the MF build.
-  # This entry exists ONLY to satisfy repochecker W8905 (a non-root package.json must be
-  # covered by a dependabot npm directory). Ignoring all dependencies means it generates
-  # ZERO pull requests, so the pinned matrix is never moved.
+  # (React / MUI / @module-federation/vite — the versions the component was built against);
+  # npm-latest breaks the MF build. This entry exists ONLY to satisfy repochecker W8905
+  # (a non-root package.json must be covered by a dependabot npm directory). Ignoring all
+  # dependencies means it generates ZERO pull requests, so the pinned matrix is never moved.
+  # (open-pull-requests-limit: 0 would trip W8907; a wildcard ignore keeps the entry warning-free.)
   - package-ecosystem: 'npm'
     directory: '/src-admin'
     schedule:

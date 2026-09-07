@@ -6,9 +6,8 @@
   "exec": {
     "before_commit": [
       "node scripts/sync-app-version.mjs",
-      "npm test",
       "npm run build",
-      "npm run --if-present build:admin"
+      "npm run --if-present fix:changelog"
     ]
   }
 }

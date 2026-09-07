@@ -1,4 +1,5 @@
 # Older Changes
+
 ## 2.29.2 (2026-09-03)
 
 - Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text

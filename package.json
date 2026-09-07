@@ -86,6 +86,7 @@
     "lint:fix": "eslint --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "fix:changelog": "node -e \"const fs=require('fs');for(const[f,r]of[['README.md',/^(-->[ \\t]*)\\r?\\n(#{1,6} )/m],['CHANGELOG_OLD.md',/^(#{1,6} .*)\\r?\\n(#{1,6} )/]])if(fs.existsSync(f)){const t=fs.readFileSync(f,'utf8'),n=t.replace(r,(m,a,b)=>a+'\\n\\n'+b);if(n!==t)fs.writeFileSync(f,n)}\"",
     "translate": "translate-adapter",
     "release": "release-script",
     "release-patch": "release-script patch --yes --all",

@@ -128,6 +128,7 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24.x"
+          cache: npm
       - run: npm ci
       - run: npm run validate-devices
 
@@ -150,32 +151,17 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: "24.x"
+          cache: npm
       - run: npm ci
       - name: Build admin custom component (Vite / Module Federation)
         run: npm run build:admin
       - name: Build the adapter
         run: npm run build
-      # `build/` is deliberately committed (see .gitignore) so a GitHub install
-      # runs without a build step. That only holds while it matches `src/` — and
-      # twice after the 2.28.0 tag a commit changed a source file (once a
-      # user-facing log message) while labelled as documentation with the CI
-      # skipped, so nothing rebuilt and nothing checked it.
-      #
-      # ONLY `build/` is compared. The TypeScript output is byte-identical
-      # anywhere (its source maps carry relative paths only), but the Vite build
-      # under `admin/custom/` names its chunks by content hash and those differ
-      # between the runner and a developer machine — comparing it would keep the
-      # job permanently red without ever pointing at a real defect. Measured on
-      # this very workflow: the first version compared both and failed on
-      # `admin/custom/` alone while `build/` matched exactly.
-      - name: Committed build output must match the sources
-        run: |
-          set -euo pipefail
-          if ! git diff --quiet -- build; then
-            echo "::error ::build/ is behind src/ — run 'npm run build' and commit the result."
-            git --no-pager diff --stat -- build
-            exit 1
-          fi
+      # No drift check here any more: `build/` left version control with the
+      # nogit rule, so `git diff -- build` can never report anything and the
+      # step it used to guard with was silently doing nothing. What still
+      # matters is that both builds RUN — the Module-Federation bundle and the
+      # adapter — because the CI is now the only place either is produced.
 
   adapter-tests:
     if: contains(github.event.head_commit.message, '[skip ci]') == false
@@ -215,3 +201,10 @@ jobs:
           node-version: "24.x"
           build: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          sentry: true
+          sentry-token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          sentry-url: https://de.sentry.io
+          sentry-org: power-dreams
+          sentry-project: iobroker
+          sentry-version-prefix: iobroker.govee-smart
+          sentry-sourcemap-paths: build/
