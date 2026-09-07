@@ -1,0 +1,16 @@
+{
+  "devices.*.info.model": "Plain identification of the hardware — the SKU label is the whole content.",
+  "devices.*.info.name": "Plain identification of the hardware — the name is what the user typed in the Govee app.",
+  "devices.*.info.serial": "Plain identification of the hardware — the serial is the whole content.",
+  "devices.*.control.power": "A basic light and appliance control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.brightness": "A basic light control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.color_rgb": "A basic light control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.color_temperature": "A basic light control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.humidity": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.target_temperature": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.segments.*.color": "The same colour control once per segment; segments.count carries the explanation for the whole subtree.",
+  "devices.*.segments.*.brightness": "The same brightness control once per segment; segments.count carries the explanation for the whole subtree.",
+  "devices.*.sensor.temperature": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
+  "devices.*.sensor.humidity": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
+  "devices.*.sensor.battery": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one."
+}
