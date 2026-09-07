@@ -177,6 +177,7 @@ function mapSingleCapability(cap) {
         {
           id: sanitizeId(cap.instance),
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "boolean",
           role: "switch",
           write: true,
@@ -196,6 +197,7 @@ function mapSingleCapability(cap) {
         {
           id: `_segment_${sanitizeId(cap.instance)}`,
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -211,6 +213,7 @@ function mapSingleCapability(cap) {
         {
           id: sanitizeId(cap.instance),
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -239,6 +242,7 @@ function mapRange(cap) {
     {
       id: sanitizeId(cap.instance),
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "number",
       role: isBrightness ? "level.brightness" : "level",
       write: true,
@@ -353,6 +357,7 @@ function mapProperty(cap) {
     {
       id: canonicalSyntheticId(cap.instance),
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "number",
       role,
       write: false,
@@ -373,6 +378,7 @@ function mapWorkMode(cap) {
       {
         id: "work_mode",
         name: (0, import_i18n.tName)("workMode"),
+        desc: (0, import_i18n.tDesc)("descWorkMode"),
         type: "mixed",
         role: "state",
         write: true,
@@ -394,6 +400,7 @@ function mapWorkMode(cap) {
     states.push({
       id: "work_mode",
       name: (0, import_i18n.tName)("workMode"),
+      desc: (0, import_i18n.tDesc)("descWorkMode"),
       type: "mixed",
       role: "state",
       write: true,
@@ -415,6 +422,7 @@ function mapWorkMode(cap) {
       states.push({
         id: "mode_value",
         name: (0, import_i18n.tName)("modeValue"),
+        desc: (0, import_i18n.tDesc)("descModeValue"),
         type: "mixed",
         role: "state",
         write: true,
@@ -427,6 +435,7 @@ function mapWorkMode(cap) {
       states.push({
         id: "mode_value",
         name: (0, import_i18n.tName)("modeValue"),
+        desc: (0, import_i18n.tDesc)("descModeValue"),
         type: "number",
         role: "level",
         write: true,
@@ -510,6 +519,7 @@ function mapEvent(cap) {
     {
       id,
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "boolean",
       // Known events use the shared role table (M5 — same role as the
       // synthetic write path); a genuinely unknown event is an alarm.
@@ -553,6 +563,7 @@ function mapMusicSetting(cap) {
     states.push({
       id: "music_mode",
       name: (0, import_i18n.tName)("musicMode"),
+      desc: (0, import_i18n.tDesc)("descMusicMode"),
       type: "mixed",
       role: "state",
       write: true,
@@ -567,6 +578,7 @@ function mapMusicSetting(cap) {
     states.push({
       id: "music_sensitivity",
       name: (0, import_i18n.tName)("musicSensitivity"),
+      desc: (0, import_i18n.tDesc)("descMusicSensitivity"),
       type: "number",
       role: "level",
       write: true,
@@ -648,6 +660,23 @@ const CAPABILITY_NAME_KEYS = {
   fanSpeed: "capFanSpeed",
   humidity: "capHumidity"
 };
+const CAPABILITY_DESC_KEYS = {
+  gradientToggle: "descGradientToggle",
+  airQuality: "descAirQuality",
+  filterLifeTime: "descFilterLifeTime",
+  // Events reach the tree through TWO paths — this cloud-capability one and
+  // state-manager's SYNTHETIC_STATE_META. Both need the explanation, or the
+  // same datapoint carries one only on the installations that happened to
+  // create it the other way.
+  lackWaterEvent: "descLackOfWater",
+  iceFullEvent: "descIceBucketFull",
+  bodyAppearedEvent: "descBodyDetected",
+  dirtDetectedEvent: "descDirtDetected"
+};
+function capabilityDesc(instance) {
+  const key = CAPABILITY_DESC_KEYS[instance];
+  return key ? (0, import_i18n.tDesc)(key) : void 0;
+}
 function capabilityName(instance) {
   const key = CAPABILITY_NAME_KEYS[instance];
   if (key) {
@@ -837,6 +866,7 @@ function buildDiagStateDefs(tierDef) {
   defs.push({
     id: "tier",
     name: (0, import_i18n.tName)("deviceTier"),
+    desc: (0, import_i18n.tDesc)("descDeviceTier"),
     type: "string",
     role: "text",
     write: false,

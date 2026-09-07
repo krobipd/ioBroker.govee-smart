@@ -105,6 +105,12 @@ interface SyntheticStateMeta {
   role: string;
   unit?: string;
   nameKey: I18nKey;
+  /**
+   * i18n key for the explanation. Absent where the name already says
+   * everything — an invented sentence is worse than none; the deliberate
+   * omissions are listed in `catalog-completeness.test.ts`.
+   */
+  descKey?: I18nKey;
   /** Semantic channel — sensor readings vs. device events. */
   channel: "sensor" | "events";
 }
@@ -136,30 +142,46 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
   // by an old install was exempt from cleanup and could never be removed —
   // against the rule that the adapter owns its datapoint inventory. Without the
   // entry that leftover leaves on the next cloud rebuild, migration-free.
-  lack_water: { type: "boolean", role: EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
+  lack_water: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.lack_water.role,
+    nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
+    channel: "events",
+  },
   lack_water_event: {
     type: "boolean",
     role: EVENT_STATE_ROLES.lack_water_event.role,
     nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
     channel: "events",
   },
-  ice_full: { type: "boolean", role: EVENT_STATE_ROLES.ice_full.role, nameKey: "iceBucketFull", channel: "events" },
+  ice_full: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.ice_full.role,
+    nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
+    channel: "events",
+  },
   ice_full_event: {
     type: "boolean",
     role: EVENT_STATE_ROLES.ice_full_event.role,
     nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
     channel: "events",
   },
   body_appeared: {
     type: "boolean",
     role: EVENT_STATE_ROLES.body_appeared.role,
     nameKey: "bodyDetected",
+    descKey: "descBodyDetected",
     channel: "events",
   },
   dirt_detected: {
     type: "boolean",
     role: EVENT_STATE_ROLES.dirt_detected.role,
     nameKey: "dirtDetected",
+    descKey: "descDirtDetected",
     channel: "events",
   },
 };
@@ -617,6 +639,7 @@ export class StateManager {
         type: "state",
         common: {
           name: tName(meta.nameKey),
+          ...(meta.descKey !== undefined ? { desc: tDesc(meta.descKey) } : {}),
           type: meta.type,
           role: meta.role,
           read: true,
@@ -717,6 +740,7 @@ export class StateManager {
         false,
         undefined,
         false,
+        tDesc("descOnline"),
       );
       this.onlineMarkerCache?.add(`${prefix}.info.online`);
       // info.online is written via syncInfoOnline (resolver-based, no
@@ -730,14 +754,41 @@ export class StateManager {
       // (info.gateway) instead of a permanently-empty info.ip. Everything else
       // keeps info.ip as before.
       if (device.gateway) {
-        await this.ensureState(`${prefix}.info.gateway`, tName("gateway"), "string", "text", false, undefined, "");
+        await this.ensureState(
+          `${prefix}.info.gateway`,
+          tName("gateway"),
+          "string",
+          "text",
+          false,
+          undefined,
+          "",
+          tDesc("descGateway"),
+        );
       } else {
-        await this.ensureState(`${prefix}.info.ip`, tName("ipAddress"), "string", "info.ip", false, undefined, "");
+        await this.ensureState(
+          `${prefix}.info.ip`,
+          tName("ipAddress"),
+          "string",
+          "info.ip",
+          false,
+          undefined,
+          "",
+          tDesc("descIpAddress"),
+        );
       }
       // Device-type marker — short label like "light", "thermometer",
       // "heater" (Govee API type without the "devices.types." prefix).
       // Lets scripts filter `*.info.type === "light"` without parsing.
-      await this.ensureState(`${prefix}.info.type`, tName("deviceType"), "string", "text", false, undefined, "");
+      await this.ensureState(
+        `${prefix}.info.type`,
+        tName("deviceType"),
+        "string",
+        "text",
+        false,
+        undefined,
+        "",
+        tDesc("descDeviceType"),
+      );
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true,
@@ -773,7 +824,16 @@ export class StateManager {
     } else {
       // Group members: comma-separated device prefix IDs
       const memberIds = (device.groupMembers ?? []).map(m => treeKey(m.sku, m.deviceId)).join(", ");
-      await this.ensureState(`${prefix}.info.members`, tName("members"), "string", "text", false);
+      await this.ensureState(
+        `${prefix}.info.members`,
+        tName("members"),
+        "string",
+        "text",
+        false,
+        undefined,
+        undefined,
+        tDesc("descMembers"),
+      );
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
         ack: true,
@@ -989,7 +1049,16 @@ export class StateManager {
         : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
 
-    await this.ensureState(`${prefix}.segments.count`, tName("segmentCount"), "number", "value", false);
+    await this.ensureState(
+      `${prefix}.segments.count`,
+      tName("segmentCount"),
+      "number",
+      "value",
+      false,
+      undefined,
+      undefined,
+      tDesc("descSegmentCount"),
+    );
     await this.adapter.setState(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true,
@@ -1214,7 +1283,16 @@ export class StateManager {
       common: { name: tName("groupsStatus") },
       native: {},
     });
-    await this.ensureState("groups.info.online", tName("cloudOnline"), "boolean", "indicator.reachable", false);
+    await this.ensureState(
+      "groups.info.online",
+      tName("cloudOnline"),
+      "boolean",
+      "indicator.reachable",
+      false,
+      undefined,
+      undefined,
+      tDesc("descCloudOnline"),
+    );
     this.onlineMarkerCache?.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
       val: online,
@@ -1551,6 +1629,9 @@ export class StateManager {
    * @param def Optional default value — set so the state has a sensible
    *            initial value before the first writeback (avoids `null`
    *            display in admin between create and first setState).
+   * @param desc Optional explanation. Omitted where the name already says
+   *             everything; the deliberate omissions are listed in
+   *             `catalog-completeness.test.ts`.
    */
   private async ensureState(
     id: string,
@@ -1560,6 +1641,7 @@ export class StateManager {
     write: boolean,
     unit?: string,
     def?: ioBroker.StateValue,
+    desc?: ioBroker.StringOrTranslated,
   ): Promise<void> {
     if (this.ensuredStates.has(id)) {
       return;
@@ -1571,6 +1653,12 @@ export class StateManager {
       read: true,
       write,
     };
+    // A datapoint whose name already says everything gets NO description — an
+    // invented sentence is worse than none. Which ones those are is decided
+    // once, in `catalog-completeness.test.ts`, not silently here.
+    if (desc) {
+      common.desc = desc;
+    }
     if (unit) {
       common.unit = unit;
     }

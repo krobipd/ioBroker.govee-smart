@@ -65,30 +65,46 @@ const SYNTHETIC_STATE_META = {
   // by an old install was exempt from cleanup and could never be removed —
   // against the rule that the adapter owns its datapoint inventory. Without the
   // entry that leftover leaves on the next cloud rebuild, migration-free.
-  lack_water: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.lack_water.role, nameKey: "lackOfWater", channel: "events" },
+  lack_water: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.lack_water.role,
+    nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
+    channel: "events"
+  },
   lack_water_event: {
     type: "boolean",
     role: import_capability_mapper.EVENT_STATE_ROLES.lack_water_event.role,
     nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
     channel: "events"
   },
-  ice_full: { type: "boolean", role: import_capability_mapper.EVENT_STATE_ROLES.ice_full.role, nameKey: "iceBucketFull", channel: "events" },
+  ice_full: {
+    type: "boolean",
+    role: import_capability_mapper.EVENT_STATE_ROLES.ice_full.role,
+    nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
+    channel: "events"
+  },
   ice_full_event: {
     type: "boolean",
     role: import_capability_mapper.EVENT_STATE_ROLES.ice_full_event.role,
     nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
     channel: "events"
   },
   body_appeared: {
     type: "boolean",
     role: import_capability_mapper.EVENT_STATE_ROLES.body_appeared.role,
     nameKey: "bodyDetected",
+    descKey: "descBodyDetected",
     channel: "events"
   },
   dirt_detected: {
     type: "boolean",
     role: import_capability_mapper.EVENT_STATE_ROLES.dirt_detected.role,
     nameKey: "dirtDetected",
+    descKey: "descDirtDetected",
     channel: "events"
   }
 };
@@ -483,6 +499,7 @@ class StateManager {
         type: "state",
         common: {
           name: (0, import_i18n.tName)(meta.nameKey),
+          ...meta.descKey !== void 0 ? { desc: (0, import_i18n.tDesc)(meta.descKey) } : {},
           type: meta.type,
           role: meta.role,
           read: true,
@@ -562,17 +579,45 @@ class StateManager {
         "indicator.reachable",
         false,
         void 0,
-        false
+        false,
+        (0, import_i18n.tDesc)("descOnline")
       );
       (_a = this.onlineMarkerCache) == null ? void 0 : _a.add(`${prefix}.info.online`);
       await this.ensureState(`${prefix}.info.model`, (0, import_i18n.tName)("model"), "string", "text", false, void 0, "");
       await this.ensureState(`${prefix}.info.serial`, (0, import_i18n.tName)("serialNumber"), "string", "text", false, void 0, "");
       if (device.gateway) {
-        await this.ensureState(`${prefix}.info.gateway`, (0, import_i18n.tName)("gateway"), "string", "text", false, void 0, "");
+        await this.ensureState(
+          `${prefix}.info.gateway`,
+          (0, import_i18n.tName)("gateway"),
+          "string",
+          "text",
+          false,
+          void 0,
+          "",
+          (0, import_i18n.tDesc)("descGateway")
+        );
       } else {
-        await this.ensureState(`${prefix}.info.ip`, (0, import_i18n.tName)("ipAddress"), "string", "info.ip", false, void 0, "");
+        await this.ensureState(
+          `${prefix}.info.ip`,
+          (0, import_i18n.tName)("ipAddress"),
+          "string",
+          "info.ip",
+          false,
+          void 0,
+          "",
+          (0, import_i18n.tDesc)("descIpAddress")
+        );
       }
-      await this.ensureState(`${prefix}.info.type`, (0, import_i18n.tName)("deviceType"), "string", "text", false, void 0, "");
+      await this.ensureState(
+        `${prefix}.info.type`,
+        (0, import_i18n.tName)("deviceType"),
+        "string",
+        "text",
+        false,
+        void 0,
+        "",
+        (0, import_i18n.tDesc)("descDeviceType")
+      );
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true
@@ -600,7 +645,16 @@ class StateManager {
       await this.syncInfoOnline(device);
     } else {
       const memberIds = ((_c = device.groupMembers) != null ? _c : []).map((m) => (0, import_device_key.treeKey)(m.sku, m.deviceId)).join(", ");
-      await this.ensureState(`${prefix}.info.members`, (0, import_i18n.tName)("members"), "string", "text", false);
+      await this.ensureState(
+        `${prefix}.info.members`,
+        (0, import_i18n.tName)("members"),
+        "string",
+        "text",
+        false,
+        void 0,
+        void 0,
+        (0, import_i18n.tDesc)("descMembers")
+      );
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
         ack: true
@@ -775,7 +829,16 @@ class StateManager {
     segmentCount = Math.min(Math.max(0, Math.floor(segmentCount)), import_lookups.SEGMENT_COUNT_MAX);
     const validIndices = device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0 ? device.manualSegments.slice().sort((a, b) => a - b) : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
-    await this.ensureState(`${prefix}.segments.count`, (0, import_i18n.tName)("segmentCount"), "number", "value", false);
+    await this.ensureState(
+      `${prefix}.segments.count`,
+      (0, import_i18n.tName)("segmentCount"),
+      "number",
+      "value",
+      false,
+      void 0,
+      void 0,
+      (0, import_i18n.tDesc)("descSegmentCount")
+    );
     await this.adapter.setState(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true
@@ -955,7 +1018,16 @@ class StateManager {
       common: { name: (0, import_i18n.tName)("groupsStatus") },
       native: {}
     });
-    await this.ensureState("groups.info.online", (0, import_i18n.tName)("cloudOnline"), "boolean", "indicator.reachable", false);
+    await this.ensureState(
+      "groups.info.online",
+      (0, import_i18n.tName)("cloudOnline"),
+      "boolean",
+      "indicator.reachable",
+      false,
+      void 0,
+      void 0,
+      (0, import_i18n.tDesc)("descCloudOnline")
+    );
     (_a = this.onlineMarkerCache) == null ? void 0 : _a.add("groups.info.online");
     await this.adapter.setState("groups.info.online", {
       val: online,
@@ -1232,8 +1304,11 @@ class StateManager {
    * @param def Optional default value — set so the state has a sensible
    *            initial value before the first writeback (avoids `null`
    *            display in admin between create and first setState).
+   * @param desc Optional explanation. Omitted where the name already says
+   *             everything; the deliberate omissions are listed in
+   *             `catalog-completeness.test.ts`.
    */
-  async ensureState(id, name, type, role, write, unit, def) {
+  async ensureState(id, name, type, role, write, unit, def, desc) {
     if (this.ensuredStates.has(id)) {
       return;
     }
@@ -1244,6 +1319,9 @@ class StateManager {
       read: true,
       write
     };
+    if (desc) {
+      common.desc = desc;
+    }
     if (unit) {
       common.unit = unit;
     }

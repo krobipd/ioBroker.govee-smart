@@ -121,7 +121,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -169,6 +182,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -243,6 +269,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -293,6 +332,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -448,7 +500,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -496,6 +561,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -570,6 +648,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -620,6 +711,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -727,7 +831,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -775,7 +892,20 @@
       "role": "indicator.alarm",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "de": "Meldet den Moment, in dem der Sensor jemanden sieht; setzt sich von selbst zurück.",
+        "en": "Reports the moment the sensor sees someone; it clears itself again.",
+        "es": "Informa del momento en que el sensor detecta a alguien; se restablece solo.",
+        "fr": "Signale l'instant où le capteur détecte quelqu'un ; se réinitialise seul.",
+        "it": "Segnala il momento in cui il sensore rileva qualcuno; si azzera da solo.",
+        "nl": "Meldt het moment waarop de sensor iemand ziet; herstelt zichzelf.",
+        "pl": "Zgłasza moment, w którym czujnik wykrywa kogoś; sam się resetuje.",
+        "pt": "Comunica o momento em que o sensor deteta alguém; repõe-se sozinho.",
+        "ru": "Сообщает момент, когда датчик кого-то обнаруживает; сбрасывается сам.",
+        "uk": "Повідомляє момент, коли датчик когось виявляє; скидається самостійно.",
+        "zh-cn": "在传感器检测到有人的瞬间上报；随后自行复位。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.event",
@@ -823,6 +953,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -897,6 +1040,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -947,6 +1103,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -1054,7 +1223,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -1102,6 +1284,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -1176,6 +1371,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -1226,6 +1434,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -1411,7 +1632,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -1459,6 +1693,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -1533,6 +1780,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -1583,6 +1843,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -1811,7 +2084,20 @@
       "role": "switch",
       "read": true,
       "write": true,
-      "def": false
+      "def": false,
+      "desc": {
+        "de": "Ob der Streifen seine Segmentfarben ineinander übergehen lässt statt sie als harte Stufen zu zeigen.",
+        "en": "Whether the strip blends its segment colours into each other instead of showing them as hard steps.",
+        "es": "Si la tira funde sus colores de segmento entre sí en lugar de mostrarlos como saltos duros.",
+        "fr": "Si le ruban fond ses couleurs de segment les unes dans les autres au lieu de marches nettes.",
+        "it": "Se la striscia sfuma i colori dei segmenti l'uno nell'altro invece di mostrarli a scatti netti.",
+        "nl": "Of de strip zijn segmentkleuren in elkaar laat overlopen in plaats van als harde stappen.",
+        "pl": "Czy taśma płynnie przenika kolory segmentów zamiast pokazywać je jako ostre przejścia.",
+        "pt": "Se a fita funde as cores dos segmentos entre si em vez de as mostrar como degraus abruptos.",
+        "ru": "Смешивает ли лента цвета сегментов друг с другом вместо резких переходов.",
+        "uk": "Чи змішує стрічка кольори сегментів один в одного замість різких переходів.",
+        "zh-cn": "灯带是否让各分段颜色相互渐变，而非呈现硬边过渡。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.toggle",
@@ -1934,7 +2220,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -1982,6 +2281,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -2056,6 +2368,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -2106,6 +2431,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -2156,7 +2494,20 @@
         "1": "Energic",
         "2": "Rhythm"
       },
-      "def": "0"
+      "def": "0",
+      "desc": {
+        "de": "Das musikreaktive Muster, das die Lampe spielt; 0 schaltet den Musikmodus aus.",
+        "en": "The music-reactive pattern the light plays; 0 turns music mode off.",
+        "es": "El patrón reactivo a la música que reproduce la luz; 0 desactiva el modo música.",
+        "fr": "Le motif réactif à la musique joué par la lampe ; 0 désactive le mode musique.",
+        "it": "Il motivo reattivo alla musica riprodotto dalla luce; 0 disattiva la modalità musica.",
+        "nl": "Het muziekreactieve patroon dat de lamp speelt; 0 schakelt de muziekmodus uit.",
+        "pl": "Wzór reagujący na muzykę odtwarzany przez lampę; 0 wyłącza tryb muzyczny.",
+        "pt": "O padrão reativo à música que a luz reproduz; 0 desliga o modo música.",
+        "ru": "Музыкальный режим свечения лампы; 0 выключает музыкальный режим.",
+        "uk": "Музично-реактивний візерунок лампи; 0 вимикає музичний режим.",
+        "zh-cn": "灯具播放的音乐律动图案；0 表示关闭音乐模式。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.music_setting",
@@ -2187,7 +2538,20 @@
       "unit": "%",
       "min": 0,
       "max": 100,
-      "def": 100
+      "def": 100,
+      "desc": {
+        "de": "Wie stark die Lampe auf die Musik reagiert — höhere Werte sprechen auf leisere Töne an.",
+        "en": "How strongly the light reacts to the music — higher values respond to quieter sound.",
+        "es": "Cuánto reacciona la luz a la música — valores más altos responden a sonidos más suaves.",
+        "fr": "L'intensité de la réaction de la lampe à la musique — des valeurs élevées répondent à des sons plus faibles.",
+        "it": "Quanto la luce reagisce alla musica — valori più alti rispondono a suoni più deboli.",
+        "nl": "Hoe sterk de lamp op de muziek reageert — hogere waarden reageren op zachter geluid.",
+        "pl": "Jak mocno lampa reaguje na muzykę — wyższe wartości reagują na cichszy dźwięk.",
+        "pt": "Quão fortemente a luz reage à música — valores mais altos respondem a som mais baixo.",
+        "ru": "Насколько сильно лампа реагирует на музыку — большие значения откликаются на тихий звук.",
+        "uk": "Наскільки сильно лампа реагує на музику — більші значення відгукуються на тихіший звук.",
+        "zh-cn": "灯具对音乐的反应强度 —— 数值越高，越能响应轻微的声音。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.music_setting",
@@ -3002,7 +3366,20 @@
       "type": "number",
       "role": "value",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Mit wie vielen Segmenten der Streifen angesprochen wird — aus dem Katalog, vom Gerät selbst oder aus der manuellen Liste.",
+        "en": "How many segments the strip is addressed with — from the catalogue, the device itself, or your manual list.",
+        "es": "Con cuántos segmentos se direcciona la tira — del catálogo, del propio dispositivo o de tu lista manual.",
+        "fr": "Avec combien de segments le ruban est adressé — du catalogue, de l'appareil lui-même ou de votre liste manuelle.",
+        "it": "Con quanti segmenti viene indirizzata la striscia — dal catalogo, dal dispositivo stesso o dalla tua lista manuale.",
+        "nl": "Met hoeveel segmenten de strip wordt aangestuurd — uit de catalogus, van het apparaat zelf of uit je handmatige lijst.",
+        "pl": "Iloma segmentami adresowana jest taśma — z katalogu, od samego urządzenia lub z twojej listy ręcznej.",
+        "pt": "Com quantos segmentos a fita é endereçada — do catálogo, do próprio dispositivo ou da tua lista manual.",
+        "ru": "Сколькими сегментами адресуется лента — из каталога, от самого устройства или из вашего ручного списка.",
+        "uk": "Скількома сегментами адресується стрічка — з каталогу, від самого пристрою або з вашого ручного списку.",
+        "zh-cn": "灯带以多少个分段寻址 —— 来自目录、设备本身或你的手动清单。"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172_0001.segments.count"
@@ -3438,7 +3815,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -3486,6 +3876,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -3560,6 +3963,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -3610,6 +4026,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -3818,7 +4247,20 @@
       "write": true,
       "min": 1,
       "max": 8,
-      "def": 1
+      "def": 1,
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.work_mode",
@@ -3878,7 +4320,20 @@
         "1": "Normal",
         "5": "Sleep"
       },
-      "def": "1"
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.work_mode",
@@ -3973,7 +4428,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -4021,6 +4489,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -4095,6 +4576,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -4145,6 +4639,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -4300,7 +4807,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -4348,6 +4868,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -4422,6 +4955,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -4472,6 +5018,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -4517,7 +5076,20 @@
       "role": "value",
       "read": true,
       "write": false,
-      "def": 0
+      "def": 0,
+      "desc": {
+        "de": "Der Luftqualitätsindex, den das Gerät misst; niedriger ist sauberer.",
+        "en": "The air-quality index the device measures; lower is cleaner.",
+        "es": "El índice de calidad del aire que mide el dispositivo; más bajo es más limpio.",
+        "fr": "L'indice de qualité de l'air mesuré par l'appareil ; plus bas est plus propre.",
+        "it": "L'indice di qualità dell'aria misurato dal dispositivo; più basso è più pulito.",
+        "nl": "De luchtkwaliteitsindex die het apparaat meet; lager is schoner.",
+        "pl": "Indeks jakości powietrza mierzony przez urządzenie; niższy oznacza czystsze.",
+        "pt": "O índice de qualidade do ar medido pelo dispositivo; mais baixo é mais limpo.",
+        "ru": "Индекс качества воздуха, измеряемый устройством; меньше — чище.",
+        "uk": "Індекс якості повітря, який вимірює пристрій; менше — чистіше.",
+        "zh-cn": "设备测得的空气质量指数；数值越低越洁净。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.property",
@@ -4546,7 +5118,20 @@
       "read": true,
       "write": false,
       "unit": "%",
-      "def": 0
+      "def": 0,
+      "desc": {
+        "de": "Wie viel Lebensdauer der Filter noch hat, bevor er getauscht werden sollte.",
+        "en": "How much of the filter's life is left before it should be replaced.",
+        "es": "Cuánta vida le queda al filtro antes de que deba sustituirse.",
+        "fr": "Durée de vie restante du filtre avant son remplacement.",
+        "it": "Quanta vita resta al filtro prima della sostituzione.",
+        "nl": "Hoeveel levensduur het filter nog heeft voordat het vervangen moet worden.",
+        "pl": "Ile żywotności pozostało filtrowi przed wymianą.",
+        "pt": "Quanta vida resta ao filtro antes de dever ser substituído.",
+        "ru": "Сколько ресурса осталось у фильтра до замены.",
+        "uk": "Скільки ресурсу залишилося у фільтра до заміни.",
+        "zh-cn": "滤芯在需要更换前还剩多少寿命。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.property",
@@ -4611,7 +5196,20 @@
       "write": true,
       "min": 0,
       "max": 3,
-      "def": 0
+      "def": 0,
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.work_mode",
@@ -4702,7 +5300,20 @@
         "1": "Auto",
         "2": "Fan"
       },
-      "def": "1"
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.work_mode",
@@ -4797,7 +5408,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -4845,6 +5469,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -4919,6 +5556,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -4969,6 +5619,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -5155,7 +5818,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -5203,7 +5879,20 @@
       "role": "indicator.maintenance",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "de": "Meldet den Moment, in dem das Gerät einen leeren Wassertank signalisiert; setzt sich von selbst zurück.",
+        "en": "Reports the moment the device signals an empty water tank; it clears itself again.",
+        "es": "Informa del momento en que el aparato señala el depósito de agua vacío; se restablece solo.",
+        "fr": "Signale l'instant où l'appareil annonce un réservoir d'eau vide ; se réinitialise seul.",
+        "it": "Segnala il momento in cui l'apparecchio indica il serbatoio dell'acqua vuoto; si azzera da solo.",
+        "nl": "Meldt het moment waarop het apparaat een leeg waterreservoir aangeeft; herstelt zichzelf.",
+        "pl": "Zgłasza moment, w którym urządzenie sygnalizuje pusty zbiornik wody; sam się resetuje.",
+        "pt": "Comunica o momento em que o aparelho sinaliza o depósito de água vazio; repõe-se sozinho.",
+        "ru": "Сообщает момент, когда прибор сигнализирует о пустом баке для воды; сбрасывается сам.",
+        "uk": "Повідомляє момент, коли прилад сигналізує про порожній бак води; скидається самостійно.",
+        "zh-cn": "在设备提示水箱见底的瞬间上报；随后自行复位。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.event",
@@ -5251,6 +5940,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -5325,6 +6027,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -5375,6 +6090,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -5561,7 +6289,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -5609,6 +6350,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -5683,6 +6437,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -5733,6 +6500,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -5919,7 +6699,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -5967,6 +6760,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -6041,6 +6847,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -6091,6 +6910,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -6246,7 +7078,20 @@
         "seed": "Seed — beta, needs experimental toggle in adapter settings",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
-      "def": "unknown"
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
     },
     "native": {
       "capabilityType": "local",
@@ -6294,7 +7139,20 @@
       "role": "indicator.maintenance",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "de": "Meldet den Moment, in dem der Eisbehälter als voll gemeldet wird; setzt sich von selbst zurück.",
+        "en": "Reports the moment the ice bucket is signalled as full; it clears itself again.",
+        "es": "Informa del momento en que el cubo de hielo se señala como lleno; se restablece solo.",
+        "fr": "Signale l'instant où le bac à glaçons est annoncé plein ; se réinitialise seul.",
+        "it": "Segnala il momento in cui il cestello del ghiaccio è indicato come pieno; si azzera da solo.",
+        "nl": "Meldt het moment waarop de ijsbak als vol wordt gemeld; herstelt zichzelf.",
+        "pl": "Zgłasza moment, w którym pojemnik na lód sygnalizowany jest jako pełny; sam się resetuje.",
+        "pt": "Comunica o momento em que o balde de gelo é sinalizado como cheio; repõe-se sozinho.",
+        "ru": "Сообщает момент, когда контейнер для льда сигнализируется как полный; сбрасывается сам.",
+        "uk": "Повідомляє момент, коли контейнер для льоду сигналізується як повний; скидається самостійно.",
+        "zh-cn": "在冰桶被报告为已满的瞬间上报；随后自行复位。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.event",
@@ -6342,6 +7200,19 @@
       "role": "info.ip",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
       "def": ""
     },
     "native": {},
@@ -6416,6 +7287,19 @@
       "role": "indicator.reachable",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
       "def": false
     },
     "native": {},
@@ -6466,6 +7350,19 @@
       "role": "text",
       "read": true,
       "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
       "def": ""
     },
     "native": {},
@@ -6513,89 +7410,6 @@
     },
     "native": {}
   },
-  "govee-smart.0.groups.basegroup_0001": {
-    "type": "device",
-    "common": {
-      "name": "Group Ground Floor",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE2IDExYzEuNjYgMCAyLjk5LTEuMzQgMi45OS0zUzE3LjY2IDUgMTYgNWMtMS42NiAwLTMgMS4zNC0zIDNzMS4zNCAzIDMgM3ptLTggMGMxLjY2IDAgMi45OS0xLjM0IDIuOTktM1M5LjY2IDUgOCA1QzYuMzQgNSA1IDYuMzQgNSA4czEuMzQgMyAzIDN6bTAgMmMtMi4zMyAwLTcgMS4xNy03IDMuNVYxOWgxNHYtMi41YzAtMi4zMy00LjY3LTMuNS03LTMuNXptOCAwYy0uMjkgMC0uNjIuMDItLjk3LjA1IDEuMTYuODQgMS45NyAxLjk3IDEuOTcgMy40NVYxOWg2di0yLjVjMC0yLjMzLTQuNjctMy41LTctMy41eiIvPjwvc3ZnPg==",
-      "statusStates": {
-        "onlineId": "govee-smart.0.groups.info.online"
-      }
-    },
-    "native": {
-      "sku": "BaseGroup",
-      "deviceId": "9900001"
-    },
-    "_id": "govee-smart.0.groups.basegroup_0001"
-  },
-  "govee-smart.0.groups.basegroup_0001.info": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Geräte-Informationen",
-        "en": "Device Information",
-        "es": "Información del dispositivo",
-        "fr": "Informations sur l'appareil",
-        "it": "Informazioni dispositivo",
-        "nl": "Apparaatgegevens",
-        "pl": "Informacje o urządzeniu",
-        "pt": "Informações do dispositivo",
-        "ru": "Информация об устройстве",
-        "uk": "Інформація про пристрій",
-        "zh-cn": "设备信息"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.groups.basegroup_0001.info"
-  },
-  "govee-smart.0.groups.basegroup_0001.info.members": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Mitglieder",
-        "en": "Members",
-        "es": "Miembros",
-        "fr": "Membres",
-        "it": "Membri",
-        "nl": "Leden",
-        "pl": "Członkowie",
-        "pt": "Membros",
-        "ru": "Участники",
-        "uk": "Учасники",
-        "zh-cn": "成员"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false
-    },
-    "native": {},
-    "_id": "govee-smart.0.groups.basegroup_0001.info.members"
-  },
-  "govee-smart.0.groups.basegroup_0001.info.name": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Name",
-        "en": "Name",
-        "es": "Nombre",
-        "fr": "Nom",
-        "it": "Nome",
-        "nl": "Naam",
-        "pl": "Nazwa",
-        "pt": "Nome",
-        "ru": "Имя",
-        "uk": "Ім'я",
-        "zh-cn": "名称"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false
-    },
-    "native": {},
-    "_id": "govee-smart.0.groups.basegroup_0001.info.name"
-  },
   "govee-smart.0.groups.info": {
     "type": "channel",
     "common": {
@@ -6635,7 +7449,20 @@
       "type": "boolean",
       "role": "indicator.reachable",
       "read": true,
-      "write": false
+      "write": false,
+      "desc": {
+        "de": "Ob der Adapter die Govee-Cloud erreicht — nicht, ob ein einzelnes Gerät da ist.",
+        "en": "Whether the adapter reaches the Govee cloud — not whether any single device is there.",
+        "es": "Si el adaptador alcanza la nube de Govee — no si un dispositivo concreto está presente.",
+        "fr": "Si l'adaptateur atteint le cloud Govee — pas si un appareil donné est présent.",
+        "it": "Se l'adattatore raggiunge il cloud Govee — non se un singolo dispositivo è presente.",
+        "nl": "Of de adapter de Govee-cloud bereikt — niet of een afzonderlijk apparaat aanwezig is.",
+        "pl": "Czy adapter łączy się z chmurą Govee — nie czy pojedyncze urządzenie jest obecne.",
+        "pt": "Se o adaptador alcança a nuvem Govee — não se um dispositivo em particular está presente.",
+        "ru": "Достигает ли адаптер облака Govee — а не есть ли отдельное устройство.",
+        "uk": "Чи досягає адаптер хмари Govee — а не чи присутній окремий пристрій.",
+        "zh-cn": "适配器能否连通 Govee 云端 —— 而非某个具体设备是否在线。"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.groups.info.online"

@@ -286,6 +286,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
         {
           id: sanitizeId(cap.instance),
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "boolean",
           role: "switch",
           write: true,
@@ -311,6 +312,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
         {
           id: `_segment_${sanitizeId(cap.instance)}`,
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -330,6 +332,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
         {
           id: sanitizeId(cap.instance),
           name: capabilityName(cap.instance),
+          desc: capabilityDesc(cap.instance),
           type: "string",
           role: "json",
           write: true,
@@ -369,6 +372,7 @@ function mapRange(cap: CloudCapability): StateDefinition[] {
     {
       id: sanitizeId(cap.instance),
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "number",
       role: isBrightness ? "level.brightness" : "level",
       write: true,
@@ -541,6 +545,7 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
     {
       id: canonicalSyntheticId(cap.instance),
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "number",
       role,
       write: false,
@@ -571,6 +576,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
       {
         id: "work_mode",
         name: tName("workMode"),
+        desc: tDesc("descWorkMode"),
         type: "mixed",
         role: "state",
         write: true,
@@ -593,6 +599,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
     states.push({
       id: "work_mode",
       name: tName("workMode"),
+      desc: tDesc("descWorkMode"),
       type: "mixed",
       role: "state",
       write: true,
@@ -615,6 +622,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
       states.push({
         id: "mode_value",
         name: tName("modeValue"),
+        desc: tDesc("descModeValue"),
         type: "mixed",
         role: "state",
         write: true,
@@ -627,6 +635,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
       states.push({
         id: "mode_value",
         name: tName("modeValue"),
+        desc: tDesc("descModeValue"),
         type: "number",
         role: "level",
         write: true,
@@ -731,6 +740,7 @@ function mapEvent(cap: CloudCapability): StateDefinition[] {
     {
       id,
       name: capabilityName(cap.instance),
+      desc: capabilityDesc(cap.instance),
       type: "boolean",
       // Known events use the shared role table (M5 — same role as the
       // synthetic write path); a genuinely unknown event is an alarm.
@@ -814,6 +824,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     states.push({
       id: "music_mode",
       name: tName("musicMode"),
+      desc: tDesc("descMusicMode"),
       type: "mixed",
       role: "state",
       write: true,
@@ -830,6 +841,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     states.push({
       id: "music_sensitivity",
       name: tName("musicSensitivity"),
+      desc: tDesc("descMusicSensitivity"),
       type: "number",
       role: "level",
       write: true,
@@ -962,6 +974,37 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
   fanSpeed: "capFanSpeed",
   humidity: "capHumidity",
 };
+
+/**
+ * Govee capability instances with something non-obvious to explain. Everything
+ * else stays without a description on purpose — a capability whose name is the
+ * whole content ("Brightness") gains nothing from a sentence repeating it, and
+ * an invented one is worse than none. The deliberate omissions are listed in
+ * `catalog-completeness.test.ts`.
+ */
+const CAPABILITY_DESC_KEYS: Record<string, I18nKey> = {
+  gradientToggle: "descGradientToggle",
+  airQuality: "descAirQuality",
+  filterLifeTime: "descFilterLifeTime",
+  // Events reach the tree through TWO paths — this cloud-capability one and
+  // state-manager's SYNTHETIC_STATE_META. Both need the explanation, or the
+  // same datapoint carries one only on the installations that happened to
+  // create it the other way.
+  lackWaterEvent: "descLackOfWater",
+  iceFullEvent: "descIceBucketFull",
+  bodyAppearedEvent: "descBodyDetected",
+  dirtDetectedEvent: "descDirtDetected",
+};
+
+/**
+ * The explanation for a Govee capability, or undefined where its name says it all.
+ *
+ * @param instance Govee capability instance, e.g. `gradientToggle`
+ */
+function capabilityDesc(instance: string): ioBroker.StringOrTranslated | undefined {
+  const key = CAPABILITY_DESC_KEYS[instance];
+  return key ? tDesc(key) : undefined;
+}
 
 /**
  * The display name for a Govee capability.
@@ -1275,6 +1318,7 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
   defs.push({
     id: "tier",
     name: tName("deviceTier"),
+    desc: tDesc("descDeviceTier"),
     type: "string",
     role: "text",
     write: false,
