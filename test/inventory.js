@@ -46,42 +46,19 @@ const FIXTURE_NATIVE = {
 };
 
 /**
- * Encrypt a config value the way js-controller does, so the adapter's automatic
- * decryption gives the plain value back.
+ * The instance config the fixtures run on.
  *
- * The instance object declares `encryptedNative: ["apiKey", ...]`, so writing the
- * key in plain text does not produce a plain key at the other end — it produces
- * the XOR of the key with the system secret, which then fails as a header value
- * ("Invalid character in header content") long before it fails as a credential.
- *
- * @param {string} secret system.config native.secret
- * @param {string} value The plain value
+ * The values go in as PLAIN TEXT: the instance object declares
+ * `encryptedNative: ["apiKey", …]`, and @iobroker/testing 6 encrypts those
+ * fields itself when the config is written. Encrypting them here as well —
+ * which v5 required, because it wrote the value through unchanged — hands the
+ * adapter the double-encrypted key, and it fails as a header value ("Invalid
+ * character in header content") long before it fails as a credential: the
+ * cloud never answers, and the inventory comes out with 26 objects instead of
+ * 262 while every gate above it stays green.
  */
-function encryptValue(secret, value) {
-  if (!/^[0-9a-f]{64}$/.test(secret)) {
-    // Legacy XOR — what js-controller uses while the secret is not a 32-byte key.
-    let result = "";
-    for (let i = 0; i < value.length; ++i) {
-      result += String.fromCharCode(secret.charCodeAt(i % secret.length) ^ value.charCodeAt(i));
-    }
-    return result;
-  }
-  const iv = crypto.randomBytes(16);
-  const cipher = crypto.createCipheriv("aes-192-cbc", Buffer.from(secret, "hex").subarray(0, 24), iv);
-  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
-  return `$/aes-192-cbc:${iv.toString("hex")}:${encrypted.toString("hex")}`;
-}
-
-/**
- * The fixture config with every `encryptedNative` field encrypted for THIS
- * throwaway controller's secret.
- *
- * @param {import("@iobroker/testing").TestHarness} harness
- */
-async function fixtureNative(harness) {
-  const sysConfig = await harness.objects.getObjectAsync("system.config");
-  const secret = sysConfig?.native?.secret || "";
-  return { ...FIXTURE_NATIVE, apiKey: encryptValue(secret, FIXTURE_NATIVE.apiKey) };
+function fixtureNative() {
+  return { ...FIXTURE_NATIVE };
 }
 
 /** Cloud REST envelope Govee puts around every payload. */
@@ -261,12 +238,41 @@ function startFakeLanDevice() {
  * @param {{ announce: () => void }} lan The fake LAN light
  */
 async function feedFixtures(harness, lan) {
-  void harness;
   // The LAN scan runs every 30 s; announcing repeatedly makes the first one
   // land whenever the adapter's listen socket came up.
   for (let i = 0; i < 12; i++) {
     lan.announce();
     await new Promise(r => setTimeout(r, 1000));
+  }
+  // Then WAIT FOR THE TREE, never for a duration. Group objects are created
+  // only after the account's group list has been resolved, which is one more
+  // round trip than the device list — on a slower run that landed after the
+  // fixed 12 s and the inventory came out four objects short. A fixed sleep
+  // makes the machine decide what the inventory contains; the settle check
+  // makes the adapter decide.
+  let previous = -1;
+  let stable = 0;
+  for (let i = 0; i < 120 && stable < 5; i++) {
+    const count = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}\u9999` })).rows.length;
+    stable = count === previous ? stable + 1 : 0;
+    previous = count;
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  if (stable < 5) {
+    throw new Error(`object tree never settled — still changing after 120 s (last count ${previous})`);
+  }
+}
+
+/**
+ * Remove every object below the adapter namespace, so a dump measures this run
+ * alone and not what a previous one left in the reused temp controller.
+ *
+ * @param {import("@iobroker/testing").TestHarness} harness
+ */
+async function wipeNamespace(harness) {
+  const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}\u9999` });
+  for (const row of list.rows) {
+    await harness.objects.delObjectAsync(row.id);
   }
 }
 
@@ -291,9 +297,16 @@ tests.integration(ADAPTER_DIR, {
       before(async function () {
         this.timeout(180000);
         harness = getHarness();
+        // Start from an EMPTY namespace. The inventory is supposed to say what
+        // THIS adapter run creates; anything an earlier run left in the reused
+        // temp controller would be dumped as if the adapter had just made it.
+        // That is not hypothetical: a run once produced four group objects the
+        // fixture cannot create at all (it carries no account, so group members
+        // are never resolved), and the file went into the release that way.
+        await wipeNamespace(harness);
         cloud = await startFakeCloud();
         lan = await startFakeLanDevice();
-        await harness.changeAdapterConfig(ADAPTER, { native: await fixtureNative(harness) });
+        await harness.changeAdapterConfig(ADAPTER, { native: fixtureNative() });
         await harness.startAdapterAndWait(false, {
           NODE_OPTIONS: `--require ${HOOK}`,
           GOVEE_FIXTURE_PORT: String(FIXTURE_PORT),
@@ -330,7 +343,7 @@ tests.integration(ADAPTER_DIR, {
           for (const [id, obj] of Object.entries(previous)) {
             await harness.objects.setObjectAsync(id, obj);
           }
-          await harness.changeAdapterConfig(ADAPTER, { native: await fixtureNative(harness) });
+          await harness.changeAdapterConfig(ADAPTER, { native: fixtureNative() });
           await harness.startAdapterAndWait(false, {
             NODE_OPTIONS: `--require ${HOOK}`,
             GOVEE_FIXTURE_PORT: String(FIXTURE_PORT),

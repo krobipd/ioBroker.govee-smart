@@ -103,6 +103,19 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### 2.32.0 (2026-09-07)
+
+- Fixed: In an account without a single light, every device stopped being switchable after a restart — appliances, plugs and sensors had no state and no reachability until you pressed sync devices
+- Fixed: A device could stay green for up to 30 minutes after Govee had reported it offline; an arriving reading no longer overrides an explicit offline report
+- Fixed: With only an API key configured, devices fell offline 30 minutes after the start although they were still controllable — the proof now renews itself without account credentials
+- Fixed: Scene and snapshot commands that fell back to the cloud and failed there were still confirmed as carried out; a command that did not arrive now stays unconfirmed
+- Fixed: A manually chosen segment list could only ever lengthen the learned strip and never shorten it again — the wizard's own measurement was overwritten by it
+- Fixed: Under load the adapter stopped counting appliance commands against their daily limit, so a heater or humidifier could burn through its Govee quota and stop responding
+- Fixed: On a device model the adapter does not know yet, the tier datapoint told the user to press a button that 2.31.0 had already removed from the admin page
+- Fixed: Without account credentials, a group from the Govee app grew an empty entry in the object tree on every restart; it now appears only once its members are actually known
+- New: Datapoints carry an explanation in all 11 languages wherever the name alone does not say enough — 99 of them instead of 26
+- Changed: The adapter can no longer be installed directly from GitHub — install it from the ioBroker repository or from npm, as with every other adapter
+
 ### 2.31.1 (2026-09-04)
 
 - Fixed: When the adapter met a device model it does not know yet, its log asked the user to press a button that 2.31.0 had removed — it now points at the Expert tab, where the report is actually made
@@ -132,12 +145,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - New: The diagnostics report says WHERE a device's reachability comes from, when that source last spoke and which sources stay silent for this device kind
 - New: The report shows whether the Govee account login succeeded, with Govee's own reason — so a missing realtime connection is no longer a guess
 - Fixed: A failed account device list is recorded in the report instead of looking as if it had never been attempted
-
-### 2.29.3 (2026-09-03)
-
-- Fixed: Cloud-controlled datapoints such as brightness or the gradient switch are translated instead of carrying Govee's English wording
-- Fixed: A stray datapoint left behind by an early version 2 release disappears from the object tree on the next start
-- Fixed: After a restart the list of unreachable group members is rebuilt right away instead of keeping the value from before the restart
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

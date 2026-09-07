@@ -1,5 +1,11 @@
 # Older Changes
 
+## 2.29.3 (2026-09-03)
+
+- Fixed: Cloud-controlled datapoints such as brightness or the gradient switch are translated instead of carrying Govee's English wording
+- Fixed: A stray datapoint left behind by an early version 2 release disappears from the object tree on the next start
+- Fixed: After a restart the list of unreachable group members is rebuilt right away instead of keeping the value from before the restart
+
 ## 2.29.2 (2026-09-03)
 
 - Fixed: Datapoint and channel names stayed in their old wording on installations that already existed — only fresh ones got the new text

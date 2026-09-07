@@ -139,6 +139,16 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
     return;
   }
   const sm = adapter.stateManager;
+  // A group is only a group once its members are known. Without account
+  // credentials they are never resolved (`loadGroupMembers` bails without a
+  // bearer token), and this callback still handed such a group a device
+  // object, an info channel, its name and an empty members list — on the
+  // cache path of every restart, so an installation grew objects a fresh
+  // install never creates. The phase-3 callback (`onGroupMembersReady`)
+  // builds the tree the moment the members are actually there.
+  if (device.sku === "BaseGroup" && !device.groupMembers?.length) {
+    return;
+  }
   const localSnaps = adapter.localSnapshots?.getSnapshots(device.sku, device.deviceId);
   let memberDevices: GoveeDevice[] | undefined;
   if (device.sku === "BaseGroup" && device.groupMembers) {

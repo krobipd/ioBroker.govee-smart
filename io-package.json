@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.31.1",
+    "version": "2.32.0",
     "news": {
+      "2.32.0": {
+        "en": "Devices in an account without a single light are switchable again after a restart.\nA device is no longer shown as reachable once Govee has reported it offline, and the display stays right on installations that have only an API key.\nA cloud command that failed is no longer confirmed as done, and datapoints explain themselves in 11 languages.",
+        "de": "Geräte in einem Konto ohne ein einziges Licht sind nach einem Neustart wieder schaltbar.\nEin Gerät wird nicht mehr als erreichbar angezeigt, sobald Govee es als offline gemeldet hat, und die Anzeige bleibt auch mit nur einem API-Schlüssel richtig.\nEin fehlgeschlagener Cloud-Befehl gilt nicht mehr als ausgeführt, und Datenpunkte erklären sich in 11 Sprachen.",
+        "ru": "Устройства в учётной записи без единого светильника снова управляются после перезапуска.\nУстройство больше не показывается доступным после того, как Govee сообщил о его отключении, и отображение остаётся верным даже с одним лишь ключом API.\nНеудавшаяся облачная команда больше не считается выполненной, а точки данных поясняются на 11 языках.",
+        "pt": "Os dispositivos de uma conta sem qualquer luz voltam a ser comandáveis após um reinício.\nUm dispositivo deixa de ser mostrado como acessível assim que a Govee o dá como offline, e a indicação mantém-se correta mesmo só com a chave API.\nUm comando na nuvem falhado deixa de contar como executado e os pontos de dados explicam-se em 11 idiomas.",
+        "nl": "Apparaten in een account zonder enige lamp zijn na een herstart weer schakelbaar.\nEen apparaat wordt niet meer als bereikbaar getoond zodra Govee het offline meldt, en de weergave blijft ook met alleen een API-sleutel kloppen.\nEen mislukte cloudopdracht geldt niet meer als uitgevoerd en datapunten leggen zichzelf in 11 talen uit.",
+        "fr": "Les appareils d'un compte sans aucune lampe redeviennent commandables après un redémarrage.\nUn appareil n'est plus affiché comme joignable dès que Govee le signale hors ligne, et l'affichage reste juste même avec la seule clé API.\nUne commande cloud échouée n'est plus considérée comme exécutée et les points de données s'expliquent en 11 langues.",
+        "it": "I dispositivi di un account senza alcuna luce tornano comandabili dopo un riavvio.\nUn dispositivo non viene più mostrato come raggiungibile una volta che Govee lo segnala offline, e l'indicazione resta corretta anche con la sola chiave API.\nUn comando cloud fallito non vale più come eseguito e i punti dati si spiegano in 11 lingue.",
+        "es": "Los dispositivos de una cuenta sin ninguna luz vuelven a ser controlables tras un reinicio.\nUn dispositivo deja de mostrarse como accesible en cuanto Govee lo da por desconectado, y la indicación sigue siendo correcta incluso solo con la clave API.\nUn comando en la nube fallido ya no cuenta como ejecutado y los puntos de datos se explican en 11 idiomas.",
+        "pl": "Urządzenia na koncie bez ani jednego światła są po restarcie znowu sterowalne.\nUrządzenie nie jest już pokazywane jako osiągalne, gdy Govee zgłosi je jako offline, a wskazanie pozostaje poprawne także przy samym kluczu API.\nNieudane polecenie w chmurze nie liczy się już jako wykonane, a punkty danych objaśniają się w 11 językach.",
+        "uk": "Пристрої в обліковому записі без жодного світильника знову керуються після перезапуску.\nПристрій більше не показується доступним, щойно Govee повідомить про його від'єднання, і показ лишається правильним навіть з одним ключем API.\nНевдала хмарна команда більше не вважається виконаною, а точки даних пояснюються 11 мовами.",
+        "zh-cn": "账号中没有任何灯具时，设备在重启后重新可控。\n一旦 Govee 报告设备离线，就不再显示为可达；只配置了 API 密钥的安装，显示同样保持正确。\n失败的云端指令不再算作已执行，数据点也会用 11 种语言自我说明。"
+      },
       "2.31.1": {
         "en": "Fixed: when the adapter met an unknown device model, its log asked for a button that 2.31.0 had removed — it now points at the Expert tab",
         "de": "Behoben: Bei einem unbekannten Gerätemodell verwies das Protokoll auf einen Knopf, den 2.31.0 entfernt hatte — es nennt jetzt den Reiter „Experte“",
@@ -80,19 +93,6 @@
         "pl": "Nazwy punktów danych i kanałów aktualizują się teraz także w istniejących instalacjach — dotąd nowy tekst trafiał tylko do nowych.",
         "uk": "Назви точок даних і каналів тепер оновлюються й на наявних установках — досі новий текст отримували лише нові.",
         "zh-cn": "数据点和通道名称现在在已有安装上也会更新——此前只有全新安装才能获得新文案。"
-      },
-      "2.29.1": {
-        "en": "A switched-off device is shown as not reachable again — 2.29.0 reported it as reachable. The diagnostics export works again.",
-        "de": "Ein ausgeschaltetes Gerät wird wieder als nicht erreichbar angezeigt — 2.29.0 meldete es als erreichbar. Der Diagnose-Export geht wieder.",
-        "ru": "Выключенное устройство снова показывается как недоступное — 2.29.0 сообщал обратное. Экспорт диагностики снова работает.",
-        "pt": "Um dispositivo desligado volta a surgir como inacessível — a 2.29.0 dizia o contrário. O export de diagnóstico funciona de novo.",
-        "nl": "Een uitgeschakeld apparaat wordt weer als onbereikbaar getoond — 2.29.0 meldde het omgekeerde. De diagnose-export werkt weer.",
-        "fr": "Un appareil éteint est de nouveau affiché comme injoignable — la 2.29.0 disait l'inverse. L'export de diagnostic refonctionne.",
-        "it": "Un dispositivo spento torna irraggiungibile nella vista — la 2.29.0 diceva il contrario. L'export di diagnostica funziona di nuovo.",
-        "es": "Un dispositivo apagado vuelve a verse como inaccesible — la 2.29.0 decía lo contrario. La exportación de diagnóstico funciona otra vez.",
-        "pl": "Wyłączone urządzenie znów jest pokazywane jako niedostępne — 2.29.0 twierdziła inaczej. Eksport diagnostyczny znów działa.",
-        "uk": "Вимкнений пристрій знову показується як недоступний — 2.29.0 стверджувала протилежне. Експорт діагностики знову працює.",
-        "zh-cn": "已断电的设备重新显示为不可达——2.29.0 曾报告相反。诊断导出恢复正常。"
       }
     },
     "plugins": {

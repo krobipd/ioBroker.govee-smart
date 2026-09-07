@@ -213,6 +213,33 @@ describe("onCloudDataReady (phase 2)", () => {
     );
   });
 
+  it("gives a group with unresolved members no object tree at all", async () => {
+    // An account without email + password never resolves group members
+    // (loadGroupMembers bails without a bearer token). The cache path fires
+    // this callback for the group on every restart, and it used to create the
+    // device object, the info channel, the name and an empty members list —
+    // objects a fresh install never creates, so the tree grew a shell that
+    // nothing could ever fill. Measured on the object inventory: 262 objects
+    // from a cold start, 266 from the same fixtures with a cache.
+    const group = createTestDevice({ sku: "BaseGroup", groupMembers: undefined });
+    const rig = makeRig({ devices: [group], statesReady: false });
+    onCloudDataReady(rig.adapter, group, [group]);
+    await Promise.all(rig.queue);
+    expect(rig.calls).toEqual([]);
+  });
+
+  it("builds the tree for a group as soon as its members are there", async () => {
+    const member = createTestDevice();
+    const group = createTestDevice({
+      sku: "BaseGroup",
+      groupMembers: [{ sku: member.sku, deviceId: member.deviceId }],
+    });
+    const rig = makeRig({ devices: [group, member], statesReady: false });
+    onCloudDataReady(rig.adapter, group, [group, member]);
+    await Promise.all(rig.queue);
+    expect(rig.calls).toEqual(expect.arrayContaining(["createInfoStates"]));
+  });
+
   it("hands the tree builder the count the device manager settled — not 0, not its own guess", async () => {
     // The device manager owns device.segmentCount (syncSegmentCount); the
     // state manager only builds the tree for the number it is given. A wiring
