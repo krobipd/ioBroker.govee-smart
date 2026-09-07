@@ -1594,9 +1594,14 @@ describe("GoveeAdapter — callback wiring", () => {
       tokenExpiresAt: Date.now() + 3_600_000,
     });
     // The write is asynchronous (temp file + rename) — wait for the file to be complete.
+    // The old budget was 50 x 10 ms: locally the file is readable on the FIRST pass
+    // (measured 11 ms, five runs), so 500 ms looked like ample headroom — and it still
+    // ran out on a loaded CI worker, turning main red (run #34156073616, ubuntu 24.x).
+    // A fixed deadline against an asynchronous write is a coin toss under load; a
+    // generous one costs nothing, because a passing test leaves on the first pass.
     const file = pathReal.join(currentDataDir(), "mqtt-credentials.json");
     let stored: { bearerToken?: string } | null = null;
-    for (let attempt = 0; attempt < 50 && !stored; attempt++) {
+    for (let attempt = 0; attempt < 500 && !stored; attempt++) {
       await new Promise(resolve => setTimeout(resolve, 10));
       try {
         stored = JSON.parse(fsReal.readFileSync(file, "utf-8")) as { bearerToken?: string };
@@ -1604,6 +1609,9 @@ describe("GoveeAdapter — callback wiring", () => {
         stored = null;
       }
     }
+    // Say WHICH of the two failed — a missing file and a missing field are different
+    // defects, and the old assertion reported both as "expected undefined".
+    expect(stored, `no readable ${file} within 5 s`).not.toBeNull();
     expect(stored?.bearerToken).toBe("enc:bt"); // encrypted at rest
   });
 
