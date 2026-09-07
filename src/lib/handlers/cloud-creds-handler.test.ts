@@ -149,6 +149,25 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     expect(await loadPersistedCreds(adapter, dataDir)).toEqual(creds); // decrypted back
   });
 
+  it("the credentials file is owner-only — on both write paths", async () => {
+    // Encryption and file mode are two independent guards, and only the content one
+    // was ever asserted: a mutation run on 2026-09-07 flipped 0o600 to 0o644 on BOTH
+    // writers and the whole suite stayed green. The bearer token and the certificate
+    // password sit in this file; the adapter secret that decrypts them is on the same
+    // machine, so a world-readable blob is not a rest state we want.
+    const { adapter, metaFiles } = makeCredAdapter();
+
+    // async writer — the hot path, runs on every login and token refresh
+    await persistCreds(adapter, dataDir, creds);
+    expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+
+    // sync writer — the one-shot startup migration from the v2.18.x meta object
+    fs.rmSync(credsFile());
+    metaFiles.set("govee-smart.0.credentials/mqtt.json", encBlob);
+    await migrateCredentialsMetaOnce(adapter, dataDir);
+    expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+  });
+
   it("persist creates the data directory when it does not exist yet", async () => {
     const { adapter } = makeCredAdapter();
     const nested = path.join(dataDir, "does", "not", "exist");
