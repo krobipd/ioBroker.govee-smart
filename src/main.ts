@@ -1152,6 +1152,9 @@ export class GoveeAdapter extends utils.Adapter {
       // Cleanup stale devices after initial discovery (30s delay for LAN scan).
       // Reaps devices from every adapter-level map that was keyed on them so the
       // process doesn't leak memory across Cloud-side device turnover.
+      // The timer fires no matter what any channel achieved — the reaper itself
+      // refuses to act until an account list has answered (hasKnownPopulation),
+      // because absence proves nothing while the population is unknown.
       this.cleanupTimer = this.setTimeout(() => {
         connectionState
           .reapStaleDevices(this.handlerHost)

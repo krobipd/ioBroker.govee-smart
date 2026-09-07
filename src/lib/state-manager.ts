@@ -108,7 +108,7 @@ interface SyntheticStateMeta {
   /**
    * i18n key for the explanation. Absent where the name already says
    * everything — an invented sentence is worse than none; the deliberate
-   * omissions are listed in `catalog-completeness.test.ts`.
+   * omissions are declared, with their reason, in `test/self-explaining.json`.
    */
   descKey?: I18nKey;
   /** Semantic channel — sensor readings vs. device events. */
@@ -1630,8 +1630,8 @@ export class StateManager {
    *            initial value before the first writeback (avoids `null`
    *            display in admin between create and first setState).
    * @param desc Optional explanation. Omitted where the name already says
-   *             everything; the deliberate omissions are listed in
-   *             `catalog-completeness.test.ts`.
+   *             everything; the deliberate omissions are declared, with their
+   *             reason, in `test/self-explaining.json`.
    */
   private async ensureState(
     id: string,
@@ -1654,8 +1654,9 @@ export class StateManager {
       write,
     };
     // A datapoint whose name already says everything gets NO description — an
-    // invented sentence is worse than none. Which ones those are is decided
-    // once, in `catalog-completeness.test.ts`, not silently here.
+    // invented sentence is worse than none. Which ones those are is declared
+    // once, in `test/self-explaining.json`, not silently here; the fleet gate
+    // D08 blocks on anything that is neither explained nor declared.
     if (desc) {
       common.desc = desc;
     }

@@ -979,8 +979,9 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
  * Govee capability instances with something non-obvious to explain. Everything
  * else stays without a description on purpose — a capability whose name is the
  * whole content ("Brightness") gains nothing from a sentence repeating it, and
- * an invented one is worse than none. The deliberate omissions are listed in
- * `catalog-completeness.test.ts`.
+ * an invented one is worse than none. The deliberate omissions are declared,
+ * with their reason, in `test/self-explaining.json` — the fleet gate D08 reads
+ * that file and blocks on a datapoint that is in neither place.
  */
 const CAPABILITY_DESC_KEYS: Record<string, I18nKey> = {
   gradientToggle: "descGradientToggle",
