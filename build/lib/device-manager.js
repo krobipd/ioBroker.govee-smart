@@ -355,7 +355,9 @@ class DeviceManager {
         `Cache merged into LAN-discovered device ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`
       );
     } else {
-      this.devices.set(key, cacheHelpers.cachedToGoveeDevice(entry));
+      const restored = cacheHelpers.cachedToGoveeDevice(entry);
+      restored.channels.cloud = entry.capabilities.length > 0;
+      this.devices.set(key, restored);
       this.log.debug(
         `Cache restored (no LAN discovery yet) for ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`
       );

@@ -426,7 +426,18 @@ export class DeviceManager {
         `Cache merged into LAN-discovered device ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`,
       );
     } else {
-      this.devices.set(key, cacheHelpers.cachedToGoveeDevice(entry));
+      const restored = cacheHelpers.cachedToGoveeDevice(entry);
+      // Same derivation as the merge branch above — the cache carries the
+      // account's capability list, and that list IS what "has a cloud path"
+      // means. Without it the flag stayed false for a device that was never
+      // seen on LAN: an installation without a single light never runs a Cloud
+      // load on start (loadFromCache returns true, main.ts skips cloudInit), so
+      // mergeCloudDevices — the only other writer — never ran that session and
+      // every cloud consumer dropped the device: no state load, no reachability
+      // renewal, and resolveTransport answered skip/no-channel, so an appliance
+      // that worked before the restart could not be switched at all.
+      restored.channels.cloud = entry.capabilities.length > 0;
+      this.devices.set(key, restored);
       this.log.debug(
         `Cache restored (no LAN discovery yet) for ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`,
       );

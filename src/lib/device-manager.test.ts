@@ -21,6 +21,7 @@ import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { DeviceRegistry } from "./device-registry";
+import { CommandRouter } from "./command-router";
 import { mockLog, mockTimers } from "./test-helpers";
 import type {
   CloudCapability,
@@ -2514,6 +2515,54 @@ describe("DeviceManager — loadFromCache merge", () => {
     const skus = dm.getDevices().map(d => d.sku);
     expect(skus).toContain("H6102");
     expect(skus).not.toContain("SameModeGroup");
+  });
+
+  /**
+   * An installation without a single light never runs a Cloud load on start:
+   * loadFromCache() returns true and main.ts skips cloudInit entirely, so
+   * mergeCloudDevices — the only other place that raises channels.cloud —
+   * never runs that session. The cache branch that CREATES a device (no LAN
+   * discovery, i.e. every cloud-only appliance and sensor) left the flag at
+   * false while its LAN-discovered sibling one branch up derived it from the
+   * capabilities. The device was in the account, had capabilities, and was
+   * still dropped by every cloud consumer: no state load, no reachability
+   * renewal, and `resolveTransport` answered skip/no-channel — it could not
+   * be switched at all until the user pressed "sync devices".
+   */
+  it("keeps a cache-restored cloud-only device controllable when the account has no light", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const cached = [
+      {
+        sku: "H7126",
+        deviceId: "AA:BB:CC:DD:EE:FF:00:11",
+        name: "Air Purifier",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        scenesChecked: true,
+        cachedAt: Date.now(),
+      },
+    ];
+    dm.setSkuCache(makeMockSkuCache(cached) as never);
+
+    // No light in the cache — the adapter treats the cache as sufficient and
+    // makes no Cloud call for the rest of the session.
+    expect(dm.loadFromCache()).toBe(true);
+
+    const [device] = dm.getDevices();
+    expect(device.lanIp).toBeUndefined();
+    expect(device.channels.cloud).toBe(true);
+
+    // The consequence the user feels: the appliance is still switchable.
+    const router = new CommandRouter(mockLog, mockTimers, registry);
+    router.setCloudClient({ sendCommand: () => Promise.resolve() } as never);
+    expect(router.resolveTransport(device, "power").kind).toBe("cloud");
   });
 
   it("leaves merged fields undefined when cache entry has none (no segment data ever captured)", () => {
