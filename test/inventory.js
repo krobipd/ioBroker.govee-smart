@@ -276,6 +276,17 @@ async function wipeNamespace(harness) {
   }
 }
 
+/**
+ * The tree key the adapter builds for a device: lower-case SKU plus the last
+ * four hex pairs of the Govee device id, colons dropped.
+ *
+ * @param {{sku: string, device: string}} entry Fixture device
+ */
+function treeKeyFor(entry) {
+  const tail = entry.device.replace(/:/g, "").slice(-4).toLowerCase();
+  return `${entry.sku.toLowerCase()}_${tail}`;
+}
+
 async function dumpObjects(harness) {
   // The range starts at "<adapter>.0." — the instance root object itself is not part of the tree.
   const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` });
@@ -321,7 +332,22 @@ tests.integration(ADAPTER_DIR, {
       it("writes test/objects.inventory.json", async function () {
         this.timeout(30000);
         const objects = await dumpObjects(harness);
-        assert.ok(Object.keys(objects).length > 0, "no objects created — fixtures did not reach the adapter");
+        // "not empty" is not an assertion — it passed on a run that produced 26
+        // objects instead of 262, because the cloud never answered and only the
+        // manifest's own info tree existed. Every gate above it stayed green:
+        // the dependency guard runs lint/test/build and never this file, and the
+        // inventory gate prints the removed objects but does not fail on them.
+        // So the fixture list itself is the yardstick: every device in it must
+        // have reached the tree.
+        const missing = FIXTURE.devices
+          // The two pseudo-devices Govee returns in the account list get no
+          // tree here: SameModeGroup is never merged at all, and a BaseGroup
+          // only becomes a tree once its members are resolved — which needs
+          // account credentials this fixture deliberately does not carry.
+          .filter(d => d.sku !== "SameModeGroup" && d.sku !== "BaseGroup")
+          .map(d => treeKeyFor(d))
+          .filter(prefix => !objects[`${NS}devices.${prefix}`]);
+        assert.deepStrictEqual(missing, [], `fixture devices missing from the object tree: ${missing.join(", ")}`);
         fs.writeFileSync(INVENTORY, `${JSON.stringify(objects, null, 2)}\n`);
       });
     });
