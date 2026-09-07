@@ -109,11 +109,6 @@ export class DeviceManager {
   private lastAppList: ReconcileSource | null = null;
   private lastGroupList: ReconcileSource | null = null;
   /**
-   * How many devices the SKU cache restored this session — the persisted
-   * picture of the last complete session. Feeds {@link hasKnownPopulation}.
-   */
-  private cacheRestoredCount = 0;
-  /**
    * Gate for the account-reconcile — main flips this true once the initial LAN
    * scan is done, so a cache-restored LAN device isn't counted as an account
    * miss before `channels.lan` has been set (advisor guard).
@@ -281,23 +276,29 @@ export class DeviceManager {
   /**
    * Is the device population KNOWN this session?
    *
-   * True once an account list answered plausibly (cloud / app / group) or the
-   * SKU cache restored the last complete session's picture. False means the
-   * adapter has no picture at all: everything it holds came from live
-   * discovery, and a device's absence proves nothing about the account.
+   * Only an account list proves it — a plausible, non-empty answer from the
+   * Cloud REST list, the App API or the group list. Nothing else does:
    *
-   * The object reaper must not run while this is false. Measured 2026-09-07 on
-   * the real path (fixtures, HTTP 500 from the cloud, no LAN reply, empty
-   * cache): the 30 s cleanup timer deleted all 249 device objects of a seeded
-   * installation together with their state history and left 16 objects behind.
-   * The account reconcile below already refuses to act on an implausible
-   * source — "a transient empty body must never drive an irreversible
-   * removal". This is that same rule for the side that does the deleting.
+   * - LAN discovery finds what is switched on right now. A lamp off at the
+   *   socket is "absent", and deleting its tree over that would be absurd.
+   * - The SKU cache is a SNAPSHOT of the last session, not a completeness
+   *   proof. It is written one file per device, so a partial cache is the
+   *   normal state after any growth whose write did not land. Counting it as
+   *   knowledge deletes exactly the devices the cache does not hold: measured
+   *   2026-09-07 with 5 of 15 devices cached and the cloud answering HTTP 500,
+   *   the reaper removed 10 device trees, 132 of 249 objects.
+   *
+   * With an empty cache and no cloud the same run deleted all 249. The account
+   * reconcile below already refuses to act on an implausible source — "a
+   * transient empty body must never drive an irreversible removal". This is
+   * that same rule for the side that does the deleting.
+   *
+   * The price is deliberate: an installation with no account credentials never
+   * reaps. That removes no working cleanup — without an account list every
+   * removal it could make rests on absence it cannot verify.
    */
   hasKnownPopulation(): boolean {
-    return Boolean(
-      this.lastCloudList?.ok || this.lastAppList?.ok || this.lastGroupList?.ok || this.cacheRestoredCount > 0,
-    );
+    return Boolean(this.lastCloudList?.ok || this.lastAppList?.ok || this.lastGroupList?.ok);
   }
 
   /**
@@ -383,7 +384,6 @@ export class DeviceManager {
     for (const entry of cached) {
       this.applyCachedEntry(entry, nowMs);
     }
-    this.cacheRestoredCount = cached.length;
     this.log.info(`Loaded ${cached.length} device(s) from cache`);
 
     const allDevices = this.getDevices();

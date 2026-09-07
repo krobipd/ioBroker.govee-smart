@@ -2472,6 +2472,42 @@ describe("DeviceManager — loadFromCache merge", () => {
     expect(device.manualSegments).toEqual([4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]);
   });
 
+  it("a cache restore alone does NOT make the device population known", () => {
+    // The cache is a SNAPSHOT of the last session, not a completeness proof —
+    // it is written one file per device, so holding some of them is the normal
+    // state after any growth whose write did not land. Treating it as
+    // knowledge lets the object reaper delete exactly the devices the cache
+    // does not hold: measured 2026-09-07 on the real adapter with 5 of 15
+    // devices cached and the cloud answering HTTP 500, it removed 10 device
+    // trees — 132 of 249 objects. Only an account list answers the question.
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const cached = [
+      {
+        sku: "H61BE",
+        deviceId: "AA:BB:CC:DD:EE:FF:12:34",
+        name: "Eating Room",
+        type: "devices.types.light",
+        capabilities: lightCapabilities(),
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        scenesChecked: true,
+        cachedAt: Date.now(),
+      },
+    ];
+    dm.setSkuCache(makeMockSkuCache(cached) as never);
+
+    // The return value says "cloud refetch not needed" — for a light it is
+    // false either way. What matters here is that the device IS in the map.
+    dm.loadFromCache();
+    expect(dm.getDevices()).toHaveLength(1);
+    expect(dm.hasKnownPopulation()).toBe(false);
+  });
+
   it("never restores a SameModeGroup pseudo-device from an older cache", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const cached = [

@@ -141,13 +141,14 @@ export async function reapStaleDevices(adapter: ConnectionStateAdapter): Promise
   if (!adapter.stateManager || !adapter.deviceManager) {
     return;
   }
-  // Absence only means something when the population is known. Without a
-  // plausible account list and without a cache restore, `getDevices()` holds
-  // whatever live discovery happened to find this session — on a cloud outage
-  // that is nothing at all, and cleaning up against it deletes the user's
-  // entire device tree including its recorded history.
+  // Absence only means something when the population is known, and only an
+  // account list makes it known. Without one, `getDevices()` holds whatever
+  // LAN discovery found plus whatever the cache happened to hold — and
+  // cleaning up against that deletes live devices' trees including their
+  // recorded history (measured: 249 of 249 objects with an empty cache, 132 of
+  // 249 with a partial one).
   if (!adapter.deviceManager.hasKnownPopulation()) {
-    adapter.log.debug("Device cleanup skipped: no account list and no cache this session — absence proves nothing");
+    adapter.log.debug("Device cleanup skipped: no account list answered this session — absence proves nothing");
     return;
   }
   const currentDevices = adapter.deviceManager.getDevices();

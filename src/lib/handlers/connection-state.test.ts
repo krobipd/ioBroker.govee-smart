@@ -244,12 +244,12 @@ describe("reapStaleDevices", () => {
     expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(false);
   });
 
-  it("deletes nothing while the device population is unknown (cloud down, no cache)", async () => {
+  it("deletes nothing while no account list has answered (cloud down)", async () => {
     // The 30 s cleanup timer in onReady fires regardless of what any channel
-    // achieved. With the cloud answering HTTP 500, no LAN reply and an empty
-    // cache, `getDevices()` is empty — and reaping against an empty list wiped
-    // all 249 device objects of a seeded installation plus their state history
-    // (measured 2026-09-07 against the real adapter, not a mock).
+    // achieved. Without an account list the device map holds only what LAN
+    // discovery and the cache produced — reaping against that deleted 249 of
+    // 249 device objects of a seeded installation with an empty cache, and 132
+    // of 249 with a partial one (measured 2026-09-07 against the real adapter).
     const rig = makeRig({ devices: [], populationKnown: false });
     rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
 
