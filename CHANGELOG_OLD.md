@@ -1,5 +1,12 @@
 # Older Changes
 
+## 2.29.4 (2026-09-03)
+
+- New: The diagnostics report lists how each control of a device is actually driven: over the local API or over the cloud, together with the reason for that choice
+- New: The diagnostics report says WHERE a device's reachability comes from, when that source last spoke and which sources stay silent for this device kind
+- New: The report shows whether the Govee account login succeeded, with Govee's own reason — so a missing realtime connection is no longer a guess
+- Fixed: A failed account device list is recorded in the report instead of looking as if it had never been attempted
+
 ## 2.29.3 (2026-09-03)
 
 - Fixed: Cloud-controlled datapoints such as brightness or the gradient switch are translated instead of carrying Govee's English wording

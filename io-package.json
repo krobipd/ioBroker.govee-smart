@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.32.0",
+    "version": "2.32.1",
     "news": {
+      "2.32.1": {
+        "en": "Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup.",
+        "de": "Deine Geräte und ihre aufgezeichnete Historie verschwinden nicht mehr aus dem Objektbaum, wenn die Govee-Cloud beim Start nicht erreichbar ist.",
+        "ru": "Ваши устройства и их записанная история больше не исчезают из дерева объектов, если облако Govee недоступно при запуске.",
+        "pt": "Os seus dispositivos e o respetivo histórico registado já não desaparecem da árvore de objetos quando a nuvem Govee está inacessível no arranque.",
+        "nl": "Je apparaten en hun vastgelegde geschiedenis verdwijnen niet meer uit de objectboom wanneer de Govee-cloud bij het starten onbereikbaar is.",
+        "fr": "Vos appareils et leur historique enregistré ne disparaissent plus de l'arborescence des objets lorsque le cloud Govee est injoignable au démarrage.",
+        "it": "I tuoi dispositivi e la loro cronologia registrata non spariscono più dall'albero degli oggetti quando il cloud Govee non è raggiungibile all'avvio.",
+        "es": "Tus dispositivos y su historial registrado ya no desaparecen del árbol de objetos cuando la nube de Govee no está accesible al iniciar.",
+        "pl": "Twoje urządzenia i ich zapisana historia nie znikają już z drzewa obiektów, gdy chmura Govee jest niedostępna przy starcie.",
+        "uk": "Ваші пристрої та їхня записана історія більше не зникають з дерева об'єктів, коли хмара Govee недоступна під час запуску.",
+        "zh-cn": "当启动时无法连接 Govee 云端，你的设备及其记录的历史数据不再从对象树中消失。"
+      },
       "2.32.0": {
         "en": "Devices in an account without a single light are switchable again after a restart.\nA device is no longer shown as reachable once Govee has reported it offline, and the display stays right on installations that have only an API key.\nA cloud command that failed is no longer confirmed as done, and datapoints explain themselves in 11 languages.",
         "de": "Geräte in einem Konto ohne ein einziges Licht sind nach einem Neustart wieder schaltbar.\nEin Gerät wird nicht mehr als erreichbar angezeigt, sobald Govee es als offline gemeldet hat, und die Anzeige bleibt auch mit nur einem API-Schlüssel richtig.\nEin fehlgeschlagener Cloud-Befehl gilt nicht mehr als ausgeführt, und Datenpunkte erklären sich in 11 Sprachen.",
@@ -80,19 +93,6 @@
         "pl": "Punkty danych z chmury, jak jasność, są przetłumaczone; po restarcie lista nieosiągalnych członków grupy jest od razu odnawiana.",
         "uk": "Хмарні точки даних, як-от яскравість, перекладені; після перезапуску список недоступних учасників групи одразу оновлюється.",
         "zh-cn": "亮度等云端数据点已翻译；重启后会立即重建无法访问的群组成员列表。"
-      },
-      "2.29.2": {
-        "en": "Datapoint and channel names now also update on installations that already exist — until now only fresh ones got the new wording.",
-        "de": "Datenpunkt- und Kanalnamen werden jetzt auch auf bestehenden Anlagen aktualisiert — bisher bekamen nur neue Installationen den neuen Text.",
-        "ru": "Имена точек данных и каналов теперь обновляются и на существующих установках — раньше новый текст получали только новые.",
-        "pt": "Os nomes de pontos de dados e canais passam a atualizar também em instalações existentes — até agora só as novas recebiam o novo texto.",
-        "nl": "Namen van datapunten en kanalen worden nu ook op bestaande installaties bijgewerkt — tot nu toe kregen alleen nieuwe de nieuwe tekst.",
-        "fr": "Les noms des points de données et des canaux se mettent désormais à jour aussi sur les installations existantes — seules les nouvelles en profitaient.",
-        "it": "I nomi di punti dati e canali ora si aggiornano anche sulle installazioni esistenti — finora il nuovo testo arrivava solo alle nuove.",
-        "es": "Los nombres de puntos de datos y canales ahora también se actualizan en instalaciones existentes — hasta ahora solo las nuevas recibían el texto.",
-        "pl": "Nazwy punktów danych i kanałów aktualizują się teraz także w istniejących instalacjach — dotąd nowy tekst trafiał tylko do nowych.",
-        "uk": "Назви точок даних і каналів тепер оновлюються й на наявних установках — досі новий текст отримували лише нові.",
-        "zh-cn": "数据点和通道名称现在在已有安装上也会更新——此前只有全新安装才能获得新文案。"
       }
     },
     "plugins": {

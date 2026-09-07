@@ -103,6 +103,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### 2.32.1 (2026-09-07)
+
+- Fixed: Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup
+
 ### 2.32.0 (2026-09-07)
 
 - Fixed: In an account without a single light, every device stopped being switchable after a restart — appliances, plugs and sensors had no state and no reachability until you pressed sync devices
@@ -138,13 +142,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Improved: A device that is unplugged and put away is reported as unreachable within half an hour, instead of staying green until the adapter is restarted
 - New: 37 additional device models are recognised, including smart plugs, a button remote, an air quality monitor and an aroma diffuser
 - New: Battery buttons and remotes are supported as their own device kind, with battery level and reachability
-
-### 2.29.4 (2026-09-03)
-
-- New: The diagnostics report lists how each control of a device is actually driven: over the local API or over the cloud, together with the reason for that choice
-- New: The diagnostics report says WHERE a device's reachability comes from, when that source last spoke and which sources stay silent for this device kind
-- New: The report shows whether the Govee account login succeeded, with Govee's own reason — so a missing realtime connection is no longer a guess
-- Fixed: A failed account device list is recorded in the report instead of looking as if it had never been attempted
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
