@@ -155,17 +155,32 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     // writers and the whole suite stayed green. The bearer token and the certificate
     // password sit in this file; the adapter secret that decrypts them is on the same
     // machine, so a world-readable blob is not a rest state we want.
+    // Windows has no POSIX modes: statSync reports 0o666 there, which turned CI run
+    // #705 red on windows-latest (2026-09-07). The hot path is therefore asserted on
+    // what the code HANDS OVER — that holds on every platform — and the real mode is
+    // checked wherever the concept exists.
     const { adapter, metaFiles } = makeCredAdapter();
+    // `fs.writeFileSync` is a plain ESM export and cannot be spied on, so the sync path
+    // is only provable where the mode exists.
+    const asyncWrite = vi.spyOn(fs.promises, "writeFile");
+    const posix = process.platform !== "win32";
 
     // async writer — the hot path, runs on every login and token refresh
     await persistCreds(adapter, dataDir, creds);
-    expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+    expect(asyncWrite.mock.calls.at(-1)?.[2]).toMatchObject({ mode: 0o600 });
+    if (posix) {
+      expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+    }
 
     // sync writer — the one-shot startup migration from the v2.18.x meta object
     fs.rmSync(credsFile());
     metaFiles.set("govee-smart.0.credentials/mqtt.json", encBlob);
     await migrateCredentialsMetaOnce(adapter, dataDir);
-    expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+    if (posix) {
+      expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+    }
+
+    asyncWrite.mockRestore();
   });
 
   it("persist creates the data directory when it does not exist yet", async () => {
