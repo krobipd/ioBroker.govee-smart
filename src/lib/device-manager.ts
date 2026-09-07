@@ -109,6 +109,11 @@ export class DeviceManager {
   private lastAppList: ReconcileSource | null = null;
   private lastGroupList: ReconcileSource | null = null;
   /**
+   * How many devices the SKU cache restored this session — the persisted
+   * picture of the last complete session. Feeds {@link hasKnownPopulation}.
+   */
+  private cacheRestoredCount = 0;
+  /**
    * Gate for the account-reconcile — main flips this true once the initial LAN
    * scan is done, so a cache-restored LAN device isn't counted as an account
    * miss before `channels.lan` has been set (advisor guard).
@@ -274,6 +279,28 @@ export class DeviceManager {
   }
 
   /**
+   * Is the device population KNOWN this session?
+   *
+   * True once an account list answered plausibly (cloud / app / group) or the
+   * SKU cache restored the last complete session's picture. False means the
+   * adapter has no picture at all: everything it holds came from live
+   * discovery, and a device's absence proves nothing about the account.
+   *
+   * The object reaper must not run while this is false. Measured 2026-09-07 on
+   * the real path (fixtures, HTTP 500 from the cloud, no LAN reply, empty
+   * cache): the 30 s cleanup timer deleted all 249 device objects of a seeded
+   * installation together with their state history and left 16 objects behind.
+   * The account reconcile below already refuses to act on an implausible
+   * source — "a transient empty body must never drive an irreversible
+   * removal". This is that same rule for the side that does the deleting.
+   */
+  hasKnownPopulation(): boolean {
+    return Boolean(
+      this.lastCloudList?.ok || this.lastAppList?.ok || this.lastGroupList?.ok || this.cacheRestoredCount > 0,
+    );
+  }
+
+  /**
    * Remove a device from internal tracking. Called when a device was removed
    * from the Govee account — the jsonl objects are cleaned up by
    * `cleanupDevices` (state-manager); here only the in-memory maps.
@@ -356,6 +383,7 @@ export class DeviceManager {
     for (const entry of cached) {
       this.applyCachedEntry(entry, nowMs);
     }
+    this.cacheRestoredCount = cached.length;
     this.log.info(`Loaded ${cached.length} device(s) from cache`);
 
     const allDevices = this.getDevices();

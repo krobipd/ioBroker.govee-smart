@@ -42,6 +42,7 @@ function makeRig(opts: {
   appApiInitialPollDone?: boolean;
   needsAppApi?: boolean;
   channelStatus?: ChannelStatusSnapshot;
+  populationKnown?: boolean;
 }): Rig {
   const stateWrites: Array<{ id: string; val: unknown }> = [];
   const logs: Record<string, string[]> = { debug: [], info: [], warn: [], error: [] };
@@ -62,6 +63,7 @@ function makeRig(opts: {
     },
     deviceManager: {
       getDevices: () => devices,
+      hasKnownPopulation: () => opts.populationKnown ?? true,
       hasDeviceNeedingAppApi: () => opts.needsAppApi ?? false,
       saveDevicesToCache: () => saveToCacheCalls.push(1),
       getDiagnostics: () => ({
@@ -240,6 +242,25 @@ describe("reapStaleDevices", () => {
     expect(rig.prunedWith[0].has("AA:01")).toBe(true);
     expect(rig.adapter.diagnosticsLastRun.has(sessionKey(live.sku, live.deviceId))).toBe(true);
     expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(false);
+  });
+
+  it("deletes nothing while the device population is unknown (cloud down, no cache)", async () => {
+    // The 30 s cleanup timer in onReady fires regardless of what any channel
+    // achieved. With the cloud answering HTTP 500, no LAN reply and an empty
+    // cache, `getDevices()` is empty — and reaping against an empty list wiped
+    // all 249 device objects of a seeded installation plus their state history
+    // (measured 2026-09-07 against the real adapter, not a mock).
+    const rig = makeRig({ devices: [], populationKnown: false });
+    rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
+
+    await reapStaleDevices(rig.adapter);
+
+    expect(rig.cleanupCalls).toEqual([]);
+    expect(rig.prunedWith).toEqual([]);
+    // The throttle entry survives too — it is keyed on a device whose objects
+    // are still there.
+    expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(true);
+    expect(rig.logs.debug.some(m => m.includes("Device cleanup skipped"))).toBe(true);
   });
 });
 

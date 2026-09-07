@@ -1677,6 +1677,37 @@ describe("GoveeAdapter — callback wiring", () => {
   });
 
   it("the stale-device cleanup timer really reaps — object tree cleanup runs with the live list", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    // Reaping needs a KNOWN population, and the rig's account is empty — an
+    // empty list is precisely what must never drive a removal. So hand the
+    // account one device and load it before firing the timer.
+    f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H61BE",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    await (i.deviceManager as unknown as { loadFromCloud: () => Promise<unknown> }).loadFromCloud();
+    const cleanup = vi.fn(() => Promise.resolve([] as string[]));
+    (i.stateManager as unknown as { cleanupDevices: unknown }).cleanupDevices = cleanup;
+    const timer = i.setTimeout.mock.calls.find(c => c[1] === STALE_DEVICE_CLEANUP_DELAY_MS);
+    expect(timer, "stale-device cleanup timer must be armed").toBeDefined();
+    (timer![0] as () => void)();
+    await settle(5);
+    expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("the cleanup timer deletes NOTHING while the device population is unknown", async () => {
+    // The timer is armed in onReady and fires no matter what any channel
+    // achieved. With the cloud down and no cache, the device map is empty —
+    // and reaping against an empty map deleted all 249 device objects of a
+    // seeded installation plus their state history (measured 2026-09-07 on the
+    // real adapter). The rig's account is empty, which is the same "nothing
+    // plausible answered" state.
     const { adapter } = await fullSetup();
     const i = internalOf(adapter);
     const cleanup = vi.fn(() => Promise.resolve([] as string[]));
@@ -1685,7 +1716,7 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(timer, "stale-device cleanup timer must be armed").toBeDefined();
     (timer![0] as () => void)();
     await settle(5);
-    expect(cleanup).toHaveBeenCalledTimes(1);
+    expect(cleanup).not.toHaveBeenCalled();
   });
 });
 
