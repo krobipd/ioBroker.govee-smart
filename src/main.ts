@@ -1322,15 +1322,15 @@ export class GoveeAdapter extends utils.Adapter {
     await this.extendObject("groups", { common: { name: tName("groups") } }).catch(fail("groups"));
     await this.extendObject("snapshots", { common: { name: tName("localSnapshotsFolder") } }).catch(fail("snapshots"));
     await this.extendObject("diagnostics", { common: { name: tName("diagnosticsFolder") } }).catch(fail("diagnostics"));
-    await this.extendObject("info.connection", { common: { name: tName("infoConnection") } }).catch(
-      fail("info.connection"),
-    );
-    await this.extendObject("info.mqttConnected", { common: { name: tName("infoMqttConnected") } }).catch(
-      fail("info.mqttConnected"),
-    );
-    await this.extendObject("info.cloudConnected", { common: { name: tName("infoCloudConnected") } }).catch(
-      fail("info.cloudConnected"),
-    );
+    await this.extendObject("info.connection", {
+      common: { name: tName("infoConnection"), desc: tDesc("infoConnectionDesc") },
+    }).catch(fail("info.connection"));
+    await this.extendObject("info.mqttConnected", {
+      common: { name: tName("infoMqttConnected"), desc: tDesc("infoMqttConnectedDesc") },
+    }).catch(fail("info.mqttConnected"));
+    await this.extendObject("info.cloudConnected", {
+      common: { name: tName("infoCloudConnected"), desc: tDesc("infoCloudConnectedDesc") },
+    }).catch(fail("info.cloudConnected"));
     await this.extendObject("info.openapiMqttConnected", {
       common: { name: tName("infoOpenapiMqttConnected"), desc: tDesc("infoOpenapiMqttConnectedDesc") },
     }).catch(fail("info.openapiMqttConnected"));

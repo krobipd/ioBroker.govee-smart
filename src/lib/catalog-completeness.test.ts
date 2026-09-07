@@ -40,15 +40,6 @@ const SELF_EXPLAINING = new Set<string>([
 ]);
 
 /**
- * Datapoints whose text does not come from this repository: the manifest's
- * `instanceObjects` are rendered from `admin/i18n` by the fleet's release
- * script, whose per-adapter `desc_mapping` decides which of them get one.
- * Listing them here keeps the test honest about WHY they are exempt instead of
- * silently passing them.
- */
-const OWNED_BY_THE_RELEASE_SCRIPT = new Set<string>(["info.connection", "info.cloudConnected", "info.mqttConnected"]);
-
-/**
  * Collapse a concrete object id to its datapoint KIND.
  *
  * @param id Full object id from the inventory
@@ -74,7 +65,7 @@ describe("catalog completeness", () => {
     const undecided = Object.entries(inventory)
       .filter(([, obj]) => obj.type === "state" && !obj.common?.desc)
       .map(([id]) => kindOf(id))
-      .filter(k => !SELF_EXPLAINING.has(k) && !OWNED_BY_THE_RELEASE_SCRIPT.has(k))
+      .filter(k => !SELF_EXPLAINING.has(k))
       .filter((k, i, all) => all.indexOf(k) === i)
       .sort();
     expect(undecided, "datapoints with neither an explanation nor a self-explaining entry").toEqual([]);
@@ -89,7 +80,7 @@ describe("catalog completeness", () => {
         .filter(([, obj]) => obj.type === "state")
         .map(([id]) => kindOf(id)),
     );
-    const stale = [...SELF_EXPLAINING, ...OWNED_BY_THE_RELEASE_SCRIPT].filter(k => !present.has(k)).sort();
+    const stale = [...SELF_EXPLAINING].filter(k => !present.has(k)).sort();
     expect(stale, "entries naming a datapoint the adapter no longer creates").toEqual([]);
   });
 

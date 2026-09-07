@@ -66,6 +66,8 @@ The per-device diagnostics report (Expert tab → Diagnostics) is meant to be at
 - ioBroker Admin >= 8.0.11
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
+> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
+
 ---
 
 ## Getting started

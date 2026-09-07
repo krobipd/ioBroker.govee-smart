@@ -7508,7 +7508,20 @@
       "role": "indicator.connected",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "en": "True while the Govee Cloud API answers. It needs the API key and supplies the device list, scenes, segments and cloud commands.",
+        "de": "Wahr, solange die Govee-Cloud-API antwortet. Sie braucht den API-Schlüssel und liefert Geräteliste, Szenen, Segmente und Cloud-Befehle.",
+        "ru": "Истина, пока отвечает облачный API Govee. Ему нужен ключ API, и он предоставляет список устройств, сцены, сегменты и облачные команды.",
+        "pt": "Verdadeiro enquanto a API na nuvem da Govee responder. Necessita da chave API e fornece a lista de dispositivos, cenas, segmentos e comandos na nuvem.",
+        "nl": "Waar zolang de Govee-cloud-API antwoordt. Deze heeft de API-sleutel nodig en levert de apparaatlijst, scènes, segmenten en cloudopdrachten.",
+        "fr": "Vrai tant que l'API cloud de Govee répond. Elle nécessite la clé API et fournit la liste des appareils, les scènes, les segments et les commandes cloud.",
+        "it": "Vero finché l'API cloud di Govee risponde. Richiede la chiave API e fornisce l'elenco dei dispositivi, le scene, i segmenti e i comandi cloud.",
+        "es": "Verdadero mientras la API en la nube de Govee responde. Necesita la clave API y proporciona la lista de dispositivos, escenas, segmentos y comandos en la nube.",
+        "pl": "Prawda, dopóki chmurowe API Govee odpowiada. Wymaga klucza API i dostarcza listę urządzeń, sceny, segmenty oraz polecenia chmurowe.",
+        "uk": "Істина, доки відповідає хмарний API Govee. Йому потрібен ключ API, і він надає список пристроїв, сцени, сегменти та хмарні команди.",
+        "zh-cn": "只要 Govee 云 API 有响应即为真。它需要 API 密钥，提供设备列表、场景、分段和云端命令。"
+      }
     },
     "native": {}
   },
@@ -7533,7 +7546,20 @@
       "role": "indicator.connected",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "en": "True while the adapter is working — at least one device answers, or, before any device is known, the LAN listener is running. Whether one particular device is reachable is what its own info.online says.",
+        "de": "Wahr, solange der Adapter arbeitet — mindestens ein Gerät antwortet, oder, bevor ein Gerät bekannt ist, läuft der LAN-Empfänger. Ob ein bestimmtes Gerät erreichbar ist, sagt dessen eigenes info.online.",
+        "ru": "Истина, пока адаптер работает: отвечает хотя бы одно устройство или, пока ни одно устройство не известно, запущен приёмник LAN. Доступно ли конкретное устройство, показывает его собственный info.online.",
+        "pt": "Verdadeiro enquanto o adaptador estiver a funcionar: pelo menos um dispositivo responde ou, antes de existir um dispositivo conhecido, o recetor LAN está ativo. Se um dispositivo concreto está acessível é o seu próprio info.online que o diz.",
+        "nl": "Waar zolang de adapter werkt: minstens één apparaat antwoordt, of, voordat er een apparaat bekend is, draait de LAN-ontvanger. Of een bepaald apparaat bereikbaar is, zegt zijn eigen info.online.",
+        "fr": "Vrai tant que l'adaptateur fonctionne : au moins un appareil répond ou, avant qu'un appareil ne soit connu, le récepteur LAN est actif. Pour savoir si un appareil précis est joignable, consultez son propre info.online.",
+        "it": "Vero finché l'adattatore funziona: almeno un dispositivo risponde oppure, prima che sia noto un dispositivo, il ricevitore LAN è attivo. Se un determinato dispositivo sia raggiungibile lo dice il suo info.online.",
+        "es": "Verdadero mientras el adaptador funciona: al menos un dispositivo responde o, antes de conocer ningún dispositivo, el receptor LAN está activo. Si un dispositivo concreto es accesible lo indica su propio info.online.",
+        "pl": "Prawda, dopóki adapter działa: odpowiada co najmniej jedno urządzenie lub, zanim poznane zostanie jakiekolwiek urządzenie, działa odbiornik LAN. O tym, czy konkretne urządzenie jest osiągalne, mówi jego własne info.online.",
+        "uk": "Істина, доки адаптер працює: відповідає щонайменше один пристрій або, доки жоден пристрій не відомий, запущено приймач LAN. Чи доступний конкретний пристрій, показує його власний info.online.",
+        "zh-cn": "只要适配器正常工作即为真：至少有一台设备响应，或在尚未识别到设备时 LAN 接收端正在运行。某台具体设备是否可达，由它自己的 info.online 说明。"
+      }
     },
     "native": {}
   },
@@ -7596,7 +7622,20 @@
       "role": "indicator.connected",
       "read": true,
       "write": false,
-      "def": false
+      "def": false,
+      "desc": {
+        "en": "True while the real-time account connection is up. It needs email and password and pushes status changes by itself instead of the adapter polling for them.",
+        "de": "Wahr, solange die Echtzeit-Kontoverbindung steht. Sie braucht E-Mail und Passwort und schickt Statusänderungen von sich aus, statt dass der Adapter sie abfragt.",
+        "ru": "Истина, пока действует соединение с учётной записью в реальном времени. Ему нужны адрес электронной почты и пароль, и оно само присылает изменения состояния, вместо опроса адаптером.",
+        "pt": "Verdadeiro enquanto a ligação à conta em tempo real estiver ativa. Necessita de e-mail e palavra-passe e envia as alterações de estado por si própria, em vez de o adaptador as consultar.",
+        "nl": "Waar zolang de realtime accountverbinding actief is. Deze heeft e-mail en wachtwoord nodig en stuurt statuswijzigingen uit zichzelf, in plaats van dat de adapter ernaar vraagt.",
+        "fr": "Vrai tant que la connexion au compte en temps réel est établie. Elle nécessite l'e-mail et le mot de passe et transmet les changements d'état d'elle-même, sans interrogation par l'adaptateur.",
+        "it": "Vero finché la connessione all'account in tempo reale è attiva. Richiede e-mail e password e invia le variazioni di stato da sé, invece di farle interrogare dall'adattatore.",
+        "es": "Verdadero mientras la conexión de cuenta en tiempo real está activa. Necesita correo electrónico y contraseña y envía los cambios de estado por sí misma, en lugar de que el adaptador los consulte.",
+        "pl": "Prawda, dopóki działa połączenie z kontem w czasie rzeczywistym. Wymaga adresu e-mail i hasła oraz samo wysyła zmiany stanu, zamiast odpytywania przez adapter.",
+        "uk": "Істина, доки діє з'єднання з обліковим записом у реальному часі. Йому потрібні електронна пошта та пароль, і воно саме надсилає зміни стану, замість опитування адаптером.",
+        "zh-cn": "只要实时账号连接可用即为真。它需要邮箱和密码，会主动推送状态变化，而不是由适配器轮询。"
+      }
     },
     "native": {}
   },
