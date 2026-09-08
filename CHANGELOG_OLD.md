@@ -1,5 +1,14 @@
 # Older Changes
 
+## 2.30.0 (2026-09-03)
+
+- Fixed: Devices without a local API were shown as unreachable although they switched and reported normally; they now show as reachable for as long as they are
+- Fixed: Sensors and buttons behind a Govee gateway were shown as unreachable although their readings kept arriving; their gateway now decides whether they are reachable
+- Fixed: Appliances stayed marked as reachable for up to two minutes after they had actually gone offline
+- Improved: A device that is unplugged and put away is reported as unreachable within half an hour, instead of staying green until the adapter is restarted
+- New: 37 additional device models are recognised, including smart plugs, a button remote, an air quality monitor and an aroma diffuser
+- New: Battery buttons and remotes are supported as their own device kind, with battery level and reachability
+
 ## 2.29.4 (2026-09-03)
 
 - New: The diagnostics report lists how each control of a device is actually driven: over the local API or over the cloud, together with the reason for that choice

@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.32.1",
+    "version": "2.33.0",
     "news": {
+      "2.33.0": {
+        "en": "Lights without a local API stay reachable while they report their own state (H600D). 486 more Govee models start as experimental, and the wiki device list folds per device type.",
+        "de": "Lampen ohne lokale Schnittstelle bleiben erreichbar, solange sie ihren Zustand selbst melden (H600D). 486 weitere Govee-Modelle starten experimentell, die Wiki-Geräteliste klappt je Typ.",
+        "ru": "Светильники без локального API остаются доступными, пока сами сообщают своё состояние (H600D). Ещё 486 моделей Govee добавлены как экспериментальные, список в wiki свёрнут по типам.",
+        "pt": "Luzes sem API local continuam acessíveis enquanto informam o próprio estado (H600D). Mais 486 modelos Govee começam como experimentais e a lista de dispositivos da wiki é dobrada por tipo.",
+        "nl": "Lampen zonder lokale API blijven bereikbaar zolang ze hun eigen status melden (H600D). 486 extra Govee-modellen starten als experimenteel, de wiki-apparatenlijst klapt per type in.",
+        "fr": "Les lampes sans API locale restent joignables tant qu'elles signalent elles-mêmes leur état (H600D). 486 modèles Govee de plus démarrent en expérimental, la liste wiki se replie par type.",
+        "it": "Le luci senza API locale restano raggiungibili finché comunicano da sole il proprio stato (H600D). Altri 486 modelli Govee partono come sperimentali, l'elenco wiki si ripiega per tipo.",
+        "es": "Las luces sin API local siguen accesibles mientras informan su propio estado (H600D). 486 modelos Govee más empiezan como experimentales y la lista de dispositivos de la wiki se pliega por tipo.",
+        "pl": "Lampy bez lokalnego API pozostają osiągalne, dopóki same zgłaszają swój stan (H600D). 486 kolejnych modeli Govee startuje jako eksperymentalne, lista urządzeń w wiki zwija się według typu.",
+        "uk": "Світильники без локального API залишаються доступними, поки самі повідомляють свій стан (H600D). Ще 486 моделей Govee додано як експериментальні, список у wiki згорнуто за типами.",
+        "zh-cn": "没有本地 API 的灯具在自行上报状态时保持可达（H600D）。新增 486 个 Govee 型号作为实验性支持，wiki 设备列表按设备类型折叠。"
+      },
       "2.32.1": {
         "en": "Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup.",
         "de": "Deine Geräte und ihre aufgezeichnete Historie verschwinden nicht mehr aus dem Objektbaum, wenn die Govee-Cloud beim Start nicht erreichbar ist.",
@@ -80,19 +93,6 @@
         "pl": "Raport diagnostyczny pokazuje teraz, jak sterowana jest każda funkcja, skąd pochodzi osiągalność i czy logowanie do konta się powiodło.",
         "uk": "Звіт діагностики тепер показує, як керується кожна функція, звідки береться доступність і чи вдався вхід в обліковий запис.",
         "zh-cn": "诊断报告现在会显示每项控制通过哪条通道下达、设备可达性的来源，以及账户登录是否成功。"
-      },
-      "2.29.3": {
-        "en": "Cloud datapoints like brightness are translated now; after a restart the list of unreachable group members is rebuilt right away.",
-        "de": "Cloud-Datenpunkte wie Helligkeit sind jetzt übersetzt; nach einem Neustart wird die Liste nicht erreichbarer Gruppenmitglieder sofort erneuert.",
-        "ru": "Облачные точки данных вроде яркости переведены; после перезапуска список недоступных участников группы сразу обновляется.",
-        "pt": "Pontos de dados da nuvem como o brilho estão traduzidos; após um reinício, a lista de membros inacessíveis é refeita de imediato.",
-        "nl": "Cloud-datapunten zoals helderheid zijn vertaald; na een herstart wordt de lijst met onbereikbare groepsleden meteen vernieuwd.",
-        "fr": "Les points de données cloud comme la luminosité sont traduits ; après un redémarrage, la liste des membres injoignables est refaite.",
-        "it": "I punti dati cloud come la luminosità sono tradotti; dopo un riavvio l'elenco dei membri non raggiungibili viene rifatto subito.",
-        "es": "Los puntos de datos de la nube como el brillo están traducidos; tras un reinicio, la lista de miembros no accesibles se rehace enseguida.",
-        "pl": "Punkty danych z chmury, jak jasność, są przetłumaczone; po restarcie lista nieosiągalnych członków grupy jest od razu odnawiana.",
-        "uk": "Хмарні точки даних, як-от яскравість, перекладені; після перезапуску список недоступних учасників групи одразу оновлюється.",
-        "zh-cn": "亮度等云端数据点已翻译；重启后会立即重建无法访问的群组成员列表。"
       }
     },
     "plugins": {
