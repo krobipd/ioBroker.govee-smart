@@ -59,6 +59,8 @@ const resolveSegmentCount = (device: GoveeDevice): number => resolveSegmentCount
 const QUIRK_TEST_REGISTRY = {
   devices: {
     H6141: { name: "LED Strip", type: "light", status: "seed", quirks: { brokenPlatformApi: true } },
+    // A seed WITHOUT quirks — the shape of the 486 models imported from homebridge-govee in 2.33.0.
+    H6001: { name: "Smart Light", type: "light", status: "seed" },
     H5179: { name: "Thermometer", type: "sensor", status: "verified" },
     H61BE: { name: "LED Strip", type: "light", status: "verified" },
     H6056: { name: "LED Strip", type: "light", status: "verified" },
@@ -3848,6 +3850,23 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     dm.maybeNudgeSeedSku("H6141", undefined);
     expect(warns).toEqual([]);
     expect(infos).toEqual(["Device H6141 is in beta — experimental quirks are active."]);
+  });
+
+  it("a seed WITHOUT quirks does not promise corrections — it asks for the toggle and a diagnostics report", () => {
+    const { dm, warns } = nudgeDm(false);
+    dm.maybeNudgeSeedSku("H6001", "Bulb");
+    expect(warns).toEqual([
+      'Device Bulb (H6001) is in beta and untested — enable "Enable experimental device support" in adapter settings to try it, then create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
+    ]);
+  });
+
+  it("a seed WITHOUT quirks and the toggle ON asks for the report on info", () => {
+    const { dm, warns, infos } = nudgeDm(true);
+    dm.maybeNudgeSeedSku("H6001", "Bulb");
+    expect(warns).toEqual([]);
+    expect(infos).toEqual([
+      "Device Bulb (H6001) is in beta and untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
+    ]);
   });
 
   it("verified / reported models stay silent, an unknown model asks for a diag export", () => {

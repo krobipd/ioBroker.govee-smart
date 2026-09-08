@@ -965,7 +965,25 @@ export class DeviceManager {
       case "verified":
       case "reported":
         return;
-      case "seed":
+      case "seed": {
+        // A seed without quirks (the 486 models imported from homebridge-govee in
+        // 2.33.0) has no corrections the toggle could apply — promising them was a
+        // lie (advisor 2026-09-08). The opt-in stays the rule for every seed
+        // (reference_community_quirks_pattern); what such a model needs is the
+        // report that confirms it.
+        const hasQuirks = this.registry.getEntry(upper)?.quirks !== undefined;
+        if (!hasQuirks) {
+          if (this.registry.isSeedAndDormant(upper)) {
+            this.log.warn(
+              `Device ${label} is in beta and untested — enable "Enable experimental device support" in adapter settings to try it, then create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
+            );
+          } else {
+            this.log.info(
+              `Device ${label} is in beta and untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
+            );
+          }
+          return;
+        }
         if (this.registry.isSeedAndDormant(upper)) {
           this.log.warn(
             `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`,
@@ -974,6 +992,7 @@ export class DeviceManager {
           this.log.info(`Device ${label} is in beta — experimental quirks are active.`);
         }
         return;
+      }
       case "unknown":
         this.log.warn(
           `Device ${label} is not in the supported device list. Please open the adapter's Expert tab, create a diagnostics report for it and attach the file to a GitHub issue so the SKU can be added.`,
