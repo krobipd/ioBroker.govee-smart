@@ -501,6 +501,18 @@ export interface DeviceState {
    */
   cloudLivenessAt?: number;
   /**
+   * When the device ITSELF last pushed a status packet over the account broker
+   * — its own voice, as opposed to what Govee's lists say about it. Dated by
+   * the packet's transaction stamp where it carries one (so a retained replay
+   * dates itself old), else by arrival. For the evidence window
+   * (`CLOUD_ONLINE_EVIDENCE_TTL_MS`) this holds against a POLLED "offline":
+   * Govee's device-list flag is measured to stick (gateway sensors, #18/#31)
+   * and to lag (2026-05-13 capture), while a packet from the device cannot lie
+   * about the device having spoken. An explicit `cmd:"online"` packet is an
+   * event, not a poll, and still wins. Runtime-only, never cached.
+   */
+  devicePushAt?: number;
+  /**
    * Reachability of this device's gateway, resolved by the DeviceManager (which
    * is the only place that can see other devices). `false` caps this device's
    * reachability: a sensor behind a dead gateway is not reachable no matter how

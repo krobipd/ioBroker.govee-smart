@@ -9,9 +9,11 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { DeviceManager } from "./device-manager";
 import {
+  isDevicePushFresh,
   isLanDriven,
   parseMqttSegmentData,
   plausibleSegmentCount,
+  readDevicePushAt,
   readReportedReachability,
   resolveDeviceReachability,
   resolveSegmentCount as resolveSegmentCountRaw,
@@ -3827,6 +3829,53 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
 describe("Reachability from the account push (v2.30.0)", () => {
   // Every packet below is a real capture from the four diagnostic reports
   // attached to issues #20/#22/#25/#26 (Joylancer, June 2026).
+
+  describe("readDevicePushAt — the device's own voice, dated by the packet", () => {
+    const now = 1_788_604_000_000;
+
+    it("takes the stamp from a status packet's transaction id", () => {
+      expect(
+        readDevicePushAt(
+          { sku: "H600D", device: "d", cmd: "status", transaction: "x_1788603714892008", state: { onOff: 0 } },
+          now,
+        ),
+      ).toBe(1_788_603_714_892);
+    });
+
+    it("falls back to the arrival time when the packet carries no usable stamp", () => {
+      expect(readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", state: { onOff: 0 } }, now)).toBe(now);
+      expect(
+        readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", transaction: "junk", state: { onOff: 0 } }, now),
+      ).toBe(now);
+    });
+
+    it("a stamp from the future is not trusted — arrival time instead", () => {
+      const future = `x_${now + 10 * 60_000}000`;
+      expect(
+        readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", transaction: future, state: { onOff: 0 } }, now),
+      ).toBe(now);
+    });
+
+    it("only a status packet with state is the device's voice — Govee's own online packet is not", () => {
+      expect(readDevicePushAt({ sku: "H600D", device: "d", cmd: "online", state: { connected: "true" } }, now)).toBe(
+        undefined,
+      );
+      expect(readDevicePushAt({ sku: "H600D", device: "d", cmd: "status" }, now)).toBe(undefined);
+    });
+  });
+
+  describe("isDevicePushFresh — the push proves the device for the evidence window", () => {
+    const now = Date.now();
+
+    it("is fresh inside the window and stale beyond it", () => {
+      expect(isDevicePushFresh({ devicePushAt: now - 60_000 }, now)).toBe(true);
+      expect(isDevicePushFresh({ devicePushAt: now - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 1) }, now)).toBe(false);
+    });
+
+    it("no push, no proof", () => {
+      expect(isDevicePushFresh({}, now)).toBe(false);
+    });
+  });
 
   describe("readReportedReachability — what Govee itself says", () => {
     it("reads the pactType-1 shape: connected as text, in any packet kind", () => {

@@ -1,4 +1,4 @@
-import { normalizeDeviceId, type GoveeDevice, type MqttStatusUpdate } from "../types";
+import { normalizeDeviceId, type DeviceState, type GoveeDevice, type MqttStatusUpdate } from "../types";
 import { mapKey } from "../device-key";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import { CLOUD_ONLINE_EVIDENCE_TTL_MS, LAN_CAPABLE_MEMORY_MS, LAN_REPLY_FRESHNESS_MS } from "../timing-constants";
@@ -462,4 +462,42 @@ export function readReportedReachability(update: MqttStatusUpdate): boolean | un
     return state.result === 1 ? true : state.result === 0 ? false : undefined;
   }
   return undefined;
+}
+
+/** Govee transaction ids look like `x_1788603714892008`: 13 digits of epoch ms, then a counter. */
+const TRANSACTION_STAMP = /^[a-z]_(\d{13})\d*$/i;
+/** A stamp further ahead than this is a clock we do not trust — arrival time it is. */
+const FUTURE_STAMP_TOLERANCE_MS = 5 * 60 * 1000;
+
+/**
+ * When the device itself spoke, according to a status push. Only a `status`
+ * packet with a state is the device's own voice; Govee's `online` packet is
+ * Govee talking ABOUT the device and goes through `readReportedReachability`.
+ *
+ * @param update the decoded push
+ * @param now arrival time
+ * @returns the packet's own stamp, the arrival time when it has none, or undefined when this is not the device speaking
+ */
+export function readDevicePushAt(update: MqttStatusUpdate, now: number): number | undefined {
+  if (update.cmd !== "status" || !update.state) {
+    return undefined;
+  }
+  const match = typeof update.transaction === "string" ? TRANSACTION_STAMP.exec(update.transaction) : null;
+  if (match) {
+    const stamp = Number(match[1]);
+    if (Number.isFinite(stamp) && stamp <= now + FUTURE_STAMP_TOLERANCE_MS) {
+      return stamp;
+    }
+  }
+  return now;
+}
+
+/**
+ * Whether the device's own last push is still inside the evidence window.
+ *
+ * @param state the device state carrying `devicePushAt`
+ * @param now the moment to judge from
+ */
+export function isDevicePushFresh(state: Pick<DeviceState, "devicePushAt">, now: number): boolean {
+  return typeof state.devicePushAt === "number" && now - state.devicePushAt < CLOUD_ONLINE_EVIDENCE_TTL_MS;
 }
