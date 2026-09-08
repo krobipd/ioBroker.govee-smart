@@ -2,7 +2,7 @@ import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import type { CloudDevice, CloudStateCapability, DeviceState, GoveeDevice } from "../types";
 import { cloudDeviceToGoveeDevice } from "./mapping";
-import { deviceKey } from "./lookups";
+import { deviceKey, isDevicePushFresh } from "./lookups";
 
 /**
  * Adapter surface required by the cloud-merge helpers — DeviceManager
@@ -124,6 +124,20 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
     }
     device.state.online = true;
     adapter.onDeviceUpdate?.(device, { online: true });
+    return;
+  }
+  // A polled "offline" yields to the device's own recent voice. Govee's list
+  // flag is measured to stick on false while the device keeps talking (gateway
+  // sensors, #18/#31) and to lag reality (2026-05-13 capture); a status packet
+  // the device pushed minutes ago cannot lie about the device having spoken.
+  // Bounded by the same evidence window as every other proof — a device that
+  // then falls silent goes grey with the next poll after the window. An
+  // explicit `cmd:"online"` packet is an event, not a poll, and never comes
+  // through here (parseMqttStateUpdate), so it still wins in both directions.
+  if (online === false && isDevicePushFresh(device.state, now)) {
+    adapter.log.debug(
+      `${device.sku} ${device.deviceId}: polled offline ignored — the device itself pushed ${Math.round((now - (device.state.devicePushAt ?? now)) / 1000)} s ago`,
+    );
     return;
   }
   // Remember that Govee spoke at all — `syncInfoOnline` needs to tell "Govee

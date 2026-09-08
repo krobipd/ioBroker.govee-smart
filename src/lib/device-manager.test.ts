@@ -3161,6 +3161,47 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(dev.state.cloudReportedOnline).toBeUndefined();
       expect(dev.state.cloudLivenessAt).toBeUndefined();
     });
+
+    it("a polled offline does not overwrite a device that spoke for itself minutes ago (#46)", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      // A light without any local trace — the H600D shape (the fixture's LAN
+      // discovery would otherwise make a light LAN-driven and skip the cap).
+      dev.type = "devices.types.light";
+      dev.lastLanSeenAt = undefined;
+      dev.lastLanReplyAt = undefined;
+      dev.state.devicePushAt = Date.now() - 3 * 60_000;
+      dev.state.cloudReportedOnline = true;
+      dev.state.cloudReportedOnlineAt = dev.state.devicePushAt;
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+      ]);
+      expect(
+        dev.state.cloudReportedOnline,
+        "Govee's list flag is measured to stick — the device's own push holds",
+      ).toBe(true);
+      expect(resolveDeviceReachability(dev)).toMatchObject({ online: true, decidedBy: "cloudReport" });
+    });
+
+    it("once the device has been silent for the evidence window, the polled offline is applied", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dev.state.devicePushAt = Date.now() - (CLOUD_ONLINE_EVIDENCE_TTL_MS + 1);
+      dev.state.cloudReportedOnline = true;
+      dev.state.cloudReportedOnlineAt = Date.now() - 60_000;
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+      ]);
+      expect(dev.state.cloudReportedOnline).toBe(false);
+    });
+
+    it("a polled online is applied regardless — the guard only shields against a downgrade", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dev.state.devicePushAt = Date.now() - 60_000;
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+      ]);
+      expect(dev.state.cloudReportedOnline).toBe(true);
+      expect(dev.state.cloudReportedOnlineAt).toBeGreaterThan(dev.state.devicePushAt);
+    });
   });
 
   describe("applyOnlineCap (Pkt 12 — info.online for App-API + OpenAPI-MQTT)", () => {
@@ -4281,6 +4322,15 @@ describe("Account push drives reachability for devices without a local interface
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "online", state: { connected: "true" } });
     expect(dev.state.devicePushAt).toBeUndefined();
+  });
+
+  it("Govee's explicit online packet still beats a fresh push — an event is not a poll", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "status", state: { onOff: 1 } });
+    expect(resolveDeviceReachability(dev).online).toBe(true);
+    dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "online", state: { connected: "false" } });
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });
   });
 
   it("a LAN-driven light is untouched by the push, explicit claim or not", () => {
