@@ -1,11 +1,77 @@
 {
   "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi, transportOverrides).",
   "devices": {
+    "B5178": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "B7080": {
+      "name": "4 pcs Rock Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "B7081": {
+      "name": "8 pcs Rock Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "B7082": {
+      "name": "6 pcs Rock Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1161": {
+      "name": "Govee Sync",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1163": {
+      "name": "Music Sync Box 2",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1168": {
+      "name": "Sync Box",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1232": {
+      "name": "Ceiling Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1250": {
+      "name": "18-Inch Ceiling Light Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1252": {
+      "name": "Ceiling Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H1270": {
       "name": "Ceiling Light Ultra",
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
+    },
+    "H12D0": {
+      "name": "Govee Ceiling Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H1310": {
       "name": "Smart Ceiling Fan",
@@ -25,6 +91,12 @@
       "status": "seed",
       "since": "2.18.1"
     },
+    "H14A1": {
+      "name": "Smart LED Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H14C0": {
       "name": "Edison Bulb",
       "type": "light",
@@ -36,6 +108,12 @@
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
+    },
+    "H14C2": {
+      "name": "Edison Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H1630": {
       "name": "Lantern Floor Lamp",
@@ -49,11 +127,209 @@
       "status": "seed",
       "since": "2.18.1"
     },
+    "H16C0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H1741": {
       "name": "Table Lamp",
       "type": "light",
       "status": "seed",
       "since": "2.18.1"
+    },
+    "H1771": {
+      "name": "Table Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1811": {
+      "name": "Projector Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1A42": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1A43": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1A44": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1A45": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1AA2": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1AA5": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1AB1": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1AB2": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1AB3": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H1B6A": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H2800": {
+      "name": "Monitor Light Bar",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H2A40": {
+      "name": "TV Backlight 3",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H2A41": {
+      "name": "TV Backlight 3",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3001": {
+      "name": "bluetooth-only solar string lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H30D0": {
+      "name": "Bulb String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H30D1": {
+      "name": "Bulb String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3200": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3351": {
+      "name": "Wall Floodlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3401": {
+      "name": "Outdoor Deck Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3500": {
+      "name": "RGBIC Path Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3501": {
+      "name": "RGBIC Path Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3510": {
+      "name": "Cylinder Pathway Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3511": {
+      "name": "Cylinder Pathway Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3751": {
+      "name": "Wall Light Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3860": {
+      "name": "Projector Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3A51": {
+      "name": "Permanent Lights 2 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3A52": {
+      "name": "Permanent Lights 2 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H3A53": {
+      "name": "Permanent Lights 2 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5001": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5023": {
+      "name": "Contact Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5051": {
       "name": "Thermo-Hygrometer",
@@ -61,11 +337,65 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H5052": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5053": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5054": {
+      "name": "Water Leak Detector",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5055": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5058": {
+      "name": "Water Leak Detector",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5059": {
+      "name": "Water Leak Detector",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5071": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5072": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5074": {
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H5075": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5080": {
       "name": "Smart Plug",
@@ -73,11 +403,41 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H5081": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5082": {
       "name": "Dual Smart Plug",
       "type": "socket",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H5083": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5085": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5086": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5089": {
+      "name": "Dual Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5100": {
       "name": "Thermo-Hygrometer",
@@ -85,11 +445,35 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H5101": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5102": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5103": {
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
       "status": "seed",
       "since": "2.0.0"
+    },
+    "H5104": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5105": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5106": {
       "name": "Smart Air Quality Monitor",
@@ -103,11 +487,47 @@
       "status": "seed",
       "since": "2.18.1"
     },
+    "H5108": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5109": {
       "name": "Pool Thermometer",
       "type": "thermometer",
       "status": "reported",
       "since": "2.17.0"
+    },
+    "H5110": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5111": {
+      "name": "same broadcast format as the H5101 family",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5112": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5122": {
+      "name": "Smart Button",
+      "type": "button",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5123": {
+      "name": "Contact Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5125": {
       "name": "Button Remote",
@@ -121,11 +541,29 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H5127": {
+      "name": "Presence Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5140": {
       "name": "Smart CO2 Monitor",
       "type": "sensor",
       "status": "seed",
       "since": "2.18.1"
+    },
+    "H5160": {
+      "name": "Power Strip",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5161": {
+      "name": "Power Strip",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H5171": {
       "name": "Thermo-Hygrometer",
@@ -133,11 +571,71 @@
       "status": "seed",
       "since": "2.18.1"
     },
+    "H5174": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5177": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H5179": {
       "name": "Wifi Thermometer",
       "type": "thermometer",
       "status": "verified",
       "since": "2.0.0"
+    },
+    "H5183": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5190": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5220": {
+      "name": "same broadcast format as the H5101 family",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5310": {
+      "name": "Thermo-Hygrometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5830": {
+      "name": "Water Leak Detector",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H5901": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6001": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6002": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6003": {
       "name": "LED Bulb",
@@ -148,17 +646,125 @@
         "brokenPlatformApi": true
       }
     },
+    "H6004": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6005": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6006": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6007": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6008": {
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
     },
+    "H6009": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H600A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H600B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H600C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H600D": {
+      "name": "GU10 Smart Bulb",
+      "type": "light",
+      "status": "reported",
+      "since": "2.33.0"
+    },
     "H6010": {
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H6011": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6013": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H601F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6020": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6022": {
       "name": "LED Bulb (RGBWW)",
@@ -172,11 +778,83 @@
         }
       }
     },
+    "H6038": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6039": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6042": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6043": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6046": {
       "name": "TV Backlight",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H6047": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6048": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6049": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H604A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H604B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H604C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H604D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6050": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6051": {
       "name": "Smart Desk Lamp",
@@ -199,11 +877,29 @@
         "brokenPlatformApi": true
       }
     },
+    "H6054": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6055": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6056": {
       "name": "Light Strip",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H6057": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6058": {
       "name": "StarPal Pro Portable Table Lamp",
@@ -211,11 +907,35 @@
       "status": "reported",
       "since": "2.16.0"
     },
+    "H6059": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H605A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H605B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H605C": {
       "name": "Envisual TV Backlight T2",
       "type": "light",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H605D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6061": {
       "name": "Glide Hexa Light Panel",
@@ -229,6 +949,42 @@
       "status": "reported",
       "since": "2.24.0"
     },
+    "H6063": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6065": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6066": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6067": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6069": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H606A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6071": {
       "name": "Smart Light",
       "type": "light",
@@ -241,11 +997,35 @@
       "status": "reported",
       "since": "2.16.0"
     },
+    "H6073": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6075": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6076": {
       "name": "RGBICW Smart Corner Floor Lamp",
       "type": "light",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H6078": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6079": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H607C": {
       "name": "Floor Lamp 2",
@@ -253,11 +1033,47 @@
       "status": "reported",
       "since": "2.13.1"
     },
+    "H6083": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6085": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6086": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6087": {
       "name": "Wall Sconce",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H6088": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6089": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H608A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H608B": {
       "name": "Smart Light",
@@ -265,11 +1081,59 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H608C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H608D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6091": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6092": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6093": {
       "name": "Star Light Projector",
       "type": "light",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H6094": {
+      "name": "Star Light Projector",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6095": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6097": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6098": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6099": {
       "name": "Smart Light",
@@ -283,6 +1147,12 @@
       "status": "seed",
       "since": "2.22.0"
     },
+    "H60A0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H60A1": {
       "name": "LED Bulb",
       "type": "light",
@@ -295,6 +1165,54 @@
         }
       }
     },
+    "H60A4": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60A6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60B0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60B1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60B2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60B3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H60C1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6101": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6102": {
       "name": "LED Strip",
       "type": "light",
@@ -304,17 +1222,77 @@
         "brokenPlatformApi": true
       }
     },
+    "H6104": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6105": {
+      "name": "TV Backlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6107": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6109": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H610A": {
       "name": "Light Strip",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
     },
+    "H610B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6110": {
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H6113": {
+      "name": "Car Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6114": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6116": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6117": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6118": {
+      "name": "Car Led Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6119": {
       "name": "LED Strip",
@@ -325,11 +1303,161 @@
         "brokenPlatformApi": true
       }
     },
+    "H611A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H611B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H611C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H611Z": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6121": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6125": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6126": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6127": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6129": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H612A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H612B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H612C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H612D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H612E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H612F": {
       "name": "RGBIC LED Strip",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H6135": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6137": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6138": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6139": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H613G": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6141": {
       "name": "LED Strip",
@@ -352,6 +1480,72 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H6144": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6145": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6146": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6147": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6148": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H614A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H614B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H614C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H614D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H614E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6154": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6159": {
       "name": "LED Strip",
       "type": "light",
@@ -360,6 +1554,168 @@
       "quirks": {
         "brokenPlatformApi": true
       }
+    },
+    "H615A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H615B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H615C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H615D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H615E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H615F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6160": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6161": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6163": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6165": {
+      "name": "Rock Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6166": {
+      "name": "Rock Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6167": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6168": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6169": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H616B": {
+      "name": "RGB Strip Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H616C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H616D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H616E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6170": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6171": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6172": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6173": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6175": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6176": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6178": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6179": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H617A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H617C": {
       "name": "LED Strip",
@@ -388,6 +1744,12 @@
         "brokenPlatformApi": true
       }
     },
+    "H617G": {
+      "name": "RGBIC LED Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H6181": {
       "name": "Smart Light",
       "type": "light",
@@ -400,11 +1762,83 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H6184": {
+      "name": "Car Underglow Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6185": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6188": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H618A": {
       "name": "RGBIC Strip Lights",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H618C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H618E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H618F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H618G": {
+      "name": "RGBIC LED Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6192": {
+      "name": "Motorcycle LED Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6194": {
+      "name": "Motorcycle LED Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6195": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6196": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6198": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H6199": {
       "name": "DreamView T1 TV Backlight",
@@ -418,11 +1852,65 @@
       "status": "seed",
       "since": "2.16.0"
     },
+    "H619B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H619C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H619D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H619E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H619Z": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H61A0": {
       "name": "Light Strip",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H61A1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61A2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61A3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61A5": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H61A8": {
       "name": "Outdoor Neon LED Strip 10m",
@@ -435,11 +1923,53 @@
         }
       }
     },
+    "H61A9": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61B1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H61B2": {
       "name": "TV Backlight",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H61B3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61B5": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61B6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61B8": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61B9": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H61BA": {
       "name": "Glide Wall Light",
@@ -459,11 +1989,35 @@
       "status": "verified",
       "since": "1.0.0"
     },
+    "H61C2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H61C3": {
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H61C5": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61D2": {
+      "name": "Neon Rope Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61D3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H61D5": {
       "name": "LED Strip",
@@ -471,17 +2025,329 @@
       "status": "verified",
       "since": "2.1.2"
     },
+    "H61D6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61E0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61E1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H61E5": {
       "name": "COB Light Strip",
       "type": "light",
       "status": "reported",
       "since": "2.24.0"
     },
+    "H61E6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61F2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61F5": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H61F6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6350": {
+      "name": "Net Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6351": {
+      "name": "Net Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6601": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6602": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6603": {
+      "name": "AI Sync Box Kit",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6604": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6608": {
+      "name": "Gaming Light Kit G1",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6609": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6630": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6631": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6640": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6641": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6671": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6672": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6690": {
+      "name": "TV Backlight 3 Lite",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H66A0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H66A1": {
       "name": "TV Backlight 3 Pro",
       "type": "light",
       "status": "reported",
       "since": "2.16.0"
+    },
+    "H6800": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6810": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6811": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6821": {
+      "name": "Meteor Shower Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6840": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6841": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6842": {
+      "name": "Cone Tree Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6843": {
+      "name": "Cone Tree Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6850": {
+      "name": "Govee Ball Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6860": {
+      "name": "C9 String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6861": {
+      "name": "C9 String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6870": {
+      "name": "RGBWIC String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H6871": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7001": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7002": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7004": {
+      "name": "Plant Grow Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7005": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7006": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7007": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7008": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7010": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7011": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7012": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7013": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7014": {
+      "name": "Smart Plug",
+      "type": "socket",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7015": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7016": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7017": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7019": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7020": {
       "name": "Bulb String Lights",
@@ -495,11 +2361,173 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H7022": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7023": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7024": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7025": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7026": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7027": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7028": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7029": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H702A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H702B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H702C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7031": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7032": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7033": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7037": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7038": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7039": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H703A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H703B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7040": {
+      "name": "Camping lantern",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7041": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7042": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7045": {
+      "name": "String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7046": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H7050": {
       "name": "Outdoor Bulb",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H7051": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7052": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7053": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7055": {
       "name": "Outdoor Bulb",
@@ -507,11 +2535,59 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H7056": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7057": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7058": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H705A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H705B": {
       "name": "Outdoor Lamp",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H705C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H705D": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H705E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H705F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7060": {
       "name": "Outdoor Floodlight",
@@ -525,17 +2601,185 @@
       "status": "seed",
       "since": "2.30.0"
     },
+    "H7062": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7063": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H7065": {
       "name": "Outdoor Spotlight",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
     },
+    "H7066": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7067": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7068": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7069": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H706A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H706B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H706C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7070": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7071": {
+      "name": "Decoration Projector",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7072": {
+      "name": "Lamp Post Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7073": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7075": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7076": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7078": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H707A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H707B": {
+      "name": "Permanent Lights Prism",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H707C": {
+      "name": "Permanent Lights Prism",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7086": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7087": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7090": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7092": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7093": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7094": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7095": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H70A1": {
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H70A2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H70A3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H70B1": {
       "name": "Curtain Lights",
@@ -584,6 +2828,24 @@
           "lightScene": "cloud"
         }
       }
+    },
+    "H70B6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H70B8": {
+      "name": "Lightwall",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H70BC": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H70C1": {
       "name": "Smart Light",
@@ -645,11 +2907,35 @@
         }
       }
     },
+    "H70CB": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H70D1": {
       "name": "Icicle Lights",
       "type": "light",
       "status": "verified",
       "since": "1.0.0"
+    },
+    "H70D2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H70D3": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7100": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7101": {
       "name": "Smart Tower Fan",
@@ -663,11 +2949,47 @@
       "status": "seed",
       "since": "2.16.0"
     },
+    "H7103": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7105": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7106": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7107": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H7111": {
       "name": "Smart Air Circulator Fan",
       "type": "fan",
       "status": "seed",
       "since": "2.16.0"
+    },
+    "H7112": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7120": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7121": {
       "name": "Smart Air Purifier",
@@ -675,11 +2997,53 @@
       "status": "seed",
       "since": "2.16.0"
     },
+    "H7122": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H7123": {
       "name": "Smart Air Purifier",
       "type": "air_purifier",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H7124": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7126": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7127": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7128": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7129": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H712C": {
+      "name": "Air Purifier",
+      "type": "air_purifier",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7130": {
       "name": "Smart Space Heater",
@@ -717,6 +3081,12 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H7137": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H713A": {
       "name": "Smart Space Heater",
       "type": "heater",
@@ -729,6 +3099,96 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H713C": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H713E": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7140": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7141": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7142": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7143": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7145": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7146": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7147": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7148": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7149": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H714E": {
+      "name": "Humidifier",
+      "type": "humidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7150": {
+      "name": "Dehumidifier",
+      "type": "dehumidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7151": {
+      "name": "Dehumidifier",
+      "type": "dehumidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7152": {
+      "name": "Dehumidifier",
+      "type": "dehumidifier",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H7160": {
       "name": "Smart Humidifier",
       "type": "humidifier",
@@ -740,6 +3200,12 @@
       "type": "aroma_diffuser",
       "status": "seed",
       "since": "2.30.0"
+    },
+    "H7162": {
+      "name": "Aroma Diffuser",
+      "type": "aroma_diffuser",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H7170": {
       "name": "Smart Kettle",
@@ -765,11 +3231,119 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H7175": {
+      "name": "Smart Kettle",
+      "type": "kettle",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H717A": {
+      "name": "Smart Kettle",
+      "type": "kettle",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H717D": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7308": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7309": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7310": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7311": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7312": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7313": {
+      "name": "Copper Wire Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7315": {
+      "name": "LED Curtain Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7317": {
+      "name": "RGB Copper Wire Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H7318": {
+      "name": "RGB Copper Wire Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H800B": {
+      "name": "Govee Smart Bulb",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8015": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H801A": {
+      "name": "Downlight",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H801B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H801C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "H801D": {
       "name": "Recessed Downlight",
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
+    },
+    "H8022": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     },
     "H8025": {
       "name": "Smart Outdoor String Lights",
@@ -777,11 +3351,359 @@
       "status": "seed",
       "since": "2.18.1"
     },
+    "H8026": {
+      "name": "LED Bulb String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H802A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8048": {
+      "name": "Gaming Light Bars",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8057": {
+      "name": "Flood Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H805A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H805B": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H805C": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H805D": {
+      "name": "Permanent Lights Elite",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8066": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8067": {
+      "name": "Outdoor Spotlights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8069": {
+      "name": "Mini Panel Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H806A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H806C": {
+      "name": "Permanent Lights Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8072": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8076": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H807C": {
+      "name": "Floor Lamp 2",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H808A": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8098": {
+      "name": "RGBIC TV Backlight 3S",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80A1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80A4": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80B5": {
+      "name": "Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80C4": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80C5": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H80D1": {
+      "name": "Icicle Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8102": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8120": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8121": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8122": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8131": {
+      "name": "Ice Maker",
+      "type": "ice_maker",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8604": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8630": {
+      "name": "Gaming Pixel Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8811": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8840": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "H8841": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1250": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1310": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1401": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R14A1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R14C0": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R14C1": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R14C2": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1501": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1630": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
     "R16D0": {
       "name": "Smart Floor Lamp",
       "type": "light",
       "status": "seed",
       "since": "2.22.0"
+    },
+    "R1741": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R1810": {
+      "name": "Star Light Projector",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R2A80": {
+      "name": "TV Backlight 3 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R2A81": {
+      "name": "TV Backlight 3 Pro",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R3A51": {
+      "name": "Permanent Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R5112": {
+      "name": "the refreshed H5112",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R60B3": {
+      "name": "Uplighter Floor Lamp",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R617G": {
+      "name": "RGBIC LED Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R618D": {
+      "name": "RGBIC LED Strip Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R6842": {
+      "name": "Cone Tree Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R6861": {
+      "name": "C9 String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R6871": {
+      "name": "RGBWIC String Lights",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R707A": {
+      "name": "Permanent Lights Prism",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R707B": {
+      "name": "Permanent Lights Prism",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
+    },
+    "R707C": {
+      "name": "Permanent Lights Prism",
+      "type": "light",
+      "status": "seed",
+      "since": "2.33.0"
     }
   }
 }
