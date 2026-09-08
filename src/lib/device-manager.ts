@@ -945,8 +945,11 @@ export class DeviceManager {
    *     action needed). The tier is still surfaced via the
    *     `diag.tier` state for any user who wants to check.
    *   - seed (toggle off): warn — points the user at the experimental
-   *     toggle that gates the per-SKU corrections we'd otherwise apply.
-   *   - seed (toggle on): info — confirms quirks are active.
+   *     toggle. With catalog quirks it names the corrections the toggle
+   *     applies; without them (the homebridge-govee seeds of 2.33.0) it asks
+   *     to try the model and to send a diagnostics report.
+   *   - seed (toggle on): info — confirms quirks are active, or (no quirks)
+   *     asks for the diagnostics report that would promote the model.
    *   - unknown: warn — asks for a diagnostics export so we can add the
    *     SKU to the catalogue.
    *

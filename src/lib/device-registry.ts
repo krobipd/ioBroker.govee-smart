@@ -247,7 +247,8 @@ export class DeviceRegistry {
   /**
    * Whether the given SKU exists as a `seed` entry in the catalog and
    * the experimental toggle is OFF — i.e. the adapter recognises this
-   * device but the per-SKU quirk corrections aren't active. The device
+   * device but the user has not opted in yet (catalog quirks, where the
+   * entry carries any, stay inactive as well). The device
    * manager calls this when a real device shows up so the user gets a
    * targeted* nudge ("you have an H7160, enable the toggle"), not a
    * blanket dump of every seed entry in the catalog.
