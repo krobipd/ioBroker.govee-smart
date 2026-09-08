@@ -45,6 +45,10 @@ export default [
       "build",
       // Generated coverage report (npm run coverage) — never lint it.
       "coverage",
+      // Session files of the note-taking hook (remember plugin): its cooldown
+      // marker `tmp/last-ndc.ts` is a timestamp, not TypeScript — it made the
+      // release lint red whenever it existed (2026-09-08).
+      ".remember/**",
       "admin",
       // Custom admin React component — its own toolchain (src-admin/eslint.config.mjs).
       "src-admin",
