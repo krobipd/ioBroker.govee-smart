@@ -228,7 +228,7 @@ jobs:
           # Maintainer-Empfehlung von mcm1957. Engines-Constraint des
           # Adapters bleibt davon unberührt — das ist nur die CI-Runtime
           # für `npm publish`.
-          node-version: "24.x"
+          node-version: "26.x"
           build: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
           sentry: true
