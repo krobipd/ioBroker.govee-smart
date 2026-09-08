@@ -4248,6 +4248,41 @@ describe("Account push drives reachability for devices without a local interface
     expect(dev.state.cloudReportedOnline).toBe(true);
   });
 
+  it("a status push stamps the device's own voice — with the packet's time, not arrival", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "status",
+      transaction: "x_1788603714892008",
+      state: { onOff: 1 },
+    });
+    expect(dev.state.devicePushAt).toBe(1_788_603_714_892);
+    expect(dev.state.cloudReportedOnlineAt, "the implicit report carries the same stamp").toBe(1_788_603_714_892);
+  });
+
+  it("a replayed old status packet does not paint the device green for the next 30 minutes", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    const stale = Date.now() - 2 * 60 * 60 * 1000;
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "status",
+      transaction: `x_${stale}001`,
+      state: { onOff: 1 },
+    });
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "noEvidence" });
+  });
+
+  it("Govee's own online packet never counts as the device's voice", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "online", state: { connected: "true" } });
+    expect(dev.state.devicePushAt).toBeUndefined();
+  });
+
   it("a LAN-driven light is untouched by the push, explicit claim or not", () => {
     // krobi 2026-09-03: the local path stays exactly as it is. Govee's cloud
     // cache lags reality, so its word must not reach a local device at all.

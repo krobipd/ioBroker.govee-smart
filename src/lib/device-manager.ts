@@ -12,6 +12,7 @@ import {
   parseMqttSegmentData,
   plausibleSegmentCount,
   plausibleSegmentIndices,
+  readDevicePushAt,
   readReportedReachability,
   SEGMENT_COUNT_MAX,
   type MqttSegmentData,
@@ -1023,6 +1024,11 @@ export class DeviceManager {
     // reality (measured 2026-05-13: `true` twice during a real 8-minute outage),
     // and that path is deliberately left untouched.
     if (!isLanDriven(device)) {
+      const now = Date.now();
+      const pushAt = readDevicePushAt(update, now);
+      if (pushAt !== undefined) {
+        state.devicePushAt = pushAt;
+      }
       const reported = readReportedReachability(update);
       // ORDER IS LOAD-BEARING: an explicit report beats mere arrival, in both
       // directions. Counting arrival first would turn Govee's own "this device
@@ -1032,8 +1038,10 @@ export class DeviceManager {
       state.online = heard;
       state.cloudReportedOnline = heard;
       // Stamped so the proof can expire — an unstamped one would read as
-      // reachable forever (the Weihnachtslichter case).
-      state.cloudReportedOnlineAt = Date.now();
+      // reachable forever (the Weihnachtslichter case). An implicit "heard"
+      // from a status packet carries the PACKET's stamp: a retained replay
+      // dates itself old and proves nothing, instead of a fresh half hour.
+      state.cloudReportedOnlineAt = reported === undefined && pushAt !== undefined ? pushAt : now;
     }
     if (!update.state) {
       return state;
