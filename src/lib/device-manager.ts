@@ -1026,22 +1026,29 @@ export class DeviceManager {
     if (!isLanDriven(device)) {
       const now = Date.now();
       const pushAt = readDevicePushAt(update, now);
-      if (pushAt !== undefined) {
-        state.devicePushAt = pushAt;
-      }
       const reported = readReportedReachability(update);
       // ORDER IS LOAD-BEARING: an explicit report beats mere arrival, in both
       // directions. Counting arrival first would turn Govee's own "this device
       // is gone" packet into a liveness sign — which is what the adapter did
       // for appliances until 2.30.0.
       const heard = reported !== undefined ? reported : true;
+      // The device's own voice arms the shield against a polled offline — but
+      // only a packet that does not itself say "offline" (advisor 2026-09-08).
+      if (pushAt !== undefined && heard) {
+        state.devicePushAt = pushAt;
+      }
+      if (pushAt !== undefined && now - pushAt >= CLOUD_ONLINE_EVIDENCE_TTL_MS) {
+        this.log.debug(
+          `${deviceLabel(device)}: status push is stamped ${Math.round((now - pushAt) / 60_000)} min old — a replayed message or a device clock running behind; it proves nothing`,
+        );
+      }
       state.online = heard;
       state.cloudReportedOnline = heard;
       // Stamped so the proof can expire — an unstamped one would read as
-      // reachable forever (the Weihnachtslichter case). An implicit "heard"
-      // from a status packet carries the PACKET's stamp: a retained replay
-      // dates itself old and proves nothing, instead of a fresh half hour.
-      state.cloudReportedOnlineAt = reported === undefined && pushAt !== undefined ? pushAt : now;
+      // reachable forever (the Weihnachtslichter case). A status packet from
+      // the device carries the PACKET's stamp: a retained replay dates itself
+      // old and proves nothing, instead of a fresh half hour.
+      state.cloudReportedOnlineAt = pushAt ?? now;
     }
     if (!update.state) {
       return state;

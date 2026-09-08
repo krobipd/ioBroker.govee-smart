@@ -3883,18 +3883,20 @@ describe("Reachability from the account push (v2.30.0)", () => {
       ).toBe(1_788_603_714_892);
     });
 
-    it("falls back to the arrival time when the packet carries no usable stamp", () => {
-      expect(readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", state: { onOff: 0 } }, now)).toBe(now);
+    it("yields nothing when the packet carries no usable stamp — no shield without the packet's own time", () => {
+      // Arrival time would let a retained replay on every reconnect arm a full
+      // 30-minute shield (advisor 2026-09-08); without a stamp the old rule stands.
+      expect(readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", state: { onOff: 0 } }, now)).toBeUndefined();
       expect(
         readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", transaction: "junk", state: { onOff: 0 } }, now),
-      ).toBe(now);
+      ).toBeUndefined();
     });
 
-    it("a stamp from the future is not trusted — arrival time instead", () => {
+    it("a stamp from the future is not trusted either", () => {
       const future = `x_${now + 10 * 60_000}000`;
       expect(
         readDevicePushAt({ sku: "H600D", device: "d", cmd: "status", transaction: future, state: { onOff: 0 } }, now),
-      ).toBe(now);
+      ).toBeUndefined();
     });
 
     it("only a status packet with state is the device's voice — Govee's own online packet is not", () => {
@@ -4322,6 +4324,36 @@ describe("Account push drives reachability for devices without a local interface
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "online", state: { connected: "true" } });
     expect(dev.state.devicePushAt).toBeUndefined();
+  });
+
+  it("a status packet that itself says offline does not arm the shield", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    // The H6199 shape (connected as text in every packet) on the fixture's SKU.
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "status",
+      transaction: `x_${Date.now() - 1000}001`,
+      state: { connected: "false", onOff: 1 },
+    });
+    expect(dev.state.devicePushAt).toBeUndefined();
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });
+  });
+
+  it("a replayed status packet with an explicit online and an old stamp proves nothing", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dev = cloudOnlyLight(dm);
+    const stale = Date.now() - 2 * 60 * 60 * 1000;
+    dm.handleMqttStatus({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      cmd: "status",
+      transaction: `x_${stale}001`,
+      state: { connected: "true", onOff: 1 },
+    });
+    expect(dev.state.cloudReportedOnlineAt, "the report is dated by the packet, not by its arrival").toBe(stale);
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "noEvidence" });
   });
 
   it("Govee's explicit online packet still beats a fresh push — an event is not a poll", () => {

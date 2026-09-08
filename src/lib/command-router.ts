@@ -190,12 +190,13 @@ export class CommandRouter {
   }
 
   /**
-   * Catch for unkatalogisierte no-segment SKUs: when a lightScene activation
-   * with scenceParam data hits a device that doesn't have any segments, the
+   * Catch for no-segment devices: when a lightScene activation with
+   * scenceParam data hits a device that doesn't have any segments, the
    * A3-framed multi-packet ptReal protocol gets silently dropped by the
-   * firmware. Cloud activation is the safer default. SKUs known to need
-   * this go into devices.json `transportOverrides.lightScene = "cloud"` —
-   * the heuristic only fires for SKUs not (yet) in the catalog.
+   * firmware. Cloud activation is the safer default. The heuristic looks at
+   * the learned segment count only — catalog membership plays no part; a SKU
+   * whose routing is known for sure pins it in devices.json
+   * `transportOverrides.lightScene`, which `resolveTransport` checks first.
    *
    * @param device Target device
    * @param command Command type

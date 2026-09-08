@@ -474,22 +474,26 @@ const FUTURE_STAMP_TOLERANCE_MS = 5 * 60 * 1000;
  * packet with a state is the device's own voice; Govee's `online` packet is
  * Govee talking ABOUT the device and goes through `readReportedReachability`.
  *
+ * Without a parseable stamp there is NO answer — deliberately not the arrival
+ * time: the broker replays retained messages on every reconnect, and an
+ * arrival-dated replay would arm a 30-minute shield for a device that may be
+ * unplugged (advisor 2026-09-08). A packet that cannot date itself keeps the
+ * old rule, where the next poll decides within two minutes.
+ *
  * @param update the decoded push
  * @param now arrival time
- * @returns the packet's own stamp, the arrival time when it has none, or undefined when this is not the device speaking
+ * @returns the packet's own stamp, or undefined when it has none or this is not the device speaking
  */
 export function readDevicePushAt(update: MqttStatusUpdate, now: number): number | undefined {
   if (update.cmd !== "status" || !update.state) {
     return undefined;
   }
   const match = typeof update.transaction === "string" ? TRANSACTION_STAMP.exec(update.transaction) : null;
-  if (match) {
-    const stamp = Number(match[1]);
-    if (Number.isFinite(stamp) && stamp <= now + FUTURE_STAMP_TOLERANCE_MS) {
-      return stamp;
-    }
+  if (!match) {
+    return undefined;
   }
-  return now;
+  const stamp = Number(match[1]);
+  return Number.isFinite(stamp) && stamp <= now + FUTURE_STAMP_TOLERANCE_MS ? stamp : undefined;
 }
 
 /**
