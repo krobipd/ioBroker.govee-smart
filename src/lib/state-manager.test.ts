@@ -1567,11 +1567,17 @@ describe("StateManager", () => {
       // lastLanReplyAt). Then call updateDeviceState with online=false —
       // it must NOT overwrite info.online for the Light.
       const before = states.get("devices.h6160_0011.info.online");
+      expect(before).toMatchObject({ val: true });
+      // Age the LAN evidence so the resolver's answer (offline) differs from the
+      // marker (online): a write from this path would now CHANGE the value. With the
+      // same value, setStateChanged hides the write (mutation G13, 2026-09-08).
+      dev.lastLanReplyAt = 0;
 
       await sm.updateDeviceState(dev, { online: false });
 
       const after = states.get("devices.h6160_0011.info.online");
       expect(after).toEqual(before);
+      expect(after).toMatchObject({ val: true });
     });
 
     describe("syncInfoOnline — cloud-only lights (local-first, not local-only)", () => {
