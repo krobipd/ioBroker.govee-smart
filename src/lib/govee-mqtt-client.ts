@@ -616,9 +616,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // account list carries devices without a `pactType`. Not parsed any more;
       // the raw envelope is in the diagnostics buffer either way.
       const cmd = typeof raw.cmd === "string" ? raw.cmd : undefined;
+      // The transaction id dates the packet itself (see MqttStatusUpdate.transaction).
+      const transaction = typeof raw.transaction === "string" ? raw.transaction : undefined;
 
       if (sku || device) {
-        this.onStatus?.({ sku, device, cmd, state, op });
+        this.onStatus?.({ sku, device, cmd, state, op, transaction });
         if (this.onPacket && device) {
           // v2.9.1 — always forward the raw envelope so state-only pushes
           // (state with no op.command) are visible in diag. Previously the

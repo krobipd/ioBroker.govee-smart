@@ -955,6 +955,27 @@ describe("GoveeMqttClient", () => {
       expect(statuses).toEqual([{ sku: "H61BE", device: "AA:BB", state: { onOff: 1 }, op: { command: [] } }]);
     });
 
+    it("forwards the packet's transaction stamp — it dates the packet itself, not its arrival", () => {
+      const { statuses, feed } = makeClient();
+      feed({ sku: "H600D", device: "AA:BB", cmd: "status", transaction: "x_1788603714892008", state: { onOff: 0 } });
+      expect(statuses).toEqual([
+        {
+          sku: "H600D",
+          device: "AA:BB",
+          cmd: "status",
+          state: { onOff: 0 },
+          op: undefined,
+          transaction: "x_1788603714892008",
+        },
+      ]);
+    });
+
+    it("drops a transaction that is not a string (API boundary)", () => {
+      const { statuses, feed } = makeClient();
+      feed({ sku: "H600D", device: "AA:BB", cmd: "status", transaction: 42, state: { onOff: 0 } });
+      expect((statuses[0] as { transaction?: unknown }).transaction).toBeUndefined();
+    });
+
     it("drops an oversized message before parsing it (SEC-I2)", () => {
       const { statuses, feed } = makeClient();
       // A valid-looking status, padded past the 64 KB guard.

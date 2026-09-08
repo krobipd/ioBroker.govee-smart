@@ -206,6 +206,15 @@ export interface MqttStatusUpdate {
    * nothing downstream could tell a reachability packet from a state push.
    */
   cmd?: string;
+  /**
+   * Govee's transaction id, e.g. `x_1788603714892008`: its first 13 digits are
+   * the millisecond timestamp of the request the device is answering. Kept
+   * because it dates the packet ITSELF — a retained message the broker replays
+   * on (re)subscribe carries the stamp of when it was originally sent, not of
+   * its arrival, and `readDevicePushAt` uses exactly that to tell a fresh sign
+   * of life from an old echo.
+   */
+  transaction?: string;
   /** Device state values */
   state?: {
     /** Power state (1 = on, 0 = off) */
