@@ -1130,7 +1130,9 @@ export class DiagnosticsCollector {
       renewers.push("LAN scan, every 30 s");
     } else {
       silent.push(isLight ? "LAN reply (device has no local API enabled)" : "LAN reply (not a light)");
-      renewers.push("account push, event-driven (needs email + password)");
+      renewers.push(
+        "account push, event-driven (needs email + password) — the device's own status push holds against a polled offline for 30 min",
+      );
       renewers.push("app device list, every 2 min (needs email + password)");
       renewers.push("cloud event push, event-driven (needs the API key)");
       renewers.push(
