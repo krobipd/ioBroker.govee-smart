@@ -103,6 +103,21 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### 2.34.0 (2026-09-10)
+
+- Fixed: Air purifiers, heaters, humidifiers and fans — choosing a mode or a speed now reaches the device, where the adapter used to send a value Govee rejected as "Invalid parameter type" (#47)
+- Fixed: The speed selector of an air purifier now offers the levels the device actually has, instead of the single unusable entry it showed before (#47)
+- Fixed: On an appliance updating from an older version the level datapoint accepts values again — it kept the selection list of the previous version and refused every write against it
+- Changed: On appliances whose modes share the same level numbers — kettles, some fans and humidifiers — the level is a plain number now; a selection list could only ever show one mode's levels
+- Fixed: An installation with no light at all now reads its device states at start — filter life, air quality and every other reported value stayed empty forever (#47)
+- Fixed: A heater's target temperature is sent in the shape the Govee API asks for, and the datapoint is labelled in the unit the heater itself reports — a 5–30 °C heater used to read °F
+- Fixed: The current speed level now arrives from the cloud together with the mode — until now only the mode updated while the level datapoint kept showing its default
+- Fixed: A command the Govee cloud rejects no longer counts as successful, so the datapoint stops showing a change the device never made, and the reason is named
+- New: A device's night-light scene is selectable — the adapter received the scene list and the current scene from Govee and threw both away without creating a datapoint
+- Fixed: The scene dropdown's "---" entry now carries the same value the adapter writes when it resets the dropdown, so the entry stopped being rewritten on every start
+- New: The H7127 air purifier is confirmed by a user report — it is no longer listed as untested and no longer asks for the experimental switch at start
+- Changed: The diagnostics report no longer repeats the privacy note the export button already shows, and says instead what only the file itself can say
+
 ### 2.33.0 (2026-09-08)
 
 - Fixed: A light without a local API stays reachable while it reports its own state — Govee's device list lagged behind the bulb and overrode it every two minutes (reported for the H600D)
@@ -132,16 +147,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.31.1 (2026-09-04)
 
 - Fixed: When the adapter met a device model it does not know yet, its log asked the user to press a button that 2.31.0 had removed — it now points at the Expert tab, where the report is actually made
-
-### 2.31.0 (2026-09-03)
-
-- Fixed: On instances upgraded from 2.27.0 or newer, every admin card was dead — diagnostics, segment wizard and connection test alike; affected installations repair themselves on the next start
-- Fixed: A card that could not reach the adapter reported "no devices yet" instead of the real error
-- Changed: Segment detection and diagnostics now share one **Expert** tab with a button each
-- Changed: The per-device `diag.export` button is gone; the Expert tab builds the report and hands you the file in one press
-- Changed: `diag.lastExport` now records WHEN the last report was taken, instead of naming the file
-- Improved: Both cards say "Loading devices …" while they search, and explain the wait if it takes long
-- Fixed: The diagnostics report still described the reachability rule as it was before 2.30.0
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

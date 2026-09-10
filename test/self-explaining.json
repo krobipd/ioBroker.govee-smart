@@ -8,6 +8,8 @@
   "devices.*.control.color_temperature": "A basic light control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.humidity": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.target_temperature": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.nightlight_toggle": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
+  "devices.*.control.nightlight_scene": "A dropdown over the night-light scenes the device itself names (Flame, Rainbow, …) — the option list IS the explanation, and it differs per model.",
   "devices.*.segments.*.color": "The same colour control once per segment; segments.count carries the explanation for the whole subtree.",
   "devices.*.segments.*.brightness": "The same brightness control once per segment; segments.count carries the explanation for the whole subtree.",
   "devices.*.sensor.temperature": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",

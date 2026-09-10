@@ -4720,6 +4720,53 @@
     },
     "_id": "govee-smart.0.devices.h7121_0009.control.power"
   },
+  "govee-smart.0.devices.h7121_0009.control.work_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsmodus",
+        "en": "Work Mode",
+        "es": "Modo de trabajo",
+        "fr": "Mode de fonctionnement",
+        "it": "Modalità di lavoro",
+        "nl": "Werkmodus",
+        "pl": "Tryb pracy",
+        "pt": "Modo de trabalho",
+        "ru": "Режим работы",
+        "uk": "Режим роботи",
+        "zh-cn": "工作模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "Low",
+        "2": "Medium",
+        "3": "High",
+        "16": "Sleep"
+      },
+      "def": "3",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7121_0009.control.work_mode"
+  },
   "govee-smart.0.devices.h7121_0009.diag": {
     "type": "channel",
     "common": {
@@ -5139,6 +5186,539 @@
     },
     "_id": "govee-smart.0.devices.h7121_0009.sensor.filter_life_time"
   },
+  "govee-smart.0.devices.h7127_0010": {
+    "type": "device",
+    "common": {
+      "name": "Air Purifier Bedroom",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS41IDE2YzAgLjI4LS4yMi41LS41LjVzLS41LS4yMi0uNS0uNXYtMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYyem0wLTRjMCAuMjgtLjIyLjUtLjUuNXMtLjUtLjIyLS41LS41di0xMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYxMnoiLz48L3N2Zz4=",
+      "statusStates": {
+        "onlineId": "govee-smart.0.devices.h7127_0010.info.online"
+      }
+    },
+    "native": {
+      "sku": "H7127",
+      "deviceId": "AA:BB:CC:DD:EE:FF:00:10"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010"
+  },
+  "govee-smart.0.devices.h7127_0010.control": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Steuerung",
+        "en": "Controls",
+        "es": "Controles",
+        "fr": "Commandes",
+        "it": "Controlli",
+        "nl": "Bediening",
+        "pl": "Sterowanie",
+        "pt": "Controlos",
+        "ru": "Управление",
+        "uk": "Керування",
+        "zh-cn": "控制"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.control"
+  },
+  "govee-smart.0.devices.h7127_0010.control.mode_value": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modus-Wert",
+        "en": "Mode Value",
+        "es": "Valor del modo",
+        "fr": "Valeur du mode",
+        "it": "Valore modalità",
+        "nl": "Moduswaarde",
+        "pl": "Wartość trybu",
+        "pt": "Valor do modo",
+        "ru": "Значение режима",
+        "uk": "Значення режиму",
+        "zh-cn": "模式值"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "Sleep",
+        "2": "Low",
+        "3": "High"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.control.mode_value"
+  },
+  "govee-smart.0.devices.h7127_0010.control.power": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ein/Aus",
+        "en": "Power",
+        "es": "Encendido",
+        "fr": "Marche/Arrêt",
+        "it": "Accensione",
+        "nl": "Aan/Uit",
+        "pl": "Zasilanie",
+        "pt": "Ligar/Desligar",
+        "ru": "Питание",
+        "uk": "Живлення",
+        "zh-cn": "电源"
+      },
+      "type": "boolean",
+      "role": "switch",
+      "read": true,
+      "write": true,
+      "def": false
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.on_off",
+      "capabilityInstance": "powerSwitch"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.control.power"
+  },
+  "govee-smart.0.devices.h7127_0010.control.work_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsmodus",
+        "en": "Work Mode",
+        "es": "Modo de trabajo",
+        "fr": "Mode de fonctionnement",
+        "it": "Modalità di lavoro",
+        "nl": "Werkmodus",
+        "pl": "Tryb pracy",
+        "pt": "Modo de trabalho",
+        "ru": "Режим работы",
+        "uk": "Режим роботи",
+        "zh-cn": "工作模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "gearMode",
+        "2": "Custom",
+        "3": "Auto"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.control.work_mode"
+  },
+  "govee-smart.0.devices.h7127_0010.diag": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Diagnose",
+        "en": "Diagnostics",
+        "es": "Diagnóstico",
+        "fr": "Diagnostic",
+        "it": "Diagnostica",
+        "nl": "Diagnose",
+        "pl": "Diagnostyka",
+        "pt": "Diagnóstico",
+        "ru": "Диагностика",
+        "uk": "Діагностика",
+        "zh-cn": "诊断"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.diag"
+  },
+  "govee-smart.0.devices.h7127_0010.diag.lastExport": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Diagnose-Export",
+        "en": "Last diagnostics export",
+        "es": "Última exportación de diagnóstico",
+        "fr": "Dernier export de diagnostic",
+        "it": "Ultima esportazione diagnostica",
+        "nl": "Laatste diagnose-export",
+        "pl": "Ostatni eksport diagnostyki",
+        "pt": "Última exportação de diagnóstico",
+        "ru": "Последний экспорт диагностики",
+        "uk": "Останній експорт діагностики",
+        "zh-cn": "上次诊断导出"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "def": "",
+      "desc": {
+        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
+        "en": "When the most recent diagnostics report was taken for this device.",
+        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
+        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
+        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
+        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
+        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
+        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
+        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
+        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
+        "zh-cn": "上次为该设备生成诊断报告的时间。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsLastExport"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.diag.lastExport"
+  },
+  "govee-smart.0.devices.h7127_0010.diag.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.diag.tier"
+  },
+  "govee-smart.0.devices.h7127_0010.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Geräte-Informationen",
+        "en": "Device Information",
+        "es": "Información del dispositivo",
+        "fr": "Informations sur l'appareil",
+        "it": "Informazioni dispositivo",
+        "nl": "Apparaatgegevens",
+        "pl": "Informacje o urządzeniu",
+        "pt": "Informações do dispositivo",
+        "ru": "Информация об устройстве",
+        "uk": "Інформація про пристрій",
+        "zh-cn": "设备信息"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info"
+  },
+  "govee-smart.0.devices.h7127_0010.info.ip": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "IP-Adresse",
+        "en": "IP Address",
+        "es": "Dirección IP",
+        "fr": "Adresse IP",
+        "it": "Indirizzo IP",
+        "nl": "IP-adres",
+        "pl": "Adres IP",
+        "pt": "Endereço IP",
+        "ru": "IP-адрес",
+        "uk": "IP-адреса",
+        "zh-cn": "IP地址"
+      },
+      "type": "string",
+      "role": "info.ip",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.ip"
+  },
+  "govee-smart.0.devices.h7127_0010.info.model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modell",
+        "en": "Model",
+        "es": "Modelo",
+        "fr": "Modèle",
+        "it": "Modello",
+        "nl": "Model",
+        "pl": "Model",
+        "pt": "Modelo",
+        "ru": "Модель",
+        "uk": "Модель",
+        "zh-cn": "型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.model"
+  },
+  "govee-smart.0.devices.h7127_0010.info.name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Name",
+        "en": "Name",
+        "es": "Nombre",
+        "fr": "Nom",
+        "it": "Nome",
+        "nl": "Naam",
+        "pl": "Nazwa",
+        "pt": "Nome",
+        "ru": "Имя",
+        "uk": "Ім'я",
+        "zh-cn": "名称"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.name"
+  },
+  "govee-smart.0.devices.h7127_0010.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "Conectado",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
+      "def": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.online"
+  },
+  "govee-smart.0.devices.h7127_0010.info.serial": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Seriennummer",
+        "en": "Serial Number",
+        "es": "Número de serie",
+        "fr": "Numéro de série",
+        "it": "Numero di serie",
+        "nl": "Serienummer",
+        "pl": "Numer seryjny",
+        "pt": "Número de série",
+        "ru": "Серийный номер",
+        "uk": "Серійний номер",
+        "zh-cn": "序列号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.serial"
+  },
+  "govee-smart.0.devices.h7127_0010.info.type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gerätetyp",
+        "en": "Device Type",
+        "es": "Tipo de dispositivo",
+        "fr": "Type d'appareil",
+        "it": "Tipo di dispositivo",
+        "nl": "Apparaattype",
+        "pl": "Typ urządzenia",
+        "pt": "Tipo de dispositivo",
+        "ru": "Тип устройства",
+        "uk": "Тип пристрою",
+        "zh-cn": "设备类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.info.type"
+  },
+  "govee-smart.0.devices.h7127_0010.sensor": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Sensordaten",
+        "en": "Sensor Data",
+        "es": "Datos del sensor",
+        "fr": "Données des capteurs",
+        "it": "Dati dei sensori",
+        "nl": "Sensorgegevens",
+        "pl": "Dane czujników",
+        "pt": "Dados do sensor",
+        "ru": "Данные датчиков",
+        "uk": "Дані датчиків",
+        "zh-cn": "传感器数据"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7127_0010.sensor"
+  },
+  "govee-smart.0.devices.h7127_0010.sensor.filter_life_time": {
+    "type": "state",
+    "common": {
+      "name": {
+        "en": "Filter Life Time",
+        "de": "Filter Life Time",
+        "ru": "Filter Life Time",
+        "pt": "Filter Life Time",
+        "nl": "Filter Life Time",
+        "fr": "Filter Life Time",
+        "it": "Filter Life Time",
+        "es": "Filter Life Time",
+        "pl": "Filter Life Time",
+        "uk": "Filter Life Time",
+        "zh-cn": "Filter Life Time"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "unit": "%",
+      "def": 0,
+      "desc": {
+        "de": "Wie viel Lebensdauer der Filter noch hat, bevor er getauscht werden sollte.",
+        "en": "How much of the filter's life is left before it should be replaced.",
+        "es": "Cuánta vida le queda al filtro antes de que deba sustituirse.",
+        "fr": "Durée de vie restante du filtre avant son remplacement.",
+        "it": "Quanta vita resta al filtro prima della sostituzione.",
+        "nl": "Hoeveel levensduur het filter nog heeft voordat het vervangen moet worden.",
+        "pl": "Ile żywotności pozostało filtrowi przed wymianą.",
+        "pt": "Quanta vida resta ao filtro antes de dever ser substituído.",
+        "ru": "Сколько ресурса осталось у фильтра до замены.",
+        "uk": "Скільки ресурсу залишилося у фільтра до заміни.",
+        "zh-cn": "滤芯在需要更换前还剩多少寿命。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.property",
+      "capabilityInstance": "filterLifeTime"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.sensor.filter_life_time"
+  },
   "govee-smart.0.devices.h7130_0006": {
     "type": "device",
     "common": {
@@ -5265,7 +5845,7 @@
       "role": "level.temperature",
       "read": true,
       "write": true,
-      "unit": "°F",
+      "unit": "°C",
       "min": 5,
       "max": 30,
       "def": 5
@@ -5636,6 +6216,572 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7130_0006.info.type"
+  },
+  "govee-smart.0.devices.h7131_0012": {
+    "type": "device",
+    "common": {
+      "name": "Space Heater Study",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE3LjY2IDExLjJjLS4yMy0uMzMtLjQ4LS42Ni0uNzgtLjk4Yy0uNTctLjY2LTEuMjEtMS4zMi0xLjg2LTEuOTdjLTEuMzgtMS4zNS0yLjg2LTIuNzMtMy45Ny00LjU0Yy0uNDgtLjc4LS44LTEuNTktMS4wMi0yLjQyYy0uNTguODYtMS4wOSAxLjctMS41OSAyLjU1Yy0uODcgMS40OS0xLjY3IDIuOTYtMi4yMyA0LjUyYy0uNzcgMi4xNi0xLjAxIDQuMzgtLjUyIDYuNTRjLjUgMi4xNiAxLjY3IDQuMjUgMy4zNyA1LjcxYy44Ni43NCAxLjg5IDEuMzMgMyAxLjc2YzEuMS40MyAyLjI4LjY3IDMuNDcuNzFjMS4xOS4wNCAyLjQtLjEyIDMuNTQtLjUyYzEuMTQtLjQgMi4yMS0xLjAyIDMuMTctMS44NWMxLjg5LTEuNjMgMy4yNi0zLjc4IDMuNTctNi4xN2MuMzEtMi4zOS0uNTQtNC44NC0yLjE1LTYuNTd6Ii8+PC9zdmc+",
+      "statusStates": {
+        "onlineId": "govee-smart.0.devices.h7131_0012.info.online"
+      }
+    },
+    "native": {
+      "sku": "H7131",
+      "deviceId": "AA:BB:CC:DD:EE:FF:00:12"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012"
+  },
+  "govee-smart.0.devices.h7131_0012.control": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Steuerung",
+        "en": "Controls",
+        "es": "Controles",
+        "fr": "Commandes",
+        "it": "Controlli",
+        "nl": "Bediening",
+        "pl": "Sterowanie",
+        "pt": "Controlos",
+        "ru": "Управление",
+        "uk": "Керування",
+        "zh-cn": "控制"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.control"
+  },
+  "govee-smart.0.devices.h7131_0012.control.mode_value": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modus-Wert",
+        "en": "Mode Value",
+        "es": "Valor del modo",
+        "fr": "Valeur du mode",
+        "it": "Valore modalità",
+        "nl": "Moduswaarde",
+        "pl": "Wartość trybu",
+        "pt": "Valor do modo",
+        "ru": "Значение режима",
+        "uk": "Значення режиму",
+        "zh-cn": "模式值"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "Low",
+        "2": "Medium",
+        "3": "High"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.mode_value"
+  },
+  "govee-smart.0.devices.h7131_0012.control.nightlight_scene": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Nachtlicht-Szene",
+        "en": "Night-light scene",
+        "es": "Escena de luz nocturna",
+        "fr": "Scène veilleuse",
+        "it": "Scena luce notturna",
+        "nl": "Nachtlampscène",
+        "pl": "Scena lampki nocnej",
+        "pt": "Cena de luz noturna",
+        "ru": "Сцена ночника",
+        "uk": "Сцена нічника",
+        "zh-cn": "夜灯场景"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "0": "---",
+        "1": "Flame",
+        "2": "Rainbow",
+        "3": "Rhythm",
+        "4": "Easy",
+        "5": "Sleep"
+      },
+      "def": "0"
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.mode",
+      "capabilityInstance": "nightlightScene"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.nightlight_scene"
+  },
+  "govee-smart.0.devices.h7131_0012.control.nightlight_toggle": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Nachtlicht",
+        "en": "Night light",
+        "es": "Luz nocturna",
+        "fr": "Veilleuse",
+        "it": "Luce notturna",
+        "nl": "Nachtlampje",
+        "pl": "Lampka nocna",
+        "pt": "Luz noturna",
+        "ru": "Ночник",
+        "uk": "Нічник",
+        "zh-cn": "夜灯"
+      },
+      "type": "boolean",
+      "role": "switch",
+      "read": true,
+      "write": true,
+      "def": false
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.toggle",
+      "capabilityInstance": "nightlightToggle"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.nightlight_toggle"
+  },
+  "govee-smart.0.devices.h7131_0012.control.power": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ein/Aus",
+        "en": "Power",
+        "es": "Encendido",
+        "fr": "Marche/Arrêt",
+        "it": "Accensione",
+        "nl": "Aan/Uit",
+        "pl": "Zasilanie",
+        "pt": "Ligar/Desligar",
+        "ru": "Питание",
+        "uk": "Живлення",
+        "zh-cn": "电源"
+      },
+      "type": "boolean",
+      "role": "switch",
+      "read": true,
+      "write": true,
+      "def": false
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.on_off",
+      "capabilityInstance": "powerSwitch"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.power"
+  },
+  "govee-smart.0.devices.h7131_0012.control.target_temperature": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Zieltemperatur",
+        "en": "Target Temperature",
+        "es": "Temperatura objetivo",
+        "fr": "Température cible",
+        "it": "Temperatura obiettivo",
+        "nl": "Doeltemperatuur",
+        "pl": "Temperatura docelowa",
+        "pt": "Temperatura alvo",
+        "ru": "Целевая температура",
+        "uk": "Цільова температура",
+        "zh-cn": "目标温度"
+      },
+      "type": "number",
+      "role": "level.temperature",
+      "read": true,
+      "write": true,
+      "unit": "°C",
+      "min": 5,
+      "max": 30,
+      "def": 5
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.temperature_setting",
+      "capabilityInstance": "targetTemperature"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.target_temperature"
+  },
+  "govee-smart.0.devices.h7131_0012.control.work_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsmodus",
+        "en": "Work Mode",
+        "es": "Modo de trabajo",
+        "fr": "Mode de fonctionnement",
+        "it": "Modalità di lavoro",
+        "nl": "Werkmodus",
+        "pl": "Tryb pracy",
+        "pt": "Modo de trabalho",
+        "ru": "Режим работы",
+        "uk": "Режим роботи",
+        "zh-cn": "工作模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "gearMode",
+        "3": "Auto",
+        "9": "Fan"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.work_mode"
+  },
+  "govee-smart.0.devices.h7131_0012.diag": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Diagnose",
+        "en": "Diagnostics",
+        "es": "Diagnóstico",
+        "fr": "Diagnostic",
+        "it": "Diagnostica",
+        "nl": "Diagnose",
+        "pl": "Diagnostyka",
+        "pt": "Diagnóstico",
+        "ru": "Диагностика",
+        "uk": "Діагностика",
+        "zh-cn": "诊断"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.diag"
+  },
+  "govee-smart.0.devices.h7131_0012.diag.lastExport": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Diagnose-Export",
+        "en": "Last diagnostics export",
+        "es": "Última exportación de diagnóstico",
+        "fr": "Dernier export de diagnostic",
+        "it": "Ultima esportazione diagnostica",
+        "nl": "Laatste diagnose-export",
+        "pl": "Ostatni eksport diagnostyki",
+        "pt": "Última exportação de diagnóstico",
+        "ru": "Последний экспорт диагностики",
+        "uk": "Останній експорт діагностики",
+        "zh-cn": "上次诊断导出"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "def": "",
+      "desc": {
+        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
+        "en": "When the most recent diagnostics report was taken for this device.",
+        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
+        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
+        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
+        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
+        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
+        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
+        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
+        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
+        "zh-cn": "上次为该设备生成诊断报告的时间。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsLastExport"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.diag.lastExport"
+  },
+  "govee-smart.0.devices.h7131_0012.diag.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.diag.tier"
+  },
+  "govee-smart.0.devices.h7131_0012.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Geräte-Informationen",
+        "en": "Device Information",
+        "es": "Información del dispositivo",
+        "fr": "Informations sur l'appareil",
+        "it": "Informazioni dispositivo",
+        "nl": "Apparaatgegevens",
+        "pl": "Informacje o urządzeniu",
+        "pt": "Informações do dispositivo",
+        "ru": "Информация об устройстве",
+        "uk": "Інформація про пристрій",
+        "zh-cn": "设备信息"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info"
+  },
+  "govee-smart.0.devices.h7131_0012.info.ip": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "IP-Adresse",
+        "en": "IP Address",
+        "es": "Dirección IP",
+        "fr": "Adresse IP",
+        "it": "Indirizzo IP",
+        "nl": "IP-adres",
+        "pl": "Adres IP",
+        "pt": "Endereço IP",
+        "ru": "IP-адрес",
+        "uk": "IP-адреса",
+        "zh-cn": "IP地址"
+      },
+      "type": "string",
+      "role": "info.ip",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.ip"
+  },
+  "govee-smart.0.devices.h7131_0012.info.model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modell",
+        "en": "Model",
+        "es": "Modelo",
+        "fr": "Modèle",
+        "it": "Modello",
+        "nl": "Model",
+        "pl": "Model",
+        "pt": "Modelo",
+        "ru": "Модель",
+        "uk": "Модель",
+        "zh-cn": "型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.model"
+  },
+  "govee-smart.0.devices.h7131_0012.info.name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Name",
+        "en": "Name",
+        "es": "Nombre",
+        "fr": "Nom",
+        "it": "Nome",
+        "nl": "Naam",
+        "pl": "Nazwa",
+        "pt": "Nome",
+        "ru": "Имя",
+        "uk": "Ім'я",
+        "zh-cn": "名称"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.name"
+  },
+  "govee-smart.0.devices.h7131_0012.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "Conectado",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
+      "def": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.online"
+  },
+  "govee-smart.0.devices.h7131_0012.info.serial": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Seriennummer",
+        "en": "Serial Number",
+        "es": "Número de serie",
+        "fr": "Numéro de série",
+        "it": "Numero di serie",
+        "nl": "Serienummer",
+        "pl": "Numer seryjny",
+        "pt": "Número de série",
+        "ru": "Серийный номер",
+        "uk": "Серійний номер",
+        "zh-cn": "序列号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.serial"
+  },
+  "govee-smart.0.devices.h7131_0012.info.type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gerätetyp",
+        "en": "Device Type",
+        "es": "Tipo de dispositivo",
+        "fr": "Type d'appareil",
+        "it": "Tipo di dispositivo",
+        "nl": "Apparaattype",
+        "pl": "Typ urządzenia",
+        "pt": "Tipo de dispositivo",
+        "ru": "Тип устройства",
+        "uk": "Тип пристрою",
+        "zh-cn": "设备类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7131_0012.info.type"
   },
   "govee-smart.0.devices.h7141_0007": {
     "type": "device",
@@ -6108,6 +7254,474 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7141_0007.info.type"
   },
+  "govee-smart.0.devices.h7143_0011": {
+    "type": "device",
+    "common": {
+      "name": "Humidifier Bedroom",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDIuNVMxOSA3IDE5IDEzYzAgMy44Ny0zLjEzIDctNyA3cy03LTMuMTMtNy03YzAtNiA3LTEwLjUgNy0xMC41eiIvPjwvc3ZnPg==",
+      "statusStates": {
+        "onlineId": "govee-smart.0.devices.h7143_0011.info.online"
+      }
+    },
+    "native": {
+      "sku": "H7143",
+      "deviceId": "AA:BB:CC:DD:EE:FF:00:11"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011"
+  },
+  "govee-smart.0.devices.h7143_0011.control": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Steuerung",
+        "en": "Controls",
+        "es": "Controles",
+        "fr": "Commandes",
+        "it": "Controlli",
+        "nl": "Bediening",
+        "pl": "Sterowanie",
+        "pt": "Controlos",
+        "ru": "Управление",
+        "uk": "Керування",
+        "zh-cn": "控制"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.control"
+  },
+  "govee-smart.0.devices.h7143_0011.control.mode_value": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modus-Wert",
+        "en": "Mode Value",
+        "es": "Valor del modo",
+        "fr": "Valeur du mode",
+        "it": "Valore modalità",
+        "nl": "Moduswaarde",
+        "pl": "Wartość trybu",
+        "pt": "Valor do modo",
+        "ru": "Значение режима",
+        "uk": "Значення режиму",
+        "zh-cn": "模式值"
+      },
+      "type": "number",
+      "role": "level",
+      "read": true,
+      "write": true,
+      "min": 1,
+      "max": 80,
+      "def": 1,
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011.control.mode_value"
+  },
+  "govee-smart.0.devices.h7143_0011.control.power": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Ein/Aus",
+        "en": "Power",
+        "es": "Encendido",
+        "fr": "Marche/Arrêt",
+        "it": "Accensione",
+        "nl": "Aan/Uit",
+        "pl": "Zasilanie",
+        "pt": "Ligar/Desligar",
+        "ru": "Питание",
+        "uk": "Живлення",
+        "zh-cn": "电源"
+      },
+      "type": "boolean",
+      "role": "switch",
+      "read": true,
+      "write": true,
+      "def": false
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.on_off",
+      "capabilityInstance": "powerSwitch"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011.control.power"
+  },
+  "govee-smart.0.devices.h7143_0011.control.work_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsmodus",
+        "en": "Work Mode",
+        "es": "Modo de trabajo",
+        "fr": "Mode de fonctionnement",
+        "it": "Modalità di lavoro",
+        "nl": "Werkmodus",
+        "pl": "Tryb pracy",
+        "pt": "Modo de trabalho",
+        "ru": "Режим работы",
+        "uk": "Режим роботи",
+        "zh-cn": "工作模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "Manual",
+        "2": "Custom",
+        "3": "Auto"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011.control.work_mode"
+  },
+  "govee-smart.0.devices.h7143_0011.diag": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Diagnose",
+        "en": "Diagnostics",
+        "es": "Diagnóstico",
+        "fr": "Diagnostic",
+        "it": "Diagnostica",
+        "nl": "Diagnose",
+        "pl": "Diagnostyka",
+        "pt": "Diagnóstico",
+        "ru": "Диагностика",
+        "uk": "Діагностика",
+        "zh-cn": "诊断"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.diag"
+  },
+  "govee-smart.0.devices.h7143_0011.diag.lastExport": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Diagnose-Export",
+        "en": "Last diagnostics export",
+        "es": "Última exportación de diagnóstico",
+        "fr": "Dernier export de diagnostic",
+        "it": "Ultima esportazione diagnostica",
+        "nl": "Laatste diagnose-export",
+        "pl": "Ostatni eksport diagnostyki",
+        "pt": "Última exportação de diagnóstico",
+        "ru": "Последний экспорт диагностики",
+        "uk": "Останній експорт діагностики",
+        "zh-cn": "上次诊断导出"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "def": "",
+      "desc": {
+        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
+        "en": "When the most recent diagnostics report was taken for this device.",
+        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
+        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
+        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
+        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
+        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
+        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
+        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
+        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
+        "zh-cn": "上次为该设备生成诊断报告的时间。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsLastExport"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011.diag.lastExport"
+  },
+  "govee-smart.0.devices.h7143_0011.diag.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7143_0011.diag.tier"
+  },
+  "govee-smart.0.devices.h7143_0011.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Geräte-Informationen",
+        "en": "Device Information",
+        "es": "Información del dispositivo",
+        "fr": "Informations sur l'appareil",
+        "it": "Informazioni dispositivo",
+        "nl": "Apparaatgegevens",
+        "pl": "Informacje o urządzeniu",
+        "pt": "Informações do dispositivo",
+        "ru": "Информация об устройстве",
+        "uk": "Інформація про пристрій",
+        "zh-cn": "设备信息"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info"
+  },
+  "govee-smart.0.devices.h7143_0011.info.ip": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "IP-Adresse",
+        "en": "IP Address",
+        "es": "Dirección IP",
+        "fr": "Adresse IP",
+        "it": "Indirizzo IP",
+        "nl": "IP-adres",
+        "pl": "Adres IP",
+        "pt": "Endereço IP",
+        "ru": "IP-адрес",
+        "uk": "IP-адреса",
+        "zh-cn": "IP地址"
+      },
+      "type": "string",
+      "role": "info.ip",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.ip"
+  },
+  "govee-smart.0.devices.h7143_0011.info.model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modell",
+        "en": "Model",
+        "es": "Modelo",
+        "fr": "Modèle",
+        "it": "Modello",
+        "nl": "Model",
+        "pl": "Model",
+        "pt": "Modelo",
+        "ru": "Модель",
+        "uk": "Модель",
+        "zh-cn": "型号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.model"
+  },
+  "govee-smart.0.devices.h7143_0011.info.name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Name",
+        "en": "Name",
+        "es": "Nombre",
+        "fr": "Nom",
+        "it": "Nome",
+        "nl": "Naam",
+        "pl": "Nazwa",
+        "pt": "Nome",
+        "ru": "Имя",
+        "uk": "Ім'я",
+        "zh-cn": "名称"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.name"
+  },
+  "govee-smart.0.devices.h7143_0011.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "Conectado",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
+      "def": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.online"
+  },
+  "govee-smart.0.devices.h7143_0011.info.serial": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Seriennummer",
+        "en": "Serial Number",
+        "es": "Número de serie",
+        "fr": "Numéro de série",
+        "it": "Numero di serie",
+        "nl": "Serienummer",
+        "pl": "Numer seryjny",
+        "pt": "Número de série",
+        "ru": "Серийный номер",
+        "uk": "Серійний номер",
+        "zh-cn": "序列号"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.serial"
+  },
+  "govee-smart.0.devices.h7143_0011.info.type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gerätetyp",
+        "en": "Device Type",
+        "es": "Tipo de dispositivo",
+        "fr": "Type d'appareil",
+        "it": "Tipo di dispositivo",
+        "nl": "Apparaattype",
+        "pl": "Typ urządzenia",
+        "pt": "Tipo de dispositivo",
+        "ru": "Тип устройства",
+        "uk": "Тип пристрою",
+        "zh-cn": "设备类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h7143_0011.info.type"
+  },
   "govee-smart.0.devices.h7161_000c": {
     "type": "device",
     "common": {
@@ -6553,6 +8167,49 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7171_000a.control"
   },
+  "govee-smart.0.devices.h7171_000a.control.mode_value": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modus-Wert",
+        "en": "Mode Value",
+        "es": "Valor del modo",
+        "fr": "Valeur du mode",
+        "it": "Valore modalità",
+        "nl": "Moduswaarde",
+        "pl": "Wartość trybu",
+        "pt": "Valor do modo",
+        "ru": "Значение режима",
+        "uk": "Значення режиму",
+        "zh-cn": "模式值"
+      },
+      "type": "number",
+      "role": "level",
+      "read": true,
+      "write": true,
+      "min": 1,
+      "max": 4,
+      "def": 1,
+      "desc": {
+        "de": "Die Einstellung innerhalb der aktuellen Betriebsart, etwa die Lüfterstufe — ihre Bedeutung hängt von der Betriebsart ab.",
+        "en": "The setting inside the current mode, for example the fan step — its meaning depends on that mode.",
+        "es": "El ajuste dentro del modo actual, por ejemplo el nivel del ventilador — su significado depende de ese modo.",
+        "fr": "Le réglage dans le mode actuel, par exemple le niveau du ventilateur — son sens dépend de ce mode.",
+        "it": "L'impostazione all'interno della modalità attuale, ad esempio il livello della ventola — dipende da quella modalità.",
+        "nl": "De instelling binnen de huidige modus, bijvoorbeeld de ventilatorstand — de betekenis hangt van die modus af.",
+        "pl": "Ustawienie w bieżącym trybie, np. stopień wentylatora — jego znaczenie zależy od tego trybu.",
+        "pt": "A definição dentro do modo atual, por exemplo o nível da ventoinha — o significado depende desse modo.",
+        "ru": "Настройка внутри текущего режима, например ступень вентилятора — смысл зависит от режима.",
+        "uk": "Налаштування в межах поточного режиму, наприклад ступінь вентилятора — його зміст залежить від режиму.",
+        "zh-cn": "当前模式下的具体设定，例如风扇档位 —— 含义取决于该模式。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7171_000a.control.mode_value"
+  },
   "govee-smart.0.devices.h7171_000a.control.power": {
     "type": "state",
     "common": {
@@ -6601,7 +8258,7 @@
       "role": "level.temperature",
       "read": true,
       "write": true,
-      "unit": "°F",
+      "unit": "°C",
       "min": 40,
       "max": 100,
       "def": 40
@@ -6611,6 +8268,53 @@
       "capabilityInstance": "targetTemperature"
     },
     "_id": "govee-smart.0.devices.h7171_000a.control.target_temperature"
+  },
+  "govee-smart.0.devices.h7171_000a.control.work_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Betriebsmodus",
+        "en": "Work Mode",
+        "es": "Modo de trabajo",
+        "fr": "Mode de fonctionnement",
+        "it": "Modalità di lavoro",
+        "nl": "Werkmodus",
+        "pl": "Tryb pracy",
+        "pt": "Modo de trabalho",
+        "ru": "Режим работы",
+        "uk": "Режим роботи",
+        "zh-cn": "工作模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "1": "DIY",
+        "2": "Boiling",
+        "3": "Tea",
+        "4": "Coffee"
+      },
+      "def": "1",
+      "desc": {
+        "de": "Die Betriebsart, in der das Gerät läuft; welche Betriebsarten es gibt, hängt vom Modell ab.",
+        "en": "The operating mode the appliance is in; which modes exist depends on the model.",
+        "es": "El modo de funcionamiento del aparato; qué modos existen depende del modelo.",
+        "fr": "Le mode de fonctionnement de l'appareil ; les modes disponibles dépendent du modèle.",
+        "it": "La modalità operativa dell'apparecchio; quali modalità esistono dipende dal modello.",
+        "nl": "De bedrijfsmodus van het apparaat; welke modi er zijn hangt van het model af.",
+        "pl": "Tryb pracy urządzenia; dostępne tryby zależą od modelu.",
+        "pt": "O modo de funcionamento do aparelho; que modos existem depende do modelo.",
+        "ru": "Режим работы прибора; какие режимы есть, зависит от модели.",
+        "uk": "Режим роботи приладу; які режими є, залежить від моделі.",
+        "zh-cn": "设备当前的工作模式；可用模式取决于型号。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.work_mode",
+      "capabilityInstance": "workMode"
+    },
+    "_id": "govee-smart.0.devices.h7171_000a.control.work_mode"
   },
   "govee-smart.0.devices.h7171_000a.diag": {
     "type": "channel",

@@ -922,19 +922,16 @@ export class DiagnosticsCollector {
     }
 
     const report: Record<string, unknown> = {
-      // The file is read by a stranger with none of our context, so it says up
-      // front what it is and — crucially — that it has been pseudonymised.
-      // Without that line a reader takes `address-1` for a bug.
+      // The file is read by someone with none of our context. The privacy
+      // statement itself lives at the export button (gsw_diagPrivacy, 11
+      // languages), where it still decides whether to upload; repeating it
+      // inside the uploaded file changed nothing. What only the file can say
+      // is that its markers stop at its own edge.
       readMe: {
-        what: "Diagnostics export of one Govee device, for a GitHub issue.",
-        privacy:
-          "Pseudonymised: IP addresses, mail addresses and device names are replaced by stable " +
-          "markers (address-local-1, device-1, …), device ids are shortened to their last four " +
-          "characters — the same four the object tree uses as the folder name. The same real " +
-          "value always maps to the same marker INSIDE this file, so two lines about the same " +
-          "device stay recognisable. Markers are NOT comparable between two files: a second " +
-          "export, especially after an adapter restart, may number them differently.",
-        secrets: "Credentials, tokens and account topics are removed entirely, not marked.",
+        what: "Diagnostics export of one Govee device, for a GitHub issue. Pseudonymised; credentials removed.",
+        markers:
+          "Markers (device-1, address-local-1, …) and the shortened device ids are stable INSIDE this file only. " +
+          "Never compare them across two exports — a second export, especially after a restart, may number them differently.",
       },
       adapter: "iobroker.govee-smart",
       version: adapterVersion,

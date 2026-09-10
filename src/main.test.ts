@@ -1266,6 +1266,99 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(i.cloudInitDone).toBe(true);
   });
 
+  it("reads device states even when the cache alone was enough, but never for a light (issue #47)", async () => {
+    // An account with no light: loadFromCache() returns true and the whole
+    // cloud phase is skipped, so /device/state was never called and every
+    // `property` sensor stayed on its default forever.
+    //
+    // The light rides along in the same cache so `cachedOk` is decided by the
+    // purifier: `cache.ts` drops lanIp, so the light looks address-less here
+    // and the loader's own LAN guard cannot protect its values — the skip has
+    // to happen at the call site.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    const cached = (sku: string, id: string, type: string, caps: unknown[]): string =>
+      JSON.stringify({
+        sku,
+        deviceId: id,
+        name: sku,
+        type,
+        capabilities: caps,
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h7127_ee11.json"),
+      cached("H7127", "AA:BB:CC:DD:EE:11", "devices.types.air_purifier", [
+        { type: "devices.capabilities.property", instance: "filterLifeTime" },
+      ]),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    // Return a real reading — asserting only that the call fired would prove
+    // the plumbing, not the thing the user reported (filter life stuck at 0).
+    ctx.f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 73 } },
+    ]);
+    await i.onReady();
+    await settle();
+
+    expect(ctx.f.cloud.getDevices).not.toHaveBeenCalled();
+    expect(ctx.f.cloud.getDeviceState).toHaveBeenCalledWith("H7127", "AA:BB:CC:DD:EE:11");
+    expect(i.states.get("devices.h7127_ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
+    expect(i.cloudInitDone).toBe(true);
+  });
+
+  it("skips a LAN-discovered light on the cached path — LAN owns those values", async () => {
+    // The light cannot come from the cache: loadFromCache() returns false the
+    // moment one is present, and then this branch never runs. It arrives from
+    // the UDP scan, which runs in parallel and can add a light AFTER the cache
+    // decided. `cache.ts` drops lanIp, so the loader's own LAN guard
+    // (`device.lanIp && LAN_STATE_IDS…`) cannot protect power/brightness at
+    // that moment — the skip has to happen at the call site.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h7127_ee11.json"),
+      JSON.stringify({
+        sku: "H7127",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Purifier",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDeviceState.mockResolvedValue([]);
+    // The UDP scan answers the moment it is started — i.e. after the cache
+    // decided there is no light, and before the cached branch runs its loop.
+    ctx.f.lan.start.mockImplementation((onDevice: (d: unknown) => void) => {
+      onDevice({ ip: "192.168.1.50", device: "AA:BB:CC:DD:EE:22", sku: "H6076" });
+    });
+    await i.onReady();
+    await settle();
+
+    expect(ctx.f.cloud.getDeviceState).toHaveBeenCalledWith("H7127", "AA:BB:CC:DD:EE:11");
+    expect(ctx.f.cloud.getDeviceState).not.toHaveBeenCalledWith("H6076", "AA:BB:CC:DD:EE:22");
+  });
+
   it("a light with no local API is reachable when Govee's state read says so", async () => {
     // The reported regression (krobi + Joylancer, five models): such a light
     // showed as unreachable while it still controlled fine. The evidence was

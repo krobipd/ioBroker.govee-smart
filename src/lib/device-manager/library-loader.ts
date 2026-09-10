@@ -3,7 +3,14 @@ import type { GoveeCloudClient } from "../govee-cloud-client";
 import type { DiagnosticsCollector } from "../diagnostics";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { extractHttpStatus } from "../http-client";
-import { deviceLabel, errMessage, type CloudDevice, type CloudScene, type GoveeDevice } from "../types";
+import {
+  deviceLabel,
+  errMessage,
+  type CloudDevice,
+  type CloudScene,
+  type GoveeDevice,
+  type NamedCapabilityOption,
+} from "../types";
 
 /**
  * Host surface for the scene/library loaders — the Cloud/App-API data
@@ -153,7 +160,10 @@ export async function loadDeviceScenes(
     );
     if (snapCap?.parameters?.options) {
       device.snapshots = snapCap.parameters.options
-        .filter(o => o && typeof o.name === "string" && o.value !== undefined && o.value !== null)
+        .filter(
+          (o): o is NamedCapabilityOption =>
+            !!o && typeof o.name === "string" && o.value !== undefined && o.value !== null,
+        )
         .map(o => ({
           name: o.name,
           value: typeof o.value === "number" ? o.value : (o.value as Record<string, unknown>),

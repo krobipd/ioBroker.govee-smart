@@ -241,6 +241,38 @@ describe("GoveeCloudClient", () => {
       ).rejects.toThrow(/code=400.*capability not allowed/);
     });
 
+    it("carries Govee's own reason — the field is `msg`, not `message` (issue #47)", async () => {
+      // Captured verbatim from the H7127 export. Reading `resp.message` left the
+      // log line at a bare "code=400" and threw away the only actionable half.
+      const fake = makeFakeHttps(() => ({
+        requestId: "ctrl_1",
+        msg: "Invalid parameter type",
+        code: 400,
+        capability: {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { status: "failure", errorCode: 400, errorMsg: "Invalid parameter type" },
+          value: "3",
+        },
+      }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(
+        client.controlDevice("H7127", "AABB", "devices.capabilities.work_mode", "workMode", "3"),
+      ).rejects.toThrow(/code=400.*Invalid parameter type/);
+    });
+
+    it("rejects a per-capability failure even when the envelope says 200", async () => {
+      const fake = makeFakeHttps(() => ({
+        requestId: "ctrl_2",
+        code: 200,
+        capability: { state: { status: "failure", errorCode: 400, errorMsg: "Device offline" } },
+      }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(
+        client.controlDevice("H6160", "AABB", "devices.capabilities.on_off", "powerSwitch", 1),
+      ).rejects.toThrow(/Device offline/);
+    });
+
     it("accepts the two success codes Govee uses (200 and 0)", async () => {
       for (const code of [200, 0]) {
         const fake = makeFakeHttps(() => ({ code }));

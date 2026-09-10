@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Issue openen",
   "gsw_diagNoDevices": "Nog geen apparaten. Het rapport is per apparaat — zodra de adapter er een vindt, verschijnt het hier.",
   "gsw_diagExportFailed": "Het rapport kon niet worden gemaakt. Het adapterlogboek zegt waarom.",
-  "gsw_diagPrivacy": "Het rapport is gepseudonimiseerd: adressen, mailadressen en apparaatnamen worden vervangen door vaste markeringen, apparaat-ids worden ingekort en inloggegevens komen er niet in voor. Het bestand legt dit uit in zijn eigen kop.",
+  "gsw_diagPrivacy": "Het rapport is gepseudonimiseerd: adressen, mailadressen en apparaatnamen worden vervangen door vaste markeringen, apparaat-ids worden ingekort en inloggegevens komen er niet in voor.",
   "gsw_loadingDevices": "Apparaten laden …",
   "gsw_loadingDevicesSlow": "Nog bezig — hiervoor moet de adapterinstantie draaien.",
   "gsw_listFailed": "Kon de apparatenlijst niet laden. Draait de instantie?",

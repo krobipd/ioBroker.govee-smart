@@ -201,19 +201,36 @@ export class GoveeCloudClient {
         },
       },
     };
-    const resp = await this.request<{ code?: number; message?: string }>(
-      "POST",
-      "/router/api/v1/device/control",
-      reqBody,
-    );
+    const resp = await this.request<{
+      code?: number;
+      msg?: string;
+      message?: string;
+      capability?: { state?: { status?: string; errorCode?: number; errorMsg?: string } };
+    }>("POST", "/router/api/v1/device/control", reqBody);
     this.onResponse?.(device, "/router/api/v1/device/control", { request: reqBody.payload.capability, response: resp });
-    // Govee returns 200 with a payload-level `code`/`message` on logical
-    // failures (capability not allowed, device offline as seen by Cloud).
-    // Without this surface, the caller sees a "successful" command that the
-    // device never received.
+    // Govee returns 200 with a payload-level `code`/`msg` on logical failures
+    // (capability not allowed, wrong value shape, device offline as seen by
+    // Cloud). The field is `msg` — reading `message` dropped the only
+    // actionable half of the line ("Invalid parameter type", issue #47) — and
+    // the per-capability `state.status` can say failure while the envelope
+    // still says 200.
+    const capState = resp?.capability?.state;
+    // Govee names the reason `msg`, not `message` — reading the wrong field left
+    // the log line at a bare "code=400" and threw away the only actionable half
+    // (issue #47). `message` stays as a fallback for the older shape.
+    const reason = resp?.msg ?? resp?.message ?? capState?.errorMsg;
     if (resp && typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
       throw new Error(
-        `Cloud control rejected for ${sku}/${device}/${instance}: code=${resp.code}${resp.message ? ` — ${resp.message}` : ""}`,
+        `Cloud control rejected for ${sku}/${device}/${instance}: code=${resp.code}${reason ? ` — ${reason}` : ""}`,
+      );
+    }
+    // A rejection can arrive with a 200 envelope while the per-capability state
+    // carries the failure — without this the command was acked as done
+    // (issue #47). Either marker is enough: the captured payload sets both, and
+    // a lone errorCode must not slip through.
+    if (capState?.status === "failure" || typeof capState?.errorCode === "number") {
+      throw new Error(
+        `Cloud control rejected for ${sku}/${device}/${instance}: code=${capState.errorCode ?? "?"}${reason ? ` — ${reason}` : ""}`,
       );
     }
   }

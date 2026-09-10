@@ -3024,7 +3024,7 @@
     "H7127": {
       "name": "Air Purifier",
       "type": "air_purifier",
-      "status": "seed",
+      "status": "reported",
       "since": "2.33.0"
     },
     "H7128": {

@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Apri una issue",
   "gsw_diagNoDevices": "Ancora nessun dispositivo. Il rapporto è per dispositivo — appena l'adattatore ne trova uno, compare qui.",
   "gsw_diagExportFailed": "Non è stato possibile creare il rapporto. Il log dell'adattatore spiega perché.",
-  "gsw_diagPrivacy": "Il rapporto è pseudonimizzato: indirizzi, indirizzi mail e nomi dei dispositivi sono sostituiti da marcatori stabili, gli id sono accorciati e le credenziali non compaiono mai. Il file lo spiega nella propria intestazione.",
+  "gsw_diagPrivacy": "Il rapporto è pseudonimizzato: indirizzi, indirizzi mail e nomi dei dispositivi sono sostituiti da marcatori stabili, gli id sono accorciati e le credenziali non compaiono mai.",
   "gsw_loadingDevices": "Caricamento dispositivi …",
   "gsw_loadingDevicesSlow": "Ancora in caricamento: l'istanza dell'adattatore deve essere in esecuzione.",
   "gsw_listFailed": "Impossibile caricare l'elenco dei dispositivi. L'istanza è in esecuzione?",

@@ -11,6 +11,9 @@ vi.mock("@iobroker/adapter-core", () => ({
 import {
   applyQuirksToStates as applyQuirksToStatesRaw,
   canonicalSyntheticId,
+  classifyModeLevels,
+  mapCloudStateValues,
+  resolveWorkModeStruct,
   buildCloudStateDefs as buildCloudStateDefsRaw,
   buildLanStateDefs as buildLanStateDefsRaw,
   getDefaultLanStates,
@@ -23,7 +26,7 @@ import {
 } from "./capability-mapper";
 import { DeviceRegistry } from "./device-registry";
 import { createTestDevice, mockLog } from "./test-helpers";
-import type { CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
+import type { CapabilityOption, CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
@@ -36,6 +39,280 @@ let registry: DeviceRegistry = emptyRegistry();
 // capability-mapper functions so per-cap skip-decisions land in the
 // debug log.
 const mapCapabilities = (caps: CloudCapability[]): StateDefinition[] => mapCapabilitiesRaw(caps, mockLog);
+
+/**
+ * A work_mode capability with the given mode list and modeValue option list.
+ *
+ * @param modes  workMode field options
+ * @param levels modeValue field options
+ */
+function workModeCapFixture(modes: CapabilityOption[], levels: CapabilityOption[]): CloudCapability {
+  return {
+    type: "devices.capabilities.work_mode",
+    instance: "workMode",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        { fieldName: "workMode", dataType: "ENUM", options: modes, required: true },
+        { fieldName: "modeValue", dataType: "ENUM", options: levels, required: true },
+      ],
+    },
+  };
+}
+
+// H7127, issue #47 — one named group plus two defaultValue-only modes.
+const h7127Cap = workModeCapFixture(
+  [
+    { name: "gearMode", value: 1 },
+    { name: "Custom", value: 2 },
+    { name: "Auto", value: 3 },
+  ],
+  [
+    {
+      name: "gearMode",
+      options: [
+        { name: "Sleep", value: 1 },
+        { name: "Low", value: 2 },
+        { name: "High", value: 3 },
+      ],
+    },
+    { name: "Custom", defaultValue: 0 },
+    { name: "Auto", defaultValue: 0 },
+  ],
+);
+// Kettle, issue47-fixtures/work-mode-issue-100.json — three groups, same keys.
+const kettleLevels = [1, 2, 3, 4].map(v => ({ value: v }));
+const kettleCap = workModeCapFixture(
+  [
+    { name: "DIY", value: 1 },
+    { name: "Boiling", value: 2 },
+    { name: "Tea", value: 3 },
+    { name: "Coffee", value: 4 },
+  ],
+  [
+    { name: "Boiling", value: null, defaultValue: 0 },
+    { name: "Tea", value: null, options: kettleLevels },
+    { name: "Coffee", value: null, options: kettleLevels },
+    { name: "DIY", value: null, options: kettleLevels },
+  ],
+);
+// H7143, issue47-fixtures/work-mode-issue-81.json — Auto is a 40..80 target.
+const humidifierCap = workModeCapFixture(
+  [
+    { name: "Manual", value: 1 },
+    { name: "Custom", value: 2 },
+    { name: "Auto", value: 3 },
+  ],
+  [
+    { name: "Manual", value: null, options: [1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => ({ value: v })) },
+    { name: "Custom", value: null, defaultValue: 0 },
+    { name: "Auto", range: { min: 40, max: 80 } },
+  ],
+);
+// H7121 — no mode has levels.
+const h7121Cap = workModeCapFixture(
+  [
+    { name: "High", value: 3 },
+    { name: "Sleep", value: 16 },
+  ],
+  [
+    { name: "High", defaultValue: 0 },
+    { name: "Sleep", defaultValue: 0 },
+  ],
+);
+
+describe("classifyModeLevels + mapWorkMode against the real option shapes", () => {
+  it("H7127 (issue #47): one named group becomes a real dropdown", () => {
+    const modeValue = mapCapabilities([h7127Cap]).find(s => s.id === "mode_value");
+    expect(modeValue!.states).toEqual({ 1: "Sleep", 2: "Low", 3: "High" });
+    expect(modeValue!.def).toBe("1");
+    expect(modeValue!.type).toBe("mixed");
+  });
+
+  it("H7121 purifier: every mode carries only a defaultValue — no level datapoint at all", () => {
+    expect(mapCapabilities([h7121Cap]).find(s => s.id === "mode_value")).toBeUndefined();
+  });
+
+  it("H7143 humidifier: unnamed levels plus a per-mode range become one number spanning both", () => {
+    const modeValue = mapCapabilities([humidifierCap]).find(s => s.id === "mode_value");
+    expect(modeValue!.type).toBe("number");
+    expect(modeValue!.states).toBeUndefined();
+    expect(modeValue!.min).toBe(1);
+    expect(modeValue!.max).toBe(80);
+  });
+
+  it("kettle: three groups claiming the same keys must not collapse into one mode's list", () => {
+    const modeValue = mapCapabilities([kettleCap]).find(s => s.id === "mode_value");
+    expect(modeValue!.type).toBe("number");
+    expect(modeValue!.min).toBe(1);
+    expect(modeValue!.max).toBe(4);
+  });
+
+  it("an empty option list produces no datapoint", () => {
+    expect(classifyModeLevels([]).kind).toBe("none");
+  });
+});
+
+describe("resolveWorkModeStruct", () => {
+  it("dropdown case: a level write picks the mode that owns the level", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "3", "2", "modeValue")).toEqual({ workMode: 1, modeValue: 2 });
+  });
+
+  it("dropdown case: a mode without levels sends its defaultValue", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "3", "2", "workMode")).toEqual({ workMode: 3, modeValue: 0 });
+  });
+
+  it("dropdown case: a mode WITH levels keeps the current level when it belongs to that mode", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "1", "3", "workMode")).toEqual({ workMode: 1, modeValue: 3 });
+  });
+
+  it("dropdown case: an alien level falls back to that mode's first one", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "1", "99", "workMode")).toEqual({ workMode: 1, modeValue: 1 });
+  });
+
+  it("dropdown case: accepts the label instead of the key (Pattern 45 dual input)", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "gearMode", "High", "modeValue")).toEqual({ workMode: 1, modeValue: 3 });
+  });
+
+  it("collision case: the mode comes from work_mode, never from the level", () => {
+    expect(resolveWorkModeStruct(kettleCap, "4", "3", "modeValue")).toEqual({ workMode: 4, modeValue: 3 });
+    expect(resolveWorkModeStruct(kettleCap, "3", "3", "modeValue")).toEqual({ workMode: 3, modeValue: 3 });
+  });
+
+  it("collision case: a mode without levels still sends its defaultValue", () => {
+    expect(resolveWorkModeStruct(kettleCap, "2", "3", "workMode")).toEqual({ workMode: 2, modeValue: 0 });
+  });
+
+  it("range case: the level is clamped into the selected mode's own range", () => {
+    expect(resolveWorkModeStruct(humidifierCap, "3", 55, "modeValue")).toEqual({ workMode: 3, modeValue: 55 });
+    expect(resolveWorkModeStruct(humidifierCap, "3", 100, "modeValue")).toEqual({ workMode: 3, modeValue: 80 });
+    expect(resolveWorkModeStruct(humidifierCap, "3", 5, "modeValue")).toEqual({ workMode: 3, modeValue: 40 });
+  });
+
+  it("range case: the same value in the unnamed-list mode uses that list instead", () => {
+    expect(resolveWorkModeStruct(humidifierCap, "1", 5, "modeValue")).toEqual({ workMode: 1, modeValue: 5 });
+  });
+
+  it("no-levels device: every mode sends 0", () => {
+    expect(resolveWorkModeStruct(h7121Cap, "16", null, "workMode")).toEqual({ workMode: 16, modeValue: 0 });
+  });
+
+  it("returns null when the mode cannot be resolved", () => {
+    expect(resolveWorkModeStruct(h7127Cap, "nonsense", "", "workMode")).toBeNull();
+  });
+
+  it("handles a flat modeValue list (heater/humidifier shape) without a group", () => {
+    const flat = workModeCapFixture(
+      [{ name: "Heat", value: 1 }],
+      [
+        { name: "Low", value: 1 },
+        { name: "High", value: 2 },
+      ],
+    );
+    expect(resolveWorkModeStruct(flat, "1", "2", "modeValue")).toEqual({ workMode: 1, modeValue: 2 });
+  });
+});
+
+describe("mapCloudStateValues", () => {
+  it("keeps the level Govee sent alongside the mode (issue47-fixtures/get_device_state.json)", () => {
+    expect(
+      mapCloudStateValues(
+        {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { value: { workMode: 3, modeValue: 9 } },
+        },
+        [humidifierCap],
+      ),
+    ).toEqual([
+      { stateId: "work_mode", value: "3" },
+      { stateId: "mode_value", value: 9 },
+    ]);
+  });
+
+  it("returns the mode alone when Govee sends no level", () => {
+    expect(
+      mapCloudStateValues(
+        { type: "devices.capabilities.work_mode", instance: "workMode", state: { value: { workMode: 2 } } },
+        [h7127Cap],
+      ),
+    ).toEqual([{ stateId: "work_mode", value: "2" }]);
+  });
+
+  it("emits the level as a dropdown key when no declared capability is available", () => {
+    expect(
+      mapCloudStateValues({
+        type: "devices.capabilities.work_mode",
+        instance: "workMode",
+        state: { value: { workMode: 1, modeValue: 2 } },
+      }),
+    ).toEqual([
+      { stateId: "work_mode", value: "1" },
+      { stateId: "mode_value", value: "2" },
+    ]);
+  });
+
+  it("passes a non-work_mode capability straight through as one result", () => {
+    expect(
+      mapCloudStateValues({
+        type: "devices.capabilities.on_off",
+        instance: "powerSwitch",
+        state: { value: 1 },
+      }),
+    ).toEqual([{ stateId: "power", value: true }]);
+  });
+});
+
+describe("temperature_setting unit", () => {
+  it("labels the datapoint with the unit the device declares in its struct (H7131)", () => {
+    const caps: CloudCapability[] = [
+      {
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        parameters: {
+          dataType: "STRUCT",
+          fields: [
+            { fieldName: "autoStop", defaultValue: 0, dataType: "ENUM", options: [{ name: "Maintain", value: 0 }] },
+            {
+              fieldName: "temperature",
+              dataType: "INTEGER",
+              range: { min: 5, max: 30, precision: 1 },
+              required: true,
+            },
+            {
+              fieldName: "unit",
+              defaultValue: "Celsius",
+              dataType: "ENUM",
+              options: [
+                { name: "Celsius", value: "Celsius" },
+                { name: "Fahrenheit", value: "Fahrenheit" },
+              ],
+              required: true,
+            },
+          ],
+        },
+      },
+    ];
+    const target = mapCapabilities(caps).find(s => s.id === "target_temperature");
+    expect(target!.unit).toBe("°C");
+    expect(target!.min).toBe(5);
+    expect(target!.max).toBe(30);
+  });
+
+  it("still falls back to °F when the device declares no unit at all", () => {
+    const caps: CloudCapability[] = [
+      {
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        parameters: {
+          dataType: "STRUCT",
+          fields: [{ fieldName: "temperature", dataType: "INTEGER", range: { min: 60, max: 90, precision: 1 } }],
+        },
+      },
+    ];
+    expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBe("°F");
+  });
+});
 const applyQuirksToStates = (sku: string, states: StateDefinition[]): StateDefinition[] =>
   applyQuirksToStatesRaw(sku, states, mockLog, registry);
 const buildLanStateDefs = (device: GoveeDevice): StateDefinition[] => buildLanStateDefsRaw(device, mockLog, registry);
@@ -183,8 +460,10 @@ describe("CapabilityMapper", () => {
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("scene");
-      // "" sentinel: matches def "" so the stale-dropdown reset pass converges (LOW)
-      expect(result[0].states).toEqual({ "": "---", 1: "Sunset", 2: "Rainbow", 3: "Movie" });
+      // "0" sentinel — the key resetModeDropdowns writes, and a `def` the
+      // repochecker accepts for a `mixed` datapoint (E1006 wants valid JSON).
+      expect(result[0].states).toEqual({ 0: "---", 1: "Sunset", 2: "Rainbow", 3: "Movie" });
+      expect(result[0].def).toBe("0");
       expect(result[0].write).toBe(true);
     });
 
@@ -682,16 +961,47 @@ describe("CapabilityMapper", () => {
       expect(result[0].channel).toBe("sensor");
     });
 
-    it("should skip mode with non-presetScene instance", () => {
+    it("gives every mode instance its own datapoint, not only presetScene", () => {
+      // `api-referenz.md:135-136` documents presetScene AND nightlightScene.
+      // The captures carry nightlightScene twice — declared with its option
+      // list on the H7131 heater (list-devices-issue4-H7131-H7121.json) and
+      // answered with a value by /device/state. The old instance check dropped
+      // it silently: no datapoint, no value, no warning.
       const caps: CloudCapability[] = [
         {
           type: "devices.capabilities.mode",
-          instance: "someOtherMode",
-          parameters: { dataType: "ENUM", options: [{ name: "A", value: 1 }] },
+          instance: "nightlightScene",
+          parameters: {
+            dataType: "ENUM",
+            options: [
+              { name: "Flame", value: 1 },
+              { name: "Rainbow", value: 2 },
+            ],
+          },
         },
       ];
       const result = mapCapabilities(caps);
-      expect(result).toHaveLength(0);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("nightlight_scene");
+      expect(result[0].states).toEqual({ 0: "---", 1: "Flame", 2: "Rainbow" });
+    });
+
+    it("keeps presetScene on the id it has always had — a rename orphans it", () => {
+      const caps: CloudCapability[] = [
+        {
+          type: "devices.capabilities.mode",
+          instance: "presetScene",
+          parameters: { dataType: "ENUM", options: [{ name: "A", value: 1 }] },
+        },
+      ];
+      expect(mapCapabilities(caps)[0].id).toBe("scene");
+    });
+
+    it("still skips a mode capability that declares no options", () => {
+      const caps: CloudCapability[] = [
+        { type: "devices.capabilities.mode", instance: "someOtherMode", parameters: { dataType: "ENUM" } },
+      ];
+      expect(mapCapabilities(caps)).toHaveLength(0);
     });
 
     it("should return empty for unknown color_setting instance", () => {
@@ -799,21 +1109,23 @@ describe("CapabilityMapper", () => {
       expect(diy?.stateId).toBe("diy_scene");
     });
 
-    it("decodes a work_mode cloud state — STRUCT and direct number (L28)", () => {
+    it("decodes a work_mode cloud state as the datapoint's own key type (L28)", () => {
+      // A dropdown's keys are strings; a numeric 3 does not resolve against
+      // common.states in Admin.
       expect(
         mapCloudStateValue({
           type: "devices.capabilities.work_mode",
           instance: "workMode",
           state: { value: { workMode: 3 } },
         }),
-      ).toEqual({ stateId: "work_mode", value: 3 });
+      ).toEqual({ stateId: "work_mode", value: "3" });
       expect(
         mapCloudStateValue({
           type: "devices.capabilities.work_mode",
           instance: "workMode",
           state: { value: 2 },
         }),
-      ).toEqual({ stateId: "work_mode", value: 2 });
+      ).toEqual({ stateId: "work_mode", value: "2" });
     });
 
     it("decodes a temperature_setting cloud state — STRUCT and direct number (L28)", () => {
@@ -970,14 +1282,23 @@ describe("CapabilityMapper", () => {
       expect(result).toBeNull();
     });
 
-    it("should return null for non-presetScene mode", () => {
-      const cap: CloudStateCapability = {
-        type: "devices.capabilities.mode",
-        instance: "someOtherMode",
-        state: { value: 1 },
-      };
-      const result = mapCloudStateValue(cap);
-      expect(result).toBeNull();
+    it("decodes every mode instance, not only presetScene", () => {
+      // get_device_state.json carries `nightlightScene` with value 5. Returning
+      // null here threw that away even once the datapoint existed.
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.mode",
+          instance: "nightlightScene",
+          state: { value: 5 },
+        }),
+      ).toEqual({ stateId: "nightlight_scene", value: "5" });
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.mode",
+          instance: "presetScene",
+          state: { value: 1 },
+        }),
+      ).toEqual({ stateId: "scene", value: "1" });
     });
 
     it("should return null for unknown color_setting instance", () => {

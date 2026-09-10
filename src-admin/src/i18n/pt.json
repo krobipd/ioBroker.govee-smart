@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Abrir um issue",
   "gsw_diagNoDevices": "Ainda sem dispositivos. O relatório é por dispositivo — assim que o adaptador encontrar um, aparece aqui.",
   "gsw_diagExportFailed": "Não foi possível criar o relatório. O log do adaptador diz porquê.",
-  "gsw_diagPrivacy": "O relatório é pseudonimizado: endereços, endereços de e-mail e nomes de dispositivos são substituídos por marcadores estáveis, os identificadores são encurtados e as credenciais nunca aparecem. O ficheiro explica isso no seu cabeçalho.",
+  "gsw_diagPrivacy": "O relatório é pseudonimizado: endereços, endereços de e-mail e nomes de dispositivos são substituídos por marcadores estáveis, os identificadores são encurtados e as credenciais nunca aparecem.",
   "gsw_loadingDevices": "A carregar dispositivos …",
   "gsw_loadingDevicesSlow": "Ainda a carregar — a instância do adaptador tem de estar em execução.",
   "gsw_listFailed": "Não foi possível carregar a lista de dispositivos. A instância está a correr?",

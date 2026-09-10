@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.33.0",
+    "version": "2.34.0",
     "news": {
+      "2.34.0": {
+        "en": "Air purifiers, heaters, humidifiers and fans accept a mode or speed again and show their real levels, a heater's temperature is sent correctly, and an account with no light reads its device states.",
+        "de": "Luftreiniger, Heizungen, Befeuchter und Ventilatoren nehmen Modus und Stufe wieder an und zeigen echte Stufen, die Heizungstemperatur geht korrekt raus, ein Konto ohne Lampe liest seine Zustände.",
+        "ru": "Очистители, обогреватели, увлажнители и вентиляторы снова принимают режим и скорость и показывают реальные ступени, температура обогревателя уходит верно, аккаунт без ламп читает состояния устройств.",
+        "pt": "Purificadores, aquecedores, humidificadores e ventoinhas voltam a aceitar modo e velocidade e mostram os níveis reais, a temperatura é enviada corretamente e contas sem luzes leem os estados.",
+        "nl": "Luchtreinigers, kachels, luchtbevochtigers en ventilatoren accepteren modus en stand weer en tonen echte standen, de temperatuur gaat correct uit, een account zonder lamp leest zijn statussen.",
+        "fr": "Purificateurs, chauffages, humidificateurs et ventilateurs acceptent de nouveau mode et vitesse et affichent leurs vrais niveaux, la température part correctement, un compte sans lampe lit ses états.",
+        "it": "Purificatori, stufe, umidificatori e ventilatori accettano di nuovo modalità e velocità e mostrano i livelli reali, la temperatura parte corretta e un account senza luci legge i suoi stati.",
+        "es": "Purificadores, calefactores, humidificadores y ventiladores vuelven a aceptar modo y velocidad y muestran niveles reales, la temperatura sale correcta y una cuenta sin luces lee sus estados.",
+        "pl": "Oczyszczacze, grzejniki, nawilżacze i wentylatory znów przyjmują tryb i bieg oraz pokazują prawdziwe stopnie, temperatura grzejnika wychodzi poprawnie, a konto bez lamp odczytuje swoje stany.",
+        "uk": "Очищувачі, обігрівачі, зволожувачі та вентилятори знову приймають режим і швидкість та показують справжні ступені, температура обігрівача йде правильно, обліковий запис без ламп читає свої стани.",
+        "zh-cn": "空气净化器、取暖器、加湿器和风扇重新接受模式与档位设置，并显示设备真实的档位列表；取暖器目标温度以正确格式和单位发送；账户中没有灯具时也会读取设备状态。"
+      },
       "2.33.0": {
         "en": "Lights without a local API stay reachable while they report their own state (H600D). 486 more Govee models start as experimental, and the wiki device list folds per device type.",
         "de": "Lampen ohne lokale Schnittstelle bleiben erreichbar, solange sie ihren Zustand selbst melden (H600D). 486 weitere Govee-Modelle starten experimentell, die Wiki-Geräteliste klappt je Typ.",
@@ -80,19 +93,6 @@
         "pl": "Urządzenia bez lokalnego interfejsu i czujniki za bramką nie są już pokazywane jako niedostępne, gdy działają. Rozpoznano 37 kolejnych modeli.",
         "uk": "Пристрої без локального інтерфейсу та датчики за шлюзом більше не показуються як недоступні, поки працюють. Розпізнано ще 37 моделей.",
         "zh-cn": "没有本地接口的设备和网关后面的传感器在正常工作时不再显示为不可达。新增识别 37 个设备型号。"
-      },
-      "2.29.4": {
-        "en": "The diagnostics report now shows how each control is driven, where a device's reachability comes from and whether the account login worked.",
-        "de": "Der Diagnosebericht zeigt jetzt, wie jede Steuerung angesprochen wird, woher die Erreichbarkeit stammt und ob die Konto-Anmeldung geklappt hat.",
-        "ru": "Отчёт диагностики теперь показывает, как управляется каждая функция, откуда берётся доступность и удался ли вход в аккаунт.",
-        "pt": "O relatório de diagnóstico mostra agora como cada controlo é acionado, de onde vem a acessibilidade e se o início de sessão funcionou.",
-        "nl": "Het diagnoserapport toont nu hoe elke bediening verloopt, waar de bereikbaarheid vandaan komt en of het accountaanmelden lukte.",
-        "fr": "Le rapport de diagnostic montre désormais comment chaque commande est acheminée, d'où vient l'accessibilité et si la connexion a réussi.",
-        "it": "Il rapporto diagnostico mostra ora come viene comandata ogni funzione, da dove proviene la raggiungibilità e se l'accesso è riuscito.",
-        "es": "El informe de diagnóstico muestra ahora cómo se controla cada función, de dónde procede la accesibilidad y si el inicio de sesión funcionó.",
-        "pl": "Raport diagnostyczny pokazuje teraz, jak sterowana jest każda funkcja, skąd pochodzi osiągalność i czy logowanie do konta się powiodło.",
-        "uk": "Звіт діагностики тепер показує, як керується кожна функція, звідки береться доступність і чи вдався вхід в обліковий запис.",
-        "zh-cn": "诊断报告现在会显示每项控制通过哪条通道下达、设备可达性的来源，以及账户登录是否成功。"
       }
     },
     "plugins": {

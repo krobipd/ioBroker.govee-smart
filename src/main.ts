@@ -34,6 +34,7 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
+import { GOVEE_DEVICE_TYPE } from "./lib/govee-constants";
 import { deviceLabel, errMessage, logRejected, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
 import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
@@ -1102,6 +1103,31 @@ export class GoveeAdapter extends utils.Adapter {
         const pending = this.stateCreationQueue;
         this.stateCreationQueue = [];
         await Promise.all(pending);
+      }
+
+      // The cache covers the device LIST, never the device STATE. Without this
+      // an account with no light — `loadFromCache()` returns true exactly then
+      // — never read `/device/state` at all, and every `property` sensor stayed
+      // on its default for the adapter's whole life (issue #47).
+      //
+      // It has to run AFTER the drain above: the state objects are created by
+      // the phase callbacks and only awaited here, so a load placed in the
+      // cached branch itself writes into a tree that does not exist yet and the
+      // value is lost behind the default that lands afterwards (measured).
+      //
+      // Lights are skipped, and that skip has to be here rather than inside the
+      // loader: `cache.ts` deliberately discards `lanIp`, so a light the UDP
+      // scan just found still looks address-less and the loader's own LAN guard
+      // (`device.lanIp && LAN_STATE_IDS…`) does not engage. Cloud values would
+      // then overwrite power/brightness/color_rgb/color_temperature, which this
+      // adapter must never do.
+      if (config.apiKey && cachedOk && this.deviceManager) {
+        for (const d of this.deviceManager.getDevices()) {
+          if (d.type === GOVEE_DEVICE_TYPE.LIGHT) {
+            continue;
+          }
+          await cloudStateLoader.loadCloudStates(this.handlerHost, d);
+        }
       }
 
       // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went

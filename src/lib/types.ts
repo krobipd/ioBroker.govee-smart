@@ -54,11 +54,20 @@ export interface CapabilityParameters {
 
 /** ENUM option */
 export interface CapabilityOption {
-  /** Display name of the option */
-  name: string;
-  /** Option value (number, string, or complex object) */
-  value: number | string | Record<string, unknown>;
+  /** Display name of the option. Absent on an unnamed level (see `options`). */
+  name?: string;
+  /** Option value. Optional and sometimes explicitly `null` (grouping entry). */
+  value?: number | string | Record<string, unknown> | null;
+  /** Nested per-mode sub-list. Its entries often have a value and NO name. */
+  options?: CapabilityOption[];
+  /** A mode whose level is a range instead of a list (H7143 Auto: 40-80). */
+  range?: { min: number; max: number; precision?: number };
+  /** Fixed value for a mode that has no levels at all (Govee sends 0). */
+  defaultValue?: number;
 }
+
+/** An ENUM option that carries a usable display name. */
+export type NamedCapabilityOption = CapabilityOption & { name: string };
 
 /** STRUCT field definition */
 export interface CapabilityField {
@@ -72,6 +81,8 @@ export interface CapabilityField {
   range?: { min: number; max: number; precision: number };
   /** Element range for Array fields (0-based, segment count = max + 1) */
   elementRange?: { min: number; max: number };
+  /** Default the device declares for this field (`"Celsius"`, `0`, `null`). */
+  defaultValue?: unknown;
   /** Whether this field is required */
   required?: boolean;
 }

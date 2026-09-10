@@ -97,15 +97,21 @@ describe("handleDiagnosticsExport", () => {
     expect([...files.keys()][0]).toContain("H6160_0011");
   });
 
-  it("the report itself says it is pseudonymised", async () => {
-    // Without that line a reader takes `address-1` for a bug.
+  it("the report warns that its markers do not travel between files", async () => {
+    // The privacy statement itself lives at the export button (gsw_diagPrivacy,
+    // 11 languages) where it decides whether to upload at all. What only the
+    // file can say is that `device-1` in a second export is a different device.
     const { adapter, files } = makeAdapter();
     const dm = {
-      generateDiagnostics: () => Promise.resolve({ readMe: { privacy: "Pseudonymised: …" }, sku: "H6160" }),
+      generateDiagnostics: () =>
+        Promise.resolve({
+          readMe: { markers: "Markers (device-1, …) are stable INSIDE this file only" },
+          sku: "H6160",
+        }),
     } as unknown as DeviceManager;
     await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
     const stored = [...files.values()][0];
-    expect(JSON.parse(stored).readMe.privacy).toContain("Pseudonymised");
+    expect(JSON.parse(stored).readMe.markers).toContain("INSIDE this file only");
   });
 
   it("keeps only the newest reports per device", async () => {

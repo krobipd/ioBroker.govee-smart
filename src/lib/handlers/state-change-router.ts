@@ -1,4 +1,4 @@
-import { getMusicModeOptions, musicModeNameUsesRgb } from "../capability-mapper";
+import { getMusicModeOptions, musicModeNameUsesRgb, resolveWorkModeStruct } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { SEGMENT_HARD_MAX } from "../device-manager/lookups";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -80,7 +80,19 @@ export async function resolveDropdownInput(
   if (typeof raw !== "number" && typeof raw !== "string") {
     return { val: raw, ok: true };
   }
-  const obj = (await adapter.getObjectAsync(id)) as { common?: { states?: unknown } } | null | undefined;
+  const obj = (await adapter.getObjectAsync(id)) as { common?: { states?: unknown; type?: string } } | null | undefined;
+  // A numeric datapoint is never a dropdown. An install upgrading from a
+  // version where this state WAS one still carries the old `common.states`:
+  // `extendObject` deep-merges, and that merge is deliberate elsewhere — a
+  // light that has no scenes right now may get some later, and its dropdown
+  // has to survive a build that carried none. Resolving a number against that
+  // dead map makes every write miss and return ok:false, so the command is
+  // dropped before the handler ever sees it (issue #47, the fan/kettle/
+  // humidifier upgrade path). No state definition in this adapter combines
+  // `type: "number"` with `states`, so this gate is inert everywhere else.
+  if (obj?.common?.type === "number") {
+    return { val: raw, ok: true };
+  }
   const states = obj?.common?.states;
   if (!states || typeof states !== "object") {
     return { val: raw, ok: true };
@@ -93,10 +105,93 @@ export async function resolveDropdownInput(
 }
 
 /**
- * Build and send a music_setting STRUCT command. Reads sibling music state
- * values and combines them into one API call.
+ * Build and send a work_mode STRUCT command. Reads the sibling dropdown and
+ * combines both into one API call, the same way {@link sendMusicCommand} does
+ * for music_setting — Govee requires both struct fields and rejects a bare
+ * value with `code:400, msg:"Invalid parameter type"` (issue #47).
  *
+ * @param adapter       Adapter surface
+ * @param device        Target device
+ * @param prefix        The device's state-tree prefix
+ * @param changedSuffix Which datapoint the user wrote
+ * @param newValue      The written value
+ * @returns true when a command was dispatched (the caller acks the state)
  */
+export async function sendWorkModeCommand(
+  adapter: StateChangeRouterAdapter,
+  device: GoveeDevice,
+  prefix: string,
+  changedSuffix: string,
+  newValue: ioBroker.StateValue,
+): Promise<boolean> {
+  const cap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.WORK_MODE && c.instance === "workMode");
+  if (!cap) {
+    adapter.log.warn(`${deviceLabel(device)}: no work mode capability — ignoring the write`);
+    return false;
+  }
+  const base = `${adapter.namespace}.${prefix}.control`;
+  const changed = changedSuffix === "control.mode_value" ? "modeValue" : "workMode";
+  const modeState = await adapter.getStateAsync(`${base}.work_mode`);
+  const levelState = await adapter.getStateAsync(`${base}.mode_value`);
+
+  const workModeKey = changed === "workMode" ? newValue : (modeState?.val ?? null);
+  const modeValueKey = changed === "modeValue" ? newValue : (levelState?.val ?? null);
+
+  const struct = resolveWorkModeStruct(cap, workModeKey, modeValueKey, changed);
+  if (!struct) {
+    adapter.log.warn(
+      `${deviceLabel(device)}: could not resolve a work mode from ` +
+        `${JSON.stringify(workModeKey)}/${JSON.stringify(modeValueKey)} — ignoring the write`,
+    );
+    return false;
+  }
+  await adapter.deviceManager!.sendCapabilityCommand(device, GOVEE_CAP_TYPE.WORK_MODE, "workMode", struct);
+  return true;
+}
+
+/**
+ * Build and send a temperature_setting STRUCT command.
+ *
+ * The struct is `{temperature, unit}` (`api-referenz.md:158`). `unit` is
+ * `required: true` and comes from the capability's own `unit` FIELD — the
+ * display string on the datapoint is an ioBroker label, not an API token.
+ *
+ * @param adapter  Adapter surface
+ * @param device   Target device
+ * @param newValue The written temperature
+ * @returns true when a command was dispatched (the caller acks the state)
+ */
+export async function sendTargetTemperatureCommand(
+  adapter: StateChangeRouterAdapter,
+  device: GoveeDevice,
+  newValue: ioBroker.StateValue,
+): Promise<boolean> {
+  const cap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.TEMPERATURE_SETTING);
+  if (!cap) {
+    adapter.log.warn(`${deviceLabel(device)}: no temperature capability — ignoring the write`);
+    return false;
+  }
+  const written = typeof newValue === "number" ? newValue : Number(newValue);
+  if (!Number.isFinite(written)) {
+    adapter.log.warn(`${deviceLabel(device)}: ${JSON.stringify(newValue)} is not a temperature — ignoring the write`);
+    return false;
+  }
+  const fields = cap.parameters?.fields ?? [];
+  const range = fields.find(f => f && f.fieldName === "temperature")?.range;
+  const temperature =
+    range && typeof range.min === "number" && typeof range.max === "number"
+      ? Math.min(Math.max(written, range.min), range.max)
+      : written;
+
+  const struct: Record<string, unknown> = { temperature };
+  const unitField = fields.find(f => f && f.fieldName === "unit");
+  if (typeof unitField?.defaultValue === "string" && unitField.defaultValue) {
+    struct.unit = unitField.defaultValue;
+  }
+  await adapter.deviceManager!.sendCapabilityCommand(device, cap.type, cap.instance, struct);
+  return true;
+}
+
 export async function sendMusicCommand(
   adapter: StateChangeRouterAdapter,
   device: GoveeDevice,
@@ -443,6 +538,20 @@ export async function onStateChange(
   }
 
   try {
+    if (command === "workMode") {
+      if (await sendWorkModeCommand(adapter, device, prefix, stateSuffix, val)) {
+        await adapter.setState(id, { val, ack: true });
+      }
+      return;
+    }
+
+    if (command === "targetTemperature") {
+      if (await sendTargetTemperatureCommand(adapter, device, val)) {
+        await adapter.setState(id, { val, ack: true });
+      }
+      return;
+    }
+
     if (command === "music") {
       if (stateSuffix === "music.music_mode" && (val === "0" || val === 0)) {
         await adapter.setState(id, { val, ack: true });

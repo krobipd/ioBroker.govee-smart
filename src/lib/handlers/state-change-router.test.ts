@@ -16,6 +16,8 @@ import {
   onStateChange,
   resolveDropdownInput,
   sendMusicCommand,
+  sendTargetTemperatureCommand,
+  sendWorkModeCommand,
   type StateChangeRouterAdapter,
 } from "./state-change-router";
 import type { GoveeDevice } from "../types";
@@ -208,6 +210,188 @@ function musicDeviceNamed(modes: { name: string; value: number }[], overrides: P
   return { ...base, capabilities: [...base.capabilities, cap] };
 }
 
+// Captured from the H7127 export (issue #47). Govee groups the modeValue
+// options BY MODE: gearMode carries the three levels, Custom and Auto carry
+// none and declare a defaultValue instead.
+function workModeCap(): GoveeDevice["capabilities"][number] {
+  return {
+    type: GOVEE_CAP_TYPE.WORK_MODE,
+    instance: "workMode",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        {
+          fieldName: "workMode",
+          dataType: "ENUM",
+          options: [
+            { name: "gearMode", value: 1 },
+            { name: "Custom", value: 2 },
+            { name: "Auto", value: 3 },
+          ],
+        },
+        {
+          fieldName: "modeValue",
+          dataType: "ENUM",
+          options: [
+            {
+              name: "gearMode",
+              options: [
+                { name: "Sleep", value: 1 },
+                { name: "Low", value: 2 },
+                { name: "High", value: 3 },
+              ],
+            },
+            { name: "Custom", defaultValue: 0 },
+            { name: "Auto", defaultValue: 0 },
+          ],
+        },
+      ],
+    },
+  };
+}
+
+/**
+ * An appliance, not a light: no LAN, cloud + mqtt only.
+ */
+function workModeDevice(): GoveeDevice {
+  const base = createTestDevice({
+    type: "devices.types.air_purifier",
+    lanIp: undefined,
+    lastLanReplyAt: undefined,
+    channels: { lan: false, mqtt: true, cloud: true },
+  });
+  return { ...base, capabilities: [workModeCap()] };
+}
+
+/**
+ * issue47-fixtures/list-devices-issue4-H7131-H7121.json (H7131 space heater).
+ *
+ * @param unitDefault The `unit` field's declared default, or none at all
+ */
+function heaterDevice(unitDefault?: string): GoveeDevice {
+  const base = createTestDevice({
+    type: "devices.types.heater",
+    lanIp: undefined,
+    lastLanReplyAt: undefined,
+    channels: { lan: false, mqtt: false, cloud: true },
+  });
+  const fields: unknown[] = [
+    { fieldName: "temperature", dataType: "INTEGER", range: { min: 5, max: 30, precision: 1 }, required: true },
+  ];
+  if (unitDefault) {
+    fields.push({
+      fieldName: "unit",
+      defaultValue: unitDefault,
+      dataType: "ENUM",
+      options: [
+        { name: "Celsius", value: "Celsius" },
+        { name: "Fahrenheit", value: "Fahrenheit" },
+      ],
+      required: true,
+    });
+  }
+  const cap = {
+    type: GOVEE_CAP_TYPE.TEMPERATURE_SETTING,
+    instance: "targetTemperature",
+    parameters: { dataType: "STRUCT", fields },
+  } as GoveeDevice["capabilities"][number];
+  return { ...base, capabilities: [cap] };
+}
+
+describe("sendWorkModeCommand", () => {
+  it("sends one struct carrying BOTH fields, not the bare dropdown key (issue #47)", async () => {
+    const dev = workModeDevice();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.work_mode"), "1");
+    rig.states.set(id("control.mode_value"), "1");
+    const ok = await sendWorkModeCommand(rig.adapter, dev, PREFIX, "control.mode_value", "2");
+    expect(ok).toBe(true);
+    expect(rig.capCommands).toEqual([
+      {
+        device: dev.deviceId,
+        type: GOVEE_CAP_TYPE.WORK_MODE,
+        instance: "workMode",
+        value: { workMode: 1, modeValue: 2 },
+      },
+    ]);
+  });
+
+  it("sends modeValue 0 for a mode that declares no levels", async () => {
+    const dev = workModeDevice();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.work_mode"), "1");
+    rig.states.set(id("control.mode_value"), "2");
+    await sendWorkModeCommand(rig.adapter, dev, PREFIX, "control.work_mode", "3");
+    expect(rig.capCommands[0].value).toEqual({ workMode: 3, modeValue: 0 });
+  });
+
+  it("sends nothing and reports false when the device has no work_mode capability", async () => {
+    const dev = createTestDevice();
+    const rig = makeRig([dev]);
+    const ok = await sendWorkModeCommand(rig.adapter, dev, PREFIX, "control.work_mode", "3");
+    expect(ok).toBe(false);
+    expect(rig.capCommands).toEqual([]);
+    expect(rig.warns.join(" ")).toContain("work mode");
+  });
+});
+
+describe("onStateChange — work-mode routing branch", () => {
+  it("acks control.work_mode only after the struct went out (issue #47)", async () => {
+    const dev = workModeDevice();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.mode_value"), "1");
+    await write(rig, id("control.work_mode"), "3");
+    expect(rig.capCommands).toHaveLength(1);
+    expect(rig.acks).toEqual([{ id: id("control.work_mode"), val: "3" }]);
+  });
+
+  it("does not ack when no mode could be resolved", async () => {
+    const dev = workModeDevice();
+    const rig = makeRig([dev]);
+    await write(rig, id("control.work_mode"), "nonsense");
+    expect(rig.capCommands).toEqual([]);
+    expect(rig.acks).toEqual([]);
+  });
+});
+
+describe("sendTargetTemperatureCommand", () => {
+  it("sends a struct with the unit the device's own field declares", async () => {
+    const dev = heaterDevice("Celsius");
+    const rig = makeRig([dev]);
+    expect(await sendTargetTemperatureCommand(rig.adapter, dev, 22)).toBe(true);
+    expect(rig.capCommands[0].value).toEqual({ temperature: 22, unit: "Celsius" });
+  });
+
+  it("omits unit when the device declares no unit field — never invents one", async () => {
+    const dev = heaterDevice();
+    const rig = makeRig([dev]);
+    await sendTargetTemperatureCommand(rig.adapter, dev, 22);
+    expect(rig.capCommands[0].value).toEqual({ temperature: 22 });
+  });
+
+  it("clamps into the range the device declares", async () => {
+    const dev = heaterDevice("Celsius");
+    const rig = makeRig([dev]);
+    await sendTargetTemperatureCommand(rig.adapter, dev, 99);
+    expect(rig.capCommands[0].value).toEqual({ temperature: 30, unit: "Celsius" });
+  });
+
+  it("reports false for a non-numeric write", async () => {
+    const dev = heaterDevice("Celsius");
+    const rig = makeRig([dev]);
+    expect(await sendTargetTemperatureCommand(rig.adapter, dev, "warm")).toBe(false);
+    expect(rig.capCommands).toEqual([]);
+  });
+
+  it("acks control.target_temperature through onStateChange only after the send", async () => {
+    const dev = heaterDevice("Celsius");
+    const rig = makeRig([dev]);
+    await write(rig, id("control.target_temperature"), 22);
+    expect(rig.capCommands).toHaveLength(1);
+    expect(rig.acks).toEqual([{ id: id("control.target_temperature"), val: 22 }]);
+  });
+});
+
 describe("findDeviceForState", () => {
   it("resolves a state path to its owning device via prefix match", () => {
     const rig = makeRig([device]);
@@ -226,6 +410,33 @@ describe("resolveDropdownInput (number-OR-name dual input, Pattern 45)", () => {
   function withStates(rig: Rig, stateId: string, map: Record<string, string>): void {
     rig.objects.set(stateId, { common: { states: map } });
   }
+
+  function withCommon(rig: Rig, stateId: string, common: Record<string, unknown>): void {
+    rig.objects.set(stateId, { common });
+  }
+
+  it("passes a numeric write through when the datapoint is a number carrying a stale map", async () => {
+    // Upgrade path (issue #47): mode_value WAS a dropdown, Task 2 turns it into
+    // a number, and extendObject leaves the old map on the object.
+    const rig = makeRig([device]);
+    withCommon(rig, id("control.mode_value"), { type: "number", states: { null: "DIY" }, min: 1, max: 4 });
+    expect(await resolveDropdownInput(rig.adapter, id("control.mode_value"), 3)).toEqual({ val: 3, ok: true });
+  });
+
+  it("still resolves a real dropdown against its map", async () => {
+    const rig = makeRig([device]);
+    withCommon(rig, id("control.mode_value"), { type: "mixed", states: { 0: "---", 1: "Sleep", 2: "Low" } });
+    expect(await resolveDropdownInput(rig.adapter, id("control.mode_value"), "low")).toEqual({ val: "2", ok: true });
+  });
+
+  it("still rejects an unknown value on a real dropdown", async () => {
+    const rig = makeRig([device]);
+    withCommon(rig, id("control.mode_value"), { type: "mixed", states: { 0: "---", 1: "Sleep" } });
+    expect(await resolveDropdownInput(rig.adapter, id("control.mode_value"), "Turbo")).toEqual({
+      val: "Turbo",
+      ok: false,
+    });
+  });
 
   it("resolves numeric, numeric-string and case-insensitive label input to the SAME canonical key", async () => {
     const rig = makeRig([device]);

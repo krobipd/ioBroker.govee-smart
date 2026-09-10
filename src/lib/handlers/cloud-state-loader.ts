@@ -1,4 +1,4 @@
-import { LAN_STATE_IDS, mapCloudStateValue, planCloudCapabilityWrites } from "../capability-mapper";
+import { LAN_STATE_IDS, mapCloudStateValues, planCloudCapabilityWrites } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import { applianceBudget, type RateLimiter } from "../rate-limiter";
@@ -60,11 +60,10 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         const prefix = adapter.stateManager.devicePrefix(device);
 
         const writes: Promise<unknown>[] = [];
-        for (const cap of caps) {
-          const mapped = mapCloudStateValue(cap);
-          if (!mapped) {
-            continue;
-          }
+        // One capability can carry two datapoints (work_mode → mode + level),
+        // so the list is flattened first and the LAN-shadow rule below applies
+        // per RESULT — same shape and same nesting level as before.
+        for (const mapped of caps.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
           if (device.lanIp && LAN_STATE_IDS.has(mapped.stateId)) {
             continue;
           }
@@ -133,7 +132,7 @@ export async function applyCloudCapabilities(
     return;
   }
   const prefix = adapter.stateManager.devicePrefix(device);
-  const planned = planCloudCapabilityWrites(caps, Boolean(device.lanIp), LAN_STATE_IDS);
+  const planned = planCloudCapabilityWrites(caps, Boolean(device.lanIp), LAN_STATE_IDS, device.capabilities);
   for (const mapped of planned) {
     await adapter.stateManager.ensureSyntheticStateObject(prefix, mapped.stateId);
     // v2.9.1 — mirror appliance/sensor values into device.state so the diag-

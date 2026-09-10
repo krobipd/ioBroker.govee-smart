@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Ouvrir une issue",
   "gsw_diagNoDevices": "Aucun appareil pour l'instant. Le rapport est par appareil — dès que l'adaptateur en trouve un, il apparaît ici.",
   "gsw_diagExportFailed": "Le rapport n'a pas pu être créé. Le journal de l'adaptateur en donne la raison.",
-  "gsw_diagPrivacy": "Le rapport est pseudonymisé : adresses, adresses mail et noms d'appareils sont remplacés par des marqueurs stables, les identifiants sont raccourcis et les identifiants de connexion n'y figurent jamais. Le fichier l'explique dans son en-tête.",
+  "gsw_diagPrivacy": "Le rapport est pseudonymisé : adresses, adresses mail et noms d'appareils sont remplacés par des marqueurs stables, les identifiants sont raccourcis et les identifiants de connexion n'y figurent jamais.",
   "gsw_loadingDevices": "Chargement des appareils …",
   "gsw_loadingDevicesSlow": "Chargement en cours — l'instance de l'adaptateur doit être démarrée.",
   "gsw_listFailed": "Impossible de charger la liste des appareils. L'instance est-elle démarrée ?",

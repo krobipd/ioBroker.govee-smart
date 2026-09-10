@@ -5,6 +5,7 @@ import {
   errMessage,
   rgbToHex,
   type CapabilityOption,
+  type NamedCapabilityOption,
   type CloudCapability,
   type CloudStateCapability,
   type ControlKind,
@@ -435,15 +436,33 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
  * @param cap Cloud mode capability
  */
 function mapMode(cap: CloudCapability): StateDefinition[] {
-  if (cap.instance !== "presetScene" || !Array.isArray(cap.parameters?.options)) {
+  // Any `mode` instance, not just presetScene. `api-referenz.md:135-136`
+  // documents both `presetScene` and `nightlightScene`, and the captures in
+  // `Ressourcen/govee-smart/issue47-fixtures/` carry `nightlightScene` twice —
+  // declared with its option list on the H7131 heater, and answered with a
+  // value by `/device/state`. The instance check dropped the definition AND
+  // `mapCloudStateValue` dropped the value, so the data arrived and was thrown
+  // away without a datapoint, a log line or a warning. Gating on the option
+  // list rather than on a name list is what keeps the next instance Govee
+  // invents from falling into the same hole.
+  if (typeof cap.instance !== "string" || !Array.isArray(cap.parameters?.options)) {
     return [];
   }
 
-  // Sentinel entry: def is "" — without a matching key the
-  // "Resetting stale dropdown" pass in writeStateDefsToChannels re-ran on
-  // EVERY start (the reset writes "", "" is not in the map, repeat). Same
-  // "---" convention as buildUniqueLabelMap's 0-sentinel (LOW).
-  const states: Record<string, string> = { "": "---" };
+  // Sentinel entry, keyed "0" like every other dropdown in this adapter.
+  // It used to be "", which was wrong twice: `resetModeDropdowns` writes "0"
+  // (`dropdown-reset-helpers.ts:119`), so after any mode switch the value was
+  // not a key of this map and the "Resetting stale dropdown" pass rewrote it
+  // on the next start, every start. And the repochecker requires a `mixed`
+  // datapoint's `def` to parse as JSON (`objectStructure.js:130-139`); "" does
+  // not, so the datapoint tripped E1006 the moment a device carrying it
+  // reached the object inventory. `onStateChange` already accepted "0", 0 and
+  // "" as the reset for this command (`state-change-router.ts:522`).
+  //
+  // The options are written after the sentinel: a Govee option that really
+  // used the value 0 would take the slot, which is the same property every
+  // value-keyed dropdown here has.
+  const states: Record<string, string> = { 0: "---" };
   for (const opt of cap.parameters.options) {
     if (!opt || typeof opt.name !== "string") {
       continue;
@@ -454,13 +473,23 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
 
   return [
     {
-      id: "scene",
-      name: tName("scene"),
+      // `presetScene` keeps the id it has had since the beginning — renaming it
+      // would orphan the datapoint on every existing installation. Every other
+      // instance takes its own sanitised name (nightlightScene →
+      // nightlight_scene), the same rule the rest of the mapper follows.
+      id: cap.instance === "presetScene" ? "scene" : sanitizeId(cap.instance),
+      // `capabilityName` is the shared resolver every other generic branch
+      // uses: it hands back the translation object for a known instance
+      // (`capNightlightScene` has existed in all 11 languages the whole time —
+      // only `mapMode` never asked for it) and the vendor text for an unknown
+      // one. `humanize()` here would put a plain string into `common.name`,
+      // which the object-inventory gate rejects fleet-wide.
+      name: cap.instance === "presetScene" ? tName("scene") : capabilityName(cap.instance),
       type: "mixed",
       role: "state",
       write: true,
       states,
-      def: "",
+      def: "0",
       capabilityType: cap.type,
       capabilityInstance: cap.instance,
     },
@@ -558,6 +587,160 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
   ];
 }
 
+/** One selectable level of one work mode, flattened out of the option tree. */
+interface ModeLevel {
+  /** The mode group this level belongs to (empty for a flat option list). */
+  group: string;
+  value: number;
+  name?: string;
+}
+
+/**
+ * Decide what control the `modeValue` field deserves.
+ *
+ * @param options Raw option list of the `modeValue` field
+ */
+export function classifyModeLevels(
+  options: readonly CapabilityOption[],
+):
+  | { kind: "dropdown"; states: Record<string, string> }
+  | { kind: "number"; min: number; max: number }
+  | { kind: "none" } {
+  const levels: ModeLevel[] = [];
+  const ranges: { min: number; max: number }[] = [];
+
+  for (const opt of options) {
+    if (!opt) {
+      continue;
+    }
+    const group = typeof opt.name === "string" ? opt.name : "";
+    if (Array.isArray(opt.options) && opt.options.length > 0) {
+      for (const sub of opt.options) {
+        const n = coerceNum(sub?.value);
+        if (n !== null) {
+          levels.push({ group, value: n, name: typeof sub.name === "string" ? sub.name : undefined });
+        }
+      }
+      continue;
+    }
+    const range = (opt as { range?: { min?: unknown; max?: unknown } }).range;
+    const rMin = coerceNum(range?.min);
+    const rMax = coerceNum(range?.max);
+    if (rMin !== null && rMax !== null) {
+      ranges.push({ min: rMin, max: rMax });
+      continue;
+    }
+    const n = coerceNum(opt.value);
+    if (n !== null) {
+      levels.push({ group: "", value: n, name: group || undefined });
+    }
+  }
+
+  if (levels.length === 0 && ranges.length === 0) {
+    return { kind: "none" };
+  }
+
+  const named = levels.every(l => l.name !== undefined);
+  const owners = new Map<number, string>();
+  let collision = false;
+  for (const l of levels) {
+    const seen = owners.get(l.value);
+    if (seen !== undefined && seen !== l.group) {
+      collision = true;
+      break;
+    }
+    owners.set(l.value, l.group);
+  }
+
+  if (named && !collision && ranges.length === 0) {
+    const states: Record<string, string> = {};
+    for (const l of levels) {
+      states[safeStringify(l.value)] = l.name!;
+    }
+    return { kind: "dropdown", states };
+  }
+
+  const all = [...levels.map(l => l.value), ...ranges.map(r => r.min), ...ranges.map(r => r.max)];
+  return { kind: "number", min: Math.min(...all), max: Math.max(...all) };
+}
+
+/**
+ * Turn the two datapoint values into the STRUCT the Govee control endpoint requires.
+ *
+ * @param cap           The device's work_mode capability
+ * @param workModeKey   Current/changed value of `control.work_mode`
+ * @param modeValueKey  Current/changed value of `control.mode_value`
+ * @param changed       Which of the two the user just wrote
+ */
+export function resolveWorkModeStruct(
+  cap: CloudCapability,
+  workModeKey: ioBroker.StateValue,
+  modeValueKey: ioBroker.StateValue,
+  changed: "workMode" | "modeValue",
+): { workMode: number; modeValue: number } | null {
+  const fields = cap.parameters?.fields ?? [];
+  const modeOptions = fields.find(f => f && f.fieldName === "workMode")?.options ?? [];
+  const levelOptions = fields.find(f => f && f.fieldName === "modeValue")?.options ?? [];
+
+  /**
+   * Resolve a written value against an option list: key first, then label.
+   *
+   * @param options Option list to search
+   * @param raw     Written datapoint value
+   */
+  const pick = (options: readonly CapabilityOption[], raw: ioBroker.StateValue): CapabilityOption | undefined => {
+    if (raw === null || raw === undefined) {
+      return undefined;
+    }
+    const s = String(raw).trim();
+    if (!s) {
+      return undefined;
+    }
+    return (
+      options.find(o => o && o.value !== undefined && o.value !== null && safeStringify(o.value) === s) ??
+      options.find(o => o && typeof o.name === "string" && o.name.toLowerCase() === s.toLowerCase())
+    );
+  };
+
+  const groups = levelOptions.filter(o => o && Array.isArray(o.options) && o.options.length > 0);
+  const flatLevels = levelOptions.filter(
+    o => o && !Array.isArray(o.options) && o.value !== undefined && o.value !== null,
+  );
+
+  let modeOpt: CapabilityOption | undefined;
+  if (changed === "modeValue" && groups.length > 0 && classifyModeLevels(levelOptions).kind === "dropdown") {
+    const owner = groups.find(g => pick(g.options!, modeValueKey) !== undefined);
+    modeOpt = owner ? modeOptions.find(o => o.name === owner.name) : undefined;
+  }
+  modeOpt ??= pick(modeOptions, workModeKey);
+  const workMode = coerceNum(modeOpt?.value);
+  if (modeOpt === undefined || workMode === null) {
+    return null;
+  }
+
+  const groupEntry = levelOptions.find(o => o && o.name === modeOpt.name);
+  const ownLevels =
+    Array.isArray(groupEntry?.options) && groupEntry.options.length > 0 ? groupEntry.options : flatLevels;
+
+  if (ownLevels.length > 0) {
+    const chosen = pick(ownLevels, modeValueKey) ?? ownLevels[0];
+    const modeValue = coerceNum(chosen.value);
+    return modeValue === null ? null : { workMode, modeValue };
+  }
+
+  const range = (groupEntry as { range?: { min?: unknown; max?: unknown } } | undefined)?.range;
+  const rMin = coerceNum(range?.min);
+  const rMax = coerceNum(range?.max);
+  if (rMin !== null && rMax !== null) {
+    const written = coerceNum(modeValueKey);
+    const modeValue = written === null ? rMin : Math.min(Math.max(written, rMin), rMax);
+    return { workMode, modeValue };
+  }
+
+  const fallback = coerceNum(groupEntry?.defaultValue);
+  return { workMode, modeValue: fallback ?? 0 };
+}
+
 /**
  * Map work_mode capability (STRUCT — Govee Heater/Humidifier/Fan/...).
  *
@@ -613,24 +796,38 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
   const valueField = fields.find(f => f && f.fieldName === "modeValue");
   if (valueField) {
     if (valueField.options && valueField.options.length > 0) {
-      const valStates: Record<string, string> = {};
-      for (const opt of valueField.options) {
-        if (opt && typeof opt.name === "string") {
-          valStates[safeStringify(opt.value)] = opt.name;
-        }
+      const level = classifyModeLevels(valueField.options);
+      if (level.kind === "dropdown") {
+        const firstKey = Object.keys(level.states)[0];
+        states.push({
+          id: "mode_value",
+          name: tName("modeValue"),
+          desc: tDesc("descModeValue"),
+          type: "mixed",
+          role: "state",
+          write: true,
+          states: level.states,
+          def: firstKey,
+          capabilityType: cap.type,
+          capabilityInstance: cap.instance,
+        });
+      } else if (level.kind === "number") {
+        states.push({
+          id: "mode_value",
+          name: tName("modeValue"),
+          desc: tDesc("descModeValue"),
+          type: "number",
+          role: "level",
+          write: true,
+          min: level.min,
+          max: level.max,
+          def: level.min,
+          capabilityType: cap.type,
+          capabilityInstance: cap.instance,
+        });
       }
-      states.push({
-        id: "mode_value",
-        name: tName("modeValue"),
-        desc: tDesc("descModeValue"),
-        type: "mixed",
-        role: "state",
-        write: true,
-        states: valStates,
-        def: valueField.options[0] ? safeStringify(valueField.options[0].value) : "",
-        capabilityType: cap.type,
-        capabilityInstance: cap.instance,
-      });
+      // kind "none": every mode carries only a defaultValue — the level IS the
+      // mode (H7121). A control here would be an empty dropdown.
     } else if (valueField.range) {
       states.push({
         id: "mode_value",
@@ -671,7 +868,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
       return f.fieldName.toLowerCase().includes("temperature");
     });
     if (tempField?.range) {
-      const unit = normalizeUnit(cap.parameters?.unit) ?? "°F";
+      const unit = temperatureUnit(cap);
       return [
         {
           id: "target_temperature",
@@ -692,7 +889,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
 
   const range = cap.parameters?.range;
   if (range) {
-    const unit = normalizeUnit(cap.parameters?.unit) ?? "°F";
+    const unit = temperatureUnit(cap);
     return [
       {
         id: "target_temperature",
@@ -792,7 +989,7 @@ export function musicModeNameUsesRgb(name: string | undefined): boolean {
  * @param cap A music_setting capability
  * @returns The `musicMode` field's options (string name only), in API order
  */
-export function getMusicModeOptions(cap: CloudCapability): CapabilityOption[] {
+export function getMusicModeOptions(cap: CloudCapability): NamedCapabilityOption[] {
   const fields = cap.parameters?.fields;
   if (!Array.isArray(fields)) {
     return [];
@@ -801,7 +998,7 @@ export function getMusicModeOptions(cap: CloudCapability): CapabilityOption[] {
   if (!modeField?.options || !Array.isArray(modeField.options)) {
     return [];
   }
-  return modeField.options.filter(o => !!o && typeof o.name === "string");
+  return modeField.options.filter((o): o is NamedCapabilityOption => !!o && typeof o.name === "string");
 }
 
 function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
@@ -913,7 +1110,32 @@ const UNIT_MAP: Record<string, string> = {
   "unit.kelvin": "K",
   "unit.celsius": "°C",
   "unit.fahrenheit": "°F",
+  // The temperature_setting STRUCT names its unit like this (H7131 capture).
+  Celsius: "°C",
+  Fahrenheit: "°F",
 };
+
+/**
+ * The unit a temperature_setting declares. Govee puts it in a STRUCT FIELD
+ * with a `defaultValue`, not in `cap.parameters.unit` — reading the latter
+ * silently labelled a 5-30 °C heater as °F (H7131 capture, issue #47 sweep).
+ *
+ * @param cap Cloud temperature_setting capability
+ */
+function temperatureUnit(cap: CloudCapability): string {
+  const fields = cap.parameters?.fields;
+  const unitField = fields?.find(f => f && f.fieldName === "unit");
+  const declared = typeof unitField?.defaultValue === "string" ? unitField.defaultValue : undefined;
+  // Second source: some payloads carry the unit on the `temperature` field
+  // itself (`unit.celsius`) instead of declaring a separate `unit` field.
+  const onTemperature = (fields?.find(f => f && f.fieldName === "temperature") as { unit?: unknown } | undefined)?.unit;
+  return (
+    normalizeUnit(declared) ??
+    normalizeUnit(typeof onTemperature === "string" ? onTemperature : undefined) ??
+    normalizeUnit(cap.parameters?.unit) ??
+    "°F"
+  );
+}
 
 /**
  * Normalize Govee API unit string to ioBroker standard
@@ -1099,13 +1321,16 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       return { stateId: sanitizeId(cap.instance), value: coerceBool(raw) };
 
     case "mode":
-      if (cap.instance === "presetScene") {
-        return {
-          stateId: "scene",
-          value: safeStringify(raw),
-        };
+      // Mirror mapMode: every `mode` instance has a datapoint, so every one
+      // has a value. Dropping all but presetScene threw away the
+      // `nightlightScene` value the captures carry (issue #47 sweep).
+      if (typeof cap.instance !== "string") {
+        return null;
       }
-      return null;
+      return {
+        stateId: cap.instance === "presetScene" ? "scene" : sanitizeId(cap.instance),
+        value: safeStringify(raw),
+      };
 
     case "dynamic_scene":
       // snapshot is an action-only dropdown (activate a saved snapshot) — there
@@ -1123,23 +1348,17 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       };
 
     case "work_mode": {
-      // STRUCT: { workMode: <number>, modeValue?: <number> }. Cloud
-      // /device/state only returns the primary mode here — mode_value
-      // (sub-parameter) follows via MQTT status push when the device
-      // reports it, so we don't lose it just because it isn't in the
-      // initial state response.
-      if (typeof raw === "object" && raw !== null) {
-        const struct = raw as Record<string, unknown>;
-        const n = coerceNum(struct.workMode);
-        if (n !== null) {
-          return { stateId: "work_mode", value: n };
-        }
+      // Govee sends `{workMode, modeValue}` and BOTH halves matter — the level
+      // is not "MQTT only" as this comment used to claim; the real H7143
+      // response in `issue47-fixtures/get_device_state.json` carries it. The
+      // level rides along in `mapCloudStateValues`, which is what the writers
+      // call; this function keeps its one-result shape for its own callers.
+      const struct = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : undefined;
+      const n = coerceNum(struct ? struct.workMode : raw);
+      if (n === null) {
+        return null;
       }
-      const direct = coerceNum(raw);
-      if (direct !== null) {
-        return { stateId: "work_mode", value: direct };
-      }
-      return null;
+      return { stateId: "work_mode", value: safeStringify(n) };
     }
 
     case "temperature_setting": {
@@ -1208,27 +1427,68 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
  * @param caps Capabilities to consider
  * @param hasLanIp Whether the target device has a known LAN IP
  * @param lanStateIds Default-LAN state IDs that LAN delivers authoritatively
+ * @param declared The device's declared capabilities, for work_mode level typing
  */
 export function planCloudCapabilityWrites(
   caps: CloudStateCapability[],
   hasLanIp: boolean,
   lanStateIds: ReadonlySet<string>,
+  declared?: readonly CloudCapability[],
 ): CloudStateValue[] {
   const writes: CloudStateValue[] = [];
   if (!Array.isArray(caps)) {
     return writes;
   }
-  for (const cap of caps) {
-    const mapped = mapCloudStateValue(cap);
-    if (!mapped) {
-      continue;
-    }
+  // Flattened on purpose: one capability can now carry two datapoints
+  // (work_mode → mode + level), and the LAN-shadow rule below has to be
+  // applied per RESULT, not per capability. Keeping it a single loop also
+  // keeps that rule at one nesting level.
+  for (const mapped of caps.flatMap(cap => mapCloudStateValues(cap, declared))) {
     if (hasLanIp && lanStateIds.has(mapped.stateId)) {
       continue;
     }
     writes.push(mapped);
   }
   return writes;
+}
+
+/**
+ * Every datapoint one cloud-state capability carries.
+ *
+ * Only `work_mode` yields more than one: Govee's `/device/state` returns the
+ * whole struct, and dropping `modeValue` left the level datapoint on its
+ * default while the mode updated (issue #47).
+ *
+ * @param cap      One capability from the cloud-state response
+ * @param declared The device's declared capabilities, if the caller has them
+ */
+export function mapCloudStateValues(
+  cap: CloudStateCapability,
+  declared?: readonly CloudCapability[],
+): CloudStateValue[] {
+  const primary = mapCloudStateValue(cap);
+  if (!primary) {
+    return [];
+  }
+  if (primary.stateId !== "work_mode") {
+    return [primary];
+  }
+  const raw = cap.state?.value;
+  if (typeof raw !== "object" || raw === null) {
+    return [primary];
+  }
+  const level = coerceNum((raw as Record<string, unknown>).modeValue);
+  if (level === null) {
+    return [primary];
+  }
+  // The state response carries no `parameters` (measured). Whether the level
+  // datapoint is a dropdown or a number is decided by the DECLARED capability,
+  // which lives on the device. With none in hand, assume the common case.
+  const levelOptions = declared
+    ?.find(c => c.type === cap.type && c.instance === cap.instance)
+    ?.parameters?.fields?.find(f => f && f.fieldName === "modeValue")?.options;
+  const asNumber = levelOptions !== undefined && classifyModeLevels(levelOptions).kind === "number";
+  return [primary, { stateId: "mode_value", value: asNumber ? level : safeStringify(level) }];
 }
 
 /**

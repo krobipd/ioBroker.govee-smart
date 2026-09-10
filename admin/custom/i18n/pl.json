@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Otwórz zgłoszenie",
   "gsw_diagNoDevices": "Brak urządzeń. Raport dotyczy pojedynczego urządzenia — gdy adapter jakieś znajdzie, pojawi się tutaj.",
   "gsw_diagExportFailed": "Nie udało się utworzyć raportu. Powód znajdziesz w logu adaptera.",
-  "gsw_diagPrivacy": "Raport jest pseudonimizowany: adresy, adresy e-mail i nazwy urządzeń zastępują stałe znaczniki, identyfikatory są skracane, a dane logowania nigdy się w nim nie pojawiają. Plik wyjaśnia to we własnym nagłówku.",
+  "gsw_diagPrivacy": "Raport jest pseudonimizowany: adresy, adresy e-mail i nazwy urządzeń zastępują stałe znaczniki, identyfikatory są skracane, a dane logowania nigdy się w nim nie pojawiają.",
   "gsw_loadingDevices": "Wczytywanie urządzeń …",
   "gsw_loadingDevicesSlow": "Nadal trwa wczytywanie — instancja adaptera musi być uruchomiona.",
   "gsw_listFailed": "Nie udało się wczytać listy urządzeń. Czy instancja działa?",

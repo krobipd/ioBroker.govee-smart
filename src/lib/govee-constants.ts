@@ -20,6 +20,8 @@ export const GOVEE_CAP_TYPE = {
   PROPERTY: "devices.capabilities.property",
   MUSIC_SETTING: "devices.capabilities.music_setting",
   ONLINE: "devices.capabilities.online",
+  WORK_MODE: "devices.capabilities.work_mode",
+  TEMPERATURE_SETTING: "devices.capabilities.temperature_setting",
 } as const;
 
 /** Govee Cloud API device type strings (`device.type`). */

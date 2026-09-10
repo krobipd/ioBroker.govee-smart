@@ -1,5 +1,15 @@
 # Older Changes
 
+## 2.31.0 (2026-09-03)
+
+- Fixed: On instances upgraded from 2.27.0 or newer, every admin card was dead — diagnostics, segment wizard and connection test alike; affected installations repair themselves on the next start
+- Fixed: A card that could not reach the adapter reported "no devices yet" instead of the real error
+- Changed: Segment detection and diagnostics now share one **Expert** tab with a button each
+- Changed: The per-device `diag.export` button is gone; the Expert tab builds the report and hands you the file in one press
+- Changed: `diag.lastExport` now records WHEN the last report was taken, instead of naming the file
+- Improved: Both cards say "Loading devices …" while they search, and explain the wait if it takes long
+- Fixed: The diagnostics report still described the reachability rule as it was before 2.30.0
+
 ## 2.30.0 (2026-09-03)
 
 - Fixed: Devices without a local API were shown as unreachable although they switched and reported normally; they now show as reachable for as long as they are

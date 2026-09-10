@@ -51,7 +51,7 @@
   "gsw_diagOpenIssue": "Issue eröffnen",
   "gsw_diagNoDevices": "Noch keine Geräte. Der Bericht gilt je Gerät — sobald der Adapter eines gefunden hat, erscheint es hier.",
   "gsw_diagExportFailed": "Der Bericht konnte nicht erstellt werden. Warum, steht im Adapter-Log.",
-  "gsw_diagPrivacy": "Der Bericht ist anonymisiert: Adressen, E-Mail-Adressen und Gerätenamen werden durch gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, Zugangsdaten tauchen gar nicht auf. Die Datei erklärt das in ihrem eigenen Kopf.",
+  "gsw_diagPrivacy": "Der Bericht ist anonymisiert: Adressen, E-Mail-Adressen und Gerätenamen werden durch gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, Zugangsdaten tauchen gar nicht auf.",
   "gsw_loadingDevices": "Geräte werden geladen …",
   "gsw_loadingDevicesSlow": "Lädt noch — dafür muss die Adapter-Instanz laufen.",
   "gsw_listFailed": "Die Geräteliste konnte nicht geladen werden. Läuft die Instanz?",
