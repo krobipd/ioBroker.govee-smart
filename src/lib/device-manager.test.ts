@@ -1339,6 +1339,130 @@ describe("DeviceManager", () => {
     });
   });
 
+  describe("handleMqttStatus — an appliance's own status push (issue #47)", () => {
+    it("an appliance's status push reaches the datapoint pipe decoded (H7127, issue #47 — local first)", () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H7127" });
+      const dev = dm2.getDevices()[0];
+      dev.type = "devices.types.air_purifier";
+      dev.lanIp = undefined;
+      dev.capabilities = [
+        {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          parameters: {
+            dataType: "STRUCT",
+            fields: [
+              {
+                fieldName: "workMode",
+                dataType: "ENUM",
+                options: [
+                  { name: "gearMode", value: 1 },
+                  { name: "Custom", value: 2 },
+                  { name: "Auto", value: 3 },
+                ],
+                required: true,
+              },
+              {
+                fieldName: "modeValue",
+                dataType: "ENUM",
+                options: [
+                  {
+                    name: "gearMode",
+                    options: [
+                      { name: "Sleep", value: 1 },
+                      { name: "Low", value: 2 },
+                      { name: "High", value: 3 },
+                    ],
+                  },
+                  { name: "Custom", defaultValue: 0 },
+                  { name: "Auto", defaultValue: 0 },
+                ],
+                required: true,
+              },
+            ],
+          },
+        },
+        { type: "devices.capabilities.property", instance: "filterLifeTime" },
+        { type: "devices.capabilities.property", instance: "airQuality" },
+      ];
+      // The state after the drain: the tree exists, pushes go straight through.
+      dm2.releaseHeldPushes();
+      const received: Array<{ instance?: string; value: unknown }> = [];
+      dm2.setOnCloudCapabilities((_, caps) =>
+        caps.forEach(c => received.push({ instance: c.instance, value: c.state?.value })),
+      );
+      dm2.handleMqttStatus({
+        sku: "H7127",
+        device: "AABBCCDDEEFF0097",
+        cmd: "status",
+        transaction: "o_1789018372832",
+        state: { onOff: 0 },
+        op: {
+          command: [
+            "qhcAAAAAAAAAAAAAAAAAAAAAAL0=",
+            "qhkA//8GAEkAAAAAAAAAAAAAAPw=",
+            "qhIAAAAAAAAAAAAAAAAAAAAAALg=",
+            "qiYAAAAAAAAAAAAAAAAAAAAAAIw=",
+            "qgUAAQAAAAAAAAAAAAAAAAAAAK4=",
+            "qgUBAQAAAAAAAAAAAAAAAAAAAK8=",
+            "qgUCAAMACgAKAgAKAAoB/////60=",
+            "qgUDAAAOAAAAAAAAAAAAAAAAAKI=",
+            "qhYA/////wAAAAAAAAAAAAAAALw=",
+            "qggAAAAAAAAAAAAAAAAAAAAAAKI=",
+          ],
+        },
+      });
+      expect(received).toEqual([
+        { instance: "workMode", value: { workMode: 1, modeValue: 1 } },
+        { instance: "filterLifeTime", value: 73 },
+      ]);
+      expect(dev.state.power, "the packet's own onOff still lands as before").toBe(false);
+    });
+
+    it("a push that arrives before the state tree exists is held — and applied once the tree is released, newest packet only", () => {
+      // Same device as above, but the adapter has not finished its state
+      // creation yet (stateTreeReady is false — the default). Applying the
+      // push now would write filter_life_time into control.* (no channel known
+      // yet) and warn "has no existing object". Dropping it would lose the
+      // device's only live word if the start-up seed read fails.
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      dm2.handleLanDiscovery({ ip: "192.168.1.98", device: "AABBCCDDEEFF0098", sku: "H7127" });
+      const dev = dm2.getDevices()[0];
+      dev.type = "devices.types.air_purifier";
+      dev.lanIp = undefined;
+      dev.capabilities = [{ type: "devices.capabilities.property", instance: "filterLifeTime" }];
+      const received: unknown[] = [];
+      dm2.setOnCloudCapabilities((_, caps) =>
+        caps.forEach(c => received.push({ instance: c.instance, value: c.state?.value })),
+      );
+      const packet = (frame: string): never =>
+        ({
+          sku: "H7127",
+          device: "AABBCCDDEEFF0098",
+          cmd: "status",
+          transaction: "o_1789018372832",
+          state: { onOff: 0 },
+          op: { command: [frame] },
+        }) as never;
+      dm2.handleMqttStatus(packet("qhkA//8GAEgAAAAAAAAAAAAAAP0=")); // filter 72 %
+      dm2.handleMqttStatus(packet("qhkA//8GAEkAAAAAAAAAAAAAAPw=")); // filter 73 % — the newer one
+      expect(received, "nothing is written before the tree exists").toEqual([]);
+      expect(dev.state.power, "the packet's own onOff is applied regardless").toBe(false);
+
+      dm2.releaseHeldPushes();
+      expect(received, "the last held packet is applied on release, not both").toEqual([
+        { instance: "filterLifeTime", value: 73 },
+      ]);
+
+      dm2.releaseHeldPushes();
+      expect(received, "a second release applies nothing — the hold is cleared").toHaveLength(1);
+
+      dm2.handleMqttStatus(packet("qhkA//8GAEgAAAAAAAAAAAAAAP0="));
+      expect(received, "after the release a push is applied immediately").toHaveLength(2);
+    });
+  });
+
   describe("handleMqttStatus — edge cases", () => {
     function setupDevice(): void {
       const lanDevice: LanDevice = {
@@ -4267,7 +4391,9 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
 
     dev.state.cloudReportedOnlineAt = Date.now() - (CLOUD_REACHABILITY_REFRESH_MS + 60_000);
     dev.lastReachabilityRefreshAt = undefined;
-    const offline = recordingCloud([{ type: "devices.capabilities.online", instance: "online", state: { value: false } }]);
+    const offline = recordingCloud([
+      { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+    ]);
     dm2.setCloudClient(offline.client as never);
     expect(await dm2.refreshExpiringReachability()).toBe(1);
     expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });

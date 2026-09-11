@@ -1388,7 +1388,71 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(ctx.f.cloud.getDevices).toHaveBeenCalled();
     expect(objectExistedAtRead, "the state read happens after the tree exists").toEqual([true]);
     expect(i.states.get("devices.h7127_ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
-    expect(i.states.has("devices.h7127_ee11.control.filter_life_time"), "no stray write in the wrong channel").toBe(false);
+    expect(i.states.has("devices.h7127_ee11.control.filter_life_time"), "no stray write in the wrong channel").toBe(
+      false,
+    );
+  });
+
+  it("a status push during the start-up seed read is held and written after it — the device's own word wins", async () => {
+    // The account broker is connected before the state tree exists. A push in
+    // that window must not be written (no channel known yet → control.*) and
+    // must not be lost either: it is the device's newest word, and the seed
+    // read it races is a cloud call that can fail. Held, released after the
+    // seed — so its value, not the seed's, is what the tree shows.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h7127_ee11.json"),
+      JSON.stringify({
+        sku: "H7127",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "H7127",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDeviceState.mockImplementation(() => {
+      // The push lands while the seed read is in flight: device known, tree
+      // created, gate still closed. The 2026-09-10 export's `aa 19` frame —
+      // filter 73 %; the seed answers 72.
+      (i.deviceManager as unknown as { handleMqttStatus(u: unknown): void }).handleMqttStatus({
+        sku: "H7127",
+        device: "AA:BB:CC:DD:EE:11",
+        cmd: "status",
+        transaction: "o_1789018372832",
+        state: { onOff: 0 },
+        op: { command: ["qhkA//8GAEkAAAAAAAAAAAAAAPw="] },
+      });
+      return Promise.resolve([
+        { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 72 } },
+      ]);
+    });
+    await i.onReady();
+    await settle();
+
+    expect(ctx.f.cloud.getDeviceState).toHaveBeenCalledWith("H7127", "AA:BB:CC:DD:EE:11");
+    expect(
+      i.states.get("devices.h7127_ee11.sensor.filter_life_time"),
+      "the held push is written after the seed",
+    ).toEqual({
+      val: 73,
+      ack: true,
+    });
+    expect(
+      i.states.has("devices.h7127_ee11.control.filter_life_time"),
+      "nothing was written into the wrong channel",
+    ).toBe(false);
   });
 
   it("a light with a local API keeps its LAN-owned values through the start-up state read (LAN-first on the wiring)", async () => {

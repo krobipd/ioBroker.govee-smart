@@ -1160,6 +1160,10 @@ export class GoveeAdapter extends utils.Adapter {
       }
 
       this.statesReady = true;
+      // The tree exists and the start-up seed is read: apply the appliance
+      // pushes held during the start (the device's own, newer word) and let
+      // later ones through immediately.
+      this.deviceManager?.releaseHeldPushes();
 
       // Subscribe to all writable device and group states, plus the adapter-level
       // manual-sync button. The button lives under `info`, which the two wildcard

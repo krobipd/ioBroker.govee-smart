@@ -34,6 +34,7 @@ import {
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
+import { decodeApplianceFrames } from "./appliance-frames";
 import { applianceBudget, type RateLimiter } from "./rate-limiter";
 import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
@@ -115,6 +116,47 @@ export class DeviceManager {
    * miss before `channels.lan` has been set (advisor guard).
    */
   public accountReconcileEnabled = false;
+  /**
+   * True once main.ts has finished creating the initial state tree (the
+   * `stateCreationQueue` drain) and read the start-up seed. A decoded status
+   * push is applied only after that: before it, `resolveStatePath` knows no
+   * channel for a capability id and would write `filter_life_time` into
+   * `control.*`. Until then the newest push per device waits in `heldPushes`
+   * — not dropped: the seed read is a cloud call that can fail, and the push
+   * may be the only live value this session gets.
+   *
+   * Invariant for main.ts: releaseHeldPushes() is called exactly once, after
+   * `statesReady`, and nothing between the broker connect and that line may
+   * throw out of onReady — every step there swallows its own errors (connect,
+   * loadFromCache, cloudInitWithTimeout, loadGroupMembers, the drain, the seed
+   * read). An unguarded await added in that window would hold every push for
+   * the rest of the session; the onReady catch block deliberately does not
+   * release — a tree that was never built has no channel to release into.
+   */
+  private stateTreeReady = false;
+  private readonly heldPushes = new Map<string, { sku: string; deviceId: string; caps: CloudStateCapability[] }>();
+
+  /**
+   * main.ts calls this once after the initial state tree exists and the
+   * start-up state read is done. Applies the pushes held during the start
+   * (device's own word, newer than the seed) and opens the gate for good.
+   */
+  releaseHeldPushes(): void {
+    this.stateTreeReady = true;
+    for (const held of this.heldPushes.values()) {
+      const device = this.findDeviceBySkuAndId(held.sku, held.deviceId);
+      if (!device) {
+        continue;
+      }
+      this.diagnostics.addLog(
+        device.deviceId,
+        "debug",
+        `status push for ${device.sku} held during start-up — applied now`,
+      );
+      this.onCloudCapabilities?.(device, held.caps);
+    }
+    this.heldPushes.clear();
+  }
   /**
    * Fired after devices were evicted from the account so the adapter runs the
    * object cleanup (reapStaleDevices → cleanupDevices + diagnostics prune). An
@@ -1022,6 +1064,29 @@ export class DeviceManager {
     this.onDeviceUpdate?.(device, state);
     if (update.op?.command) {
       this.processMqttSegmentPacket(device, update.op.command);
+      // An appliance's own status push carries its state — mode, level,
+      // filter life (spec §11, measured on the H7127). Decoded per
+      // device family and routed through the same pipe as the App-API and
+      // cloud-event values. Local first: the cloud state read is only the seed
+      // at start, the push keeps the datapoints live without a cloud call.
+      const pushed = decodeApplianceFrames(device, update.op.command);
+      if (pushed.length > 0) {
+        if (!this.stateTreeReady) {
+          // Held, newest wins — released by main.ts after the tree and the seed.
+          this.heldPushes.set(`${device.sku}:${device.deviceId}`, {
+            sku: device.sku,
+            deviceId: device.deviceId,
+            caps: pushed,
+          });
+        } else {
+          this.diagnostics.addLog(
+            device.deviceId,
+            "debug",
+            `status push decoded for ${device.sku}: ${pushed.map(c => `${c.instance}=${JSON.stringify(c.state?.value)}`).join(", ")}`,
+          );
+          this.onCloudCapabilities?.(device, pushed);
+        }
+      }
     }
   }
 
