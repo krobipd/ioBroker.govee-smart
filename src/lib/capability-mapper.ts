@@ -1284,7 +1284,11 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
   }
   const shortType = cap.type.replace("devices.capabilities.", "");
   const raw = cap.state?.value;
-  if (raw === undefined || raw === null) {
+  // Govee's "" is "no statement", not a value: a light not in white mode
+  // reports lightScene:"" and gradientToggle:"" (H61A8 capture), a sensor with
+  // no reading sensorTemperature:"" (#18). coerceNum already drops it; the
+  // boolean and string branches turned it into `false` / "" on the datapoint.
+  if (raw === undefined || raw === null || raw === "") {
     return null;
   }
 
@@ -1310,7 +1314,9 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       }
       if (cap.instance.includes("colorTem")) {
         const n = coerceNum(raw);
-        if (n === null) {
+        // 0 = "not in white-light mode" — the convention the MQTT status path
+        // applies as well (parseMqttStateUpdate drops colorTemInKelvin 0).
+        if (n === null || n <= 0) {
           return null;
         }
         return { stateId: "color_temperature", value: n };
@@ -1333,19 +1339,13 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       };
 
     case "dynamic_scene":
-      // snapshot is an action-only dropdown (activate a saved snapshot) — there
-      // is no persistent "current snapshot" status, and its real state id is
-      // snapshot_cloud (not "snapshot"), so a cloud-state write here only
-      // produced a "has no existing object" warning (B12). Skip it. lightScene /
-      // diyScene DO have a meaningful active value and sanitizeId maps them to
-      // light_scene / diy_scene, which match their real states.
-      if (cap.instance === "snapshot") {
-        return null;
-      }
-      return {
-        stateId: sanitizeId(cap.instance),
-        value: safeStringify(raw),
-      };
+      // No datapoint takes this value. The scene dropdowns are keyed by INDEX
+      // (buildUniqueLabelMap: "0" = ---, "1".."n"), so a raw Govee value can
+      // never match a key — and every capture of this endpoint carries ""
+      // here anyway (H61A8, H7143). Until a capture shows the shape of an
+      // active scene there is nothing to resolve; snapshot never had a status
+      // at all (its real state id is snapshot_cloud — B12).
+      return null;
 
     case "work_mode": {
       // Govee sends `{workMode, modeValue}` and BOTH halves matter — the level

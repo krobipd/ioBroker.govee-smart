@@ -1094,19 +1094,44 @@ describe("CapabilityMapper", () => {
       expect(mapCloudStateValue(cap)).toBeNull();
     });
 
-    it("maps lightScene/diyScene dynamic_scene to their real snake_case state ids", () => {
-      const ls = mapCloudStateValue({
-        type: "devices.capabilities.dynamic_scene",
-        instance: "lightScene",
-        state: { value: 3 },
+    it('treats Govee\'s "" as "no statement" for every type — H61A8 and #18 captures', () => {
+      // tukey42's H61A8 answers gradientToggle:"", lightScene:"", diyScene:"";
+      // the #18 H5074 answers sensorTemperature:"". coerceNum already dropped
+      // the numeric ones; the boolean and string branches wrote `false` / "".
+      const empty = (type: string, instance: string): CloudStateCapability => ({
+        type: `devices.capabilities.${type}`,
+        instance,
+        state: { value: "" },
       });
-      expect(ls?.stateId).toBe("light_scene"); // matches SCENE_DROPDOWN_RULES + the real state
-      const diy = mapCloudStateValue({
-        type: "devices.capabilities.dynamic_scene",
-        instance: "diyScene",
-        state: { value: 2 },
-      });
-      expect(diy?.stateId).toBe("diy_scene");
+      expect(mapCloudStateValue(empty("toggle", "gradientToggle"))).toBeNull();
+      expect(mapCloudStateValue(empty("on_off", "powerSwitch"))).toBeNull();
+      expect(mapCloudStateValue(empty("mode", "nightlightScene"))).toBeNull();
+      expect(mapCloudStateValue(empty("property", "sensorTemperature"))).toBeNull();
+      expect(mapCloudStateValue(empty("range", "brightness"))).toBeNull();
+      expect(mapCloudStateValue(empty("work_mode", "workMode"))).toBeNull();
+    });
+
+    it("drops colorTemperatureK 0 — the light is not in white mode (same rule as the MQTT status path)", () => {
+      expect(
+        mapCloudStateValue({
+          type: "devices.capabilities.color_setting",
+          instance: "colorTemperatureK",
+          state: { value: 0 },
+        }),
+      ).toBeNull();
+    });
+
+    it("writes no scene value from the state read — the scene dropdowns are keyed by index", () => {
+      // light_scene / diy_scene use "0" = --- and "1".."n" (buildUniqueLabelMap),
+      // so a raw Govee value can never be one of their keys — and every capture
+      // of this endpoint carries "" here (H61A8, H7143). Until a capture shows
+      // the shape of an active scene, the honest write is none.
+      expect(
+        mapCloudStateValue({ type: "devices.capabilities.dynamic_scene", instance: "lightScene", state: { value: 3 } }),
+      ).toBeNull();
+      expect(
+        mapCloudStateValue({ type: "devices.capabilities.dynamic_scene", instance: "diyScene", state: { value: 2 } }),
+      ).toBeNull();
     });
 
     it("decodes a work_mode cloud state as the datapoint's own key type (L28)", () => {
@@ -1219,15 +1244,16 @@ describe("CapabilityMapper", () => {
       expect(result!.value).toBe(false);
     });
 
-    it("should map dynamic_scene object to JSON string", () => {
+    it("does not turn a dynamic_scene object into a JSON string on the dropdown", () => {
+      // This used to document writing '{"id":123,"paramId":"abc"}' into an
+      // index-keyed dropdown — junk by design, never observable while the
+      // state read returned nothing.
       const cap: CloudStateCapability = {
         type: "devices.capabilities.dynamic_scene",
         instance: "lightScene",
         state: { value: { id: 123, paramId: "abc" } },
       };
-      const result = mapCloudStateValue(cap);
-      expect(result!.stateId).toBe("light_scene");
-      expect(result!.value).toBe('{"id":123,"paramId":"abc"}');
+      expect(mapCloudStateValue(cap)).toBeNull();
     });
 
     it("should map property to number", () => {
