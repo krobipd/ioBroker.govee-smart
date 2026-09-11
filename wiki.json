@@ -1,0 +1,23 @@
+{
+  "_comment": "Read by gate A13 (Entwicklung/scripts/check-wiki.py). The wiki is a separate git repo and used to fall out of the release chain entirely. The wiki address is NOT declared here — it is derived from package.json, so there is only one truth. `pairs` maps each English page to its German counterpart; the mapping cannot be guessed from the names (State-Tree -> Datenpunkte).",
+  "clone": "../ioBroker.govee-smart.wiki",
+  "meta": ["_Sidebar", "_Footer"],
+  "pairs": {
+    "Home": "Startseite",
+    "Setup": "Einrichtung",
+    "Devices": "Geraete",
+    "State-Tree": "Datenpunkte",
+    "Behavior": "Verhalten",
+    "Groups": "Gruppen",
+    "Segments": "Segmente",
+    "Scenes-and-Snapshots": "Szenen-und-Snapshots",
+    "Sensors-and-Appliances": "Sensoren-und-Appliances"
+  },
+  "generated": [
+    {
+      "command": "npm run gen-wiki --",
+      "pages": ["Devices", "Geraete"]
+    }
+  ],
+  "undocumented": {}
+}

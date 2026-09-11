@@ -354,7 +354,11 @@ export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): stri
   out.push("");
   out.push(`---`);
   out.push("");
-  out.push(`*${t.footer} ${totalCount} ${t.entriesWord} · ${new Date().toISOString().slice(0, 10)}*`);
+  // No date in the footer: gate A13 compares a fresh render against the committed page, and a
+  // day stamp would make that diff red every day while the content is identical (measured
+  // 2026-09-12: 602/602 entries, only the stamp differed). The entry count IS the state the
+  // page describes; when it was written is in the wiki's git history.
+  out.push(`*${t.footer} ${totalCount} ${t.entriesWord}*`);
   out.push("");
   return out.join("\n");
 }

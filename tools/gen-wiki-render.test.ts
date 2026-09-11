@@ -47,4 +47,10 @@ describe("renderPage — one folded block per device type", () => {
   it("the footer still counts every entry, folded or not", () => {
     expect(renderPage(devices, TEXTS_EN)).toContain("4 entries");
   });
+
+  it("renders byte-identical output twice, so the wiki gate can diff it", () => {
+    // Gate A13 re-runs the generator and compares. A date stamp used to make that red every day.
+    expect(renderPage(devices, TEXTS_EN)).toBe(renderPage(devices, TEXTS_EN));
+    expect(renderPage(devices, TEXTS_EN)).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+  });
 });
