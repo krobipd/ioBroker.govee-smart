@@ -1617,7 +1617,8 @@ export class DeviceManager {
           this.log.debug(`Reachability refresh failed for ${deviceLabel(device)}: ${errMessage(e)}`);
         }
       };
-      // Priority 3 — below control (0) and the regular state load (2): this is
+      // Priority 3 — below control (0), the regular state load (1) and the
+      // scene-library loads (2): this is
       // a safety net, it must never crowd out a command the user just issued.
       if (this.rateLimiter) {
         await this.rateLimiter.tryExecute(refreshOne, 3, applianceBudget(device));

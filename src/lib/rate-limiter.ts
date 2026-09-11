@@ -210,7 +210,7 @@ export class RateLimiter {
    * on debug so a hammering script can't spam the log).
    *
    * @param execute The API call to make
-   * @param priority Lower = higher priority (0 = control, 1 = status, 2 = scenes)
+   * @param priority Lower = higher priority (0 = control, 1 = status reads, 2 = scene libraries, 3 = reachability refresh)
    * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
    * @param budget The device's own daily allowance, when one applies — booked when the call actually runs, not when it is queued
    */

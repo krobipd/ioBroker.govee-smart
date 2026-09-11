@@ -45,8 +45,9 @@ export function cloudReportsOffline(caps: CloudStateCapability[]): boolean {
  * LAN-capable devices, the LAN state IDs are filtered out — Cloud only
  * fills the gaps the LAN client doesn't cover.
  *
- * Every /device/state call runs through the RateLimiter (background
- * priority, same as scene loads): a fleet-sized burst would otherwise
+ * Every /device/state call runs through the RateLimiter (status tier 1,
+ * ahead of the scene-library loads — see the note at the call site): a
+ * fleet-sized burst would otherwise
  * blow the per-minute safety budget and bypass the daily accounting —
  * including the 100/day appliance budget. On an exhausted budget the
  * calls queue and the values land when budget frees up.
