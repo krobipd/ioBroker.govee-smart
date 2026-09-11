@@ -4239,6 +4239,40 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
     expect(reads).toEqual([]);
   });
 
+  it("never polls a device that pays from its own daily allowance — its 90 calls are for its commands (#47)", async () => {
+    // Every 20 minutes would be 72 of an appliance's 90 calls a day. Today,
+    // with the state read returning nothing, an API-key-only install polled
+    // every 6 minutes, spent the 90 by 09:00 UTC and then refused the user's
+    // own commands until midnight. Its proofs are the state read at start,
+    // its status push, a command, and the account list saying online.
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dev.type = "devices.types.air_purifier";
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+    expect(reads).toEqual([]);
+  });
+
+  it("on an API-key-only install a light without a local API stays reachable while the state read says online, and goes grey the moment it says offline", async () => {
+    // The 2.32.0 design, effective for the first time now that the state read
+    // returns anything. The bound is Govee's own per-device word: renewed every
+    // 20 minutes while it says online, applied at once when it says offline (an
+    // answer with no online capability expires after 30 minutes — covered by
+    // "a device that answers nothing usable is retried").
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    const online = recordingCloud();
+    dm2.setCloudClient(online.client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: true, decidedBy: "cloudReport" });
+
+    dev.state.cloudReportedOnlineAt = Date.now() - (CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dev.lastReachabilityRefreshAt = undefined;
+    const offline = recordingCloud([{ type: "devices.capabilities.online", instance: "online", state: { value: false } }]);
+    dm2.setCloudClient(offline.client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    expect(resolveDeviceReachability(dev)).toMatchObject({ online: false, decidedBy: "cloudReport" });
+  });
+
   it("a device that answers nothing usable is retried, but not on every tick", async () => {
     // Without the attempt stamp an endpoint that never answers would be polled
     // every two minutes for the life of the adapter.

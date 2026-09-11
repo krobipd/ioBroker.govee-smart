@@ -1493,10 +1493,9 @@ export class DeviceManager {
    * in the caller — inside `pollAppApi` it would sit behind the very
    * bearer-token bail it exists to route around.
    *
-   * Cost ceiling: one call per device per {@link CLOUD_REACHABILITY_REFRESH_MS}
-   * / 4, so a device whose SKU never answers this endpoint costs at most twelve
-   * calls an hour against the account's 9,000 a day, at background priority and
-   * on the appliance's own allowance where it has one.
+   * Cost ceiling: one call per light per {@link CLOUD_REACHABILITY_REFRESH_MS}
+   * / 4 against the account's 9,000 a day, at background priority. Devices
+   * with an allowance of their own (`applianceBudget`) are never polled here.
    *
    * @returns Number of devices a refresh was dispatched for
    */
@@ -1513,6 +1512,15 @@ export class DeviceManager {
     let dispatched = 0;
     for (const device of this.devices.values()) {
       if (device.sku === "BaseGroup" || !device.channels.cloud) {
+        continue;
+      }
+      // A device that pays for its cloud calls from its own daily allowance —
+      // appliances, and sensors under the same rule — is never polled for
+      // reachability: every 20 minutes would be 72 of the 90 calls a day, and
+      // once they are spent it is the user's own commands that get refused
+      // (issue #47). Its proofs are the state read at start, its status push,
+      // a command, and the account list saying online.
+      if (applianceBudget(device) !== undefined) {
         continue;
       }
       // A LAN-driven light ignores every cloud claim (maybeApplyCloudOnline
