@@ -61,9 +61,19 @@ function fixtureNative() {
   return { ...FIXTURE_NATIVE };
 }
 
-/** Cloud REST envelope Govee puts around every payload. */
+/** Envelope of the OpenAPI device LIST (`/user/devices`): `data`. */
 function ok(payload) {
   return JSON.stringify({ code: 200, message: "success", data: payload });
+}
+
+/**
+ * Envelope of the per-device OpenAPI answers (`/device/state`, `/device/scenes`,
+ * `/device/diy-scenes`): `payload`, with `msg` instead of `message` — measured
+ * on three captures (issue #47). The adapter parsed `data` for the state read
+ * until 2.35.0 and never received a value; this fixture had copied the mistake.
+ */
+function okPayload(payload) {
+  return JSON.stringify({ requestId: "fixture", msg: "success", code: 200, payload });
 }
 
 /**
@@ -152,14 +162,14 @@ function startFakeCloud() {
         reply(ok(FIXTURE.devices));
       } else if (url.includes("/router/api/v1/device/state")) {
         reply(
-          ok({
+          okPayload({
             sku: parsed.payload?.sku,
             device: parsed.payload?.device,
             capabilities: stateFor(parsed.payload?.device),
           }),
         );
       } else if (url.includes("/router/api/v1/device/scenes") || url.includes("/router/api/v1/device/diy-scenes")) {
-        reply(ok(scenesFor()));
+        reply(okPayload(scenesFor()));
       } else if (url.includes("/router/api/v1/device/control")) {
         reply(ok({ capability: {} }));
       } else if (url.includes("/lookup")) {
