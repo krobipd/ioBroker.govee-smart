@@ -97,14 +97,20 @@ export interface CloudDeviceListResponse {
   data: CloudDevice[];
 }
 
-/** Cloud API device state response */
+/**
+ * Answer of POST /router/api/v1/device/state. Note the envelope: `payload`
+ * with `msg`, as on the scene endpoints — NOT `data`/`message`, which is the
+ * envelope of the device list (measured on three captures, issue #47).
+ */
 export interface CloudDeviceStateResponse {
+  /** Echo of the request id */
+  requestId?: string;
+  /** Response message — `msg` on this endpoint */
+  msg?: string;
   /** Response status code */
   code: number;
-  /** Response message */
-  message: string;
   /** Device state data */
-  data: {
+  payload?: {
     /** Product model */
     sku: string;
     /** Device identifier */

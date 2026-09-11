@@ -34,6 +34,33 @@ function makeFakeHttps(respond: (call: HttpRequestOptions, idx: number) => unkno
   return { fn, calls };
 }
 
+/**
+ * Govee's real answer to POST /router/api/v1/device/state — the H7127 purifier
+ * from issue #47's 2.34.0 export (Ressourcen/govee-smart/issue47-fixtures/
+ * get_device_state_h7127_live_2026-09-11.json). The envelope is `payload`, the
+ * message field is `msg`; `data` is the envelope of the device LIST only.
+ */
+const H7127_STATE_ENVELOPE = {
+  requestId: "state_1789104406298_1",
+  msg: "success",
+  code: 200,
+  payload: {
+    sku: "H7127",
+    device: "AA:BB",
+    capabilities: [
+      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+      { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 0 } },
+      {
+        type: "devices.capabilities.work_mode",
+        instance: "workMode",
+        state: { value: { workMode: 2, modeValue: 0 } },
+      },
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 72 } },
+      { type: "devices.capabilities.property", instance: "airQuality", state: { value: 6 } },
+    ],
+  },
+};
+
 describe("GoveeCloudClient", () => {
   describe("getFailureReason", () => {
     it("should return null when no error has occurred", () => {
@@ -123,9 +150,7 @@ describe("GoveeCloudClient", () => {
     });
 
     it("should fire the hook on getDeviceState", async () => {
-      const fake = makeFakeHttps(() => ({
-        data: { capabilities: [{ type: "x", instance: "y", state: { value: 1 } }] },
-      }));
+      const fake = makeFakeHttps(() => H7127_STATE_ENVELOPE);
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       const captured: Array<{ deviceId: string; endpoint: string }> = [];
       client.setResponseHook((deviceId, endpoint, _body) => captured.push({ deviceId, endpoint }));
@@ -170,29 +195,58 @@ describe("GoveeCloudClient", () => {
   });
 
   describe("getDeviceState", () => {
-    it("should return capabilities array on success", async () => {
-      const fake = makeFakeHttps(() => ({
-        data: {
-          capabilities: [
-            { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
-            { type: "devices.capabilities.range", instance: "brightness", state: { value: 80 } },
-          ],
-        },
-      }));
+    it("returns the capabilities of Govee's real envelope — `payload`, not `data` (issue #47)", async () => {
+      // Three captures agree (the reporter's export, tukey42's H61A8 from May,
+      // Govee's own docs); the scene endpoints in this file always read
+      // `payload`. Reading `data` here returned [] for every state read since
+      // v0.1.0, so no value from this endpoint ever reached a datapoint.
+      const fake = makeFakeHttps(() => H7127_STATE_ENVELOPE);
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
-      const caps = await client.getDeviceState("H6160", "AABB");
-      expect(caps).toHaveLength(2);
+      const caps = await client.getDeviceState("H7127", "AA:BB");
+      expect(caps).toHaveLength(5);
+      expect(caps.map(c => c.instance)).toEqual(["online", "powerSwitch", "workMode", "filterLifeTime", "airQuality"]);
     });
 
-    it("should return [] when capabilities missing", async () => {
-      const fake = makeFakeHttps(() => ({ data: {} }));
+    it("returns [] when the payload carries no capabilities", async () => {
+      const fake = makeFakeHttps(() => ({ requestId: "x", msg: "success", code: 200, payload: {} }));
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
       const caps = await client.getDeviceState("H6160", "AABB");
       expect(caps).toEqual([]);
     });
 
+    it("throws on the list-style envelope — an answer without payload is a broken read, not an empty device", async () => {
+      // This is the shape the parser expected for the adapter's whole life.
+      // Folding it into [] is what kept the bug invisible: "no value" and
+      // "wrong field" rendered the same. A shape this endpoint does not use
+      // is a failure — the callers record it in the diagnostics report.
+      const fake = makeFakeHttps(() => ({
+        code: 200,
+        message: "success",
+        data: { capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } }] },
+      }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDeviceState("H6160", "AABB")).rejects.toThrow(/carries no payload/);
+    });
+
+    it("throws on a bare-array answer — Govee sent `[]` once for the H7127 (export v2.34.0, 2026-09-11)", async () => {
+      // apiHistory["/router/api/v1/device/state"] of the reporter's second export
+      // holds one `[]` next to two proper payload envelopes. Until 2.35.0 the
+      // parser turned it into "no capabilities"; it is a read without an answer.
+      const fake = makeFakeHttps(() => []);
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDeviceState("H7127", "AABB")).rejects.toThrow(/carries no payload/);
+    });
+
+    it("throws on a rejection in the envelope — the reason reaches the diagnostics report", async () => {
+      // Same rule as controlDevice: Govee can answer HTTP 200 with a body
+      // code that is not 200, and the reason sits in `msg`.
+      const fake = makeFakeHttps(() => ({ requestId: "x", msg: "Invalid parameter type", code: 400 }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDeviceState("H7127", "AA:BB")).rejects.toThrow(/code=400 — Invalid parameter type/);
+    });
+
     it("should send POST with sku+device payload", async () => {
-      const fake = makeFakeHttps(() => ({ data: { capabilities: [] } }));
+      const fake = makeFakeHttps(() => H7127_STATE_ENVELOPE);
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
       await client.getDeviceState("H6160", "AABB");
       expect(fake.calls[0].method).toBe("POST");

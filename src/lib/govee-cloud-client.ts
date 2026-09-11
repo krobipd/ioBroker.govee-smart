@@ -169,7 +169,27 @@ export class GoveeCloudClient {
       payload: { sku, device },
     });
     this.onResponse?.(device, "/router/api/v1/device/state", resp);
-    const caps = resp?.data?.capabilities;
+    if (resp === null) {
+      // HTTP 200 without a body — the http client's word for "nothing came".
+      return [];
+    }
+    // A rejection and an answer of unknown shape THROW — both callers catch
+    // per device and record the reason in the diagnostics report. Only a
+    // payload without capabilities is a legitimate empty result. Folding all
+    // of it into [] is how the wrong envelope stayed invisible from v0.1.0 to
+    // 2.34.0: "no value" and "wrong field" rendered the same (issue #47).
+    if (typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
+      throw new Error(
+        `Device state rejected for ${sku}/${device}: code=${resp.code}${resp.msg ? ` — ${resp.msg}` : ""}`,
+      );
+    }
+    if (typeof resp.payload !== "object" || resp.payload === null) {
+      throw new Error(`Device state answer for ${sku}/${device} carries no payload — has Govee changed the envelope?`);
+    }
+    // Govee wraps this answer in `payload`, like the scene endpoints below —
+    // `data` is the envelope of the device LIST (three captures: the
+    // reporter's export, tukey42's H61A8, Govee's own docs).
+    const caps = resp.payload.capabilities;
     return Array.isArray(caps) ? caps : [];
   }
 
