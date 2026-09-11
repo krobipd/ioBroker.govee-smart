@@ -236,6 +236,11 @@ export class StateManager {
   private readonly resolvedOnline = new Map<string, boolean>();
   /** This instance's device catalog — quirks for the LAN default states. */
   private readonly registry: DeviceRegistry;
+  /**
+   * The tree build currently running, per device prefix — see
+   * {@link runDeviceBuild}. An entry leaves the map once its build settled.
+   */
+  private readonly buildChain = new Map<string, Promise<void>>();
 
   /**
    * @param adapter The ioBroker adapter instance
@@ -653,6 +658,36 @@ export class StateManager {
     } catch {
       /* retried on the next write */
     }
+  }
+
+  /**
+   * Run one tree build for a device after every earlier build for the same
+   * device has finished. Two builds used to run interleaved — the cache-based
+   * build of the start-up and the cloud-list build a moment later — and each
+   * of them ends in {@link cleanupCloudOwnedStates} with ITS definitions:
+   * whichever cleanup ran last deleted the datapoints only the other build
+   * declared. Measured on the object inventory (2026-09-11): the heater's
+   * `control.oscillation_toggle`, new in the cloud list, was gone on every
+   * other start. The same interleaving let the older build leave its
+   * `common.states` map on an object the newer build had already refreshed.
+   * A failed build does not block the next one; builds for different devices
+   * run side by side.
+   *
+   * @param device The device whose tree the build writes
+   * @param build The build itself (info + LAN + cloud states)
+   */
+  runDeviceBuild(device: GoveeDevice, build: () => Promise<void>): Promise<void> {
+    const key = this.devicePrefix(device);
+    const previous = this.buildChain.get(key) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(build);
+    this.buildChain.set(key, next);
+    const settle = (): void => {
+      if (this.buildChain.get(key) === next) {
+        this.buildChain.delete(key);
+      }
+    };
+    next.then(settle, settle);
+    return next;
   }
 
   /**

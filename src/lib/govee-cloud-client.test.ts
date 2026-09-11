@@ -272,15 +272,32 @@ describe("GoveeCloudClient", () => {
       expect(body.payload.capability.value).toBe(1);
     });
 
-    it("should fire the response hook with request + response shape", async () => {
-      const fake = makeFakeHttps(() => ({ ok: true }));
+    it("resolves on Govee's real success answer and forwards it to the response hook (audit 2026-09-11)", async () => {
+      // Verbatim from research-issue47-followup-2026-09-11.export-v2.34.0.json — the
+      // success answer is NOT wrapped in `data`, carries `code: 200` in the body and
+      // `capability.state.status: "success"`. `{ok:true}` never reached the 200 comparison.
+      const real = {
+        requestId: "ctrl_1789105601701_3",
+        msg: "success",
+        code: 200,
+        capability: {
+          type: "devices.capabilities.on_off",
+          instance: "powerSwitch",
+          state: { status: "success" },
+          value: 1,
+        },
+      };
+      const fake = makeFakeHttps(() => real);
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
       const captured: unknown[] = [];
       client.setResponseHook((_d, _e, body) => captured.push(body));
-      await client.controlDevice("H6160", "AABB", "devices.capabilities.on_off", "powerSwitch", 1);
+      await expect(
+        client.controlDevice("H7127", "AABB", "devices.capabilities.on_off", "powerSwitch", 1),
+      ).resolves.toBeUndefined();
       expect(captured).toHaveLength(1);
       const hookBody = captured[0] as { request: unknown; response: unknown };
       expect(Object.keys(hookBody).sort()).toEqual(["request", "response"]);
+      expect(hookBody.response).toEqual(real);
     });
   });
 

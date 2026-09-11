@@ -227,6 +227,17 @@ export class GoveeApiClient {
     this.logFallback(`/device/rest/devices/v1/list`, result);
     const resp = result.value;
 
+    // Govee answers HTTP 200 with a body-level `status` when the bearer is not
+    // accepted (`{"status":401,"message":"please login"}`, ptreal-ble-research.md
+    // §4.2). Until 2.35.0 that became an empty list: nothing warned, the sensor
+    // values simply stopped. A failed fetch throws — the caller warns once and
+    // records it in the diagnostics report (device-manager.ts pollAppApi).
+    if (typeof resp?.status === "number" && resp.status !== 200 && !Array.isArray(resp.devices)) {
+      throw new Error(
+        `Govee rejected the device list: status=${resp.status}${resp.message ? ` — ${resp.message}` : ""}`,
+      );
+    }
+
     const out: AppDeviceEntry[] = [];
     const list = Array.isArray(resp?.devices) ? resp.devices : [];
     for (const d of list) {

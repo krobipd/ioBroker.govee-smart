@@ -1,0 +1,10 @@
+{
+  "sku": "H6199",
+  "device": "AA:BB:CC:DD:EE:FF:00:02",
+  "capabilities": [
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "diyScene"
+    }
+  ]
+}

@@ -111,12 +111,14 @@ export function onLanDeviceReady<T extends DeviceEventsAdapter & connectionState
     return;
   }
   const sm = adapter.stateManager;
-  const p = (async () => {
-    await sm.createInfoStates(device);
-    await sm.createLanStates(device);
-  })().catch(e => {
-    adapter.log.error(`onLanDeviceReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
-  });
+  const p = sm
+    .runDeviceBuild(device, async () => {
+      await sm.createInfoStates(device);
+      await sm.createLanStates(device);
+    })
+    .catch(e => {
+      adapter.log.error(`onLanDeviceReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+    });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
 }
@@ -162,15 +164,20 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   // The device manager settles the count (and stores it on the device); the
   // state manager only builds the tree for that number.
   const segmentCount = adapter.deviceManager?.syncSegmentCount(device) ?? 0;
-  const p = (async () => {
-    await sm.createInfoStates(device);
-    await sm.createLanStates(device);
-    await sm.createCloudStates(device, cloudDefs, segmentCount);
-    await sm.migrateLegacyDiagnostics(device);
-    await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
-  })().catch(e => {
-    adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
-  });
+  // One build per device at a time (runDeviceBuild): the cache-based build of
+  // the start-up and the cloud-list build a moment later must not interleave,
+  // or the older cleanup deletes what the newer build just declared.
+  const p = sm
+    .runDeviceBuild(device, async () => {
+      await sm.createInfoStates(device);
+      await sm.createLanStates(device);
+      await sm.createCloudStates(device, cloudDefs, segmentCount);
+      await sm.migrateLegacyDiagnostics(device);
+      await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
+    })
+    .catch(e => {
+      adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+    });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
   if (adapter.statesReady) {

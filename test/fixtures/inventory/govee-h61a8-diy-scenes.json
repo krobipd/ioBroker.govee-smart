@@ -1,0 +1,10 @@
+{
+  "sku": "H61A8",
+  "device": "AA:BB:CC:DD:EE:FF:00:0F",
+  "capabilities": [
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "diyScene"
+    }
+  ]
+}

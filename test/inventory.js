@@ -115,7 +115,22 @@ function stateFor(device) {
   return caps;
 }
 
-/** Scenes + snapshots for a light, from the separate scenes endpoint. */
+/**
+ * The captured per-device answers of the two verbatim lights (audit 2026-09-11):
+ * scenes, DIY scenes and the state read, keyed by the fixture's device id. A
+ * device without an entry here gets the hand-built answers below.
+ */
+const CAPTURED = {};
+for (const sku of ["h61a8", "h6199"]) {
+  const scenes = require(`./fixtures/inventory/govee-${sku}-scenes.json`);
+  CAPTURED[scenes.device] = {
+    scenes,
+    diyScenes: require(`./fixtures/inventory/govee-${sku}-diy-scenes.json`),
+    state: require(`./fixtures/inventory/govee-${sku}-state.json`),
+  };
+}
+
+/** Scenes + snapshots for a light, from the separate scenes endpoint (hand-built lights only). */
 function scenesFor() {
   return {
     capabilities: [
@@ -161,17 +176,27 @@ function startFakeCloud() {
       if (url.includes("/router/api/v1/user/devices")) {
         reply(ok(FIXTURE.devices));
       } else if (url.includes("/router/api/v1/device/state")) {
+        const device = parsed.payload?.device;
+        const captured = CAPTURED[device];
         reply(
-          okPayload({
-            sku: parsed.payload?.sku,
-            device: parsed.payload?.device,
-            capabilities: stateFor(parsed.payload?.device),
+          okPayload(captured ? captured.state : { sku: parsed.payload?.sku, device, capabilities: stateFor(device) }),
+        );
+      } else if (url.includes("/router/api/v1/device/diy-scenes")) {
+        const captured = CAPTURED[parsed.payload?.device];
+        reply(okPayload(captured ? captured.diyScenes : scenesFor()));
+      } else if (url.includes("/router/api/v1/device/scenes")) {
+        const captured = CAPTURED[parsed.payload?.device];
+        reply(okPayload(captured ? captured.scenes : scenesFor()));
+      } else if (url.includes("/router/api/v1/device/control")) {
+        // The control answer is NOT wrapped in `data` — measured on 12 captures (issue #47).
+        reply(
+          JSON.stringify({
+            requestId: "fixture",
+            msg: "success",
+            code: 200,
+            capability: { ...(parsed.payload?.capability ?? {}), state: { status: "success" } },
           }),
         );
-      } else if (url.includes("/router/api/v1/device/scenes") || url.includes("/router/api/v1/device/diy-scenes")) {
-        reply(okPayload(scenesFor()));
-      } else if (url.includes("/router/api/v1/device/control")) {
-        reply(ok({ capability: {} }));
       } else if (url.includes("/lookup")) {
         // The App-Store lookup the adapter uses to learn the current Govee
         // app version. Pinned here so the inventory does not change with

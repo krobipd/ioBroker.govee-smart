@@ -155,5 +155,8 @@
   "descBodyDetected": "Signale l'instant où le capteur détecte quelqu'un ; se réinitialise seul.",
   "descDirtDetected": "Signale l'instant où l'appareil annonce une saleté détectée ; se réinitialise seul.",
   "descCloudOnline": "Si l'adaptateur atteint le cloud Govee — pas si un appareil donné est présent.",
-  "descMembers": "Les appareils que ce groupe de l'application commute ensemble, tels que nommés dans l'arbre d'objets."
+  "descMembers": "Les appareils que ce groupe de l'application commute ensemble, tels que nommés dans l'arbre d'objets.",
+  "descMusicAutoColor": "Si la lampe choisit elle-même ses couleurs en mode musique au lieu de garder une couleur fixe.",
+  "descDreamViewToggle": "Si la lampe suit les couleurs de l'écran captées par une caméra Govee DreamView.",
+  "descDiyScene": "Une des scènes que vous avez créées vous-même dans l'éditeur DIY de l'application Govee — vide tant que vous n'en avez pas créé."
 }

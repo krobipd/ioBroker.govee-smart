@@ -43,6 +43,12 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     deviceManager: { getDevices: () => devices, syncSegmentCount: (d: GoveeDevice) => d.segmentCount ?? 0 } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
+      // The real one chains builds per device; here it only records that the
+      // build went through it and runs it.
+      runDeviceBuild: (d: GoveeDevice, build: () => Promise<void>) => {
+        calls.push(`runDeviceBuild:${d.deviceId}`);
+        return build();
+      },
       updateDeviceState: (_d: GoveeDevice, s: Partial<DeviceState>) => {
         updates.push(s);
         return Promise.resolve();
@@ -194,6 +200,14 @@ describe("onLanDeviceReady (phase 1)", () => {
     onLanDeviceReady(rig.adapter, device, [device]);
     expect(rig.queue).toHaveLength(0);
   });
+
+  it("runs its build through the state manager's per-device chain — a LAN build must not overtake a cloud build on the info channel", async () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onLanDeviceReady(rig.adapter, device, [device]);
+    await Promise.all(rig.queue);
+    expect(rig.calls[0]).toBe(`runDeviceBuild:${device.deviceId}`);
+  });
 });
 
 describe("onCloudDataReady (phase 2)", () => {
@@ -211,6 +225,14 @@ describe("onCloudDataReady (phase 2)", () => {
         "updateDeviceTier",
       ]),
     );
+  });
+
+  it("runs its build through the state manager's per-device chain (the cache build and the cloud-list build must not interleave)", async () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onCloudDataReady(rig.adapter, device, [device]);
+    await Promise.all(rig.queue);
+    expect(rig.calls[0]).toBe(`runDeviceBuild:${device.deviceId}`);
   });
 
   it("gives a group with unresolved members no object tree at all", async () => {

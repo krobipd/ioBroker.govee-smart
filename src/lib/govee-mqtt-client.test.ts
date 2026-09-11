@@ -253,6 +253,61 @@ describe("GoveeMqttClient", () => {
       expect(client.getFailureReason()).toBe("cannot reach Govee servers — will retry");
     });
 
+    describe("login rejections as Govee really sends them (audit 2026-09-11)", () => {
+      // Every body below is a capture or a documented Govee answer:
+      //  451 — issue #36 log 2026-07-23 (verbatim)
+      //  454 — issue #8 log 2026-04-27: status 454 with an EMPTY message
+      //  400 "Incorrect password", 400 "The app version is too low…", 429 text —
+      //      Ressourcen/govee-smart/_archive/2fa_454_analyse_2026_04_27.md, error-code map
+      async function connectWith(body: Record<string, unknown>): Promise<{ reason: string | null; warns: string[] }> {
+        const warns: string[] = [];
+        const log: ioBroker.Logger = { ...mockLog, warn: (m: string) => void warns.push(m) };
+        const fake = makeFakeHttps(() => body);
+        const client = new GoveeMqttClient("test@example.com", "secret", log, noopTimers, fake.fn);
+        await client.connect(
+          () => {},
+          () => {},
+        );
+        return { reason: client.getFailureReason(), warns };
+      }
+
+      it("451 'This email hasn't been registered yet.' is a credential failure (issue #36)", async () => {
+        const r = await connectWith({ status: 451, message: "This email hasn't been registered yet." });
+        expect(r.reason).toBe("login failed (will retry)");
+        expect(r.warns.join("\n")).toContain("Login failed: email not registered (status 451)");
+      });
+
+      it("454 with an empty message asks for a verification code (issue #8)", async () => {
+        const r = await connectWith({ status: 454, message: "" });
+        expect(r.reason).toBe("Govee asked for verification — request a code in adapter settings");
+      });
+
+      it("400 'Incorrect password' is caught by the text, not the status", async () => {
+        const r = await connectWith({ status: 400, message: "Incorrect password" });
+        expect(r.reason).toBe("login failed (will retry)");
+        expect(r.warns.join("\n")).toContain("Login failed: Incorrect password (status 400)");
+      });
+
+      it("400 'app version too low' is rejected without a credential hint", async () => {
+        const r = await connectWith({
+          status: 400,
+          message: "The app version is too low, please upgrade the version!",
+        });
+        expect(r.reason).toBe("login rejected — see earlier log");
+        expect(r.warns.join("\n")).toContain(
+          "Govee login rejected: The app version is too low, please upgrade the version! (status 400)",
+        );
+      });
+
+      it("429 with Govee's quota text is a rate limit", async () => {
+        const r = await connectWith({
+          status: 429,
+          message: "rate limited! the limit is 10000 requests every 24 hours",
+        });
+        expect(r.reason).toBe("rate-limited by Govee — will retry");
+      });
+    });
+
     it("should fire onVerificationConsumed when login succeeds with a code", async () => {
       // Login succeeds (returns client object) — so we get past the 454 branch.
       // getIotKey is the second call and FAILS with network — so mqtt.connect

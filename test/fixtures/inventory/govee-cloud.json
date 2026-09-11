@@ -2,11 +2,16 @@
   "_comment": [
     "Fixture account for the object inventory. Covers EVERY device kind the adapter",
     "supports, not just the maintainer's own hardware (feedback_user_hardware_ist_sample):",
-    "a LAN light with segments, a cloud-only light without a local interface, a",
+    "a LAN light with segments, a cloud-only light without a local interface (H6199,",
+    "verbatim), a captured outdoor light with scenes/DIY/snapshots (H61A8, verbatim), a",
     "thermometer, a gateway-backed battery sensor plus its gateway, a heater, a",
     "humidifier, a fan, an air purifier, a kettle, an ice maker, an aroma diffuser,",
-    "a socket, a button and an app device group. Capability shapes are the ones Govee",
-    "really returns (measured captures under Ressourcen/govee-smart)."
+    "a socket, a button and an app device group.",
+    "Provenance: a device with `_source` is a WHOLE Govee list entry copied verbatim from",
+    "that capture (only the device id is the fixture's). A device without `_source` is a",
+    "hand-picked subset of real capability blocks — its shape per capability is Govee's,",
+    "its capability SET is not (audit 2026-09-11). Replace it by the verbatim entry as soon",
+    "as Ressourcen/govee-smart/github-exports/ holds its export."
   ],
   "devices": [
     {
@@ -21,8 +26,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -32,13 +43,24 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 1, "max": 100, "precision": 1 }
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
           }
         },
         {
           "type": "devices.capabilities.color_setting",
           "instance": "colorRgb",
-          "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } }
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
         },
         {
           "type": "devices.capabilities.color_setting",
@@ -46,7 +68,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.kelvin",
-            "range": { "min": 2000, "max": 9000, "precision": 1 }
+            "range": {
+              "min": 2000,
+              "max": 9000,
+              "precision": 1
+            }
           }
         },
         {
@@ -58,10 +84,21 @@
               {
                 "fieldName": "segment",
                 "dataType": "Array",
-                "elementRange": { "min": 0, "max": 9 },
+                "elementRange": {
+                  "min": 0,
+                  "max": 9
+                },
                 "elementType": "INTEGER"
               },
-              { "fieldName": "rgb", "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } }
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                }
+              }
             ]
           }
         },
@@ -74,14 +111,21 @@
               {
                 "fieldName": "segment",
                 "dataType": "Array",
-                "elementRange": { "min": 0, "max": 9 },
+                "elementRange": {
+                  "min": 0,
+                  "max": 9
+                },
                 "elementType": "INTEGER"
               },
               {
                 "fieldName": "brightness",
                 "dataType": "INTEGER",
                 "unit": "unit.percent",
-                "range": { "min": 1, "max": 100, "precision": 1 }
+                "range": {
+                  "min": 1,
+                  "max": 100,
+                  "precision": 1
+                }
               }
             ]
           }
@@ -92,8 +136,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -107,15 +157,25 @@
                 "fieldName": "musicMode",
                 "dataType": "ENUM",
                 "options": [
-                  { "name": "Energic", "value": 3 },
-                  { "name": "Rhythm", "value": 5 }
+                  {
+                    "name": "Energic",
+                    "value": 3
+                  },
+                  {
+                    "name": "Rhythm",
+                    "value": 5
+                  }
                 ]
               },
               {
                 "fieldName": "sensitivity",
                 "dataType": "INTEGER",
                 "unit": "unit.percent",
-                "range": { "min": 0, "max": 100, "precision": 1 }
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                }
               }
             ]
           }
@@ -134,8 +194,31 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "gradientToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -143,17 +226,462 @@
           "type": "devices.capabilities.range",
           "instance": "brightness",
           "parameters": {
-            "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 1, "max": 100, "precision": 1 }
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedColorRgb",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 15
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 14
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
           }
         },
         {
           "type": "devices.capabilities.color_setting",
           "instance": "colorRgb",
-          "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } }
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorTemperatureK",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 2000,
+              "max": 9000,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "lightScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.music_setting",
+          "instance": "musicMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "musicMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "Energic",
+                    "value": 1
+                  },
+                  {
+                    "name": "Spectrum",
+                    "value": 2
+                  },
+                  {
+                    "name": "Rolling",
+                    "value": 3
+                  },
+                  {
+                    "name": "Rhythm",
+                    "value": 4
+                  }
+                ],
+                "required": true
+              },
+              {
+                "unit": "unit.percent",
+                "fieldName": "sensitivity",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              },
+              {
+                "fieldName": "autoColor",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "on",
+                    "value": 1
+                  },
+                  {
+                    "name": "off",
+                    "value": 0
+                  }
+                ],
+                "required": false
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": false
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "diyScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "snapshot",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "low",
+                "value": 459706
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "dreamViewToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
         }
-      ]
+      ],
+      "_source": "Ressourcen/govee-smart/github-exports/issue-26-H6199.txt apiHistory[/router/api/v1/user/devices][0].body (issue #26, adapter 2.15.0); device id is the fixture's"
+    },
+    {
+      "sku": "H61A8",
+      "device": "AA:BB:CC:DD:EE:FF:00:0F",
+      "deviceName": "Neon Garden",
+      "type": "devices.types.light",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.on_off",
+          "instance": "powerSwitch",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "gradientToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.range",
+          "instance": "brightness",
+          "parameters": {
+            "unit": "unit.percent",
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedBrightness",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 15
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 14
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "brightness",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedColorRgb",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 15
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 14
+                },
+                "required": true
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorRgb",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorTemperatureK",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 2000,
+              "max": 9000,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "lightScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.music_setting",
+          "instance": "musicMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "musicMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "Energic",
+                    "value": 1
+                  },
+                  {
+                    "name": "Rhythm",
+                    "value": 2
+                  },
+                  {
+                    "name": "Spectrum",
+                    "value": 3
+                  },
+                  {
+                    "name": "Rolling",
+                    "value": 4
+                  },
+                  {
+                    "name": "Separation",
+                    "value": 5
+                  },
+                  {
+                    "name": "Hopping",
+                    "value": 6
+                  },
+                  {
+                    "name": "PianoKeys",
+                    "value": 7
+                  },
+                  {
+                    "name": "Fountain",
+                    "value": 8
+                  },
+                  {
+                    "name": "DayAndNight",
+                    "value": 9
+                  },
+                  {
+                    "name": "Sprouting",
+                    "value": 10
+                  },
+                  {
+                    "name": "Shiny",
+                    "value": 11
+                  }
+                ],
+                "required": true
+              },
+              {
+                "unit": "unit.percent",
+                "fieldName": "sensitivity",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              },
+              {
+                "fieldName": "autoColor",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "on",
+                    "value": 1
+                  },
+                  {
+                    "name": "off",
+                    "value": 0
+                  }
+                ],
+                "required": false
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": false
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "diyScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "snapshot",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "Regenbogen",
+                "value": 3830835
+              },
+              {
+                "name": "Standard",
+                "value": 3855662
+              }
+            ]
+          }
+        }
+      ],
+      "_source": "Ressourcen/govee-smart/tukey42-2026-05-13/govee-diag.json apiHistory[/router/api/v1/user/devices][0].body (2026-05-13); device id is the fixture's"
     },
     {
       "sku": "H5179",
@@ -167,7 +695,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.celsius",
-            "range": { "min": -20, "max": 60, "precision": 1 }
+            "range": {
+              "min": -20,
+              "max": 60,
+              "precision": 1
+            }
           }
         },
         {
@@ -176,7 +708,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 0, "max": 100, "precision": 1 }
+            "range": {
+              "min": 0,
+              "max": 100,
+              "precision": 1
+            }
           }
         }
       ]
@@ -193,8 +729,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "true", "value": 1 },
-              { "name": "false", "value": 0 }
+              {
+                "name": "true",
+                "value": 1
+              },
+              {
+                "name": "false",
+                "value": 0
+              }
             ]
           }
         }
@@ -212,7 +754,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.celsius",
-            "range": { "min": -20, "max": 60, "precision": 1 }
+            "range": {
+              "min": -20,
+              "max": 60,
+              "precision": 1
+            }
           }
         },
         {
@@ -221,7 +767,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 0, "max": 100, "precision": 1 }
+            "range": {
+              "min": 0,
+              "max": 100,
+              "precision": 1
+            }
           }
         }
       ]
@@ -238,8 +788,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -253,7 +809,11 @@
                 "fieldName": "temperature",
                 "dataType": "INTEGER",
                 "unit": "unit.celsius",
-                "range": { "min": 5, "max": 30, "precision": 1 }
+                "range": {
+                  "min": 5,
+                  "max": 30,
+                  "precision": 1
+                }
               }
             ]
           }
@@ -268,11 +828,25 @@
                 "fieldName": "workMode",
                 "dataType": "ENUM",
                 "options": [
-                  { "name": "Auto", "value": 1 },
-                  { "name": "Fan", "value": 2 }
+                  {
+                    "name": "Auto",
+                    "value": 1
+                  },
+                  {
+                    "name": "Fan",
+                    "value": 2
+                  }
                 ]
               },
-              { "fieldName": "modeValue", "dataType": "INTEGER", "range": { "min": 0, "max": 3, "precision": 1 } }
+              {
+                "fieldName": "modeValue",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 3,
+                  "precision": 1
+                }
+              }
             ]
           }
         }
@@ -290,8 +864,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -301,13 +881,25 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 0, "max": 100, "precision": 1 }
+            "range": {
+              "min": 0,
+              "max": 100,
+              "precision": 1
+            }
           }
         },
         {
           "type": "devices.capabilities.event",
           "instance": "lackWaterEvent",
-          "parameters": { "dataType": "ENUM", "options": [{ "name": "lackWater", "value": 0 }] }
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "lackWater",
+                "value": 0
+              }
+            ]
+          }
         }
       ]
     },
@@ -323,8 +915,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -338,18 +936,32 @@
                 "fieldName": "workMode",
                 "dataType": "ENUM",
                 "options": [
-                  { "name": "Normal", "value": 1 },
-                  { "name": "Sleep", "value": 5 }
+                  {
+                    "name": "Normal",
+                    "value": 1
+                  },
+                  {
+                    "name": "Sleep",
+                    "value": 5
+                  }
                 ]
               },
-              { "fieldName": "modeValue", "dataType": "INTEGER", "range": { "min": 1, "max": 8, "precision": 1 } }
+              {
+                "fieldName": "modeValue",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 1,
+                  "max": 8,
+                  "precision": 1
+                }
+              }
             ]
           }
         }
       ]
     },
     {
-      "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json — verbatim",
+      "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json",
       "sku": "H7131",
       "device": "AA:BB:CC:DD:EE:FF:00:12",
       "deviceName": "Space Heater Study",
@@ -361,8 +973,31 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "oscillationToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -372,9 +1007,39 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
+          }
+        },
+        {
+          "type": "devices.capabilities.range",
+          "instance": "brightness",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorRgb",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
           }
         },
         {
@@ -383,46 +1048,25 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "Flame", "value": 1 },
-              { "name": "Rainbow", "value": 2 },
-              { "name": "Rhythm", "value": 3 },
-              { "name": "Easy", "value": 4 },
-              { "name": "Sleep", "value": 5 }
-            ]
-          }
-        },
-        {
-          "type": "devices.capabilities.work_mode",
-          "instance": "workMode",
-          "parameters": {
-            "dataType": "STRUCT",
-            "fields": [
               {
-                "fieldName": "workMode",
-                "dataType": "ENUM",
-                "required": true,
-                "options": [
-                  { "name": "gearMode", "value": 1 },
-                  { "name": "Fan", "value": 9 },
-                  { "name": "Auto", "value": 3 }
-                ]
+                "name": "Flame",
+                "value": 1
               },
               {
-                "fieldName": "modeValue",
-                "dataType": "ENUM",
-                "required": true,
-                "options": [
-                  {
-                    "name": "gearMode",
-                    "options": [
-                      { "name": "Low", "value": 1 },
-                      { "name": "Medium", "value": 2 },
-                      { "name": "High", "value": 3 }
-                    ]
-                  },
-                  { "defaultValue": 0, "name": "Fan" },
-                  { "defaultValue": 0, "name": "Auto" }
-                ]
+                "name": "Rainbow",
+                "value": 2
+              },
+              {
+                "name": "Rhythm",
+                "value": 3
+              },
+              {
+                "name": "Easy",
+                "value": 4
+              },
+              {
+                "name": "Sleep",
+                "value": 5
               }
             ]
           }
@@ -437,27 +1081,107 @@
                 "fieldName": "autoStop",
                 "defaultValue": 0,
                 "dataType": "ENUM",
-                "required": false,
                 "options": [
-                  { "name": "Auto Stop", "value": 1 },
-                  { "name": "Maintain", "value": 0 }
-                ]
+                  {
+                    "name": "Auto Stop",
+                    "value": 1
+                  },
+                  {
+                    "name": "Maintain",
+                    "value": 0
+                  }
+                ],
+                "required": false
               },
               {
                 "fieldName": "temperature",
                 "dataType": "INTEGER",
-                "required": true,
-                "range": { "min": 5, "max": 30, "precision": 1 }
+                "range": {
+                  "min": 5,
+                  "max": 30,
+                  "precision": 1
+                },
+                "required": true
               },
               {
                 "fieldName": "unit",
                 "defaultValue": "Celsius",
                 "dataType": "ENUM",
-                "required": true,
                 "options": [
-                  { "name": "Celsius", "value": "Celsius" },
-                  { "name": "Fahrenheit", "value": "Fahrenheit" }
-                ]
+                  {
+                    "name": "Celsius",
+                    "value": "Celsius"
+                  },
+                  {
+                    "name": "Fahrenheit",
+                    "value": "Fahrenheit"
+                  }
+                ],
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.property",
+          "instance": "sensorTemperature"
+        },
+        {
+          "type": "devices.capabilities.work_mode",
+          "instance": "workMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "workMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "gearMode",
+                    "value": 1
+                  },
+                  {
+                    "name": "Fan",
+                    "value": 9
+                  },
+                  {
+                    "name": "Auto",
+                    "value": 3
+                  }
+                ],
+                "required": true
+              },
+              {
+                "fieldName": "modeValue",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "gearMode",
+                    "options": [
+                      {
+                        "name": "Low",
+                        "value": 1
+                      },
+                      {
+                        "name": "Medium",
+                        "value": 2
+                      },
+                      {
+                        "name": "High",
+                        "value": 3
+                      }
+                    ]
+                  },
+                  {
+                    "defaultValue": 0,
+                    "name": "Fan"
+                  },
+                  {
+                    "defaultValue": 0,
+                    "name": "Auto"
+                  }
+                ],
+                "required": true
               }
             ]
           }
@@ -476,8 +1200,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -493,9 +1223,18 @@
                 "dataType": "ENUM",
                 "required": true,
                 "options": [
-                  { "name": "gearMode", "value": 1 },
-                  { "name": "Custom", "value": 2 },
-                  { "name": "Auto", "value": 3 }
+                  {
+                    "name": "gearMode",
+                    "value": 1
+                  },
+                  {
+                    "name": "Custom",
+                    "value": 2
+                  },
+                  {
+                    "name": "Auto",
+                    "value": 3
+                  }
                 ]
               },
               {
@@ -506,13 +1245,28 @@
                   {
                     "name": "gearMode",
                     "options": [
-                      { "name": "Sleep", "value": 1 },
-                      { "name": "Low", "value": 2 },
-                      { "name": "High", "value": 3 }
+                      {
+                        "name": "Sleep",
+                        "value": 1
+                      },
+                      {
+                        "name": "Low",
+                        "value": 2
+                      },
+                      {
+                        "name": "High",
+                        "value": 3
+                      }
                     ]
                   },
-                  { "name": "Custom", "defaultValue": 0 },
-                  { "name": "Auto", "defaultValue": 0 }
+                  {
+                    "name": "Custom",
+                    "defaultValue": 0
+                  },
+                  {
+                    "name": "Auto",
+                    "defaultValue": 0
+                  }
                 ]
               }
             ]
@@ -524,7 +1278,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 0, "max": 100, "precision": 1 }
+            "range": {
+              "min": 0,
+              "max": 100,
+              "precision": 1
+            }
           }
         }
       ]
@@ -541,8 +1299,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -558,9 +1322,18 @@
                 "dataType": "ENUM",
                 "required": true,
                 "options": [
-                  { "name": "Manual", "value": 1 },
-                  { "name": "Custom", "value": 2 },
-                  { "name": "Auto", "value": 3 }
+                  {
+                    "name": "Manual",
+                    "value": 1
+                  },
+                  {
+                    "name": "Custom",
+                    "value": 2
+                  },
+                  {
+                    "name": "Auto",
+                    "value": 3
+                  }
                 ]
               },
               {
@@ -573,19 +1346,49 @@
                     "required": true,
                     "value": null,
                     "options": [
-                      { "value": 1 },
-                      { "value": 2 },
-                      { "value": 3 },
-                      { "value": 4 },
-                      { "value": 5 },
-                      { "value": 6 },
-                      { "value": 7 },
-                      { "value": 8 },
-                      { "value": 9 }
+                      {
+                        "value": 1
+                      },
+                      {
+                        "value": 2
+                      },
+                      {
+                        "value": 3
+                      },
+                      {
+                        "value": 4
+                      },
+                      {
+                        "value": 5
+                      },
+                      {
+                        "value": 6
+                      },
+                      {
+                        "value": 7
+                      },
+                      {
+                        "value": 8
+                      },
+                      {
+                        "value": 9
+                      }
                     ]
                   },
-                  { "defaultValue": 0, "name": "Custom", "required": false, "value": null },
-                  { "name": "Auto", "required": true, "range": { "max": 80, "min": 40 } }
+                  {
+                    "defaultValue": 0,
+                    "name": "Custom",
+                    "required": false,
+                    "value": null
+                  },
+                  {
+                    "name": "Auto",
+                    "required": true,
+                    "range": {
+                      "max": 80,
+                      "min": 40
+                    }
+                  }
                 ]
               }
             ]
@@ -605,13 +1408,18 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
         {
-          "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json",
           "type": "devices.capabilities.work_mode",
           "instance": "workMode",
           "parameters": {
@@ -620,43 +1428,62 @@
               {
                 "fieldName": "workMode",
                 "dataType": "ENUM",
-                "required": true,
                 "options": [
-                  { "name": "High", "value": 3 },
-                  { "name": "Medium", "value": 2 },
-                  { "name": "Low", "value": 1 },
-                  { "name": "Sleep", "value": 16 }
-                ]
+                  {
+                    "name": "High",
+                    "value": 3
+                  },
+                  {
+                    "name": "Medium",
+                    "value": 2
+                  },
+                  {
+                    "name": "Low",
+                    "value": 1
+                  },
+                  {
+                    "name": "Sleep",
+                    "value": 16
+                  }
+                ],
+                "required": true
               },
               {
                 "fieldName": "modeValue",
                 "dataType": "ENUM",
-                "required": false,
                 "options": [
-                  { "defaultValue": 0, "name": "High" },
-                  { "defaultValue": 0, "name": "Medium" },
-                  { "defaultValue": 0, "name": "Low" },
-                  { "defaultValue": 0, "name": "Sleep" }
-                ]
+                  {
+                    "defaultValue": 0,
+                    "name": "High"
+                  },
+                  {
+                    "defaultValue": 0,
+                    "name": "Medium"
+                  },
+                  {
+                    "defaultValue": 0,
+                    "name": "Low"
+                  },
+                  {
+                    "defaultValue": 0,
+                    "name": "Sleep"
+                  }
+                ],
+                "required": true
               }
             ]
           }
         },
         {
           "type": "devices.capabilities.property",
-          "instance": "airQuality",
-          "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 500, "precision": 1 } }
+          "instance": "filterLifeTime"
         },
         {
           "type": "devices.capabilities.property",
-          "instance": "filterLifeTime",
-          "parameters": {
-            "dataType": "INTEGER",
-            "unit": "unit.percent",
-            "range": { "min": 0, "max": 100, "precision": 1 }
-          }
+          "instance": "airQuality"
         }
-      ]
+      ],
+      "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json"
     },
     {
       "sku": "H7171",
@@ -670,8 +1497,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -687,10 +1520,22 @@
                 "dataType": "ENUM",
                 "required": true,
                 "options": [
-                  { "name": "DIY", "value": 1 },
-                  { "name": "Boiling", "value": 2 },
-                  { "name": "Tea", "value": 3 },
-                  { "name": "Coffee", "value": 4 }
+                  {
+                    "name": "DIY",
+                    "value": 1
+                  },
+                  {
+                    "name": "Boiling",
+                    "value": 2
+                  },
+                  {
+                    "name": "Tea",
+                    "value": 3
+                  },
+                  {
+                    "name": "Coffee",
+                    "value": 4
+                  }
                 ]
               },
               {
@@ -698,24 +1543,67 @@
                 "dataType": "ENUM",
                 "required": false,
                 "options": [
-                  { "defaultValue": 0, "name": "Boiling", "value": null },
+                  {
+                    "defaultValue": 0,
+                    "name": "Boiling",
+                    "value": null
+                  },
                   {
                     "dataType": "ENUM",
                     "name": "Tea",
                     "value": null,
-                    "options": [{ "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 }]
+                    "options": [
+                      {
+                        "value": 1
+                      },
+                      {
+                        "value": 2
+                      },
+                      {
+                        "value": 3
+                      },
+                      {
+                        "value": 4
+                      }
+                    ]
                   },
                   {
                     "dataType": "ENUM",
                     "name": "Coffee",
                     "value": null,
-                    "options": [{ "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 }]
+                    "options": [
+                      {
+                        "value": 1
+                      },
+                      {
+                        "value": 2
+                      },
+                      {
+                        "value": 3
+                      },
+                      {
+                        "value": 4
+                      }
+                    ]
                   },
                   {
                     "dataType": "ENUM",
                     "name": "DIY",
                     "value": null,
-                    "options": [{ "value": 1 }, { "value": 2 }, { "value": 3 }, { "value": 4 }]
+                    "options": [
+                      {
+                        "value": 1
+                      },
+                      {
+                        "value": 2
+                      },
+                      {
+                        "value": 3
+                      },
+                      {
+                        "value": 4
+                      }
+                    ]
                   }
                 ]
               }
@@ -732,7 +1620,11 @@
                 "fieldName": "temperature",
                 "dataType": "INTEGER",
                 "unit": "unit.celsius",
-                "range": { "min": 40, "max": 100, "precision": 1 }
+                "range": {
+                  "min": 40,
+                  "max": 100,
+                  "precision": 1
+                }
               }
             ]
           }
@@ -751,15 +1643,29 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
         {
           "type": "devices.capabilities.event",
           "instance": "iceFullEvent",
-          "parameters": { "dataType": "ENUM", "options": [{ "name": "iceFull", "value": 0 }] }
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "iceFull",
+                "value": 0
+              }
+            ]
+          }
         }
       ]
     },
@@ -775,8 +1681,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -786,7 +1698,11 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 1, "max": 100, "precision": 1 }
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
           }
         }
       ]
@@ -803,8 +1719,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         }
@@ -819,7 +1741,15 @@
         {
           "type": "devices.capabilities.event",
           "instance": "bodyAppearedEvent",
-          "parameters": { "dataType": "ENUM", "options": [{ "name": "bodyAppeared", "value": 0 }] }
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "bodyAppeared",
+                "value": 0
+              }
+            ]
+          }
         }
       ]
     },
@@ -835,8 +1765,14 @@
           "parameters": {
             "dataType": "ENUM",
             "options": [
-              { "name": "on", "value": 1 },
-              { "name": "off", "value": 0 }
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
             ]
           }
         },
@@ -846,13 +1782,24 @@
           "parameters": {
             "dataType": "INTEGER",
             "unit": "unit.percent",
-            "range": { "min": 1, "max": 100, "precision": 1 }
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
           }
         },
         {
           "type": "devices.capabilities.color_setting",
           "instance": "colorRgb",
-          "parameters": { "dataType": "INTEGER", "range": { "min": 0, "max": 16777215, "precision": 1 } }
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
         }
       ]
     }

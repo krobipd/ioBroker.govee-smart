@@ -155,5 +155,8 @@
   "descBodyDetected": "在传感器检测到有人的瞬间上报；随后自行复位。",
   "descDirtDetected": "在设备提示检测到污垢的瞬间上报；随后自行复位。",
   "descCloudOnline": "适配器能否连通 Govee 云端 —— 而非某个具体设备是否在线。",
-  "descMembers": "该 App 分组一起控制的设备，以对象树中的名称列出。"
+  "descMembers": "该 App 分组一起控制的设备，以对象树中的名称列出。",
+  "descMusicAutoColor": "灯在音乐模式下是否自行选择颜色，而不是保持一种固定颜色。",
+  "descDreamViewToggle": "灯是否跟随 Govee DreamView 摄像头捕捉到的屏幕颜色。",
+  "descDiyScene": "你在 Govee 应用的 DIY 编辑器中自建的场景之一——在你创建之前为空。"
 }

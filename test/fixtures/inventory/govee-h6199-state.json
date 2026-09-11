@@ -1,0 +1,90 @@
+{
+  "sku": "H6199",
+  "device": "AA:BB:CC:DD:EE:FF:00:02",
+  "capabilities": [
+    {
+      "type": "devices.capabilities.online",
+      "instance": "online",
+      "state": {
+        "value": false
+      }
+    },
+    {
+      "type": "devices.capabilities.on_off",
+      "instance": "powerSwitch",
+      "state": {
+        "value": 0
+      }
+    },
+    {
+      "type": "devices.capabilities.toggle",
+      "instance": "gradientToggle",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.range",
+      "instance": "brightness",
+      "state": {
+        "value": 20
+      }
+    },
+    {
+      "type": "devices.capabilities.segment_color_setting",
+      "instance": "segmentedColorRgb",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.color_setting",
+      "instance": "colorRgb",
+      "state": {
+        "value": 65793
+      }
+    },
+    {
+      "type": "devices.capabilities.color_setting",
+      "instance": "colorTemperatureK",
+      "state": {
+        "value": 2000
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "lightScene",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.music_setting",
+      "instance": "musicMode",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "diyScene",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "snapshot",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.toggle",
+      "instance": "dreamViewToggle",
+      "state": {
+        "value": ""
+      }
+    }
+  ]
+}

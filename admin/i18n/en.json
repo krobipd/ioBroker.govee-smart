@@ -155,5 +155,8 @@
   "descBodyDetected": "Reports the moment the sensor sees someone; it clears itself again.",
   "descDirtDetected": "Reports the moment the device signals detected dirt; it clears itself again.",
   "descCloudOnline": "Whether the adapter reaches the Govee cloud — not whether any single device is there.",
-  "descMembers": "The devices this app group switches together, as they are named in the object tree."
+  "descMembers": "The devices this app group switches together, as they are named in the object tree.",
+  "descMusicAutoColor": "Whether the light picks its own colours in music mode instead of keeping one fixed colour.",
+  "descDreamViewToggle": "Whether the light follows the screen colours a Govee DreamView camera captures.",
+  "descDiyScene": "One of the scenes you built yourself in the DIY editor of the Govee app — empty until you have made one."
 }

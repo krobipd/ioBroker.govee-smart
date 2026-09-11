@@ -961,6 +961,21 @@ describe("CapabilityMapper", () => {
       expect(result[0].channel).toBe("sensor");
     });
 
+    it("gives filterLifeTime its unit (%) although Govee declares none — the value is a percentage", () => {
+      // Govee's device list declares the purifier's property capabilities
+      // without parameters (issue #47 export, H7127 — `{"type": "devices.
+      // capabilities.property", "instance": "filterLifeTime"}`), so nothing
+      // reaches normalizeUnit. The reading IS a percentage: the same export's
+      // state read says 72 where the app showed 72 %.
+      const caps: CloudCapability[] = [{ type: "devices.capabilities.property", instance: "filterLifeTime" }];
+      const result = mapCapabilities(caps);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe("filter_life_time");
+      expect(result[0].role).toBe("value");
+      expect(result[0].unit).toBe("%");
+      expect(result[0].channel).toBe("sensor");
+    });
+
     it("gives every mode instance its own datapoint, not only presetScene", () => {
       // `api-referenz.md:135-136` documents presetScene AND nightlightScene.
       // The captures carry nightlightScene twice — declared with its option

@@ -1,0 +1,90 @@
+{
+  "sku": "H61A8",
+  "device": "AA:BB:CC:DD:EE:FF:00:0F",
+  "capabilities": [
+    {
+      "type": "devices.capabilities.online",
+      "instance": "online",
+      "state": {
+        "value": true
+      }
+    },
+    {
+      "type": "devices.capabilities.on_off",
+      "instance": "powerSwitch",
+      "state": {
+        "value": 0
+      }
+    },
+    {
+      "type": "devices.capabilities.toggle",
+      "instance": "gradientToggle",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.range",
+      "instance": "brightness",
+      "state": {
+        "value": 100
+      }
+    },
+    {
+      "type": "devices.capabilities.segment_color_setting",
+      "instance": "segmentedBrightness",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.segment_color_setting",
+      "instance": "segmentedColorRgb",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.color_setting",
+      "instance": "colorRgb",
+      "state": {
+        "value": 16744192
+      }
+    },
+    {
+      "type": "devices.capabilities.color_setting",
+      "instance": "colorTemperatureK",
+      "state": {
+        "value": 0
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "lightScene",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.music_setting",
+      "instance": "musicMode",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "diyScene",
+      "state": {
+        "value": ""
+      }
+    },
+    {
+      "type": "devices.capabilities.dynamic_scene",
+      "instance": "snapshot",
+      "state": {
+        "value": ""
+      }
+    }
+  ]
+}

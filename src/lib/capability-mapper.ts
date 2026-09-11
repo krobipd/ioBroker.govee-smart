@@ -568,6 +568,11 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
     ({ role, unit } = SENSOR_ROLE_UNIT.battery);
   } else if (instance.includes("co2") || instance.includes("carbondioxide")) {
     ({ role, unit } = SENSOR_ROLE_UNIT.co2);
+  } else if (instance === "filterlifetime") {
+    // Govee declares the purifiers' property capabilities without parameters
+    // (issue #47 export), so no unit ever arrives — the reading is a percentage
+    // (the H7127's 72 was the app's 72 %). No catalogue role fits a filter.
+    unit = "%";
   }
 
   return [
@@ -1057,6 +1062,7 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
     states.push({
       id: "music_auto_color",
       name: tName("musicAutoColor"),
+      desc: tDesc("descMusicAutoColor"),
       type: "boolean",
       role: "switch",
       write: true,
@@ -1207,6 +1213,7 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
  */
 const CAPABILITY_DESC_KEYS: Record<string, I18nKey> = {
   gradientToggle: "descGradientToggle",
+  dreamViewToggle: "descDreamViewToggle",
   airQuality: "descAirQuality",
   filterLifeTime: "descFilterLifeTime",
   // Events reach the tree through TWO paths — this cloud-capability one and
@@ -1507,7 +1514,14 @@ const SCENE_DROPDOWN_RULES: ReadonlyArray<{
   source: (d: GoveeDevice) => { name: string }[];
 }> = [
   { id: "light_scene", cap: "lightScene", nameKey: "lightScene", channel: "scenes", source: d => d.scenes },
-  { id: "diy_scene", cap: "diyScene", nameKey: "diyScene", channel: "scenes", source: d => d.diyScenes },
+  {
+    id: "diy_scene",
+    cap: "diyScene",
+    nameKey: "diyScene",
+    descKey: "descDiyScene",
+    channel: "scenes",
+    source: d => d.diyScenes,
+  },
   {
     id: "snapshot_cloud",
     cap: "snapshot",

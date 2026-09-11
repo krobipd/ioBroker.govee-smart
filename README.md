@@ -112,6 +112,9 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: An installation using only an API key lost its appliance commands by mid-morning — a reachability poll that never got an answer used up the device's daily budget
 - Changed: An appliance's reachability is no longer polled every 20 minutes; its own status push, a command and the start-up query count instead — polling would cost 72 of its 90 daily calls
 - Fixed: The diagnostics report now records mode, level, temperature and music commands with their outcome — it only listed power, brightness and colour before
+- Fixed: A datapoint Govee newly reports for a device no longer vanishes on the first start after the change — two tree builds ran at once and the older one deleted what the newer had created
+- Fixed: The filter life of an air purifier now carries its unit (%) — Govee declares none, and the datapoint had no unit since its first version
+- Changed: The DreamView switch, the music auto-colour switch and the DIY-scene selector carry an explanation now; light scenes and oscillation are declared self-explaining
 
 ### 2.34.0 (2026-09-10)
 

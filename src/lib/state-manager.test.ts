@@ -380,6 +380,120 @@ describe("StateManager", () => {
     });
   });
 
+  describe("runDeviceBuild — two builds for one device in flight (found by the inventory run, 2026-09-11)", () => {
+    const heater = (): GoveeDevice => ({
+      sku: "H7131",
+      deviceId: "AA:BB:CC:DD:EE:FF:00:12",
+      name: "Heater",
+      type: "devices.types.heater",
+      capabilities: [],
+      scenes: [],
+      diyScenes: [],
+      snapshots: [],
+      sceneLibrary: [],
+      musicLibrary: [],
+      diyLibrary: [],
+      skuFeatures: null,
+      state: { online: true },
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const def = (id: string): StateDefinition => ({
+      id,
+      name: { en: id },
+      type: "boolean",
+      role: "switch",
+      write: true,
+      def: false,
+      capabilityType: "devices.capabilities.toggle",
+      capabilityInstance: id,
+    });
+    /** Lets every pending microtask run — a queued build that may start has started. */
+    const flush = (): Promise<void> => new Promise(resolve => setImmediate(resolve));
+
+    it("a newer build's datapoints survive an older build's cleanup", async () => {
+      // Measured in the object inventory: the cache restored the heater with 5
+      // capabilities and the cloud list answered with 9 a moment later. Both
+      // builds ran at once; the cache build's cleanupCloudOwnedStates ran LAST,
+      // with the old definitions, and deleted `control.oscillation_toggle` that
+      // the cloud build had just created — the datapoint was missing until the
+      // next start refreshed the cache. Every await in a build is a chance for
+      // the other one to interleave; the mock's extendObject yields like the
+      // real one. (The same two calls WITHOUT runDeviceBuild lose the toggle.)
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const device = heater();
+      const older = sm.runDeviceBuild(device, () => sm.createCloudStates(device, [def("nightlight_toggle")], 0));
+      const newer = sm.runDeviceBuild(device, () =>
+        sm.createCloudStates(device, [def("nightlight_toggle"), def("oscillation_toggle")], 0),
+      );
+      await Promise.all([older, newer]);
+      expect(objects.has("devices.h7131_0012.control.oscillation_toggle"), "the newer build's datapoint").toBe(true);
+      expect(objects.has("devices.h7131_0012.control.nightlight_toggle")).toBe(true);
+    });
+
+    it("the second build starts only after the first one has finished", async () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const device = heater();
+      const order: string[] = [];
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      const first = sm.runDeviceBuild(device, async () => {
+        order.push("first:start");
+        await gate;
+        order.push("first:end");
+      });
+      const second = sm.runDeviceBuild(device, () => {
+        order.push("second:start");
+        return Promise.resolve();
+      });
+      await flush();
+      expect(order).toEqual(["first:start"]);
+      release();
+      await Promise.all([first, second]);
+      expect(order).toEqual(["first:start", "first:end", "second:start"]);
+    });
+
+    it("a failed build neither blocks the next one nor hides its own failure", async () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const device = heater();
+      const first = sm.runDeviceBuild(device, () => Promise.reject(new Error("object database gone")));
+      let secondRan = false;
+      const second = sm.runDeviceBuild(device, () => {
+        secondRan = true;
+        return Promise.resolve();
+      });
+      await expect(first).rejects.toThrow("object database gone");
+      await second;
+      expect(secondRan).toBe(true);
+    });
+
+    it("builds for two different devices run side by side", async () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const order: string[] = [];
+      let release!: () => void;
+      const gate = new Promise<void>(resolve => {
+        release = resolve;
+      });
+      const first = sm.runDeviceBuild(heater(), async () => {
+        order.push("heater:start");
+        await gate;
+      });
+      const other = sm.runDeviceBuild({ ...heater(), deviceId: "AA:BB:CC:DD:EE:FF:00:13" }, () => {
+        order.push("other:start");
+        return Promise.resolve();
+      });
+      await other;
+      expect(order).toEqual(["heater:start", "other:start"]);
+      release();
+      await first;
+    });
+  });
+
   describe("cleanupCloudOwnedStates", () => {
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
