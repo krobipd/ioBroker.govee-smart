@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.34.0",
+    "version": "2.35.0",
     "news": {
-      "NEXT": {
+      "2.35.0": {
         "en": "Air purifier mode, level and filter life follow the device's own status report, the device-state query delivers values at start, and an API-key-only setup keeps its appliance commands all day.",
         "de": "Modus, Stufe und Filterlebensdauer eines Luftreinigers folgen der Statusmeldung des Geräts, die Zustandsabfrage liefert beim Start Werte, ein Nur-API-Key-Setup behält seine Befehle den ganzen Tag.",
         "ru": "Режим, ступень и ресурс фильтра очистителя следуют за отчётом самого устройства, запрос состояния даёт значения при старте, установка только с API-ключом сохраняет команды весь день.",

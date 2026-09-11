@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.35.0 (2026-09-11)
 
 - New: An air purifier's mode, level and filter life follow the device's own status report — a change made in the Govee app shows in ioBroker within a second, no cloud call (H7127, #47)
 - Fixed: Filter life, air quality, mode and level of an appliance are read from Govee's device-state query at start — the adapter read that answer from the wrong field since its first version (#47)
@@ -112,9 +112,9 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: An installation using only an API key lost its appliance commands by mid-morning — a reachability poll that never got an answer used up the device's daily budget
 - Changed: An appliance's reachability is no longer polled every 20 minutes; its own status push, a command and the start-up query count instead — polling would cost 72 of its 90 daily calls
 - Fixed: The diagnostics report now records mode, level, temperature and music commands with their outcome — it only listed power, brightness and colour before
-- Fixed: A datapoint Govee newly reports for a device no longer vanishes on the first start after the change — two tree builds ran at once and the older one deleted what the newer had created
+- Fixed: A datapoint Govee newly reports for a device is there from the first start on — it used to disappear again and only show up after the next restart
 - Fixed: The filter life of an air purifier now carries its unit (%) — Govee declares none, and the datapoint had no unit since its first version
-- Changed: The DreamView switch, the music auto-colour switch and the DIY-scene selector carry an explanation now; light scenes and oscillation are declared self-explaining
+- Changed: The DreamView switch, the music auto-colour switch and the DIY-scene selector now carry an explanation in the object tree
 
 ### 2.34.0 (2026-09-10)
 
@@ -156,10 +156,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: Without account credentials, a group from the Govee app grew an empty entry in the object tree on every restart; it now appears only once its members are actually known
 - New: Datapoints carry an explanation in all 11 languages wherever the name alone does not say enough — 99 of them instead of 26
 - Changed: The adapter can no longer be installed directly from GitHub — install it from the ioBroker repository or from npm, as with every other adapter
-
-### 2.31.1 (2026-09-04)
-
-- Fixed: When the adapter met a device model it does not know yet, its log asked the user to press a button that 2.31.0 had removed — it now points at the Expert tab, where the report is actually made
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

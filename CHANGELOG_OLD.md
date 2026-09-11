@@ -1,5 +1,9 @@
 # Older Changes
 
+## 2.31.1 (2026-09-04)
+
+- Fixed: When the adapter met a device model it does not know yet, its log asked the user to press a button that 2.31.0 had removed — it now points at the Expert tab, where the report is actually made
+
 ## 2.31.0 (2026-09-03)
 
 - Fixed: On instances upgraded from 2.27.0 or newer, every admin card was dead — diagnostics, segment wizard and connection test alike; affected installations repair themselves on the next start
