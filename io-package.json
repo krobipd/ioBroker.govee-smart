@@ -93,19 +93,6 @@
         "pl": "Urządzenia na koncie bez ani jednego światła są po restarcie znowu sterowalne.\nUrządzenie nie jest już pokazywane jako osiągalne, gdy Govee zgłosi je jako offline, a wskazanie pozostaje poprawne także przy samym kluczu API.\nNieudane polecenie w chmurze nie liczy się już jako wykonane, a punkty danych objaśniają się w 11 językach.",
         "uk": "Пристрої в обліковому записі без жодного світильника знову керуються після перезапуску.\nПристрій більше не показується доступним, щойно Govee повідомить про його від'єднання, і показ лишається правильним навіть з одним ключем API.\nНевдала хмарна команда більше не вважається виконаною, а точки даних пояснюються 11 мовами.",
         "zh-cn": "账号中没有任何灯具时，设备在重启后重新可控。\n一旦 Govee 报告设备离线，就不再显示为可达；只配置了 API 密钥的安装，显示同样保持正确。\n失败的云端指令不再算作已执行，数据点也会用 11 种语言自我说明。"
-      },
-      "2.31.1": {
-        "en": "Fixed: when the adapter met an unknown device model, its log asked for a button that 2.31.0 had removed — it now points at the Expert tab",
-        "de": "Behoben: Bei einem unbekannten Gerätemodell verwies das Protokoll auf einen Knopf, den 2.31.0 entfernt hatte — es nennt jetzt den Reiter „Experte“",
-        "ru": "Исправлено: при неизвестной модели устройства журнал ссылался на кнопку, удалённую в 2.31.0 — теперь он указывает на вкладку «Эксперт»",
-        "pt": "Corrigido: perante um modelo desconhecido, o registo pedia um botão removido na 2.31.0 — agora indica o separador Especialista",
-        "nl": "Opgelost: bij een onbekend apparaatmodel verwees het logboek naar een knop die 2.31.0 had verwijderd — het noemt nu het tabblad Expert",
-        "fr": "Corrigé : face à un modèle inconnu, le journal renvoyait à un bouton supprimé en 2.31.0 — il indique désormais l'onglet Expert",
-        "it": "Corretto: con un modello sconosciuto il log rimandava a un pulsante rimosso nella 2.31.0 — ora indica la scheda Esperto",
-        "es": "Corregido: ante un modelo desconocido, el registro pedía un botón eliminado en 2.31.0: ahora indica la pestaña Experto",
-        "pl": "Naprawiono: przy nieznanym modelu dziennik odsyłał do przycisku usuniętego w 2.31.0 — teraz wskazuje zakładkę Ekspert",
-        "uk": "Виправлено: для невідомої моделі журнал посилався на кнопку, вилучену в 2.31.0 — тепер він вказує на вкладку «Експерт»",
-        "zh-cn": "修复：遇到未知设备型号时，日志要求按下 2.31.0 已移除的按钮 — 现在改为指向“专家”选项卡"
       }
     },
     "plugins": {
