@@ -1030,8 +1030,9 @@ export class GoveeAdapter extends utils.Adapter {
         );
 
         // App-API poll — every 2 minutes, pulls state for sensors like H5179
-        // where OpenAPI v2 /device/state returns empty. Bearer token comes
-        // from the AWS-IoT MQTT login, so a no-op until that succeeds.
+        // whose OpenAPI /device/state answer carries the capability with an
+        // empty value (""). Bearer token comes from the AWS-IoT MQTT login, so
+        // a no-op until that succeeds.
         //
         // The same tick also renews reachability proofs that nothing else
         // renews. It runs HERE and not inside pollAppApi on purpose: that

@@ -103,6 +103,16 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- New: An air purifier's mode, level and filter life follow the device's own status report — a change made in the Govee app shows in ioBroker within a second, no cloud call (H7127, #47)
+- Fixed: Filter life, air quality, mode and level of an appliance are read from Govee's device-state query at start — the adapter read that answer from the wrong field since its first version (#47)
+- Fixed: A light without a local connection gets its power, brightness and colour from the same query at start; Govee's empty answers no longer turn into false or blank values
+- Fixed: A light without a local connection on an installation with only an API key stays reachable — the 20-minute check meant to renew it never received an answer before
+- Fixed: An installation using only an API key lost its appliance commands by mid-morning — a reachability poll that never got an answer used up the device's daily budget
+- Changed: An appliance's reachability is no longer polled every 20 minutes; its own status push, a command and the start-up query count instead — polling would cost 72 of its 90 daily calls
+- Fixed: The diagnostics report now records mode, level, temperature and music commands with their outcome — it only listed power, brightness and colour before
+
 ### 2.34.0 (2026-09-10)
 
 - Fixed: Air purifiers, heaters, humidifiers and fans — choosing a mode or a speed now reaches the device, where the adapter used to send a value Govee rejected as "Invalid parameter type" (#47)
