@@ -34,7 +34,6 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { GOVEE_DEVICE_TYPE } from "./lib/govee-constants";
 import { deviceLabel, errMessage, logRejected, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
 import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
@@ -964,6 +963,9 @@ export class GoveeAdapter extends utils.Adapter {
 
       // --- Device data: Cache first, Cloud only on cache miss ---
       const cachedOk = this.deviceManager.loadFromCache();
+      // Whether the state read below may run: the cloud client exists and the
+      // account answered (from the cache or from a live list).
+      let cloudStateReadable = false;
 
       if (config.apiKey) {
         this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
@@ -1071,7 +1073,7 @@ export class GoveeAdapter extends utils.Adapter {
           this.stateManager?.updateGroupsOnline(result.ok).catch(logRejected(this.log, "write groups.info.online"));
 
           if (result.ok) {
-            await cloudStateLoader.loadCloudStates(this.handlerHost);
+            cloudStateReadable = true;
           } else {
             cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
           }
@@ -1087,6 +1089,7 @@ export class GoveeAdapter extends utils.Adapter {
             ack: true,
           }).catch(logRejected(this.log, "best-effort write"));
           this.stateManager?.updateGroupsOnline(true).catch(logRejected(this.log, "write groups.info.online"));
+          cloudStateReadable = true;
         }
         // Load group membership from undocumented API (needs bearer token + device map)
         await this.deviceManager.loadGroupMembers();
@@ -1105,29 +1108,20 @@ export class GoveeAdapter extends utils.Adapter {
         await Promise.all(pending);
       }
 
-      // The cache covers the device LIST, never the device STATE. Without this
-      // an account with no light — `loadFromCache()` returns true exactly then
-      // — never read `/device/state` at all, and every `property` sensor stayed
-      // on its default for the adapter's whole life (issue #47).
-      //
-      // It has to run AFTER the drain above: the state objects are created by
-      // the phase callbacks and only awaited here, so a load placed in the
-      // cached branch itself writes into a tree that does not exist yet and the
-      // value is lost behind the default that lands afterwards (measured).
-      //
-      // Lights are skipped, and that skip has to be here rather than inside the
-      // loader: `cache.ts` deliberately discards `lanIp`, so a light the UDP
-      // scan just found still looks address-less and the loader's own LAN guard
-      // (`device.lanIp && LAN_STATE_IDS…`) does not engage. Cloud values would
-      // then overwrite power/brightness/color_rgb/color_temperature, which this
-      // adapter must never do.
-      if (config.apiKey && cachedOk && this.deviceManager) {
-        for (const d of this.deviceManager.getDevices()) {
-          if (d.type === GOVEE_DEVICE_TYPE.LIGHT) {
-            continue;
-          }
-          await cloudStateLoader.loadCloudStates(this.handlerHost, d);
-        }
+      // The device STATE is read here, after the drain, for every cloud device
+      // at once. The cache covers the device LIST, never the state, and the two
+      // start paths used to differ: the no-light path read nothing at all until
+      // 2.34.0, the path with a light read before the drain and relied on the
+      // phase callbacks having finished during loadFromCloud's own awaits
+      // (measured: they had — the read must not depend on it). Before the
+      // drain the channel map would be empty and `resolveStatePath` would fall
+      // back to "control" for a sensor id. By now the UDP scan has answered, so
+      // a light with a local API carries its address and the loader's LAN guard
+      // keeps its power/brightness/colour untouched; a failed cloud init
+      // reaches this via the retry loop instead (`onCloudRestored` →
+      // loadCloudStates).
+      if (cloudStateReadable) {
+        await cloudStateLoader.loadCloudStates(this.handlerHost);
       }
 
       // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went

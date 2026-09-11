@@ -1271,10 +1271,9 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     // cloud phase is skipped, so /device/state was never called and every
     // `property` sensor stayed on its default forever.
     //
-    // The light rides along in the same cache so `cachedOk` is decided by the
-    // purifier: `cache.ts` drops lanIp, so the light looks address-less here
-    // and the loader's own LAN guard cannot protect its values — the skip has
-    // to happen at the call site.
+    // Since 2.35.0 the read runs once, after the drain, for every cloud device;
+    // a light with a local API is protected by the loader's own LAN guard
+    // (its address is set by the scan long before the read — pinned below).
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
     const cached = (sku: string, id: string, type: string, caps: unknown[]): string =>
@@ -1316,13 +1315,156 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     expect(i.cloudInitDone).toBe(true);
   });
 
+  it("an installation with a light AND an appliance reads the appliance's state after the tree exists", async () => {
+    // Pins the order for the cache-miss path. Until 2.35.0 that path called the
+    // loader BEFORE the state-creation drain and relied on the callbacks having
+    // finished during loadFromCloud's own awaits (they had — measured). The
+    // read now sits after the drain on both paths; this test fails if it is
+    // ever moved back and the objects are not there at read time.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    const cached = (sku: string, deviceId: string, type: string, capabilities: unknown[]): string =>
+      JSON.stringify({
+        sku,
+        deviceId,
+        name: sku,
+        type,
+        capabilities,
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee22.json"),
+      cached("H6172", "AA:BB:CC:DD:EE:22", "devices.types.light", [
+        { type: "devices.capabilities.on_off", instance: "powerSwitch" },
+      ]),
+    );
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h7127_ee11.json"),
+      cached("H7127", "AA:BB:CC:DD:EE:11", "devices.types.air_purifier", [
+        { type: "devices.capabilities.property", instance: "filterLifeTime" },
+      ]),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    // A light in the cache makes loadFromCache() return false — the cloud list
+    // is fetched, and this is the path the reporter's neighbours with lights take.
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H6172",
+        device: "AA:BB:CC:DD:EE:22",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+      {
+        sku: "H7127",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Purifier",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+      },
+    ]);
+    const objectExistedAtRead: boolean[] = [];
+    ctx.f.cloud.getDeviceState.mockImplementation((sku: string) => {
+      if (sku !== "H7127") {
+        return Promise.resolve([]);
+      }
+      objectExistedAtRead.push(i.objects.has("devices.h7127_ee11.sensor.filter_life_time"));
+      return Promise.resolve([
+        { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 73 } },
+      ]);
+    });
+    await i.onReady();
+    await settle();
+
+    expect(ctx.f.cloud.getDevices).toHaveBeenCalled();
+    expect(objectExistedAtRead, "the state read happens after the tree exists").toEqual([true]);
+    expect(i.states.get("devices.h7127_ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
+    expect(i.states.has("devices.h7127_ee11.control.filter_life_time"), "no stray write in the wrong channel").toBe(false);
+  });
+
+  it("a light with a local API keeps its LAN-owned values through the start-up state read (LAN-first on the wiring)", async () => {
+    // The state read returns values for every cloud device now — for the
+    // first time since v0.1.0 — and a light with a local API is a target too.
+    // Its power, brightness, colour and colour temperature belong to the LAN
+    // (CLAUDE.md, hard rule): the loader skips them while `lanIp` is set. The
+    // UDP scan is started at the top of onReady and has answered long before
+    // the cloud phase and the drain are over, so `lanIp` is there when the
+    // read runs. The loader's guard is unit-tested on its own; this pins the
+    // chain scan → cache merge → cloud merge → read, which is what Task 3
+    // rewires.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee22.json"),
+      JSON.stringify({
+        sku: "H6172",
+        deviceId: "AA:BB:CC:DD:EE:22",
+        name: "Strip",
+        type: "devices.types.light",
+        capabilities: [
+          { type: "devices.capabilities.on_off", instance: "powerSwitch" },
+          { type: "devices.capabilities.range", instance: "brightness" },
+        ],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    // The scan answers for THIS light — the id the cache and the cloud list carry.
+    ctx.f.lan.start.mockImplementation((onDevice: (d: unknown) => void) => {
+      onDevice({ ip: "192.168.1.22", device: "AA:BB:CC:DD:EE:22", sku: "H6172" });
+    });
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H6172",
+        device: "AA:BB:CC:DD:EE:22",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [
+          { type: "devices.capabilities.on_off", instance: "powerSwitch" },
+          { type: "devices.capabilities.range", instance: "brightness" },
+        ],
+      },
+    ]);
+    // The cloud claims ON at 42 % — the LAN has said nothing of the kind.
+    ctx.f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+      { type: "devices.capabilities.range", instance: "brightness", state: { value: 42 } },
+    ]);
+    await i.onReady();
+    await settle();
+
+    expect(ctx.f.cloud.getDeviceState, "the light IS read — its cloud-only values may flow").toHaveBeenCalledWith(
+      "H6172",
+      "AA:BB:CC:DD:EE:22",
+    );
+    expect(i.states.get("devices.h6172_ee22.control.power")?.val, "power stays the LAN's word").not.toBe(true);
+    expect(i.states.get("devices.h6172_ee22.control.brightness")?.val, "brightness stays the LAN's word").not.toBe(42);
+  });
+
   it("skips a LAN-discovered light on the cached path — LAN owns those values", async () => {
     // The light cannot come from the cache: loadFromCache() returns false the
     // moment one is present, and then this branch never runs. It arrives from
     // the UDP scan, which runs in parallel and can add a light AFTER the cache
-    // decided. `cache.ts` drops lanIp, so the loader's own LAN guard
-    // (`device.lanIp && LAN_STATE_IDS…`) cannot protect power/brightness at
-    // that moment — the skip has to happen at the call site.
+    // decided. A scan-discovered light carries no cloud capabilities, so the
+    // loader never targets it.
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
     fsReal.writeFileSync(
