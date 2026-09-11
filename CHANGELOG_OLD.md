@@ -1,5 +1,9 @@
 # Older Changes
 
+## 2.32.1 (2026-09-07)
+
+- Fixed: Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup
+
 ## 2.32.0 (2026-09-07)
 
 - Fixed: In an account without a single light, every device stopped being switchable after a restart — appliances, plugs and sensors had no state and no reachability until you pressed sync devices

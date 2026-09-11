@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.35.1",
+    "version": "2.35.2",
     "news": {
-      "NEXT": {
+      "2.35.2": {
         "en": "A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written.",
         "de": "Eine ausgesteckte Lampe zeigt sich nach einem Start nicht mehr als eingeschaltet — Govees Antwort für ein unerreichbares Gerät trägt die Werte des letzten Kontakts, die nicht mehr geschrieben werden.",
         "ru": "Отключённая от сети лампа после старта больше не показывается включённой — ответ Govee для недоступного устройства несёт значения последнего контакта, и они больше не записываются.",

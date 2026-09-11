@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.35.2 (2026-09-11)
 
 - Fixed: A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written
 
@@ -147,10 +147,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - New: 486 more Govee models start as experimental — every model the homebridge-govee project lists as of September 2026, from bulbs and strips to fans, heaters and ice makers
 - New: An experimental model is tried by enabling "experimental device support"; a diagnostics report from the Expert tab confirms it for everyone
 - Changed: The wiki's device list folds each device type into one block with its counts, so 602 entries stay readable
-
-### 2.32.1 (2026-09-07)
-
-- Fixed: Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
