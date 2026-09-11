@@ -517,6 +517,16 @@ export class CommandRouter {
       cloudValue = value ? 1 : 0;
     }
 
+    // Same trace as sendCommand: this is the route every appliance command
+    // takes (work mode, target temperature, music), and the diagnostics report
+    // was blind to all of them — the reporter's export showed four level
+    // writes with no command line and no result (issue #47).
+    this.onDiagLog?.(
+      device.deviceId,
+      "debug",
+      `sendCommand ${capabilityInstance}=${JSON.stringify(cloudValue)} → Cloud`,
+    );
+
     const execute = async (): Promise<void> => {
       await this.cloudClient!.controlDevice(
         device.sku,
@@ -527,7 +537,24 @@ export class CommandRouter {
       );
     };
 
-    await this.sendBudgeted(execute, device);
+    try {
+      await this.sendBudgeted(execute, device);
+      this.onCommandResult?.(device.deviceId, {
+        stateId: capabilityInstance,
+        value: cloudValue,
+        transport: "Cloud",
+        ok: true,
+      });
+    } catch (e) {
+      this.onCommandResult?.(device.deviceId, {
+        stateId: capabilityInstance,
+        value: cloudValue,
+        transport: "Cloud",
+        ok: false,
+        error: errMessage(e),
+      });
+      throw e;
+    }
   }
 
   /**

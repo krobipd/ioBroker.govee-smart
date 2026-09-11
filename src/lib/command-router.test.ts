@@ -495,6 +495,46 @@ describe("CommandRouter", () => {
   });
 
   describe("sendCapabilityCommand (generic capability route)", () => {
+    it("records the outcome in the diagnostics report — the appliance route was blind (#47)", async () => {
+      // The reporter's export: four level writes, no `sendCommand` line, no
+      // result entry — the proof that Govee accepted them was only in the
+      // control history.
+      const cloud = makeCloudStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setCloudClient(cloud.client);
+      router.setRateLimiter(makeRateLimiter());
+      const results: Array<{ stateId: string; value: unknown; transport: string; ok: boolean; error?: string }> = [];
+      const lines: string[] = [];
+      router.onCommandResult = (_, r) => results.push(r);
+      router.onDiagLog = (_, _level, msg) => lines.push(msg);
+      await router.sendCapabilityCommand(makeDevice(), "devices.capabilities.work_mode", "workMode", {
+        workMode: 1,
+        modeValue: 2,
+      });
+      expect(results).toEqual([
+        { stateId: "workMode", value: { workMode: 1, modeValue: 2 }, transport: "Cloud", ok: true },
+      ]);
+      expect(lines).toEqual(['sendCommand workMode={"workMode":1,"modeValue":2} → Cloud']);
+    });
+
+    it("a rejected appliance command is recorded as a failure and still rethrown", async () => {
+      const cloud = makeCloudStub("devices.capabilities.work_mode");
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setCloudClient(cloud.client);
+      router.setRateLimiter(makeRateLimiter());
+      const results: Array<{ ok: boolean; error?: string }> = [];
+      router.onCommandResult = (_, r) => results.push(r);
+      await expect(
+        router.sendCapabilityCommand(makeDevice(), "devices.capabilities.work_mode", "workMode", {
+          workMode: 1,
+          modeValue: 2,
+        }),
+      ).rejects.toThrow(/stub-throw/);
+      expect(results).toHaveLength(1);
+      expect(results[0].ok).toBe(false);
+      expect(results[0].error).toMatch(/stub-throw/);
+    });
+
     it("forwards toggle as 0/1", async () => {
       const cloud = makeCloudStub();
       const limiter = makeRateLimiter();
