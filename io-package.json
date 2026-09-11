@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.34.0",
     "news": {
+      "NEXT": {
+        "en": "Air purifier mode, level and filter life follow the device's own status report, the device-state query delivers values at start, and an API-key-only setup keeps its appliance commands all day.",
+        "de": "Modus, Stufe und Filterlebensdauer eines Luftreinigers folgen der Statusmeldung des Geräts, die Zustandsabfrage liefert beim Start Werte, ein Nur-API-Key-Setup behält seine Befehle den ganzen Tag.",
+        "ru": "Режим, ступень и ресурс фильтра очистителя следуют за отчётом самого устройства, запрос состояния даёт значения при старте, установка только с API-ключом сохраняет команды весь день.",
+        "pt": "Modo, nível e vida do filtro de um purificador seguem o relato do próprio aparelho, a consulta de estado entrega valores no arranque e uma instalação só com chave API mantém os comandos todo o dia.",
+        "nl": "Modus, stand en filterduur van de luchtreiniger volgen de melding van het apparaat, de statusopvraag levert waarden bij de start, een setup met alleen API-sleutel houdt zijn commando's heel de dag.",
+        "fr": "Mode, niveau et durée du filtre du purificateur suivent le rapport de l'appareil, la requête d'état livre des valeurs au démarrage, une installation clé-API seule garde ses commandes tout le jour.",
+        "it": "Modalità, livello e durata del filtro di un purificatore seguono il rapporto del dispositivo, la lettura dello stato dà valori all'avvio e un setup solo chiave API tiene i comandi tutto il giorno.",
+        "es": "Modo, nivel y vida del filtro de un purificador siguen el informe del aparato, la consulta de estado entrega valores al inicio, y un montaje solo con clave API mantiene sus órdenes todo el día.",
+        "pl": "Tryb, stopień i żywotność filtra oczyszczacza podążają za raportem urządzenia, zapytanie o stan daje wartości przy starcie, a instalacja z samym kluczem API zachowuje polecenia cały dzień.",
+        "uk": "Режим, ступінь і ресурс фільтра очищувача йдуть за звітом самого пристрою, запит стану дає значення при старті, а установка лише з API-ключем зберігає команди весь день.",
+        "zh-cn": "空气净化器的模式、档位和滤芯寿命跟随设备自身的状态报告；启动时的状态查询返回数值；仅使用 API 密钥的安装全天保留其电器命令。"
+      },
       "2.34.0": {
         "en": "Air purifiers, heaters, humidifiers and fans accept a mode or speed again and show their real levels, a heater's temperature is sent correctly, and an account with no light reads its device states.",
         "de": "Luftreiniger, Heizungen, Befeuchter und Ventilatoren nehmen Modus und Stufe wieder an und zeigen echte Stufen, die Heizungstemperatur geht korrekt raus, ein Konto ohne Lampe liest seine Zustände.",
@@ -80,19 +93,6 @@
         "pl": "Naprawiono: na instancjach od 2.27.0 wszystkie karty administracyjne nie działały; dotknięte instalacje naprawiają się przy następnym starcie\nNaprawiono: karta bez dostępu do adaptera zgłaszała „brak urządzeń” zamiast prawdziwego błędu\nZmieniono: wykrywanie segmentów i diagnostyka dzielą jedną zakładkę Ekspert, każde z własnym przyciskiem\nZmieniono: przycisk diag.export został usunięty; zakładka Ekspert wydaje plik jednym naciśnięciem\nZmieniono: diag.lastExport zapisuje teraz, KIEDY powstał ostatni raport\nUlepszono: obie karty pokazują „Wczytywanie urządzeń …” podczas wyszukiwania\nNaprawiono: raport diagnostyczny opisywał regułę dostępności sprzed 2.30.0",
         "uk": "Виправлено: на екземплярах від 2.27.0 усі картки адміністратора не працювали; уражені встановлення виправляються під час наступного запуску\nВиправлено: картка без доступу до адаптера повідомляла «пристроїв ще немає» замість справжньої помилки\nЗмінено: виявлення сегментів і діагностика мають спільну вкладку «Експерт» із кнопкою для кожного\nЗмінено: кнопку diag.export прибрано; вкладка «Експерт» видає файл одним натисканням\nЗмінено: diag.lastExport тепер зберігає, КОЛИ створено останній звіт\nПокращено: обидві картки показують «Завантаження пристроїв …» під час пошуку\nВиправлено: звіт діагностики описував правило досяжності станом до 2.30.0",
         "zh-cn": "修复：在 2.27.0 及更高版本升级的实例上，所有管理页卡片均失效；受影响的安装会在下次启动时自行修复\n修复：无法连接适配器的卡片显示“暂无设备”，而不是真正的错误\n变更：分段检测与诊断共用一个“专家”选项卡，各有一个按钮\n变更：diag.export 按钮已移除；“专家”选项卡一次按下即可交付文件\n变更：diag.lastExport 现在记录上次生成报告的时间\n改进：两个卡片在搜索期间显示“正在加载设备 …”\n修复：诊断报告描述的是 2.30.0 之前的可达性规则"
-      },
-      "2.30.0": {
-        "en": "Devices without a local API and sensors behind a gateway are no longer shown as unreachable while they work. 37 more device models recognised.",
-        "de": "Geräte ohne lokale Schnittstelle und Sensoren hinter einem Gateway werden nicht mehr als nicht erreichbar angezeigt, während sie arbeiten. 37 weitere Gerätemodelle erkannt.",
-        "ru": "Устройства без локального интерфейса и датчики за шлюзом больше не показываются как недоступные, пока работают. Распознаются ещё 37 моделей.",
-        "pt": "Dispositivos sem API local e sensores atrás de um gateway já não aparecem como inacessíveis enquanto funcionam. Mais 37 modelos reconhecidos.",
-        "nl": "Apparaten zonder lokale API en sensoren achter een gateway worden niet meer als onbereikbaar getoond terwijl ze werken. 37 extra modellen herkend.",
-        "fr": "Les appareils sans API locale et les capteurs derrière une passerelle ne sont plus indiqués injoignables alors qu'ils fonctionnent. 37 modèles de plus.",
-        "it": "I dispositivi senza API locale e i sensori dietro un gateway non sono più mostrati come irraggiungibili mentre funzionano. Altri 37 modelli riconosciuti.",
-        "es": "Los dispositivos sin API local y los sensores detrás de una pasarela ya no se muestran como inaccesibles mientras funcionan. 37 modelos más reconocidos.",
-        "pl": "Urządzenia bez lokalnego interfejsu i czujniki za bramką nie są już pokazywane jako niedostępne, gdy działają. Rozpoznano 37 kolejnych modeli.",
-        "uk": "Пристрої без локального інтерфейсу та датчики за шлюзом більше не показуються як недоступні, поки працюють. Розпізнано ще 37 моделей.",
-        "zh-cn": "没有本地接口的设备和网关后面的传感器在正常工作时不再显示为不可达。新增识别 37 个设备型号。"
       }
     },
     "plugins": {
