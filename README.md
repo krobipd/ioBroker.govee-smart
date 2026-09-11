@@ -103,6 +103,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: The values Govee reports for a device at start no longer wait behind the loading of the scene libraries — on an installation with a dozen lights they arrived seven minutes after the start
+
 ### 2.35.0 (2026-09-11)
 
 - New: An air purifier's mode, level and filter life follow the device's own status report — a change made in the Govee app shows in ioBroker within a second, no cloud call (H7127, #47)

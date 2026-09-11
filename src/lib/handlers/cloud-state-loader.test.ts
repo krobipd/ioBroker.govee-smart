@@ -153,7 +153,7 @@ describe("loadCloudStates", () => {
     await expect(loadCloudStates(rig.adapter)).resolves.toBeUndefined();
   });
 
-  it("dispatches every /device/state call through the RateLimiter at background priority (M2)", async () => {
+  it("dispatches every /device/state call through the RateLimiter at status priority — ahead of the queued scene libraries", async () => {
     const d1 = createTestDevice({ deviceId: "AA:06", channels: { lan: false, mqtt: false, cloud: true } });
     const d2 = createTestDevice({ deviceId: "AA:07", channels: { lan: false, mqtt: false, cloud: true } });
     const rig = makeRig([d1, d2]);
@@ -170,8 +170,11 @@ describe("loadCloudStates", () => {
       } as never,
     };
     await loadCloudStates(limited);
-    // one budgeted call per device, background priority (2) like scene loads
-    expect(dispatched).toEqual([2, 2]);
+    // One budgeted call per device at the limiter's status tier (1). At tier 2
+    // — the scene-library tier this used to share — the start-up read sat
+    // behind five queued library calls per light and arrived seven minutes
+    // after the start on a 12-device installation (measured 2026-09-11).
+    expect(dispatched).toEqual([1, 1]);
     expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery"))).toHaveLength(2);
   });
 

@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.35.0",
     "news": {
+      "NEXT": {
+        "en": "The values Govee reports for a device at start no longer wait behind the loading of the scene libraries — with a dozen lights they used to arrive seven minutes after the start.",
+        "de": "Die Werte, die Govee beim Start für ein Gerät meldet, warten nicht mehr hinter dem Laden der Szenen-Bibliotheken — mit einem Dutzend Lampen kamen sie sieben Minuten nach dem Start.",
+        "ru": "Значения, которые Govee сообщает для устройства при старте, больше не ждут загрузки библиотек сцен — с дюжиной ламп они приходили через семь минут после старта.",
+        "pt": "Os valores que a Govee comunica para um aparelho no arranque já não esperam pelo carregamento das bibliotecas de cenas — com uma dúzia de luzes chegavam sete minutos depois.",
+        "nl": "De waarden die Govee bij de start voor een apparaat meldt, wachten niet meer op het laden van de scènebibliotheken — met een dozijn lampen kwamen ze zeven minuten na de start.",
+        "fr": "Les valeurs que Govee signale pour un appareil au démarrage n'attendent plus le chargement des bibliothèques de scènes — avec une douzaine de lampes elles arrivaient sept minutes après.",
+        "it": "I valori che Govee riporta per un dispositivo all'avvio non aspettano più il caricamento delle librerie di scene — con una dozzina di luci arrivavano sette minuti dopo l'avvio.",
+        "es": "Los valores que Govee informa para un dispositivo al inicio ya no esperan a la carga de las bibliotecas de escenas — con una docena de luces llegaban siete minutos después del inicio.",
+        "pl": "Wartości, które Govee zgłasza dla urządzenia przy starcie, nie czekają już na załadowanie bibliotek scen — przy tuzinie lamp przychodziły siedem minut po starcie.",
+        "uk": "Значення, які Govee повідомляє для пристрою при старті, більше не чекають завантаження бібліотек сцен — із дюжиною ламп вони надходили через сім хвилин після старту.",
+        "zh-cn": "Govee 在启动时为设备报告的数值不再排在场景库加载之后——在有十几盏灯的安装中，它们曾在启动七分钟后才到达。"
+      },
       "2.35.0": {
         "en": "Air purifier mode, level and filter life follow the device's own status report, the device-state query delivers values at start, and an API-key-only setup keeps its appliance commands all day.",
         "de": "Modus, Stufe und Filterlebensdauer eines Luftreinigers folgen der Statusmeldung des Geräts, die Zustandsabfrage liefert beim Start Werte, ein Nur-API-Key-Setup behält seine Befehle den ganzen Tag.",

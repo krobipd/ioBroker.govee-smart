@@ -99,7 +99,13 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
       // these calls are covered by the 100/day appliance budget, and until now
       // none of them were: no budget was passed, so an appliance's state reads
       // only ever counted against the account-wide limit.
-      await adapter.rateLimiter.tryExecute(loadOne, 2, applianceBudget(device));
+      // Status tier (1), not the scene-library tier (2): at start the library
+      // loads of every light are already queued (five calls per light, eight
+      // calls a minute), and a read queued BEHIND them at the same tier came
+      // seven minutes after the start on a 12-device installation (measured
+      // 2026-09-11, first start on 2.35.0) — the values a user looks at first
+      // arrived last. A priority-1 call overtakes the queued tier-2 loads.
+      await adapter.rateLimiter.tryExecute(loadOne, 1, applianceBudget(device));
     } else {
       await loadOne();
     }
