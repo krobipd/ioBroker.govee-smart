@@ -1,6 +1,7 @@
 import { LAN_STATE_IDS, mapCloudStateValues, planCloudCapabilityWrites } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
+import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { applianceBudget, type RateLimiter } from "../rate-limiter";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice } from "../types";
@@ -16,6 +17,23 @@ export interface CloudStateLoaderAdapter {
   readonly stateManager: StateManager | null;
   readonly rateLimiter: RateLimiter | null;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+}
+
+/**
+ * Whether Govee's state answer says the device is offline — the `online`
+ * capability with an explicit `false`. Absent or non-boolean counts as "no
+ * statement", not as offline.
+ *
+ * @param caps The capabilities of one `/device/state` answer
+ */
+export function cloudReportsOffline(caps: CloudStateCapability[]): boolean {
+  return caps.some(
+    c =>
+      c &&
+      typeof c.type === "string" &&
+      (c.type === GOVEE_CAP_TYPE.ONLINE || c.type === "online") &&
+      c.state?.value === false,
+  );
 }
 
 /**
@@ -57,6 +75,18 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         // with no local API this is the ONLY evidence there is, so without it
         // such a device could never be shown as reachable at all.
         adapter.deviceManager?.applyCloudStateOnline(device, caps);
+        // Govee's memory of a device it cannot reach is not the device's state:
+        // for an unplugged light the same answer carried `online: false` AND
+        // `powerSwitch: 1`, `brightness: 100` (krobi's H70C5, unplugged for a
+        // week, measured on the first 2.35.0 start) — the values of the last
+        // contact. Written, they showed an unplugged light as switched on. The
+        // online evidence above is applied; the remembered values are not.
+        if (cloudReportsOffline(caps)) {
+          adapter.log.debug(
+            `Cloud state for ${deviceLabel(device)}: Govee reports the device offline — its remembered values are not written`,
+          );
+          return;
+        }
         const prefix = adapter.stateManager.devicePrefix(device);
 
         const writes: Promise<unknown>[] = [];

@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.35.1",
     "news": {
+      "NEXT": {
+        "en": "A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written.",
+        "de": "Eine ausgesteckte Lampe zeigt sich nach einem Start nicht mehr als eingeschaltet — Govees Antwort für ein unerreichbares Gerät trägt die Werte des letzten Kontakts, die nicht mehr geschrieben werden.",
+        "ru": "Отключённая от сети лампа после старта больше не показывается включённой — ответ Govee для недоступного устройства несёт значения последнего контакта, и они больше не записываются.",
+        "pt": "Uma luz desligada da tomada já não aparece como ligada após um arranque — a resposta da Govee para um aparelho inacessível traz os valores do último contacto, e esses já não são escritos.",
+        "nl": "Een lamp zonder stroom toont zich na een start niet meer als ingeschakeld — Govees antwoord voor een onbereikbaar apparaat draagt de waarden van het laatste contact, die niet meer worden geschreven.",
+        "fr": "Une lampe débranchée ne s'affiche plus comme allumée après un démarrage — la réponse de Govee pour un appareil injoignable porte les valeurs du dernier contact, qui ne sont plus écrites.",
+        "it": "Una luce scollegata non appare più accesa dopo un avvio — la risposta di Govee per un dispositivo irraggiungibile porta i valori dell'ultimo contatto, che non vengono più scritti.",
+        "es": "Una luz desenchufada ya no aparece encendida tras un inicio — la respuesta de Govee para un dispositivo inalcanzable trae los valores del último contacto, y esos ya no se escriben.",
+        "pl": "Odłączona od prądu lampa nie pokazuje się już po starcie jako włączona — odpowiedź Govee dla nieosiągalnego urządzenia niesie wartości ostatniego kontaktu, a te nie są już zapisywane.",
+        "uk": "Вимкнена з розетки лампа після старту більше не показується увімкненою — відповідь Govee для недосяжного пристрою несе значення останнього контакту, і вони більше не записуються.",
+        "zh-cn": "拔掉电源的灯在启动后不再显示为已开启——Govee 对无法访问的设备返回的是上次联系时的数值，这些数值不再被写入。"
+      },
       "2.35.1": {
         "en": "The values Govee reports for a device at start no longer wait behind the loading of the scene libraries — with a dozen lights they used to arrive seven minutes after the start.",
         "de": "Die Werte, die Govee beim Start für ein Gerät meldet, warten nicht mehr hinter dem Laden der Szenen-Bibliotheken — mit einem Dutzend Lampen kamen sie sieben Minuten nach dem Start.",

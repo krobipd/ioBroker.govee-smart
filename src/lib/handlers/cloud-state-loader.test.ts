@@ -19,6 +19,7 @@ interface TestRig {
   ensured: string[];
   removed: Array<{ prefix: string; stateId: string }>;
   failures: Array<{ deviceId: string; endpoint: string }>;
+  onlineApplied: Array<{ device: string; caps: unknown[] }>;
   setDeviceState(fn: (sku: string, deviceId: string) => Promise<CloudStateCapability[]>): void;
 }
 
@@ -71,6 +72,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
     ensured,
     removed,
     failures,
+    onlineApplied,
     setDeviceState: fn => {
       getDeviceState = fn;
     },
@@ -111,6 +113,45 @@ describe("loadCloudStates", () => {
     });
     const rig = makeRig([cloudOnly]);
     rig.setDeviceState(() => Promise.resolve([powerCap]));
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toMatchObject({ val: true });
+  });
+
+  it("does not write Govee's remembered values for a device Govee itself reports offline — only the online evidence", async () => {
+    // Measured on krobi's server 2026-09-11 (H70C5 unplugged since 09-03):
+    // Govee's state answer carried `online: false` AND `powerSwitch: 1`,
+    // `brightness: 100` — its memory of the last contact, not the device's
+    // state. The 2.35.0 start wrote them, and an unplugged light showed "on".
+    const unplugged = createTestDevice({
+      deviceId: "AA:0F",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const rig = makeRig([unplugged]);
+    const offlineCap: CloudStateCapability = {
+      type: "devices.capabilities.online",
+      instance: "online",
+      state: { value: false },
+    };
+    rig.setDeviceState(() => Promise.resolve([offlineCap, powerCap, batteryCap]));
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes).toEqual([]);
+    expect(rig.onlineApplied.map(o => o.device)).toEqual(["AA:0F"]);
+  });
+
+  it("writes the values when Govee reports the device online in the same answer", async () => {
+    const reachable = createTestDevice({
+      deviceId: "AA:10",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const rig = makeRig([reachable]);
+    const onlineCap: CloudStateCapability = {
+      type: "devices.capabilities.online",
+      instance: "online",
+      state: { value: true },
+    };
+    rig.setDeviceState(() => Promise.resolve([onlineCap, powerCap]));
     await loadCloudStates(rig.adapter);
     expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toMatchObject({ val: true });
   });
