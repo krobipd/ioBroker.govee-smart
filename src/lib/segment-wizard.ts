@@ -209,6 +209,10 @@ export class SegmentWizard {
           const total = device.segmentCount ?? 0;
           if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
             const color = parseInt(session.baseline.colorRgb.slice(1), 16);
+            // The DEVICE brightness on purpose, unlike restoreBaseline (F3):
+            // onUnload gets one datagram, not the two commands a full restore
+            // needs — carrying the dim in the segment packet is the closest
+            // approximation of what the user had.
             const brightness = session.baseline.brightness ?? 100;
             // Fire-and-forget on teardown — the surrounding try/catch only
             // catches synchronous throws, so swallow the promise rejection too
@@ -601,7 +605,11 @@ export class SegmentWizard {
       await restoreSegmentsGrouped((d, cmd, val) => this.host.sendCommand(d, cmd, val), device, segs);
     } else if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
       const color = parseInt(baseline.colorRgb.slice(1), 16);
-      const brightness = baseline.brightness ?? 100;
+      // The SEGMENT brightness, not the device's: restoreStripAtomic ends in
+      // `restoreAllSegments`, which sends a segment-brightness packet, and the
+      // global brightness is restored on its own below. Passing the device
+      // value here applied the dim twice (audit 2026-09-12, F3).
+      const brightness = segs[0]?.brightness ?? 100;
       const atomic = await this.host.restoreStripAtomic(device, total, color, brightness);
       if (!atomic) {
         await this.host.sendCommand(device, "segmentBatch", {
@@ -610,6 +618,16 @@ export class SegmentWizard {
           brightness,
         });
       }
+    }
+    // Restore the global brightness — start() forces 100 % so a dimmed strip
+    // shows the flashing at all (see there), and Govee multiplies segment
+    // brightness WITH the device brightness: without this a strip dimmed to
+    // 10 % stayed at full after every wizard run, and the segment restore could
+    // not make up for it (audit 2026-09-12, F3). Only when start() really
+    // changed it, and before the power line so the value lands while the strip
+    // is still on.
+    if (typeof baseline.brightness === "number" && baseline.brightness !== 100) {
+      await this.host.sendCommand(device, "brightness", baseline.brightness);
     }
     // Restore the original power state — the wizard forces the strip ON to flash
     // segments (start() sends power:true), so a device that was OFF beforehand

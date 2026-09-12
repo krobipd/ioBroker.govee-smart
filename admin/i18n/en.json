@@ -106,6 +106,7 @@
   "devicesTotal": "Devices total",
   "devicesOnline": "Devices online",
   "devicesAllOnline": "All devices online",
+  "descDevicesAllOnline": "True only while every device the adapter knows is reachable — with no devices at all it stays false, so an empty installation cannot report completeness.",
   "information": "Information",
   "infoConnection": "Adapter connected",
   "infoMqttConnected": "MQTT connected",

@@ -556,13 +556,18 @@ describe("CommandRouter", () => {
       expect(cloud.calls[0].value).toEqual({ v: 1 });
     });
 
-    it("no-op (debug, no cloud call) when Cloud not configured (L23)", async () => {
-      const debugs: string[] = [];
-      const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as unknown as ioBroker.Logger;
-      const router = new CommandRouter(log, noopTimers, registry);
+    // Was "no-op (debug, no cloud call)" until the 2026-09-12 audit: a silent
+    // return let every caller ack the state as if the command had gone out —
+    // the user cannot tell that from success, and the diagnostics report holds
+    // no command result either. Same rule as sendCloudCommand: it throws.
+    it("throws instead of returning silently when Cloud is not configured (L23)", async () => {
+      const cloud = makeCloudStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       const device = makeDevice({ channels: { lan: true, mqtt: false, cloud: false } });
-      await router.sendCapabilityCommand(device, "devices.capabilities.toggle", "any", true);
-      expect(debugs.some(d => /cloud not available/i.test(d))).toBe(true);
+      await expect(router.sendCapabilityCommand(device, "devices.capabilities.toggle", "any", true)).rejects.toThrow(
+        /No Cloud connection/,
+      );
+      expect(cloud.calls).toHaveLength(0);
     });
   });
 

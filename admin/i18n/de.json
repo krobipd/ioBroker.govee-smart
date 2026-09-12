@@ -106,6 +106,7 @@
   "devicesTotal": "Geräte gesamt",
   "devicesOnline": "Geräte online",
   "devicesAllOnline": "Alle Geräte online",
+  "descDevicesAllOnline": "Wahr nur, solange jedes bekannte Gerät erreichbar ist — ohne Geräte bleibt der Wert falsch, damit eine leere Installation keine Vollzähligkeit meldet.",
   "information": "Information",
   "infoConnection": "Adapter verbunden",
   "infoMqttConnected": "MQTT verbunden",

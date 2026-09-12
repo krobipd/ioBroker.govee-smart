@@ -297,15 +297,17 @@ describe("SegmentWizard", () => {
     it("should capture baseline from existing states", async () => {
       await wizard.start(key);
       await wizard.abort();
-      const restoreCall = host.calls[host.calls.length - 1];
-      expect(restoreCall.command).toBe("segmentBatch");
+      // the LAST segmentBatch is the restore — the earlier ones are the flashes
+      const restoreCall = host.calls.filter(c => c.command === "segmentBatch").pop()!;
       const v = restoreCall.value as {
         segments: number[];
         color: number;
         brightness: number;
       };
       expect(v.color).toBe(0xff6600);
-      expect(v.brightness).toBe(75);
+      // The SEGMENT brightness (50), not the device's (75) — the device value
+      // is restored by its own command, see the F3 test below.
+      expect(v.brightness).toBe(50);
       // Restore scopes to device.segmentCount — the pre-measurement value
       expect(v.segments).toEqual([0, 1, 2, 3, 4]);
     });
@@ -459,12 +461,12 @@ describe("SegmentWizard", () => {
       await wizard.answer(true);
       host.calls.length = 0;
       await wizard.runStep("apply", key, { indices: [0, 1] });
-      // Last sendCommand should be the restore segmentBatch
-      const last = host.calls[host.calls.length - 1];
-      expect(last.command).toBe("segmentBatch");
-      const v = last.value as { color: number; brightness: number };
+      const restore = host.calls.find(c => c.command === "segmentBatch")!;
+      const v = restore.value as { color: number; brightness: number };
       expect(v.color).toBe(0xff6600);
-      expect(v.brightness).toBe(75);
+      expect(v.brightness).toBe(50);
+      // …and the device brightness the wizard forced to 100 goes back to 75.
+      expect(host.calls.find(c => c.command === "brightness")?.value).toBe(75);
     });
 
     it("should clear the idle timer on apply", async () => {
@@ -491,13 +493,14 @@ describe("SegmentWizard", () => {
       await wizard.start(key);
       host.calls.length = 0;
       await wizard.abort();
-      expect(host.calls).toHaveLength(1);
+      // Two calls: the segment restore, then the global brightness (F3).
+      expect(host.calls.map(c => c.command)).toEqual(["segmentBatch", "brightness"]);
       const v = host.calls[0].value as {
         color: number;
         brightness: number;
       };
       expect(v.color).toBe(0xff6600);
-      expect(v.brightness).toBe(75);
+      expect(v.brightness).toBe(50);
     });
 
     it("should NOT apply a result on abort", async () => {
@@ -515,12 +518,40 @@ describe("SegmentWizard", () => {
       expect(again.active).toBe(true);
     });
 
-    it("should skip restore when baseline color is missing", async () => {
+    it("should skip the segment restore when baseline color is missing", async () => {
       host.states.delete(`${host.namespace}.${host.devicePrefix(device)}.control.color_rgb`);
       await wizard.start(key);
       host.calls.length = 0;
       await wizard.abort();
-      expect(host.calls).toHaveLength(0);
+      // No colour to paint back — but the dim the wizard overrode is still
+      // restored, otherwise the strip stays at 100 % (F3).
+      expect(host.calls.map(c => c.command)).toEqual(["brightness"]);
+      expect(host.calls[0].value).toBe(75);
+    });
+
+    // Audit 2026-09-12 (F3): start() forces brightness 100 so a dimmed strip
+    // shows the flashing; restoreBaseline put the segments back but never the
+    // device brightness, and Govee multiplies the two — a strip dimmed to 10 %
+    // came out of every wizard run at full.
+    it("restores the global brightness the wizard forced to 100 (F3)", async () => {
+      host.states.set(`${host.namespace}.${host.devicePrefix(device)}.control.brightness`, 10);
+      await wizard.start(key);
+      host.calls.length = 0;
+      await wizard.abort();
+      const brightnessCalls = host.calls.filter(c => c.command === "brightness");
+      expect(brightnessCalls).toHaveLength(1);
+      expect(brightnessCalls[0].value).toBe(10);
+      // and the segment packet must NOT carry it a second time
+      const seg = host.calls.find(c => c.command === "segmentBatch")!.value as { brightness: number };
+      expect(seg.brightness).toBe(50);
+    });
+
+    it("sends no brightness command when the strip was already at 100", async () => {
+      host.states.set(`${host.namespace}.${host.devicePrefix(device)}.control.brightness`, 100);
+      await wizard.start(key);
+      host.calls.length = 0;
+      await wizard.abort();
+      expect(host.calls.some(c => c.command === "brightness")).toBe(false);
     });
 
     it("restores the original power state — turns the strip back off if it was off (L8)", async () => {
@@ -653,9 +684,9 @@ describe("SegmentWizard", () => {
       await wizard.runStep("start", key);
       host.calls.length = 0; // drop the flash calls — keep only the restore
       await wizard.runStep("apply", key, { indices: [0, 1, 2] });
-      // baseline restored: last sendCommand is the restore segmentBatch
-      const last = host.calls[host.calls.length - 1];
-      expect(last.command).toBe("segmentBatch");
+      // baseline restored: the segment batch went out (the global brightness
+      // follows it, see the F3 tests)
+      expect(host.calls.some(c => c.command === "segmentBatch")).toBe(true);
       // session released → a fresh start succeeds (would be "already active" if leaked)
       expect(wizard.getSessionSnapshot()).toBeNull();
       const again = await wizard.runStep("start", key);

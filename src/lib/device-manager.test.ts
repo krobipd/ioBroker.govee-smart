@@ -3787,6 +3787,32 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     expect(patches[2].online).toBeUndefined();
   });
 
+  // Audit 2026-09-12 (F7): the same class as the `online` test above, for
+  // `power`. onDeviceStateUpdate keys the mode-dropdown reset on the REPORTED
+  // power, so a `power:false` in every devStatus reply re-read five dropdown
+  // states per poll and per switched-off light — twice a minute, writing nothing.
+  it("a devStatus reply carries `power` only when it really changed", () => {
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dev = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
+    dev.state.online = true; // keep `online` out of the patches
+    (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), dev);
+    const patches: Partial<DeviceState>[] = [];
+    dm2.onDeviceUpdate = (_d, s) => patches.push(s);
+    const off = { onOff: 0, brightness: 50, color: { r: 255, g: 0, b: 0 }, colorTemInKelvin: 0 };
+
+    dm2.handleLanStatus("192.168.1.100", off);
+    expect(patches[0].power).toBe(false); // first reply: the state is new
+
+    dm2.handleLanStatus("192.168.1.100", off);
+    dm2.handleLanStatus("192.168.1.100", off);
+    expect(patches[1].power).toBeUndefined();
+    expect(patches[2].power).toBeUndefined();
+
+    // …and a real change is still reported
+    dm2.handleLanStatus("192.168.1.100", { ...off, onOff: 1 });
+    expect(patches[3].power).toBe(true);
+  });
+
   it("skips the App-API poll entirely in a lights-only installation", async () => {
     const dm2 = new DeviceManager(mockLog, mockTimers, registry);
     (dm2 as any).devices.set(

@@ -506,8 +506,15 @@ export class CommandRouter {
     value: unknown,
   ): Promise<void> {
     if (!this.cloudClient || !device.channels.cloud) {
-      this.log.debug(`Cloud not available for generic command on ${deviceLabel(device)}`);
-      return;
+      // Throw rather than return, same rule as sendCloudCommand below: the
+      // command did NOT run, and a silent return let every caller ack the
+      // state as if it had — every appliance write (work mode, mode value,
+      // target temperature, music struct, any generic capability) goes through
+      // here. Reached after the API key is removed from a configured
+      // installation, in the init race right after start, and while stopping.
+      throw new Error(
+        `No Cloud connection for ${deviceLabel(device)}/${capabilityInstance} (no API key, or adapter stopping)`,
+      );
     }
 
     const shortType = capabilityType.replace("devices.capabilities.", "");

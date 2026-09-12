@@ -16,5 +16,7 @@
   "devices.*.segments.*.brightness": "The same brightness control once per segment; segments.count carries the explanation for the whole subtree.",
   "devices.*.sensor.temperature": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
   "devices.*.sensor.humidity": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
-  "devices.*.sensor.battery": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one."
+  "devices.*.sensor.battery": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
+  "info.devicesTotal": "A plain count of the devices the adapter knows — the name is the whole content.",
+  "info.devicesOnline": "A plain count of the reachable devices — the name is the whole content; devicesAllOnline carries the explanation for the summary group."
 }

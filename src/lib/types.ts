@@ -545,8 +545,6 @@ export interface DeviceState {
   colorRgb?: string;
   /** Color temperature in Kelvin */
   colorTemperature?: number;
-  /** Active scene name */
-  scene?: string;
   /** Additional dynamic state values */
   [key: string]: unknown;
 }

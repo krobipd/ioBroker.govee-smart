@@ -103,6 +103,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: A command to an appliance is no longer confirmed when it was never sent — without a cloud connection the datapoint used to show the new value as if the device had taken it
+- Fixed: Music sensitivity and auto-colour written on a locally controlled light are no longer confirmed — the local protocol carries no such fields, and the adapter now only warns
+- Fixed: The segment wizard restores the brightness the strip had before it ran — it turns the strip to full while measuring, and a dimmed strip stayed bright afterwards
+- Fixed: An installation with Govee account and no API key now reads its sensor values again — the two-minute account query ran only when an API key was configured
+- Changed: A sensor reading that has not changed is no longer written again every two minutes — the datapoint keeps its timestamp until the value itself changes
+- Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
+
 ### 2.35.2 (2026-09-11)
 
 - Fixed: A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written

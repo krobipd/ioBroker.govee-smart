@@ -527,6 +527,25 @@ describe("GoveeAdapter onReady — channel wiring", () => {
   });
 });
 
+describe("GoveeAdapter onReady — the device rollup", () => {
+  // Audit 2026-09-12 (F8): the three summary datapoints were created by the
+  // 20-second round only, so right after a start they did not exist yet. The
+  // object-inventory run finishes before that on a fast machine — name, role,
+  // type and description of the three were judged by no gate, and whether they
+  // reached the committed inventory depended on machine speed.
+  it("creates the three summary datapoints before the first 20 s round", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    expect(i.objects.has("info.devicesTotal")).toBe(true);
+    expect(i.objects.has("info.devicesOnline")).toBe(true);
+    expect(i.objects.has("info.devicesAllOnline")).toBe(true);
+    // …and a restart says "nothing is being read right now" straight away,
+    // because markAllOffline's clearDeviceRollup now finds them.
+    expect(i.states.get("info.devicesOnline")?.val).toBe(0);
+    expect(i.states.get("info.devicesAllOnline")?.val).toBe(false);
+  });
+});
+
 describe("GoveeAdapter onReady — timers", () => {
   it("arms every recurring timer with its documented interval", async () => {
     const { adapter } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
@@ -566,6 +585,37 @@ describe("GoveeAdapter onReady — timers", () => {
     await settle();
     expect(f.api.fetchDeviceList).toHaveBeenCalledTimes(1);
     expect(i.appApiInitialPollDone).toBe(true);
+  });
+
+  // Audit 2026-09-12 (F5): the whole App-API block sat inside `if (config.apiKey)`,
+  // although the poll runs on the ACCOUNT bearer token. An installation with
+  // account credentials and no API key therefore never polled: no sensor
+  // values, and `appApiInitialPollDone` stayed false, so checkAllReady only
+  // ever passed through the 60 s safety timer.
+  it("polls the App-API on an account-only installation (no API key)", async () => {
+    const { adapter, f } = await setupReady({ goveeEmail: "user@example.com", goveePassword: "secret" });
+    const i = internalOf(adapter);
+    expect(i.cloudClient).toBeNull(); // no API key → no cloud client, as before
+    f.api.hasBearerToken.mockReturnValue(true);
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set(
+      "H5179_aabbccddee22",
+      makeDevice({ sku: "H5179", type: "devices.types.thermometer", deviceId: "AA:BB:CC:DD:EE:22" }),
+    );
+
+    const pollCall = i.setInterval.mock.calls.find(c => c[1] === 2 * 60 * 1000);
+    expect(pollCall, "App-API poll interval must be armed without an API key").toBeDefined();
+    f.api.fetchDeviceList.mockClear();
+    (pollCall![0] as () => void)();
+    await settle();
+    expect(f.api.fetchDeviceList).toHaveBeenCalledTimes(1);
+    expect(i.appApiInitialPollDone).toBe(true);
+  });
+
+  it("arms no App-API timer on a LAN-only installation", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    expect(i.setInterval.mock.calls.some(c => c[1] === 2 * 60 * 1000)).toBe(false);
+    expect(i.setTimeout.mock.calls.some(c => c[1] === 5_000)).toBe(false);
   });
 
   it("the online-sync callback re-evaluates every device's info.online", async () => {
@@ -2024,6 +2074,38 @@ describe("GoveeAdapter — callback wiring", () => {
     (timer![0] as () => void)();
     await settle(5);
     expect(cleanup).not.toHaveBeenCalled();
+  });
+});
+
+describe("GoveeAdapter — cloud capability writes over the REAL host object", () => {
+  // Same class of hole as the diagnostics export below: the handlers only ever
+  // see the host view `buildHost()` assembles, and `const host = {} as
+  // AdapterHost` means a method missing there is NOT a type error. Audit
+  // 2026-09-12 (F6) added `setStateChanged` to that view — a rig declaring it
+  // on its own fake would prove nothing about the real one.
+  it("writes an App-API reading through setStateChangedAsync, not setState", async () => {
+    const { adapter } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    const sensor = makeDevice({ sku: "H5179", type: "devices.types.thermometer", deviceId: "AA:BB:CC:DD:EE:33" });
+    sensor.lanIp = undefined;
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H5179_aabbccddee33", sensor);
+    await (i.stateManager as unknown as { createInfoStates(d: GoveeDevice): Promise<void> }).createInfoStates(sensor);
+    const prefix = i.stateManager!.devicePrefix(sensor);
+
+    i.setStateChangedAsync.mockClear();
+    i.setState.mockClear();
+    const bridge = (
+      i.deviceManager as unknown as {
+        onCloudCapabilities: ((d: GoveeDevice, caps: unknown[]) => void) | null;
+      }
+    ).onCloudCapabilities;
+    expect(bridge, "main wires the cloud-capability bridge").toBeTruthy();
+    bridge!(sensor, [{ type: "devices.capabilities.property", instance: "battery", state: { value: 75 } }]);
+    await settle(4);
+
+    expect(i.states.get(`${prefix}.sensor.battery`)?.val).toBe(75);
+    expect(i.setStateChangedAsync.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(true);
+    expect(i.setState.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(false);
   });
 });
 

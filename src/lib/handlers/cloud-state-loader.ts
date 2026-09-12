@@ -17,6 +17,8 @@ export interface CloudStateLoaderAdapter {
   readonly stateManager: StateManager | null;
   readonly rateLimiter: RateLimiter | null;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  /** `setStateChangedAsync` of the real adapter — see applyCloudCapabilities. */
+  setStateChanged(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
 /**
@@ -184,10 +186,17 @@ export async function applyCloudCapabilities(
       (device.state as Record<string, unknown>)[mapped.stateId] = mapped.value;
     }
   }
+  // setStateChanged, not setState: this path runs on EVERY App-API poll (every
+  // 2 minutes) and on every cloud event, and it re-sends the same reading each
+  // time — 720 writes a day per value, each one bumping `ts`, firing every
+  // subscription and landing in a history adapter that records "all values".
+  // Every other repeating writer of this adapter suppresses the unchanged
+  // write; this one did not (audit 2026-09-12, F6). Freshness is not carried by
+  // `ts` here — `info.online` and `isSensorDataFresh` answer that question.
   const writes = planned.map(mapped => {
     const statePath = adapter.stateManager!.resolveStatePath(prefix, mapped.stateId);
     return adapter
-      .setState(statePath, { val: mapped.value, ack: true })
+      .setStateChanged(statePath, { val: mapped.value, ack: true })
       .catch(logRejected(adapter.log, `write ${statePath}`));
   });
   await Promise.all(writes);

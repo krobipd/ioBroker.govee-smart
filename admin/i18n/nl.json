@@ -106,6 +106,7 @@
   "devicesTotal": "Apparaten totaal",
   "devicesOnline": "Apparaten online",
   "devicesAllOnline": "Alle apparaten online",
+  "descDevicesAllOnline": "Waar zolang elk bekend apparaat bereikbaar is — zonder apparaten blijft het onwaar, zodat een lege installatie geen volledigheid meldt.",
   "information": "Informatie",
   "infoConnection": "Adapter verbonden",
   "infoMqttConnected": "MQTT verbonden",

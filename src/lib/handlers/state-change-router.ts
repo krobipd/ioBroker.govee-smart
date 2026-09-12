@@ -198,7 +198,7 @@ export async function sendMusicCommand(
   prefix: string,
   changedSuffix: string,
   newValue: ioBroker.StateValue,
-): Promise<void> {
+): Promise<boolean> {
   const musicBase = `${adapter.namespace}.${prefix}.music`;
 
   const modeState = await adapter.getStateAsync(`${musicBase}.music_mode`);
@@ -220,7 +220,7 @@ export async function sendMusicCommand(
   // 2026-08-22 test audit). It stays because it names the intent.
   if (!Number.isFinite(selectedIndex) || selectedIndex <= 0) {
     adapter.log.debug("Music mode not selected, skipping command");
-    return;
+    return false;
   }
 
   // Resolve the dropdown index to the device's actual mode value through the
@@ -231,7 +231,7 @@ export async function sendMusicCommand(
   const musicMode = chosen ? Number(chosen.value) : NaN;
   if (!Number.isFinite(musicMode)) {
     adapter.log.debug(`Music mode index ${selectedIndex} has no matching numeric option, skipping command`);
-    return;
+    return false;
   }
 
   if (device.lanIp && adapter.lanClient) {
@@ -244,7 +244,7 @@ export async function sendMusicCommand(
         `${deviceLabel(device)}: music sensitivity / auto-color can't be set over the local API — ` +
           `only the music mode applies for LAN-controlled lights.`,
       );
-      return;
+      return false;
     }
     let r = 0,
       g = 0,
@@ -266,7 +266,7 @@ export async function sendMusicCommand(
     // then be wrong and needs hardware validation. The RGB gate above is
     // already name-correct regardless of the numbering.
     adapter.lanClient.setMusicMode(device.lanIp, musicMode, includeRgb, r, g, b);
-    return;
+    return true;
   }
 
   const structValue: Record<string, unknown> = {
@@ -276,6 +276,7 @@ export async function sendMusicCommand(
   };
 
   await adapter.deviceManager!.sendCapabilityCommand(device, GOVEE_CAP_TYPE.MUSIC_SETTING, "musicMode", structValue);
+  return true;
 }
 
 /**
@@ -557,7 +558,15 @@ export async function onStateChange(
         await adapter.setState(id, { val, ack: true });
         return;
       }
-      await sendMusicCommand(adapter, device, prefix, stateSuffix, val);
+      // Ack only when something really went out. sendMusicCommand bails on
+      // three paths that send nothing at all — no mode selected, an index with
+      // no numeric option, and sensitivity / auto-color on a LAN light (the
+      // local packet has no such fields, A3). Acking those wrote the user's
+      // wish into the datapoint as if the device had taken it (audit
+      // 2026-09-12, F2); the mode sentinel keeps its own ack above.
+      if (!(await sendMusicCommand(adapter, device, prefix, stateSuffix, val))) {
+        return;
+      }
       await adapter.setState(id, { val, ack: true });
       if (stateSuffix === "music.music_mode") {
         await dropdownReset.resetRelatedDropdowns(adapter, prefix, "music");

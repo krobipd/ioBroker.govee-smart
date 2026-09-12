@@ -444,6 +444,33 @@ export class StateManager {
   }
 
   /**
+   * Create the three rollup datapoints, without writing a value.
+   *
+   * Called from onReady as well as from {@link writeDeviceRollup}: created only
+   * by the 20-second round, they did not exist until the first tick — long
+   * enough for the object-inventory run to finish without them, so name, role,
+   * type and description of the three were judged by no gate, and whether they
+   * made it into the committed inventory depended on how fast the machine was
+   * (audit 2026-09-12, F8). The VALUES stay with the round that resolves the
+   * markers — a summary computed anywhere else drifts from what the individual
+   * devices say.
+   */
+  public async ensureDeviceRollupStates(): Promise<void> {
+    await this.ensureState("info.devicesTotal", tName("devicesTotal"), "number", "value", false, undefined, 0);
+    await this.ensureState("info.devicesOnline", tName("devicesOnline"), "number", "value", false, undefined, 0);
+    await this.ensureState(
+      "info.devicesAllOnline",
+      tName("devicesAllOnline"),
+      "boolean",
+      "indicator",
+      false,
+      undefined,
+      false,
+      tDesc("descDevicesAllOnline"),
+    );
+  }
+
+  /**
    * Write the device rollup: how many devices exist, how many are reachable, and
    * whether that is all of them.
    *
@@ -466,9 +493,7 @@ export class StateManager {
     const deviceIds = ids.filter(id => id.startsWith("devices."));
     const online = deviceIds.filter(id => this.resolvedOnline.get(id) === true).length;
     const total = deviceIds.length;
-    await this.ensureState("info.devicesTotal", tName("devicesTotal"), "number", "value", false);
-    await this.ensureState("info.devicesOnline", tName("devicesOnline"), "number", "value", false);
-    await this.ensureState("info.devicesAllOnline", tName("devicesAllOnline"), "boolean", "indicator", false);
+    await this.ensureDeviceRollupStates();
     await this.adapter.setStateChangedAsync("info.devicesTotal", { val: total, ack: true });
     await this.adapter.setStateChangedAsync("info.devicesOnline", { val: online, ack: true });
     await this.adapter.setStateChangedAsync("info.devicesAllOnline", {
@@ -1295,10 +1320,6 @@ export class StateManager {
     if (state.colorTemperature !== undefined) {
       set(`${prefix}.control.color_temperature`, state.colorTemperature);
     }
-    if (state.scene !== undefined) {
-      set(`${prefix}.control.scene`, state.scene);
-    }
-
     await Promise.all(writes);
   }
 

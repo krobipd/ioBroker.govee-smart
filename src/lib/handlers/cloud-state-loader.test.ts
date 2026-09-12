@@ -29,6 +29,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
   const removed: Array<{ prefix: string; stateId: string }> = [];
   const failures: Array<{ deviceId: string; endpoint: string }> = [];
   const onlineApplied: Array<{ device: string; caps: unknown[] }> = [];
+  const lastWritten = new Map<string, unknown>();
   let getDeviceState: (sku: string, deviceId: string) => Promise<CloudStateCapability[]> = () => Promise.resolve([]);
 
   const adapter: CloudStateLoaderAdapter = {
@@ -63,6 +64,17 @@ function makeRig(devices: GoveeDevice[]): TestRig {
     } as never,
     setState: (id, state) => {
       writes.push({ id, val: (state as { val: unknown }).val });
+      return Promise.resolve();
+    },
+    // Models setStateChangedAsync: an unchanged value is not written at all.
+    // Without that the rig would hide exactly what this method is chosen for.
+    setStateChanged: (id, state) => {
+      const val = (state as { val: unknown }).val;
+      if (lastWritten.has(id) && Object.is(lastWritten.get(id), val)) {
+        return Promise.resolve();
+      }
+      lastWritten.set(id, val);
+      writes.push({ id, val });
       return Promise.resolve();
     },
   };
@@ -247,6 +259,29 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     expect(rig.writes.find(w => w.id.endsWith(".sensor.battery"))).toMatchObject({ val: 75 });
     // v2.9.1 — diag `state` field must reflect non-Light runtime values
     expect((sensor.state as Record<string, unknown>).battery).toBe(75);
+  });
+
+  // Audit 2026-09-12 (F6): this path runs on every App-API poll (every 2 min)
+  // and every cloud event, and it re-sent the same reading each time — 720
+  // writes a day per value, each bumping `ts`, firing every subscription and
+  // landing in a history adapter set to "all values".
+  it("writes a repeated reading only once — unchanged values are suppressed", async () => {
+    const sensor = createTestDevice({
+      deviceId: "AA:07",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+    });
+    const rig = makeRig([sensor]);
+    await applyCloudCapabilities(rig.adapter, sensor, [batteryCap]);
+    await applyCloudCapabilities(rig.adapter, sensor, [batteryCap]);
+    await applyCloudCapabilities(rig.adapter, sensor, [batteryCap]);
+    expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery"))).toHaveLength(1);
+
+    // …and a real change still gets through.
+    await applyCloudCapabilities(rig.adapter, sensor, [
+      { type: "devices.capabilities.property", instance: "battery", state: { value: 60 } },
+    ]);
+    expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery")).map(w => w.val)).toEqual([75, 60]);
   });
 
   it("LAN-capable device: LAN-owned ids are shadowed, others still flow", async () => {

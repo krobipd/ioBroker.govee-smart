@@ -297,6 +297,9 @@ export class GoveeAdapter extends utils.Adapter {
     read("version", () => this.version);
     read("config", () => this.config);
     method("setState", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) => this.setState(id, state));
+    method("setStateChanged", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) =>
+      this.setStateChangedAsync(id, state),
+    );
     method("getStateAsync", (id: string) => this.getStateAsync(id));
     method("getObjectAsync", (id: string) => this.getObjectAsync(id));
     method("getForeignObjectAsync", (id: string) => this.getForeignObjectAsync(id));
@@ -568,6 +571,11 @@ export class GoveeAdapter extends utils.Adapter {
       // Nothing has been asked yet, so nothing may still claim to be reachable from
       // the previous run — least of all after a crash, where no shutdown code ran at
       // all and the old values would stand until the 20-second sync catches up.
+      // Before markAllOffline: its clearDeviceRollup only touches datapoints
+      // that already exist, so creating them first makes a restart say
+      // "0 online, not all online" right away instead of leaving the last
+      // session's numbers standing until the first 20 s round (F8).
+      await this.stateManager.ensureDeviceRollupStates().catch(() => undefined);
       await this.stateManager.markAllOffline().catch(() => undefined);
       // One-shot orphan cleanup: builds up to v2.21.0 merged a Govee app
       // "SameModeGroup" pseudo-device into a generic device; the fix skips it at
@@ -967,6 +975,61 @@ export class GoveeAdapter extends utils.Adapter {
       // account answered (from the cache or from a live list).
       let cloudStateReadable = false;
 
+      // Bridge synthetic capabilities (App-API, OpenAPI-MQTT events) into the
+      // same setState pipeline as polled Cloud state. Keeps mapCloudStateValue
+      // as the single source of truth for value coercion + state-id resolution.
+      // Outside the API-key branch: the App-API runs on the ACCOUNT token, so
+      // an installation with account credentials and no API key needs this too
+      // — without it its poll would fetch values that reach no datapoint
+      // (audit 2026-09-12, F5).
+      this.deviceManager.setOnCloudCapabilities((device, caps) => {
+        cloudStateLoader
+          .applyCloudCapabilities(this.handlerHost, device, caps)
+          .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
+      });
+
+      // App-API poll — every 2 minutes, pulls state for sensors like H5179
+      // whose OpenAPI /device/state answer carries the capability with an
+      // empty value (""). Bearer token comes from the AWS-IoT MQTT login, so
+      // a no-op until that succeeds.
+      //
+      // The same tick also renews reachability proofs that nothing else
+      // renews. It runs HERE and not inside pollAppApi on purpose: that
+      // method returns immediately without a bearer token, and an
+      // installation with only an API key is exactly the case this covers.
+      //
+      // Both credential tiers, not just the API key: the poll needs the
+      // ACCOUNT token and the refresh needs the cloud client, and each of the
+      // two returns 0 on its own when its source is missing. Gated on the
+      // account as well since 2026-09-12 (F5) — before that, an account-only
+      // installation never polled, so `appApiInitialPollDone` stayed false and
+      // "ready" came from the 60 s safety timer alone. A LAN-only installation
+      // has neither and gets no timer at all.
+      if (config.apiKey || hasAccountCreds) {
+        const triggerAppApiPoll = (): void => {
+          this.deviceManager
+            ?.refreshExpiringReachability()
+            .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
+          this.deviceManager
+            ?.pollAppApi()
+            .then(() => {
+              // H2 — mark initial-poll-done and re-check Ready so the adapter
+              // can log "ready" as soon as sensor values are in.
+              if (!this.appApiInitialPollDone) {
+                this.appApiInitialPollDone = true;
+                connectionState.checkAllReady(this.handlerHost);
+              }
+            })
+            .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
+        };
+        this.appApiPollTimer = this.setInterval(triggerAppApiPoll, APP_API_POLL_INTERVAL_MS);
+        // Initial poll: gives MQTT time for the bearer login. Without this
+        // immediate poll, sensors like the H5179 stay offline for the first
+        // 2 minutes after start (the online signal only comes via App-API).
+        // Kept in a member variable so onUnload can clear the timer.
+        this.appApiInitialTimer = this.setTimeout(triggerAppApiPoll, APP_API_INITIAL_DELAY_MS);
+      }
+
       if (config.apiKey) {
         this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
         // Capture the most recent Cloud response per (deviceId, endpoint) for
@@ -975,15 +1038,6 @@ export class GoveeAdapter extends utils.Adapter {
           this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body);
         });
         this.deviceManager.setCloudClient(this.cloudClient);
-
-        // Bridge synthetic capabilities (App-API, OpenAPI-MQTT events) into the
-        // same setState pipeline as polled Cloud state. Keeps mapCloudStateValue
-        // as the single source of truth for value coercion + state-id resolution.
-        this.deviceManager.setOnCloudCapabilities((device, caps) => {
-          cloudStateLoader
-            .applyCloudCapabilities(this.handlerHost, device, caps)
-            .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
-        });
 
         this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_FULL_LIMITS.perMinute, CLOUD_FULL_LIMITS.perDay);
         this.rateLimiter.start();
@@ -1028,38 +1082,6 @@ export class GoveeAdapter extends utils.Adapter {
             }
           },
         );
-
-        // App-API poll — every 2 minutes, pulls state for sensors like H5179
-        // whose OpenAPI /device/state answer carries the capability with an
-        // empty value (""). Bearer token comes from the AWS-IoT MQTT login, so
-        // a no-op until that succeeds.
-        //
-        // The same tick also renews reachability proofs that nothing else
-        // renews. It runs HERE and not inside pollAppApi on purpose: that
-        // method returns immediately without a bearer token, and an
-        // installation with only an API key is exactly the case this covers.
-        const triggerAppApiPoll = (): void => {
-          this.deviceManager
-            ?.refreshExpiringReachability()
-            .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
-          this.deviceManager
-            ?.pollAppApi()
-            .then(() => {
-              // H2 — mark initial-poll-done and re-check Ready so the adapter
-              // can log "ready" as soon as sensor values are in.
-              if (!this.appApiInitialPollDone) {
-                this.appApiInitialPollDone = true;
-                connectionState.checkAllReady(this.handlerHost);
-              }
-            })
-            .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
-        };
-        this.appApiPollTimer = this.setInterval(triggerAppApiPoll, APP_API_POLL_INTERVAL_MS);
-        // Initial poll: gives MQTT time for the bearer login. Without this
-        // immediate poll, sensors like the H5179 stay offline for the first
-        // 2 minutes after start (the online signal only comes via App-API).
-        // Kept in a member variable so onUnload can clear the timer.
-        this.appApiInitialTimer = this.setTimeout(triggerAppApiPoll, APP_API_INITIAL_DELAY_MS);
 
         if (!cachedOk) {
           // No cache — first start, fetch from Cloud with 60s hard-timeout.

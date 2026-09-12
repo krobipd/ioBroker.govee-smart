@@ -1275,11 +1275,20 @@ export class DeviceManager {
     device.lastLanSeenAt = Date.now();
     const { r, g, b } = status.color;
     const state: Partial<DeviceState> = {
-      power: status.onOff === 1,
       brightness: status.brightness,
       colorRgb: rgbToHex(r, g, b),
       colorTemperature: status.colorTemInKelvin || undefined,
     };
+    // `power` only on a real change, same reason as `online` below: the
+    // dropdown reset in onDeviceStateUpdate keys on the REPORTED value, so a
+    // `power:false` in every devStatus reply made every poll of every switched-
+    // off light read five dropdown states again — twice a minute, writing
+    // nothing (audit 2026-09-12, F7). The datapoint itself loses nothing:
+    // updateDeviceState writes it with setStateChangedAsync anyway.
+    const power = status.onOff === 1;
+    if (device.state.power !== power) {
+      state.power = power;
+    }
     // `online` only on a real offline→online flip (mirrors
     // applyLanDiscoveryToExisting): with online:true in EVERY devStatus
     // patch, each poll reply triggered the group-reachability pass and a

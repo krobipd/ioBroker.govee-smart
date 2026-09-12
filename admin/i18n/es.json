@@ -106,6 +106,7 @@
   "devicesTotal": "Dispositivos en total",
   "devicesOnline": "Dispositivos en línea",
   "devicesAllOnline": "Todos los dispositivos en línea",
+  "descDevicesAllOnline": "Verdadero solo mientras todos los dispositivos conocidos estén accesibles: sin dispositivos permanece falso, para que una instalación vacía no informe de completitud.",
   "information": "Información",
   "infoConnection": "Adaptador conectado",
   "infoMqttConnected": "MQTT conectado",

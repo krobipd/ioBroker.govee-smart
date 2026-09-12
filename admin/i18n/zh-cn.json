@@ -106,6 +106,7 @@
   "devicesTotal": "设备总数",
   "devicesOnline": "在线设备数",
   "devicesAllOnline": "所有设备在线",
+  "descDevicesAllOnline": "仅当适配器已知的所有设备均可访问时为真——没有设备时保持为假，这样空安装不会报告完整性。",
   "information": "信息",
   "infoConnection": "适配器已连接",
   "infoMqttConnected": "MQTT 已连接",

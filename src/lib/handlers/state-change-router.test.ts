@@ -83,6 +83,13 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
         return Promise.resolve();
       },
       sendCapabilityCommand: (device: GoveeDevice, type: string, instance: string, value: unknown) => {
+        // Honours setSendFailure like sendCommand does: since the 2026-09-12
+        // audit this method REJECTS when the cloud channel is missing, and the
+        // router's ack must depend on that.
+        const err = sendFailure();
+        if (err) {
+          return Promise.reject(err);
+        }
         capCommands.push({ device: device.deviceId, type, instance, value });
         return Promise.resolve();
       },
@@ -644,6 +651,21 @@ describe("onStateChange — generic capability routing", () => {
     expect(rig.capCommands).toHaveLength(0);
     expect(rig.warns).toHaveLength(0);
   });
+
+  // Audit 2026-09-12 (F1): without a cloud channel the command router used to
+  // return silently, and this path acked the state as if the command had gone
+  // out — indistinguishable from success for the user, and no entry in the
+  // diagnostics report either. The ack must depend on the send.
+  it("does not ack when the capability command could not be sent", async () => {
+    const rig = makeRig([device]);
+    rig.objects.set(id("control.oscillation_toggle"), {
+      native: { capabilityType: "devices.capabilities.toggle", capabilityInstance: "oscillationToggle" },
+    });
+    rig.setSendFailure(() => new Error("No Cloud connection for Fan (H7102)/oscillationToggle"));
+    await write(rig, id("control.oscillation_toggle"), true);
+    expect(rig.acks).toEqual([]);
+    expect(rig.warns.some(w => w.includes("Command failed"))).toBe(true);
+  });
 });
 
 describe("handleManualSegmentsChange", () => {
@@ -780,9 +802,34 @@ describe("sendMusicCommand", () => {
     const lanDev = musicDevice([1, 2, 3]); // has lanIp (default) → LAN music path
     const rig = makeRig([lanDev]);
     rig.states.set(`${NS}.${PREFIX}.music.music_mode`, 1); // a mode is selected
-    await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_sensitivity", 80);
+    const sent = await sendMusicCommand(rig.adapter, lanDev, PREFIX, "music.music_sensitivity", 80);
+    expect(sent).toBe(false); // nothing went out → the caller must not ack
     expect(rig.lanMusic).toHaveLength(0); // no pointless mode re-send
     expect(rig.warns.some(w => w.toLowerCase().includes("sensitivity"))).toBe(true);
+  });
+
+  // Audit 2026-09-12 (T9/F2): the test above proves the warning, and the
+  // comment in the production code promises "instead of … acking 'ok'" — but
+  // nothing checked the ack, and the router acked unconditionally. This one
+  // drives the whole path through onStateChange, which is where the ack lives.
+  it("does NOT ack the LAN sensitivity write the warning refused (A3, through onStateChange)", async () => {
+    const rig = makeRig([musicDevice([1, 2, 3])]);
+    rig.states.set(id("music.music_mode"), 1); // a mode is selected
+    await write(rig, id("music.music_sensitivity"), 80);
+    expect(rig.lanMusic).toHaveLength(0);
+    expect(rig.acks).toEqual([]);
+    expect(rig.warns.some(w => w.toLowerCase().includes("sensitivity"))).toBe(true);
+  });
+
+  it("does NOT ack a music write while no mode is selected", async () => {
+    const rig = makeRig([musicDevice([1, 2, 3])]);
+    // music_mode unset → sendMusicCommand bails on the sentinel path. The
+    // sentinel ack in the router covers a write TO music_mode itself, not a
+    // sensitivity write made while nothing is playing.
+    await write(rig, id("music.music_sensitivity"), 80);
+    expect(rig.lanMusic).toHaveLength(0);
+    expect(rig.capCommands).toEqual([]);
+    expect(rig.acks).toEqual([]);
   });
 });
 
