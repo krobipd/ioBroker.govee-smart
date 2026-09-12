@@ -1392,7 +1392,16 @@ export class StateManager {
       .filter(m => !resolveDeviceReachability(m).online)
       .map(m => treeKey(m.sku, m.deviceId));
 
-    await this.ensureState(stateId, tName("membersUnreachable"), "string", "text", false);
+    await this.ensureState(
+      stateId,
+      tName("membersUnreachable"),
+      "string",
+      "text",
+      false,
+      undefined,
+      undefined,
+      tDesc("descMembersUnreachable"),
+    );
     // setStateChangedAsync: reachability is re-evaluated on every online
     // signal — with an unconditional setState every devStatus poll reply
     // bumped ts on an unchanged (usually empty) value, spamming state

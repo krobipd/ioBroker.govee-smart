@@ -1201,6 +1201,17 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
   presetScene: "capPresetScene",
   fanSpeed: "capFanSpeed",
   humidity: "capHumidity",
+  // The light zones and the fan of the combination devices — a ceiling-fan
+  // light (H1310) and a floor lamp with two lit parts (H607C). Captures show
+  // them since issue #15/#40; until 2026-09-12 they reached the tree with
+  // Govee's own wording in all eleven languages because no fixture carried them.
+  mainLightToggle: "capMainLightToggle",
+  backgroundLightToggle: "capBackgroundLightToggle",
+  fanToggle: "capFanToggle",
+  fanSpeedMode: "capFanSpeedMode",
+  reverseAirflowToggle: "capReverseAirflowToggle",
+  pillarLightToggle: "capPillarLightToggle",
+  baseLightToggle: "capBaseLightToggle",
 };
 
 /**
@@ -1224,6 +1235,19 @@ const CAPABILITY_DESC_KEYS: Record<string, I18nKey> = {
   iceFullEvent: "descIceBucketFull",
   bodyAppearedEvent: "descBodyDetected",
   dirtDetectedEvent: "descDirtDetected",
+  // What the name alone does not say: which way a ceiling fan blows, which part
+  // of a two-zone lamp a switch belongs to, and that "warm mist" means the
+  // humidifier heats the water. The plain on/off lights (main, background, fan)
+  // and the speed dropdown stay without one — declared in test/self-explaining.json.
+  reverseAirflowToggle: "descReverseAirflowToggle",
+  pillarLightToggle: "descPillarLightToggle",
+  baseLightToggle: "descBaseLightToggle",
+  warmMistToggle: "descWarmMistToggle",
+  // `control.scene` reaches no fixture (no capture shows a device reporting
+  // `mode/presetScene`), so a self-explaining entry for it would be a pattern
+  // matching nothing — which the D08 gate reports in its own right. It gets the
+  // explanation instead, and the decision is made either way (audit 2026-09-12).
+  presetScene: "descPresetScene",
 };
 
 /**

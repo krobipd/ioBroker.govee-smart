@@ -159,5 +159,18 @@
   "descMembers": "The devices this app group switches together, as they are named in the object tree.",
   "descMusicAutoColor": "Whether the light picks its own colours in music mode instead of keeping one fixed colour.",
   "descDreamViewToggle": "Whether the light follows the screen colours a Govee DreamView camera captures.",
-  "descDiyScene": "One of the scenes you built yourself in the DIY editor of the Govee app — empty until you have made one."
+  "descDiyScene": "One of the scenes you built yourself in the DIY editor of the Govee app — empty until you have made one.",
+  "capMainLightToggle": "Main light",
+  "capBackgroundLightToggle": "Background light",
+  "capFanToggle": "Fan",
+  "capFanSpeedMode": "Fan speed",
+  "capReverseAirflowToggle": "Reverse airflow",
+  "capPillarLightToggle": "Pillar light",
+  "capBaseLightToggle": "Base light",
+  "descReverseAirflowToggle": "Whether the fan turns the other way and pushes the air up instead of down — the winter setting of a ceiling fan.",
+  "descPillarLightToggle": "Whether the upright part of the lamp is lit; the base has a switch of its own.",
+  "descBaseLightToggle": "Whether the lamp's base is lit; the upright part has a switch of its own.",
+  "descWarmMistToggle": "Whether the humidifier heats the water before misting — warm mist instead of cool.",
+  "descPresetScene": "A dropdown over the ready-made scenes this model offers; which ones exist comes from Govee and differs per model.",
+  "descMembersUnreachable": "Which of the group's members are currently unreachable, as they are named in the object tree — empty while all of them answer."
 }

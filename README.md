@@ -111,6 +111,8 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: An installation with Govee account and no API key now reads its sensor values again — the two-minute account query ran only when an API key was configured
 - Changed: A sensor reading that has not changed is no longer written again every two minutes — the datapoint keeps its timestamp until the value itself changes
 - Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
+- Added: Names in all eleven languages and, where the name does not say it, an explanation for eight datapoints real devices report — main light, background light, fan, fan speed, reverse airflow, pillar light, base light and warm mist
+- Added: An explanation for the preset-scene dropdown and for the list of unreachable group members
 
 ### 2.35.2 (2026-09-11)
 

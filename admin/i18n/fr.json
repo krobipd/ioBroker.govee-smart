@@ -159,5 +159,18 @@
   "descMembers": "Les appareils que ce groupe de l'application commute ensemble, tels que nommés dans l'arbre d'objets.",
   "descMusicAutoColor": "Si la lampe choisit elle-même ses couleurs en mode musique au lieu de garder une couleur fixe.",
   "descDreamViewToggle": "Si la lampe suit les couleurs de l'écran captées par une caméra Govee DreamView.",
-  "descDiyScene": "Une des scènes que vous avez créées vous-même dans l'éditeur DIY de l'application Govee — vide tant que vous n'en avez pas créé."
+  "descDiyScene": "Une des scènes que vous avez créées vous-même dans l'éditeur DIY de l'application Govee — vide tant que vous n'en avez pas créé.",
+  "capMainLightToggle": "Lumière principale",
+  "capBackgroundLightToggle": "Lumière d'ambiance",
+  "capFanToggle": "Ventilateur",
+  "capFanSpeedMode": "Vitesse du ventilateur",
+  "capReverseAirflowToggle": "Flux d'air inversé",
+  "capPillarLightToggle": "Lumière de la colonne",
+  "capBaseLightToggle": "Lumière du socle",
+  "descReverseAirflowToggle": "Si le ventilateur tourne dans l'autre sens et pousse l'air vers le haut plutôt que vers le bas — le réglage hiver d'un ventilateur de plafond.",
+  "descPillarLightToggle": "Si la partie verticale du lampadaire est allumée ; le socle a son propre interrupteur.",
+  "descBaseLightToggle": "Si le socle du lampadaire est allumé ; la partie verticale a son propre interrupteur.",
+  "descWarmMistToggle": "Si l'humidificateur chauffe l'eau avant de la vaporiser — brume chaude au lieu de froide.",
+  "descPresetScene": "Une liste déroulante des scènes prêtes à l'emploi de ce modèle ; lesquelles existent dépend de Govee et varie selon le modèle.",
+  "descMembersUnreachable": "Quels membres du groupe sont actuellement injoignables, nommés comme dans l'arborescence — vide tant que tous répondent."
 }

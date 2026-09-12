@@ -159,5 +159,18 @@
   "descMembers": "该 App 分组一起控制的设备，以对象树中的名称列出。",
   "descMusicAutoColor": "灯在音乐模式下是否自行选择颜色，而不是保持一种固定颜色。",
   "descDreamViewToggle": "灯是否跟随 Govee DreamView 摄像头捕捉到的屏幕颜色。",
-  "descDiyScene": "你在 Govee 应用的 DIY 编辑器中自建的场景之一——在你创建之前为空。"
+  "descDiyScene": "你在 Govee 应用的 DIY 编辑器中自建的场景之一——在你创建之前为空。",
+  "capMainLightToggle": "主灯",
+  "capBackgroundLightToggle": "背景灯",
+  "capFanToggle": "风扇",
+  "capFanSpeedMode": "风速",
+  "capReverseAirflowToggle": "反向气流",
+  "capPillarLightToggle": "立柱灯",
+  "capBaseLightToggle": "底座灯",
+  "descReverseAirflowToggle": "风扇是否反向旋转，将空气向上而不是向下推送——吊扇的冬季设置。",
+  "descPillarLightToggle": "灯具的立柱部分是否点亮；底座有自己的开关。",
+  "descBaseLightToggle": "灯具底座是否点亮；立柱部分有自己的开关。",
+  "descWarmMistToggle": "加湿器是否先加热水再喷雾——温雾而非凉雾。",
+  "descPresetScene": "该型号可用的预设场景下拉列表；有哪些由 Govee 决定，各型号不同。",
+  "descMembersUnreachable": "当前哪些组成员无法访问，名称与对象树中一致——全部有响应时为空。"
 }

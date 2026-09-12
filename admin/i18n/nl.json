@@ -159,5 +159,18 @@
   "descMembers": "De apparaten die deze app-groep samen schakelt, zoals ze in de objectboom heten.",
   "descMusicAutoColor": "Of de lamp in de muziekmodus zelf kleuren kiest in plaats van één vaste kleur te houden.",
   "descDreamViewToggle": "Of de lamp de schermkleuren volgt die een Govee DreamView-camera opneemt.",
-  "descDiyScene": "Een van de scènes die je zelf in de DIY-editor van de Govee-app hebt gemaakt — leeg tot je er een hebt gemaakt."
+  "descDiyScene": "Een van de scènes die je zelf in de DIY-editor van de Govee-app hebt gemaakt — leeg tot je er een hebt gemaakt.",
+  "capMainLightToggle": "Hoofdlicht",
+  "capBackgroundLightToggle": "Achtergrondverlichting",
+  "capFanToggle": "Ventilator",
+  "capFanSpeedMode": "Ventilatorsnelheid",
+  "capReverseAirflowToggle": "Omgekeerde luchtstroom",
+  "capPillarLightToggle": "Zuilverlichting",
+  "capBaseLightToggle": "Voetverlichting",
+  "descReverseAirflowToggle": "Of de ventilator de andere kant op draait en de lucht omhoog in plaats van omlaag duwt — de winterstand van een plafondventilator.",
+  "descPillarLightToggle": "Of het staande deel van de lamp brandt; de voet heeft een eigen schakelaar.",
+  "descBaseLightToggle": "Of de voet van de lamp brandt; het staande deel heeft een eigen schakelaar.",
+  "descWarmMistToggle": "Of de luchtbevochtiger het water verwarmt voor het vernevelen — warme in plaats van koele nevel.",
+  "descPresetScene": "Een keuzelijst met de kant-en-klare scènes van dit model; welke er zijn bepaalt Govee en verschilt per model.",
+  "descMembersUnreachable": "Welke leden van de groep momenteel onbereikbaar zijn, zoals ze in de objectboom heten — leeg zolang ze allemaal antwoorden."
 }

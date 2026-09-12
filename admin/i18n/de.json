@@ -159,5 +159,18 @@
   "descMembers": "Die Geräte, die diese App-Gruppe gemeinsam schaltet, mit ihrem Namen im Objektbaum.",
   "descMusicAutoColor": "Ob die Lampe im Musikmodus ihre Farben selbst wählt, statt bei einer festen Farbe zu bleiben.",
   "descDreamViewToggle": "Ob die Lampe den Bildschirmfarben folgt, die eine Govee-DreamView-Kamera aufnimmt.",
-  "descDiyScene": "Eine der Szenen, die du selbst im DIY-Editor der Govee-App gebaut hast — leer, bis du eine angelegt hast."
+  "descDiyScene": "Eine der Szenen, die du selbst im DIY-Editor der Govee-App gebaut hast — leer, bis du eine angelegt hast.",
+  "capMainLightToggle": "Hauptlicht",
+  "capBackgroundLightToggle": "Hintergrundlicht",
+  "capFanToggle": "Ventilator",
+  "capFanSpeedMode": "Lüfterstufe",
+  "capReverseAirflowToggle": "Umgekehrte Luftrichtung",
+  "capPillarLightToggle": "Säulenlicht",
+  "capBaseLightToggle": "Sockellicht",
+  "descReverseAirflowToggle": "Ob der Ventilator andersherum dreht und die Luft nach oben statt nach unten drückt — die Wintereinstellung eines Deckenventilators.",
+  "descPillarLightToggle": "Ob der aufrechte Teil der Leuchte leuchtet; der Sockel hat einen eigenen Schalter.",
+  "descBaseLightToggle": "Ob der Sockel der Leuchte leuchtet; der aufrechte Teil hat einen eigenen Schalter.",
+  "descWarmMistToggle": "Ob der Luftbefeuchter das Wasser vor dem Vernebeln erwärmt — warmer statt kühler Nebel.",
+  "descPresetScene": "Eine Auswahlliste der fertigen Szenen dieses Modells; welche es gibt, gibt Govee vor und unterscheidet sich je Modell.",
+  "descMembersUnreachable": "Welche Mitglieder der Gruppe gerade nicht erreichbar sind, benannt wie im Objektbaum — leer, solange alle antworten."
 }

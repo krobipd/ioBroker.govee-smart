@@ -159,5 +159,18 @@
   "descMembers": "Os dispositivos que este grupo da app comuta em conjunto, com o nome que têm na árvore de objetos.",
   "descMusicAutoColor": "Se a luz escolhe as suas próprias cores no modo música em vez de manter uma cor fixa.",
   "descDreamViewToggle": "Se a luz segue as cores do ecrã captadas por uma câmara Govee DreamView.",
-  "descDiyScene": "Uma das cenas que criou no editor DIY da app Govee — vazio até criar uma."
+  "descDiyScene": "Uma das cenas que criou no editor DIY da app Govee — vazio até criar uma.",
+  "capMainLightToggle": "Luz principal",
+  "capBackgroundLightToggle": "Luz de fundo",
+  "capFanToggle": "Ventoinha",
+  "capFanSpeedMode": "Velocidade da ventoinha",
+  "capReverseAirflowToggle": "Fluxo de ar invertido",
+  "capPillarLightToggle": "Luz da coluna",
+  "capBaseLightToggle": "Luz da base",
+  "descReverseAirflowToggle": "Se a ventoinha gira ao contrário e empurra o ar para cima em vez de para baixo — a regulação de inverno de uma ventoinha de teto.",
+  "descPillarLightToggle": "Se a parte vertical do candeeiro está acesa; a base tem um interruptor próprio.",
+  "descBaseLightToggle": "Se a base do candeeiro está acesa; a parte vertical tem um interruptor próprio.",
+  "descWarmMistToggle": "Se o humidificador aquece a água antes de a nebulizar — névoa quente em vez de fria.",
+  "descPresetScene": "Uma lista das cenas prontas deste modelo; quais existem é definido pela Govee e varia consoante o modelo.",
+  "descMembersUnreachable": "Quais membros do grupo estão atualmente inacessíveis, com os nomes da árvore de objetos — vazio enquanto todos responderem."
 }

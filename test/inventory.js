@@ -40,8 +40,16 @@ const FIXTURE_NATIVE = {
   // outright (the v2.11.0 encryption-migration detector), so a made-up string
   // never reaches the cloud client.
   apiKey: "12345678-1234-4321-8765-123456789abc",
-  goveeEmail: "",
-  goveePassword: "",
+  // Account credentials since 2026-09-12: the group SUBTREE needs them. Group
+  // members are resolved through the App API, which runs on the bearer token of
+  // the account login — without it `loadGroupMembers` returns before the first
+  // request and `groups.*.info.members`, `membersUnreachable` and the
+  // intersection controls existed in no inventory, so no gate ever judged them.
+  // The fixture logs in against the fake cloud below; the IoT-key answer that
+  // follows carries no certificate, so the login stops BEFORE any socket is
+  // opened — the token is set by then, which is all the group read needs.
+  goveeEmail: "fixture@example.com",
+  goveePassword: "fixture-password",
   networkInterface: "",
 };
 
@@ -202,6 +210,58 @@ function startFakeCloud() {
         // app version. Pinned here so the inventory does not change with
         // whatever Apple happens to answer.
         reply(JSON.stringify({ resultCount: 1, results: [{ version: "7.6.20" }] }));
+      } else if (url.includes("/account/rest/account/v2/login")) {
+        // The account login. `client` present = success; accountId and topic are
+        // validated by the client (H11), the token is what the group read needs.
+        reply(
+          JSON.stringify({
+            status: 200,
+            message: "success",
+            client: {
+              token: "fixture-bearer-token",
+              accountId: "1000001",
+              topic: "GA/fixture-account",
+              token_expire_cycle: 3600,
+            },
+          }),
+        );
+      } else if (url.includes("/app/v1/account/iot/key")) {
+        // Deliberately WITHOUT endpoint/certificate: the client throws right
+        // here ("IoT key response missing endpoint/certificate data") and never
+        // reaches mqtt.connect — no socket leaves the machine, and the bearer
+        // token from the step before is already handed on.
+        reply(JSON.stringify({ status: 200, message: "success", data: {} }));
+      } else if (url.includes("/bff-app/v1/exec-plat/home")) {
+        // The account's home view: which devices belong to which app group.
+        // Only the group the device list carries (BaseGroup 9900001) and the
+        // two members it has there.
+        reply(
+          JSON.stringify({
+            status: 200,
+            message: "success",
+            data: {
+              components: [
+                {
+                  groups: [
+                    {
+                      gId: 9900001,
+                      name: "Group Ground Floor",
+                      devices: [
+                        { sku: "H6172", device: "AA:BB:CC:DD:EE:FF:00:01" },
+                        { sku: "H6199", device: "AA:BB:CC:DD:EE:FF:00:02" },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          }),
+        );
+      } else if (url.includes("/device/rest/devices/v1/list")) {
+        // The App-API device list drives the sensor/appliance readings. Empty
+        // and well-formed: those values come from the OpenAPI state read in
+        // this fixture, and an empty list keeps the inventory deterministic.
+        reply(JSON.stringify({ status: 200, message: "ok", devices: [] }));
       } else if (url.includes("/appsku/v1/") || url.includes("/bff-app/v1/")) {
         // Scene / music / DIY libraries and snapshots are public app-API
         // reads. Empty but well-formed: the adapter must build its tree

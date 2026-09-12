@@ -18,5 +18,15 @@
   "devices.*.sensor.humidity": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
   "devices.*.sensor.battery": "A sensor reading whose unit and role say it all — unlike air quality and filter life, which do carry one.",
   "info.devicesTotal": "A plain count of the devices the adapter knows — the name is the whole content.",
-  "info.devicesOnline": "A plain count of the reachable devices — the name is the whole content; devicesAllOnline carries the explanation for the summary group."
+  "info.devicesOnline": "A plain count of the reachable devices — the name is the whole content; devicesAllOnline carries the explanation for the summary group.",
+  "devices.*.control.main_light_toggle": "One of the two light groups of a combination device (ceiling-fan light) — an on/off switch whose name IS its function.",
+  "devices.*.control.background_light_toggle": "One of the two light groups of a combination device (ceiling-fan light) — an on/off switch whose name IS its function.",
+  "devices.*.control.fan_toggle": "The fan of a ceiling-fan light — an on/off switch whose name IS its function; reverse_airflow_toggle carries the explanation for the direction.",
+  "devices.*.control.fan_speed_mode": "A dropdown over the speeds the device itself names (Speed 1, Speed 2, …) — the option list IS the explanation, and it differs per model.",
+  "groups.*.info.name": "Plain identification of the app group — the name is what the user typed in the Govee app.",
+  "groups.*.control.power": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
+  "groups.*.control.brightness": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
+  "groups.*.control.color_rgb": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
+  "groups.*.control.color_temperature": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
+  "groups.*.scenes.light_scene": "A dropdown over the scenes every member of the group knows — the option list IS the explanation, and it differs per group."
 }

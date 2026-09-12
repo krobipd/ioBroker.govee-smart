@@ -11,7 +11,11 @@
     "that capture (only the device id is the fixture's). A device without `_source` is a",
     "hand-picked subset of real capability blocks — its shape per capability is Govee's,",
     "its capability SET is not (audit 2026-09-11). Replace it by the verbatim entry as soon",
-    "as Ressourcen/govee-smart/github-exports/ holds its export."
+    "as Ressourcen/govee-smart/github-exports/ holds its export.",
+    "Three verbatim entries were added on 2026-09-12 (audit): H1310 (ceiling-fan light with",
+    "main/background light, fan and airflow toggles), H66A1 (movie mode) and H607C (pillar and",
+    "base light) — nine capability instances that real captures show and no fixture device had,",
+    "so no gate had ever judged their datapoints."
   ],
   "devices": [
     {
@@ -1311,6 +1315,24 @@
           }
         },
         {
+          "_source": "Ressourcen/govee-smart/issue47-fixtures/get_device_state.json (Govee's own H7143 state answer lists warmMistToggle); the ENUM on/off parameters are the shape every recorded toggle carries",
+          "type": "devices.capabilities.toggle",
+          "instance": "warmMistToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
           "_source": "Ressourcen/govee-smart/issue47-fixtures/work-mode-issue-81.json",
           "type": "devices.capabilities.work_mode",
           "instance": "workMode",
@@ -1802,6 +1824,914 @@
           }
         }
       ]
+    },
+    {
+      "sku": "H1310",
+      "device": "AA:BB:CC:DD:EE:FF:00:13",
+      "deviceName": "Ceiling Fan Light Kitchen",
+      "type": "devices.types.light",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.on_off",
+          "instance": "powerSwitch",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.range",
+          "instance": "brightness",
+          "parameters": {
+            "unit": "unit.percent",
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedBrightness",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 8
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 7
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "brightness",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedColorRgb",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 8
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 7
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorRgb",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorTemperatureK",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 2700,
+              "max": 6500,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "lightScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "diyScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "snapshot",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "couch1",
+                "value": 4094333
+              },
+              {
+                "name": "lesen",
+                "value": 4094335
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "mainLightToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "backgroundLightToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "fanToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.mode",
+          "instance": "fanSpeedMode",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "Speed 1",
+                "value": 1
+              },
+              {
+                "name": "Speed 2",
+                "value": 2
+              },
+              {
+                "name": "Speed 3",
+                "value": 3
+              },
+              {
+                "name": "Speed 4",
+                "value": 4
+              },
+              {
+                "name": "Speed 5",
+                "value": 5
+              },
+              {
+                "name": "Speed 6",
+                "value": 6
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "reverseAirflowToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ],
+      "_source": "Ressourcen/govee-smart/github-exports/issue-40-h1310-diag.json.txt apiHistory[/router/api/v1/user/devices][0].body (issue #40, adapter 2.20.0); device id and name are the fixture's"
+    },
+    {
+      "sku": "H66A1",
+      "device": "AA:BB:CC:DD:EE:FF:00:14",
+      "deviceName": "TV Backlight Living Room",
+      "type": "devices.types.light",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.on_off",
+          "instance": "powerSwitch",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.range",
+          "instance": "brightness",
+          "parameters": {
+            "unit": "unit.percent",
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorRgb",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorTemperatureK",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 2200,
+              "max": 6500,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "gradientToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedBrightness",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 14
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 13
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "brightness",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedColorRgb",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 14
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 13
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "lightScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.music_setting",
+          "instance": "musicMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "musicMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "Energic",
+                    "value": 0
+                  },
+                  {
+                    "name": "Rhythm",
+                    "value": 1
+                  },
+                  {
+                    "name": "Spectrum",
+                    "value": 2
+                  },
+                  {
+                    "name": "Rolling",
+                    "value": 3
+                  },
+                  {
+                    "name": "Separation",
+                    "value": 4
+                  },
+                  {
+                    "name": "Hopping",
+                    "value": 5
+                  },
+                  {
+                    "name": "Piano Keys",
+                    "value": 6
+                  },
+                  {
+                    "name": "Fountain",
+                    "value": 7
+                  },
+                  {
+                    "name": "Day and Night",
+                    "value": 8
+                  },
+                  {
+                    "name": "Sprouting",
+                    "value": 9
+                  },
+                  {
+                    "name": "Splash",
+                    "value": 10
+                  },
+                  {
+                    "name": "Spring",
+                    "value": 11
+                  },
+                  {
+                    "name": "Color Painting",
+                    "value": 12
+                  },
+                  {
+                    "name": "Beat",
+                    "value": 13
+                  },
+                  {
+                    "name": "Windmill",
+                    "value": 14
+                  },
+                  {
+                    "name": "Flowing Light",
+                    "value": 15
+                  }
+                ],
+                "required": true
+              },
+              {
+                "unit": "unit.percent",
+                "fieldName": "sensitivity",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              },
+              {
+                "fieldName": "autoColor",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "on",
+                    "value": 1
+                  },
+                  {
+                    "name": "off",
+                    "value": 0
+                  }
+                ],
+                "required": false
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": false
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.movie_setting",
+          "instance": "movieMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "moveMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": {
+                      "de": "Spiel",
+                      "ja": "ゲーム",
+                      "en": "Game",
+                      "it": "Gioco",
+                      "fr": "Jeu",
+                      "key": "Game",
+                      "es": "Juego"
+                    },
+                    "value": 0
+                  }
+                ],
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "diyScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "snapshot",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "dreamViewToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ],
+      "_source": "Ressourcen/govee-smart/github-exports/issue-25-H66a1.txt apiHistory[/router/api/v1/user/devices][0].body (issue #25, adapter 2.16.0); device id and name are the fixture's"
+    },
+    {
+      "sku": "H607C",
+      "device": "AA:BB:CC:DD:EE:FF:00:15",
+      "deviceName": "Floor Lamp Hall",
+      "type": "devices.types.light",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.on_off",
+          "instance": "powerSwitch",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "gradientToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.range",
+          "instance": "brightness",
+          "parameters": {
+            "unit": "unit.percent",
+            "dataType": "INTEGER",
+            "range": {
+              "min": 1,
+              "max": 100,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedBrightness",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 16
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 14
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "brightness",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.segment_color_setting",
+          "instance": "segmentedColorRgb",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "segment",
+                "size": {
+                  "min": 1,
+                  "max": 16
+                },
+                "dataType": "Array",
+                "elementRange": {
+                  "min": 0,
+                  "max": 14
+                },
+                "elementType": "INTEGER",
+                "required": true
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": true
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorRgb",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 0,
+              "max": 16777215,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.color_setting",
+          "instance": "colorTemperatureK",
+          "parameters": {
+            "dataType": "INTEGER",
+            "range": {
+              "min": 2200,
+              "max": 6500,
+              "precision": 1
+            }
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "lightScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.music_setting",
+          "instance": "musicMode",
+          "parameters": {
+            "dataType": "STRUCT",
+            "fields": [
+              {
+                "fieldName": "musicMode",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "Touching",
+                    "value": 0
+                  },
+                  {
+                    "name": "Rhythm",
+                    "value": 1
+                  },
+                  {
+                    "name": "Hopping",
+                    "value": 2
+                  },
+                  {
+                    "name": "Blend",
+                    "value": 3
+                  },
+                  {
+                    "name": "Luminous",
+                    "value": 4
+                  },
+                  {
+                    "name": "Fantasy",
+                    "value": 5
+                  },
+                  {
+                    "name": "Stippling",
+                    "value": 6
+                  },
+                  {
+                    "name": "Splash",
+                    "value": 7
+                  },
+                  {
+                    "name": "Spring",
+                    "value": 8
+                  }
+                ],
+                "required": true
+              },
+              {
+                "unit": "unit.percent",
+                "fieldName": "sensitivity",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 100,
+                  "precision": 1
+                },
+                "required": true
+              },
+              {
+                "fieldName": "autoColor",
+                "dataType": "ENUM",
+                "options": [
+                  {
+                    "name": "on",
+                    "value": 1
+                  },
+                  {
+                    "name": "off",
+                    "value": 0
+                  }
+                ],
+                "required": false
+              },
+              {
+                "fieldName": "rgb",
+                "dataType": "INTEGER",
+                "range": {
+                  "min": 0,
+                  "max": 16777215,
+                  "precision": 1
+                },
+                "required": false
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "diyScene",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": []
+          }
+        },
+        {
+          "type": "devices.capabilities.dynamic_scene",
+          "instance": "snapshot",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "SLT Graffitti",
+                "value": 3847228
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "dreamViewToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "pillarLightToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        },
+        {
+          "type": "devices.capabilities.toggle",
+          "instance": "baseLightToggle",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ],
+      "_source": "Ressourcen/govee-smart/github-exports/issue-15-diag.json apiHistory[/router/api/v1/user/devices][0].body (issue #15, adapter 2.13.0); device id and name are the fixture's"
     }
   ]
 }

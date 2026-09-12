@@ -159,5 +159,18 @@
   "descMembers": "Los dispositivos que este grupo de la app conmuta juntos, con su nombre en el árbol de objetos.",
   "descMusicAutoColor": "Si la luz elige sus propios colores en el modo música en lugar de mantener un color fijo.",
   "descDreamViewToggle": "Si la luz sigue los colores de la pantalla que capta una cámara Govee DreamView.",
-  "descDiyScene": "Una de las escenas que creaste tú mismo en el editor DIY de la app Govee — vacío hasta que crees una."
+  "descDiyScene": "Una de las escenas que creaste tú mismo en el editor DIY de la app Govee — vacío hasta que crees una.",
+  "capMainLightToggle": "Luz principal",
+  "capBackgroundLightToggle": "Luz de fondo",
+  "capFanToggle": "Ventilador",
+  "capFanSpeedMode": "Velocidad del ventilador",
+  "capReverseAirflowToggle": "Flujo de aire inverso",
+  "capPillarLightToggle": "Luz de la columna",
+  "capBaseLightToggle": "Luz de la base",
+  "descReverseAirflowToggle": "Si el ventilador gira al revés y empuja el aire hacia arriba en lugar de hacia abajo: el ajuste de invierno de un ventilador de techo.",
+  "descPillarLightToggle": "Si la parte vertical de la lámpara está encendida; la base tiene su propio interruptor.",
+  "descBaseLightToggle": "Si la base de la lámpara está encendida; la parte vertical tiene su propio interruptor.",
+  "descWarmMistToggle": "Si el humidificador calienta el agua antes de nebulizarla: vapor cálido en lugar de frío.",
+  "descPresetScene": "Una lista desplegable con las escenas predefinidas de este modelo; cuáles existen lo define Govee y varía según el modelo.",
+  "descMembersUnreachable": "Qué miembros del grupo están ahora inaccesibles, con los nombres del árbol de objetos: vacío mientras todos respondan."
 }

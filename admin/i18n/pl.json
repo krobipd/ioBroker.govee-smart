@@ -159,5 +159,18 @@
   "descMembers": "Urządzenia przełączane razem przez tę grupę z aplikacji, pod nazwami z drzewa obiektów.",
   "descMusicAutoColor": "Czy lampa w trybie muzycznym sama dobiera kolory, zamiast trzymać jeden stały kolor.",
   "descDreamViewToggle": "Czy lampa podąża za kolorami ekranu rejestrowanymi przez kamerę Govee DreamView.",
-  "descDiyScene": "Jedna ze scen, które sam zbudowałeś w edytorze DIY aplikacji Govee — puste, dopóki nie utworzysz żadnej."
+  "descDiyScene": "Jedna ze scen, które sam zbudowałeś w edytorze DIY aplikacji Govee — puste, dopóki nie utworzysz żadnej.",
+  "capMainLightToggle": "Światło główne",
+  "capBackgroundLightToggle": "Podświetlenie tła",
+  "capFanToggle": "Wentylator",
+  "capFanSpeedMode": "Prędkość wentylatora",
+  "capReverseAirflowToggle": "Odwrócony przepływ powietrza",
+  "capPillarLightToggle": "Światło kolumny",
+  "capBaseLightToggle": "Światło podstawy",
+  "descReverseAirflowToggle": "Czy wentylator obraca się w drugą stronę i tłoczy powietrze w górę zamiast w dół — ustawienie zimowe wentylatora sufitowego.",
+  "descPillarLightToggle": "Czy pionowa część lampy świeci; podstawa ma własny przełącznik.",
+  "descBaseLightToggle": "Czy podstawa lampy świeci; pionowa część ma własny przełącznik.",
+  "descWarmMistToggle": "Czy nawilżacz podgrzewa wodę przed rozpyleniem — ciepła mgiełka zamiast chłodnej.",
+  "descPresetScene": "Lista rozwijana z gotowymi scenami tego modelu; które istnieją, określa Govee i różnią się zależnie od modelu.",
+  "descMembersUnreachable": "Którzy członkowie grupy są obecnie nieosiągalni, nazwani jak w drzewie obiektów — puste, dopóki wszyscy odpowiadają."
 }
