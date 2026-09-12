@@ -137,6 +137,33 @@ describe("DiagnosticsCollector", () => {
       expect(gw.bleName).toBe("ihoment_H5042_3795");
     });
 
+    // Audit 2026-09-12 (T4): moving the redaction BEHIND the size cap survived
+    // all 1638 tests. The cap turns an oversized body into a flat string, and
+    // the redaction works on KEYS — it can never reach inside one afterwards.
+    // The truncation test below feeds 70 KB without a secret, the test above a
+    // secret without truncation; the intersection is the case the order exists
+    // for, and the adapter asks the user to publish this report.
+    it("masks a secret in an OVERSIZED body too — redaction happens before the cap (SEC-ISSUE1)", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
+        sku: "H5109",
+        settings: {
+          gatewayInfo: { secretCode: "VYb5QvZVkjE=", topic: "GD/f501fb9140eaf7" },
+        },
+        // pushes the serialised body past MAX_BODY_BYTES (65_536)
+        pad: "x".repeat(70_000),
+      });
+      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
+      const json = JSON.stringify(result);
+      expect(json).not.toContain("VYb5QvZVkjE=");
+      expect(json).not.toContain("GD/f501fb");
+      // and it really is the truncated shape, not a body that stayed small
+      const entry = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/device/rest/devices/v1/list"][0];
+      expect(typeof entry.body).toBe("string");
+      expect(entry.body as string).toContain("<truncated");
+      expect(entry.body as string).toContain("***");
+    });
+
     it("keeps multiple slots per endpoint (no overwrite)", async () => {
       const c = new DiagnosticsCollector(registry);
       c.recordApiSuccess("dev1", "/api/state", { v: 1 });

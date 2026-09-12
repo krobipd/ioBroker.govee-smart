@@ -776,6 +776,48 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     client.stop();
   });
 
+  // Audit 2026-09-12 (T6): these five senders had ZERO calls in the whole
+  // suite. Their packet builders are tested one by one, the wiring was not:
+  // which socket, which port, which IP, and which builder each one reaches.
+  // That is the class of defect the dead sync button was (a path nothing ever
+  // drove), and CLAUDE.md claimed the send path as covered.
+  it("the five ptReal senders each put their builder's packet on port 4003 of the device", () => {
+    const { client, sendSock, hook } = startedClient();
+    client.setGradient("10.0.0.5", true);
+    client.setDiyScene("10.0.0.5", "");
+    client.setMusicMode("10.0.0.5", 3, true, 255, 0, 0);
+    client.setSegmentColor("10.0.0.5", 255, 0, 0, [0, 1]);
+    client.setSegmentBrightness("10.0.0.5", 50, [0, 1]);
+
+    // every one of them is a ptReal datagram to the device's command port
+    expect(sendSock.sends.map(d => [d.address, d.port])).toEqual([
+      ["10.0.0.5", 4003],
+      ["10.0.0.5", 4003],
+      ["10.0.0.5", 4003],
+      ["10.0.0.5", 4003],
+      ["10.0.0.5", 4003],
+    ]);
+    expect(hook.map(h => h.cmd)).toEqual(["ptReal", "ptReal", "ptReal", "ptReal", "ptReal"]);
+
+    // …and each carries exactly what its own builder produces
+    const command = (i: number): string[] =>
+      (decode(sendSock.sends[i]) as { msg: { cmd: string; data: { command: string[] } } }).msg.data.command;
+    expect(command(0)).toEqual([buildGradientPacket(true)]);
+    expect(command(1)).toEqual(buildDiyPackets(""));
+    expect(command(2)).toEqual([buildMusicModePacket(3, true, 255, 0, 0)]);
+    expect(command(3)).toEqual([buildSegmentColorPacket(255, 0, 0, [0, 1])]);
+    expect(command(4)).toEqual([buildSegmentBrightnessPacket(50, [0, 1])]);
+    client.stop();
+  });
+
+  it("a ptReal sender reports the failed send to the diag hook instead of swallowing it", () => {
+    const { client, sendSock, hook } = startedClient();
+    sendSock.sendError = new Error("network unreachable");
+    client.setGradient("10.0.0.5", true);
+    expect(hook).toEqual([expect.objectContaining({ ip: "10.0.0.5", cmd: "ptReal", error: "network unreachable" })]);
+    client.stop();
+  });
+
   it("setBrightness clamps into 0..100 before it goes on the wire", () => {
     const { client, sendSock } = startedClient();
     client.setBrightness("10.0.0.5", 150);

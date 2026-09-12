@@ -83,6 +83,11 @@ export interface CapabilityField {
   elementRange?: { min: number; max: number };
   /** Default the device declares for this field (`"Celsius"`, `0`, `null`). */
   defaultValue?: unknown;
+  /**
+   * Unit carried on the field itself (`"unit.celsius"`) — some payloads label
+   * the temperature field instead of declaring a separate `unit` field.
+   */
+  unit?: string;
   /** Whether this field is required */
   required?: boolean;
 }

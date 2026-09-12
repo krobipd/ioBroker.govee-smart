@@ -1134,13 +1134,8 @@ function temperatureUnit(cap: CloudCapability): string {
   const declared = typeof unitField?.defaultValue === "string" ? unitField.defaultValue : undefined;
   // Second source: some payloads carry the unit on the `temperature` field
   // itself (`unit.celsius`) instead of declaring a separate `unit` field.
-  const onTemperature = (fields?.find(f => f && f.fieldName === "temperature") as { unit?: unknown } | undefined)?.unit;
-  return (
-    normalizeUnit(declared) ??
-    normalizeUnit(typeof onTemperature === "string" ? onTemperature : undefined) ??
-    normalizeUnit(cap.parameters?.unit) ??
-    "°F"
-  );
+  const onTemperature = fields?.find(f => f && f.fieldName === "temperature")?.unit;
+  return normalizeUnit(declared) ?? normalizeUnit(onTemperature) ?? normalizeUnit(cap.parameters?.unit) ?? "°F";
 }
 
 /**

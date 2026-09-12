@@ -140,6 +140,44 @@ describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", (
     expect(decodeApplianceFrames(device, frames)).toEqual([]);
   });
 
+  // Audit 2026-09-12 (T2): raising the plausibility bound from 100 to 255
+  // survived the whole suite — a frame claiming 200 % filter life reached the
+  // datapoint. Byte 7 is a percentage; anything above 100 is a differently
+  // laid-out frame, not a reading.
+  it("drops a filter value above 100 % instead of writing it", () => {
+    const sensors = Buffer.from("aa1900ffff0600c8000000000000000000000000", "hex").subarray(0, 19);
+    const xor = sensors.reduce((a, b) => a ^ b, 0);
+    const frame = Buffer.concat([sensors, Buffer.from([xor])]).toString("base64");
+    const out = decodeApplianceFrames(purifier(), [frame]);
+    expect(out).toEqual([]);
+    // …while the same frame with a plausible value is written.
+    const ok = Buffer.from("aa1900ffff0600480000000000000000000000", "hex").subarray(0, 19);
+    const okFrame = Buffer.concat([ok, Buffer.from([ok.reduce((a, b) => a ^ b, 0)])]).toString("base64");
+    expect(decodeApplianceFrames(purifier(), [okFrame])).toEqual([
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 72 } },
+    ]);
+  });
+
+  // Audit 2026-09-12 (T3): applying the H7127 decoder to EVERY sku survived —
+  // the existing "sku without a decoder" case below uses a device that has no
+  // declared capabilities either, so it proves nothing about the sku gate. This
+  // one carries the H7127's own capabilities under a foreign sku: only the gate
+  // can keep it empty. The rule is explicit in CLAUDE.md — a decoder is valid
+  // for the sku whose frames were measured, and for no other.
+  it("decodes nothing for a foreign sku that declares the SAME capabilities", () => {
+    const foreign = createTestDevice({
+      sku: "H7126",
+      deviceId: "AA:BB:CC:DD:EE:22",
+      type: "devices.types.air_purifier",
+      lanIp: undefined,
+      capabilities: H7127_CAPS,
+      channels: { lan: false, mqtt: true, cloud: true },
+    });
+    expect(decodeApplianceFrames(foreign, PUSH_2026_09_11)).toEqual([]);
+    // the very same packet on the measured sku does decode
+    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11)).toHaveLength(2);
+  });
+
   it("returns [] for a SKU without a decoder, for a light, and for junk", () => {
     expect(
       decodeApplianceFrames(createTestDevice({ sku: "H7131", type: "devices.types.heater" }), PUSH_2026_09_11),

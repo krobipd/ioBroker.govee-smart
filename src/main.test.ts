@@ -1,4 +1,7 @@
 import { vi } from "vitest";
+import type * as HttpClient from "./lib/http-client";
+
+type HttpClientModule = typeof HttpClient;
 import * as os from "node:os";
 import * as fsReal from "node:fs";
 import * as pathReal from "node:path";
@@ -25,6 +28,16 @@ function currentDataDir(): string {
   return pathReal.join(tmpRoot, dataDirName);
 }
 let dataDirSeq = 0;
+
+// The app-version lookup (connection-state.refreshLiveAppVersion) calls the
+// module-level httpsRequest with no seam. Wrapped in a spy that keeps the real
+// implementation, so every existing test behaves exactly as before and the
+// daily timer's body can still be asserted (it is the only way to see WHICH
+// request that callback makes).
+vi.mock("./lib/http-client", async importOriginal => {
+  const actual = await importOriginal<HttpClientModule>();
+  return { ...actual, httpsRequest: vi.fn(actual.httpsRequest) };
+});
 
 vi.mock("@iobroker/adapter-core", () => {
   class Adapter {
@@ -150,6 +163,7 @@ import { STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
 import type { GoveeDevice } from "./lib/types";
+import { httpsRequest } from "./lib/http-client";
 
 beforeEach(() => {
   // Fresh instance data dir per test — see dataDirName above. Done here (not in
@@ -524,6 +538,47 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     });
     await i.onReady();
     expect(i.log.error).toHaveBeenCalledWith(expect.stringContaining("onReady failed"));
+  });
+});
+
+describe("GoveeAdapter onReady — timer bodies with no other caller", () => {
+  // Audit 2026-09-12 (optimisation 3): both callbacks were armed by a test that
+  // only looked at the interval, so their BODIES were unguarded — removing
+  // `readyLogged = true` or the whole version refresh made nothing red.
+  it("the 60 s safety timeout logs ready exactly once", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const timeoutCall = i.setTimeout.mock.calls.find(c => c[1] === 60_000);
+    expect(timeoutCall, "ready safety timeout must be armed").toBeDefined();
+
+    i.readyLogged = false;
+    i.log.info.mockClear();
+    (timeoutCall![0] as () => void)();
+    expect(i.readyLogged).toBe(true);
+    expect(i.log.info.mock.calls.flat().join(" ")).toMatch(/ready/i);
+
+    // …and a second run of the same callback stays silent: the flag is what
+    // keeps the line from appearing twice when a channel connects late.
+    i.log.info.mockClear();
+    (timeoutCall![0] as () => void)();
+    expect(i.log.info).not.toHaveBeenCalled();
+  });
+
+  it("the daily timer really re-reads the Govee app version", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const versionCall = i.setInterval.mock.calls.find(c => c[1] === 24 * 60 * 60 * 1000);
+    expect(versionCall, "app-version interval must be armed").toBeDefined();
+
+    const http = vi.mocked(httpsRequest);
+    http.mockClear();
+    http.mockResolvedValueOnce({
+      value: { resultCount: 1, results: [{ version: "9.9.9" }] },
+    } as never);
+    (versionCall![0] as () => void)();
+    await settle();
+    expect(http).toHaveBeenCalledTimes(1);
+    expect(String((http.mock.calls[0][0] as { url: string }).url)).toContain("itunes.apple.com");
   });
 });
 
@@ -1017,6 +1072,34 @@ describe("GoveeAdapter — segment echo caps", () => {
     router.onSegmentBatchUpdate!(device, { segments: [0, 1], color: 0x00ff00 });
     await settle();
     expect([...i.states.keys()].filter(k => k.startsWith(`${prefix}.segments.`))).toEqual([]);
+  });
+
+  // Audit 2026-09-12 (T5): switching the cap to effectiveSegmentCount survived
+  // the whole suite, although ten lines of comment explain why it must not be
+  // that one — effectiveSegmentCount takes the MAXIMUM of the physical count
+  // and the user's manual list, so a manual claim reaching beyond the hardware
+  // would open the filter for echo indices that have no state object.
+  it("keeps the physical cap even when the user's manual list claims more segments", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const { device, prefix } = await withSegmentDevice(adapter, 3);
+    // The user marked index 9 as in use — a claim about a cut strip, not
+    // evidence about what the hardware echoes back.
+    device.manualMode = true;
+    device.manualSegments = [0, 1, 9];
+    const dm = i.deviceManager as unknown as {
+      onMqttSegmentUpdate: (
+        d: GoveeDevice,
+        s: { index: number; brightness: number; r: number; g: number; b: number }[],
+      ) => void;
+    };
+    dm.onMqttSegmentUpdate(device, [
+      { index: 1, brightness: 80, r: 255, g: 0, b: 0 },
+      { index: 7, brightness: 80, r: 0, g: 255, b: 0 },
+    ]);
+    await settle();
+    expect(i.states.get(`${prefix}.segments.1.color`)?.val).toBe("#ff0000");
+    expect(i.states.has(`${prefix}.segments.7.color`)).toBe(false);
   });
 
   it("applies the same cap to the MQTT per-segment push", async () => {

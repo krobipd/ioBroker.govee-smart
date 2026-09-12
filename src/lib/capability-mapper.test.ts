@@ -299,6 +299,68 @@ describe("temperature_setting unit", () => {
     expect(target!.max).toBe(30);
   });
 
+  // Audit 2026-09-12 (T1): moving `parameters.unit` in front of the declared
+  // struct field survived the whole suite, although that order IS the #47
+  // defect — the wrong source labelled a 5–30 °C heater as °F. No capture
+  // carries a contradicting `parameters.unit`, so this test builds the
+  // contradiction the field order exists for.
+  it("prefers the struct's own unit field over a contradicting parameters.unit (#47)", () => {
+    const caps: CloudCapability[] = [
+      {
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        parameters: {
+          dataType: "STRUCT",
+          // Govee would not normally send both; when it does, the field the
+          // command is built from decides — the command carries `unit`.
+          unit: "unit.fahrenheit",
+          fields: [
+            {
+              fieldName: "temperature",
+              dataType: "INTEGER",
+              range: { min: 5, max: 30, precision: 1 },
+              required: true,
+            },
+            {
+              fieldName: "unit",
+              defaultValue: "Celsius",
+              dataType: "ENUM",
+              options: [
+                { name: "Celsius", value: "Celsius" },
+                { name: "Fahrenheit", value: "Fahrenheit" },
+              ],
+              required: true,
+            },
+          ],
+        },
+      },
+    ];
+    expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBe("°C");
+  });
+
+  it("takes the unit from the temperature field when no unit field is declared", () => {
+    const caps: CloudCapability[] = [
+      {
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        parameters: {
+          dataType: "STRUCT",
+          unit: "unit.fahrenheit",
+          fields: [
+            {
+              fieldName: "temperature",
+              dataType: "INTEGER",
+              unit: "unit.celsius",
+              range: { min: 5, max: 30, precision: 1 },
+              required: true,
+            },
+          ],
+        },
+      },
+    ];
+    expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBe("°C");
+  });
+
   it("still falls back to °F when the device declares no unit at all", () => {
     const caps: CloudCapability[] = [
       {
