@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.36.0 (2026-09-14)
 
 - Fixed: A command the adapter could not send is no longer confirmed — no cloud connection, or a light reachable on neither channel — the datapoint used to claim the device had taken the value
 - Fixed: Music sensitivity and auto-colour are no longer confirmed on a light or group that cannot apply them — the datapoint keeps the old value and the log says why, instead of claiming success
@@ -150,15 +150,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: The scene dropdown's "---" entry now carries the same value the adapter writes when it resets the dropdown, so the entry stopped being rewritten on every start
 - New: The H7127 air purifier is confirmed by a user report — it is no longer listed as untested and no longer asks for the experimental switch at start
 - Changed: The diagnostics report no longer repeats the privacy note the export button already shows, and says instead what only the file itself can say
-
-### 2.33.0 (2026-09-08)
-
-- Fixed: A light without a local API stays reachable while it reports its own state — Govee's device list lagged behind the bulb and overrode it every two minutes (reported for the H600D)
-- Fixed: A status message the Govee cloud replays after a reconnect no longer counts as a fresh sign of life for the next half hour
-- New: The H600D GU10 smart bulb is recognised from a user report
-- New: 486 more Govee models start as experimental — every model the homebridge-govee project lists as of September 2026, from bulbs and strips to fans, heaters and ice makers
-- New: An experimental model is tried by enabling "experimental device support"; a diagnostics report from the Expert tab confirms it for everyone
-- Changed: The wiki's device list folds each device type into one block with its counts, so 602 entries stay readable
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.35.2",
+    "version": "2.36.0",
     "news": {
-      "NEXT": {
+      "2.36.0": {
         "en": "A command that could not be sent is no longer confirmed, the segment wizard puts the brightness back, and an installation that kept its Govee account but removed the API key reads sensor values again.",
         "de": "Ein nicht sendbarer Befehl wird nicht mehr bestätigt, der Segment-Assistent stellt die Helligkeit zurück, und eine Anlage mit Govee-Konto, aber entferntem API-Key liest wieder Sensorwerte.",
         "ru": "Команда, которую не удалось отправить, больше не подтверждается, мастер сегментов возвращает яркость, а установка с аккаунтом Govee, но удалённым API-ключом снова читает значения датчиков.",
