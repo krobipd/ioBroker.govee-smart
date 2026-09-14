@@ -53,7 +53,9 @@ tls.connect = function patchedTlsConnect(...args) {
   if (host === "127.0.0.1" || host === "localhost") {
     return realTlsConnect.apply(tls, args);
   }
-  process.stderr.write(`inventory fixture: refusing tls.connect to ${host}:${opts.port ?? "?"} — nothing leaves the machine\n`);
+  process.stderr.write(
+    `inventory fixture: refusing tls.connect to ${host}:${opts.port ?? "?"} — nothing leaves the machine\n`,
+  );
   const socket = new net.Socket();
   process.nextTick(() => {
     const err = new Error(`inventory fixture: connection to ${host} refused`);

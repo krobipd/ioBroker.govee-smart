@@ -109,7 +109,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: Music sensitivity and auto-colour are no longer confirmed on a light or group that cannot apply them — the datapoint keeps the old value and the log says why, instead of claiming success
 - Fixed: The segment wizard restores the brightness the strip had before it ran — it turns the strip to full while measuring, and a dimmed strip stayed bright afterwards
 - Fixed: The segment wizard no longer stays locked for five minutes when the strip cannot be reached at start — it stops with the reason, and can be started again right away
-- Fixed: An installation that removed its API key but kept the Govee account reads its sensor values again — the two-minute account query used to run only while an API key was configured
+- Fixed: Sensor values update again on an installation that removed its API key but kept the Govee account — they had frozen at the last reading, and the adapter took a minute to report ready
 - Changed: A sensor reading that has not changed is no longer written again every two minutes — the datapoint keeps its timestamp until the value itself changes
 - Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
 - New: Seven datapoints real devices report now carry a translated name — main light, background light, fan, fan speed, reverse airflow, pillar light and base light
