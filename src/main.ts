@@ -673,7 +673,8 @@ export class GoveeAdapter extends utils.Adapter {
       this.deviceManager.setApiClient(apiClient);
 
       this.deviceManager.setCallbacks({
-        onUpdate: (device, state) => deviceEvents.onDeviceStateUpdate(this.handlerHost, device, state),
+        onUpdate: (device, state, changes) =>
+          deviceEvents.onDeviceStateUpdate(this.handlerHost, device, state, changes),
         onLanDeviceReady: (device, allDevices) => deviceEvents.onLanDeviceReady(this.handlerHost, device, allDevices),
         onCloudDataReady: (device, allDevices) => deviceEvents.onCloudDataReady(this.handlerHost, device, allDevices),
         onGroupMembersReady: (group, allDevices) =>

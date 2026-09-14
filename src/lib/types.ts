@@ -555,6 +555,17 @@ export interface DeviceState {
 }
 
 /**
+ * What a state patch CHANGED, for consumers that must act on a transition
+ * rather than on the reported value. Carried next to the patch, never inside
+ * it: the patch is merged into `device.state` and shows up in diagnostics.
+ * Sources that only report changes (account push, cloud merge) pass nothing.
+ */
+export interface DeviceStateChanges {
+  /** `power` differs from what the device reported before (a switch-on or -off). */
+  powerFlipped: boolean;
+}
+
+/**
  * Normalize device ID — remove colons, lowercase.
  * Returns empty string if input is not a string (defensive against malformed API data).
  *

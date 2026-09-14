@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Nie znaleziono urządzenia: {key}",
   "errNoSegments": "{name} nie ma segmentów — kreator nie ma zastosowania.",
   "errDeviceOffline": "{name} jest teraz nieosiągalne — kreator wymaga urządzenia, które odpowiada.",
+  "errCommandRefused": "{name}: nie udało się wysłać polecenia ({msg}) — kreator został zatrzymany.",
   "errNoWizard": "Żaden kreator nie jest aktywny. Najpierw kliknij przycisk „Start”.",
   "errNoWizardShort": "Żaden kreator nie jest aktywny",
   "errUnknownAction": "Nieznana akcja: {action}",

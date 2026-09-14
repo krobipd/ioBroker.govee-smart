@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Dispositivo não encontrado: {key}",
   "errNoSegments": "{name} não tem segmentos — assistente não aplicável.",
   "errDeviceOffline": "{name} não está acessível agora — o assistente precisa que o dispositivo responda.",
+  "errCommandRefused": "{name}: não foi possível enviar o comando ({msg}) — o assistente foi encerrado.",
   "errNoWizard": "Nenhum assistente ativo. Clique em 'Iniciar' primeiro.",
   "errNoWizardShort": "Nenhum assistente ativo",
   "errUnknownAction": "Ação desconhecida: {action}",

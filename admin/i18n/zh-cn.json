@@ -33,6 +33,7 @@
   "errDeviceNotFound": "未找到设备：{key}",
   "errNoSegments": "{name} 没有段 - 向导不适用。",
   "errDeviceOffline": "{name} 当前无法访问 — 向导需要设备能够响应。",
+  "errCommandRefused": "{name}：命令无法发送（{msg}）— 向导已停止。",
   "errNoWizard": "没有激活向导。请先单击“开始”。",
   "errNoWizardShort": "没有激活向导",
   "errUnknownAction": "未知操作：{action}",

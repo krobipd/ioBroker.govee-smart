@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Appareil introuvable : {key}",
   "errNoSegments": "{name} n'a pas de segments – assistant non applicable.",
   "errDeviceOffline": "{name} n'est pas joignable actuellement — l'assistant a besoin que l'appareil réponde.",
+  "errCommandRefused": "{name} : la commande n'a pas pu être envoyée ({msg}) — l'assistant s'est arrêté.",
   "errNoWizard": "Aucun assistant actif. Veuillez d'abord cliquer sur « Démarrer ».",
   "errNoWizardShort": "Aucun assistant actif",
   "errUnknownAction": "Action inconnue : {action}",

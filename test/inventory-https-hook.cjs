@@ -14,6 +14,8 @@
 // silently reaching the real Govee.
 const http = require("node:http");
 const https = require("node:https");
+const net = require("node:net");
+const tls = require("node:tls");
 
 const PORT = process.env.GOVEE_FIXTURE_PORT;
 const ROUTED = new Set(["openapi.api.govee.com", "app2.govee.com", "itunes.apple.com"]);
@@ -33,4 +35,30 @@ https.request = function patchedRequest(options, callback) {
   opts.agent = false;
   opts.headers = { ...(opts.headers || {}), host };
   return http.request(opts, callback);
+};
+
+// The Cloud-events client (mqtt.js over mqtts://) does not go through
+// https.request — it opens a TLS socket of its own. With the fixture's API key
+// it used to reach Govee's REAL broker on every inventory run and collect
+// "Connection refused: Not authorized" there. mqtt.js reads `connect` from the
+// tls module object at call time (`(0, tls_1.connect)(opts)`), so replacing it
+// here is seen. Anything outside this machine is refused the way an unplugged
+// network would refuse it — asynchronously, as ECONNREFUSED on the socket —
+// so the client runs its ordinary NETWORK path (force-close, backoff) and
+// never dials out.
+const realTlsConnect = tls.connect;
+tls.connect = function patchedTlsConnect(...args) {
+  const opts = typeof args[0] === "object" && args[0] !== null ? args[0] : { port: args[0], host: args[1] };
+  const host = String(opts.host || opts.hostname || opts.servername || "");
+  if (host === "127.0.0.1" || host === "localhost") {
+    return realTlsConnect.apply(tls, args);
+  }
+  process.stderr.write(`inventory fixture: refusing tls.connect to ${host}:${opts.port ?? "?"} — nothing leaves the machine\n`);
+  const socket = new net.Socket();
+  process.nextTick(() => {
+    const err = new Error(`inventory fixture: connection to ${host} refused`);
+    err.code = "ECONNREFUSED";
+    socket.destroy(err);
+  });
+  return socket;
 };

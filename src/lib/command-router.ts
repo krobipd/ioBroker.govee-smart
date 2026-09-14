@@ -272,34 +272,34 @@ export class CommandRouter {
   }
 
   /**
-   * Skip-handler — emits the right log level depending on why we couldn't
-   * route. Override+no-cloud is a configurable mismatch (user's fault, but
-   * we tell them once); regular no-channel during init-race is debug.
+   * Why a command has nowhere to go — the message the refusal carries.
+   *
+   * Until 2026-09-14 this LOGGED (warn, or debug in the init race) and the
+   * skip returned normally: every caller then acked the datapoint and the
+   * report recorded `ok:true` for a command that never left the adapter —
+   * the same defect as the appliance path (audit 2026-09-12, F1), on the
+   * light path (F9). Now the skip throws this text; the state-change router
+   * turns it into the single "Command failed" warn the user sees, so nothing
+   * is logged here beyond debug. A user-initiated command is the only thing
+   * that reaches this point, which is why the init-race case is no longer a
+   * false alarm: the user asked, and the answer is "not yet".
    *
    * @param device Target device
    * @param command Command type
    * @param reason Skip reason from resolveTransport
    */
-  private handleSkip(device: GoveeDevice, command: string, reason: "no-channel" | "override-cloud-missing"): void {
+  private describeSkip(device: GoveeDevice, command: string, reason: "no-channel" | "override-cloud-missing"): string {
+    let message: string;
     if (reason === "override-cloud-missing") {
-      const prev = this.lastErrorByCategory.get("override-missing-cloud") ?? null;
-      this.lastErrorByCategory.set(
-        "override-missing-cloud",
-        logDedup(
-          this.log,
-          prev,
-          `Cloud transport override for ${deviceLabel(device)}/${command} but no Cloud channel available`,
-          new Error("override-cloud-missing"),
-        ),
-      );
-      return;
+      message = `Cloud transport override for ${deviceLabel(device)}/${command} but no Cloud channel available`;
+    } else if (device.channels.cloud && !this.cloudClient) {
+      // init race: the cloud client is built a moment after the tree
+      message = `Cloud client not ready yet for ${deviceLabel(device)}/${command}`;
+    } else {
+      message = `No channel available for ${deviceLabel(device)}/${command} (no LAN address, no Cloud)`;
     }
-    // no-channel: init-race or genuinely orphan device
-    if (device.channels.cloud && !this.cloudClient) {
-      this.log.debug(`Command for ${deviceLabel(device)} dropped: Cloud client not ready yet`);
-      return;
-    }
-    this.log.warn(`No channel available for ${deviceLabel(device)}`);
+    this.log.debug(`Command refused: ${message}`);
+    return message;
   }
 
   /**
@@ -358,8 +358,9 @@ export class CommandRouter {
     this.onDiagLog?.(device.deviceId, "debug", `sendCommand ${summary} → ${this.decisionToChannelMarker(decision)}`);
 
     if (decision.kind === "skip") {
-      this.handleSkip(device, command, decision.reason);
-      return;
+      // Refuse, never return: a normal return here acked the datapoint and
+      // reported the command as sent (F9). Every caller already catches.
+      throw new Error(this.describeSkip(device, command, decision.reason));
     }
 
     // Segment-special cases — they bypass sendCloudCommand for Cloud sends

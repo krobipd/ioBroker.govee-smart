@@ -1786,8 +1786,11 @@ describe("DeviceManager", () => {
       });
       (noDm as any).devices.set("H6160_aabbccddeeff0011", device);
 
-      await noDm.sendCommand(device, "power", true);
-      expect(warnings.some(w => w.includes("No channel available"))).toBe(true);
+      // A command with nowhere to go is REFUSED with the reason (F9, 2026-09-14)
+      // — it used to resolve, and the caller acked it. The single warn is the
+      // state-change router's; the manager itself stays quiet.
+      await expect(noDm.sendCommand(device, "power", true)).rejects.toThrow(/No channel available/);
+      expect(warnings).toHaveLength(0);
     });
   });
 
@@ -3787,30 +3790,38 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     expect(patches[2].online).toBeUndefined();
   });
 
-  // Audit 2026-09-12 (F7): the same class as the `online` test above, for
-  // `power`. onDeviceStateUpdate keys the mode-dropdown reset on the REPORTED
-  // power, so a `power:false` in every devStatus reply re-read five dropdown
-  // states per poll and per switched-off light — twice a minute, writing nothing.
-  it("a devStatus reply carries `power` only when it really changed", () => {
+  // Audit 2026-09-12 (F7), reworked 2026-09-14: unlike `online`, `power` has a
+  // user-writable twin in the database. The first cut kept `power` out of a
+  // reply that matched device.state — and so a lost UDP command (datapoint
+  // acked `true`, device still off, device.state still `false`) was never
+  // corrected again until the device really flipped. Every reply carries
+  // `power` (setStateChangedAsync absorbs the repeat); the TRANSITION travels
+  // as a flag so the dropdown reset in onDeviceStateUpdate runs once per
+  // switch-off instead of twice a minute per switched-off light.
+  it("every devStatus reply carries `power`; the flag marks the real transition", () => {
     const dm2 = new DeviceManager(mockLog, mockTimers, registry);
     const dev = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
     dev.state.online = true; // keep `online` out of the patches
     (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), dev);
     const patches: Partial<DeviceState>[] = [];
-    dm2.onDeviceUpdate = (_d, s) => patches.push(s);
+    const flips: Array<boolean | undefined> = [];
+    dm2.onDeviceUpdate = (_d, s, changes) => {
+      patches.push(s);
+      flips.push(changes?.powerFlipped);
+    };
     const off = { onOff: 0, brightness: 50, color: { r: 255, g: 0, b: 0 }, colorTemInKelvin: 0 };
 
     dm2.handleLanStatus("192.168.1.100", off);
-    expect(patches[0].power).toBe(false); // first reply: the state is new
-
     dm2.handleLanStatus("192.168.1.100", off);
     dm2.handleLanStatus("192.168.1.100", off);
-    expect(patches[1].power).toBeUndefined();
-    expect(patches[2].power).toBeUndefined();
-
-    // …and a real change is still reported
     dm2.handleLanStatus("192.168.1.100", { ...off, onOff: 1 });
-    expect(patches[3].power).toBe(true);
+
+    // The value is in every patch — a datapoint that drifted from the device
+    // (lost command) gets corrected by the very next reply.
+    expect(patches.map(p => p.power)).toEqual([false, false, false, true]);
+    // The first reply after a start is a transition (device.state.power starts
+    // undefined — the cache persists only `online`), the repeats are not.
+    expect(flips).toEqual([true, false, false, true]);
   });
 
   it("skips the App-API poll entirely in a lights-only installation", async () => {

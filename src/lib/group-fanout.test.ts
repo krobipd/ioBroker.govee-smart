@@ -69,6 +69,8 @@ function makeHost(opts: {
   commandToSuffix?: Record<string, string>;
   groupSceneStates?: Record<string, string>;
   groupMusicStates?: Record<string, string>;
+  /** Per-member answer of sendMusicCommand (default: sent). */
+  musicResult?: (device: GoveeDevice) => boolean;
 }): {
   host: GroupFanoutHost;
   commands: RecordedCommand[];
@@ -113,7 +115,7 @@ function makeHost(opts: {
     getObject: id => Promise.resolve(objects.get(id) ?? null),
     sendMusicCommand: (device, devicePrefix, stateSuffix, value) => {
       musicCalls.push({ device: device.deviceId, prefix: devicePrefix, suffix: stateSuffix, value });
-      return Promise.resolve();
+      return Promise.resolve(opts.musicResult ? opts.musicResult(device) : true);
     },
   };
   return { host, commands, musicCalls };
@@ -367,6 +369,36 @@ describe("GroupFanoutHandler", () => {
       await handler.fanOut(group, "music.music_sensitivity", 80);
       expect(musicCalls).toHaveLength(1);
       expect(musicCalls[0].value).toBe(80);
+    });
+
+    // Audit 2026-09-12 follow-up (F10, 2026-09-14): sendMusicCommand answers
+    // `false` when it sent nothing (LAN light: sensitivity/auto-colour cannot
+    // be applied; unknown mode). The fan-out awaited it and counted the
+    // member as reached anyway, so a group of LAN lights acked a sensitivity
+    // write that no member took.
+    it("a member whose music command was not sent does not count — no member sent, no ack", async () => {
+      const m1 = makeMember({ deviceId: "MM:01" });
+      const m2 = makeMember({ deviceId: "MM:02" });
+      const group = makeGroup([
+        { sku: m1.sku, deviceId: m1.deviceId },
+        { sku: m2.sku, deviceId: m2.deviceId },
+      ]);
+      const { host, musicCalls } = makeHost({ devices: [m1, m2], musicResult: () => false });
+      const handler = new GroupFanoutHandler(host);
+      expect(await handler.fanOut(group, "music.music_sensitivity", 80)).toBe(false);
+      expect(musicCalls).toHaveLength(2); // both were tried …
+    });
+
+    it("one member that took the music command is enough for the ack", async () => {
+      const m1 = makeMember({ deviceId: "MM:01" });
+      const m2 = makeMember({ deviceId: "MM:02" });
+      const group = makeGroup([
+        { sku: m1.sku, deviceId: m1.deviceId },
+        { sku: m2.sku, deviceId: m2.deviceId },
+      ]);
+      const { host } = makeHost({ devices: [m1, m2], musicResult: d => d.deviceId === "MM:02" });
+      const handler = new GroupFanoutHandler(host);
+      expect(await handler.fanOut(group, "music.music_sensitivity", 80)).toBe(true);
     });
 
     it("ignores music-mode 0 (reset)", async () => {

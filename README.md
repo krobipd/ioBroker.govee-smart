@@ -105,14 +105,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ### **WORK IN PROGRESS**
 
-- Fixed: A command to an appliance is no longer confirmed when it was never sent — without a cloud connection the datapoint used to show the new value as if the device had taken it
-- Fixed: Music sensitivity and auto-colour written on a locally controlled light are no longer confirmed — the local protocol carries no such fields, and the adapter now only warns
+- Fixed: A command the adapter could not send is no longer confirmed — no cloud connection, or a light reachable on neither channel — the datapoint used to claim the device had taken the value
+- Fixed: Music sensitivity and auto-colour are no longer confirmed on a light or group that cannot apply them — the datapoint keeps the old value and the log says why, instead of claiming success
 - Fixed: The segment wizard restores the brightness the strip had before it ran — it turns the strip to full while measuring, and a dimmed strip stayed bright afterwards
-- Fixed: An installation with Govee account and no API key now reads its sensor values again — the two-minute account query ran only when an API key was configured
+- Fixed: The segment wizard no longer stays locked for five minutes when the strip cannot be reached at start — it stops with the reason, and can be started again right away
+- Fixed: An installation that removed its API key but kept the Govee account reads its sensor values again — the two-minute account query used to run only while an API key was configured
 - Changed: A sensor reading that has not changed is no longer written again every two minutes — the datapoint keeps its timestamp until the value itself changes
 - Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
-- Added: Names in all eleven languages and, where the name does not say it, an explanation for eight datapoints real devices report — main light, background light, fan, fan speed, reverse airflow, pillar light, base light and warm mist
-- Added: An explanation for the preset-scene dropdown and for the list of unreachable group members
+- New: Seven datapoints real devices report now carry a translated name — main light, background light, fan, fan speed, reverse airflow, pillar light and base light
+- New: Explanations where the name alone does not say it — reverse airflow, pillar and base light, warm mist, the preset-scene dropdown and the unreachable members of a group
 
 ### 2.35.2 (2026-09-11)
 

@@ -352,9 +352,20 @@ export class SegmentWizard {
     // Make sure the strip is ON and at full global brightness before we
     // start flashing segments — otherwise a user with their strip dimmed to
     // e.g. 10 % would see nothing.
-    await this.host.sendCommand(device, "power", true);
-    await this.host.sendCommand(device, "brightness", 100);
-    await this.flashSegment(device, 0);
+    try {
+      await this.host.sendCommand(device, "power", true);
+      await this.host.sendCommand(device, "brightness", 100);
+      await this.flashSegment(device, 0);
+    } catch (e) {
+      // The router refuses a command it cannot place (no LAN address, no
+      // cloud — F9). The session was reserved above, so release it here:
+      // left in place, the lock held until the idle abort five minutes later.
+      const msg = e instanceof Error ? e.message : String(e);
+      this.host.log.warn(`Segment wizard for ${deviceLabel(device)}: start failed — ${msg}`);
+      this.session = null;
+      this.clearIdleTimer();
+      return { error: this.t("errCommandRefused", { name: device.name, msg }) };
+    }
 
     return { active: true };
   }
@@ -399,11 +410,28 @@ export class SegmentWizard {
     }
     const device = this.host.findDevice(session.deviceKey);
     if (device) {
-      await this.restoreBaseline(device, session.baseline);
+      await this.restoreBaselineOrWarn(device, session.baseline);
     }
     this.session = null;
     this.clearIdleTimer();
     return { done: true, aborted: true };
+  }
+
+  /**
+   * Restore the baseline; a refused send is logged, never thrown. Both closers
+   * (abort, finalize) release the session AFTER the restore, so a throw here
+   * used to keep the global wizard lock until the idle abort (F9, 2026-09-14).
+   *
+   * @param device Target device
+   * @param baseline Previously captured baseline values
+   */
+  private async restoreBaselineOrWarn(device: GoveeDevice, baseline: SegmentWizardSession["baseline"]): Promise<void> {
+    try {
+      await this.restoreBaseline(device, baseline);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.host.log.warn(`Segment wizard for ${deviceLabel(device)}: baseline not restored — ${msg}`);
+    }
   }
 
   /**
@@ -493,7 +521,7 @@ export class SegmentWizard {
    */
   private async finalize(device: GoveeDevice, session: SegmentWizardSession, result: WizardResult): Promise<void> {
     await this.host.applyWizardResult(device, result);
-    await this.restoreBaseline(device, session.baseline);
+    await this.restoreBaselineOrWarn(device, session.baseline);
 
     // Logs are English regardless of admin language (system-language rule); the
     // user-facing `message`/`progress` stay localized (C6).

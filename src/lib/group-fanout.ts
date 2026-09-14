@@ -50,13 +50,17 @@ export interface GroupFanoutHost {
   stateToCommand: (stateSuffix: string) => string | undefined;
   /** Get-object — for the common.states lookup during scene/music mapping. */
   getObject: (id: string) => Promise<ioBroker.Object | null | undefined>;
-  /** Music command sender (wraps the music_mode/sensitivity/auto_color STRUCT). */
+  /**
+   * Music command sender (wraps the music_mode/sensitivity/auto_color STRUCT).
+   * Resolves `false` when nothing was sent — a LAN light cannot take
+   * sensitivity/auto-colour, an unknown mode goes nowhere (F2).
+   */
   sendMusicCommand: (
     device: GoveeDevice,
     devicePrefix: string,
     stateSuffix: string,
     value: ioBroker.StateValue,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 /**
@@ -114,7 +118,12 @@ export class GroupFanoutHandler {
         if (command === "lightScene") {
           await this.fanOutScene(group, member, value);
         } else if (command === "music") {
-          await this.fanOutMusic(group, member, stateSuffix, value);
+          // A member that took nothing is not "reached" (F10): until 2026-09-14
+          // the answer was ignored and a group of LAN lights acked a
+          // sensitivity write no member could apply.
+          if (!(await this.fanOutMusic(group, member, stateSuffix, value))) {
+            continue;
+          }
         } else {
           await this.host.sendCommand(member, command, value);
         }
@@ -195,22 +204,22 @@ export class GroupFanoutHandler {
     member: GoveeDevice,
     stateSuffix: string,
     value: ioBroker.StateValue,
-  ): Promise<void> {
+  ): Promise<boolean> {
     // Sensitivity/auto_color are forwarded directly
     if (stateSuffix !== "music.music_mode") {
-      await this.host.sendMusicCommand(member, this.host.devicePrefix(member), stateSuffix, value);
-      return;
+      return this.host.sendMusicCommand(member, this.host.devicePrefix(member), stateSuffix, value);
     }
     const groupPrefix = this.host.devicePrefix(group);
     const obj = await this.host.getObject(`${this.host.namespace}.${groupPrefix}.music.music_mode`);
     const groupStates = obj?.common?.states as Record<string, string> | undefined;
     const musicName = groupStates?.[String(value)];
     if (!musicName) {
-      return;
+      return false;
     }
     const memberIdx = member.musicLibrary.findIndex(m => m.name === musicName);
-    if (memberIdx >= 0) {
-      await this.host.sendMusicCommand(member, this.host.devicePrefix(member), "music.music_mode", memberIdx + 1);
+    if (memberIdx < 0) {
+      return false; // this member does not know the mode — nothing sent
     }
+    return this.host.sendMusicCommand(member, this.host.devicePrefix(member), "music.music_mode", memberIdx + 1);
   }
 }

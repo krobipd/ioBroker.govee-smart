@@ -70,9 +70,12 @@ class TestHost implements WizardHost {
     return Promise.resolve(null);
   }
 
+  /** When set, every sendCommand rejects with it — the router's "no channel" outcome. */
+  public sendFailure: Error | null = null;
+
   public sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     this.calls.push({ kind: "sendCommand", device, command, value });
-    return Promise.resolve();
+    return this.sendFailure ? Promise.reject(this.sendFailure) : Promise.resolve();
   }
 
   /** Filter host.calls down to only the segmentBatch commands. */
@@ -480,6 +483,48 @@ describe("SegmentWizard", () => {
       expect(host.clearedTimers).toBeGreaterThan(clearedBefore);
       expect(() => host.fireLatestTimer()).not.toThrow();
       expect(host.appliedResults).toHaveLength(1); // still exactly the one apply
+    });
+  });
+
+  // Audit 2026-09-12 follow-up (2026-09-14): since the router refuses a
+  // command it cannot place (no LAN address, no cloud), host.sendCommand can
+  // reject where it used to resolve silently. Every wizard step that sends
+  // must still release the session — start() reserved it synchronously, and
+  // abort()/finalize() cleared it only AFTER the restore. A thrown restore
+  // left the global lock held until the idle abort, which threw again.
+  describe("a rejected send never strands the session", () => {
+    it("start() releases the session and answers with the error", async () => {
+      host.sendFailure = new Error("No channel available for H6160");
+      const r = await wizard.start(key);
+      expect(r.error).toContain("No channel available");
+      expect(wizard.getSessionSnapshot()).toBeNull();
+      expect(() => host.fireLatestTimer()).not.toThrow(); // the idle timer is disarmed
+      expect(host.logs.some(l => l.level === "warn" && l.msg.includes("No channel available"))).toBe(true);
+    });
+
+    it("abort() still closes the session when the restore throws", async () => {
+      await wizard.start(key);
+      host.sendFailure = new Error("No channel available for H6160");
+      const clearedBefore = host.clearedTimers;
+      const r = await wizard.abort();
+      expect(r).toMatchObject({ done: true, aborted: true });
+      expect(wizard.getSessionSnapshot()).toBeNull();
+      expect(host.clearedTimers).toBeGreaterThan(clearedBefore);
+      expect(host.logs.some(l => l.level === "warn" && l.msg.includes("No channel available"))).toBe(true);
+      // A second start is possible right away — the lock is really gone.
+      host.sendFailure = null;
+      expect((await wizard.start(key)).active).toBe(true);
+    });
+
+    it("apply still records the result and closes the session when the restore throws", async () => {
+      await wizard.start(key);
+      await wizard.answer(true);
+      host.sendFailure = new Error("No channel available for H6160");
+      const r = await wizard.runStep("apply", key, { indices: [0] });
+      expect(r.error).toBeUndefined();
+      expect(host.appliedResults).toHaveLength(1);
+      expect(wizard.getSessionSnapshot()).toBeNull();
+      expect(host.logs.some(l => l.level === "warn" && l.msg.includes("No channel available"))).toBe(true);
     });
   });
 

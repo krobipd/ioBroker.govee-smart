@@ -30,13 +30,31 @@ function currentDataDir(): string {
 let dataDirSeq = 0;
 
 // The app-version lookup (connection-state.refreshLiveAppVersion) calls the
-// module-level httpsRequest with no seam. Wrapped in a spy that keeps the real
-// implementation, so every existing test behaves exactly as before and the
-// daily timer's body can still be asserted (it is the only way to see WHICH
-// request that callback makes).
+// module-level httpsRequest with no seam, and onReady fires it on every start.
+// Wrapped in a spy so the daily timer's body can be asserted (it is the only
+// way to see WHICH request that callback makes). The spy answers the iTunes
+// lookup itself: until 2026-09-14 it passed through to the real transport,
+// and every setupReady() — fifty-odd per run, times nine CI jobs — opened a
+// real HTTPS connection to Apple. Every other URL still passes through (none
+// is expected; the afterAll below proves it), so a leak shows up as a failure
+// and never as a request that left the machine.
+// vi.hoisted: the mock factory below is hoisted above the imports and must not
+// touch a module-level const that is still in its temporal dead zone.
+const { ITUNES_LOOKUP, httpsRequestUrls } = vi.hoisted(() => ({
+  ITUNES_LOOKUP: "https://itunes.apple.com/lookup",
+  /** Every URL the spy saw, checked at the end: nothing but the iTunes lookup. */
+  httpsRequestUrls: [] as string[],
+}));
 vi.mock("./lib/http-client", async importOriginal => {
   const actual = await importOriginal<HttpClientModule>();
-  return { ...actual, httpsRequest: vi.fn(actual.httpsRequest) };
+  const spy = vi.fn((options: { url: string }) => {
+    httpsRequestUrls.push(String(options.url));
+    if (String(options.url).startsWith(ITUNES_LOOKUP)) {
+      return Promise.resolve({ value: { resultCount: 1, results: [{ version: "6.9.99" }] }, statusCode: 200 });
+    }
+    return actual.httpsRequest(options as never);
+  });
+  return { ...actual, httpsRequest: spy };
 });
 
 vi.mock("@iobroker/adapter-core", () => {
@@ -162,6 +180,7 @@ import { GoveeAdapter } from "./main";
 import { STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
+import type { DeviceManager } from "./lib/device-manager";
 import type { GoveeDevice } from "./lib/types";
 import { httpsRequest } from "./lib/http-client";
 
@@ -174,6 +193,11 @@ beforeEach(() => {
 
 afterAll(() => {
   fsReal.rmSync(tmpRoot, { recursive: true, force: true });
+  // The unit suite is hermetic: the only request main.ts makes outside its
+  // client seams is the iTunes lookup, and the spy answers that one itself.
+  const foreign = httpsRequestUrls.filter(u => !u.startsWith(ITUNES_LOOKUP));
+  expect(foreign, "httpsRequest reached a URL the spy does not answer").toEqual([]);
+  expect(httpsRequestUrls.length, "the iTunes lookup runs on every start").toBeGreaterThan(0);
 });
 
 /** Minimal fakes for the network collaborators main.ts builds via its seams. */
@@ -1287,6 +1311,31 @@ describe("GoveeAdapter — state-change boundary", () => {
   });
 });
 
+describe("GoveeAdapter — a command the router cannot place anywhere", () => {
+  // Audit 2026-09-12 follow-up (F9, 2026-09-14): resolveTransport answers
+  // `skip` when a light has neither a LAN address nor a cloud channel — every
+  // light in the seconds after a start, or one the scan never found. The skip
+  // used to return normally, so the router acked control.power and the report
+  // logged `ok:true` for a command that never left the adapter. Same class as
+  // F1, on the light path; driven through the real DeviceManager + router.
+  it("is neither acked nor reported as sent — one warn names the reason", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const light = makeDevice({ lanIp: undefined, channels: { lan: true, mqtt: false, cloud: false } });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", light);
+    const prefix = i.stateManager!.devicePrefix(light);
+    i.setState.mockClear();
+    i.log.warn.mockClear();
+
+    await i.onStateChange(`${i.namespace}.${prefix}.control.power`, { val: true, ack: false });
+
+    expect(i.setState.mock.calls.filter(c => String(c[0]).endsWith(".control.power"))).toHaveLength(0);
+    const warns = i.log.warn.mock.calls.map(c => String(c[0]));
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toMatch(/Command failed .*No channel available/);
+  });
+});
+
 describe("GoveeAdapter onReady — state-creation drain", () => {
   it("waits for state-creation promises that are queued WHILE it is draining", async () => {
     const { adapter } = setup();
@@ -2189,6 +2238,36 @@ describe("GoveeAdapter — cloud capability writes over the REAL host object", (
     expect(i.states.get(`${prefix}.sensor.battery`)?.val).toBe(75);
     expect(i.setStateChangedAsync.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(true);
     expect(i.setState.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(false);
+  });
+});
+
+describe("GoveeAdapter — the LAN poll keeps control.power honest", () => {
+  // Audit 2026-09-12 (F7), reworked 2026-09-14. The first cut put `power` into
+  // a devStatus patch only when it differed from device.state — but
+  // device.state is what the DEVICE last reported, and a command acks the
+  // datapoint without touching it. A lost UDP packet therefore left
+  // control.power at `true` (acked) while the device stayed off, and no poll
+  // ever corrected it again. This is that exact picture, over the real
+  // StateManager and the real handler chain.
+  it("a devStatus reply corrects a datapoint that drifted after a lost command", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const light = makeDevice({ lanIp: "10.0.0.7", lastLanReplyAt: Date.now() });
+    light.state.power = false; // the device last reported OFF …
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", light);
+    const prefix = i.stateManager!.devicePrefix(light);
+    i.states.set(`${prefix}.control.power`, { val: true, ack: true }); // … the datapoint says ON (acked, packet lost)
+    expect(i.statesReady).toBe(true); // setupReady drains the creation queue; the mirror is live
+
+    (i.deviceManager as unknown as DeviceManager).handleLanStatus("10.0.0.7", {
+      onOff: 0,
+      brightness: 40,
+      color: { r: 0, g: 0, b: 0 },
+      colorTemInKelvin: 0,
+    });
+    await settle(4);
+
+    expect(i.states.get(`${prefix}.control.power`)?.val).toBe(false);
   });
 });
 

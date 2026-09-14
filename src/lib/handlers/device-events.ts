@@ -4,7 +4,14 @@ import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
-import { deviceLabel, errMessage, logRejected, type DeviceState, type GoveeDevice } from "../types";
+import {
+  deviceLabel,
+  errMessage,
+  logRejected,
+  type DeviceState,
+  type DeviceStateChanges,
+  type GoveeDevice,
+} from "../types";
 import * as connectionState from "./connection-state";
 import * as groupFanoutHandler from "./group-fanout-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
@@ -46,7 +53,7 @@ export function onDeviceStateUpdate<
     connectionState.ConnectionStateAdapter &
     groupFanoutHandler.GroupFanoutHandlerAdapter &
     dropdownReset.GroupStateHelpersAdapter,
->(adapter: T, device: GoveeDevice, state: Partial<DeviceState>): void {
+>(adapter: T, device: GoveeDevice, state: Partial<DeviceState>, changes?: DeviceStateChanges): void {
   // Package A: don't mirror values before the initial object-creation batch has
   // finished — a fast LAN devStatus can otherwise write control.color_rgb before
   // createLanStates declared the object ("has no existing object"). Mirrors the
@@ -72,8 +79,13 @@ export function onDeviceStateUpdate<
   // a device that's off can't be "playing Aurora-A" anymore.
   // L11 — defensively accept 0 as false too (Govee should send power as a
   // boolean, but the MQTT boundary could let a 0 slip through).
+  // Only on the TRANSITION when the source says so: the LAN poll repeats
+  // `power:false` every 30 s (the repeat is what keeps control.power honest
+  // after a lost command), and resetting on each repeat read five dropdown
+  // states per poll and per switched-off light (audit 2026-09-12, F7).
+  // Sources that report changes only pass no flag and reset as before.
   const powerOff = state.power === false || (state.power as unknown) === 0;
-  if (powerOff && adapter.stateManager) {
+  if (powerOff && (changes?.powerFlipped ?? true) && adapter.stateManager) {
     const prefix = adapter.stateManager.devicePrefix(device);
     dropdownReset.resetModeDropdowns(adapter, prefix, "").catch(logRejected(adapter.log, "reset mode dropdowns"));
   }

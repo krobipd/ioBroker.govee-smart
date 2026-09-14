@@ -29,7 +29,7 @@ function makeAdapter(devices: GoveeDevice[]): {
     } as never,
     getObjectAsync: () => Promise.resolve(null),
     stateToCommand: () => null,
-    sendMusicCommand: () => Promise.resolve(undefined),
+    sendMusicCommand: () => Promise.resolve(true),
   };
   return { adapter, unreachableCalls };
 }

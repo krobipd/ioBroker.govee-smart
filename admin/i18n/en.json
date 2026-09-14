@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Device not found: {key}",
   "errNoSegments": "{name} has no segments — wizard not applicable.",
   "errDeviceOffline": "{name} is not reachable right now — the wizard needs the device to answer.",
+  "errCommandRefused": "{name}: the command could not be sent ({msg}) — the wizard stopped.",
   "errNoWizard": "No wizard active. Please click 'Start' first.",
   "errNoWizardShort": "No wizard active",
   "errUnknownAction": "Unknown action: {action}",

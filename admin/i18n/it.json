@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Dispositivo non trovato: {key}",
   "errNoSegments": "{name} non ha segmenti: procedura guidata non applicabile.",
   "errDeviceOffline": "{name} non è raggiungibile in questo momento: la procedura guidata richiede che il dispositivo risponda.",
+  "errCommandRefused": "{name}: impossibile inviare il comando ({msg}) — la procedura guidata è stata interrotta.",
   "errNoWizard": "Nessuna procedura guidata attiva. Fare prima clic su \"Avvia\".",
   "errNoWizardShort": "Nessuna procedura guidata attiva",
   "errUnknownAction": "Azione sconosciuta: {action}",

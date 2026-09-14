@@ -172,6 +172,32 @@ describe("onDeviceStateUpdate", () => {
     expect(rig.dropdownResets).toHaveLength(0);
   });
 
+  // Audit 2026-09-12 (F7, reworked 2026-09-14): the LAN devStatus poll repeats
+  // `power:false` every 30 s. The patch must keep carrying it (the datapoint
+  // mirror is what corrects a value the device never took — a lost UDP
+  // command), but only the TRANSITION resets the dropdowns. Paths that report
+  // changes only (account push, cloud merge) pass no flag and keep resetting.
+  it("a repeated power-off (no transition) still mirrors the value but does not reset the dropdowns", async () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: true });
+    onDeviceStateUpdate(rig.adapter, device, { power: false }, { powerFlipped: false });
+    await new Promise(r => setImmediate(r));
+    expect(rig.updates).toEqual([{ power: false }]);
+    expect(rig.dropdownResets).toHaveLength(0);
+  });
+
+  it("a power-off transition resets the dropdowns, with and without the flag", async () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: true });
+    onDeviceStateUpdate(rig.adapter, device, { power: false }, { powerFlipped: true });
+    await new Promise(r => setImmediate(r));
+    const afterFlag = rig.dropdownResets.length;
+    expect(afterFlag).toBeGreaterThan(0);
+    onDeviceStateUpdate(rig.adapter, device, { power: false });
+    await new Promise(r => setImmediate(r));
+    expect(rig.dropdownResets.length).toBe(afterFlag * 2);
+  });
+
   it("ignores value updates before statesReady — avoids the color_rgb start-race", () => {
     // A fast LAN devStatus arriving before createLanStates has drained the queue
     // must not write control.color_rgb onto a not-yet-created object. The next

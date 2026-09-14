@@ -33,6 +33,7 @@
   "errDeviceNotFound": "Apparaat niet gevonden: {key}",
   "errNoSegments": "{name} heeft geen segmenten — wizard niet van toepassing.",
   "errDeviceOffline": "{name} is nu niet bereikbaar — de wizard heeft een reagerend apparaat nodig.",
+  "errCommandRefused": "{name}: de opdracht kon niet worden verzonden ({msg}) — de wizard is gestopt.",
   "errNoWizard": "Geen wizard actief. Klik eerst op 'Start'.",
   "errNoWizardShort": "Geen wizard actief",
   "errUnknownAction": "Onbekende actie: {action}",

@@ -48,6 +48,7 @@ import {
   type CloudLoadResult,
   type CloudStateCapability,
   type DeviceState,
+  type DeviceStateChanges,
   type ErrorCategory,
   type GoveeDevice,
   type LanDevice,
@@ -80,7 +81,8 @@ export class DeviceManager {
   /** Public for sub-module helpers (cache). */
   public skuCache: SkuCache | null = null;
   /** Public for sub-module helpers (cloud-merge). */
-  public onDeviceUpdate: ((device: GoveeDevice, state: Partial<DeviceState>) => void) | null = null;
+  public onDeviceUpdate:
+    ((device: GoveeDevice, state: Partial<DeviceState>, changes?: DeviceStateChanges) => void) | null = null;
   /** Phase-specific callbacks — one per data source. See setCallbacks. */
   public onLanDeviceReady: ((device: GoveeDevice, allDevices: GoveeDevice[]) => void) | null = null;
   public onCloudDataReady: ((device: GoveeDevice, allDevices: GoveeDevice[]) => void) | null = null;
@@ -300,7 +302,7 @@ export class DeviceManager {
    * @param callbacks.onGroupMembersReady Fired when group membership has been resolved via App-API
    */
   setCallbacks(callbacks: {
-    onUpdate: (device: GoveeDevice, state: Partial<DeviceState>) => void;
+    onUpdate: (device: GoveeDevice, state: Partial<DeviceState>, changes?: DeviceStateChanges) => void;
     onLanDeviceReady: (device: GoveeDevice, allDevices: GoveeDevice[]) => void;
     onCloudDataReady: (device: GoveeDevice, allDevices: GoveeDevice[]) => void;
     onGroupMembersReady: (group: GoveeDevice, allDevices: GoveeDevice[]) => void;
@@ -1279,16 +1281,19 @@ export class DeviceManager {
       colorRgb: rgbToHex(r, g, b),
       colorTemperature: status.colorTemInKelvin || undefined,
     };
-    // `power` only on a real change, same reason as `online` below: the
-    // dropdown reset in onDeviceStateUpdate keys on the REPORTED value, so a
-    // `power:false` in every devStatus reply made every poll of every switched-
-    // off light read five dropdown states again — twice a minute, writing
-    // nothing (audit 2026-09-12, F7). The datapoint itself loses nothing:
-    // updateDeviceState writes it with setStateChangedAsync anyway.
+    // `power` is in EVERY patch, unlike `online` below: control.power has a
+    // user-writable twin in the database, and the poll is what corrects it
+    // after a command the device never took (a lost UDP packet leaves the
+    // datapoint acked `true` while the device stays off). setStateChangedAsync
+    // absorbs the repeat. What must NOT repeat is the dropdown reset in
+    // onDeviceStateUpdate — it used to key on the reported value and read five
+    // dropdown states twice a minute per switched-off light (audit 2026-09-12,
+    // F7) — so the TRANSITION travels alongside as a flag. Right after a start
+    // device.state.power is undefined (the cache persists only `online`), so
+    // the first reply counts as a transition, as it always did.
     const power = status.onOff === 1;
-    if (device.state.power !== power) {
-      state.power = power;
-    }
+    const powerFlipped = device.state.power !== power;
+    state.power = power;
     // `online` only on a real offline→online flip (mirrors
     // applyLanDiscoveryToExisting): with online:true in EVERY devStatus
     // patch, each poll reply triggered the group-reachability pass and a
@@ -1299,7 +1304,7 @@ export class DeviceManager {
     }
 
     Object.assign(device.state, state);
-    this.onDeviceUpdate?.(device, state);
+    this.onDeviceUpdate?.(device, state, { powerFlipped });
   }
 
   /**

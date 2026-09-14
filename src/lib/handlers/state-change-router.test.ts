@@ -108,7 +108,15 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     } as never,
     snapshotHandler: {
       save: (_d: GoveeDevice, name: string) => Promise.resolve(snapshotCalls.push(`save:${name}`)),
-      restore: (_d: GoveeDevice, val: unknown) => Promise.resolve(snapshotCalls.push(`restore:${String(val)}`)),
+      // Honours setSendFailure: the restore replays sendCommand calls, and since
+      // 2026-09-14 those reject when the router cannot place the command.
+      restore: (_d: GoveeDevice, val: unknown) => {
+        const err = sendFailure();
+        if (err) {
+          return Promise.reject(err);
+        }
+        return Promise.resolve(snapshotCalls.push(`restore:${String(val)}`));
+      },
       delete: (_d: GoveeDevice, name: string) => Promise.resolve(snapshotCalls.push(`delete:${name}`)),
     } as never,
     groupFanout: {
@@ -597,6 +605,17 @@ describe("onStateChange — local snapshots", () => {
     await write(rig, id("snapshots.snapshot_local"), "0");
     expect(rig.snapshotCalls).toHaveLength(0);
     expect(rig.acks).toContainEqual({ id: id("snapshots.snapshot_local"), val: "0" });
+  });
+
+  it("snapshot_local: a restore the router cannot send is not acked — one 'Command failed' warn", async () => {
+    // The restore sat outside the router's try/catch: a rejected replay used to
+    // surface as "onStateChange crashed" from main's boundary (F9, 2026-09-14).
+    const rig = makeRig([device]);
+    rig.setSendFailure(() => new Error("No channel available for H6160"));
+    await write(rig, id("snapshots.snapshot_local"), "2");
+    expect(rig.acks).toHaveLength(0);
+    expect(rig.warns).toHaveLength(1);
+    expect(rig.warns[0]).toMatch(/Command failed .*No channel available/);
   });
 
   it("snapshot_delete: deletes by trimmed name and clears the field", async () => {

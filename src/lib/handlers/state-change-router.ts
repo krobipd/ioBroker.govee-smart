@@ -462,7 +462,15 @@ export async function onStateChange(
   }
   if (stateSuffix === "snapshots.snapshot_local") {
     if (val !== "0" && val !== 0) {
-      await adapter.snapshotHandler!.restore(device, val);
+      try {
+        await adapter.snapshotHandler!.restore(device, val);
+      } catch (err) {
+        // The restore replays sendCommand, which refuses a command it cannot
+        // place (F9). Same outcome as every other refused command: no ack,
+        // one warn with the reason — not main's "onStateChange crashed".
+        adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
+        return;
+      }
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, "snapshotLocal");
     }
     await adapter.setState(id, { val, ack: true });

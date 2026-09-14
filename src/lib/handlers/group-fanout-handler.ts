@@ -16,8 +16,8 @@ export interface GroupFanoutHandlerAdapter {
   getObjectAsync(id: string): Promise<unknown>;
   /** State-suffix → command lookup — owned by main.ts because it lives next to STATE_TO_COMMAND. */
   stateToCommand(suffix: string): string | null;
-  /** Music command builder — owned by main.ts because it pulls sibling state values. */
-  sendMusicCommand(device: GoveeDevice, devicePrefix: string, stateSuffix: string, value: unknown): Promise<void>;
+  /** Music command builder — owned by main.ts because it pulls sibling state values; `false` = nothing sent. */
+  sendMusicCommand(device: GoveeDevice, devicePrefix: string, stateSuffix: string, value: unknown): Promise<boolean>;
 }
 
 // resolveGroupMembers (canonical resolver) lives in ../group-fanout, shared with

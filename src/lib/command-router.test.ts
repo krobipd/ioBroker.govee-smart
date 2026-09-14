@@ -185,7 +185,7 @@ describe("CommandRouter", () => {
       expect(cloud.calls[0].value).toBe(1);
     });
 
-    it("debug-logs without warn when Cloud client not yet ready (init-race) — L23", async () => {
+    it("refuses with 'not ready yet' while the Cloud client is still being built (init-race) — L23, F9", async () => {
       const warns: string[] = [];
       const debugs: string[] = [];
       const log = {
@@ -196,18 +196,21 @@ describe("CommandRouter", () => {
       const router = new CommandRouter(log, noopTimers, registry);
       // No lanClient, no cloudClient — but channel says cloud:true (init-race)
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
-      await router.sendCommand(device, "power", true);
-      expect(warns).toHaveLength(0); // init-race false alarm must NOT warn
-      expect(debugs.some(d => /not ready/i.test(d))).toBe(true);
+      // Until 2026-09-14 this resolved after a debug line and the caller acked
+      // the datapoint. Only a user command reaches here, so "not yet" is the
+      // honest answer — carried by the rejection, warned once by the router.
+      await expect(router.sendCommand(device, "power", true)).rejects.toThrow(/not ready yet/);
+      expect(warns).toHaveLength(0);
+      expect(debugs.some(d => /not ready yet/.test(d))).toBe(true);
     });
 
-    it("warns when no channel available at all (L23)", async () => {
+    it("refuses with 'No channel available' when neither LAN nor Cloud can carry the command (L23, F9)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
       const router = new CommandRouter(log, noopTimers, registry);
       const device = makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: false } });
-      await router.sendCommand(device, "power", true);
-      expect(warns.some(w => /no channel/i.test(w))).toBe(true);
+      await expect(router.sendCommand(device, "power", true)).rejects.toThrow(/No channel available/);
+      expect(warns).toHaveLength(0); // the one warn is the state-change router's "Command failed"
     });
 
     it("a LAN case that falls through to a FAILING Cloud call rejects — the state may not be acked", async () => {
@@ -627,27 +630,26 @@ describe("CommandRouter", () => {
       expect(cloud.calls[0].instance).toBe("snapshot");
     });
 
-    it("snapshot=cloud + device.channels.cloud=false → skip (no warn loop)", async () => {
+    it("snapshot=cloud + device.channels.cloud=false → refused, no LAN ptReal fallback", async () => {
       registry = new DeviceRegistry({ data: TEST_CATALOG });
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
-      await router.sendCommand(device, "snapshot", "1");
-      // Cloud-override but no Cloud channel → no LAN ptReal, no Cloud send,
-      // dedup-warn fires once (we don't assert on logger because mockLog is
-      // a spy stub — verifying no LAN ptReal call is enough)
+      // Cloud-override but no Cloud channel → no LAN ptReal, no Cloud send —
+      // and since 2026-09-14 the command is refused rather than resolved (F9).
+      await expect(router.sendCommand(device, "snapshot", "1")).rejects.toThrow(/override/);
       expect(lan.calls.find(c => c.method === "sendPtReal")).toBeUndefined();
     });
 
-    it("snapshot=cloud + cloudClient=null (init-race) → debug, no throw", async () => {
+    it("snapshot=cloud + cloudClient=null (init-race) → refused, no LAN ptReal fallback", async () => {
       registry = new DeviceRegistry({ data: TEST_CATALOG });
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       // setCloudClient NOT called → cloudClient is null even though
       // device.channels.cloud=true
-      await router.sendCommand(makeH70B3(), "snapshot", "1");
+      await expect(router.sendCommand(makeH70B3(), "snapshot", "1")).rejects.toThrow(/override/);
       expect(lan.calls.find(c => c.method === "sendPtReal")).toBeUndefined();
     });
 
@@ -780,17 +782,24 @@ describe("CommandRouter", () => {
       expect(lan.calls[0].method).toBe("setPower");
     });
 
-    it("dedup-map: repeated override-cloud-missing logs only once at warn level (L23)", async () => {
+    it("override-cloud-missing REFUSES every command with the reason; the router owns the one warn (L23, F9)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
       registry = new DeviceRegistry({ data: TEST_CATALOG });
       const router = new CommandRouter(log, noopTimers, registry);
       const device = makeH70B3({ channels: { lan: true, mqtt: false, cloud: false } });
-      // Three rapid commands in same category — first warns, the rest are debug.
-      await router.sendCommand(device, "snapshot", "1");
-      await router.sendCommand(device, "snapshot", "1");
-      await router.sendCommand(device, "snapshot", "1");
-      expect(warns).toHaveLength(1); // deduped — only the first occurrence warns
+      const results: Array<{ ok: boolean; error?: string }> = [];
+      router.onCommandResult = (_id, r) => results.push({ ok: r.ok, error: r.error });
+      // Until 2026-09-14 a skipped command resolved normally, the caller acked
+      // the datapoint and the report logged ok:true. Now every one rejects
+      // with the reason; the state-change router turns that into its single
+      // "Command failed" warn, so nothing here warns on its own.
+      for (let n = 0; n < 3; n++) {
+        await expect(router.sendCommand(device, "snapshot", "1")).rejects.toThrow(/override.*no Cloud channel/);
+      }
+      expect(warns).toHaveLength(0);
+      expect(results.map(r => r.ok)).toEqual([false, false, false]);
+      expect(results[0].error).toMatch(/override/);
     });
   });
 
