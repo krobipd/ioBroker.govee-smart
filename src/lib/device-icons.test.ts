@@ -28,6 +28,43 @@ describe("device-icons", () => {
     });
   });
 
+  // The Admin inlines a data:image/svg+xml icon into the object tree row, so
+  // the markup inherits the row's text colour ONLY through `currentColor` —
+  // it does not invert or recolour anything (measured at admin 7.9.13 and
+  // 8.0.12, 2026-09-12). Until 2.36.1 every icon here carried no fill at all:
+  // default black, invisible on both dark themes. And the row's cell CSS
+  // zeroes the width of rect/image/use/nested svg/foreignObject inside the
+  // inlined markup, so only path and circle may draw.
+  describe("every icon is theme-true in the inlined object-tree row", () => {
+    const decode = (uri: string): string =>
+      Buffer.from(uri.replace(/^data:image\/svg\+xml;base64,/, ""), "base64").toString("utf8");
+    const icons = [...new Set([...Object.values(GOVEE_DEVICE_TYPE).map(iconForGoveeType), GROUP_ICON])];
+
+    it("the root svg fills with currentColor and nothing carries a fixed colour", () => {
+      for (const uri of icons) {
+        const svg = decode(uri);
+        expect(svg, svg).toMatch(/^<svg[^>]*\sfill="currentColor"[^>]*>/);
+        const colours = [...svg.matchAll(/(?:fill|stroke)="([^"]+)"/g)].map(m => m[1]);
+        expect(
+          colours.every(c => c === "currentColor" || c === "none"),
+          svg,
+        ).toBe(true);
+      }
+    });
+
+    it("draws with path and circle only", () => {
+      for (const uri of icons) {
+        const svg = decode(uri);
+        const elements = [...svg.matchAll(/<([a-zA-Z]+)[\s/>]/g)].map(m => m[1]).filter(e => e !== "svg");
+        expect(elements.length, svg).toBeGreaterThan(0);
+        expect(
+          elements.every(e => e === "path" || e === "circle"),
+          svg,
+        ).toBe(true);
+      }
+    });
+  });
+
   describe("shortenGoveeType", () => {
     it("strips the devices.types. prefix", () => {
       expect(shortenGoveeType("devices.types.light")).toBe("light");

@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.36.0",
     "news": {
+      "NEXT": {
+        "en": "The device icons in the object tree are visible on the dark themes again — they take the row's text colour instead of plain black.",
+        "de": "Die Geräte-Symbole im Objektbaum sind auf den dunklen Themen wieder sichtbar — sie nehmen die Textfarbe der Zeile statt Schwarz.",
+        "ru": "Значки устройств в дереве объектов снова видны на тёмных темах — они принимают цвет текста строки вместо чёрного.",
+        "pt": "Os ícones dos dispositivos na árvore de objetos voltam a ser visíveis nos temas escuros — usam a cor do texto da linha em vez de preto.",
+        "nl": "De apparaatpictogrammen in de objectboom zijn op de donkere thema's weer zichtbaar — ze nemen de tekstkleur van de rij in plaats van zwart.",
+        "fr": "Les icônes d'appareil dans l'arborescence sont de nouveau visibles sur les thèmes sombres — elles prennent la couleur du texte de la ligne au lieu du noir.",
+        "it": "Le icone dei dispositivi nell'albero degli oggetti sono di nuovo visibili nei temi scuri — usano il colore del testo della riga invece del nero.",
+        "es": "Los iconos de los dispositivos en el árbol de objetos vuelven a verse en los temas oscuros — toman el color del texto de la fila en lugar de negro.",
+        "pl": "Ikony urządzeń w drzewie obiektów są znów widoczne w ciemnych motywach — przyjmują kolor tekstu wiersza zamiast czerni.",
+        "uk": "Значки пристроїв у дереві об'єктів знову видно на темних темах — вони набувають кольору тексту рядка замість чорного.",
+        "zh-cn": "对象树中的设备图标在深色主题下再次可见——它们采用行的文字颜色而不是纯黑色。"
+      },
       "2.36.0": {
         "en": "A command that could not be sent is no longer confirmed, the segment wizard puts the brightness back, and an installation that kept its Govee account but removed the API key reads sensor values again.",
         "de": "Ein nicht sendbarer Befehl wird nicht mehr bestätigt, der Segment-Assistent stellt die Helligkeit zurück, und eine Anlage mit Govee-Konto, aber entferntem API-Key liest wieder Sensorwerte.",
@@ -80,19 +93,6 @@
         "pl": "Lampy bez lokalnego API pozostają osiągalne, dopóki same zgłaszają swój stan (H600D). 486 kolejnych modeli Govee startuje jako eksperymentalne, lista urządzeń w wiki zwija się według typu.",
         "uk": "Світильники без локального API залишаються доступними, поки самі повідомляють свій стан (H600D). Ще 486 моделей Govee додано як експериментальні, список у wiki згорнуто за типами.",
         "zh-cn": "没有本地 API 的灯具在自行上报状态时保持可达（H600D）。新增 486 个 Govee 型号作为实验性支持，wiki 设备列表按设备类型折叠。"
-      },
-      "2.32.1": {
-        "en": "Your devices and their recorded history no longer disappear from the object tree when the Govee cloud cannot be reached at startup.",
-        "de": "Deine Geräte und ihre aufgezeichnete Historie verschwinden nicht mehr aus dem Objektbaum, wenn die Govee-Cloud beim Start nicht erreichbar ist.",
-        "ru": "Ваши устройства и их записанная история больше не исчезают из дерева объектов, если облако Govee недоступно при запуске.",
-        "pt": "Os seus dispositivos e o respetivo histórico registado já não desaparecem da árvore de objetos quando a nuvem Govee está inacessível no arranque.",
-        "nl": "Je apparaten en hun vastgelegde geschiedenis verdwijnen niet meer uit de objectboom wanneer de Govee-cloud bij het starten onbereikbaar is.",
-        "fr": "Vos appareils et leur historique enregistré ne disparaissent plus de l'arborescence des objets lorsque le cloud Govee est injoignable au démarrage.",
-        "it": "I tuoi dispositivi e la loro cronologia registrata non spariscono più dall'albero degli oggetti quando il cloud Govee non è raggiungibile all'avvio.",
-        "es": "Tus dispositivos y su historial registrado ya no desaparecen del árbol de objetos cuando la nube de Govee no está accesible al iniciar.",
-        "pl": "Twoje urządzenia i ich zapisana historia nie znikają już z drzewa obiektów, gdy chmura Govee jest niedostępna przy starcie.",
-        "uk": "Ваші пристрої та їхня записана історія більше не зникають з дерева об'єктів, коли хмара Govee недоступна під час запуску.",
-        "zh-cn": "当启动时无法连接 Govee 云端，你的设备及其记录的历史数据不再从对象树中消失。"
       }
     },
     "plugins": {

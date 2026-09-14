@@ -23,7 +23,7 @@
     "type": "device",
     "common": {
       "name": "Ceiling Fan Light Kitchen",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h1310_0013.info.online"
       }
@@ -1735,7 +1735,7 @@
     "type": "device",
     "common": {
       "name": "Gateway Hallway",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE1IDEzVjVjMC0xLjY2LTEuMzQtMy0zLTNTOSAzLjM0IDkgNXY4Yy0xLjIxLjkxLTIgMi4zNS0yIDQgMCAyLjc2IDIuMjQgNSA1IDVzNS0yLjI0IDUtNWMwLTEuNjUtLjc5LTMuMDktMi00em0tNC04YzAtLjU1LjQ1LTEgMS0xczEgLjQ1IDEgMWgtMnYxaDJ2MmgtMnYxaDJ2MmgtMnYxLjFjMS40NC40NyAyLjUgMS44IDIuNSAzLjQgMCAyLjA5LTEuNzEgMy43NS0zLjc1IDMuNzVTNyAxOS4xOSA3IDE3LjFjMC0xLjYgMS4wNi0yLjkzIDIuNS0zLjRWNXoiLz48L3N2Zz4=",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTUgMTNWNWMwLTEuNjYtMS4zNC0zLTMtM1M5IDMuMzQgOSA1djhjLTEuMjEuOTEtMiAyLjM1LTIgNCAwIDIuNzYgMi4yNCA1IDUgNXM1LTIuMjQgNS01YzAtMS42NS0uNzktMy4wOS0yLTR6bS00LThjMC0uNTUuNDUtMSAxLTFzMSAuNDUgMSAxaC0ydjFoMnYyaC0ydjFoMnYyaC0ydjEuMWMxLjQ0LjQ3IDIuNSAxLjggMi41IDMuNCAwIDIuMDktMS43MSAzLjc1LTMuNzUgMy43NVM3IDE5LjE5IDcgMTcuMWMwLTEuNiAxLjA2LTIuOTMgMi41LTMuNFY1eiIvPjwvc3ZnPg==",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h5042_0004.info.online"
       }
@@ -2066,7 +2066,7 @@
     "type": "device",
     "common": {
       "name": "Socket Balcony",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE2IDdoLTEuOWwtLjg1LTEuN2EuNS41IDAgMCAwLS40NS0uM2gtNS42YS41LjUgMCAwIDAtLjQ1LjNMNi45IDdINWMtMS4xMSAwLTIgLjg5LTIgMnYxMmMwIDEuMTEuODkgMiAyIDJoMTFjMS4xMSAwIDItLjg5IDItMlY5YzAtMS4xMS0uODktMi0yLTJ6TTEwIDhoMnY1aC0yek04IDhoMnY1SDh6Ii8+PC9zdmc+",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTYgN2gtMS45bC0uODUtMS43YS41LjUgMCAwIDAtLjQ1LS4zaC01LjZhLjUuNSAwIDAgMC0uNDUuM0w2LjkgN0g1Yy0xLjExIDAtMiAuODktMiAydjEyYzAgMS4xMS44OSAyIDIgMmgxMWMxLjExIDAgMi0uODkgMi0yVjljMC0xLjExLS44OS0yLTItMnpNMTAgOGgydjVoLTJ6TTggOGgydjVIOHoiLz48L3N2Zz4=",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h5080_000d.info.online"
       }
@@ -2445,7 +2445,7 @@
     "type": "device",
     "common": {
       "name": "Button Desk",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJhMTAgMTAgMCAxIDAgMCAyMCAxMCAxMCAwIDAgMCAwLTIwem0wIDJhOCA4IDAgMSAxIDAgMTYgOCA4IDAgMCAxIDAtMTZ6Ii8+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iNCIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMmExMCAxMCAwIDEgMCAwIDIwIDEwIDEwIDAgMCAwIDAtMjB6bTAgMmE4IDggMCAxIDEgMCAxNiA4IDggMCAwIDEgMC0xNnoiLz48Y2lyY2xlIGN4PSIxMiIgY3k9IjEyIiByPSI0Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h5085_000e.info.online"
       }
@@ -2837,7 +2837,7 @@
     "type": "device",
     "common": {
       "name": "Battery Sensor Cellar",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE1IDEzVjVjMC0xLjY2LTEuMzQtMy0zLTNTOSAzLjM0IDkgNXY4Yy0xLjIxLjkxLTIgMi4zNS0yIDQgMCAyLjc2IDIuMjQgNSA1IDVzNS0yLjI0IDUtNWMwLTEuNjUtLjc5LTMuMDktMi00em0tNC04YzAtLjU1LjQ1LTEgMS0xczEgLjQ1IDEgMWgtMnYxaDJ2MmgtMnYxaDJ2MmgtMnYxLjFjMS40NC40NyAyLjUgMS44IDIuNSAzLjQgMCAyLjA5LTEuNzEgMy43NS0zLjc1IDMuNzVTNyAxOS4xOSA3IDE3LjFjMC0xLjYgMS4wNi0yLjkzIDIuNS0zLjRWNXoiLz48L3N2Zz4=",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTUgMTNWNWMwLTEuNjYtMS4zNC0zLTMtM1M5IDMuMzQgOSA1djhjLTEuMjEuOTEtMiAyLjM1LTIgNCAwIDIuNzYgMi4yNCA1IDUgNXM1LTIuMjQgNS01YzAtMS42NS0uNzktMy4wOS0yLTR6bS00LThjMC0uNTUuNDUtMSAxLTFzMSAuNDUgMSAxaC0ydjFoMnYyaC0ydjFoMnYyaC0ydjEuMWMxLjQ0LjQ3IDIuNSAxLjggMi41IDMuNCAwIDIuMDktMS43MSAzLjc1LTMuNzUgMy43NVM3IDE5LjE5IDcgMTcuMWMwLTEuNiAxLjA2LTIuOTMgMi41LTMuNFY1eiIvPjwvc3ZnPg==",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h5109_0005.info.online"
       }
@@ -3246,7 +3246,7 @@
     "type": "device",
     "common": {
       "name": "Thermo Bedroom",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE1IDEzVjVjMC0xLjY2LTEuMzQtMy0zLTNTOSAzLjM0IDkgNXY4Yy0xLjIxLjkxLTIgMi4zNS0yIDQgMCAyLjc2IDIuMjQgNSA1IDVzNS0yLjI0IDUtNWMwLTEuNjUtLjc5LTMuMDktMi00em0tNC04YzAtLjU1LjQ1LTEgMS0xczEgLjQ1IDEgMWgtMnYxaDJ2MmgtMnYxaDJ2MmgtMnYxLjFjMS40NC40NyAyLjUgMS44IDIuNSAzLjQgMCAyLjA5LTEuNzEgMy43NS0zLjc1IDMuNzVTNyAxOS4xOSA3IDE3LjFjMC0xLjYgMS4wNi0yLjkzIDIuNS0zLjRWNXoiLz48L3N2Zz4=",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTUgMTNWNWMwLTEuNjYtMS4zNC0zLTMtM1M5IDMuMzQgOSA1djhjLTEuMjEuOTEtMiAyLjM1LTIgNCAwIDIuNzYgMi4yNCA1IDUgNXM1LTIuMjQgNS01YzAtMS42NS0uNzktMy4wOS0yLTR6bS00LThjMC0uNTUuNDUtMSAxLTFzMSAuNDUgMSAxaC0ydjFoMnYyaC0ydjFoMnYyaC0ydjEuMWMxLjQ0LjQ3IDIuNSAxLjggMi41IDMuNCAwIDIuMDktMS43MSAzLjc1LTMuNzUgMy43NVM3IDE5LjE5IDcgMTcuMWMwLTEuNiAxLjA2LTIuOTMgMi41LTMuNFY1eiIvPjwvc3ZnPg==",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h5179_0003.info.online"
       }
@@ -3655,7 +3655,7 @@
     "type": "device",
     "common": {
       "name": "Floor Lamp Hall",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h607c_0015.info.online"
       }
@@ -6038,7 +6038,7 @@
     "type": "device",
     "common": {
       "name": "Strip Living Room",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h6172_0001.info.online"
       }
@@ -7705,7 +7705,7 @@
     "type": "device",
     "common": {
       "name": "Bulb Hall Cloud Only",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h6199_0002.info.online"
       }
@@ -10239,7 +10239,7 @@
     "type": "device",
     "common": {
       "name": "Neon Garden",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h61a8_000f.info.online"
       }
@@ -12501,7 +12501,7 @@
     "type": "device",
     "common": {
       "name": "TV Backlight Living Room",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTkgMjFjMCAuNTUuNDUgMSAxIDFoNGMuNTUgMCAxLS40NSAxLTF2LTFIOXYxem0zLTE5QzguMTQgMiA1IDUuMTQgNSA5YzAgMi4zOCAxLjE5IDQuNDcgMyA1Ljc0VjE3YzAgLjU1LjQ1IDEgMSAxaDZjLjU1IDAgMS0uNDUgMS0xdi0yLjI2YzEuODEtMS4yNyAzLTMuMzYgMy01Ljc0IDAtMy44Ni0zLjE0LTctNy03eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNOSAyMWMwIC41NS40NSAxIDEgMWg0Yy41NSAwIDEtLjQ1IDEtMXYtMUg5djF6bTMtMTlDOC4xNCAyIDUgNS4xNCA1IDljMCAyLjM4IDEuMTkgNC40NyAzIDUuNzRWMTdjMCAuNTUuNDUgMSAxIDFoNmMuNTUgMCAxLS40NSAxLTF2LTIuMjZjMS44MS0xLjI3IDMtMy4zNiAzLTUuNzQgMC0zLjg2LTMuMTQtNy03LTd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h66a1_0014.info.online"
       }
@@ -14736,7 +14736,7 @@
     "type": "device",
     "common": {
       "name": "Fan Study",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDExYzEuMSAwIDItLjkgMi0yYzAtMS4xLS45LTItMi0yYy0xLjEgMC0yIC45LTIgMmMwIDEuMS45IDIgMiAyem05LjU2LTEuM2MwIC4xMS4wMy4yLjAzLjMxYzAgMi4xMy0xLjI3IDQuMzMtMy4yNCA1LjY3Yy43Ni0xLjMzIDEuMjEtMi44NyAxLjIxLTQuNDdjMC0uNTQtLjA1LTEuMDgtLjE1LTEuNjFjMS4yLS40MSAyLjE2LS43OSAyLjE1LjF6TTYuNDQgOS43YzEuMi0uOTEgMi4xNi0xLjI4IDIuMTYuMWMtLjEuNTMtLjE1IDEuMDctLjE1IDEuNjFjMCAxLjYuNDUgMy4xNCAxLjIxIDQuNDdjLTEuOTctMS4zNC0zLjI0LTMuNTMtMy4yNC01LjY3YzAtLjEuMDMtLjIuMDMtLjMxbS0uNyA0LjJjLjE2LjA5LjI4LjE5LjQyLjI3Yy0xLjk3IDEuMzQtMy4yNCAzLjUzLTMuMjQgNS42N2MwIC4xLjAzLjIuMDMuMzFjMCAuMTEuMDMuMi4wMy4zMWMwIDEuOTYgMS40OCA0LjEzIDMuMTUgNS41OWMtLjMzLTEuMTYtLjUyLTIuMy0uNTItMy40NWMwLTIuMSAuNDQtNC4xNiAxLjA1LTYuMDhjLS4zMS0uMjEtLjYxLS40NC0uOTItLjY3eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMTFjMS4xIDAgMi0uOSAyLTJjMC0xLjEtLjktMi0yLTJjLTEuMSAwLTIgLjktMiAyYzAgMS4xLjkgMiAyIDJ6bTkuNTYtMS4zYzAgLjExLjAzLjIuMDMuMzFjMCAyLjEzLTEuMjcgNC4zMy0zLjI0IDUuNjdjLjc2LTEuMzMgMS4yMS0yLjg3IDEuMjEtNC40N2MwLS41NC0uMDUtMS4wOC0uMTUtMS42MWMxLjItLjQxIDIuMTYtLjc5IDIuMTUuMXpNNi40NCA5LjdjMS4yLS45MSAyLjE2LTEuMjggMi4xNi4xYy0uMS41My0uMTUgMS4wNy0uMTUgMS42MWMwIDEuNi40NSAzLjE0IDEuMjEgNC40N2MtMS45Ny0xLjM0LTMuMjQtMy41My0zLjI0LTUuNjdjMC0uMS4wMy0uMi4wMy0uMzFtLS43IDQuMmMuMTYuMDkuMjguMTkuNDIuMjdjLTEuOTcgMS4zNC0zLjI0IDMuNTMtMy4yNCA1LjY3YzAgLjEuMDMuMi4wMy4zMWMwIC4xMS4wMy4yLjAzLjMxYzAgMS45NiAxLjQ4IDQuMTMgMy4xNSA1LjU5Yy0uMzMtMS4xNi0uNTItMi4zLS41Mi0zLjQ1YzAtMi4xIC40NC00LjE2IDEuMDUtNi4wOGMtLjMxLS4yMS0uNjEtLjQ0LS45Mi0uNjd6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7102_0008.info.online"
       }
@@ -15203,7 +15203,7 @@
     "type": "device",
     "common": {
       "name": "Air Purifier Attic",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS41IDE2YzAgLjI4LS4yMi41LS41LjVzLS41LS4yMi0uNS0uNXYtMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYyem0wLTRjMCAuMjgtLjIyLjUtLjUuNXMtLjUtLjIyLS41LS41di0xMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYxMnoiLz48L3N2Zz4=",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMHMxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptLjUgMTZjMCAuMjgtLjIyLjUtLjUuNXMtLjUtLjIyLS41LS41di0yYzAtLjI4LjIyLS41LjUtLjVzLjUuMjIuNS41djJ6bTAtNGMwIC4yOC0uMjIuNS0uNS41cy0uNS0uMjItLjUtLjV2LTEyYzAtLjI4LjIyLS41LjUtLjVzLjUuMjIuNS41djEyeiIvPjwvc3ZnPg==",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7121_0009.info.online"
       }
@@ -15732,7 +15732,7 @@
     "type": "device",
     "common": {
       "name": "Air Purifier Bedroom",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDJDNi40OCAyIDIgNi40OCAyIDEyczQuNDggMTAgMTAgMTBzMTAtNC40OCAxMC0xMFMxNy41MiAyIDEyIDJ6bS41IDE2YzAgLjI4LS4yMi41LS41LjVzLS41LS4yMi0uNS0uNXYtMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYyem0wLTRjMCAuMjgtLjIyLjUtLjUuNXMtLjUtLjIyLS41LS41di0xMmMwLS4yOC4yMi0uNS41LS41cy41LjIyLjUuNXYxMnoiLz48L3N2Zz4=",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMkM2LjQ4IDIgMiA2LjQ4IDIgMTJzNC40OCAxMCAxMCAxMHMxMC00LjQ4IDEwLTEwUzE3LjUyIDIgMTIgMnptLjUgMTZjMCAuMjgtLjIyLjUtLjUuNXMtLjUtLjIyLS41LS41di0yYzAtLjI4LjIyLS41LjUtLjVzLjUuMjIuNS41djJ6bTAtNGMwIC4yOC0uMjIuNS0uNS41cy0uNS0uMjItLjUtLjV2LTEyYzAtLjI4LjIyLS41LjUtLjVzLjUuMjIuNS41djEyeiIvPjwvc3ZnPg==",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7127_0010.info.online"
       }
@@ -16265,7 +16265,7 @@
     "type": "device",
     "common": {
       "name": "Heater Office",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE3LjY2IDExLjJjLS4yMy0uMzMtLjQ4LS42Ni0uNzgtLjk4Yy0uNTctLjY2LTEuMjEtMS4zMi0xLjg2LTEuOTdjLTEuMzgtMS4zNS0yLjg2LTIuNzMtMy45Ny00LjU0Yy0uNDgtLjc4LS44LTEuNTktMS4wMi0yLjQyYy0uNTguODYtMS4wOSAxLjctMS41OSAyLjU1Yy0uODcgMS40OS0xLjY3IDIuOTYtMi4yMyA0LjUyYy0uNzcgMi4xNi0xLjAxIDQuMzgtLjUyIDYuNTRjLjUgMi4xNiAxLjY3IDQuMjUgMy4zNyA1LjcxYy44Ni43NCAxLjg5IDEuMzMgMyAxLjc2YzEuMS40MyAyLjI4LjY3IDMuNDcuNzFjMS4xOS4wNCAyLjQtLjEyIDMuNTQtLjUyYzEuMTQtLjQgMi4yMS0xLjAyIDMuMTctMS44NWMxLjg5LTEuNjMgMy4yNi0zLjc4IDMuNTctNi4xN2MuMzEtMi4zOS0uNTQtNC44NC0yLjE1LTYuNTd6Ii8+PC9zdmc+",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTcuNjYgMTEuMmMtLjIzLS4zMy0uNDgtLjY2LS43OC0uOThjLS41Ny0uNjYtMS4yMS0xLjMyLTEuODYtMS45N2MtMS4zOC0xLjM1LTIuODYtMi43My0zLjk3LTQuNTRjLS40OC0uNzgtLjgtMS41OS0xLjAyLTIuNDJjLS41OC44Ni0xLjA5IDEuNy0xLjU5IDIuNTVjLS44NyAxLjQ5LTEuNjcgMi45Ni0yLjIzIDQuNTJjLS43NyAyLjE2LTEuMDEgNC4zOC0uNTIgNi41NGMuNSAyLjE2IDEuNjcgNC4yNSAzLjM3IDUuNzFjLjg2Ljc0IDEuODkgMS4zMyAzIDEuNzZjMS4xLjQzIDIuMjguNjcgMy40Ny43MWMxLjE5LjA0IDIuNC0uMTIgMy41NC0uNTJjMS4xNC0uNCAyLjIxLTEuMDIgMy4xNy0xLjg1YzEuODktMS42MyAzLjI2LTMuNzggMy41Ny02LjE3Yy4zMS0yLjM5LS41NC00Ljg0LTIuMTUtNi41N3oiLz48L3N2Zz4=",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7130_0006.info.online"
       }
@@ -16763,7 +16763,7 @@
     "type": "device",
     "common": {
       "name": "Space Heater Study",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE3LjY2IDExLjJjLS4yMy0uMzMtLjQ4LS42Ni0uNzgtLjk4Yy0uNTctLjY2LTEuMjEtMS4zMi0xLjg2LTEuOTdjLTEuMzgtMS4zNS0yLjg2LTIuNzMtMy45Ny00LjU0Yy0uNDgtLjc4LS44LTEuNTktMS4wMi0yLjQyYy0uNTguODYtMS4wOSAxLjctMS41OSAyLjU1Yy0uODcgMS40OS0xLjY3IDIuOTYtMi4yMyA0LjUyYy0uNzcgMi4xNi0xLjAxIDQuMzgtLjUyIDYuNTRjLjUgMi4xNiAxLjY3IDQuMjUgMy4zNyA1LjcxYy44Ni43NCAxLjg5IDEuMzMgMyAxLjc2YzEuMS40MyAyLjI4LjY3IDMuNDcuNzFjMS4xOS4wNCAyLjQtLjEyIDMuNTQtLjUyYzEuMTQtLjQgMi4yMS0xLjAyIDMuMTctMS44NWMxLjg5LTEuNjMgMy4yNi0zLjc4IDMuNTctNi4xN2MuMzEtMi4zOS0uNTQtNC44NC0yLjE1LTYuNTd6Ii8+PC9zdmc+",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTcuNjYgMTEuMmMtLjIzLS4zMy0uNDgtLjY2LS43OC0uOThjLS41Ny0uNjYtMS4yMS0xLjMyLTEuODYtMS45N2MtMS4zOC0xLjM1LTIuODYtMi43My0zLjk3LTQuNTRjLS40OC0uNzgtLjgtMS41OS0xLjAyLTIuNDJjLS41OC44Ni0xLjA5IDEuNy0xLjU5IDIuNTVjLS44NyAxLjQ5LTEuNjcgMi45Ni0yLjIzIDQuNTJjLS43NyAyLjE2LTEuMDEgNC4zOC0uNTIgNi41NGMuNSAyLjE2IDEuNjcgNC4yNSAzLjM3IDUuNzFjLjg2Ljc0IDEuODkgMS4zMyAzIDEuNzZjMS4xLjQzIDIuMjguNjcgMy40Ny43MWMxLjE5LjA0IDIuNC0uMTIgMy41NC0uNTJjMS4xNC0uNCAyLjIxLTEuMDIgMy4xNy0xLjg1YzEuODktMS42MyAzLjI2LTMuNzggMy41Ny02LjE3Yy4zMS0yLjM5LS41NC00Ljg0LTIuMTUtNi41N3oiLz48L3N2Zz4=",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7131_0012.info.online"
       }
@@ -17464,7 +17464,7 @@
     "type": "device",
     "common": {
       "name": "Humidifier Nursery",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDIuNVMxOSA3IDE5IDEzYzAgMy44Ny0zLjEzIDctNyA3cy03LTMuMTMtNy03YzAtNiA3LTEwLjUgNy0xMC41eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMi41UzE5IDcgMTkgMTNjMCAzLjg3LTMuMTMgNy03IDdzLTctMy4xMy03LTdjMC02IDctMTAuNSA3LTEwLjV6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7141_0007.info.online"
       }
@@ -17935,7 +17935,7 @@
     "type": "device",
     "common": {
       "name": "Humidifier Bedroom",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDIuNVMxOSA3IDE5IDEzYzAgMy44Ny0zLjEzIDctNyA3cy03LTMuMTMtNy03YzAtNiA3LTEwLjUgNy0xMC41eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMi41UzE5IDcgMTkgMTNjMCAzLjg3LTMuMTMgNy03IDdzLTctMy4xMy03LTdjMC02IDctMTAuNSA3LTEwLjV6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7143_0011.info.online"
       }
@@ -18444,7 +18444,7 @@
     "type": "device",
     "common": {
       "name": "Aroma Diffuser Bath",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTEyIDIuNVMxOSA3IDE5IDEzYzAgMy44Ny0zLjEzIDctNyA3cy03LTMuMTMtNy03YzAtNiA3LTEwLjUgNy0xMC41eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTIgMi41UzE5IDcgMTkgMTNjMCAzLjg3LTMuMTMgNy03IDdzLTctMy4xMy03LTdjMC02IDctMTAuNSA3LTEwLjV6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7161_000c.info.online"
       }
@@ -18854,7 +18854,7 @@
     "type": "device",
     "common": {
       "name": "Kettle Kitchen",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE5IDE0VjlsLTQtNGgtNGEzIDMgMCAwIDAtMyAzdjZsLTIgMnY0aDE2di00bC0zLTJ6Ii8+PC9zdmc+",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTkgMTRWOWwtNC00aC00YTMgMyAwIDAgMC0zIDN2NmwtMiAydjRoMTZ2LTRsLTMtMnoiLz48L3N2Zz4=",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7171_000a.info.online"
       }
@@ -19354,7 +19354,7 @@
     "type": "device",
     "common": {
       "name": "Ice Maker Bar",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE2IDdoLTEuOWwtLjg1LTEuN2EuNS41IDAgMCAwLS40NS0uM2gtNS42YS41LjUgMCAwIDAtLjQ1LjNMNi45IDdINWMtMS4xMSAwLTIgLjg5LTIgMnYxMmMwIDEuMTEuODkgMiAyIDJoMTFjMS4xMSAwIDItLjg5IDItMlY5YzAtMS4xMS0uODktMi0yLTJ6TTEwIDhoMnY1aC0yek04IDhoMnY1SDh6Ii8+PC9zdmc+",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTYgN2gtMS45bC0uODUtMS43YS41LjUgMCAwIDAtLjQ1LS4zaC01LjZhLjUuNSAwIDAgMC0uNDUuM0w2LjkgN0g1Yy0xLjExIDAtMiAuODktMiAydjEyYzAgMS4xMS44OSAyIDIgMmgxMWMxLjExIDAgMi0uODkgMi0yVjljMC0xLjExLS44OS0yLTItMnpNMTAgOGgydjVoLTJ6TTggOGgydjVIOHoiLz48L3N2Zz4=",
       "statusStates": {
         "onlineId": "govee-smart.0.devices.h7172_000b.info.online"
       }
@@ -19836,7 +19836,7 @@
     "type": "device",
     "common": {
       "name": "Group Ground Floor",
-      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZD0iTTE2IDExYzEuNjYgMCAyLjk5LTEuMzQgMi45OS0zUzE3LjY2IDUgMTYgNWMtMS42NiAwLTMgMS4zNC0zIDNzMS4zNCAzIDMgM3ptLTggMGMxLjY2IDAgMi45OS0xLjM0IDIuOTktM1M5LjY2IDUgOCA1QzYuMzQgNSA1IDYuMzQgNSA4czEuMzQgMyAzIDN6bTAgMmMtMi4zMyAwLTcgMS4xNy03IDMuNVYxOWgxNHYtMi41YzAtMi4zMy00LjY3LTMuNS03LTMuNXptOCAwYy0uMjkgMC0uNjIuMDItLjk3LjA1IDEuMTYuODQgMS45NyAxLjk3IDEuOTcgMy40NVYxOWg2di0yLjVjMC0yLjMzLTQuNjctMy41LTctMy41eiIvPjwvc3ZnPg==",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTYgMTFjMS42NiAwIDIuOTktMS4zNCAyLjk5LTNTMTcuNjYgNSAxNiA1Yy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzem0tOCAwYzEuNjYgMCAyLjk5LTEuMzQgMi45OS0zUzkuNjYgNSA4IDVDNi4zNCA1IDUgNi4zNCA1IDhzMS4zNCAzIDMgM3ptMCAyYy0yLjMzIDAtNyAxLjE3LTcgMy41VjE5aDE0di0yLjVjMC0yLjMzLTQuNjctMy41LTctMy41em04IDBjLS4yOSAwLS42Mi4wMi0uOTcuMDUgMS4xNi44NCAxLjk3IDEuOTcgMS45NyAzLjQ1VjE5aDZ2LTIuNWMwLTIuMzMtNC42Ny0zLjUtNy0zLjV6Ii8+PC9zdmc+",
       "statusStates": {
         "onlineId": "govee-smart.0.groups.info.online"
       }
