@@ -111,7 +111,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: The instance settings open on the Configuration tab again — the admin remembered the last tab you used, and once you had visited the Expert tab every later visit started there
 - Fixed: The device icons in the object tree are visible on the dark themes again — they were drawn in plain black, invisible on a dark background, and now take the row's text colour
 - Fixed: A group's "membersUnreachable" datapoint is created together with the group — it used to appear only with the first reachability check, up to 20 seconds after the rest of the group
-- Changed: The LAN listen port 4002 is declared in the settings — the admin warns when another adapter takes it, and the network interface you chose is carried over on the first start
+- Changed: The admin warns when another adapter takes the LAN port 4002 (now shown as a fixed field in the settings), and the network interface you chose is carried over on the first start
 
 ### 2.36.0 (2026-09-14)
 
