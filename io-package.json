@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.36.0",
+    "version": "2.37.0",
     "news": {
-      "NEXT": {
+      "2.37.0": {
         "en": "The root folders snapshots and diagnostics are gone, the settings open on Configuration again, icons show on dark themes, and the admin warns when another adapter takes LAN port 4002.",
         "de": "Root-Ordner snapshots und diagnostics sind weg, Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen, die Admin warnt, wenn ein anderer Adapter LAN-Port 4002 belegt.",
         "ru": "Корневые папки snapshots и diagnostics удалены, настройки снова открываются на «Конфигурации», значки видны на тёмных темах, админ предупреждает, если другой адаптер занял LAN-порт 4002.",
