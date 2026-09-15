@@ -55,7 +55,7 @@
           "type": "port",
           "label": "portLabel",
           "tooltip": "portTooltip",
-          "disabled": "true",
+          "disabled": true,
           "min": 4002,
           "max": 4002,
           "xs": 12,
