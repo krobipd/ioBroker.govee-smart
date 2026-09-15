@@ -1,9 +1,9 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.37.0",
+    "version": "2.37.1",
     "news": {
-      "NEXT": {
+      "2.37.1": {
         "en": "The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 covered the browser storage only, so every open still landed on Expert.",
         "de": "Die Instanz-Einstellungen öffnen auch dann wieder auf Konfiguration, wenn die Admin ihre Einstellungen am Server ablegt — 2.37.0 deckte nur den Browser-Speicher ab, jedes Öffnen landete auf Experte.",
         "ru": "Настройки экземпляра снова открываются на «Конфигурации», даже если админ хранит свои настройки на сервере — 2.37.0 учитывала только хранилище браузера, и открытие всё ещё вело на «Эксперт».",
@@ -93,19 +93,6 @@
         "pl": "Oczyszczacze, grzejniki, nawilżacze i wentylatory znów przyjmują tryb i bieg oraz pokazują prawdziwe stopnie, temperatura grzejnika wychodzi poprawnie, a konto bez lamp odczytuje swoje stany.",
         "uk": "Очищувачі, обігрівачі, зволожувачі та вентилятори знову приймають режим і швидкість та показують справжні ступені, температура обігрівача йде правильно, обліковий запис без ламп читає свої стани.",
         "zh-cn": "空气净化器、取暖器、加湿器和风扇重新接受模式与档位设置，并显示设备真实的档位列表；取暖器目标温度以正确格式和单位发送；账户中没有灯具时也会读取设备状态。"
-      },
-      "2.33.0": {
-        "en": "Lights without a local API stay reachable while they report their own state (H600D). 486 more Govee models start as experimental, and the wiki device list folds per device type.",
-        "de": "Lampen ohne lokale Schnittstelle bleiben erreichbar, solange sie ihren Zustand selbst melden (H600D). 486 weitere Govee-Modelle starten experimentell, die Wiki-Geräteliste klappt je Typ.",
-        "ru": "Светильники без локального API остаются доступными, пока сами сообщают своё состояние (H600D). Ещё 486 моделей Govee добавлены как экспериментальные, список в wiki свёрнут по типам.",
-        "pt": "Luzes sem API local continuam acessíveis enquanto informam o próprio estado (H600D). Mais 486 modelos Govee começam como experimentais e a lista de dispositivos da wiki é dobrada por tipo.",
-        "nl": "Lampen zonder lokale API blijven bereikbaar zolang ze hun eigen status melden (H600D). 486 extra Govee-modellen starten als experimenteel, de wiki-apparatenlijst klapt per type in.",
-        "fr": "Les lampes sans API locale restent joignables tant qu'elles signalent elles-mêmes leur état (H600D). 486 modèles Govee de plus démarrent en expérimental, la liste wiki se replie par type.",
-        "it": "Le luci senza API locale restano raggiungibili finché comunicano da sole il proprio stato (H600D). Altri 486 modelli Govee partono come sperimentali, l'elenco wiki si ripiega per tipo.",
-        "es": "Las luces sin API local siguen accesibles mientras informan su propio estado (H600D). 486 modelos Govee más empiezan como experimentales y la lista de dispositivos de la wiki se pliega por tipo.",
-        "pl": "Lampy bez lokalnego API pozostają osiągalne, dopóki same zgłaszają swój stan (H600D). 486 kolejnych modeli Govee startuje jako eksperymentalne, lista urządzeń w wiki zwija się według typu.",
-        "uk": "Світильники без локального API залишаються доступними, поки самі повідомляють свій стан (H600D). Ще 486 моделей Govee додано як експериментальні, список у wiki згорнуто за типами.",
-        "zh-cn": "没有本地 API 的灯具在自行上报状态时保持可达（H600D）。新增 486 个 Govee 型号作为实验性支持，wiki 设备列表按设备类型折叠。"
       }
     },
     "plugins": {

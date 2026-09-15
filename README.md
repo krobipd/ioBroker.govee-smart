@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.37.1 (2026-09-15)
 
 - Fixed: The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 handled the browser storage only, so every open still landed on Expert
 
@@ -136,19 +136,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.35.1 (2026-09-11)
 
 - Fixed: The values Govee reports for a device at start no longer wait behind the loading of the scene libraries — on an installation with a dozen lights they arrived seven minutes after the start
-
-### 2.35.0 (2026-09-11)
-
-- New: An air purifier's mode, level and filter life follow the device's own status report — a change made in the Govee app shows in ioBroker within a second, no cloud call (H7127, #47)
-- Fixed: Filter life, air quality, mode and level of an appliance are read from Govee's device-state query at start — the adapter read that answer from the wrong field since its first version (#47)
-- Fixed: A light without a local connection gets its power, brightness and colour from the same query at start; Govee's empty answers no longer turn into false or blank values
-- Fixed: A light without a local connection on an installation with only an API key stays reachable — the 20-minute check meant to renew it never received an answer before
-- Fixed: An installation using only an API key lost its appliance commands by mid-morning — a reachability poll that never got an answer used up the device's daily budget
-- Changed: An appliance's reachability is no longer polled every 20 minutes; its own status push, a command and the start-up query count instead — polling would cost 72 of its 90 daily calls
-- Fixed: The diagnostics report now records mode, level, temperature and music commands with their outcome — it only listed power, brightness and colour before
-- Fixed: A datapoint Govee newly reports for a device is there from the first start on — it used to disappear again and only show up after the next restart
-- Fixed: The filter life of an air purifier now carries its unit (%) — Govee declares none, and the datapoint had no unit since its first version
-- Changed: The DreamView switch, the music auto-colour switch and the DIY-scene selector now carry an explanation in the object tree
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
