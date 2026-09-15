@@ -981,19 +981,24 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(f.lan.start).not.toHaveBeenCalled();
   });
 
-  it("an instance without the old key starts without touching the instance object", async () => {
-    const { adapter } = await setupReady();
-    const i = internalOf(adapter);
-    i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
-    i.getForeignObjectAsync.mockResolvedValueOnce({ native: { bind: "0.0.0.0", port: 4002 } });
-    i.extendForeignObjectAsync.mockClear();
+  it("an instance without the old key — or with the null the delete left behind — starts without a write", async () => {
+    for (const native of [
+      { bind: "0.0.0.0", port: 4002 },
+      { bind: "192.168.1.9", port: 4002, networkInterface: null }, // the state after the one-time migration
+    ]) {
+      const { adapter } = await setupReady();
+      const i = internalOf(adapter);
+      i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
+      i.getForeignObjectAsync.mockResolvedValueOnce({ native });
+      i.extendForeignObjectAsync.mockClear();
 
-    await i.onReady();
+      await i.onReady();
 
-    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
-      `system.adapter.${i.namespace}`,
-      expect.objectContaining({ native: expect.anything() }),
-    );
+      expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
+        `system.adapter.${i.namespace}`,
+        expect.objectContaining({ native: expect.anything() }),
+      );
+    }
   });
 
   it("no leftover flag means the startup carries on", async () => {

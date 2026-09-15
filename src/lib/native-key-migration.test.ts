@@ -70,13 +70,17 @@ describe("migrateNativeKeys", () => {
     expect(rig.logs).toEqual([]);
   });
 
-  it("runs once: after the write the old key is gone and the next start finds nothing to do", async () => {
+  it("runs once: the delete leaves the old key behind as null, and that is not a reason to migrate again", async () => {
+    // Measured on the dev-server profile 2026-09-15: after `extend` with `networkInterface: null`
+    // the stored object still CARRIES the key, with the value null. Treating that as "still
+    // there" wrote the object on every start — and every write is a restart: an endless loop.
     const first = makeRig({ networkInterface: "10.0.0.5", bind: "0.0.0.0" });
     expect(await migrateNativeKeys(first.adapter)).toBe(true);
-    const afterRestart = { bind: "10.0.0.5" }; // what the extend left behind: value carried, old key deleted
+    const afterRestart = { bind: "10.0.0.5", networkInterface: null };
     const second = makeRig(afterRestart);
     expect(await migrateNativeKeys(second.adapter)).toBe(false);
     expect(second.writes).toEqual([]);
+    expect(second.logs).toEqual([]);
   });
 
   it("drops a value of the wrong type instead of writing it into the new key", async () => {

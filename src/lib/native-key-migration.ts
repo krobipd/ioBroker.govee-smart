@@ -62,6 +62,13 @@ export const NATIVE_KEY_RENAMES: readonly NativeKeyRename[] = [
  * as well: the default that arrived with the manifest is then the right value,
  * and the instance object stops carrying a setting nobody reads.
  *
+ * "Deleted" means: the stored object keeps the key with the value `null` —
+ * measured on the dev-server profile 2026-09-15 (the extend does not drop the
+ * key, it stores the null). So a null-valued old key is the state AFTER the
+ * migration, never a reason to migrate: treating it as "still there" wrote the
+ * object on every start, and every write is a restart — an endless loop on
+ * each installation that ever had the old key.
+ *
  * @param adapter the adapter (instance object access + log)
  * @param renames the renames to apply — the adapter's list by default
  * @returns true when the instance object was changed and the restart is coming
@@ -80,10 +87,11 @@ export async function migrateNativeKeys(
     const patch: Record<string, unknown> = {};
     const carried: string[] = [];
     for (const rename of renames) {
-      if (!Object.prototype.hasOwnProperty.call(native, rename.from)) {
-        continue;
+      const old = native[rename.from];
+      if (old === undefined || old === null) {
+        continue; // never had the key, or already migrated (null is what the delete leaves behind)
       }
-      const value = rename.coerce(native[rename.from]);
+      const value = rename.coerce(old);
       if (value !== undefined) {
         patch[rename.to] = value;
         carried.push(`${rename.from} → ${rename.to}`);
