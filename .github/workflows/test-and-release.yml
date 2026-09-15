@@ -223,11 +223,17 @@ jobs:
             git diff --stat -- test/objects.inventory.json
           fi
 
-  # deploy.needs stays on one line (the fleet checks read it that way); validate-devices is
-  # covered through adapter-tests, which needs it — a failed catalogue skips the tests, and a
-  # skipped test job keeps deploy from running.
+  # deploy.needs as a block list: the fleet checks read that form, and prettier leaves it
+  # alone (a one-line list this long would be wrapped into a form the checks cannot read).
   deploy:
-    needs: [check-and-lint, adapter-tests, repochecker-version-gate, workflow-lint, admin-component, adapter-inventory]
+    needs:
+      - check-and-lint
+      - validate-devices
+      - adapter-tests
+      - repochecker-version-gate
+      - workflow-lint
+      - admin-component
+      - adapter-inventory
     if: |
       contains(github.event.head_commit.message, '[skip ci]') == false &&
       github.event_name == 'push' &&
