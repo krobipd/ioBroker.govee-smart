@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.37.0",
     "news": {
+      "NEXT": {
+        "en": "The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 covered the browser storage only, so every open still landed on Expert.",
+        "de": "Die Instanz-Einstellungen öffnen auch dann wieder auf Konfiguration, wenn die Admin ihre Einstellungen am Server ablegt — 2.37.0 deckte nur den Browser-Speicher ab, jedes Öffnen landete auf Experte.",
+        "ru": "Настройки экземпляра снова открываются на «Конфигурации», даже если админ хранит свои настройки на сервере — 2.37.0 учитывала только хранилище браузера, и открытие всё ещё вело на «Эксперт».",
+        "pt": "As definições da instância abrem de novo em Configuração também quando o admin guarda as suas definições no servidor — a 2.37.0 só cobria o armazenamento do browser e cada abertura ia parar a Perito.",
+        "nl": "De instantie-instellingen openen weer op Configuratie, ook als de admin zijn instellingen op de server bewaart — 2.37.0 dekte alleen de browseropslag, elke keer openen kwam nog op Expert uit.",
+        "fr": "Les réglages de l'instance s'ouvrent sur Configuration même si l'admin garde ses réglages sur le serveur — 2.37.0 ne couvrait que le stockage du navigateur, chaque ouverture retombait sur Expert.",
+        "it": "Le impostazioni dell'istanza si aprono di nuovo su Configurazione anche se l'admin conserva le impostazioni sul server — 2.37.0 copriva solo la memoria del browser, ogni apertura finiva su Esperto.",
+        "es": "Los ajustes de la instancia vuelven a abrirse en Configuración cuando el admin guarda sus ajustes en el servidor — 2.37.0 solo cubría el almacenamiento del navegador y cada apertura caía en Experto.",
+        "pl": "Ustawienia instancji znów otwierają się na Konfiguracji także wtedy, gdy admin przechowuje ustawienia na serwerze — 2.37.0 obejmowała tylko pamięć przeglądarki, każde otwarcie lądowało na Ekspercie.",
+        "uk": "Налаштування екземпляра знову відкриваються на «Конфігурації», навіть якщо адмін зберігає налаштування на сервері — 2.37.0 охоплювала лише сховище браузера, кожне відкриття потрапляло на «Експерт».",
+        "zh-cn": "即使管理界面将其设置保存在服务器上，实例设置也会再次在“配置”页打开——2.37.0 只处理了浏览器存储，因此每次打开仍停在“专家”页。"
+      },
       "2.37.0": {
         "en": "The root folders snapshots and diagnostics are gone, the settings open on Configuration again, icons show on dark themes, and the admin warns when another adapter takes LAN port 4002.",
         "de": "Root-Ordner snapshots und diagnostics sind weg, Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen, die Admin warnt, wenn ein anderer Adapter LAN-Port 4002 belegt.",

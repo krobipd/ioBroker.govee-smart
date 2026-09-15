@@ -12,6 +12,9 @@ type Tool = "wizard" | "diagnostics";
 /** The tab ids of `admin/jsonConfig.json` — the only values the tab memory can hold for this adapter. */
 const OWN_TAB_IDS = new Set(["_main", "_expert"]);
 
+/** What the tab memory is kept in: a real Storage, or the admin's server-synced object without enumeration. */
+type TabMemoryStorage = Pick<Storage, "getItem" | "removeItem"> & Partial<Pick<Storage, "length" | "key">>;
+
 /**
  * Forget which tab was open last, so the next visit to the instance settings
  * starts on the Configuration tab.
@@ -22,6 +25,18 @@ const OWN_TAB_IDS = new Set(["_main", "_expert"]);
  * dialog opens on that entry whenever the URL hash names no tab — which it
  * never does on a fresh open. There is no schema switch against it. This
  * component mounts exactly when the Expert tab is entered, AFTER that write,
+ * and unmounts when the settings close — the entry is removed at both ends,
+ * whichever order the admin's own write and the mount take.
+ *
+ * Where the entry lives depends on the admin setting "store GUI settings on
+ * the server": then `window._localStorage` is a plain object with getItem /
+ * setItem / removeItem only — no `length`, no `key()` — synced to
+ * `system.adapter.admin.0.guiSettings` on every write (measured on krobi's
+ * admin 8.0.12 after 2.37.0: the enumeration below never ran there, the entry
+ * stayed `_expert` on the server, and every open still landed on Expert). The
+ * key is known, so it is asked for directly; the enumeration only covers a
+ * real Storage, where the same adapter name may sit under another dialog
+ * name.
  * so removing the entry here is enough: the next open finds nothing and
  * takes the first tab. Only this adapter's entries are touched, and only
  * those holding one of its own tab ids.
@@ -31,13 +46,21 @@ const OWN_TAB_IDS = new Set(["_main", "_expert"]);
 export function forgetLastTab(namespace: string): void {
   const adapterName = namespace.split(".")[0];
   try {
-    const w = window as Window & { _localStorage?: Storage };
-    const storage = w._localStorage ?? window.localStorage;
-    const stale: string[] = [];
-    for (let i = 0; i < storage.length; i++) {
-      const key = storage.key(i);
-      if (key?.endsWith(`.${adapterName}`) && OWN_TAB_IDS.has(storage.getItem(key) ?? "")) {
-        stale.push(key);
+    const w = window as Window & { _localStorage?: TabMemoryStorage };
+    const storage: TabMemoryStorage = w._localStorage ?? window.localStorage;
+    const stale = new Set<string>();
+    // The admin's default dialog name is "App" — the key the server-synced
+    // storage holds, which cannot be enumerated.
+    const known = `App.${adapterName}`;
+    if (OWN_TAB_IDS.has(storage.getItem(known) ?? "")) {
+      stale.add(known);
+    }
+    if (typeof storage.length === "number" && typeof storage.key === "function") {
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key?.endsWith(`.${adapterName}`) && OWN_TAB_IDS.has(storage.getItem(key) ?? "")) {
+          stale.add(key);
+        }
       }
     }
     // Collect first, then remove — deleting while indexing skips entries.
@@ -75,7 +98,10 @@ export interface ExpertPanelProps {
  */
 export function ExpertPanel({ socket, namespace }: ExpertPanelProps): React.JSX.Element {
   const [tool, setTool] = React.useState<Tool>("wizard");
-  React.useEffect(() => forgetLastTab(namespace), [namespace]);
+  React.useEffect(() => {
+    forgetLastTab(namespace);
+    return () => forgetLastTab(namespace);
+  }, [namespace]);
 
   return (
     <Box sx={{ p: 2 }}>

@@ -124,6 +124,42 @@ describe("the tab memory", () => {
     expect(window.localStorage.getItem("something.govee-smart")).toBe("not-a-tab");
   });
 
+  it("forgets the tab in the admin's server-synced storage, which cannot be enumerated", () => {
+    // With "store GUI settings on the server" the admin replaces the storage by
+    // a plain object with getItem/setItem/removeItem only — no length, no key().
+    // Measured on the live admin 8.0.12 after 2.37.0: the enumeration never ran,
+    // the entry stayed on the server and every open still landed on Expert.
+    const data: Record<string, string> = { "App.govee-smart": "_expert", "App.hm-rpc": "_expert" };
+    const synced = {
+      getItem: (k: string) => (k in data ? data[k] : null),
+      setItem: (k: string, v: string) => {
+        data[k] = v;
+      },
+      removeItem: vi.fn((k: string) => {
+        delete data[k];
+      }),
+    };
+    (window as Window & { _localStorage?: unknown })._localStorage = synced;
+    try {
+      const { unmount } = render(
+        <ExpertPanel
+          socket={{}}
+          namespace="govee-smart.0"
+        />,
+      );
+      expect(synced.removeItem).toHaveBeenCalledWith("App.govee-smart");
+      expect(data["App.govee-smart"]).toBeUndefined();
+      expect(data["App.hm-rpc"]).toBe("_expert");
+      // The admin may write the entry again after the mount (its own tab-switch
+      // write) — leaving the settings removes it once more.
+      synced.setItem("App.govee-smart", "_expert");
+      unmount();
+      expect(data["App.govee-smart"]).toBeUndefined();
+    } finally {
+      delete (window as Window & { _localStorage?: unknown })._localStorage;
+    }
+  });
+
   it("survives a blocked storage", () => {
     window.localStorage.setItem("App.govee-smart", "_expert");
     const spy = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
