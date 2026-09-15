@@ -72,8 +72,8 @@
   "musicAutoColor": "Muziek auto-kleur",
   "musicMode": "Muziekmodus",
   "musicSensitivity": "Muziekgevoeligheid",
-  "networkInterfaceLabel": "Netwerkinterface",
-  "networkInterfaceTooltip": "Selecteer de netwerkinterface voor LAN-detectie en -besturing. Behoud de standaard (0.0.0.0 = alle interfaces), tenzij deze host meerdere netwerkinterfaces heeft.",
+  "bindLabel": "Netwerkinterface",
+  "bindTooltip": "Selecteer de netwerkinterface voor LAN-detectie en -besturing. Behoud de standaard (0.0.0.0 = alle interfaces), tenzij deze host meerdere netwerkinterfaces heeft.",
   "online": "Online",
   "power": "Aan/Uit",
   "refreshCloud": "Cloudgegevens vernieuwen",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "Of de voet van de lamp brandt; het staande deel heeft een eigen schakelaar.",
   "descWarmMistToggle": "Of de luchtbevochtiger het water verwarmt voor het vernevelen — warme in plaats van koele nevel.",
   "descPresetScene": "Een keuzelijst met de kant-en-klare scènes van dit model; welke er zijn bepaalt Govee en verschilt per model.",
-  "descMembersUnreachable": "Welke leden van de groep momenteel onbereikbaar zijn, zoals ze in de objectboom heten — leeg zolang ze allemaal antwoorden."
+  "descMembersUnreachable": "Welke leden van de groep momenteel onbereikbaar zijn, zoals ze in de objectboom heten — leeg zolang ze allemaal antwoorden.",
+  "portLabel": "LAN-luisterpoort",
+  "portTooltip": "Vastgelegd door het Govee-LAN-protocol: antwoorden van de lampen komen binnen op UDP 4002. Een tweede instantie op deze host kan hem niet delen — de admin waarschuwt als een andere adapter de poort gebruikt."
 }

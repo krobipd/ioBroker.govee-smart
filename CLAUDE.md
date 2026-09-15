@@ -157,7 +157,7 @@ Auth-Flow, Header und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md` — hier 
 
 ## LAN UDP
 
-Discovery `239.255.255.250:4001` · Antworten an Client `:4002` · Commands an Geräte-IP `:4003`. Ports fix (Govee-Protokoll). Nur Lights mit aktivierter LAN-Funktion in der Govee-Home-App. Der Multicast-Egress muss an die richtige Netzwerkkarte gebunden werden (Config `networkInterface`).
+Discovery `239.255.255.250:4001` · Antworten an Client `:4002` · Commands an Geräte-IP `:4003`. Ports fix (Govee-Protokoll). Nur Lights mit aktivierter LAN-Funktion in der Govee-Home-App. Der Multicast-Egress und der Empfangs-Socket 4002 werden an die gewählte Netzwerkkarte gebunden — **Config `bind` (seit 2.37.0; bis 2.36.0 `networkInterface`)**, dazu `native.port: 4002` als Zahl: der Flotten-Standard „Listen-Port-Deklaration“ (`Entwicklung/CLAUDE_PATTERNS.md`, Prüfpaket-Check `listen-port-declaration`, `fleet.json` → `listenPorts`) — nur mit `native.port` UND `native.bind` sieht die Admin-Portprüfung diese Instanz. Das Feld `port` ist im Formular `disabled` mit `min = max = 4002` (protokollfest), der Code bindet weiter die Konstante `LISTEN_PORT`. **Umbenennung = Migration beim Start** (`src/lib/native-key-migration.ts`, `migrateNativeKeys` direkt nach `clearStopInstanceFlag` in `onReady`): js-controller ergänzt beim Upgrade `bind` mit dem Manifest-Default und löscht `networkInterface` nie — ein Lese-Fallback `bind || networkInterface` wäre tot, weil der injizierte Default immer gewinnt. Also: alter Wert (getrimmt, nicht leer) → `bind`, alter Schlüssel `null` (löscht im Extend), Rückgabe `true` ⇒ `onReady` bricht ab, der Host startet die Instanz einmal neu; ein leerer alter Schlüssel wird nur entfernt.
 
 ## Szenen-Architektur
 

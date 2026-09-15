@@ -329,7 +329,7 @@ function makeDevice(o: Partial<GoveeDevice> = {}): GoveeDevice {
 function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeAdapter; f: Fakes } {
   const adapter = new GoveeAdapter();
   const i = internalOf(adapter);
-  Object.assign(i.config, { networkInterface: "", experimentalQuirks: false }, configOverrides);
+  Object.assign(i.config, { port: 4002, bind: "", experimentalQuirks: false }, configOverrides);
 
   const calls: Fakes["calls"] = { mqtt: [], cloud: [], openapi: [], limiter: [], lan: [] };
   const lan: Fakes["lan"] = {
@@ -960,6 +960,42 @@ describe("GoveeAdapter onReady — timers", () => {
     );
   });
 
+  it("a listen address stored under the old key is carried into bind once, and the startup stops there", async () => {
+    // js-controller adds `bind` with the manifest default on the upgrade and keeps
+    // `networkInterface` — the user's interface would be silently replaced by
+    // 0.0.0.0. The value is moved, the old key deleted, and the write restarts us.
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} }); // the stop-flag check reads first
+    i.getForeignObjectAsync.mockResolvedValueOnce({ native: { networkInterface: "192.168.1.9", bind: "0.0.0.0" } });
+    i.extendForeignObjectAsync.mockClear();
+    i.setInterval.mockClear();
+    f.lan.start.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
+      native: { bind: "192.168.1.9", networkInterface: null },
+    });
+    expect(i.setInterval).not.toHaveBeenCalled();
+    expect(f.lan.start).not.toHaveBeenCalled();
+  });
+
+  it("an instance without the old key starts without touching the instance object", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
+    i.getForeignObjectAsync.mockResolvedValueOnce({ native: { bind: "0.0.0.0", port: 4002 } });
+    i.extendForeignObjectAsync.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(
+      `system.adapter.${i.namespace}`,
+      expect.objectContaining({ native: expect.anything() }),
+    );
+  });
+
   it("no leftover flag means the startup carries on", async () => {
     // Writing on every start would restart the instance every start — a loop.
     const { adapter } = await setupReady();
@@ -1094,8 +1130,11 @@ describe("GoveeAdapter — LAN discovery wiring", () => {
   });
 
   it("a socket error on a pinned interface becomes a user-actionable problem", async () => {
-    const { adapter, f } = await setupReady({ networkInterface: "192.168.1.9" });
+    const { adapter, f } = await setupReady({ bind: "192.168.1.9" });
     const i = internalOf(adapter);
+    // native.bind is the listen address the admin's port-conflict check reads —
+    // and the one the LAN client binds (until 2.36.0 the key was networkInterface).
+    expect(f.lan.startArgs[3]).toBe("192.168.1.9");
     f.lan.onInterfaceError!("selected IP is gone");
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("LAN unavailable"));
     f.lan.onListenReady!();

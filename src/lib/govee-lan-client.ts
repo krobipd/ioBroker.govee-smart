@@ -176,18 +176,13 @@ export class GoveeLanClient {
    * @param onDiscovery Called when a new device is found
    * @param onStatus Called when a status response arrives
    * @param scanIntervalMs How often to send multicast scan (default 30s)
-   * @param networkInterface IP of network interface to bind to (empty = all)
+   * @param bind listen address for the LAN sockets (`native.bind`; empty or 0.0.0.0 = all interfaces)
    */
-  start(
-    onDiscovery: LanDiscoveryCallback,
-    onStatus: LanStatusCallback,
-    scanIntervalMs = 30_000,
-    networkInterface = "",
-  ): void {
+  start(onDiscovery: LanDiscoveryCallback, onStatus: LanStatusCallback, scanIntervalMs = 30_000, bind = ""): void {
     this.onDiscovery = onDiscovery;
     this.onStatus = onStatus;
 
-    const bindAddr = networkInterface && networkInterface !== "0.0.0.0" ? networkInterface : undefined;
+    const bindAddr = bind && bind !== "0.0.0.0" ? bind : undefined;
     if (bindAddr) {
       this.log.info(`LAN binding to network interface ${bindAddr}`);
     }

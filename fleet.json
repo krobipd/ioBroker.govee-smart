@@ -22,5 +22,14 @@
       "info.verificationPending": "infoVerificationPendingDesc"
     }
   },
-  "forumThread": "https://forum.iobroker.net/topic/84712/test-adapter-govee-smart-2.14.1"
+  "forumThread": "https://forum.iobroker.net/topic/84712/test-adapter-govee-smart-2.14.1",
+  "listenPorts": [
+    {
+      "_comment": "UDP 4002 is where Govee LAN devices send their replies (protocol-fixed, ports table on the Setup wiki page); the discovery multicast 4001 and the command port 4003 belong to the devices, not to this instance.",
+      "key": "port",
+      "protocol": "udp",
+      "role": "primary",
+      "fixed": 4002
+    }
+  ]
 }

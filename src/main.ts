@@ -11,6 +11,7 @@ import { GoveeLanClient } from "./lib/govee-lan-client";
 import { GoveeMqttClient } from "./lib/govee-mqtt-client";
 import { GoveeOpenapiMqttClient } from "./lib/govee-openapi-mqtt-client";
 import { LocalSnapshotStore } from "./lib/local-snapshots";
+import { migrateNativeKeys } from "./lib/native-key-migration";
 import { installLogPrefix, type ChannelStatusSnapshot } from "./lib/log-prefix";
 import { SnapshotHandler } from "./lib/snapshot-handler";
 import { GroupFanoutHandler } from "./lib/group-fanout";
@@ -432,6 +433,11 @@ export class GoveeAdapter extends utils.Adapter {
       if (await this.clearStopInstanceFlag()) {
         return;
       }
+      // Same class of correction, same consequence: a settings key renamed by an
+      // earlier release is carried over once, the write restarts the instance.
+      if (await migrateNativeKeys(this)) {
+        return;
+      }
       await I18n.init(path.join(this.adapterDir, "admin"), this);
       // Read once — a controller or admin update restarts every instance, so
       // these cannot go stale while this process lives. Failure is silent: a
@@ -828,7 +834,7 @@ export class GoveeAdapter extends utils.Adapter {
           this.deviceManager!.handleLanStatus(sourceIp, status);
         },
         LAN_SCAN_INTERVAL_MS,
-        config.networkInterface || "",
+        config.bind || "",
       );
 
       // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)

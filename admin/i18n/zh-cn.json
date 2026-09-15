@@ -72,8 +72,8 @@
   "musicAutoColor": "音乐自动颜色",
   "musicMode": "音乐模式",
   "musicSensitivity": "音乐灵敏度",
-  "networkInterfaceLabel": "网络接口",
-  "networkInterfaceTooltip": "选择用于局域网发现和控制的网络接口。除非此主机有多个网络接口，否则请保留默认值（0.0.0.0 = 所有接口）。",
+  "bindLabel": "网络接口",
+  "bindTooltip": "选择用于局域网发现和控制的网络接口。除非此主机有多个网络接口，否则请保留默认值（0.0.0.0 = 所有接口）。",
   "online": "在线",
   "power": "电源",
   "refreshCloud": "刷新云数据",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "灯具底座是否点亮；立柱部分有自己的开关。",
   "descWarmMistToggle": "加湿器是否先加热水再喷雾——温雾而非凉雾。",
   "descPresetScene": "该型号可用的预设场景下拉列表；有哪些由 Govee 决定，各型号不同。",
-  "descMembersUnreachable": "当前哪些组成员无法访问，名称与对象树中一致——全部有响应时为空。"
+  "descMembersUnreachable": "当前哪些组成员无法访问，名称与对象树中一致——全部有响应时为空。",
+  "portLabel": "LAN 监听端口",
+  "portTooltip": "由 Govee LAN 协议固定：灯具的回复到达 UDP 4002。同一主机上的第二个实例无法共用该端口——当其他适配器占用此端口时，管理界面会发出警告。"
 }

@@ -72,8 +72,8 @@
   "musicAutoColor": "Musik Auto-Farbe",
   "musicMode": "Musik-Modus",
   "musicSensitivity": "Musik-Empfindlichkeit",
-  "networkInterfaceLabel": "Netzwerk-Interface",
-  "networkInterfaceTooltip": "Netzwerk-Interface für LAN-Discovery und -Steuerung. Standard (0.0.0.0 = alle Interfaces) beibehalten, außer dieser Host hat mehrere Netzwerk-Interfaces.",
+  "bindLabel": "Netzwerk-Interface",
+  "bindTooltip": "Netzwerk-Interface für LAN-Discovery und -Steuerung. Standard (0.0.0.0 = alle Interfaces) beibehalten, außer dieser Host hat mehrere Netzwerk-Interfaces.",
   "online": "Online",
   "power": "Ein/Aus",
   "refreshCloud": "Cloud-Daten aktualisieren",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "Ob der Sockel der Leuchte leuchtet; der aufrechte Teil hat einen eigenen Schalter.",
   "descWarmMistToggle": "Ob der Luftbefeuchter das Wasser vor dem Vernebeln erwärmt — warmer statt kühler Nebel.",
   "descPresetScene": "Eine Auswahlliste der fertigen Szenen dieses Modells; welche es gibt, gibt Govee vor und unterscheidet sich je Modell.",
-  "descMembersUnreachable": "Welche Mitglieder der Gruppe gerade nicht erreichbar sind, benannt wie im Objektbaum — leer, solange alle antworten."
+  "descMembersUnreachable": "Welche Mitglieder der Gruppe gerade nicht erreichbar sind, benannt wie im Objektbaum — leer, solange alle antworten.",
+  "portLabel": "LAN-Empfangsport",
+  "portTooltip": "Vom Govee-LAN-Protokoll vorgegeben: Antworten der Lampen kommen auf UDP 4002 an. Eine zweite Instanz auf diesem Host kann ihn nicht teilen — die Admin warnt, wenn ein anderer Adapter den Port nutzt."
 }

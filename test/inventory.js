@@ -50,7 +50,8 @@ const FIXTURE_NATIVE = {
   // opened — the token is set by then, which is all the group read needs.
   goveeEmail: "fixture@example.com",
   goveePassword: "fixture-password",
-  networkInterface: "",
+  port: 4002,
+  bind: "0.0.0.0",
 };
 
 /**

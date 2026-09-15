@@ -4,17 +4,17 @@
     "version": "2.36.0",
     "news": {
       "NEXT": {
-        "en": "The root folders snapshots and diagnostics are gone — local snapshots live with their device, reports are download-only — the settings open on Configuration again, and the icons show on dark themes.",
-        "de": "Root-Ordner snapshots und diagnostics sind weg — Momentaufnahmen liegen beim Gerät, Berichte nur als Download —, die Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen.",
-        "ru": "Корневые папки snapshots и diagnostics удалены — снимки хранятся у устройства, отчёты только для скачивания —, настройки снова открываются на «Конфигурации», значки видны на тёмных темах.",
-        "pt": "As pastas raiz snapshots e diagnostics desapareceram — os snapshots ficam no dispositivo, relatórios só por download —, as definições abrem de novo em Configuração, ícones visíveis nos temas escuros.",
-        "nl": "Hoofdmappen snapshots en diagnostics zijn weg — snapshots horen bij hun apparaat, rapporten alleen als download —, instellingen openen weer op Configuratie, pictogrammen zichtbaar op donkere thema's.",
-        "fr": "Les dossiers racine snapshots et diagnostics ont disparu — instantanés avec l'appareil, rapports en téléchargement seul —, les réglages s'ouvrent sur Configuration, icônes visibles en thème sombre.",
-        "it": "Le cartelle radice snapshots e diagnostics sono sparite — gli snapshot stanno con il dispositivo, report solo in download —, le impostazioni si aprono su Configurazione, icone visibili nei temi scuri.",
-        "es": "Las carpetas raíz snapshots y diagnostics han desaparecido — instantáneas con su dispositivo, informes solo como descarga —, los ajustes abren en Configuración, iconos visibles en temas oscuros.",
-        "pl": "Foldery główne snapshots i diagnostics zniknęły — migawki są przy urządzeniu, raporty tylko do pobrania —, ustawienia otwierają się znów na Konfiguracji, ikony widoczne w ciemnych motywach.",
-        "uk": "Кореневі теки snapshots і diagnostics зникли — знімки зберігаються біля пристрою, звіти лише для завантаження —, налаштування знову відкриваються на «Конфігурації», значки видно на темних темах.",
-        "zh-cn": "对象树顶部的 snapshots 和 diagnostics 两个文件夹已移除——本地快照随设备保存，报告仅供下载——设置再次在“配置”页打开，图标在深色主题下可见。"
+        "en": "The root folders snapshots and diagnostics are gone (a local snapshot stays with its device), the settings open on Configuration again, icons show on dark themes, LAN port 4002 is declared.",
+        "de": "Root-Ordner snapshots und diagnostics sind weg (Momentaufnahmen liegen beim Gerät), die Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen, LAN-Port 4002 deklariert.",
+        "ru": "Корневые папки snapshots и diagnostics удалены (снимки хранятся у устройства), настройки снова открываются на «Конфигурации», значки видны на тёмных темах, LAN-порт 4002 объявлен.",
+        "pt": "As pastas raiz snapshots e diagnostics desapareceram (os snapshots ficam no dispositivo), as definições abrem de novo em Configuração, ícones visíveis nos temas escuros, porta LAN 4002 declarada.",
+        "nl": "Hoofdmappen snapshots en diagnostics zijn weg (snapshots horen bij hun apparaat), instellingen openen weer op Configuratie, pictogrammen zichtbaar op donkere thema's, LAN-poort 4002 aangegeven.",
+        "fr": "Les dossiers racine snapshots et diagnostics ont disparu (instantanés avec l'appareil), les réglages s'ouvrent sur Configuration, icônes visibles en thème sombre, port LAN 4002 déclaré.",
+        "it": "Le cartelle radice snapshots e diagnostics sono sparite (gli snapshot stanno con il dispositivo), le impostazioni si aprono su Configurazione, icone visibili nei temi scuri, porta LAN 4002 dichiarata.",
+        "es": "Las carpetas raíz snapshots y diagnostics han desaparecido (instantáneas con su dispositivo), los ajustes abren en Configuración, iconos visibles en temas oscuros, puerto LAN 4002 declarado.",
+        "pl": "Foldery główne snapshots i diagnostics zniknęły (migawki są przy urządzeniu), ustawienia otwierają się znów na Konfiguracji, ikony widoczne w ciemnych motywach, port LAN 4002 zadeklarowany.",
+        "uk": "Кореневі теки snapshots і diagnostics зникли (знімки зберігаються біля пристрою), налаштування знову відкриваються на «Конфігурації», значки видно на темних темах, LAN-порт 4002 оголошено.",
+        "zh-cn": "对象树顶部的 snapshots 和 diagnostics 文件夹已移除（本地快照随设备保存），设置再次在“配置”页打开，图标在深色主题下可见，并声明了 LAN 端口 4002。"
       },
       "2.36.0": {
         "en": "A command that could not be sent is no longer confirmed, the segment wizard puts the brightness back, and an installation that kept its Govee account but removed the API key reads sensor values again.",
@@ -484,7 +484,8 @@
     "apiKey": "",
     "goveeEmail": "",
     "goveePassword": "",
-    "networkInterface": "0.0.0.0",
+    "port": 4002,
+    "bind": "0.0.0.0",
     "experimentalQuirks": false,
     "mqttVerificationCode": ""
   },

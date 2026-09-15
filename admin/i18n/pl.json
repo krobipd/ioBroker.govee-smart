@@ -72,8 +72,8 @@
   "musicAutoColor": "Auto-kolor muzyki",
   "musicMode": "Tryb muzyki",
   "musicSensitivity": "Czułość muzyki",
-  "networkInterfaceLabel": "Interfejs sieciowy",
-  "networkInterfaceTooltip": "Wybierz interfejs sieciowy do wykrywania i sterowania LAN. Pozostaw domyślny (0.0.0.0 = wszystkie), chyba że ten host ma wiele interfejsów.",
+  "bindLabel": "Interfejs sieciowy",
+  "bindTooltip": "Wybierz interfejs sieciowy do wykrywania i sterowania LAN. Pozostaw domyślny (0.0.0.0 = wszystkie), chyba że ten host ma wiele interfejsów.",
   "online": "Online",
   "power": "Zasilanie",
   "refreshCloud": "Odśwież dane Cloud",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "Czy podstawa lampy świeci; pionowa część ma własny przełącznik.",
   "descWarmMistToggle": "Czy nawilżacz podgrzewa wodę przed rozpyleniem — ciepła mgiełka zamiast chłodnej.",
   "descPresetScene": "Lista rozwijana z gotowymi scenami tego modelu; które istnieją, określa Govee i różnią się zależnie od modelu.",
-  "descMembersUnreachable": "Którzy członkowie grupy są obecnie nieosiągalni, nazwani jak w drzewie obiektów — puste, dopóki wszyscy odpowiadają."
+  "descMembersUnreachable": "Którzy członkowie grupy są obecnie nieosiągalni, nazwani jak w drzewie obiektów — puste, dopóki wszyscy odpowiadają.",
+  "portLabel": "Port nasłuchu LAN",
+  "portTooltip": "Ustalony przez protokół LAN Govee: odpowiedzi lamp przychodzą na UDP 4002. Druga instancja na tym hoście nie może go współdzielić — admin ostrzega, gdy inny adapter używa portu."
 }

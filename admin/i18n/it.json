@@ -72,8 +72,8 @@
   "musicAutoColor": "Colore automatico musica",
   "musicMode": "Modalità musica",
   "musicSensitivity": "Sensibilità musica",
-  "networkInterfaceLabel": "Interfaccia di rete",
-  "networkInterfaceTooltip": "Seleziona l'interfaccia di rete per il rilevamento e il controllo LAN. Mantieni il valore predefinito (0.0.0.0 = tutte) a meno che questo host non abbia più interfacce.",
+  "bindLabel": "Interfaccia di rete",
+  "bindTooltip": "Seleziona l'interfaccia di rete per il rilevamento e il controllo LAN. Mantieni il valore predefinito (0.0.0.0 = tutte) a meno che questo host non abbia più interfacce.",
   "online": "Online",
   "power": "Accensione",
   "refreshCloud": "Aggiorna dati Cloud",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "Se la base della lampada è accesa; la parte verticale ha un interruttore proprio.",
   "descWarmMistToggle": "Se l'umidificatore riscalda l'acqua prima di nebulizzarla — vapore caldo anziché freddo.",
   "descPresetScene": "Un elenco a discesa delle scene predefinite di questo modello; quali esistano lo stabilisce Govee e varia per modello.",
-  "descMembersUnreachable": "Quali membri del gruppo sono attualmente irraggiungibili, con i nomi dell'albero degli oggetti — vuoto finché rispondono tutti."
+  "descMembersUnreachable": "Quali membri del gruppo sono attualmente irraggiungibili, con i nomi dell'albero degli oggetti — vuoto finché rispondono tutti.",
+  "portLabel": "Porta di ascolto LAN",
+  "portTooltip": "Fissata dal protocollo LAN Govee: le risposte delle lampade arrivano su UDP 4002. Una seconda istanza su questo host non può condividerla — l'admin avvisa se un altro adattatore usa la porta."
 }

@@ -51,10 +51,23 @@
           "text": "advancedHeader",
           "size": 5
         },
-        "networkInterface": {
+        "port": {
+          "type": "port",
+          "label": "portLabel",
+          "tooltip": "portTooltip",
+          "disabled": true,
+          "min": 4002,
+          "max": 4002,
+          "xs": 12,
+          "sm": 12,
+          "md": 3,
+          "lg": 3,
+          "xl": 3
+        },
+        "bind": {
           "type": "ip",
-          "label": "networkInterfaceLabel",
-          "tooltip": "networkInterfaceTooltip",
+          "label": "bindLabel",
+          "tooltip": "bindTooltip",
           "onlyIp4": true,
           "noInternal": true,
           "listenOnAllPorts": true,

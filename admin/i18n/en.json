@@ -72,8 +72,8 @@
   "musicAutoColor": "Music Auto Color",
   "musicMode": "Music Mode",
   "musicSensitivity": "Music Sensitivity",
-  "networkInterfaceLabel": "Network Interface",
-  "networkInterfaceTooltip": "Select the network interface for LAN discovery and control. Keep the default (0.0.0.0 = all interfaces) unless this host has multiple network interfaces.",
+  "bindLabel": "Network Interface",
+  "bindTooltip": "Select the network interface for LAN discovery and control. Keep the default (0.0.0.0 = all interfaces) unless this host has multiple network interfaces.",
   "online": "Online",
   "power": "Power",
   "refreshCloud": "Refresh Cloud Data",
@@ -171,5 +171,7 @@
   "descBaseLightToggle": "Whether the lamp's base is lit; the upright part has a switch of its own.",
   "descWarmMistToggle": "Whether the humidifier heats the water before misting — warm mist instead of cool.",
   "descPresetScene": "A dropdown over the ready-made scenes this model offers; which ones exist comes from Govee and differs per model.",
-  "descMembersUnreachable": "Which of the group's members are currently unreachable, as they are named in the object tree — empty while all of them answer."
+  "descMembersUnreachable": "Which of the group's members are currently unreachable, as they are named in the object tree — empty while all of them answer.",
+  "portLabel": "LAN listen port",
+  "portTooltip": "Fixed by the Govee LAN protocol: replies from your lights arrive on UDP 4002. A second instance on this host cannot share it — the admin warns when another adapter uses the port."
 }

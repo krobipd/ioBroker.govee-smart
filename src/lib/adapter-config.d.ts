@@ -10,8 +10,14 @@ declare global {
       goveeEmail: string;
       /** Govee account password (optional — enables MQTT real-time status) */
       goveePassword: string;
-      /** Network interface IP for LAN multicast (empty = all interfaces) */
-      networkInterface: string;
+      /**
+       * UDP port the LAN replies arrive on — fixed by the Govee protocol (4002).
+       * Declared so the admin's port-conflict check sees this instance; the
+       * code binds the constant, the form shows the field disabled.
+       */
+      port: number;
+      /** Listen address for the LAN sockets ("0.0.0.0" = all interfaces); `networkInterface` until 2.36.0 */
+      bind: string;
       /**
        * Activate device entries with status `seed` from `devices.json`. Off by
        * default — these devices are prepared in code but unconfirmed by any
