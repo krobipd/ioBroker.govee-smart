@@ -98,6 +98,45 @@ describe("ExpertPanel", () => {
   });
 });
 
+describe("the tab memory", () => {
+  // The admin remembers the last tab per adapter in localStorage and opens
+  // the settings on it. Entering the Expert tab is the moment that memory
+  // gets written; the panel forgets it right after, so the next open lands
+  // on Configuration — the tabs themselves stay as they are.
+  afterEach(() => {
+    window.localStorage.clear();
+  });
+
+  it("forgets the adapter's remembered tab when the Expert tab is entered", () => {
+    window.localStorage.setItem("App.govee-smart", "_expert");
+    renderPanel();
+    expect(window.localStorage.getItem("App.govee-smart")).toBeNull();
+  });
+
+  it("leaves other adapters and foreign values alone", () => {
+    window.localStorage.setItem("App.govee-smart", "_expert");
+    window.localStorage.setItem("App.hm-rpc", "_expert");
+    window.localStorage.setItem("Other.govee-smart", "_main");
+    window.localStorage.setItem("something.govee-smart", "not-a-tab");
+    renderPanel();
+    expect(window.localStorage.getItem("App.hm-rpc")).toBe("_expert");
+    expect(window.localStorage.getItem("Other.govee-smart")).toBeNull();
+    expect(window.localStorage.getItem("something.govee-smart")).toBe("not-a-tab");
+  });
+
+  it("survives a blocked storage", () => {
+    window.localStorage.setItem("App.govee-smart", "_expert");
+    const spy = vi.spyOn(Storage.prototype, "key").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+    try {
+      expect(() => renderPanel()).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
 describe("the loading state", () => {
   afterEach(() => {
     vi.useRealTimers();
