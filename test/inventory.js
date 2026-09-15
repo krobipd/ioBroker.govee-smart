@@ -488,6 +488,10 @@ tests.integration(ADAPTER_DIR, {
           for (const [id, obj] of Object.entries(previous)) {
             await harness.objects.setObjectAsync(id, obj);
           }
+          // The "fresh" DB is restored from the harness's backup, and that backup
+          // carries the instance object of whatever version first set it up — with
+          // the settings keys of that version. See resetInstanceNative.
+          await resetInstanceNative(harness);
           await harness.changeAdapterConfig(ADAPTER, { native: fixtureNative() });
           await harness.startAdapterAndWait(false, {
             NODE_OPTIONS: `--require ${HOOK}`,
