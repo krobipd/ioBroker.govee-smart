@@ -898,6 +898,12 @@ export class StateManager {
         val: memberIds,
         ack: true,
       });
+      // The object exists from the first build on; its VALUE is written by the
+      // reachability rounds (first one ≤ 20 s after start). Created lazily on
+      // that first round, the object appeared up to 20 s after the rest of the
+      // group — the object tree of a fresh start was not the same twice, and
+      // the CI start proof measured exactly that on 2026-09-15.
+      await this.ensureGroupMembersUnreachableState(prefix);
 
       // Legacy cleanup — groups never carry device-level info states or
       // diagnostics, but older installs had them. Drop any leftovers so the
@@ -1366,6 +1372,26 @@ export class StateManager {
   }
 
   /**
+   * The group's `info.membersUnreachable` object — shared by the group build
+   * (so the object is there from the start) and the reachability round (which
+   * writes the value).
+   *
+   * @param prefix Group prefix (`groups.<key>`)
+   */
+  private async ensureGroupMembersUnreachableState(prefix: string): Promise<void> {
+    await this.ensureState(
+      `${prefix}.info.membersUnreachable`,
+      tName("membersUnreachable"),
+      "string",
+      "text",
+      false,
+      undefined,
+      undefined,
+      tDesc("descMembersUnreachable"),
+    );
+  }
+
+  /**
    * Update info.membersUnreachable for a group.
    *
    * Always keeps the state (existing) and writes a comma-separated list of the
@@ -1392,16 +1418,7 @@ export class StateManager {
       .filter(m => !resolveDeviceReachability(m).online)
       .map(m => treeKey(m.sku, m.deviceId));
 
-    await this.ensureState(
-      stateId,
-      tName("membersUnreachable"),
-      "string",
-      "text",
-      false,
-      undefined,
-      undefined,
-      tDesc("descMembersUnreachable"),
-    );
+    await this.ensureGroupMembersUnreachableState(prefix);
     // setStateChangedAsync: reachability is re-evaluated on every online
     // signal — with an unconditional setState every devStatus poll reply
     // bumped ts on an unchanged (usually empty) value, spamming state

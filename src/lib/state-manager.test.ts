@@ -1174,6 +1174,26 @@ describe("StateManager", () => {
       expect(val!.val).toBe("h61be_525f, h61bc_1a2b");
     });
 
+    it("creates info.membersUnreachable with the group, before any reachability round", async () => {
+      // Created lazily on the first round (≤ 20 s after start), the object made
+      // the start tree of a group non-deterministic: the CI start proof saw it
+      // in the previous release's inventory but not in the fresh one (2026-09-15).
+      // The VALUE stays with the reachability round — nothing is claimed here.
+      const { adapter, objects, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice({
+        sku: "BaseGroup",
+        deviceId: "6781311",
+        name: "living",
+        groupMembers: [{ sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:FF:52:5F" }],
+      });
+
+      await createAllStatesForTest(sm, dev, []);
+
+      expect(objects.has("groups.basegroup_1311.info.membersUnreachable")).toBe(true);
+      expect(states.get("groups.basegroup_1311.info.membersUnreachable")).toBeUndefined();
+    });
+
     it("should create empty info.members for BaseGroup without groupMembers", async () => {
       const { adapter, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
