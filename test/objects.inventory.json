@@ -19790,28 +19790,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7172_000b.info.type"
   },
-  "govee-smart.0.diagnostics": {
-    "_id": "govee-smart.0.diagnostics",
-    "type": "meta",
-    "common": {
-      "name": {
-        "en": "Diagnostics reports",
-        "de": "Diagnoseberichte",
-        "ru": "Отчёты диагностики",
-        "pt": "Relatórios de diagnóstico",
-        "nl": "Diagnoserapporten",
-        "fr": "Rapports de diagnostic",
-        "it": "Rapporti di diagnostica",
-        "es": "Informes de diagnóstico",
-        "pl": "Raporty diagnostyczne",
-        "uk": "Звіти діагностики",
-        "zh-cn": "诊断报告"
-      },
-      "type": "meta.user",
-      "role": "meta.user"
-    },
-    "native": {}
-  },
   "govee-smart.0.groups": {
     "_id": "govee-smart.0.groups",
     "type": "folder",
@@ -20545,28 +20523,6 @@
       "read": true,
       "write": false,
       "def": false
-    },
-    "native": {}
-  },
-  "govee-smart.0.snapshots": {
-    "_id": "govee-smart.0.snapshots",
-    "type": "meta",
-    "common": {
-      "name": {
-        "en": "User-saved local snapshots",
-        "de": "Vom Benutzer gespeicherte lokale Snapshots",
-        "ru": "Сохранённые пользователем локальные снимки",
-        "pt": "Snapshots locais salvos pelo utilizador",
-        "nl": "Door gebruiker opgeslagen lokale snapshots",
-        "fr": "Snapshots locaux enregistrés par l'utilisateur",
-        "it": "Snapshot locali salvati dall'utente",
-        "es": "Instantáneas locales guardadas por el usuario",
-        "pl": "Lokalne migawki zapisane przez użytkownika",
-        "uk": "Збережені користувачем локальні знімки",
-        "zh-cn": "用户保存的本地快照"
-      },
-      "type": "meta.user",
-      "role": "meta.user"
     },
     "native": {}
   }

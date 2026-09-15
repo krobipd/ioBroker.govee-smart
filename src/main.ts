@@ -1,6 +1,5 @@
 import { I18n } from "@iobroker/adapter-core";
 import * as utils from "@iobroker/adapter-core";
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
@@ -308,15 +307,6 @@ export class GoveeAdapter extends utils.Adapter {
     );
     method("readFileAsync", (meta: string, name: string) => this.readFileAsync(meta, name));
     method("delFileAsync", (meta: string, name: string) => this.delFileAsync(meta, name));
-    // The diagnostics export writes its report into the `diagnostics` meta
-    // object and prunes older ones. These were missing in 2.29.0: the handlers
-    // never get `this`, only this host view, so the export died on the live
-    // system with "writeFileAsync is not a function" while every test passed —
-    // each test rig declared the methods itself.
-    method("writeFileAsync", (meta: string, name: string, data: Buffer | string) =>
-      this.writeFileAsync(meta, name, data),
-    );
-    method("readDirAsync", (meta: string, path: string) => this.readDirAsync(meta, path));
     method("delObjectAsync", (id: string) => this.delObjectAsync(id));
     method("encrypt", (value: string) => this.encrypt(value));
     method("decrypt", (value: string) => this.decrypt(value));
@@ -465,6 +455,13 @@ export class GoveeAdapter extends utils.Adapter {
       // info.manualSyncDevices (BUG-1). Drop the dead orphan.
       await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
 
+      // One-shot cleanup: 2.29.0–2.36.0 kept a copy of every diagnostics report
+      // as a file under a `diagnostics` meta object at the root of the instance
+      // — a folder next to the devices that nobody asked for. Since 2.37.0 the
+      // report travels only in the answer to the Expert card. Drop the copies
+      // and the folder; a fresh install has neither and this is silent.
+      await this.removeLegacyReportStore();
+
       // One-shot cleanup: the manual-sync button was spelled info.manual_sync_devices
       // from v2.17.0 to v2.27.1 — the only snake_case id in the otherwise camelCase
       // info channel. It was never subscribed either, so no script can depend on the
@@ -588,12 +585,11 @@ export class GoveeAdapter extends utils.Adapter {
       const dataDir = utils.getAbsoluteInstanceDataDir(this);
 
       this.skuCache = new SkuCache(dataDir, this.log);
-      // One-shot migration: pull pre-v2.11 snapshot files from the instance data
-      // dir into the meta.user storage so they're included in iob backup. Runs
-      // before LocalSnapshotStore.init() so the files are visible to the cache.
-      await this.migrateLocalSnapshotsToMetaUser(dataDir);
+      // The store carries the snapshot files of earlier versions (root meta
+      // object 2.11.0–2.36.0, instance data dir before 2.11) into the device
+      // objects once and removes the root folder — see LocalSnapshotStore.
       this.localSnapshots = new LocalSnapshotStore(this, this.log);
-      await this.localSnapshots.init();
+      await this.localSnapshots.init(dataDir);
       this.snapshotHandler = new SnapshotHandler(snapshotHandlerGlue.buildSnapshotHost(this.handlerHost));
       this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
       this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
@@ -1277,54 +1273,6 @@ export class GoveeAdapter extends utils.Adapter {
     }
   }
 
-  /**
-   * One-shot migration: copy snapshots from the pre-v2.11 filesystem location
-   * (`<dataDir>/snapshots/*.json`) into the `<namespace>.snapshots` meta.user
-   * object. After migration the FS files are deleted so iob backup picks up
-   * the new location. No-op if the old directory doesn't exist.
-   *
-   * @param dataDir Adapter instance data directory
-   */
-  private async migrateLocalSnapshotsToMetaUser(dataDir: string): Promise<void> {
-    const oldDir = path.join(dataDir, "snapshots");
-    if (!fs.existsSync(oldDir)) {
-      return;
-    }
-    let files: string[];
-    try {
-      files = fs.readdirSync(oldDir).filter(f => f.endsWith(".json"));
-    } catch (e) {
-      this.log.warn(`Snapshot migration: cannot read ${oldDir}: ${errMessage(e)}`);
-      return;
-    }
-    if (files.length === 0) {
-      try {
-        fs.rmdirSync(oldDir);
-      } catch {
-        /* dir already gone or non-empty with non-JSON, ignore */
-      }
-      return;
-    }
-    this.log.info(`Migrating ${files.length} local snapshots from ${oldDir} to backup-included storage...`);
-    let migrated = 0;
-    for (const file of files) {
-      try {
-        const data = fs.readFileSync(path.join(oldDir, file));
-        await this.writeFileAsync(`${this.namespace}.snapshots`, file, data);
-        fs.unlinkSync(path.join(oldDir, file));
-        migrated++;
-      } catch (e) {
-        this.log.warn(`Snapshot migration of ${file} failed: ${errMessage(e)}`);
-      }
-    }
-    try {
-      fs.rmdirSync(oldDir);
-    } catch {
-      /* dir still has files we failed to migrate — leave for retry on next start */
-    }
-    this.log.info(`Snapshot migration complete: ${migrated}/${files.length} files moved to meta.user storage.`);
-  }
-
   private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
     try {
       await stateChangeRouter.onStateChange(this.handlerHost, id, state);
@@ -1361,6 +1309,35 @@ export class GoveeAdapter extends utils.Adapter {
    *
    * `preserve` is deliberately NOT used: the point is to deliver the new text.
    */
+  /**
+   * Delete the `<namespace>.diagnostics` meta object and every report file it
+   * holds (2.29.0–2.36.0 stored up to three reports per device there). The
+   * object is an `instanceObjects` entry of those versions, so js-controller
+   * recreated it on every update — only the adapter can take it away. Runs
+   * once per start; without the object it does nothing.
+   */
+  private async removeLegacyReportStore(): Promise<void> {
+    const meta = `${this.namespace}.diagnostics`;
+    const store = await this.getObjectAsync("diagnostics").catch(() => null);
+    if (!store) {
+      return;
+    }
+    // readDirAsync throws while the meta object holds nothing — treat it as empty.
+    const entries = await this.readDirAsync(meta, "").catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isDir) {
+        await this.delFileAsync(meta, entry.file).catch(() => undefined);
+      }
+    }
+    await this.delObjectAsync("diagnostics").catch(() => undefined);
+    const removed = entries.filter(e => !e.isDir).length;
+    if (removed > 0) {
+      this.log.info(`Removed ${removed} stored diagnostics report(s) and their folder — reports are download-only now`);
+    } else {
+      this.log.debug("Removed the empty diagnostics report store — reports are download-only now");
+    }
+  }
+
   private async ensureManifestObjects(): Promise<void> {
     // Written out one call per object on purpose. A loop over a table would be
     // shorter and would hide which objects are actually reached — from a reader
@@ -1371,8 +1348,6 @@ export class GoveeAdapter extends utils.Adapter {
     await this.extendObject("info", { common: { name: tName("information") } }).catch(fail("info"));
     await this.extendObject("devices", { common: { name: tName("devicesFolder") } }).catch(fail("devices"));
     await this.extendObject("groups", { common: { name: tName("groups") } }).catch(fail("groups"));
-    await this.extendObject("snapshots", { common: { name: tName("localSnapshotsFolder") } }).catch(fail("snapshots"));
-    await this.extendObject("diagnostics", { common: { name: tName("diagnosticsFolder") } }).catch(fail("diagnostics"));
     await this.extendObject("info.connection", {
       common: { name: tName("infoConnection"), desc: tDesc("infoConnectionDesc") },
     }).catch(fail("info.connection"));
@@ -1634,21 +1609,19 @@ export class GoveeAdapter extends utils.Adapter {
           return { error: `Unknown device '${deviceKey}'` };
         }
         const prefix = this.stateManager.devicePrefix(device);
-        const fileName = await diagnosticsHandlerImpl.handleDiagnosticsExport(
+        const report = await diagnosticsHandlerImpl.handleDiagnosticsExport(
           this,
           this.deviceManager,
           this.diagnosticsLastRun,
           device,
           prefix,
         );
-        if (!fileName) {
+        if (!report) {
           return { error: "Export failed or was throttled — try again in a moment" };
         }
-        // Read back what was written rather than generating a second time: the
-        // user gets exactly the file that is in the instance's storage, not a
-        // near-identical copy taken a moment later.
-        const { file } = await this.readFileAsync(`${this.namespace}.diagnostics`, fileName);
-        return { fileName, content: typeof file === "string" ? file : file.toString("utf8") };
+        // The answer is the only copy of the report — the card offers it as a
+        // download; nothing is kept in the instance (2.37.0).
+        return report;
       },
       runWizardStep: (action, deviceKey, payload) =>
         wizardHandler.runWizardStep(this.handlerHost, action, deviceKey, payload),

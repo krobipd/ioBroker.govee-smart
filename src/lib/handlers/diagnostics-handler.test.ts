@@ -1,6 +1,5 @@
-import { vi } from "vitest";
 import { handleDiagnosticsExport, type DiagnosticsHandlerAdapter } from "./diagnostics-handler";
-import { DIAGNOSTICS_EXPORT_THROTTLE_MS, DIAGNOSTICS_KEEP_PER_DEVICE } from "../timing-constants";
+import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 import type { DeviceManager } from "../device-manager";
 import { createTestDevice, mockLog } from "../test-helpers";
@@ -8,15 +7,13 @@ import { createTestDevice, mockLog } from "../test-helpers";
 function makeAdapter(): {
   adapter: DiagnosticsHandlerAdapter;
   writes: Array<{ id: string; val: unknown; ack: boolean }>;
-  files: Map<string, string>;
 } {
   const writes: Array<{ id: string; val: unknown; ack: boolean }> = [];
-  // The meta.user file store the report is written into — the same shape
-  // LocalSnapshotStore already uses.
-  const files = new Map<string, string>();
+  // No file store on the surface, on purpose: 2.29.0–2.36.0 also wrote every
+  // report into a `diagnostics` meta object at the root of the instance —
+  // the copy nobody asked for. The contract no longer has a way to do that.
   return {
     writes,
-    files,
     adapter: {
       log: mockLog,
       namespace: "govee-smart.0",
@@ -24,20 +21,6 @@ function makeAdapter(): {
       setState: (id, state) => {
         const s = state as { val: unknown; ack: boolean };
         writes.push({ id, val: s.val, ack: s.ack });
-        return Promise.resolve();
-      },
-      writeFileAsync: (meta, name, data) => {
-        files.set(`${meta}/${name}`, String(data));
-        return Promise.resolve();
-      },
-      readDirAsync: meta =>
-        Promise.resolve(
-          [...files.keys()]
-            .filter(k => k.startsWith(`${meta}/`))
-            .map(k => ({ file: k.slice(meta.length + 1), isDir: false })),
-        ),
-      delFileAsync: (meta, name) => {
-        files.delete(`${meta}/${name}`);
         return Promise.resolve();
       },
     },
@@ -58,31 +41,31 @@ function makeDeviceManager(): { dm: DeviceManager; generateCalls: string[] } {
 const device = createTestDevice();
 const PREFIX = "devices.h6160_0011";
 describe("handleDiagnosticsExport", () => {
-  it("writes the report as a FILE and points the datapoint at it", async () => {
-    // The whole point of the change: the report measured 67,917 characters on
-    // an H61BE — past GitHub's issue limit, so it could not be pasted into the
-    // issue it exists for, and as a state value it sat in the state database
-    // and flowed through every history subscription on the device.
-    const { adapter, writes, files } = makeAdapter();
+  it("answers the report as text under its file name and stamps the datapoint", async () => {
+    // The report measured 67,917 characters on an H61BE — past GitHub's issue
+    // limit, so it could not be pasted into the issue it exists for, and as a
+    // state value it sat in the state database and flowed through every
+    // history subscription on the device. So it travels in the answer: the
+    // card turns it into a download, and nothing is kept in the instance.
+    const { adapter, writes } = makeAdapter();
     const { dm, generateCalls } = makeDeviceManager();
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
+    const report = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
 
     expect(generateCalls).toEqual(["9.9.9"]);
-    expect(name).toBeTruthy();
-    const stored = files.get(`govee-smart.0.diagnostics/${name!}`);
-    expect(stored).toBeDefined();
-    expect(JSON.parse(stored!).sku).toBe("H6160");
+    expect(report).not.toBeNull();
+    expect(JSON.parse(report!.content).sku).toBe("H6160");
 
     // The datapoint carries WHEN the report was taken. The name would say
-    // nothing a moment later — the card hands the file over on the spot — while
-    // "was a report taken since the fault?" stays answerable in the object tree.
+    // nothing a moment later — the card hands the report over on the spot —
+    // while "was a report taken since the fault?" stays answerable in the
+    // object tree.
     const pointer = writes.find(w => w.id === `govee-smart.0.${PREFIX}.diag.lastExport`);
     expect(pointer?.ack).toBe(true);
     expect(pointer?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
     // Neither predecessor is written any more: the fat report datapoint (≤2.28.0)
     // nor the file name (≤2.30.0).
     expect(writes.find(w => w.id.endsWith(".diag.result"))).toBeUndefined();
-    expect(pointer?.val).not.toBe(name);
+    expect(pointer?.val).not.toBe(report!.fileName);
     // And nothing writes to the button datapoint, which no longer exists.
     expect(writes.find(w => w.id.endsWith(".diag.export"))).toBeUndefined();
   });
@@ -90,18 +73,17 @@ describe("handleDiagnosticsExport", () => {
   it("the file name tells a stranger which device it is about", async () => {
     // The recipient has none of our context, and a reporter with two Govee
     // devices attaches two of these.
-    const { adapter, files } = makeAdapter();
+    const { adapter } = makeAdapter();
     const { dm } = makeDeviceManager();
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
-    expect(name).toMatch(/^govee-smart_H6160_0011_v9\.9\.9_\d{4}-\d{2}-\d{2}_\d{6}\.json$/);
-    expect([...files.keys()][0]).toContain("H6160_0011");
+    const report = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
+    expect(report?.fileName).toMatch(/^govee-smart_H6160_0011_v9\.9\.9_\d{4}-\d{2}-\d{2}_\d{6}\.json$/);
   });
 
   it("the report warns that its markers do not travel between files", async () => {
     // The privacy statement itself lives at the export button (gsw_diagPrivacy,
     // 11 languages) where it decides whether to upload at all. What only the
     // file can say is that `device-1` in a second export is a different device.
-    const { adapter, files } = makeAdapter();
+    const { adapter } = makeAdapter();
     const dm = {
       generateDiagnostics: () =>
         Promise.resolve({
@@ -109,31 +91,18 @@ describe("handleDiagnosticsExport", () => {
           sku: "H6160",
         }),
     } as unknown as DeviceManager;
-    await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
-    const stored = [...files.values()][0];
-    expect(JSON.parse(stored).readMe.markers).toContain("INSIDE this file only");
+    const report = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
+    expect(JSON.parse(report!.content).readMe.markers).toContain("INSIDE this file only");
   });
 
-  it("keeps only the newest reports per device", async () => {
-    // The throttle guards against button spam, not against accumulation.
-    // Real time has to advance between exports: the export is throttled to one
-    // every 2 s and the file name carries a to-the-second stamp, so two runs
-    // can never collide in practice — clearing the throttle without moving the
-    // clock would just have each export overwrite the last one and prove
-    // nothing about pruning.
-    const { adapter, files } = makeAdapter();
+  it("hands over exactly one copy — nothing is written anywhere", async () => {
+    // Every write the handler makes goes through `setState`; a report that
+    // lands anywhere else would need a method the surface does not offer.
+    const { adapter, writes } = makeAdapter();
     const { dm } = makeDeviceManager();
-    vi.useFakeTimers();
-    try {
-      vi.setSystemTime(new Date("2026-09-03T10:00:00Z"));
-      for (let i = 0; i < 5; i++) {
-        vi.setSystemTime(new Date(Date.now() + DIAGNOSTICS_EXPORT_THROTTLE_MS + 1_000));
-        await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
-      }
-    } finally {
-      vi.useRealTimers();
-    }
-    expect(files.size).toBe(DIAGNOSTICS_KEEP_PER_DEVICE);
+    await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
+    expect(writes.map(w => w.id)).toEqual([`govee-smart.0.${PREFIX}.diag.lastExport`]);
+    expect("writeFileAsync" in adapter).toBe(false);
   });
 
   it("a failing export answers null and leaves the timestamp alone", async () => {
@@ -143,8 +112,8 @@ describe("handleDiagnosticsExport", () => {
     const dm = {
       generateDiagnostics: () => Promise.reject(new Error("object db down")),
     } as unknown as DeviceManager;
-    const name = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
-    expect(name).toBeNull();
+    const report = await handleDiagnosticsExport(adapter, dm, new Map(), device, PREFIX);
+    expect(report).toBeNull();
     expect(writes.find(w => w.id.endsWith(".diag.lastExport"))).toBeUndefined();
   });
 

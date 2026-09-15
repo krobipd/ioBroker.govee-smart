@@ -101,10 +101,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 <!--
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
--->
 
-### **WORK IN PROGRESS**
-
+- Changed: The two folders "snapshots" and "diagnostics" at the top of the object tree are gone — a saved local snapshot now lives with its device, and no diagnostics report is stored any more
+- Changed: A diagnostics report is generated and downloaded from the Expert tab only — the adapter keeps no copy in the instance, and the copies left by earlier versions are removed at the first start
+- Changed: Local snapshots saved by earlier versions are carried over into their device objects at the first start, so nothing you saved is lost when the folder disappears
+- Fixed: The instance settings open on the Configuration tab again — the admin remembered the last tab you used, and once you had visited the Expert tab every later visit started there
 - Fixed: The device icons in the object tree are visible on the dark themes again — they were drawn in plain black, invisible on a dark background, and now take the row's text colour
 
 ### 2.36.0 (2026-09-14)

@@ -100,10 +100,12 @@ vi.mock("@iobroker/adapter-core", () => {
     public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
       const key = id.replace(`${this.namespace}.`, "");
       const existing = this.objects.get(key) ?? {};
+      // js-controller deep-merges `common` and `native` alike.
       this.objects.set(key, {
         ...existing,
         ...obj,
         common: { ...(existing.common ?? {}), ...(obj.common ?? {}) },
+        native: { ...(existing.native ?? {}), ...(obj.native ?? {}) },
       });
       return Promise.resolve();
     });
@@ -270,6 +272,11 @@ function internalOf(adapter: GoveeAdapter): {
   clearStopInstanceFlag: () => Promise<boolean>;
   getForeignObjectAsync: ReturnType<typeof vi.fn>;
   extendForeignObjectAsync: ReturnType<typeof vi.fn>;
+  localSnapshots: { getSnapshots(sku: string, deviceId: string): unknown[] } | null;
+  readDirAsync: ReturnType<typeof vi.fn>;
+  writeFileAsync: ReturnType<typeof vi.fn>;
+  delFileAsync: ReturnType<typeof vi.fn>;
+  delObjectAsync: ReturnType<typeof vi.fn>;
   onStateChange: (id: string, s: unknown) => Promise<void>;
   onMessage: (obj: unknown) => void;
   syncDevicesManually: () => Promise<void>;
@@ -524,6 +531,61 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.states.get("info.connection")).toEqual({ val: true, ack: true });
     // A leftover `true` would keep the connection card's code field open forever.
     expect(i.states.get("info.verificationPending")).toEqual({ val: false, ack: true });
+  });
+
+  it("removes the report store of 2.29.0–2.36.0 — files and the meta object", async () => {
+    // The `diagnostics` meta object was an instanceObjects entry, so every
+    // update recreated it; only the adapter can take the folder away. The
+    // files inside would be orphaned without their meta object.
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.objects.set("diagnostics", { type: "meta", common: { type: "meta.user" } });
+    i.files.set("govee-smart_H61BE_ee11_v2.36.0_2026-09-14_231000.json", "{}");
+    i.files.set("govee-smart_H61BE_ee11_v2.36.0_2026-09-14_231500.json", "{}");
+    // The rig keeps one flat file map; only the report store lists these.
+    i.readDirAsync.mockImplementation((meta: string) =>
+      Promise.resolve(
+        meta === "govee-smart.0.diagnostics" ? [...i.files.keys()].map(file => ({ file, isDir: false })) : [],
+      ),
+    );
+    await i.onReady();
+    const deleted = i.delFileAsync.mock.calls.filter(c => c[0] === "govee-smart.0.diagnostics");
+    expect(deleted).toHaveLength(2);
+    expect(i.files.size).toBe(0);
+    expect(i.objects.has("diagnostics")).toBe(false);
+  });
+
+  it("carries the root snapshot store of 2.11.0–2.36.0 into the device objects and removes it", async () => {
+    // Same mechanism as the report store: the meta object came from the
+    // manifest, so only the adapter can take it away — but here the files are
+    // user data (their saved snapshots) and move onto the device first.
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.objects.set("snapshots", { type: "meta", common: { type: "meta.user" } });
+    i.objects.set("devices.h61be_ee11", { type: "device", common: { name: "Strip" }, native: { sku: "H61BE" } });
+    const snap = { name: "Evening", power: true, brightness: 40, colorRgb: "#ff8800", colorTemperature: 0, savedAt: 7 };
+    i.files.set("h61be_ee11.json", JSON.stringify({ snapshots: [snap] }));
+    i.readDirAsync.mockImplementation((meta: string) =>
+      Promise.resolve(
+        meta === "govee-smart.0.snapshots" ? [...i.files.keys()].map(file => ({ file, isDir: false })) : [],
+      ),
+    );
+    await i.onReady();
+    const device = i.objects.get("devices.h61be_ee11") as { native: Record<string, unknown> };
+    expect(JSON.parse(device.native.localSnapshots as string)).toEqual({ snapshots: [snap] });
+    expect(device.native.sku).toBe("H61BE");
+    expect(i.files.size).toBe(0);
+    expect(i.objects.has("snapshots")).toBe(false);
+    // And the moved values are what the dropdown will list.
+    expect(i.localSnapshots!.getSnapshots("H61BE", "AA:BB:CC:DD:EE:11")).toEqual([snap]);
+  });
+
+  it("a fresh install has no report store — the cleanup touches nothing", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    await i.onReady();
+    expect(i.readDirAsync).not.toHaveBeenCalledWith("govee-smart.0.diagnostics", "");
+    expect(i.delObjectAsync).not.toHaveBeenCalledWith("diagnostics");
   });
 
   it("drops the three removed orphan objects on an upgraded install", async () => {
@@ -2272,15 +2334,16 @@ describe("GoveeAdapter — the LAN poll keeps control.power honest", () => {
 });
 
 describe("GoveeAdapter — the diagnostics export over the REAL host object", () => {
-  it("writes a report file and hands its content back, over the assembled host", async () => {
+  it("hands the report back in the answer and keeps no copy, over the assembled host", async () => {
     // 2.29.0 shipped this broken: the handlers never get `this`, only the host
-    // view `buildHost()` assembles, and the file methods were missing from it.
-    // Every test passed because each rig declared those methods on its own
-    // fake — nothing drove the real host. On the live system the export died
-    // with "writeFileAsync is not a function".
+    // view `buildHost()` assembles, and a method was missing from it. Every
+    // test passed because each rig declared the method on its own fake —
+    // nothing drove the real host. On the live system the export died with
+    // "writeFileAsync is not a function".
     //
     // Since 2.31.0 the admin card is the ONLY caller, so this drives the real
     // `buildDiagnosticsReport` — the same seam, one path fewer to be wrong on.
+    // Since 2.37.0 the answer is the only copy: nothing lands in a file store.
     const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     f.cloud.getDevices.mockResolvedValue([
@@ -2303,13 +2366,12 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     )(`${device.sku}:${device.deviceId}`);
     await settle(6);
 
-    // The stub keys its file store by name (the meta object is a separate arg).
-    const written = [...i.files.keys()].filter(k => k.startsWith("govee-smart_"));
-    expect(written).toHaveLength(1);
-    expect(written[0]).toMatch(/^govee-smart_H61BE_ee11_v.*\.json$/);
+    // Nothing is written anywhere — the file store of 2.29.0–2.36.0 is gone.
+    expect(i.files.size).toBe(0);
+    expect(i.writeFileAsync).not.toHaveBeenCalled();
     // The card gets the content along with the name, so one press produces the
-    // download — no second round-trip to fetch what was just written.
-    expect(result.fileName).toBe(written[0]);
+    // download — the name tells the recipient which device and version.
+    expect(result.fileName).toMatch(/^govee-smart_H61BE_ee11_v.*\.json$/);
     expect(JSON.parse(result.content).device.sku).toBe("H61BE");
     // And the datapoint says WHEN, not which file.
     expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);

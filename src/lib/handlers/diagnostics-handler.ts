@@ -1,6 +1,6 @@
 import type { DeviceManager } from "../device-manager";
 import { deviceLabel, type GoveeDevice } from "../types";
-import { DIAGNOSTICS_EXPORT_THROTTLE_MS, DIAGNOSTICS_KEEP_PER_DEVICE } from "../timing-constants";
+import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 
 /**
@@ -12,12 +12,12 @@ export interface DiagnosticsHandlerAdapter {
   readonly namespace: string;
   readonly version?: string;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
-  /** Writes into the `<namespace>.diagnostics` meta.user object. */
-  writeFileAsync(meta: string, name: string, data: Buffer | string): Promise<void>;
-  /** Lists what the meta object already holds, for pruning older reports. */
-  readDirAsync(meta: string, path: string): Promise<{ file: string; isDir: boolean }[]>;
-  /** Removes a superseded report. */
-  delFileAsync(meta: string, name: string): Promise<void>;
+}
+
+/** One generated report: the name the download should carry and the JSON text. */
+export interface DiagnosticsReport {
+  fileName: string;
+  content: string;
 }
 
 /**
@@ -40,45 +40,22 @@ export function diagnosticsFileName(device: GoveeDevice, adapterVersion: string,
 }
 
 /**
- * Drop all but the newest {@link DIAGNOSTICS_KEEP_PER_DEVICE} reports for one
- * device. Without this the folder grows with every button press — the export
- * is throttled against spam, not against accumulation.
+ * Throttled (≥2 s) diagnostics export. Generates the report for `device`,
+ * hands it back as text under the file name the download should carry, and
+ * stamps `<prefix>.diag.lastExport` with the time it ran.
  *
- * The file name starts with model + short id, so a plain prefix match selects
- * exactly this device's reports, and the timestamp inside the name sorts them.
- *
- * @param adapter ioBroker adapter surface
- * @param meta Meta object id holding the reports
- * @param device The device whose older reports should go
- */
-async function pruneOlderReports(adapter: DiagnosticsHandlerAdapter, meta: string, device: GoveeDevice): Promise<void> {
-  const shortId = device.deviceId.replace(/:/g, "").slice(-4).toLowerCase();
-  const prefix = `govee-smart_${device.sku}_${shortId}_`;
-  // readDirAsync throws while the meta object holds nothing yet — first export.
-  const entries = await adapter.readDirAsync(meta, "").catch(() => []);
-  const mine = entries
-    .filter(e => !e.isDir && e.file.startsWith(prefix))
-    .map(e => e.file)
-    .sort();
-  for (const stale of mine.slice(0, Math.max(0, mine.length - DIAGNOSTICS_KEEP_PER_DEVICE))) {
-    await adapter.delFileAsync(meta, stale).catch(() => undefined);
-  }
-}
-
-/**
- * Throttled (≥2 s) diagnostics export. Writes the report for `device` as a
- * FILE into the `<namespace>.diagnostics` meta object and stamps
- * `<prefix>.diag.lastExport` with the time it ran.
- *
- * Why a file and not a state: the report measured 67,917 characters on an
- * H61BE. That is past GitHub's 65,536-character issue body, so it could not be
- * pasted into the very issue it exists for — and as a state value it sat in the
+ * The report is NOT stored in the instance. It measured 67,917 characters on
+ * an H61BE — past GitHub's 65,536-character issue body, so it could not be
+ * pasted into the very issue it exists for, and as a state value it sat in the
  * state database and flowed through every history subscription on the device.
- * As a file the user downloads it from the adapter's Expert tab (or the admin
- * file browser) and attaches it.
+ * Until 2.36.0 it was also written as a file into a `diagnostics` meta object
+ * at the root of the instance; nobody asked for that copy, it put a folder
+ * next to the devices, and the card had the content in its answer all along.
+ * Since 2.37.0 the answer is the only copy: the Expert card offers it as a
+ * download and the user attaches it.
  *
  * Since 2.31.0 the export is started from the admin card only. The per-device
- * button datapoint is gone: it was a second, clumsier path to the same file —
+ * button datapoint is gone: it was a second, clumsier path to the same report —
  * flip a state, then go find the file — and the card does both in one press.
  *
  * @param adapter ioBroker adapter surface
@@ -86,7 +63,7 @@ async function pruneOlderReports(adapter: DiagnosticsHandlerAdapter, meta: strin
  * @param lastRun Per-device throttle map (keyed by `sku:deviceId`)
  * @param device Target device
  * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
- * @returns The file name written, or null when the export was throttled or failed
+ * @returns The report with its file name, or null when the export was throttled or failed
  */
 export async function handleDiagnosticsExport(
   adapter: DiagnosticsHandlerAdapter,
@@ -94,7 +71,7 @@ export async function handleDiagnosticsExport(
   lastRun: Map<string, number>,
   device: GoveeDevice,
   prefix: string,
-): Promise<string | null> {
+): Promise<DiagnosticsReport | null> {
   const deviceKey = sessionKey(device.sku, device.deviceId);
   const now = Date.now();
   const last = lastRun.get(deviceKey) ?? 0;
@@ -104,13 +81,11 @@ export async function handleDiagnosticsExport(
   }
   lastRun.set(deviceKey, now);
   const version = adapter.version ?? "unknown";
-  const meta = `${adapter.namespace}.diagnostics`;
   const fileName = diagnosticsFileName(device, version, new Date(now));
   try {
     const diag = await deviceManager.generateDiagnostics(device, version, prefix);
-    await adapter.writeFileAsync(meta, fileName, JSON.stringify(diag, null, 2));
-    await pruneOlderReports(adapter, meta, device);
-    // WHEN, not which file: the card hands the file over on the spot, so the
+    const content = JSON.stringify(diag, null, 2);
+    // WHEN, not which file: the card hands the report over on the spot, so the
     // name says nothing a moment later — but "was a report taken since the
     // fault?" is a question the object tree can still answer. Seconds are
     // enough; ISO-8601 in UTC so it reads the same in every timezone and sorts.
@@ -118,8 +93,8 @@ export async function handleDiagnosticsExport(
       val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
       ack: true,
     });
-    adapter.log.info(`Diagnostics report for ${deviceLabel(device)} written to ${fileName}`);
-    return fileName;
+    adapter.log.info(`Diagnostics report for ${deviceLabel(device)} generated as ${fileName}`);
+    return { fileName, content };
   } catch (e) {
     // An export that fails silently is the same dead end the old
     // copy-out-of-a-state flow was — say so in the log, and the card shows the

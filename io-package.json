@@ -4,17 +4,17 @@
     "version": "2.36.0",
     "news": {
       "NEXT": {
-        "en": "The device icons in the object tree are visible on the dark themes again — they take the row's text colour instead of plain black.",
-        "de": "Die Geräte-Symbole im Objektbaum sind auf den dunklen Themen wieder sichtbar — sie nehmen die Textfarbe der Zeile statt Schwarz.",
-        "ru": "Значки устройств в дереве объектов снова видны на тёмных темах — они принимают цвет текста строки вместо чёрного.",
-        "pt": "Os ícones dos dispositivos na árvore de objetos voltam a ser visíveis nos temas escuros — usam a cor do texto da linha em vez de preto.",
-        "nl": "De apparaatpictogrammen in de objectboom zijn op de donkere thema's weer zichtbaar — ze nemen de tekstkleur van de rij in plaats van zwart.",
-        "fr": "Les icônes d'appareil dans l'arborescence sont de nouveau visibles sur les thèmes sombres — elles prennent la couleur du texte de la ligne au lieu du noir.",
-        "it": "Le icone dei dispositivi nell'albero degli oggetti sono di nuovo visibili nei temi scuri — usano il colore del testo della riga invece del nero.",
-        "es": "Los iconos de los dispositivos en el árbol de objetos vuelven a verse en los temas oscuros — toman el color del texto de la fila en lugar de negro.",
-        "pl": "Ikony urządzeń w drzewie obiektów są znów widoczne w ciemnych motywach — przyjmują kolor tekstu wiersza zamiast czerni.",
-        "uk": "Значки пристроїв у дереві об'єктів знову видно на темних темах — вони набувають кольору тексту рядка замість чорного.",
-        "zh-cn": "对象树中的设备图标在深色主题下再次可见——它们采用行的文字颜色而不是纯黑色。"
+        "en": "The root folders snapshots and diagnostics are gone — local snapshots live with their device, reports are download-only — the settings open on Configuration again, and the icons show on dark themes.",
+        "de": "Root-Ordner snapshots und diagnostics sind weg — Momentaufnahmen liegen beim Gerät, Berichte nur als Download —, die Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen.",
+        "ru": "Корневые папки snapshots и diagnostics удалены — снимки хранятся у устройства, отчёты только для скачивания —, настройки снова открываются на «Конфигурации», значки видны на тёмных темах.",
+        "pt": "As pastas raiz snapshots e diagnostics desapareceram — os snapshots ficam no dispositivo, relatórios só por download —, as definições abrem de novo em Configuração, ícones visíveis nos temas escuros.",
+        "nl": "Hoofdmappen snapshots en diagnostics zijn weg — snapshots horen bij hun apparaat, rapporten alleen als download —, instellingen openen weer op Configuratie, pictogrammen zichtbaar op donkere thema's.",
+        "fr": "Les dossiers racine snapshots et diagnostics ont disparu — instantanés avec l'appareil, rapports en téléchargement seul —, les réglages s'ouvrent sur Configuration, icônes visibles en thème sombre.",
+        "it": "Le cartelle radice snapshots e diagnostics non ci sono più — gli snapshot stanno con il dispositivo, report solo in download —, impostazioni aperte su Configurazione, icone visibili nei temi scuri.",
+        "es": "Las carpetas raíz snapshots y diagnostics han desaparecido — instantáneas con su dispositivo, informes solo como descarga —, los ajustes abren en Configuración, iconos visibles en temas oscuros.",
+        "pl": "Foldery główne snapshots i diagnostics zniknęły — migawki są przy urządzeniu, raporty tylko do pobrania —, ustawienia otwierają się znów na Konfiguracji, ikony widoczne w ciemnych motywach.",
+        "uk": "Кореневі теки snapshots і diagnostics зникли — знімки зберігаються біля пристрою, звіти лише для завантаження —, налаштування знову відкриваються на «Конфігурації», значки видно на темних темах.",
+        "zh-cn": "对象树顶部的 snapshots 和 diagnostics 两个文件夹已移除——本地快照随设备保存，报告仅供下载——设置再次在“配置”页打开，图标在深色主题下可见。"
       },
       "2.36.0": {
         "en": "A command that could not be sent is no longer confirmed, the segment wizard puts the brightness back, and an installation that kept its Govee account but removed the API key reads sensor values again.",
@@ -476,50 +476,6 @@
           "uk": "Групи",
           "zh-cn": "分组"
         }
-      },
-      "native": {}
-    },
-    {
-      "_id": "snapshots",
-      "type": "meta",
-      "common": {
-        "name": {
-          "en": "User-saved local snapshots",
-          "de": "Vom Benutzer gespeicherte lokale Snapshots",
-          "ru": "Сохранённые пользователем локальные снимки",
-          "pt": "Snapshots locais salvos pelo utilizador",
-          "nl": "Door gebruiker opgeslagen lokale snapshots",
-          "fr": "Snapshots locaux enregistrés par l'utilisateur",
-          "it": "Snapshot locali salvati dall'utente",
-          "es": "Instantáneas locales guardadas por el usuario",
-          "pl": "Lokalne migawki zapisane przez użytkownika",
-          "uk": "Збережені користувачем локальні знімки",
-          "zh-cn": "用户保存的本地快照"
-        },
-        "type": "meta.user",
-        "role": "meta.user"
-      },
-      "native": {}
-    },
-    {
-      "_id": "diagnostics",
-      "type": "meta",
-      "common": {
-        "name": {
-          "en": "Diagnostics reports",
-          "de": "Diagnoseberichte",
-          "ru": "Отчёты диагностики",
-          "pt": "Relatórios de diagnóstico",
-          "nl": "Diagnoserapporten",
-          "fr": "Rapports de diagnostic",
-          "it": "Rapporti di diagnostica",
-          "es": "Informes de diagnóstico",
-          "pl": "Raporty diagnostyczne",
-          "uk": "Звіти діагностики",
-          "zh-cn": "诊断报告"
-        },
-        "type": "meta.user",
-        "role": "meta.user"
       },
       "native": {}
     }
