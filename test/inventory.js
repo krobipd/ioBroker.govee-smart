@@ -373,6 +373,28 @@ async function wipeNamespace(harness) {
 }
 
 /**
+ * Drop every settings key the fixture does not define from the instance object.
+ *
+ * The temp controller keeps the instance object across runs, and `changeAdapterConfig`
+ * merges into it — a key an earlier version wrote (`networkInterface` until 2.36.0)
+ * would still be there. The adapter carries such a key over on start and then waits
+ * for the host restart that follows the write; the harness never restarts it, and the
+ * run ends without a device tree. The fixture defines the config completely.
+ *
+ * @param {import("@iobroker/testing").TestHarness} harness the running harness
+ */
+async function resetInstanceNative(harness) {
+  const id = `system.adapter.${ADAPTER}.0`;
+  const obj = await harness.objects.getObjectAsync(id);
+  if (!obj) {
+    return;
+  }
+  const keep = new Set(Object.keys(fixtureNative()));
+  obj.native = Object.fromEntries(Object.entries(obj.native ?? {}).filter(([key]) => keep.has(key)));
+  await harness.objects.setObjectAsync(id, obj);
+}
+
+/**
  * The tree key the adapter builds for a device: lower-case SKU plus the last
  * four hex pairs of the Govee device id, colons dropped.
  *
@@ -411,6 +433,7 @@ tests.integration(ADAPTER_DIR, {
         // fixture cannot create at all (it carries no account, so group members
         // are never resolved), and the file went into the release that way.
         await wipeNamespace(harness);
+        await resetInstanceNative(harness);
         cloud = await startFakeCloud();
         lan = await startFakeLanDevice();
         await harness.changeAdapterConfig(ADAPTER, { native: fixtureNative() });
