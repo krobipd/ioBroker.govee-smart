@@ -101,6 +101,9 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 <!--
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
+-->
+
+### **WORK IN PROGRESS**
 
 - Changed: The two folders "snapshots" and "diagnostics" at the top of the object tree are gone — a saved local snapshot now lives with its device, and no diagnostics report is stored any more
 - Changed: A diagnostics report is generated and downloaded from the Expert tab only — the adapter keeps no copy in the instance, and the copies left by earlier versions are removed at the first start
