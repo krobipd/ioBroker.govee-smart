@@ -416,8 +416,10 @@ export class GoveeAdapter extends utils.Adapter {
         return false;
       }
       this.log.info("Correcting a leftover setting from an earlier version — this instance restarts once");
-      // null DELETES the key (extend copies null, skips undefined) — anything
-      // else leaves an object behind and keeps the message box shut.
+      // null is what the guard above treats as "gone": the extend STORES the null
+      // (it does not drop the key — measured 2026-09-15 on the instance object),
+      // so the host reads no object and the message box stays open; anything
+      // else leaves an object behind and keeps it shut.
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
