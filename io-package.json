@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.38.0",
+    "version": "2.38.1",
     "news": {
+      "2.38.1": {
+        "en": "Repairing a dropdown is now a single write — until 2.38.0 it was emptied first, so a restart in that moment left the datapoint with nothing to pick from.",
+        "de": "Die Reparatur eines Auswahlfeldes ist jetzt EIN Schreibvorgang — bis 2.38.0 wurde es zuerst geleert, ein Neustart in diesem Moment ließ den Datenpunkt ohne Auswahl zurück.",
+        "ru": "Восстановление поля выбора теперь выполняется одной записью — до 2.38.0 оно сначала очищалось, и перезапуск в этот момент оставлял датапоинт без вариантов.",
+        "pt": "A reparação de um campo de seleção é agora uma única escrita — até 2.38.0 era primeiro esvaziado e um reinício nesse momento deixava o ponto de dados sem escolhas.",
+        "nl": "Het herstellen van een keuzeveld is nu één schrijfactie — tot 2.38.0 werd het eerst geleegd, en een herstart op dat moment liet het datapunt zonder keuzes achter.",
+        "fr": "La réparation d'un champ de sélection est désormais une seule écriture — jusqu'à 2.38.0 il était d'abord vidé, et un redémarrage à cet instant laissait le point de données sans choix.",
+        "it": "La riparazione di un campo di selezione è ora una sola scrittura — fino alla 2.38.0 veniva prima svuotato e un riavvio in quel momento lasciava il punto dati senza scelte.",
+        "es": "La reparación de un campo de selección es ahora una sola escritura — hasta 2.38.0 se vaciaba primero y un reinicio en ese momento dejaba el punto de datos sin opciones.",
+        "pl": "Naprawa pola wyboru to teraz jeden zapis — do wersji 2.38.0 było ono najpierw opróżniane, a restart w tym momencie zostawiał punkt danych bez wyboru.",
+        "uk": "Відновлення поля вибору тепер відбувається одним записом — до 2.38.0 воно спершу очищалося, і перезапуск у цей момент залишав точку даних без варіантів.",
+        "zh-cn": "修复选择字段现在只需一次写入——2.38.0 之前会先清空，此时重启会让数据点没有可选项。"
+      },
       "2.38.0": {
         "en": "A dropdown repair no longer deletes the datapoint with its value and its room and function assignment, a renamed device reaches an existing tree, and errors read properly in the log.",
         "de": "Eine Dropdown-Reparatur löscht den Datenpunkt nicht mehr samt Wert und Raum-/Funktionszuordnung, ein umbenanntes Gerät erreicht den bestehenden Baum, Fehlertexte sind lesbar.",

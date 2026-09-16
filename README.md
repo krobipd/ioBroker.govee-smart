@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.38.1 (2026-09-16)
 
 - Fixed: Repairing a dropdown is now a single write — until 2.38.0 it was emptied first, so a restart in that moment left the datapoint with nothing to pick from until the next start
 
@@ -138,10 +138,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
 - New: Seven datapoints real devices report now carry a translated name — main light, background light, fan, fan speed, reverse airflow, pillar light and base light
 - New: Explanations where the name alone does not say it — reverse airflow, pillar and base light, warm mist, the preset-scene dropdown and the unreachable members of a group
-
-### 2.35.2 (2026-09-11)
-
-- Fixed: A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
