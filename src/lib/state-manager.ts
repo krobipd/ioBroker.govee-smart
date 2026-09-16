@@ -301,10 +301,8 @@ export class StateManager {
       return;
     }
     const states = existing.common?.states;
-    // No map at all, or the `null` an interrupted repair left behind: either
-    // way there is nothing stale to clear, because the caller's own
-    // extendObject ran first and a merge into a non-object replaces it
-    // wholesale — the map is already exactly `fresh` by the time we look.
+    // No map at all: the caller's own extendObject just wrote `fresh` into a
+    // fresh object, there is nothing stale to clear.
     if (!states || typeof states !== "object") {
       return;
     }
@@ -312,13 +310,16 @@ export class StateManager {
     if (!buggy) {
       return;
     }
-    // `common.states` is typed without `null` (@iobroker/types) although the
-    // controller accepts and stores it; the cast is the whole reason for it.
-    const clearMap = { common: { states: null } } as unknown as ioBroker.PartialObject;
-    await this.adapter.extendObject(id, clearMap).catch(() => undefined);
-    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(e => {
-      // The map stays `null` until the next run — the caller's extendObject
-      // rewrites it from the definition before this method is reached again.
+    // The read-back object with the corrected map, written whole — one write,
+    // nothing deleted. `setForeignObject` takes the FULL id (and its *Async
+    // twin is deprecated in @iobroker/types 7.2.2). The read-back type is the
+    // union of every object kind; only state objects ever reach this repair,
+    // which is what the cast says.
+    existing.common.states = fresh;
+    const full = `${this.adapter.namespace}.${id}` as const;
+    await this.adapter.setForeignObject(full, existing as ioBroker.SettableObject<ioBroker.StateObject>).catch(e => {
+      // The stale keys survive until the next run — the caller's extendObject
+      // rewrites the map from the definition before this is reached again.
       this.adapter.log.debug(`could not rewrite common.states of ${id}: ${errMessage(e)}`);
     });
   }

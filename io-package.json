@@ -80,19 +80,6 @@
         "pl": "Wartości, które Govee zgłasza dla urządzenia przy starcie, nie czekają już na załadowanie bibliotek scen — przy tuzinie lamp przychodziły siedem minut po starcie.",
         "uk": "Значення, які Govee повідомляє для пристрою при старті, більше не чекають завантаження бібліотек сцен — із дюжиною ламп вони надходили через сім хвилин після старту.",
         "zh-cn": "Govee 在启动时为设备报告的数值不再排在场景库加载之后——在有十几盏灯的安装中，它们曾在启动七分钟后才到达。"
-      },
-      "2.35.0": {
-        "en": "Air purifier mode, level and filter life follow the device's own status report, the device-state query delivers values at start, and an API-key-only setup keeps its appliance commands all day.",
-        "de": "Modus, Stufe und Filterlebensdauer eines Luftreinigers folgen der Statusmeldung des Geräts, die Zustandsabfrage liefert beim Start Werte, ein Nur-API-Key-Setup behält seine Befehle den ganzen Tag.",
-        "ru": "Режим, ступень и ресурс фильтра очистителя следуют за отчётом самого устройства, запрос состояния даёт значения при старте, установка только с API-ключом сохраняет команды весь день.",
-        "pt": "Modo, nível e vida do filtro de um purificador seguem o relato do próprio aparelho, a consulta de estado entrega valores no arranque e uma instalação só com chave API mantém os comandos todo o dia.",
-        "nl": "Modus, stand en filterduur van de luchtreiniger volgen de melding van het apparaat, de statusopvraag levert waarden bij de start, een setup met alleen API-sleutel houdt zijn commando's heel de dag.",
-        "fr": "Mode, niveau et durée du filtre du purificateur suivent le rapport de l'appareil, la requête d'état livre des valeurs au démarrage, une installation clé-API seule garde ses commandes tout le jour.",
-        "it": "Modalità, livello e durata del filtro di un purificatore seguono il rapporto del dispositivo, la lettura dello stato dà valori all'avvio e un setup solo chiave API tiene i comandi tutto il giorno.",
-        "es": "Modo, nivel y vida del filtro de un purificador siguen el informe del aparato, la consulta de estado entrega valores al inicio, y un montaje solo con clave API mantiene sus órdenes todo el día.",
-        "pl": "Tryb, stopień i żywotność filtra oczyszczacza podążają za raportem urządzenia, zapytanie o stan daje wartości przy starcie, a instalacja z samym kluczem API zachowuje polecenia cały dzień.",
-        "uk": "Режим, ступінь і ресурс фільтра очищувача йдуть за звітом самого пристрою, запит стану дає значення при старті, а установка лише з API-ключем зберігає команди весь день.",
-        "zh-cn": "空气净化器的模式、档位和滤芯寿命跟随设备自身的状态报告；启动时的状态查询返回数值；仅使用 API 密钥的安装全天保留其电器命令。"
       }
     },
     "plugins": {

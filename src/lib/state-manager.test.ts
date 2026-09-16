@@ -115,6 +115,13 @@ function createMockAdapter(): {
       }
       return Promise.resolve();
     },
+    setForeignObject: (id: string, obj: Record<string, unknown>) => {
+      calls.push({ method: "setForeignObject", args: [id, obj] });
+      // Writes the object whole — and takes the FULL id, so the mock store
+      // (which is keyed without the namespace) has to strip it again.
+      objects.set(id.replace("govee-smart.0.", ""), obj);
+      return Promise.resolve();
+    },
     setState: (id: string, val: Record<string, unknown>) => {
       calls.push({ method: "setState", args: [id, val] });
       states.set(id, val as unknown as ioBroker.State);
@@ -755,30 +762,28 @@ describe("StateManager", () => {
       for (const v of Object.values(obj.common.states)) {
         expect(typeof v).toBe("string");
       }
-      // Mechanism pin: the map is cleared (`states: null`) and written again,
-      // both through extendObject. The object itself is NEVER deleted — in
-      // js-controller 7.2.2 deleting a `state` object also drops its VALUE
-      // (`delForeignState`) and every enum membership (`removeIdFromAllEnums`),
-      // which a dropdown repair has no business doing. `setObject` stays out
-      // too (repochecker S5054).
+      // Mechanism pin — the fleet form since 2026-09-12: read back, correct the
+      // map, write the object WHOLE with `setForeignObject` (full id), one
+      // write. The object is NEVER deleted: in js-controller 7.2.2 deleting a
+      // `state` object also drops its VALUE (`delForeignState`) and every enum
+      // membership (`removeIdFromAllEnums`), which a dropdown repair has no
+      // business doing. `setObject` stays out too (repochecker S5054).
       const repairPath = "devices.h6160_0011.scenes.light_scene";
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.some(c => c.method === "delStateAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
-      const clearing = calls.filter(
-        c =>
-          c.method === "extendObject" &&
-          c.args[0] === repairPath &&
-          (c.args[1] as { common?: { states?: unknown } })?.common?.states === null,
-      );
-      expect(clearing).toHaveLength(1);
+      const whole = calls.filter(c => c.method === "setForeignObject" && c.args[0] === `govee-smart.0.${repairPath}`);
+      expect(whole).toHaveLength(1);
+      // What the whole write must carry over: the recording config and the name.
+      const written = whole[0]?.args[1] as { common: { custom?: unknown; name?: unknown } };
+      expect(written.common.name).toBe("Scene");
     });
 
-    it("an interrupted repair heals itself on the next run", async () => {
-      // The clearer and the rewrite are two writes. A restart between them
-      // leaves `common.states: null` — and that is safe precisely because the
-      // caller writes the definition BEFORE the repair looks: merging an object
-      // over a non-object replaces it wholesale, so the map is whole again.
+    it("heals a map a former release left at null", async () => {
+      // 2.38.0 shipped a two-write repair that cleared the map first; a restart
+      // between its writes could leave `common.states: null` behind. Such a map
+      // still heals: the caller writes the definition BEFORE the repair looks,
+      // and merging an object over a non-object replaces it wholesale.
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
@@ -835,14 +840,7 @@ describe("StateManager", () => {
       const repairPath = "devices.h6160_0011.scenes.light_scene";
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
-      expect(
-        calls.some(
-          c =>
-            c.method === "extendObject" &&
-            c.args[0] === repairPath &&
-            (c.args[1] as { common?: { states?: unknown } })?.common?.states === null,
-        ),
-      ).toBe(false);
+      expect(calls.some(c => c.method === "setForeignObject")).toBe(false);
     });
   });
 
