@@ -572,12 +572,37 @@ describe("Types utilities", () => {
       expect(out).not.toContain("at ");
     });
 
-    it("should return String() for non-Error values", () => {
+    it("should return String() for non-Error primitives", () => {
       expect(errMessage("plain string")).toBe("plain string");
       expect(errMessage(42)).toBe("42");
       expect(errMessage(null)).toBe("null");
       expect(errMessage(undefined)).toBe("undefined");
-      expect(errMessage({ msg: "obj" })).toBe("[object Object]");
+      expect(errMessage(Symbol("sym"))).toBe("Symbol(sym)");
+    });
+
+    it("should render a thrown plain object's fields, not [object Object]", () => {
+      // The one that sent readers nowhere: a rejected HTTP/socket object used to
+      // reach the log as "[object Object]". Its fields ARE the diagnosis.
+      expect(errMessage({ code: "ECONNRESET" })).toBe('{"code":"ECONNRESET"}');
+      expect(errMessage({ msg: "obj" })).toBe('{"msg":"obj"}');
+    });
+
+    it("should never throw on a value JSON cannot serialise", () => {
+      // A logger that throws inside a catch block turns a handled failure into
+      // an unhandled rejection — the crash-loop this adapter guards against.
+      const circular: Record<string, unknown> = { a: 1 };
+      circular.self = circular;
+      expect(errMessage(circular)).toBe("[object Object]");
+      expect(errMessage({ big: 1n })).toBe("[object Object]");
+      expect(errMessage({ toJSON: () => JSON.parse("{") })).toBe("[object Object]");
+    });
+
+    it("classifies a thrown plain object by its fields (the F1 payoff)", () => {
+      // Before the object branch the marker test saw "[object Object]" and every
+      // thrown object fell through to UNKNOWN — including the network errors
+      // that carry their code as a field.
+      expect(classifyError({ code: "ECONNRESET" })).toBe("NETWORK");
+      expect(classifyError({ something: "else" })).toBe("UNKNOWN");
     });
   });
 

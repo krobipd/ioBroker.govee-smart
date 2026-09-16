@@ -156,7 +156,7 @@ export class MessageRouter {
     }
     this.handleMessage(obj).catch(e => {
       this.host.log.warn(`onMessage handler crashed for ${obj.command}: ${errMessage(e)}`);
-      this.host.sendResponse(obj, { error: e instanceof Error ? e.message : String(e) });
+      this.host.sendResponse(obj, { error: errMessage(e) });
     });
   }
 
@@ -207,7 +207,7 @@ export class MessageRouter {
       this.host.sendResponse(obj, { error: `Unknown command '${obj.command}'` });
     } catch (e) {
       this.host.log.warn(`onMessage failed for ${obj.command}: ${errMessage(e)}`);
-      this.host.sendResponse(obj, { error: e instanceof Error ? e.message : String(e) });
+      this.host.sendResponse(obj, { error: errMessage(e) });
     }
   }
 
@@ -291,7 +291,7 @@ export class MessageRouter {
         // Safety net for unexpected synchronous throws only — the regular
         // failure paths never reject (see above).
         return {
-          result: resolveLabel("mqttAuthLoginFailed", e instanceof Error ? e.message : String(e)),
+          result: resolveLabel("mqttAuthLoginFailed", errMessage(e)),
           status: "loginFailed",
         };
       } finally {
@@ -318,7 +318,7 @@ export class MessageRouter {
         await probe.requestVerificationCode();
         return { result: resolveLabel("mqttAuthCodeSent"), status: "codeSent" };
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
+        const msg = errMessage(e);
         return { result: resolveLabel("mqttAuthCodeRejected", msg), status: "codeRejected" };
       }
     }

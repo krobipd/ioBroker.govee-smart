@@ -1,5 +1,5 @@
 import { HttpError } from "./http-client";
-import { classifyError, type ErrorCategory } from "./types";
+import { classifyError, errMessage, type ErrorCategory } from "./types";
 
 /**
  * Per-channel/per-category dedup tracker — fires the warn message once per
@@ -45,7 +45,7 @@ export function logChannelFail(log: ioBroker.Logger, opts: LogChannelFailOptions
   const { channel, err, retryHint, context, dedup } = opts;
   const category = classifyError(err);
   const userMessage = formatChannelFail(channel, category, err, retryHint, context);
-  const rawMessage = err instanceof Error ? err.message : String(err);
+  const rawMessage = errMessage(err);
 
   if (dedup.lastCategory === category) {
     // Same failure category as last time — drop to debug to avoid spam.
@@ -113,7 +113,7 @@ export function formatChannelFail(
       return `${channel}: verification code rejected — request a fresh code in Settings`;
     case "UNKNOWN":
     default: {
-      const msg = err instanceof Error ? err.message : String(err);
+      const msg = errMessage(err);
       return `${channel}: request failed${contextSuffix} — ${msg}${retrySuffix}`;
     }
   }

@@ -755,13 +755,59 @@ describe("StateManager", () => {
       for (const v of Object.values(obj.common.states)) {
         expect(typeof v).toBe("string");
       }
-      // Mechanism pin: the full-object replace runs as delObject +
-      // setObjectNotExists (js-controller-blessed), never setObject
-      // (repochecker S5054). extendObject alone cannot drop the stale "9".
+      // Mechanism pin: the map is cleared (`states: null`) and written again,
+      // both through extendObject. The object itself is NEVER deleted — in
+      // js-controller 7.2.2 deleting a `state` object also drops its VALUE
+      // (`delForeignState`) and every enum membership (`removeIdFromAllEnums`),
+      // which a dropdown repair has no business doing. `setObject` stays out
+      // too (repochecker S5054).
       const repairPath = "devices.h6160_0011.scenes.light_scene";
-      expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(true);
-      expect(calls.some(c => c.method === "setObjectNotExistsAsync" && c.args[0] === repairPath)).toBe(true);
+      expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
+      expect(calls.some(c => c.method === "delStateAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
+      const clearing = calls.filter(
+        c =>
+          c.method === "extendObject" &&
+          c.args[0] === repairPath &&
+          (c.args[1] as { common?: { states?: unknown } })?.common?.states === null,
+      );
+      expect(clearing).toHaveLength(1);
+    });
+
+    it("an interrupted repair heals itself on the next run", async () => {
+      // The clearer and the rewrite are two writes. A restart between them
+      // leaves `common.states: null` — and that is safe precisely because the
+      // caller writes the definition BEFORE the repair looks: merging an object
+      // over a non-object replaces it wholesale, so the map is whole again.
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      objects.set("devices.h6160_0011.scenes.light_scene", {
+        type: "state",
+        common: { name: "Scene", type: "mixed", role: "state", states: null },
+        native: {},
+      });
+
+      const fresh: Record<string, string> = { 0: "---", 1: "Aurora" };
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "light_scene",
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          write: true,
+          channel: "scenes",
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+          states: fresh,
+          def: "0",
+        },
+      ]);
+
+      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+        common: { states: Record<string, unknown> };
+      };
+      expect(obj.common.states).toEqual(fresh);
     });
 
     it("does not rewrite healthy plain-string maps", async () => {
@@ -784,13 +830,19 @@ describe("StateManager", () => {
           def: "0",
         },
       ]);
-      // Healthy plain-string map → the repair returns early: no full-object
-      // replace of any kind (neither the old setObject nor delObject +
-      // setObjectNotExists) touches the state.
+      // Healthy plain-string map → the repair returns early: nothing clears the
+      // map, nothing deletes the object, no setObject.
       const repairPath = "devices.h6160_0011.scenes.light_scene";
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
-      expect(calls.some(c => c.method === "setObjectNotExistsAsync" && c.args[0] === repairPath)).toBe(false);
+      expect(
+        calls.some(
+          c =>
+            c.method === "extendObject" &&
+            c.args[0] === repairPath &&
+            (c.args[1] as { common?: { states?: unknown } })?.common?.states === null,
+        ),
+      ).toBe(false);
     });
   });
 
@@ -2735,15 +2787,17 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
   });
 
   describe("names reach an existing tree", () => {
-    it("only the device object keeps its name — every adapter-owned name is rewritten", async () => {
+    it("no name is preserved any more — not even the device object's", async () => {
       // Measured on the live system after 2.29.1: the segment channels still
       // carried the plain English "Segment 3" although the code had switched to
       // a translation object. The write preserved the existing name, so the new
       // one only ever reached FRESH installs — the same trap the manifest
       // objects had, one level down and with no gate watching.
       //
-      // The device object is the single exception: its name comes from the
-      // Govee app, so a user who renamed the device keeps that.
+      // The device object was the last exception (its name comes from the Govee
+      // app). It is gone too since 2.38.0: names belong to the adapter, so a
+      // name changed in the app reaches an existing tree, and a rename in the
+      // object tree is reset. The list is EMPTY — a new entry is a regression.
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
@@ -2758,7 +2812,48 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
         })
         .map(c => c.args[0] as string);
 
-      expect(preserving).toEqual(["devices.h6160_0011"]);
+      expect(preserving).toEqual([]);
+    });
+
+    it("writes the device object once per process and again when the app name changes", async () => {
+      // What replaced `preserve`: a signature map. createInfoStates re-runs on
+      // every phase callback, so without it the object would be rewritten on
+      // each one; with it the write happens once, and again exactly when name,
+      // icon or the online pointer really changed.
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      const writes = (): number =>
+        calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160_0011").length;
+
+      await sm.createInfoStates(dev);
+      expect(writes()).toBe(1);
+
+      // Same device, three more phase callbacks — nothing changed, nothing written.
+      await sm.createInfoStates(dev);
+      await sm.createInfoStates(dev);
+      await sm.createInfoStates(dev);
+      expect(writes()).toBe(1);
+
+      // The user renamed the device in the Govee app.
+      await sm.createInfoStates({ ...dev, name: "Renamed in the app" });
+      expect(writes()).toBe(2);
+      expect((objects.get("devices.h6160_0011") as { common: { name: string } }).common.name).toBe(
+        "Renamed in the app",
+      );
+    });
+
+    it("forgets the device-object signature when the prefix is dropped", async () => {
+      // A removed (or re-prefixed) device must be rebuilt in full — a surviving
+      // signature would skip the very write that recreates its device object.
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      await sm.createInfoStates(dev);
+      await sm.cleanupDevices([]);
+      await sm.createInfoStates(dev);
+      const writes = calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160_0011").length;
+      expect(writes).toBe(2);
     });
 
     it("a segment channel carries a translation object, not a fixed string", async () => {

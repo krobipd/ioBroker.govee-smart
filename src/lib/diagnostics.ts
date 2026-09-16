@@ -1,7 +1,7 @@
 import { HttpError } from "./http-client";
 import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
-import type { GoveeDevice } from "./types";
+import { errMessage, type GoveeDevice } from "./types";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import {
   effectiveSegmentCount,
@@ -750,7 +750,7 @@ export class DiagnosticsCollector {
     // A body that parses as JSON goes through the same key-based redaction as
     // a successful one; whatever it is, addresses and mail addresses inside it
     // are replaced before the length cap can hide them in a truncated string.
-    const errMsg = this.anon.text(error instanceof Error ? error.message : String(error));
+    const errMsg = this.anon.text(errMessage(error));
     const responseBody = error instanceof HttpError ? error.responseBody : undefined;
     const body: Record<string, unknown> = { error: errMsg, status: statusCode };
     if (typeof responseBody === "string" && responseBody.length > 0) {

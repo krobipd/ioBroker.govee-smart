@@ -12,7 +12,7 @@ import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import type { I18nKey } from "./i18n";
 import { tDesc, tName, tNameWith } from "./i18n";
-import type { DeviceState, GoveeDevice } from "./types";
+import { errMessage, type DeviceState, type GoveeDevice } from "./types";
 import { mapKey, treeKey } from "./device-key";
 
 /**
@@ -241,6 +241,16 @@ export class StateManager {
    * {@link runDeviceBuild}. An entry leaves the map once its build settled.
    */
   private readonly buildChain = new Map<string, Promise<void>>();
+  /**
+   * What was last written to a device object (name, icon, online pointer), per
+   * device prefix. Guards the one write in {@link createInfoStates} that
+   * carries a name the adapter did not invent, so the repeated phase callbacks
+   * do not rewrite an unchanged object. In-memory on purpose: a persisted map
+   * would skip the write on the first start after an update and the new name
+   * would never reach an existing tree — the very defect that dropping
+   * `preserve` fixes.
+   */
+  private readonly deviceObjectSignature = new Map<string, string>();
 
   /**
    * @param adapter The ioBroker adapter instance
@@ -255,22 +265,32 @@ export class StateManager {
    * Force-replace `common.states` on a persisted state object if any existing
    * value is non-string (= translation object from older releases).
    *
-   * A full-object replace is required: js-controller's `extendObject`
+   * A full replace of the MAP is required: js-controller's `extendObject`
    * deep-merges via node.extend (verified against js-controller 7.2.2 /
    * node.extend 2.0.3) — same-key values ARE replaced, but stale keys absent
    * from `fresh` survive the merge, and one surviving translation-object value
-   * is enough to keep crashing the Admin. `setObject` would deliver the "map
-   * contains exactly `fresh`" postcondition but is discouraged (repochecker
-   * S5054 — a blind full write clobbers runtime-added common fields). The
-   * js-controller-blessed full replace is `delObject` → `setObjectNotExists`:
-   * dropping the object physically clears the stale keys, recreating it from
-   * the read-back `existing` (with the plain-string `fresh` map) preserves
-   * name/native/role. The state value survives in the states DB and is
-   * re-seeded by the caller's def-value guard if the DB dropped it. Same
-   * React-#31 fix-pattern as hassemu v1.27.2 (URL-dropdown) and v1.28.4
-   * (mode-dropdown): Admin renders states-VALUES as React children, so a
-   * translation object triggers React Error #31 → fatal "Error in GUI" on
-   * dropdown open (write:true) or any render path (write:false like diag.tier).
+   * is enough to keep crashing the Admin. Same React-#31 fix-pattern as hassemu
+   * v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown): Admin renders
+   * states-VALUES as React children, so a translation object triggers React
+   * Error #31 → fatal "Error in GUI" on dropdown open (write:true) or any
+   * render path (write:false like diag.tier).
+   *
+   * ⚠️ Until 2.37.1 the replace was `delObject` → `setObjectNotExists`, and the
+   * comment here claimed the state value survives in the states DB. It does
+   * not. Measured in the source of the baseline controller
+   * (`@iobroker/js-controller-adapter` 7.2.2, `_delForeignObject`): deleting an
+   * object of type `state` also calls `delForeignState` on it AND
+   * `removeIdFromAllEnums`. So a repair that only wanted to fix a dropdown map
+   * threw away the datapoint's current VALUE and every room/function the user
+   * had assigned it to — silently, on exactly the long-lived installs that
+   * carry both. Nothing restores an enum membership.
+   *
+   * The replacement keeps the object: writing `common.states = null` first
+   * (js-controller's own object validator allows it explicitly — "we allow null
+   * for deletion") leaves a non-object in place of the map, so the following
+   * merge cannot merge into it and puts `fresh` there wholesale. Two writes
+   * instead of one, no delete: value, history (`common.custom`) and enum
+   * membership are untouched.
    *
    * @param id    Full state path.
    * @param fresh Plain-string `common.states` map to write.
@@ -281,6 +301,10 @@ export class StateManager {
       return;
     }
     const states = existing.common?.states;
+    // No map at all, or the `null` an interrupted repair left behind: either
+    // way there is nothing stale to clear, because the caller's own
+    // extendObject ran first and a merge into a non-object replaces it
+    // wholesale — the map is already exactly `fresh` by the time we look.
     if (!states || typeof states !== "object") {
       return;
     }
@@ -288,16 +312,15 @@ export class StateManager {
     if (!buggy) {
       return;
     }
-    existing.common.states = fresh;
-    // delObject drops the object (with its stale keys); setObjectNotExists
-    // recreates it from `existing` holding exactly `fresh`. Not atomic, but the
-    // object is rebuilt on the very next line. delObject is safe here despite
-    // Pattern 46's "keep objects always-existent" rule: that guards concurrent
-    // update paths against js-controller's "has no existing object" WARN — this
-    // runs in the one-shot sequential state-creation path, where no parallel
-    // writer can observe the gap.
-    await this.adapter.delObjectAsync(id).catch(() => undefined);
-    await this.adapter.setObjectNotExistsAsync(id, existing).catch(() => undefined);
+    // `common.states` is typed without `null` (@iobroker/types) although the
+    // controller accepts and stores it; the cast is the whole reason for it.
+    const clearMap = { common: { states: null } } as unknown as ioBroker.PartialObject;
+    await this.adapter.extendObject(id, clearMap).catch(() => undefined);
+    await this.adapter.extendObject(id, { common: { states: fresh } }).catch(e => {
+      // The map stays `null` until the next run — the caller's extendObject
+      // rewrites it from the definition before this method is reached again.
+      this.adapter.log.debug(`could not rewrite common.states of ${id}: ${errMessage(e)}`);
+    });
   }
 
   /**
@@ -421,7 +444,7 @@ export class StateManager {
       });
       return (view?.rows ?? []).map(row => row.id.replace(`${this.adapter.namespace}.`, ""));
     } catch (e) {
-      this.adapter.log.debug(`cannot list states: ${e instanceof Error ? e.message : String(e)}`);
+      this.adapter.log.debug(`cannot list states: ${errMessage(e)}`);
       return [];
     }
   }
@@ -753,9 +776,20 @@ export class StateManager {
       ? `${this.adapter.namespace}.groups.info.online`
       : `${this.adapter.namespace}.${prefix}.info.online`;
     const icon = isGroup ? GROUP_ICON : iconForGoveeType(device.type);
-    await this.adapter.extendObject(
-      prefix,
-      {
+    // The device name follows the Govee app, and it is written like every other
+    // name in this file: without `preserve`. Until 2.37.1 this one call carried
+    // `preserve: { common: ["name"] }` — the last one in the adapter — so a name
+    // changed in the app never reached a tree that already had the device, and a
+    // rename in the object tree outlived every correction. Names belong to the
+    // adapter (fleet rule 2026-09-02); the user's place is `0_userdata`.
+    // Memory-guided instead of preserved: createInfoStates re-runs on every
+    // phase callback, so the write is skipped while name, icon and the online
+    // pointer are unchanged — one write per device per process as before, plus
+    // one whenever the app name really changes. The map is in-memory ONLY;
+    // persisting it would rebuild exactly the defect the preserve removal fixes.
+    const signature = JSON.stringify([device.name, icon, onlineId]);
+    if (this.deviceObjectSignature.get(prefix) !== signature) {
+      await this.adapter.extendObject(prefix, {
         type: "device",
         common: {
           name: device.name,
@@ -766,12 +800,9 @@ export class StateManager {
           sku: device.sku,
           deviceId: device.deviceId,
         },
-      },
-      // The ONLY name that stays preserved: this one comes from the Govee app,
-      // so a user who renamed the device there (or here) keeps it. Every other
-      // name in this file is the adapter's own and must reach existing trees.
-      { preserve: { common: ["name"] } },
-    );
+      });
+      this.deviceObjectSignature.set(prefix, signature);
+    }
 
     // Info channel — groups only get name (no individual online)
     await this.adapter.extendObject(`${prefix}.info`, {
@@ -1054,10 +1085,10 @@ export class StateManager {
         // Existing diag.tier datapoints from v2.6.0+ may carry translation-object
         // VALUES in common.states (the old buildCloudStateDefs wrote tLabel(...)
         // directly). extendObject deep-merges: stale keys absent from the fresh
-        // map would survive with their object values — only a full setObject
-        // guarantees a plain-string map. React Error #31 would otherwise
-        // fatal-crash Admin on dropdown open (write:true states) or any view
-        // that renders the value (write:false states like diag.tier).
+        // map would survive with their object values — clearing the map before
+        // rewriting it is what makes it exactly `fresh`. React Error #31 would
+        // otherwise fatal-crash Admin on dropdown open (write:true states) or
+        // any view that renders the value (write:false states like diag.tier).
         if (def.states) {
           await this.repairCommonStatesIfBuggy(`${prefix}.${channel}.${def.id}`, def.states);
         }
@@ -1456,9 +1487,7 @@ export class StateManager {
           endkey: `${this.adapter.namespace}.${folder}.${SORT_KEY_END}`,
         });
       } catch (e) {
-        this.adapter.log.debug(
-          `cleanupDevices: getObjectViewAsync failed for ${folder}: ${e instanceof Error ? e.message : String(e)}`,
-        );
+        this.adapter.log.debug(`cleanupDevices: getObjectViewAsync failed for ${folder}: ${errMessage(e)}`);
         continue;
       }
 
@@ -1515,9 +1544,7 @@ export class StateManager {
         endkey: `${this.adapter.namespace}.devices.samemodegroup_${SORT_KEY_END}`,
       });
     } catch (e) {
-      this.adapter.log.debug(
-        `cleanupSameModeGroupOrphansOnce: getObjectViewAsync failed: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      this.adapter.log.debug(`cleanupSameModeGroupOrphansOnce: getObjectViewAsync failed: ${errMessage(e)}`);
       return removed;
     }
     if (!existing?.rows) {
@@ -1664,6 +1691,9 @@ export class StateManager {
   private forgetPrefix(prefix: string): void {
     this.onlineMarkerCache?.delete(`${prefix}.info.online`);
     this.resolvedOnline.delete(`${prefix}.info.online`);
+    // A removed or re-prefixed device must get its device object written in
+    // full again — a surviving signature would skip the write that rebuilds it.
+    this.deviceObjectSignature.delete(prefix);
     for (const key of this.prefixMap.keys()) {
       if (this.prefixMap.get(key) === prefix) {
         this.prefixMap.delete(key);

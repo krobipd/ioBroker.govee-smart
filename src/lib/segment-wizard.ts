@@ -1,6 +1,6 @@
 import { SEGMENT_COUNT_MAX, SEGMENT_HARD_MAX, resolveDeviceReachability } from "./device-manager/lookups";
 import { WIZARD_IDLE_TIMEOUT_MS } from "./timing-constants";
-import { deviceLabel, type GoveeDevice } from "./types";
+import { deviceLabel, errMessage, type GoveeDevice } from "./types";
 import { readDeviceBaseline, restoreSegmentsGrouped } from "./device-baseline";
 import { resolveLabel, type I18nKey } from "./i18n";
 
@@ -360,7 +360,7 @@ export class SegmentWizard {
       // The router refuses a command it cannot place (no LAN address, no
       // cloud — F9). The session was reserved above, so release it here:
       // left in place, the lock held until the idle abort five minutes later.
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errMessage(e);
       this.host.log.warn(`Segment wizard for ${deviceLabel(device)}: start failed — ${msg}`);
       this.session = null;
       this.clearIdleTimer();
@@ -429,7 +429,7 @@ export class SegmentWizard {
     try {
       await this.restoreBaseline(device, baseline);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = errMessage(e);
       this.host.log.warn(`Segment wizard for ${deviceLabel(device)}: baseline not restored — ${msg}`);
     }
   }
@@ -545,7 +545,7 @@ export class SegmentWizard {
       this.abort().catch(e => {
         this.host.log.warn(
           this.t("logAbortFailed", {
-            msg: e instanceof Error ? e.message : String(e),
+            msg: errMessage(e),
           }),
         );
         this.session = null;

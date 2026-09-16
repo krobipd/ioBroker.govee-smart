@@ -659,7 +659,7 @@ export class DeviceManager {
         return {
           ok: false,
           reason: "auth-failed",
-          message: err instanceof Error ? err.message : String(err),
+          message: errMessage(err),
         };
       }
 

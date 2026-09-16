@@ -1,5 +1,6 @@
 import type * as http from "node:http";
 import * as https from "node:https";
+import { errMessage } from "./types";
 
 /**
  * Module-level keep-alive agent — avoids the TLS handshake (~200ms) per
@@ -104,7 +105,7 @@ export function interpretOkBody<T>(raw: string, statusCode: number): HttpResult<
     // 100-char body prefix so "returned HTML / non-JSON 200" is diagnosable
     // without debug log; the cap keeps echoed request data out of warn logs.
     const snippet = raw.length > 100 ? `${raw.slice(0, 100)}…` : raw;
-    const detail = parseErr instanceof Error ? parseErr.message : String(parseErr);
+    const detail = errMessage(parseErr);
     throw new Error(`Invalid JSON in HTTP ${statusCode} response: ${detail} — body starts with: ${snippet}`);
   }
 }

@@ -3,6 +3,19 @@
     "name": "govee-smart",
     "version": "2.37.1",
     "news": {
+      "NEXT": {
+        "en": "A dropdown repair no longer deletes the datapoint with its value and its room and function assignment, a renamed device reaches an existing tree, and errors read properly in the log.",
+        "de": "Eine Dropdown-Reparatur löscht den Datenpunkt nicht mehr samt Wert und Raum-/Funktionszuordnung, ein umbenanntes Gerät erreicht den bestehenden Baum, Fehlertexte sind lesbar.",
+        "ru": "Восстановление списка выбора больше не удаляет датапоинт вместе со значением и принадлежностью к комнате и функции, переименованное устройство доходит до существующего дерева.",
+        "pt": "A reparação de uma lista já não apaga o ponto de dados com o seu valor e a atribuição de divisão e função, um dispositivo renomeado chega à árvore existente, erros legíveis.",
+        "nl": "Een reparatie van een keuzelijst verwijdert het datapunt niet meer met waarde en kamer- en functietoewijzing, een hernoemd apparaat bereikt de bestaande boom, leesbare fouten.",
+        "fr": "La réparation d'une liste ne supprime plus le point de données avec sa valeur et son affectation de pièce et de fonction, un appareil renommé atteint l'arbre existant.",
+        "it": "La riparazione di un elenco non elimina più il punto dati con il suo valore e l'assegnazione di stanza e funzione, un dispositivo rinominato raggiunge l'albero esistente.",
+        "es": "La reparación de una lista ya no borra el punto de datos con su valor y su asignación de habitación y función, un dispositivo renombrado llega al árbol existente.",
+        "pl": "Naprawa listy wyboru nie usuwa już punktu danych wraz z wartością oraz przypisaniem pokoju i funkcji, zmieniona nazwa urządzenia dociera do istniejącego drzewa obiektów.",
+        "uk": "Відновлення списку вибору більше не видаляє точку даних разом зі значенням і належністю до кімнати та функції, перейменований пристрій доходить до наявного дерева.",
+        "zh-cn": "修复下拉列表时不再删除数据点及其数值和所属房间与功能，在 Govee 应用中改名的设备现在也会更新到已有的对象树中，日志中的错误信息也更易读。"
+      },
       "2.37.1": {
         "en": "The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 covered the browser storage only, so every open still landed on Expert.",
         "de": "Die Instanz-Einstellungen öffnen auch dann wieder auf Konfiguration, wenn die Admin ihre Einstellungen am Server ablegt — 2.37.0 deckte nur den Browser-Speicher ab, jedes Öffnen landete auf Experte.",
@@ -80,19 +93,6 @@
         "pl": "Tryb, stopień i żywotność filtra oczyszczacza podążają za raportem urządzenia, zapytanie o stan daje wartości przy starcie, a instalacja z samym kluczem API zachowuje polecenia cały dzień.",
         "uk": "Режим, ступінь і ресурс фільтра очищувача йдуть за звітом самого пристрою, запит стану дає значення при старті, а установка лише з API-ключем зберігає команди весь день.",
         "zh-cn": "空气净化器的模式、档位和滤芯寿命跟随设备自身的状态报告；启动时的状态查询返回数值；仅使用 API 密钥的安装全天保留其电器命令。"
-      },
-      "2.34.0": {
-        "en": "Air purifiers, heaters, humidifiers and fans accept a mode or speed again and show their real levels, a heater's temperature is sent correctly, and an account with no light reads its device states.",
-        "de": "Luftreiniger, Heizungen, Befeuchter und Ventilatoren nehmen Modus und Stufe wieder an und zeigen echte Stufen, die Heizungstemperatur geht korrekt raus, ein Konto ohne Lampe liest seine Zustände.",
-        "ru": "Очистители, обогреватели, увлажнители и вентиляторы снова принимают режим и скорость и показывают реальные ступени, температура обогревателя уходит верно, аккаунт без ламп читает состояния устройств.",
-        "pt": "Purificadores, aquecedores, humidificadores e ventoinhas voltam a aceitar modo e velocidade e mostram os níveis reais, a temperatura é enviada corretamente e contas sem luzes leem os estados.",
-        "nl": "Luchtreinigers, kachels, luchtbevochtigers en ventilatoren accepteren modus en stand weer en tonen echte standen, de temperatuur gaat correct uit, een account zonder lamp leest zijn statussen.",
-        "fr": "Purificateurs, chauffages, humidificateurs et ventilateurs acceptent de nouveau mode et vitesse et affichent leurs vrais niveaux, la température part correctement, un compte sans lampe lit ses états.",
-        "it": "Purificatori, stufe, umidificatori e ventilatori accettano di nuovo modalità e velocità e mostrano i livelli reali, la temperatura parte corretta e un account senza luci legge i suoi stati.",
-        "es": "Purificadores, calefactores, humidificadores y ventiladores vuelven a aceptar modo y velocidad y muestran niveles reales, la temperatura sale correcta y una cuenta sin luces lee sus estados.",
-        "pl": "Oczyszczacze, grzejniki, nawilżacze i wentylatory znów przyjmują tryb i bieg oraz pokazują prawdziwe stopnie, temperatura grzejnika wychodzi poprawnie, a konto bez lamp odczytuje swoje stany.",
-        "uk": "Очищувачі, обігрівачі, зволожувачі та вентилятори знову приймають режим і швидкість та показують справжні ступені, температура обігрівача йде правильно, обліковий запис без ламп читає свої стани.",
-        "zh-cn": "空气净化器、取暖器、加湿器和风扇重新接受模式与档位设置，并显示设备真实的档位列表；取暖器目标温度以正确格式和单位发送；账户中没有灯具时也会读取设备状态。"
       }
     },
     "plugins": {
