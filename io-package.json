@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.37.1",
+    "version": "2.38.0",
     "news": {
+      "2.38.0": {
+        "en": "A dropdown repair no longer deletes the datapoint with its value and its room and function assignment, a renamed device reaches an existing tree, and errors read properly in the log.",
+        "de": "Eine Dropdown-Reparatur löscht den Datenpunkt nicht mehr samt Wert und Raum-/Funktionszuordnung, ein umbenanntes Gerät erreicht den bestehenden Baum, Fehlertexte sind lesbar.",
+        "ru": "Восстановление списка выбора больше не удаляет датапоинт вместе со значением и принадлежностью к комнате и функции, переименованное устройство доходит до существующего дерева.",
+        "pt": "A reparação de uma lista já não apaga o ponto de dados com o seu valor e a atribuição de divisão e função, um dispositivo renomeado chega à árvore existente, erros legíveis.",
+        "nl": "Een reparatie van een keuzelijst verwijdert het datapunt niet meer met waarde en kamer- en functietoewijzing, een hernoemd apparaat bereikt de bestaande boom, leesbare fouten.",
+        "fr": "La réparation d'une liste ne supprime plus le point de données avec sa valeur et son affectation de pièce et de fonction, un appareil renommé atteint l'arbre existant.",
+        "it": "La riparazione di un elenco non elimina più il punto dati con il suo valore e l'assegnazione di stanza e funzione, un dispositivo rinominato raggiunge l'albero esistente.",
+        "es": "La reparación de una lista ya no borra el punto de datos con su valor y su asignación de habitación y función, un dispositivo renombrado llega al árbol existente.",
+        "pl": "Naprawa listy wyboru nie usuwa już punktu danych wraz z wartością oraz przypisaniem pokoju i funkcji, zmieniona nazwa urządzenia dociera do istniejącego drzewa obiektów.",
+        "uk": "Відновлення списку вибору більше не видаляє точку даних разом зі значенням і належністю до кімнати та функції, перейменований пристрій доходить до наявного дерева.",
+        "zh-cn": "修复下拉列表时不再删除数据点及其数值和所属房间与功能，在 Govee 应用中改名的设备现在也会更新到已有的对象树中，日志中的错误信息也更易读。"
+      },
       "2.37.1": {
         "en": "The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 covered the browser storage only, so every open still landed on Expert.",
         "de": "Die Instanz-Einstellungen öffnen auch dann wieder auf Konfiguration, wenn die Admin ihre Einstellungen am Server ablegt — 2.37.0 deckte nur den Browser-Speicher ab, jedes Öffnen landete auf Experte.",

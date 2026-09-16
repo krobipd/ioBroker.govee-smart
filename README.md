@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.38.0 (2026-09-16)
 
 - Fixed: Repairing a dropdown no longer deletes and re-creates the datapoint — it used to throw away the datapoint's value and its room and function assignment
 - Changed: A device renamed in the Govee app now gets the new name in an existing object tree too — a name you change in the tree itself is reset at the next start
@@ -138,10 +138,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.35.2 (2026-09-11)
 
 - Fixed: A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written
-
-### 2.35.1 (2026-09-11)
-
-- Fixed: The values Govee reports for a device at start no longer wait behind the loading of the scene libraries — on an installation with a dozen lights they arrived seven minutes after the start
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
