@@ -36,9 +36,13 @@ export default [
       ".dev-server/",
       ".vscode/",
       "*.test.js",
-      "test/**",
-      // Release-Werkzeug wie bei public-holidays: laeuft unter node, nicht Teil des
-      // Adapter-Typprojekts (sonst „not found by the project service").
+      // Only the ioBroker template files under `test/` stay out — NOT `test/**`,
+      // which would also take the synchronised standards suite
+      // (`test/standards/repo-standards.test.ts`) off the linter.
+      "test/*.js",
+      "test/*.cjs",
+      // Release tooling, same as in public-holidays: runs under node and is not part
+      // of the adapter's type project (otherwise "not found by the project service").
       "scripts/**",
       "*.config.mjs",
       "vitest.config.mts",

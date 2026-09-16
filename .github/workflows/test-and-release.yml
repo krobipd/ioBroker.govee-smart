@@ -7,11 +7,11 @@ on:
     tags:
       - v[0-9]+.[0-9]+.[0-9]+
       - v[0-9]+.[0-9]+.[0-9]+-**
-    # Reine Doku-Pushes lösen keinen Lauf aus: an einer Textzeile kann kein
-    # Test fallen. Laut GitHub-Doku gilt "Path filters are not evaluated for
-    # pushes of tags" — der Release-Lauf am Tag bleibt also unberührt. Bewusst
-    # NUR unter `push`, nicht unter `pull_request`: dort liefert der Lauf den
-    # Pflicht-Prüfauftrag der Branch-Sperre (Dependabot-Zusammenführung).
+    # A documentation-only push starts no run: no test can fail on a line of
+    # prose. Per GitHub's docs "Path filters are not evaluated for pushes of
+    # tags", so the release run on the tag is untouched. Deliberately only
+    # under `push`, never under `pull_request`: there the run delivers the
+    # required check of the branch protection (Dependabot merges).
     paths-ignore:
       - "**.md"
       - "docs/**"
@@ -19,6 +19,10 @@ on:
       - ".gitattributes"
       - ".editorconfig"
       - "LICENSE"
+      # No job reads the Dependabot configuration; the pre-push guard rightly refuses a
+      # skip-CI marker for it, so the filter is the only thing that keeps a config
+      # change from running the full matrix (seven such runs on 2026-09-15).
+      - ".github/dependabot.yml"
   pull_request:
     branches:
       - main
@@ -46,17 +50,17 @@ jobs:
       - name: Verify io-package.json against ioBroker stable repository
         run: |
           set -euo pipefail
-          # Source: sources-dist-stable.json — die offizielle Stable-Schiene aus
-          # ioBroker.repositories. Default-Installationen (`activeRepo: stable`)
-          # ziehen alle ioBroker-Adapter von dort. Jede in io-package.json
-          # deklarierte Adapter-Voraussetzung (common.dependencies +
-          # common.globalDependencies) muss MINDESTENS latest-stable sein.
-          # Dahinter = Drift (Block). Voraus = erlaubt: die Abhängigkeits-
-          # Prüfung bei der Installation blockt das Update auf Anlagen, die
-          # die Anforderung nicht erfüllen, und Stable-Nutzer bekommen ohnehin
-          # nur die in sources-dist-stable.json gepinnte Adapter-Version
-          # (tt-tom17-Muster, ioBroker.public-transport 1.x auf npm-latest
-          # mit globalDependencies admin >=8.0.1 vor Admin-8-stable).
+          # Source: sources-dist-stable.json — the official stable channel from
+          # ioBroker.repositories. Default installations (`activeRepo: stable`)
+          # pull every ioBroker adapter from there. Every adapter requirement
+          # declared in io-package.json (common.dependencies +
+          # common.globalDependencies) must be AT LEAST latest-stable.
+          # Behind = drift (block). Ahead = allowed: the dependency check at
+          # install time blocks the update on systems that do not meet the
+          # requirement, and stable users only ever get the adapter version
+          # pinned in sources-dist-stable.json anyway (tt-tom17 pattern:
+          # ioBroker.public-transport 1.x on npm-latest with globalDependencies
+          # admin >=8.0.1 before Admin 8 reached stable).
           URL="https://raw.githubusercontent.com/ioBroker/ioBroker.repositories/master/sources-dist-stable.json"
           HTTP_STATUS=$(curl -sLo /tmp/stable.json -w "%{http_code}" --max-time 30 "$URL" || echo "000")
           if [ "$HTTP_STATUS" = "404" ]; then
@@ -71,15 +75,15 @@ jobs:
             echo "::warning ::sources-dist-stable.json returned HTTP $HTTP_STATUS — skipping live check"
             exit 0
           fi
-          # Schema-Sanity: ohne js-controller + admin ist die Datei kaputt
+          # Schema sanity: without js-controller + admin the file is broken
           JS_STABLE=$(jq -r '."js-controller".version // ""' /tmp/stable.json)
           ADMIN_STABLE=$(jq -r '.admin.version // ""' /tmp/stable.json)
           if [ -z "${JS_STABLE}" ] || [ -z "${ADMIN_STABLE}" ]; then
             echo "::error ::sources-dist-stable.json schema changed — could not parse js-controller/admin versions."
             exit 1
           fi
-          # Iteriere über alle Adapter-Deps in io-package.json (dependencies + globalDependencies)
-          # und vergleiche jeweils gegen den stable-Wert. Format: "<kind>\t<name>\t<value>"
+          # Iterate over every adapter dependency in io-package.json (dependencies + globalDependencies)
+          # and compare each one against its stable value. Format: "<kind>\t<name>\t<value>"
           DEPS=$(jq -r '
             [
               (.common.dependencies // [] | map(to_entries[] | "dependencies\t\(.key)\t\(.value)")),
@@ -155,6 +159,11 @@ jobs:
       - run: npm ci
       - name: Build admin custom component (Vite / Module Federation)
         run: npm run build:admin
+      # Needs src-admin/node_modules from the build step; the root test matrix never has
+      # them. `buildReact` calls vite directly, so without this step the component is
+      # never type-checked anywhere.
+      - name: Type-check the component with its own TypeScript
+        run: npm run check:admin
       - name: Build the adapter
         run: npm run build
       # No drift check here any more: `build/` left version control with the
