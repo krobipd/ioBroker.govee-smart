@@ -50,6 +50,15 @@ describe("makeDeviceListApi", () => {
     await expect(makeDeviceListApi(socket, "govee-smart.0").listDevices()).rejects.toThrow("no connection");
   });
 
+  it("a round-trip rejected with a plain object keeps the object's fields in the error text", async () => {
+    // The socket client of today rejects with Error instances only; the text
+    // must still carry what was thrown if that ever changes — not [object Object].
+    const socket = { sendTo: vi.fn<() => Promise<unknown>>().mockRejectedValue({ code: "notConnectedError" }) };
+    await expect(makeDeviceListApi(socket, "govee-smart.0").listDevices()).rejects.toThrow(
+      '{"code":"notConnectedError"}',
+    );
+  });
+
   it("an empty list is a RESULT, not a failure", async () => {
     // An account really can have no devices yet. That must still render the
     // friendly "nothing here yet" message, not an error.

@@ -7,6 +7,8 @@
 // It is re-declared here because src-admin is an isolated package that cannot
 // import from ../src.
 
+import { errMessage } from "./err-message";
+
 /** One device as the backend offers it. */
 export interface DeviceEntry {
   /** `sku:deviceId`, the key both the export and the wizard expect. */
@@ -65,7 +67,7 @@ export function makeDeviceListApi(socket: DeviceListSocket, namespace: string): 
       try {
         res = await socket.sendTo(namespace, "diagnostics", { action: "list" });
       } catch (e) {
-        throw new DeviceListError(e instanceof Error ? e.message : String(e));
+        throw new DeviceListError(errMessage(e));
       }
       const devices = (res as { devices?: unknown } | null | undefined)?.devices;
       if (!Array.isArray(devices)) {
