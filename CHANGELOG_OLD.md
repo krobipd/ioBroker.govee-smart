@@ -1,5 +1,17 @@
 # Older Changes
 
+## 2.36.0 (2026-09-14)
+
+- Fixed: A command the adapter could not send is no longer confirmed — no cloud connection, or a light reachable on neither channel — the datapoint used to claim the device had taken the value
+- Fixed: Music sensitivity and auto-colour are no longer confirmed on a light or group that cannot apply them — the datapoint keeps the old value and the log says why, instead of claiming success
+- Fixed: The segment wizard restores the brightness the strip had before it ran — it turns the strip to full while measuring, and a dimmed strip stayed bright afterwards
+- Fixed: The segment wizard no longer stays locked for five minutes when the strip cannot be reached at start — it stops with the reason, and can be started again right away
+- Fixed: Sensor values update again on an installation that removed its API key but kept the Govee account — they had frozen at the last reading, and the adapter took a minute to report ready
+- Changed: A sensor reading that has not changed is no longer written again every two minutes — the datapoint keeps its timestamp until the value itself changes
+- Changed: The three summary datapoints under `info` exist right after the start instead of appearing twenty seconds later
+- New: Seven datapoints real devices report now carry a translated name — main light, background light, fan, fan speed, reverse airflow, pillar light and base light
+- New: Explanations where the name alone does not say it — reverse airflow, pillar and base light, warm mist, the preset-scene dropdown and the unreachable members of a group
+
 ## 2.35.2 (2026-09-11)
 
 - Fixed: A light that is unplugged no longer shows as switched on after a start — Govee's answer for a device it cannot reach carries the values of the last contact, and those are no longer written
