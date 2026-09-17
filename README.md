@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.38.3 (2026-09-17)
 
 - Changed: Internal cleanup. No user-facing changes.
 
@@ -124,16 +124,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.37.1 (2026-09-15)
 
 - Fixed: The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 handled the browser storage only, so every open still landed on Expert
-
-### 2.37.0 (2026-09-15)
-
-- Changed: The two folders "snapshots" and "diagnostics" at the top of the object tree are gone — a saved local snapshot is kept with its device, and no diagnostics report is stored any more
-- Changed: A diagnostics report is generated and downloaded from the Expert tab only — the adapter keeps no copy in the instance, and the copies left by earlier versions are removed at the first start
-- Changed: Local snapshots saved by earlier versions are carried over into their device objects at the first start, so nothing you saved is lost when the folder disappears
-- Fixed: The instance settings open on the Configuration tab again — the admin remembered the last tab you used, and once you had visited the Expert tab every later visit started there
-- Fixed: The device icons in the object tree are visible on the dark themes again — they were drawn in plain black, invisible on a dark background, and now take the row's text colour
-- Fixed: A group's "membersUnreachable" datapoint is created together with the group — it used to appear only with the first reachability check, up to 20 seconds after the rest of the group
-- Changed: The admin warns when another adapter on the same host takes the LAN port 4002 — the port shows as a fixed field in the adapter settings next to the network interface
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
