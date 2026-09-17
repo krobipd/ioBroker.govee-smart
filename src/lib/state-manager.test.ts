@@ -144,12 +144,15 @@ function createMockAdapter(): {
       calls.push({ method: "getObjectAsync", args: [id] });
       return Promise.resolve(objects.get(id) ?? null);
     },
-    delObjectAsync: (id: string, _opts?: Record<string, unknown>) => {
-      calls.push({ method: "delObjectAsync", args: [id] });
-      // Remove all matching keys
+    delObjectAsync: (id: string, opts?: Record<string, unknown>) => {
+      calls.push({ method: "delObjectAsync", args: opts === undefined ? [id] : [id, opts] });
+      // Remove all matching keys — and, like js-controller 7.2.2
+      // (`_delForeignObject` / `_deleteObjects`), the value of every state
+      // object that goes with them.
       for (const key of objects.keys()) {
         if (key === id || key.startsWith(`${id}.`)) {
           objects.delete(key);
+          states.delete(key);
         }
       }
       return Promise.resolve();
@@ -2003,8 +2006,8 @@ describe("StateManager", () => {
       expect(delDeviceCalls.length).toBe(0);
     });
 
-    it("should delete state values before removing the device object", async () => {
-      const { adapter, calls } = createMockAdapter();
+    it("removes a stale device with ONE recursive delete — the controller drops the values with the objects", async () => {
+      const { adapter, calls, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
 
       const survivor = createTestDevice({ sku: "H6160", deviceId: "AABB1111" });
@@ -2014,21 +2017,22 @@ describe("StateManager", () => {
 
       await sm.cleanupDevices([survivor]);
 
-      // Find the indices of delStateAsync calls touching the stale prefix
-      // and the delObjectAsync call removing the stale device. The state
-      // deletes must come first so historical values don't outlive the
-      // device tree on disk.
+      // js-controller 7.2.2 (`_deleteObjects`) deletes the value of every state
+      // object it removes and drops its enum memberships — a second pass over
+      // the state table would be a second mechanism for the same guarantee.
       const stalePrefix = "devices.h6161_2222";
-      const stateDeleteIdx = calls.findIndex(
+      const objectDeletes = calls.filter(c => c.method === "delObjectAsync" && c.args[0] === stalePrefix);
+      expect(objectDeletes).toHaveLength(1);
+      expect(objectDeletes[0].args[1]).toEqual({ recursive: true });
+      const stateDeletes = calls.filter(
         c => c.method === "delStateAsync" && typeof c.args[0] === "string" && c.args[0].startsWith(`${stalePrefix}.`),
       );
-      const objectDeleteIdx = calls.findIndex(c => c.method === "delObjectAsync" && c.args[0] === stalePrefix);
-      expect(stateDeleteIdx, "delStateAsync was called for the stale prefix").toBeGreaterThan(-1);
-      expect(objectDeleteIdx, "delObjectAsync was called for the stale prefix").toBeGreaterThan(-1);
-      expect(stateDeleteIdx, "state values must be deleted before the device object").toBeLessThan(objectDeleteIdx);
+      expect(stateDeletes, "no separate value pass before the recursive delete").toHaveLength(0);
+      expect([...states.keys()].filter(k => k.startsWith(`${stalePrefix}.`))).toEqual([]);
+      expect([...states.keys()].some(k => k.startsWith("devices.h6160_1111."))).toBe(true);
     });
 
-    it("should keep state values for surviving devices", async () => {
+    it("leaves the surviving device's objects and values alone", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
 
@@ -2038,11 +2042,13 @@ describe("StateManager", () => {
       await sm.cleanupDevices([survivor]);
 
       const survivorPrefix = "devices.h6160_1111";
-      const survivorStateDeletes = calls.filter(
+      const survivorDeletes = calls.filter(
         c =>
-          c.method === "delStateAsync" && typeof c.args[0] === "string" && c.args[0].startsWith(`${survivorPrefix}.`),
+          (c.method === "delObjectAsync" || c.method === "delStateAsync") &&
+          typeof c.args[0] === "string" &&
+          (c.args[0] === survivorPrefix || c.args[0].startsWith(`${survivorPrefix}.`)),
       );
-      expect(survivorStateDeletes).toHaveLength(0);
+      expect(survivorDeletes).toHaveLength(0);
     });
   });
 

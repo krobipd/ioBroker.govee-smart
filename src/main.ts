@@ -1298,26 +1298,6 @@ export class GoveeAdapter extends utils.Adapter {
   }
 
   /**
-   * Adapter stopping — MUST be synchronous.
-   *
-   * @param callback Completion callback
-   */
-  /**
-   * js-controller and admin versions for the diagnostics report.
-   */
-  /**
-   * Refresh the manifest's own objects on an EXISTING installation.
-   *
-   * js-controller materialises `instanceObjects` only where they are MISSING,
-   * so a changed name or description in io-package.json reaches fresh installs
-   * only — an upgraded tree keeps the old text while the manifest and the name
-   * gate both look green. Every manifest object therefore gets an explicit
-   * extendObject here, with its text from `admin/i18n` (the same source the
-   * release gate writes the manifest from, so the two cannot drift).
-   *
-   * `preserve` is deliberately NOT used: the point is to deliver the new text.
-   */
-  /**
    * Delete the `<namespace>.diagnostics` meta object and every report file it
    * holds (2.29.0–2.36.0 stored up to three reports per device there). The
    * object is an `instanceObjects` entry of those versions, so js-controller
@@ -1346,6 +1326,18 @@ export class GoveeAdapter extends utils.Adapter {
     }
   }
 
+  /**
+   * Refresh the manifest's own objects on an EXISTING installation.
+   *
+   * js-controller materialises `instanceObjects` only where they are MISSING,
+   * so a changed name or description in io-package.json reaches fresh installs
+   * only — an upgraded tree keeps the old text while the manifest and the name
+   * gate both look green. Every manifest object therefore gets an explicit
+   * extendObject here, with its text from `admin/i18n` (the same source the
+   * release gate writes the manifest from, so the two cannot drift).
+   *
+   * `preserve` is deliberately NOT used: the point is to deliver the new text.
+   */
   private async ensureManifestObjects(): Promise<void> {
     // Written out one call per object on purpose. A loop over a table would be
     // shorter and would hide which objects are actually reached — from a reader
@@ -1427,6 +1419,11 @@ export class GoveeAdapter extends utils.Adapter {
     return entries;
   }
 
+  /**
+   * Adapter stopping — MUST be synchronous.
+   *
+   * @param callback Completion callback
+   */
   private onUnload(callback: () => void): void {
     // Set first — async paths read this between awaits and bail before
     // further setState, sendCommand, etc. against a torn-down adapter.

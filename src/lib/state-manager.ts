@@ -285,12 +285,13 @@ export class StateManager {
    * had assigned it to — silently, on exactly the long-lived installs that
    * carry both. Nothing restores an enum membership.
    *
-   * The replacement keeps the object: writing `common.states = null` first
-   * (js-controller's own object validator allows it explicitly — "we allow null
-   * for deletion") leaves a non-object in place of the map, so the following
-   * merge cannot merge into it and puts `fresh` there wholesale. Two writes
-   * instead of one, no delete: value, history (`common.custom`) and enum
-   * membership are untouched.
+   * The replacement keeps the object and is the fleet form for dropping a key
+   * (2026-09-12): read the object back, put the corrected map on the copy and
+   * write it WHOLE with one `setForeignObject` — no merge, so no stale key can
+   * survive, and nothing is deleted: value, history (`common.custom`), name
+   * and enum membership all travel with the copy. (2.38.0 briefly wrote the
+   * map as `null` and then fresh — two `extendObject`s with a window in which
+   * the datapoint had nothing to pick from; 2.38.1 replaced that by this.)
    *
    * @param id    Full state path.
    * @param fresh Plain-string `common.states` map to write.
@@ -335,7 +336,8 @@ export class StateManager {
     if (!obj) {
       return;
     }
-    await this.adapter.delStateAsync(id).catch(() => undefined);
+    // Deleting a state object deletes its value too (js-controller 7.2.2,
+    // `_delForeignObject`: `delForeignState` for `type: "state"`).
     await this.adapter.delObjectAsync(id).catch(() => undefined);
   }
 
@@ -1288,13 +1290,10 @@ export class StateManager {
       const segIdx = parseInt(segPart, 10);
       if (!isNaN(segIdx) && !valid.has(segIdx)) {
         this.adapter.log.debug(`Removing excess segment: ${localId}`);
-        // Drop orphan state values too — `delObjectAsync(recursive)` removes
-        // the object tree but leaves the state-table values for color and
-        // brightness behind. Without these explicit `delStateAsync` calls,
-        // historical values would resurrect into a re-created segment after
-        // a length change.
-        await this.adapter.delStateAsync(`${localId}.color`).catch(() => undefined);
-        await this.adapter.delStateAsync(`${localId}.brightness`).catch(() => undefined);
+        // The recursive delete takes the values with it: js-controller 7.2.2
+        // (`_deleteObjects`) deletes the state of every state object it
+        // removes and drops its enum memberships — nothing resurrects into a
+        // re-created segment after a length change.
         await this.adapter.delObjectAsync(localId, { recursive: true });
       }
     }
@@ -1500,21 +1499,11 @@ export class StateManager {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         if (!currentPrefixes.has(localId)) {
           this.adapter.log.debug(`Removing stale device: ${localId}`);
-          // Recursive delObject removes the object tree but can leave
-          // orphan state values in the state-table — clean those too so
-          // historical values don't survive a device removal.
-          const stateRows = await this.adapter
-            .getObjectViewAsync("system", "state", {
-              startkey: `${row.id}.`,
-              endkey: `${row.id}.${SORT_KEY_END}`,
-            })
-            .catch(() => undefined);
-          if (stateRows?.rows) {
-            for (const stateRow of stateRows.rows) {
-              const stateLocalId = stateRow.id.replace(`${this.adapter.namespace}.`, "");
-              await this.adapter.delStateAsync(stateLocalId).catch(() => undefined);
-            }
-          }
+          // One recursive delete is the whole removal: js-controller 7.2.2
+          // (`_deleteObjects`) deletes the value of every state object in the
+          // tree and drops its enum memberships. A separate pass over the
+          // state table (until 2.38.1) was a second mechanism for the same
+          // guarantee, N extra database calls per removed device.
           await this.adapter.delObjectAsync(localId, { recursive: true });
           this.forgetPrefix(localId);
           removed.push(localId);
@@ -1531,8 +1520,8 @@ export class StateManager {
    * intake, but an object tree already created under an earlier build lingers
    * under `devices.samemodegroup_*` — it never re-enters the device map, so the
    * account-reconciler's {@link cleanupDevices} never reaps it. Delete any such
-   * orphan tree once on start. Same enumerate → drop-state-values → recursive
-   * delete shape as cleanupDevices, scoped to the `samemodegroup_` prefix.
+   * orphan tree once on start. Same enumerate → recursive delete shape as
+   * cleanupDevices, scoped to the `samemodegroup_` prefix.
    *
    * @returns Prefixes of removed orphans (empty on a clean install)
    */
@@ -1553,21 +1542,8 @@ export class StateManager {
     }
     for (const row of existing.rows) {
       const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-      // Recursive delObject leaves state-table values behind — drop those first
-      // (identical to cleanupDevices) so a removed pseudo-device keeps no data.
-      const stateRows = await this.adapter
-        .getObjectViewAsync("system", "state", {
-          startkey: `${row.id}.`,
-          endkey: `${row.id}.${SORT_KEY_END}`,
-        })
-        .catch(() => undefined);
-      if (stateRows?.rows) {
-        for (const stateRow of stateRows.rows) {
-          await this.adapter
-            .delStateAsync(stateRow.id.replace(`${this.adapter.namespace}.`, ""))
-            .catch(() => undefined);
-        }
-      }
+      // The recursive delete removes the values with the objects (js-controller
+      // 7.2.2, `_deleteObjects`) — a removed pseudo-device keeps no data.
       await this.adapter.delObjectAsync(localId, { recursive: true }).catch(() => undefined);
       this.forgetPrefix(localId);
       this.adapter.log.info(`Removed a leftover SameModeGroup pseudo-device (${localId})`);
@@ -1651,8 +1627,9 @@ export class StateManager {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         this.adapter.log.debug(`Removing stale state: ${localId}`);
         this.ensuredStates.delete(localId);
+        // Deleting a state object deletes its value too (js-controller 7.2.2,
+        // `_delForeignObject`: `delForeignState` for `type: "state"`).
         await this.adapter.delObjectAsync(localId);
-        await this.adapter.delStateAsync(localId).catch(() => {});
         totals.deleted++;
       }
       totalsPerChannel.set(channel, totals);

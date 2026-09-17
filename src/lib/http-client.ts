@@ -190,7 +190,7 @@ export function httpsRequest<T>(
         try {
           resolve(interpretOkBody<T>(raw, statusCode));
         } catch (parseErr) {
-          reject(parseErr instanceof Error ? parseErr : new Error(String(parseErr)));
+          reject(parseErr instanceof Error ? parseErr : new Error(errMessage(parseErr)));
         }
       });
     });

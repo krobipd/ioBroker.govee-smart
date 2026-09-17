@@ -220,6 +220,19 @@ describe("RateLimiter", () => {
       await expect(tracked).rejects.toThrow("late 429");
     });
 
+    it("a queued call that rejects with a plain object surfaces the object's fields, not [object Object]", async () => {
+      const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
+      await rl.tryExecute(async () => {}); // burn the minute budget
+      // The caller normalises to an Error — its message must carry what was thrown.
+      // (vi.fn, not Promise.reject: the lint rule against non-Error rejections is right
+      // for production code, and a plain-object rejection is exactly the case under test.)
+      const execute = vi.fn<() => Promise<void>>().mockRejectedValue({ code: "ECONNRESET" });
+      const tracked = rl.executeTracked(execute);
+      (rl as any).callsThisMinute = 0;
+      (rl as any).processQueue();
+      await expect(tracked).rejects.toThrow('{"code":"ECONNRESET"}');
+    });
+
     it("rejects when the tracked call is evicted from a full queue", async () => {
       const rl = new RateLimiter(mockLog, mockTimers, 0, 100_000); // all queue
       for (let i = 0; i < MAX_QUEUE_LENGTH - 1; i++) {

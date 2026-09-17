@@ -331,7 +331,7 @@ export class RateLimiter {
             await execute();
             resolve();
           } catch (e) {
-            reject(e instanceof Error ? e : new Error(String(e)));
+            reject(e instanceof Error ? e : new Error(errMessage(e)));
           }
         },
         priority,
