@@ -1,3 +1,9 @@
+// The error-text helper lives in its own import-free module so the admin
+// component (`src-admin/`) can share it; re-exported here for the 20+ callers.
+import { errMessage } from "./err-message";
+
+export { errMessage };
+
 /**
  * Result of a cloud-load attempt. The retry loop inspects `reason` to handle
  * rate limits and permanent failures correctly.
@@ -707,35 +713,6 @@ export function classifyError(err: unknown): ErrorCategory {
     return "AUTH";
   }
   return "UNKNOWN";
-}
-
-/**
- * Render an unknown error to a string for logging. Returns `e.message` for
- * Error values (the stack stays out of warn/error lines — debug paths that
- * want the trace render it themselves) and `String(...)` for every primitive.
- *
- * A thrown PLAIN OBJECT gets its own branch: `String({ code: "ECONNRESET" })`
- * is `[object Object]`, so a rejected fetch/HTTP object used to reach the log
- * with nothing in it a reader could act on. `JSON.stringify` renders the
- * fields instead; it returns `undefined` for a value it cannot represent and
- * THROWS on a circular structure or a BigInt field — a logger that throws
- * inside a catch block turns a handled failure into an unhandled rejection,
- * so both outcomes fall back to the type tag.
- *
- * @param e Caught value (usually `unknown` in catch blocks)
- */
-export function errMessage(e: unknown): string {
-  if (e instanceof Error) {
-    return e.message;
-  }
-  if (typeof e === "object" && e !== null) {
-    try {
-      return JSON.stringify(e) ?? Object.prototype.toString.call(e);
-    } catch {
-      return Object.prototype.toString.call(e);
-    }
-  }
-  return String(e);
 }
 
 /**

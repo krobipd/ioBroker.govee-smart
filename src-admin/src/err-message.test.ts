@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 
-import { errMessage } from "./err-message";
+import { errMessage } from "../../src/lib/err-message";
 
-describe("errMessage (admin component)", () => {
+describe("errMessage (shared with the admin component)", () => {
   it("returns the message of an Error", () => {
     expect(errMessage(new Error("socket closed"))).toBe("socket closed");
   });

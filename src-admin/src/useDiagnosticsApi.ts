@@ -4,7 +4,9 @@
 //
 // The response shapes MUST stay in sync with the backend
 // (src/lib/message-router.ts, `diagnostics` command). They are re-declared here
-// because src-admin is an isolated package that cannot import from ../src.
+// as plain types: src-admin CAN import from ../src (measured — `err-message` is
+// shared that way), but the backend module carries imports the component must
+// not drag into its bundle, so only an import-free module is shared.
 
 /** A finished report: the file name it was stored under, plus its content. */
 export interface DiagnosticsReport {
