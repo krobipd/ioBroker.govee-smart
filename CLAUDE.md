@@ -139,7 +139,7 @@ Die interne App-API liefert, was die öffentliche OpenAPI nicht kann: **Sensor-W
 
 ## AWS IoT MQTT (Echtzeit-Status-Push)
 
-Auth-Flow, Header und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md` — hier nur, was den Adapter betrifft. **Wir sind subscribe-only für Status** (Befehle gehen über LAN/ptReal/Cloud).
+Auth-Flow, Header und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md` — hier nur, was den Adapter betrifft. **Befehle gehen nie über den Konto-Broker** (LAN/ptReal/Cloud); der einzige Publish ist seit 2.39.0 die Statusanfrage `requestStatus` (`cmdVersion` fest 2 — homebridge kennt je Modell `awsStatusCmdVersion`, H6121 braucht 1; ein Modell mit anderer Version schweigt, bleibt also grau statt falsch grün).
 
 **Login-Sturm-Schutz (#39, Konto-24h-Sperre):** globales Cap `MQTT_MAX_AUTH_FAILURES = 3`. Jeder Versuch, der Govee **erreicht** und abgelehnt wird, zählt (`reachedGovee = category ≠ NETWORK ≠ TIMEOUT`); reine Netz-/Timeout-Fehler laufen ungedeckelt, weil sie das Konto nicht belasten. Der Zähler wird **ausschließlich bei erfolgreichem Subscribe** zurückgesetzt — sonst umgeht ein Wechsel aus Ablehnung + Netz-Blip das Cap. `refreshBearerSilently` ist ein zweiter Login-Pfad und bailt bei ausgeschöpftem Cap. Klassifizierung: Credential-Fehler → dauerhafter Stopp · 2FA (454/455) → Reconnect pausiert bis User-Code (454 = „neuer Client, einmalig verifizieren", nicht „2FA aktiviert"; Code-Anforderung mit 30-s-Drossel gegen Email-Spam) · Rate-Limit/Locked/Abnormal → zählt aufs Cap.
 
