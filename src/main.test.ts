@@ -2424,6 +2424,41 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // And the datapoint says WHEN, not which file.
     expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
   });
+
+  it("the wired report carries the start time and never a group's digit id (issue #50)", async () => {
+    const before = Date.now();
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H61BE",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    await i.syncDevicesManually();
+    await settle();
+    const device = i.deviceManager!.getDevices()[0];
+    // A group is known to the adapter; its id is digits only, so only the
+    // wired id lookup can keep it out of a report that mentions it.
+    const dm = i.deviceManager as unknown as DeviceManager & { devices: Map<string, GoveeDevice> };
+    dm.devices.set("BaseGroup_98765432", { ...device, sku: "BaseGroup", deviceId: "98765432" });
+    dm.getDiagnostics().addLog(device.deviceId, "info", "member of group 98765432");
+    const host = i.buildMessageRouterHost();
+    const result = await (
+      host.buildDiagnosticsReport as (key: string) => Promise<{ fileName: string; content: string }>
+    )(`${device.sku}:${device.deviceId}`);
+    await settle(6);
+    expect(result.content).not.toContain("98765432");
+    expect(result.content).toContain("member of group id-…5432");
+    const startedAt = JSON.parse(result.content).environment.startedAt as string;
+    expect(startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    // The zero point of this run — onReady's start, not the epoch or the process.
+    expect(Date.parse(startedAt)).toBeGreaterThanOrEqual(before - 1000);
+    expect(Date.parse(startedAt)).toBeLessThanOrEqual(Date.now());
+  });
 });
 
 // ===========================================================================

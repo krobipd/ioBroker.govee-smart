@@ -4403,6 +4403,16 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
     };
   };
 
+  it("records nothing itself — Govee's answer reaches the report through the cloud client's hook, once", async () => {
+    // Until 2.39.0 the refresh recorded the parsed capabilities as well: a second
+    // entry of another shape in the same slots, halving the endpoint's history.
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dm2.setCloudClient(recordingCloud().client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(1);
+    const history = (await dm2.generateDiagnostics(dev, "2.39.1")).apiHistory as Record<string, unknown>;
+    expect(history["/router/api/v1/device/state"]).toBeUndefined();
+  });
+
   it("renews a proof that is about to expire — with no account credentials anywhere", async () => {
     const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
     const { client, reads } = recordingCloud();
@@ -4942,6 +4952,18 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     return { dm, device, controls, updates, push };
   }
 
+  it("the diagnostics report lists a held command with its time, and drops it once delivered (issue #50)", async () => {
+    const { dm, device, push } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
+    const held = (await dm.generateDiagnostics(device, "2.39.1")).heldCommands as Array<Record<string, unknown>>;
+    expect(held).toHaveLength(1);
+    expect(held[0]).toMatchObject({ kind: "command", command: "power", value: true });
+    expect(String(held[0].heldAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    push({ onOff: 0 });
+    await dm.whenIntentsSettled();
+    expect((await dm.generateDiagnostics(device, "2.39.1")).heldCommands).toEqual([]);
+  });
+
   it("holds the rejected command, delivers it once on the device's own push, and mirrors the value as acked", async () => {
     const { dm, device, controls, updates, push } = bench();
     await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
@@ -5210,6 +5232,31 @@ describe("requestStaleStatuses — the status request over the account broker (i
     current = entry({ topic: "" });
     await dm.pollAppApi();
     expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
+  });
+
+  it("the report gets Govee's entry as it came, not the parser's projection (issue #50)", async () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", d);
+    const withRaw: AppDeviceEntry = {
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      deviceName: "Strip",
+      lastData: { online: false },
+      raw: { sku: "H6160", device: "AABBCCDDEEFF0011", deviceExt: { lastDeviceData: { online: false, bat: 87 } } },
+    };
+    let current: AppDeviceEntry = withRaw;
+    dm.setApiClient({ hasBearerToken: () => true, fetchDeviceList: () => Promise.resolve([current]) } as never);
+    await dm.pollAppApi();
+    const bodyOf = async (): Promise<Record<string, any>> =>
+      ((await dm.generateDiagnostics(d, "2.39.1")).apiHistory as Record<string, Array<{ body: Record<string, any> }>>)[
+        "/device/rest/devices/v1/list"
+      ].at(-1)!.body;
+    expect((await bodyOf()).deviceExt.lastDeviceData).toEqual({ online: false, bat: 87 });
+    // An entry without the raw copy (a stub, an older client) still records the parsed one.
+    current = { ...withRaw, raw: undefined, deviceName: "Strip" };
+    await dm.pollAppApi();
+    expect((await bodyOf()).lastData).toEqual({ online: false });
   });
 
   it("the account list hands the device its topic — in memory, never in the cache", () => {

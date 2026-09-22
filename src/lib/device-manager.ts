@@ -1,7 +1,7 @@
 import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter, type HeldIntent, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
-import { DiagnosticsCollector } from "./diagnostics";
+import { DiagnosticsCollector, type HeldCommandEntry } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
 import {
@@ -219,6 +219,7 @@ export class DeviceManager {
     this.isUnloading = isUnloading;
     this.commandRouter = new CommandRouter(log, timers, registry);
     this.diagnostics = new DiagnosticsCollector(registry);
+    this.diagnostics.setHeldCommandsProvider(device => this.getHeldCommandsForReport(device));
     // v2.9.1 — funnel command-router routing decisions into the per-device
     // diag ring buffer. Without this, "I clicked but nothing happened" was
     // not triage-able from diag JSON alone — the channel decision lived
@@ -338,6 +339,19 @@ export class DeviceManager {
   getPendingIntents(device: GoveeDevice): HeldIntent[] {
     const held = this.pendingIntents.get(limiterDeviceKey(device));
     return held ? [...held.values()].map(({ at: _at, ...intent }) => intent) : [];
+  }
+
+  /**
+   * The commands waiting for this device with the time each was held — what
+   * the diagnostics report shows next to the "held" log line.
+   *
+   * @param device The device
+   */
+  private getHeldCommandsForReport(device: GoveeDevice): HeldCommandEntry[] {
+    const held = this.pendingIntents.get(limiterDeviceKey(device));
+    return held
+      ? [...held.values()].map(({ at, ...intent }) => ({ ...intent, heldAt: new Date(at).toISOString() }))
+      : [];
   }
 
   /**
@@ -1902,7 +1916,10 @@ export class DeviceManager {
       // apply it directly — otherwise sensor SKUs like H5179 stay at
       // info.online=false forever even while their readings keep updating.
       this.maybeApplyCloudOnline(device, caps);
-      this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry);
+      // Govee's entry as it came, not the parsed projection: `lastDeviceData`
+      // is cut down to five known fields by the parser, and a value Govee sends
+      // under any other name (a battery level, say) was invisible in the report.
+      this.diagnostics.recordApiSuccess(device.deviceId, "/device/rest/devices/v1/list", entry.raw ?? entry);
       updated++;
     }
     // A newly-discovered gateway is static device metadata — persist it (so the
@@ -1996,9 +2013,11 @@ export class DeviceManager {
       dispatched++;
       const refreshOne = async (): Promise<void> => {
         try {
+          // The cloud client's response hook already records Govee's whole
+          // answer for this endpoint; recording the parsed capabilities as well
+          // put a second entry of a different shape into the same slots.
           const caps = await cloudClient.getDeviceState(device.sku, device.deviceId);
           this.applyCloudStateOnline(device, caps);
-          this.diagnostics.recordApiSuccess(device.deviceId, "/router/api/v1/device/state", caps);
         } catch (e) {
           const status =
             e && typeof e === "object" && "statusCode" in e ? (e as { statusCode?: number }).statusCode : undefined;

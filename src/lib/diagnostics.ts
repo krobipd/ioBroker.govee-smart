@@ -12,6 +12,7 @@ import {
 import { CLOUD_REACHABILITY_REFRESH_MS, STATUS_REQUEST_INTERVAL_MS } from "./timing-constants";
 import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
 import type { GoveeRateLimit } from "./govee-cloud-client";
+import type { HeldIntent } from "./command-router";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -222,6 +223,9 @@ const SENSITIVE_KEYS = new Set([
   "api_key",
   "bearer",
   "topic",
+  // Settings of a device someone shared with this account — the other
+  // account's data, never needed to support a model.
+  "sharedsettings",
 ]);
 
 /**
@@ -302,10 +306,25 @@ export interface EnvironmentSnapshot {
   reachableCount?: number;
   /** Per-channel status as the ready summary shows it. */
   channels?: Record<string, string>;
+  /**
+   * When this adapter run started (ISO). Every timeline in a report — the
+   * start-up calls, a push that came late, a queue that drained — is read
+   * against it, and it used to be reconstructed from the oldest API entry.
+   */
+  startedAt?: string;
 }
 
 /** Environment provider — see {@link EnvironmentSnapshot}. */
 export type EnvironmentProvider = () => EnvironmentSnapshot;
+
+/** One command Govee refused while the device was offline, waiting for its next sign of life. */
+export type HeldCommandEntry = HeldIntent & {
+  /** When it was held (ISO). */
+  heldAt: string;
+};
+
+/** Held-command provider — the commands waiting for ONE device. */
+export type HeldCommandsProvider = (device: GoveeDevice) => HeldCommandEntry[];
 
 /**
  * How ONE writable datapoint of this device is actually driven.
@@ -417,6 +436,8 @@ export class DiagnosticsCollector {
    * renamed device is picked up without the collector tracking the account.
    */
   private deviceNamesProvider: (() => string[]) | null = null;
+  /** Every device id currently known — see {@link setDeviceIdsProvider}. */
+  private deviceIdsProvider: (() => string[]) | null = null;
   private runtimeStateProvider: RuntimeStateProvider | null = null;
   private cacheSnapshotProvider: CacheSnapshotProvider | null = null;
   private localSnapshotsProvider: LocalSnapshotsProvider | null = null;
@@ -426,6 +447,7 @@ export class DiagnosticsCollector {
   /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
   private readonly accountCalls: AccountCallEntry[] = [];
   private objectTreeProvider: ObjectTreeProvider | null = null;
+  private heldCommandsProvider: HeldCommandsProvider | null = null;
 
   /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
   constructor(private readonly registry: DeviceRegistry) {}
@@ -447,6 +469,37 @@ export class DiagnosticsCollector {
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Wire the list of known device ids. Only the digit ones matter to the
+   * pseudonymiser: a group's id has no detectable shape, so like a name it is
+   * replaced by lookup — in log lines, object ids and API bodies alike.
+   *
+   * @param provider Returns every device id known right now, or null to clear
+   */
+  setDeviceIdsProvider(provider: (() => string[]) | null): void {
+    this.deviceIdsProvider = provider;
+  }
+
+  /** Every known device id made of digits only (the groups); empty when nothing is wired. */
+  private digitDeviceIds(): string[] {
+    try {
+      return (this.deviceIdsProvider?.() ?? []).filter(id => typeof id === "string" && /^\d+$/.test(id));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Wire the held-command reader (issue #46): what the device will be sent at
+   * its next sign of life. Without it a report shows the "held" log line but
+   * not whether the command is still waiting or was delivered since.
+   *
+   * @param provider Returns the commands waiting for one device, or null to clear
+   */
+  setHeldCommandsProvider(provider: HeldCommandsProvider | null): void {
+    this.heldCommandsProvider = provider;
   }
 
   /**
@@ -915,6 +968,12 @@ export class DiagnosticsCollector {
     } catch {
       environment = null;
     }
+    let heldCommands: HeldCommandEntry[] = [];
+    try {
+      heldCommands = this.heldCommandsProvider ? this.heldCommandsProvider(device) : [];
+    } catch {
+      heldCommands = [];
+    }
     let objectTree: ObjectTreeEntry[] | null = null;
     if (this.objectTreeProvider && prefix) {
       objectTree = await this.objectTreeProvider(prefix).catch(() => null);
@@ -984,7 +1043,22 @@ export class DiagnosticsCollector {
         lastSeenOnNetwork: device.lastSeenOnNetwork ?? null,
         lastLanReplyAt: device.lastLanReplyAt ?? null,
         groupMembers: device.groupMembers ?? null,
+        // Whether the account list handed this device a broker topic — the
+        // topic itself is an address and stays out. Without one, no status
+        // request can reach the device at all.
+        brokerTopicKnown: typeof device.iotTopic === "string" && device.iotTopic.length > 0,
+        // When the adapter last asked it for its status over the broker
+        // (2.39.0), and when it last renewed its cloud reachability proof.
+        lastStatusRequestAt: device.lastStatusRequestAt ?? null,
+        lastReachabilityRefreshAt: device.lastReachabilityRefreshAt ?? null,
+        // When the libraries were last fetched, and how many account lists in a
+        // row did not contain the device (the reaper's counter).
+        librariesCheckedAt: device.librariesCheckedAt ?? null,
+        accountMissCount: device.accountMissCount ?? 0,
       },
+      // Commands Govee refused while the device was offline and that wait for
+      // its next sign of life (issue #46). Empty when nothing waits.
+      heldCommands,
       capabilities: device.capabilities,
       scenes: {
         count: device.scenes.length,
@@ -1084,7 +1158,7 @@ export class DiagnosticsCollector {
     // them were even known. Re-running the pattern passes over the whole report
     // is harmless: a marker no longer matches an address or an id, and the same
     // mapping is reused, so markers stay stable.
-    return this.anon.walk(report, this.deviceNames()) as Record<string, unknown>;
+    return this.anon.walk(report, this.deviceNames(), this.digitDeviceIds()) as Record<string, unknown>;
   }
 
   /**

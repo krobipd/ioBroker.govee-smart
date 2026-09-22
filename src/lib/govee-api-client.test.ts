@@ -273,6 +273,46 @@ describe("GoveeApiClient — fetchDeviceList (sensor device list)", () => {
     expect(list[0].settings).toMatchObject({ uploadRate: 10 });
   });
 
+  it("keeps Govee's entry as it came for the report — nested JSON strings parsed, so redaction reaches inside (issue #50)", async () => {
+    mockHttp.mockResolvedValue(
+      httpOk({
+        devices: [
+          {
+            sku: "H1741",
+            device: "20:15:EB:E7:54:95:B2:4D",
+            deviceId: 46072367,
+            goodsType: 365,
+            deviceExt: {
+              deviceSettings: JSON.stringify({
+                secretCode: "s3cr3t",
+                wifiFuncList: JSON.stringify({ wifiFuncList: [{ type: 1 }] }),
+              }),
+              lastDeviceData: '{"online":false,"bat":87}',
+              deviceSplice: "{}",
+              broken: "{not json",
+            },
+          },
+        ],
+      }),
+    );
+    const client = new GoveeApiClient(apiLog);
+    client.setBearerToken("tok");
+    const [entry] = await client.fetchDeviceList();
+    expect(entry.lastData).toEqual({ online: false });
+    expect(entry.raw).toEqual({
+      sku: "H1741",
+      device: "20:15:EB:E7:54:95:B2:4D",
+      deviceId: 46072367,
+      goodsType: 365,
+      deviceExt: {
+        deviceSettings: { secretCode: "s3cr3t", wifiFuncList: { wifiFuncList: [{ type: 1 }] } },
+        lastDeviceData: { online: false, bat: 87 },
+        deviceSplice: {},
+        broken: "{not json",
+      },
+    });
+  });
+
   it("falls back deviceName to sku when missing and returns [] for a non-array payload", async () => {
     const client = new GoveeApiClient(apiLog);
     client.setBearerToken("tok");

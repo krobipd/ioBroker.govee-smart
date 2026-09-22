@@ -3,6 +3,7 @@ import { DeviceRegistry } from "./device-registry";
 import { HttpError } from "./http-client";
 import type { GoveeDevice } from "./types";
 import { resolveDeviceReachability } from "./device-manager/lookups";
+import { rawAppEntry } from "./govee-api-client";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
@@ -729,6 +730,168 @@ describe("DiagnosticsCollector", () => {
       expect(dev.lastSeenOnNetwork).toBe(1700000000000);
       expect(dev.lastLanReplyAt).toBe(1700000001000);
       expect(dev.groupMembers).toEqual([{ sku: "H61BE", deviceId: "11:22:33" }]);
+    });
+  });
+
+  describe("what the report promises about privacy, held against a real account-list entry (issue #50)", () => {
+    // The shape of one H1741 entry of Govee's account list exactly as the
+    // endpoint answers it (homebridge-govee issue #1278, 2026-05-16): settings
+    // and last data as JSON strings, the Wi-Fi function list as JSON inside
+    // JSON. Every value that could identify a person or a home is a canary —
+    // the test asserts none of them survives anywhere in the finished report.
+    const CANARIES = {
+      appDeviceNumber: 98765432,
+      deviceName: "Canary Lamp",
+      ssid: "CANARY Jenny & Mirko",
+      matterId: "CAFEBABE0D15EA5E",
+      secretCode: "CANARYsecret0000=",
+      topic: "GD/canarycanarycanarycanarycanary",
+      wifiMac: "5C:E7:53:FC:DE:FA",
+      shared: "CANARY-shared-owner",
+    };
+    const rawEntry = {
+      deviceId: CANARIES.appDeviceNumber,
+      groupId: 0,
+      sku: "H1741",
+      device: "20:15:EB:E7:54:95:B2:4D",
+      spec: "",
+      versionHard: "3.08.01",
+      versionSoft: "1.01.09",
+      deviceName: CANARIES.deviceName,
+      pactType: 1,
+      pactCode: 1,
+      deviceExt: {
+        deviceSettings: JSON.stringify({
+          appVersion: "7.4.30",
+          address: "EB:E7:54:95:B2:4D",
+          supportEnc: true,
+          bleName: "Govee_H1741_B24D",
+          secretCode: CANARIES.secretCode,
+          wifiName: CANARIES.ssid,
+          wifiMac: CANARIES.wifiMac,
+          matterId: CANARIES.matterId,
+          deviceName: CANARIES.deviceName,
+          topic: CANARIES.topic,
+          wifiFuncList: JSON.stringify({ wifiFuncList: [{ type: 1, subType: [1, 2, 3] }] }),
+        }),
+        lastDeviceData: JSON.stringify({ online: false, bat: 87 }),
+        deviceSplice: "{}",
+        extResources: JSON.stringify({ skuUrl: "https://example.invalid/h1741.png", ic: 8 }),
+        sharedSettings: JSON.stringify({ nick: CANARIES.shared }),
+      },
+      share: 0,
+      goodsType: 365,
+    };
+
+    it("no identifying value of the entry reaches the finished report", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.setDeviceNamesProvider(() => [CANARIES.deviceName]);
+      const deviceId = "20:15:EB:E7:54:95:B2:4D";
+      c.recordApiSuccess(deviceId, "/device/rest/devices/v1/list", rawAppEntry(rawEntry));
+      const text = JSON.stringify(
+        await c.generate(makeDevice({ sku: "H1741", deviceId, name: CANARIES.deviceName }), "2.39.1"),
+      );
+      for (const canary of Object.values(CANARIES)) {
+        expect(text).not.toContain(String(canary));
+      }
+      expect(text).not.toContain("20:15:EB:E7:54:95:B2:4D");
+    });
+
+    it("keeps what a diagnosis needs: every field Govee sent in the last data, and the network as a marker", async () => {
+      // The parser keeps five known fields of `lastDeviceData`; a value under any
+      // other name — a battery level on a lamp, say — used to be invisible.
+      const c = new DiagnosticsCollector(registry);
+      const deviceId = "20:15:EB:E7:54:95:B2:4D";
+      c.recordApiSuccess(deviceId, "/device/rest/devices/v1/list", rawAppEntry(rawEntry));
+      const report = await c.generate(makeDevice({ sku: "H1741", deviceId }), "2.39.1");
+      const body = (report.apiHistory as Record<string, Array<{ body: Record<string, any> }>>)[
+        "/device/rest/devices/v1/list"
+      ][0].body;
+      expect(body.deviceExt.lastDeviceData).toEqual({ online: false, bat: 87 });
+      expect(body.deviceExt.deviceSettings.wifiName).toBe("wifi-1");
+      expect(body.deviceExt.deviceSettings.wifiFuncList).toEqual({ wifiFuncList: [{ type: 1, subType: [1, 2, 3] }] });
+      expect(body.deviceExt.deviceSettings.secretCode).toBe("***");
+      expect(body.deviceExt.sharedSettings).toBe("***");
+      expect(body.deviceId).toBe("app-id-1");
+      expect(body.groupId).toBe(0);
+    });
+  });
+
+  describe("a group's id is only digits — the report still never shows it (issue #50)", () => {
+    it("shortens it in the device section, the object prefix, log lines and API bodies", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.setDeviceIdsProvider(() => ["12345678", "AA:BB:CC:DD:EE:FF:1D:6F"]);
+      c.addLog("12345678", "info", "group 12345678 fan-out to 1 member");
+      c.recordApiSuccess("12345678", "/bff-app/v1/exec-plat/home", { groupId: 12345678, devices: [] });
+      c.setRuntimeStateProvider(
+        () => ({ lanSeenDeviceIps: [], rateLimiter: null, note: "BaseGroup:12345678" }) as never,
+      );
+      const report = await c.generate(
+        makeDevice({ sku: "BaseGroup", deviceId: "12345678", groupMembers: [] }),
+        "2.39.1",
+        "groups.12345678",
+      );
+      const text = JSON.stringify(report);
+      expect(text).not.toContain("12345678");
+      expect((report.device as Record<string, unknown>).objectPrefix).toBe("groups.id-…5678");
+    });
+  });
+
+  describe("fields that used to be missing (issue #50)", () => {
+    it("names the broker topic's presence (never the topic), the status request, the reachability refresh and the reaper's counter", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const dev = (
+        await c.generate(
+          makeDevice({
+            iotTopic: "GD/0123456789abcdef0123456789abcdef",
+            lastStatusRequestAt: 1_700_000_000_000,
+            lastReachabilityRefreshAt: 1_700_000_100_000,
+            librariesCheckedAt: 1_700_000_200_000,
+            accountMissCount: 2,
+          }),
+          "2.39.1",
+        )
+      ).device as Record<string, unknown>;
+      expect(dev.brokerTopicKnown).toBe(true);
+      expect(dev.lastStatusRequestAt).toBe(1_700_000_000_000);
+      expect(dev.lastReachabilityRefreshAt).toBe(1_700_000_100_000);
+      expect(dev.librariesCheckedAt).toBe(1_700_000_200_000);
+      expect(dev.accountMissCount).toBe(2);
+    });
+
+    it("says so when no topic is known and nothing was ever asked", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const dev = (await c.generate(makeDevice(), "2.39.1")).device as Record<string, unknown>;
+      expect(dev.brokerTopicKnown).toBe(false);
+      expect(dev.lastStatusRequestAt).toBeNull();
+      expect(dev.accountMissCount).toBe(0);
+    });
+
+    it("lists the commands held for the device's next sign of life", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.setHeldCommandsProvider(d =>
+        d.deviceId === "dev1"
+          ? [{ kind: "command", command: "power", value: true, heldAt: "2026-09-17T13:13:32.980Z" }]
+          : [],
+      );
+      expect((await c.generate(makeDevice({ deviceId: "dev1" }), "2.39.1")).heldCommands).toEqual([
+        { kind: "command", command: "power", value: true, heldAt: "2026-09-17T13:13:32.980Z" },
+      ]);
+      expect((await c.generate(makeDevice({ deviceId: "dev2" }), "2.39.1")).heldCommands).toEqual([]);
+    });
+
+    it("a failing held-command reader costs the section, not the report", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.setHeldCommandsProvider(() => {
+        throw new Error("boom");
+      });
+      expect((await c.generate(makeDevice(), "2.39.1")).heldCommands).toEqual([]);
+    });
+
+    it("carries the adapter's start time in the environment", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.setEnvironmentProvider(() => ({ startedAt: "2026-09-22T17:07:30.000Z" }));
+      expect((await c.generate(makeDevice(), "2.39.1")).environment).toEqual({ startedAt: "2026-09-22T17:07:30.000Z" });
     });
   });
 

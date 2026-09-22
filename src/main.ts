@@ -221,6 +221,8 @@ export class GoveeAdapter extends utils.Adapter {
    * process runs — a controller or admin update restarts every instance.
    */
   private hostVersions: { jsController?: string; admin?: string } = {};
+  /** When this run's onReady began — the zero point of every timeline in a diagnostics report. */
+  private startedAt = Date.now();
   /** Daily interval for the app-version-drift check against the app store. */
   private appVersionCheckTimer: ioBroker.Interval | undefined;
   /**
@@ -437,6 +439,7 @@ export class GoveeAdapter extends utils.Adapter {
   }
 
   private async onReady(): Promise<void> {
+    this.startedAt = Date.now();
     try {
       // First of all: without this the whole shutdown path stays dead on an updated
       // install, and the correction restarts us — so nothing else may start up here.
@@ -637,6 +640,8 @@ export class GoveeAdapter extends utils.Adapter {
       // Device names have no detectable shape, so the pseudonymiser can only
       // replace the ones it is told about.
       diag.setDeviceNamesProvider(() => this.deviceManager?.getDevices().map(d => d.name) ?? []);
+      // A group's id is digits only — no pattern finds it, so it goes by lookup too.
+      diag.setDeviceIdsProvider(() => this.deviceManager?.getDevices().map(d => d.deviceId) ?? []);
       // Which ioBroker this runs on, and how the installation as a whole is
       // doing. Every field here used to be a follow-up question on a report —
       // and the issue forms dropped their Node field because it belongs in here.
@@ -652,6 +657,7 @@ export class GoveeAdapter extends utils.Adapter {
           deviceCount: devices.length,
           reachableCount: devices.filter(d => resolveDeviceReachability(d).online).length,
           channels: { ...this.channelStatus },
+          startedAt: new Date(this.startedAt).toISOString(),
         };
       });
       // The datapoints as they really exist — the answer to "this datapoint is

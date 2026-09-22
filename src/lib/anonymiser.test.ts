@@ -94,6 +94,89 @@ describe("Anonymiser", () => {
     });
   });
 
+  describe("values that have no shape — found by their key (issue #50)", () => {
+    it("replaces the network name with a marker, the same network with the same marker", () => {
+      // Govee's account list carries the SSID in every device's settings. Three
+      // published exports (#46, #47, #50) showed it in clear: a village name and
+      // two first names.
+      const a = new Anonymiser();
+      const out = a.walk({
+        one: { settings: { wifiName: "Jenny & Mirko" } },
+        two: { settings: { wifiName: "Jenny & Mirko" } },
+        three: { settings: { WIFINAME: "Barmdorf2" }, ssid: "Barmdorf2" },
+      }) as Record<string, { settings: { wifiName?: string; WIFINAME?: string }; ssid?: string }>;
+      const text = JSON.stringify(out);
+      expect(text).not.toContain("Jenny");
+      expect(text).not.toContain("Barmdorf2");
+      expect(out.one.settings.wifiName).toBe("wifi-1");
+      expect(out.two.settings.wifiName).toBe("wifi-1");
+      expect(out.three.settings.WIFINAME).toBe("wifi-2");
+      expect(out.three.ssid).toBe("wifi-2");
+    });
+
+    it("replaces the Matter id", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ matterId: "E7A62E99C277DF59" })).toEqual({ matterId: "matter-1" });
+    });
+
+    it("leaves an empty network name empty — nothing to hide, and a marker would claim a network", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ wifiName: "" })).toEqual({ wifiName: "" });
+    });
+
+    it("gives the app's internal device number a marker", () => {
+      const a = new Anonymiser();
+      const out = a.walk({ deviceId: 49595162, again: { deviceId: 49595162 } }) as {
+        deviceId: string;
+        again: { deviceId: string };
+      };
+      expect(out.deviceId).toBe("app-id-1");
+      expect(out.again.deviceId).toBe("app-id-1");
+    });
+
+    it("shortens a group id like a device id, under either key and in either type", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ deviceId: "12345678", groupId: 12345678, g: { groupId: "12345678" } })).toEqual({
+        deviceId: "id-…5678",
+        groupId: "id-…5678",
+        g: { groupId: "id-…5678" },
+      });
+    });
+
+    it("keeps Govee's `groupId: 0` (in no group) and leaves a hex id to its own rule", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ groupId: 0, deviceId: "AA:BB:CC:DD:EE:FF:1D:6F" })).toEqual({
+        groupId: 0,
+        deviceId: "id-…1d6f",
+      });
+    });
+
+    it("is idempotent — a second pass leaves every key-based marker as it is", () => {
+      const a = new Anonymiser();
+      const once = a.walk({ wifiName: "Home", matterId: "M1", deviceId: 42, groupId: 12345678 });
+      expect(a.walk(once)).toEqual(once);
+    });
+  });
+
+  describe("group ids inside text — found by lookup, like names", () => {
+    it("replaces a known digit id wherever it stands on its own", () => {
+      const a = new Anonymiser();
+      const out = a.text("group 12345678 fan-out; key BaseGroup:12345678; prefix groups.12345678", [], ["12345678"]);
+      expect(out).not.toContain("12345678");
+      expect(out).toBe("group id-…5678 fan-out; key BaseGroup:id-…5678; prefix groups.id-…5678");
+    });
+
+    it("does not touch the same digits inside a longer number", () => {
+      const a = new Anonymiser();
+      expect(a.text("at 1790098123456789 ms", [], ["123456"])).toBe("at 1790098123456789 ms");
+    });
+
+    it("ignores ids shorter than six digits — they would hit byte counts and times", () => {
+      const a = new Anonymiser();
+      expect(a.text("sent 12345 bytes", [], ["12345"])).toBe("sent 12345 bytes");
+    });
+  });
+
   describe("walk", () => {
     it("pseudonymises keys as well as values", () => {
       // A Govee response can key a map by device id.

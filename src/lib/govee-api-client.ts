@@ -87,6 +87,13 @@ export interface AppDeviceEntry {
   versionHard?: string;
   /** Software firmware version */
   versionSoft?: string;
+  /**
+   * Govee's entry as it came, for the diagnostics report — with the nested
+   * `deviceExt` strings parsed into objects, so the report's key-based
+   * redaction reaches `secretCode`/`topic` inside them (a JSON string would
+   * carry them through untouched).
+   */
+  raw?: Record<string, unknown>;
 }
 
 /**
@@ -251,6 +258,7 @@ export class GoveeApiClient {
         deviceId: typeof d.deviceId === "number" ? d.deviceId : undefined,
         versionHard: typeof d.versionHard === "string" ? d.versionHard : undefined,
         versionSoft: typeof d.versionSoft === "string" ? d.versionSoft : undefined,
+        raw: rawAppEntry(d),
       };
       const ext = d.deviceExt;
       if (ext && typeof ext === "object") {
@@ -624,6 +632,55 @@ export class GoveeApiClient {
     }
     return groups;
   }
+}
+
+/**
+ * A string that holds a JSON object or array, parsed — nested strings included
+ * (`deviceSettings.wifiFuncList` is JSON inside JSON). Anything else, and
+ * anything that does not parse, comes back as it was. Depth-bounded.
+ *
+ * @param value Any value from a Govee response
+ * @param depth Remaining nesting budget
+ */
+function parseJsonStrings(value: unknown, depth: number): unknown {
+  if (depth <= 0) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const head = value.trimStart()[0];
+    if (head !== "{" && head !== "[") {
+      return value;
+    }
+    try {
+      return parseJsonStrings(JSON.parse(value) as unknown, depth - 1);
+    } catch {
+      return value;
+    }
+  }
+  if (Array.isArray(value)) {
+    return value.map(v => parseJsonStrings(v, depth - 1));
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = parseJsonStrings(v, depth - 1);
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * A copy of one device-list entry for the diagnostics report. Every string
+ * that holds JSON (`deviceExt.deviceSettings`, `lastDeviceData`,
+ * `extResources`, and JSON nested inside those) is parsed into an object: the
+ * report redacts secrets by key, and a key inside a JSON string is invisible to
+ * it. A value that does not parse stays a string.
+ *
+ * @param entry One element of the response's `devices` array
+ */
+export function rawAppEntry(entry: object): Record<string, unknown> {
+  return parseJsonStrings(entry, 8) as Record<string, unknown>;
 }
 
 /**
