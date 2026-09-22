@@ -1,5 +1,11 @@
 # Older Changes
 
+## 2.38.0 (2026-09-16)
+
+- Fixed: Repairing a dropdown no longer deletes and re-creates the datapoint — it used to throw away the datapoint's value and its room and function assignment
+- Changed: A device renamed in the Govee app now gets the new name in an existing object tree too — a name you change in the tree itself is reset at the next start
+- Fixed: An error the adapter reports as an object now reads properly in the log instead of "[object Object]", and a connection problem reported that way is recognised as one
+
 ## 2.37.1 (2026-09-15)
 
 - Fixed: The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 handled the browser storage only, so every open still landed on Expert

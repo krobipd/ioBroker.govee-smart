@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.39.0",
+    "version": "2.39.1",
     "news": {
+      "2.39.1": {
+        "en": "The diagnostics report no longer contains your Wi-Fi network name, the Govee app's device number or a group's id — they appeared in clear in every exported file\nThe diagnostics report keeps Govee's complete account-list entry and shows commands waiting for an offline device and when the adapter started",
+        "de": "Der Diagnosebericht enthält nicht mehr den WLAN-Namen, die Gerätenummer der Govee-App oder die Kennung einer Gruppe — sie standen im Klartext in jeder exportierten Datei\nDer Diagnosebericht behält Govees vollständigen Eintrag der Kontoliste und zeigt Befehle, die auf ein Offline-Gerät warten, sowie den Startzeitpunkt des Adapters",
+        "ru": "Диагностический отчёт больше не содержит имя сети Wi-Fi, номер устройства в приложении Govee и идентификатор группы — раньше они стояли открытым текстом в каждом файле\nДиагностический отчёт сохраняет полную запись списка аккаунта Govee и показывает команды, ожидающие офлайн-устройство, и время запуска адаптера",
+        "pt": "O relatório de diagnóstico já não contém o nome da rede Wi-Fi, o número do dispositivo na app Govee nem o id de um grupo — apareciam em claro em cada ficheiro exportado\nO relatório de diagnóstico mantém a entrada completa da lista da conta Govee e mostra os comandos à espera de um dispositivo offline e quando o adaptador arrancou",
+        "nl": "Het diagnoserapport bevat niet langer de wifi-netwerknaam, het apparaatnummer van de Govee-app of de id van een groep — die stonden leesbaar in elk geëxporteerd bestand\nHet diagnoserapport bewaart Govees volledige vermelding in de accountlijst en toont commando's die op een offline apparaat wachten en wanneer de adapter startte",
+        "fr": "Le rapport de diagnostic ne contient plus le nom du réseau Wi-Fi, le numéro d'appareil de l'app Govee ni l'id d'un groupe — ils figuraient en clair dans chaque fichier\nLe rapport de diagnostic garde l'entrée complète de la liste du compte Govee et montre les commandes en attente d'un appareil hors ligne et l'heure de démarrage",
+        "it": "Il rapporto di diagnostica non contiene più il nome della rete Wi-Fi, il numero del dispositivo nell'app Govee né l'id di un gruppo — comparivano in chiaro in ogni file\nIl rapporto di diagnostica conserva la voce completa dell'elenco account Govee e mostra i comandi in attesa di un dispositivo offline e l'avvio dell'adattatore",
+        "es": "El informe de diagnóstico ya no contiene el nombre de la red Wi-Fi, el número del dispositivo en la app Govee ni el id de un grupo — aparecían en claro en cada archivo\nEl informe de diagnóstico conserva la entrada completa de la lista de la cuenta Govee y muestra los comandos que esperan a un dispositivo sin conexión y el arranque",
+        "pl": "Raport diagnostyczny nie zawiera już nazwy sieci Wi-Fi, numeru urządzenia z aplikacji Govee ani identyfikatora grupy — były jawnie w każdym eksportowanym pliku\nRaport diagnostyczny zachowuje pełny wpis z listy konta Govee i pokazuje polecenia czekające na urządzenie offline oraz czas uruchomienia adaptera",
+        "uk": "Діагностичний звіт більше не містить назву мережі Wi-Fi, номер пристрою в застосунку Govee та ідентифікатор групи — раніше вони стояли відкритим текстом у кожному файлі\nДіагностичний звіт зберігає повний запис списку облікового запису Govee і показує команди, що чекають на офлайн-пристрій, та час запуску адаптера",
+        "zh-cn": "诊断报告不再包含 Wi-Fi 网络名称、Govee 应用中的设备编号和群组标识——此前它们以明文出现在每个导出的文件中\n诊断报告保留 Govee 账户列表中的完整条目，并显示等待离线设备的命令以及适配器的启动时间"
+      },
       "2.39.0": {
         "en": "A quiet device is asked for its status over the Govee account connection and stays reachable; a command refused while it was offline is delivered once it is back\n28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles and the gateways that carry battery sensors",
         "de": "Ein verstummtes Gerät wird über die Govee-Kontoverbindung nach seinem Status gefragt und bleibt erreichbar; ein bei Offline abgelehnter Befehl wird zugestellt, sobald es zurück ist\n28 weitere Govee-Modelle werden erkannt — Fleischthermometer, Bewegungs- und Drucksensoren, Heizgeräte, Wasserkocher und die Gateways der Batteriesensoren",
@@ -80,19 +93,6 @@
         "pl": "Ustawienia instancji znów otwierają się na Konfiguracji także wtedy, gdy admin przechowuje ustawienia na serwerze — 2.37.0 obejmowała tylko pamięć przeglądarki, każde otwarcie lądowało na Ekspercie.",
         "uk": "Налаштування екземпляра знову відкриваються на «Конфігурації», навіть якщо адмін зберігає налаштування на сервері — 2.37.0 охоплювала лише сховище браузера, кожне відкриття потрапляло на «Експерт».",
         "zh-cn": "即使管理界面将其设置保存在服务器上，实例设置也会再次在“配置”页打开——2.37.0 只处理了浏览器存储，因此每次打开仍停在“专家”页。"
-      },
-      "2.37.0": {
-        "en": "The root folders snapshots and diagnostics are gone, the settings open on Configuration again, icons show on dark themes, and the admin warns when another adapter takes LAN port 4002.",
-        "de": "Root-Ordner snapshots und diagnostics sind weg, Einstellungen öffnen wieder auf Konfiguration, Symbole sichtbar auf dunklen Themen, die Admin warnt, wenn ein anderer Adapter LAN-Port 4002 belegt.",
-        "ru": "Корневые папки snapshots и diagnostics удалены, настройки снова открываются на «Конфигурации», значки видны на тёмных темах, админ предупреждает, если другой адаптер занял LAN-порт 4002.",
-        "pt": "As pastas raiz snapshots e diagnostics desapareceram, as definições abrem de novo em Configuração, ícones visíveis nos temas escuros, o admin avisa se outro adaptador usa a porta LAN 4002.",
-        "nl": "Hoofdmappen snapshots en diagnostics zijn weg, instellingen openen weer op Configuratie, pictogrammen zichtbaar op donkere thema's, de admin waarschuwt als een andere adapter LAN-poort 4002 gebruikt.",
-        "fr": "Les dossiers racine snapshots et diagnostics ont disparu, les réglages s'ouvrent sur Configuration, icônes visibles en thème sombre, l'admin avertit si un autre adaptateur prend le port LAN 4002.",
-        "it": "Le cartelle radice snapshots e diagnostics sono sparite, le impostazioni si aprono su Configurazione, icone visibili nei temi scuri, l'admin avvisa se un altro adattatore usa la porta LAN 4002.",
-        "es": "Las carpetas raíz snapshots y diagnostics han desaparecido, los ajustes abren en Configuración, iconos visibles en temas oscuros, el admin avisa si otro adaptador usa el puerto LAN 4002.",
-        "pl": "Foldery główne snapshots i diagnostics zniknęły, ustawienia otwierają się znów na Konfiguracji, ikony widoczne w ciemnych motywach, admin ostrzega, gdy inny adapter zajmuje port LAN 4002.",
-        "uk": "Кореневі теки snapshots і diagnostics зникли, налаштування знову відкриваються на «Конфігурації», значки видно на темних темах, адмін попереджає, якщо інший адаптер зайняв LAN-порт 4002.",
-        "zh-cn": "对象树顶部的 snapshots 和 diagnostics 文件夹已移除，设置再次在“配置”页打开，图标在深色主题下可见，当其他适配器占用 LAN 端口 4002 时管理界面会发出警告。"
       }
     },
     "plugins": {

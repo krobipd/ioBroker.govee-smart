@@ -95,7 +95,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.39.1 (2026-09-22)
 
 - Fixed: The diagnostics report no longer contains your Wi-Fi network name, the Govee app's device number or a group's id — they appeared in clear in every exported file
 - Improved: The diagnostics report keeps Govee's complete account-list entry and shows commands waiting for an offline device and when the adapter started
@@ -122,12 +122,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.38.1 (2026-09-16)
 
 - Fixed: Repairing a dropdown is now a single write — until 2.38.0 it was emptied first, so a restart in that moment left the datapoint with nothing to pick from until the next start
-
-### 2.38.0 (2026-09-16)
-
-- Fixed: Repairing a dropdown no longer deletes and re-creates the datapoint — it used to throw away the datapoint's value and its room and function assignment
-- Changed: A device renamed in the Govee app now gets the new name in an existing object tree too — a name you change in the tree itself is reset at the next start
-- Fixed: An error the adapter reports as an object now reads properly in the log instead of "[object Object]", and a connection problem reported that way is recognised as one
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
