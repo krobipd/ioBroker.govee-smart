@@ -103,6 +103,16 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
+- Improved: The cloud budget follows Govee's per-device limits — a command for one light no longer waits for another light's calls or for library downloads
+- New: A command Govee refused because the device was offline is delivered once the device reports back (within five minutes), instead of being lost
+- Improved: The libraries of one model are fetched once per start for all its lights, and an empty library answer is remembered for seven days
+- Fixed: A scene list that shrank no longer leaves withdrawn scenes in the dropdown
+- Improved: The diagnostics report shows Govee's rate-limit headers and, for appliances, no longer promises a reachability refresh that skips them
+- New: H1771 Table Lamp reported working by a user
+
 ### 2.38.3 (2026-09-17) — stable
 
 - Changed: Internal cleanup. No user-facing changes.
