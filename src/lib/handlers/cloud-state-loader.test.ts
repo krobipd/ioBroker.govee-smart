@@ -184,6 +184,29 @@ describe("loadCloudStates", () => {
     expect(called).toBe(0);
   });
 
+  it("skips app groups — Govee keeps no state for them and answered every read with `400 devices not exist`", async () => {
+    const group = createTestDevice({
+      sku: "BaseGroup",
+      deviceId: "6781280",
+      capabilities: [
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
+      ],
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const light = createTestDevice({ deviceId: "AA:04", channels: { lan: false, mqtt: false, cloud: true } });
+    const rig = makeRig([group, light]);
+    const asked: string[] = [];
+    rig.setDeviceState((sku, id) => {
+      asked.push(`${sku}:${id}`);
+      return Promise.resolve([]);
+    });
+    await loadCloudStates(rig.adapter);
+    expect(asked).toEqual([`${light.sku}:AA:04`]);
+    // Scoped to the group itself (a refresh on it) — still no call.
+    await loadCloudStates(rig.adapter, group);
+    expect(asked).toEqual([`${light.sku}:AA:04`]);
+  });
+
   it("records a per-device API failure in the diag (C2 audit class) and continues with the next device", async () => {
     const d1 = createTestDevice({ deviceId: "AA:04", channels: { lan: true, mqtt: false, cloud: true } });
     const d2 = createTestDevice({ deviceId: "AA:05", channels: { lan: true, mqtt: false, cloud: true } });

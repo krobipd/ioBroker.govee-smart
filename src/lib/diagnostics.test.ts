@@ -908,6 +908,20 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("an app group in the reachability section", () => {
+    it("says it has no reachability of its own instead of 'nothing ever reported — not reachable'", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({ sku: "BaseGroup", deviceId: "6781280", lanIp: undefined, state: { online: false } }),
+        "2.39.1",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      const src = r.device.reachabilitySource!;
+      expect(String(src.decidedBy)).toMatch(/^not applicable — an app group/);
+      expect(src.silentSources).toEqual([]);
+      expect(String(src.refreshedBy)).toMatch(/never asked/);
+    });
+  });
+
   describe("the broker topic of a device (2.39.0)", () => {
     it("never reaches the export — it is an address, not diagnostic data", async () => {
       const c = new DiagnosticsCollector(registry);

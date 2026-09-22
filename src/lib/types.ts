@@ -141,12 +141,18 @@ export interface CloudStateCapability {
   state: { value: unknown };
 }
 
-/** Cloud API scenes response — payload contains capabilities with options */
+/**
+ * Cloud API scenes response — payload contains capabilities with options.
+ * The envelope of every device endpoint (recorded: `{requestId, msg, code,
+ * payload}`); the reason of a rejection is `msg`, not `message`.
+ */
 export interface CloudScenesResponse {
-  /** Response status code */
-  code: number;
-  /** Response message */
-  message: string;
+  /** Echo of the request id */
+  requestId?: string;
+  /** Response status code — anything but 200 (or 0) is a rejection */
+  code?: number;
+  /** Govee's message ("success", or the reason of a rejection) */
+  msg?: string;
   /** Payload with capabilities (scenes endpoint format) */
   payload?: {
     /** Scene capabilities with options */

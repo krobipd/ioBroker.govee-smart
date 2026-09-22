@@ -62,9 +62,13 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
     return;
   }
 
+  // App groups (BaseGroup) come in the cloud device list like devices, but
+  // Govee keeps no state for them: every read answered `400 devices not exist`
+  // (krobi's installation, 2.39.1) — one wasted call per group and start, and a
+  // failure line in the group's report. The reachability refresh skips them too.
   const targets = adapter.deviceManager
     .getDevices()
-    .filter(d => d.channels.cloud && d.capabilities.length > 0 && (!only || d === only));
+    .filter(d => d.channels.cloud && d.capabilities.length > 0 && d.sku !== "BaseGroup" && (!only || d === only));
 
   for (const device of targets) {
     const loadOne = async (): Promise<void> => {

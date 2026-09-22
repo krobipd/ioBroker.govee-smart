@@ -149,6 +149,26 @@ describe("GoveeCloudClient", () => {
       expect(calls).toHaveLength(1); // cleared — no further captures
     });
 
+    it("records a rejected answer NOT as a success — the caller's failure entry is the one record (issue #50 follow-up)", async () => {
+      // Measured on krobi's installation (2.39.1): a group's state read came back
+      // `400 devices not exist` and stood in the report twice — once `ok: true`
+      // from this hook, once as the loader's failure.
+      const rejected = {
+        requestId: "x",
+        msg: "devices not exist",
+        code: 400,
+        payload: { sku: "BaseGroup", device: "1" },
+      };
+      const fake = makeFakeHttps(() => rejected);
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      const captured: string[] = [];
+      client.setResponseHook((_d, endpoint) => captured.push(endpoint));
+      await expect(client.getDeviceState("BaseGroup", "1")).rejects.toThrow(/code=400 — devices not exist/);
+      await expect(client.getScenes("BaseGroup", "1")).rejects.toThrow(/code=400 — devices not exist/);
+      await expect(client.getDiyScenes("BaseGroup", "1")).rejects.toThrow(/code=400 — devices not exist/);
+      expect(captured).toEqual([]);
+    });
+
     it("should fire the hook on getDeviceState", async () => {
       const fake = makeFakeHttps(() => H7127_STATE_ENVELOPE);
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
@@ -557,6 +577,35 @@ describe("GoveeCloudClient", () => {
       expect(result.lightScenes[0].name).toBe("valid");
     });
 
+    it("throws on a rejection in the envelope — it is not a device without scenes", async () => {
+      // Read as empty, a rejection took the snapshot list from the capability
+      // fallback and let the scenes count as checked; thrown, the loader keeps
+      // the cached lists (its error path) and records the reason.
+      const fake = makeFakeHttps(() => ({ requestId: "x", msg: "devices not exist", code: 400 }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getScenes("H6160", "AABB")).rejects.toThrow(
+        /Scenes rejected for H6160\/AABB: code=400 — devices not exist/,
+      );
+    });
+
+    it("accepts Govee's success envelope (`code: 200`, `msg: success`) and a bare `code: 0`", async () => {
+      const ok = (code: number): Record<string, unknown> => ({
+        requestId: "x",
+        msg: "success",
+        code,
+        payload: { capabilities: [] },
+      });
+      for (const code of [200, 0]) {
+        const client = new GoveeCloudClient("k", mockLog, makeFakeHttps(() => ok(code)).fn);
+        await expect(client.getScenes("H6160", "AABB")).resolves.toEqual({
+          lightScenes: [],
+          diyScenes: [],
+          snapshots: [],
+        });
+        await expect(client.getDiyScenes("H6160", "AABB")).resolves.toEqual([]);
+      }
+    });
+
     it("should return empty buckets for missing payload", async () => {
       const fake = makeFakeHttps(() => ({}));
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
@@ -609,6 +658,14 @@ describe("GoveeCloudClient", () => {
       const client = new GoveeCloudClient("k", mockLog, fake.fn);
       const scenes = await client.getDiyScenes("H6160", "AABB");
       expect(scenes).toHaveLength(2);
+    });
+
+    it("throws on a rejection in the envelope, naming the DIY call", async () => {
+      const fake = makeFakeHttps(() => ({ requestId: "x", msg: "Invalid parameter type", code: 400 }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDiyScenes("H6160", "AABB")).rejects.toThrow(
+        /DIY scenes rejected for H6160\/AABB: code=400 — Invalid parameter type/,
+      );
     });
 
     it("should return [] when no capabilities", async () => {

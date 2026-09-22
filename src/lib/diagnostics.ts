@@ -1190,6 +1190,19 @@ export class DiagnosticsCollector {
     refreshedBy: string;
     silentSources: string[];
   } {
+    // An app group is no device: nothing reports on it, and its tree has no
+    // reachability datapoint of its own. Run through the device rule it read
+    // "nothing ever reported — reported as not reachable" next to five renewers
+    // that never touch a group (krobi's installation, 2.39.1).
+    if (device.sku === "BaseGroup") {
+      return {
+        decidedBy:
+          "not applicable — an app group has no reachability of its own; groups.info.online shows the cloud connection, the group's info.membersUnreachable names members that cannot be reached",
+        lastEvidenceAt: null,
+        refreshedBy: "nothing — a group is never asked for its state",
+        silentSources: [],
+      };
+    }
     const decision = resolveDeviceReachability(device);
     const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
     const lanDriven = isLanDriven(device);

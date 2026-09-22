@@ -149,6 +149,21 @@ function mapSceneOptions(opts: CapabilityOption[] | undefined): CloudScene[] {
 }
 
 /**
+ * Govee answers a device endpoint with HTTP 200 and a body-level `code` when it
+ * refuses the call (`400 devices not exist`, `Invalid parameter type`); the
+ * reason sits in `msg`. Such an answer is a failure, never an empty result.
+ *
+ * @param resp The parsed answer (null/undefined pass — the callers handle them)
+ * @param what Start of the error message, naming the call and the device
+ */
+function throwIfRejected(resp: { code?: unknown; msg?: unknown } | null | undefined, what: string): void {
+  if (resp && typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
+    const msg = typeof resp.msg === "string" && resp.msg ? ` — ${resp.msg}` : "";
+    throw new Error(`${what}: code=${resp.code}${msg}`);
+  }
+}
+
+/**
  * Govee Cloud API v2 client.
  * Used for device list, capabilities, scenes, segments, and as control fallback.
  */
@@ -275,9 +290,9 @@ export class GoveeCloudClient {
       requestId: nextRequestId("state"),
       payload: { sku, device },
     });
-    this.onResponse?.(device, "/router/api/v1/device/state", resp, this.lastRateLimit);
     if (resp === null) {
       // HTTP 200 without a body — the http client's word for "nothing came".
+      this.onResponse?.(device, "/router/api/v1/device/state", resp, this.lastRateLimit);
       return [];
     }
     // A rejection and an answer of unknown shape THROW — both callers catch
@@ -285,14 +300,13 @@ export class GoveeCloudClient {
     // payload without capabilities is a legitimate empty result. Folding all
     // of it into [] is how the wrong envelope stayed invisible from v0.1.0 to
     // 2.34.0: "no value" and "wrong field" rendered the same (issue #47).
-    if (typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
-      throw new Error(
-        `Device state rejected for ${sku}/${device}: code=${resp.code}${resp.msg ? ` — ${resp.msg}` : ""}`,
-      );
-    }
+    throwIfRejected(resp, `Device state rejected for ${sku}/${device}`);
     if (typeof resp.payload !== "object" || resp.payload === null) {
       throw new Error(`Device state answer for ${sku}/${device} carries no payload — has Govee changed the envelope?`);
     }
+    // Recorded once the answer is accepted: a rejection reaches the report as
+    // the caller's failure entry, not a second time as a "successful" answer.
+    this.onResponse?.(device, "/router/api/v1/device/state", resp, this.lastRateLimit);
     // Govee wraps this answer in `payload`, like the scene endpoints below —
     // `data` is the envelope of the device LIST (three captures: the
     // reporter's export, tukey42's H61A8, Govee's own docs).
@@ -388,6 +402,10 @@ export class GoveeCloudClient {
       requestId: nextRequestId("scenes"),
       payload: { sku, device },
     });
+    // A rejection is not "this device has no scenes": read as empty, it took
+    // the snapshot list from the capability fallback and marked the scenes as
+    // checked. It throws; the loader keeps what it had (issue #50 follow-up).
+    throwIfRejected(resp, `Scenes rejected for ${sku}/${device}`);
     this.onResponse?.(device, "/router/api/v1/device/scenes", resp, this.lastRateLimit);
 
     const lightScenes: CloudScene[] = [];
@@ -426,6 +444,7 @@ export class GoveeCloudClient {
       requestId: nextRequestId("diy"),
       payload: { sku, device },
     });
+    throwIfRejected(resp, `DIY scenes rejected for ${sku}/${device}`);
     this.onResponse?.(device, "/router/api/v1/device/diy-scenes", resp, this.lastRateLimit);
 
     const scenes: CloudScene[] = [];
