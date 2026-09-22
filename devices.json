@@ -37,6 +37,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H1167": {
+      "name": "Show Box",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H1168": {
       "name": "Sync Box",
       "type": "light",
@@ -331,6 +337,30 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H5024": {
+      "name": "Motion Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5026": {
+      "name": "Smart Motion Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5042": {
+      "name": "Smart Gateway",
+      "type": "gateway",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5043": {
+      "name": "Wi-Fi Smart Gateway 2",
+      "type": "gateway",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H5051": {
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
@@ -517,6 +547,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H5121": {
+      "name": "Motion Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H5122": {
       "name": "Smart Button",
       "type": "button",
@@ -528,6 +564,12 @@
       "type": "sensor",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H5124": {
+      "name": "Vibration Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H5125": {
       "name": "Button Remote",
@@ -546,6 +588,18 @@
       "type": "sensor",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H5129": {
+      "name": "Outdoor Motion Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5130": {
+      "name": "Button Pressure Sensor",
+      "type": "sensor",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H5140": {
       "name": "Smart CO2 Monitor",
@@ -600,6 +654,42 @@
       "type": "thermometer",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H5191": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5192": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5194": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5196": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5198": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
+    },
+    "H5199": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H5220": {
       "name": "same broadcast format as the H5101 family",
@@ -1513,6 +1603,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H6149": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H614A": {
       "name": "Smart Light",
       "type": "light",
@@ -2022,6 +2118,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H61D4": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H61D5": {
       "name": "LED Strip",
       "type": "light",
@@ -2124,6 +2226,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H6611": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H6630": {
       "name": "Smart Light",
       "type": "light",
@@ -2196,11 +2304,23 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H6820": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H6821": {
       "name": "Meteor Shower Lights",
       "type": "light",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H6822": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H6840": {
       "name": "Smart Light",
@@ -2886,6 +3006,12 @@
         }
       }
     },
+    "H70C6": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H70C7": {
       "name": "Christmas String Lights 2 (50m)",
       "type": "light",
@@ -2897,6 +3023,12 @@
           "lightScene": "cloud"
         }
       }
+    },
+    "H70C8": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H70C9": {
       "name": "Christmas String Lights 2 (100m)",
@@ -3084,11 +3216,23 @@
       "status": "seed",
       "since": "2.0.0"
     },
+    "H7136": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H7137": {
       "name": "Space Heater",
       "type": "heater",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H7138": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H713A": {
       "name": "Smart Space Heater",
@@ -3107,6 +3251,12 @@
       "type": "heater",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H713D": {
+      "name": "Space Heater",
+      "type": "heater",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H713E": {
       "name": "Space Heater",
@@ -3240,17 +3390,35 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H7178": {
+      "name": "Smart Kettle",
+      "type": "kettle",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H717A": {
       "name": "Smart Kettle",
       "type": "kettle",
       "status": "seed",
       "since": "2.33.0"
     },
+    "H717C": {
+      "name": "Smart Kettle",
+      "type": "kettle",
+      "status": "seed",
+      "since": "2.39.0"
+    },
     "H717D": {
       "name": "Ice Maker",
       "type": "ice_maker",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H7184": {
+      "name": "Smart Composter",
+      "type": "composter",
+      "status": "seed",
+      "since": "2.39.0"
     },
     "H7308": {
       "name": "Copper Wire Light",

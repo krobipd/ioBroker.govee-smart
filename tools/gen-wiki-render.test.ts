@@ -1,5 +1,7 @@
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { renderPage, TEXTS_DE, TEXTS_EN, type DeviceEntry } from "./gen-wiki-render";
+import { renderPage, TEXTS_DE, TEXTS_EN, TYPE_ORDER, type DeviceEntry } from "./gen-wiki-render";
 
 const devices: Record<string, DeviceEntry> = {
   H6160: { name: "Strip", type: "light", status: "verified", since: "2.0.0" },
@@ -46,6 +48,21 @@ describe("renderPage — one folded block per device type", () => {
 
   it("the footer still counts every entry, folded or not", () => {
     expect(renderPage(devices, TEXTS_EN)).toContain("4 entries");
+  });
+
+  it("every type of the catalog has an order slot and a title in BOTH languages — a new type word must reach three places", () => {
+    // A device kind that is missing here renders without a block (or without a
+    // heading): 2.39.0 added `gateway` and `composter` and needed all three.
+    const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "devices.json"), "utf-8")) as {
+      devices: Record<string, DeviceEntry>;
+    };
+    const kinds = new Set(Object.values(real.devices).map(e => e.type));
+    for (const kind of kinds) {
+      expect(TYPE_ORDER, `${kind} has no slot in TYPE_ORDER`).toContain(kind);
+      expect(TEXTS_EN.typeTitles, `${kind} has no English title`).toHaveProperty(kind);
+      expect(TEXTS_DE.typeTitles, `${kind} has no German title`).toHaveProperty(kind);
+    }
+    expect(kinds.has("gateway"), "the gateway is a device of its own since 2.39.0").toBe(true);
   });
 
   it("renders byte-identical output twice, so the wiki gate can diff it", () => {

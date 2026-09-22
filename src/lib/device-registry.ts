@@ -108,7 +108,9 @@ export interface DeviceEntry {
     | "kettle"
     | "ice_maker"
     | "aroma_diffuser"
-    | "button";
+    | "button"
+    | "gateway"
+    | "composter";
   /** Trust tier (see DeviceStatus). */
   status: DeviceStatus;
   /** Adapter version when this device was first supported (semver). Optional. */

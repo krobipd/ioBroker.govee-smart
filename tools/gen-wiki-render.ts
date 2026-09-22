@@ -32,7 +32,8 @@ const STATUS_ICON: Record<DeviceEntry["status"], string> = {
   seed: "⚪",
 };
 
-const TYPE_ORDER = [
+/** Order of the folded blocks — every catalog type needs a slot (test-pinned). */
+export const TYPE_ORDER = [
   "light",
   "thermometer",
   "sensor",
@@ -46,6 +47,8 @@ const TYPE_ORDER = [
   "ice_maker",
   "aroma_diffuser",
   "button",
+  "gateway",
+  "composter",
 ];
 
 /** Every language-dependent string of the page — one object per language. */
@@ -132,6 +135,8 @@ einzelne Funktionen fehlen.`,
     ice_maker: "Eiswürfelbereiter",
     aroma_diffuser: "Aromadiffusoren",
     button: "Taster und Fernbedienungen",
+    gateway: "Gateways",
+    composter: "Komposter",
   },
   colSku: "SKU",
   colName: "Govee-Name",
@@ -208,6 +213,8 @@ Problems or missing functions are possible.`,
     ice_maker: "Ice makers",
     aroma_diffuser: "Aroma diffusers",
     button: "Buttons and remotes",
+    gateway: "Gateways",
+    composter: "Composters",
   },
   colSku: "SKU",
   colName: "Govee name",

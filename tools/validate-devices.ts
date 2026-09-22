@@ -26,6 +26,10 @@ const ALLOWED_TYPES = new Set([
   "ice_maker",
   "aroma_diffuser",
   "button",
+  // 2.39.0: a Govee gateway is a device of its own — the sensor behind it is
+  // supported THROUGH it, so it needs a catalog entry (krobi 2026-09-22).
+  "gateway",
+  "composter",
 ]);
 
 const ALLOWED_STATUS = new Set(["verified", "reported", "seed"]);
