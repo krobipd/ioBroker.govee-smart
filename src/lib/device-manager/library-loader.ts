@@ -3,6 +3,7 @@ import type { GoveeCloudClient } from "../govee-cloud-client";
 import type { DiagnosticsCollector } from "../diagnostics";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { extractHttpStatus } from "../http-client";
+import { LIBRARY_RECHECK_MS } from "../timing-constants";
 import {
   deviceLabel,
   errMessage,
@@ -36,6 +37,75 @@ export interface LibraryLoaderHost {
   readonly log: ioBroker.Logger;
   readonly diagnostics: DiagnosticsCollector;
   runLimited(fn: () => Promise<void>): Promise<void>;
+  /**
+   * Per-run memo for the SKU-level fetches (scene/music/DIY library, SKU
+   * features): the first device of a SKU fetches, every other device of that
+   * SKU awaits the same outcome and gets the same data. Eight bulbs of one
+   * SKU used to make the same four calls eight times per start. Absent = no
+   * sharing (the manual refresh of one device).
+   */
+  readonly sharedFetches?: Map<string, Promise<SharedFetchOutcome<unknown>>>;
+  /**
+   * Tells the host that a fetch this device depends on never ran (the limiter
+   * dropped it) — so the caller can tell "checked, empty" from "not checked".
+   * The host's own runLimited notes that for the device that issued the call;
+   * a device that merely shared the outcome needs this hook.
+   */
+  noteCancelled?(): void;
+}
+
+/** What a (possibly shared) fetch came back with. `ran: false` = the limiter never ran it. */
+export interface SharedFetchOutcome<T> {
+  ran: boolean;
+  data: T | null;
+  error?: unknown;
+}
+
+/**
+ * Run one SKU-level fetch through the host's budget, shared per run when the
+ * host carries a memo. The memoised promise never rejects: a failed fetch is
+ * an outcome with `error`, so one failure cannot poison every device of the
+ * SKU with a rejection — each keeps what it had, the next run fetches again.
+ *
+ * @param host Loader host
+ * @param key Memo key — the endpoint including the SKU
+ * @param fetch The API call
+ */
+async function sharedFetch<T>(
+  host: LibraryLoaderHost,
+  key: string,
+  fetch: () => Promise<T>,
+): Promise<SharedFetchOutcome<T>> {
+  const memo = host.sharedFetches;
+  const existing = memo?.get(key);
+  if (existing) {
+    return (await existing) as SharedFetchOutcome<T>;
+  }
+  const outcome = (async (): Promise<SharedFetchOutcome<T>> => {
+    let result: SharedFetchOutcome<T> = { ran: false, data: null };
+    await host.runLimited(async () => {
+      try {
+        result = { ran: true, data: await fetch() };
+      } catch (e) {
+        result = { ran: true, data: null, error: e };
+      }
+    });
+    return result;
+  })();
+  memo?.set(key, outcome);
+  return outcome;
+}
+
+/**
+ * Whether an empty answer for this device's libraries is recent enough to
+ * trust. Remembered WITH an expiry: the #13 trap was "once empty, empty
+ * forever" — here Govee gets asked again after {@link LIBRARY_RECHECK_MS}.
+ *
+ * @param device The device
+ * @param now Current time (ms)
+ */
+function recentlyCheckedEmpty(device: GoveeDevice, now: number): boolean {
+  return typeof device.librariesCheckedAt === "number" && now - device.librariesCheckedAt < LIBRARY_RECHECK_MS;
 }
 
 /**
@@ -195,6 +265,7 @@ export async function loadDeviceScenes(
  *   labels, and the fetch + assign closures
  * @param cfg.force Refetch even when the field already holds data
  * @param cfg.current The device field being populated — skipped when non-empty unless forced
+ * @param cfg.recentlyChecked An empty field was confirmed empty recently — skipped unless forced
  * @param cfg.ep API endpoint path, recorded in the diag buffer and failure log
  * @param cfg.label Human-readable library name for the debug count line
  * @param cfg.noun Plural noun for the count line (e.g. "scenes")
@@ -210,6 +281,7 @@ async function loadLibrary<T>(
   cfg: {
     force: boolean;
     current: T[];
+    recentlyChecked: boolean;
     ep: string;
     label: string;
     noun: string;
@@ -218,27 +290,29 @@ async function loadLibrary<T>(
     assign: (lib: T[]) => void;
   },
 ): Promise<boolean> {
-  if (!(cfg.force || cfg.current.length === 0)) {
+  if (!cfg.force && (cfg.current.length > 0 || cfg.recentlyChecked)) {
     return false;
   }
-  let changed = false;
-  await host.runLimited(async () => {
-    try {
-      const lib = await cfg.fetch();
-      host.diagnostics.recordApiSuccess(device.deviceId, cfg.ep, lib);
-      host.log.debug(
-        `${cfg.label} for ${sku}: ${lib.length} ${cfg.noun}${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
-      );
-      if (lib.length > 0) {
-        cfg.assign(lib);
-        changed = true;
-      }
-    } catch (e) {
-      host.diagnostics.recordApiFailure(device.deviceId, cfg.ep, e, extractHttpStatus(e));
-      logUndocApiFailure(host.log, sku, cfg.failLabel, cfg.ep, hasBearer, e);
-    }
-  });
-  return changed;
+  const outcome = await sharedFetch(host, cfg.ep, cfg.fetch);
+  if (!outcome.ran) {
+    host.noteCancelled?.();
+    return false;
+  }
+  if (outcome.error !== undefined || outcome.data === null) {
+    host.diagnostics.recordApiFailure(device.deviceId, cfg.ep, outcome.error, extractHttpStatus(outcome.error));
+    logUndocApiFailure(host.log, sku, cfg.failLabel, cfg.ep, hasBearer, outcome.error);
+    return false;
+  }
+  const lib = outcome.data;
+  host.diagnostics.recordApiSuccess(device.deviceId, cfg.ep, lib);
+  host.log.debug(
+    `${cfg.label} for ${sku}: ${lib.length} ${cfg.noun}${lib.length === 0 ? " — empty (Govee returned no data for this SKU)" : ""}`,
+  );
+  if (lib.length > 0) {
+    cfg.assign(lib);
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -255,6 +329,7 @@ async function loadLibrary<T>(
  * @param force When true, refetch every endpoint regardless of cache —
  *   used by the user-triggered refresh button so a stale library
  *   actually gets replaced
+ * @param now Current time (ms) — the empty-answer memory expires against it
  * @returns true if any library data changed
  */
 export async function loadDeviceLibraries(
@@ -262,6 +337,7 @@ export async function loadDeviceLibraries(
   device: GoveeDevice,
   sku: string,
   force = false,
+  now: number = Date.now(),
 ): Promise<boolean> {
   if (!host.apiClient) {
     return false;
@@ -272,11 +348,13 @@ export async function loadDeviceLibraries(
   let changed = false;
 
   const hasBearer = apiClient.hasBearerToken();
+  const recentlyChecked = recentlyCheckedEmpty(device, now);
 
   if (
     await loadLibrary(host, device, sku, hasBearer, {
       force,
       current: device.sceneLibrary,
+      recentlyChecked,
       ep: `/light-effect-libraries?sku=${sku}`,
       label: "Scene library",
       noun: "scene(s)",
@@ -294,6 +372,7 @@ export async function loadDeviceLibraries(
     await loadLibrary(host, device, sku, hasBearer, {
       force,
       current: device.musicLibrary,
+      recentlyChecked,
       ep: `/light-effect-libraries-music?sku=${sku}`,
       label: "Music library",
       noun: "mode(s)",
@@ -311,6 +390,7 @@ export async function loadDeviceLibraries(
     await loadLibrary(host, device, sku, hasBearer, {
       force,
       current: device.diyLibrary,
+      recentlyChecked,
       ep: `/diy-effect-libraries?sku=${sku}`,
       label: "DIY library",
       noun: "effect(s)",
@@ -324,24 +404,25 @@ export async function loadDeviceLibraries(
     changed = true;
   }
 
-  if (force || !device.skuFeatures) {
-    await host.runLimited(async () => {
-      const ep = `/sku-features?sku=${sku}`;
-      try {
-        const features = await apiClient.fetchSkuFeatures(sku);
-        host.diagnostics.recordApiSuccess(device.deviceId, ep, features);
-        if (features) {
-          device.skuFeatures = features;
-          changed = true;
-          host.log.debug(`SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`);
-        } else {
-          host.log.debug(`SKU features for ${sku}: null — Govee returned no data for this SKU`);
-        }
-      } catch (e) {
-        host.diagnostics.recordApiFailure(device.deviceId, ep, e, extractHttpStatus(e));
-        logUndocApiFailure(host.log, sku, "SKU features", ep, hasBearer, e);
+  if (force || (!device.skuFeatures && !recentlyChecked)) {
+    const ep = `/sku-features?sku=${sku}`;
+    const outcome = await sharedFetch(host, ep, () => apiClient.fetchSkuFeatures(sku));
+    if (!outcome.ran) {
+      host.noteCancelled?.();
+    } else if (outcome.error !== undefined) {
+      host.diagnostics.recordApiFailure(device.deviceId, ep, outcome.error, extractHttpStatus(outcome.error));
+      logUndocApiFailure(host.log, sku, "SKU features", ep, hasBearer, outcome.error);
+    } else {
+      const features = outcome.data;
+      host.diagnostics.recordApiSuccess(device.deviceId, ep, features);
+      if (features) {
+        device.skuFeatures = features;
+        changed = true;
+        host.log.debug(`SKU features for ${sku}: ${JSON.stringify(features).slice(0, 200)}`);
+      } else {
+        host.log.debug(`SKU features for ${sku}: null — Govee returned no data for this SKU`);
       }
-    });
+    }
   }
 
   // Load snapshot BLE commands for local activation.

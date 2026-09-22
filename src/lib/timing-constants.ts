@@ -98,6 +98,15 @@ export const CLOUD_REACHABILITY_REFRESH_MS = 20 * 60 * 1000;
  */
 export const LAN_CAPABLE_MEMORY_MS = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * How long an EMPTY answer for a SKU's libraries (scene/music/DIY library,
+ * SKU features — app2.govee.com) is trusted before Govee is asked again.
+ * Until 2.38.3 an empty answer was never remembered: every start repeated the
+ * calls for every light of the SKU. Remembered with an expiry, not forever —
+ * the #13 lesson ("once empty, empty forever") is about the missing expiry.
+ */
+export const LIBRARY_RECHECK_MS = 7 * 24 * 60 * 60 * 1000;
+
 // === Adapter lifecycle ===
 
 /** Hard timeout for cloud initialisation (60 s). */

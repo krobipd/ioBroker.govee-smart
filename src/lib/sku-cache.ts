@@ -53,6 +53,8 @@ export interface CachedDeviceData {
   cachedAt: number;
   /** True after a Cloud scene-fetch attempt has completed (success or confirmed empty). */
   scenesChecked?: boolean;
+  /** When the SKU libraries were last confirmed (an empty answer expires after LIBRARY_RECHECK_MS). */
+  librariesCheckedAt?: number;
   /** Timestamp (ms) when device was last seen on local network (LAN/MQTT). */
   lastSeenOnNetwork?: number;
   /** Consecutive account-reconcile misses — debounce for the irreversible auto-removal. */

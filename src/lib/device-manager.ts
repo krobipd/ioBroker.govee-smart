@@ -295,13 +295,24 @@ export class DeviceManager {
    * @param track Optional outcome tracker for one job
    * @param track.cancelled Set when a call never ran, so the caller can tell
    *   "checked, empty" from "not checked this round"
+   * @param shared The run's memo for SKU-level fetches (one fetch per SKU and
+   *   run, shared by every light of that SKU); absent for a manual refresh
    */
-  private libraryHost(track?: { cancelled: boolean }): libraryLoader.LibraryLoaderHost {
+  private libraryHost(
+    track?: { cancelled: boolean },
+    shared?: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
+  ): libraryLoader.LibraryLoaderHost {
     return {
       cloudClient: this.cloudClient!,
       apiClient: this.apiClient,
       log: this.log,
       diagnostics: this.diagnostics,
+      sharedFetches: shared,
+      noteCancelled: () => {
+        if (track) {
+          track.cancelled = true;
+        }
+      },
       runLimited: async (fn: () => Promise<void>): Promise<void> => {
         if (!this.rateLimiter) {
           await fn();
@@ -329,9 +340,14 @@ export class DeviceManager {
    *
    * @param device The light to load for
    * @param cd Its cloud list entry (capabilities feed the snapshot fallback)
+   * @param shared The run's memo for SKU-level fetches
    */
-  private startSceneLoad(device: GoveeDevice, cd: CloudDevice): void {
-    const job: Promise<void> = this.loadSceneDataFor(device, cd)
+  private startSceneLoad(
+    device: GoveeDevice,
+    cd: CloudDevice,
+    shared: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
+  ): void {
+    const job: Promise<void> = this.loadSceneDataFor(device, cd, shared)
       .catch((e: unknown) => {
         this.log.debug(`Scene load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
       })
@@ -341,13 +357,22 @@ export class DeviceManager {
     this.pendingSceneLoads.add(job);
   }
 
-  private async loadSceneDataFor(device: GoveeDevice, cd: CloudDevice): Promise<void> {
+  private async loadSceneDataFor(
+    device: GoveeDevice,
+    cd: CloudDevice,
+    shared: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
+  ): Promise<void> {
     const track = { cancelled: false };
-    const host = this.libraryHost(track);
+    const host = this.libraryHost(track, shared);
     const scenesChanged = await libraryLoader.loadDeviceScenes(host, device, cd);
     const librariesChanged = await libraryLoader.loadDeviceLibraries(host, device, cd.sku);
     if (this.isUnloading()) {
       return;
+    }
+    if (!track.cancelled) {
+      // The libraries were confirmed this round (filled or empty) — an empty
+      // answer is remembered until LIBRARY_RECHECK_MS has passed.
+      device.librariesCheckedAt = Date.now();
     }
     // Checked = the cloud answered this round, even with an empty list (empty
     // is legitimate and must not refetch forever). A cancelled call is NOT
@@ -655,6 +680,11 @@ export class DeviceManager {
       // Step 1: Merge Cloud devices into local device map
       const changed = this.mergeCloudDevices(cloudDevices);
 
+      // One memo per run: the SKU-level library fetches are shared by every
+      // light of a SKU. The jobs of this run hold it; a later run gets a fresh
+      // one, so nothing has to be cleared.
+      const sharedFetches = new Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>();
+
       // Step 2: Load scenes, snapshots, and libraries for any device that
       // exposes a `dynamic_scene` capability — independent of `cd.type`.
       // Govee occasionally returns devices with `type` missing or a value
@@ -676,7 +706,7 @@ export class DeviceManager {
             // method 60 s. Each job persists and rebuilds its own light when
             // its answers are in (loadSceneDataFor); `changed` here stays the
             // list merge — a new device gets its tree from the loop below.
-            this.startSceneLoad(device, cd);
+            this.startSceneLoad(device, cd, sharedFetches);
           }
         }
       }
@@ -825,12 +855,16 @@ export class DeviceManager {
       capabilities: Array.isArray(target.capabilities) ? target.capabilities : [],
     };
     let changed = false;
-    const host = this.libraryHost();
+    const track = { cancelled: false };
+    const host = this.libraryHost(track);
     if (await libraryLoader.loadDeviceScenes(host, target, cd)) {
       changed = true;
     }
     if (await libraryLoader.loadDeviceLibraries(host, target, cd.sku, /* force */ true)) {
       changed = true;
+    }
+    if (!track.cancelled) {
+      target.librariesCheckedAt = Date.now();
     }
     if (changed) {
       this.saveDevicesToCache();

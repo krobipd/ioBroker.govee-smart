@@ -56,9 +56,16 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       sceneSpeed: 3,
       snapshotBleCmds: [[["aGV4ZGF0YQ=="]]],
       scenesChecked: true,
+      librariesCheckedAt: 1700000000000,
       lastSeenOnNetwork: 1234567890,
     };
   }
+
+  it("persists and restores librariesCheckedAt — the empty-library memory survives a restart (2.39.0)", () => {
+    const cached = goveeDeviceToCached(makeFullDevice());
+    expect(cached.librariesCheckedAt).toBe(1700000000000);
+    expect(cachedToGoveeDevice(cached).librariesCheckedAt).toBe(1700000000000);
+  });
 
   describe("Runtime-only field exclusion (architecture invariant)", () => {
     it("does NOT persist 'state' to cache (recomputed from LAN/MQTT each boot)", () => {

@@ -177,6 +177,127 @@ describe("library-loader — loadDeviceLibraries", () => {
   });
 });
 
+describe("library-loader — one library fetch per SKU and run, an empty answer remembered with an expiry (issue #46, 2026-09-22)", () => {
+  // Eight bulbs of one SKU fetched the same three libraries eight times per
+  // start, and an empty answer (music/DIY library `[]`, sku-features `null`)
+  // was never remembered — every start repeated the calls to an endpoint the
+  // loader's own comment asks to spare. Remembered WITH an expiry (7 days):
+  // the #13 trap was "once empty, empty forever", not "remembered at all".
+  function countingApi(): { api: unknown; calls: Record<string, number> } {
+    const calls: Record<string, number> = { scene: 0, music: 0, diy: 0, features: 0 };
+    return {
+      calls,
+      api: {
+        hasBearerToken: () => true,
+        fetchSceneLibrary: () => {
+          calls.scene++;
+          return Promise.resolve([{ name: "Sunrise", sceneCode: 1, scenceParam: "AA==" }]);
+        },
+        fetchMusicLibrary: () => {
+          calls.music++;
+          return Promise.resolve([]);
+        },
+        fetchDiyLibrary: () => {
+          calls.diy++;
+          return Promise.resolve([]);
+        },
+        fetchSkuFeatures: () => {
+          calls.features++;
+          return Promise.resolve(null);
+        },
+        fetchSnapshots: () => Promise.resolve([]),
+      },
+    };
+  }
+
+  it("skips an empty library while its check is fresh, fetches again once it expired, and always on force", async () => {
+    const { api, calls } = countingApi();
+    const host = makeHost(setupMockCloud([]), api);
+    const now = Date.now();
+    const fresh = createTestDevice({
+      musicLibrary: [],
+      diyLibrary: [],
+      skuFeatures: null,
+      librariesCheckedAt: now - 60_000,
+    });
+    await loadDeviceLibraries(host, fresh, fresh.sku, false, now);
+    expect(calls).toEqual({ scene: 0, music: 0, diy: 0, features: 0 }); // every empty library was confirmed empty a minute ago
+
+    const expired = createTestDevice({
+      sceneLibrary: [{ name: "Sunrise", sceneCode: 1, scenceParam: "AA==" }],
+      musicLibrary: [],
+      diyLibrary: [],
+      skuFeatures: null,
+      librariesCheckedAt: now - 8 * 24 * 60 * 60 * 1000,
+    });
+    await loadDeviceLibraries(host, expired, expired.sku, false, now);
+    expect(calls).toEqual({ scene: 0, music: 1, diy: 1, features: 1 }); // the filled scene library is kept, the empty ones are asked again
+
+    await loadDeviceLibraries(host, expired, expired.sku, /* force */ true, now);
+    expect(calls).toEqual({ scene: 1, music: 2, diy: 2, features: 2 });
+  });
+
+  it("devices of one SKU share one fetch per endpoint within a run — every device gets the library, a second run fetches again", async () => {
+    const { api, calls } = countingApi();
+    const run = new Map();
+    const host = { ...makeHost(setupMockCloud([]), api), sharedFetches: run };
+    const a = createTestDevice({ deviceId: "AA:01", sceneLibrary: [] });
+    const b = createTestDevice({ deviceId: "AA:02", sceneLibrary: [] });
+    const c = createTestDevice({ deviceId: "AA:03", sceneLibrary: [] });
+    await Promise.all([
+      loadDeviceLibraries(host, a, "H6160"),
+      loadDeviceLibraries(host, b, "H6160"),
+      loadDeviceLibraries(host, c, "H6160"),
+    ]);
+    expect(calls.scene).toBe(1);
+    expect(a.sceneLibrary.map(s => s.name)).toEqual(["Sunrise"]);
+    expect(b.sceneLibrary.map(s => s.name)).toEqual(["Sunrise"]);
+    expect(c.sceneLibrary.map(s => s.name)).toEqual(["Sunrise"]);
+    // Another SKU is another fetch; a new run map is a new fetch.
+    const other = createTestDevice({ sku: "H6199", deviceId: "BB:01", sceneLibrary: [] });
+    await loadDeviceLibraries(host, other, "H6199");
+    expect(calls.scene).toBe(2);
+    const d = createTestDevice({ deviceId: "AA:04", sceneLibrary: [] });
+    await loadDeviceLibraries({ ...host, sharedFetches: new Map() }, d, "H6160");
+    expect(calls.scene).toBe(3);
+  });
+
+  it("a failed shared fetch leaves every device of the SKU with what it had and rejects nothing", async () => {
+    const { api } = countingApi();
+    (api as { fetchSceneLibrary: () => Promise<unknown> }).fetchSceneLibrary = () =>
+      Promise.reject(new HttpError("HTTP 500", 500, {}));
+    const host = { ...makeHost(setupMockCloud([]), api), sharedFetches: new Map() };
+    const a = createTestDevice({ deviceId: "AA:01", sceneLibrary: [{ name: "Old", sceneCode: 9, scenceParam: "" }] });
+    const b = createTestDevice({ deviceId: "AA:02", sceneLibrary: [] });
+    await expect(
+      Promise.all([loadDeviceLibraries(host, a, "H6160", true), loadDeviceLibraries(host, b, "H6160", true)]),
+    ).resolves.toEqual([false, false]);
+    expect(a.sceneLibrary.map(s => s.name)).toEqual(["Old"]);
+    expect(b.sceneLibrary).toEqual([]);
+  });
+
+  it("a shared fetch the limiter never ran marks every sharer as not checked", async () => {
+    const { api, calls } = countingApi();
+    const cancelled: string[] = [];
+    const run = new Map();
+    const base = makeHost(setupMockCloud([]), api);
+    const hostFor = (id: string): LibraryLoaderHost => ({
+      ...base,
+      sharedFetches: run,
+      runLimited: (): Promise<void> => Promise.resolve(), // the call is dropped — never runs
+      noteCancelled: () => {
+        cancelled.push(id);
+      },
+    });
+    const a = createTestDevice({ deviceId: "AA:01", sceneLibrary: [] });
+    const b = createTestDevice({ deviceId: "AA:02", sceneLibrary: [] });
+    await Promise.all([loadDeviceLibraries(hostFor("a"), a, "H6160"), loadDeviceLibraries(hostFor("b"), b, "H6160")]);
+    expect(calls.scene).toBe(0);
+    expect(cancelled).toContain("a");
+    expect(cancelled).toContain("b");
+  });
+});
+
 describe("library-loader — undocumented-API failures are diagnosable, not silent", () => {
   it("a rejected library fetch lands as one debug line with endpoint, status and bearer state, and in the diag history", async () => {
     const debugs: string[] = [];

@@ -4717,11 +4717,58 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     expect(scenesCalls()).toBe(1); // the cancelled call never ran
     expect(second.scenes).toEqual([]);
     expect(second.scenesChecked).toBe(false);
+    expect(second.librariesCheckedAt).toBeUndefined(); // a question never asked is not "answered empty"
     // Persisted anyway — the capability entry must survive a cloud hiccup —
     // but WITHOUT the checked flag, so the next start fetches again.
     const persisted = saved.filter(s => s.deviceId === "BULB000000000002");
     expect(persisted.at(-1)).toEqual({ deviceId: "BULB000000000002", scenes: 0, scenesChecked: false });
     expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
+  });
+
+  it("three lights of one SKU share one library fetch per run and each is stamped as checked; a new run fetches again", async () => {
+    const { dm, saved, settle } = build();
+    const libraryCalls: string[] = [];
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchSceneLibrary: (sku: string) => {
+        libraryCalls.push(sku);
+        return Promise.resolve([{ name: "Sunrise", sceneCode: 1, scenceParam: "AA==" }]);
+      },
+      fetchMusicLibrary: () => Promise.resolve([]),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => Promise.resolve([]),
+    } as never);
+    dm.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([
+          cloudLight("BULB000000000001"),
+          cloudLight("BULB000000000002"),
+          cloudLight("BULB000000000003"),
+        ]),
+      getScenes: () => Promise.resolve(scenesAnswer),
+      getDiyScenes: () => Promise.resolve([]),
+    } as any);
+    const before = Date.now();
+    await dm.loadFromCloud();
+    await settle();
+    expect(libraryCalls).toEqual(["H600D"]); // one fetch for three bulbs
+    for (const d of dm.getDevices()) {
+      expect(d.sceneLibrary.map(s => s.name)).toEqual(["Sunrise"]);
+      expect(d.librariesCheckedAt).toBeGreaterThanOrEqual(before);
+      expect(saved.some(s => s.deviceId === d.deviceId)).toBe(true);
+    }
+    await dm.loadFromCloud();
+    await settle();
+    // The scene library is filled now (kept), the empty ones are remembered → no fetch this run.
+    expect(libraryCalls).toEqual(["H600D"]);
+    for (const d of dm.getDevices()) {
+      d.sceneLibrary = [];
+      d.librariesCheckedAt = undefined;
+    }
+    await dm.loadFromCloud();
+    await settle();
+    expect(libraryCalls).toEqual(["H600D", "H600D"]); // a new run, a new fetch — still one for the SKU
   });
 
   it("neither persists nor rebuilds when the adapter is unloading by the time the queued call ran", async () => {

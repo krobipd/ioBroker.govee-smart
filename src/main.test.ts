@@ -2446,7 +2446,7 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     ],
   });
 
-  function holdingLimiter(f: Fakes, immediate: number): { release: () => Promise<void> } {
+  function holdingLimiter(f: Fakes, immediate: number): { release: (pending: () => number) => Promise<void> } {
     const held: Array<() => Promise<void>> = [];
     let ran = 0;
     const limiter = f.limiter as unknown as {
@@ -2462,10 +2462,17 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
       });
     };
     return {
-      release: async () => {
-        while (held.length > 0) {
-          const next = held.shift()!;
-          await next();
+      // Jobs interleave and enqueue their next call from a microtask after
+      // the previous one resolved — so the loop keeps going while any scene
+      // job is still open, not only while something is held right now.
+      release: async (pending: () => number) => {
+        for (let i = 0; i < 500 && (held.length > 0 || pending() > 0); i++) {
+          const next = held.shift();
+          if (next) {
+            await next();
+          } else {
+            await new Promise(r => setImmediate(r));
+          }
         }
       },
     };
@@ -2496,8 +2503,12 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     expect(dropdown("ee01")).toEqual({ 0: "---" }); // still waiting — nothing invented
     expect(dropdown("ee02")).toEqual({ 0: "---" });
 
-    await gate.release();
-    await (i.deviceManager as unknown as { whenSceneLoadsSettled: () => Promise<void> }).whenSceneLoadsSettled();
+    const dm = i.deviceManager as unknown as {
+      whenSceneLoadsSettled: () => Promise<void>;
+      pendingSceneLoads: Set<unknown>;
+    };
+    await gate.release(() => dm.pendingSceneLoads.size);
+    await dm.whenSceneLoadsSettled();
     await settle();
 
     expect(dropdown("ee01")).toEqual({ 0: "---", 1: "Sunrise" });

@@ -395,6 +395,13 @@ export interface GoveeDevice {
    */
   scenesChecked?: boolean;
   /**
+   * When the SKU-level libraries (scene/music/DIY, SKU features) were last
+   * confirmed — an EMPTY answer is remembered for {@link LIBRARY_RECHECK_MS}
+   * and asked again after that; persisted. Never stamped by a call that the
+   * rate limiter dropped.
+   */
+  librariesCheckedAt?: number;
+  /**
    * Manual-mode flag for cut strips (physical segments with gaps). When true,
    * `manualSegments` lists the indices that actually light up; all others
    * (within `0..segmentCount-1`) are skipped. Orthogonal to `segmentCount`:
