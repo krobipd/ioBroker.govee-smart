@@ -95,6 +95,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: Exporting the diagnostics report of an app group no longer writes to a datapoint the group does not have — the log showed a warning on every export
+
 ### 2.39.2 (2026-09-22)
 
 - Fixed: App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report

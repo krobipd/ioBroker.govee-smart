@@ -89,10 +89,16 @@ export async function handleDiagnosticsExport(
     // name says nothing a moment later — but "was a report taken since the
     // fault?" is a question the object tree can still answer. Seconds are
     // enough; ISO-8601 in UTC so it reads the same in every timezone and sorts.
-    await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, {
-      val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
-      ack: true,
-    });
+    // An app group has no `diag` channel (its tree carries only the fan-out
+    // datapoints), but the card lists it and exports its report: stamping it
+    // wrote into a missing object and js-controller warned on every export
+    // (krobi's installation, 2.39.2).
+    if (device.sku !== "BaseGroup") {
+      await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, {
+        val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
+        ack: true,
+      });
+    }
     adapter.log.info(`Diagnostics report for ${deviceLabel(device)} generated as ${fileName}`);
     return { fileName, content };
   } catch (e) {

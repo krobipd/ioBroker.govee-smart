@@ -70,6 +70,18 @@ describe("handleDiagnosticsExport", () => {
     expect(writes.find(w => w.id.endsWith(".diag.export"))).toBeUndefined();
   });
 
+  it("an app group gets its report but no stamp — its tree has no diag channel", async () => {
+    // Measured on 2.39.2: exporting a group's report wrote
+    // `groups.basegroup_1280.diag.lastExport`, and js-controller warned that the
+    // state has no object.
+    const { adapter, writes } = makeAdapter();
+    const { dm } = makeDeviceManager();
+    const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781280" });
+    const report = await handleDiagnosticsExport(adapter, dm, new Map(), group, "groups.basegroup_1280");
+    expect(report).not.toBeNull();
+    expect(writes).toEqual([]);
+  });
+
   it("the file name tells a stranger which device it is about", async () => {
     // The recipient has none of our context, and a reporter with two Govee
     // devices attaches two of these.
