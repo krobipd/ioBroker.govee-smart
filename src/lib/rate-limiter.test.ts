@@ -697,6 +697,21 @@ describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #4
     expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
+  it("a clock that jumps backwards takes no tokens away — the bucket only ever refills forwards", async () => {
+    // Date.now() is not monotonic (NTP correction, a suspended laptop). A
+    // refill computed over a negative span would SUBTRACT tokens and stall
+    // commands the user just sent.
+    const { rl, clock, ran, fire } = bench();
+    await fire(dev(1));
+    expect(ran()).toBe(1);
+    clock.now -= 5000; // the clock is corrected backwards
+    for (let i = 0; i < 5; i++) {
+      await fire(dev(1));
+    }
+    expect(ran(), "the remaining five of the burst must still run").toBe(6);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+
   it("device reads: a device at its minute limit queues while another device runs", async () => {
     const { ran, fire } = bench({ deviceReadPerMinute: 2 });
     await fire(read(1));

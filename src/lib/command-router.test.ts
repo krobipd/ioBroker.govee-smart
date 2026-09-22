@@ -1022,6 +1022,29 @@ describe("a command Govee rejects because the device is offline is held, and the
     ]);
   });
 
+  it("a capability rejection that is NOT about being offline is not held either", async () => {
+    // The appliance path has its own catch — an invalid parameter would be
+    // resent at the device's next sign of life and rejected again forever.
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient({
+      controlDevice: () =>
+        Promise.reject(new CloudControlRejected("Cloud control rejected: code=400 — Invalid parameter type", false)),
+    } as never);
+    const held: unknown[] = [];
+    router.onDeviceOffline = (_d, intent) => {
+      held.push(intent);
+    };
+    const device = createTestDevice({
+      type: "devices.types.air_purifier",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    await expect(
+      router.sendCapabilityCommand(device, "devices.capabilities.work_mode", "workMode", { workMode: 1, modeValue: 2 }),
+    ).rejects.toThrow(/Invalid parameter/);
+    expect(held).toEqual([]);
+  });
+
   it("any other rejection is not held — and still rethrown", async () => {
     const router = new CommandRouter(mockLog, noopTimers, registry);
     router.setCloudClient({

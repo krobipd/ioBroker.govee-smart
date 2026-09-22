@@ -3559,6 +3559,35 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     expect(device.snapshots.map(s => s.name)).toEqual(["OldSnap", "NewSnap"]);
     expect(changed).toBe(true);
   });
+
+  it("the refresh button does not remember an empty library when the call never ran", async () => {
+    // The button's own job stamps `librariesCheckedAt` — the seven-day memo of
+    // an empty answer. A call the limiter dropped is not an answer; stamping it
+    // would keep the user from ever getting the library (issue #13's trap).
+    const device = createTestDevice({ sceneLibrary: [], librariesCheckedAt: undefined });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+    dm.setRateLimiter({
+      executeTracked: () => Promise.reject(new Error("dropped")),
+      tryExecute: () => Promise.resolve(false),
+      stop: () => {},
+    } as never);
+    dm.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([{ sku: "H6160", device: "AABBCCDDEEFF0011", deviceName: "Test Light", capabilities: [] }]),
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchSceneLibrary: () => Promise.resolve([]),
+      fetchMusicLibrary: () => Promise.resolve([]),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => Promise.resolve([]),
+    } as never);
+    await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011");
+    expect(device.librariesCheckedAt, "a call that never ran is not an answer").toBeUndefined();
+  });
 });
 
 describe("DeviceManager — internal logic helpers", () => {
@@ -4783,6 +4812,62 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     expect(libraryCalls).toEqual(["H600D", "H600D"]); // a new run, a new fetch — still one for the SKU
   });
 
+  it("a light that only SHARED a dropped library fetch is not stamped as checked — it never made the call itself", async () => {
+    // The second light of a SKU makes NO library call of its own: it awaits
+    // the run's memo. Its own calls (scenes) go through fine, so the host's
+    // catch never fires — the loader's cancellation report is its only signal
+    // that nothing ran. Without it an empty library is remembered for a week.
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    // A limiter that drops exactly ONE App-API call — the run's first, which
+    // is the shared scene-library fetch of the first light. Every later call
+    // runs, so the SECOND light's own calls all succeed and its host's catch
+    // never fires: only the loader's report can tell it that the library it
+    // shares was never fetched.
+    let appApiCalls = 0;
+    dm.setRateLimiter({
+      executeTracked: (fn: () => Promise<void>, lane: { kind: string }) => {
+        if (lane.kind === "appapi" && appApiCalls++ === 0) {
+          return Promise.reject(new Error("dropped"));
+        }
+        return fn();
+      },
+      tryExecute: (fn: () => Promise<void>) => fn().then(() => true),
+      stop: () => {},
+    } as never);
+    dm.setSkuCache({
+      loadAll: () => [],
+      save: () => Promise.resolve(),
+      pruneStale: () => 0,
+      clear: () => {},
+      evictDevice: () => {},
+    } as never);
+    let libraryCalls = 0;
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchSceneLibrary: () => {
+        libraryCalls++;
+        return Promise.resolve([{ name: "Sunrise", sceneCode: 1, scenceParam: "AA==" }]);
+      },
+      fetchMusicLibrary: () => Promise.resolve([]),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => Promise.resolve([]),
+    } as never);
+    dm.setCloudClient({
+      getDevices: () => Promise.resolve([cloudLight("BULB000000000001"), cloudLight("BULB000000000002")]),
+      getScenes: () => Promise.resolve(scenesAnswer),
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    expect(libraryCalls).toBe(0); // the App-API lane never ran
+    const devices = dm.getDevices();
+    expect(devices).toHaveLength(2);
+    for (const d of devices) {
+      expect(d.librariesCheckedAt, `${d.deviceId} must not remember an answer it never got`).toBeUndefined();
+    }
+  });
+
   it("neither persists nor rebuilds when the adapter is unloading by the time the queued call ran", async () => {
     let unloading = false;
     const { dm, saved, cloudReady, settle } = build({ isUnloading: () => unloading });
@@ -4922,6 +5007,26 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     push({ onOff: 1, brightness: 40 });
     await dm.whenIntentsSettled();
     expect(controls).toEqual([{ instance: "brightness", value: 40 }]);
+  });
+
+  it("a status packet that says connected:false is no sign of life — the held command stays held", async () => {
+    const { dm, device, controls, push } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    push({ onOff: 0, connected: "false" }); // the broker relays what the device last said, not that it is back
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toHaveLength(1);
+  });
+
+  it("a state read that says OFFLINE is no sign of life — nothing is delivered into the void", async () => {
+    const { dm, device, controls } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    (dm as any).maybeApplyCloudOnline(device, [
+      { type: "devices.capabilities.online", instance: "online", state: { value: false } },
+    ]);
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toHaveLength(1);
   });
 
   it("a state read that says online is a sign of life too", async () => {
@@ -5079,6 +5184,32 @@ describe("requestStaleStatuses — the status request over the account broker (i
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined, iotTopic: "GD/x" });
     (dm as any).devices.set("H6160_x", d);
     expect(dm.requestStaleStatuses(Date.now())).toBe(0);
+  });
+
+  it("a later list answer without a topic leaves the known one in place — a partial answer never takes the address away", async () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", d);
+    const entry = (settings: Record<string, unknown> | undefined): AppDeviceEntry => ({
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      deviceName: "Strip",
+      lastData: { online: false },
+      settings,
+    });
+    let current = entry({ topic: "GD/0123456789abcdef0123456789abcdef" });
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: () => Promise.resolve([current]),
+    } as never);
+    await dm.pollAppApi();
+    expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
+    current = entry(undefined);
+    await dm.pollAppApi();
+    expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
+    current = entry({ topic: "" });
+    await dm.pollAppApi();
+    expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
   });
 
   it("the account list hands the device its topic — in memory, never in the cache", () => {

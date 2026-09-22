@@ -296,6 +296,26 @@ describe("library-loader — one library fetch per SKU and run, an empty answer 
     expect(cancelled).toContain("a");
     expect(cancelled).toContain("b");
   });
+
+  it("a dropped LIBRARY call reports the cancellation on its own — not only the sku-features one", () => {
+    // The device already has its SKU features, so that branch is skipped: the
+    // only call left is the library fetch. Its cancellation must still reach
+    // the host, or the job stamps an answer it never got.
+    const { api } = countingApi();
+    const cancelled: string[] = [];
+    const host: LibraryLoaderHost = {
+      ...makeHost(setupMockCloud([]), api),
+      sharedFetches: new Map(),
+      runLimited: (): Promise<void> => Promise.resolve(), // dropped — never runs
+      noteCancelled: () => {
+        cancelled.push("x");
+      },
+    };
+    const d = createTestDevice({ sceneLibrary: [], skuFeatures: { already: "there" } });
+    return loadDeviceLibraries(host, d, "H6160").then(() => {
+      expect(cancelled.length).toBeGreaterThan(0);
+    });
+  });
 });
 
 describe("library-loader — undocumented-API failures are diagnosable, not silent", () => {
