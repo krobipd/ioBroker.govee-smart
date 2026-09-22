@@ -167,6 +167,16 @@ export const DIAGNOSTICS_EXPORT_THROTTLE_MS = 2_000;
 /** Idle timeout for the segment-detection wizard (5 min). */
 export const WIZARD_IDLE_TIMEOUT_MS = 5 * 60_000;
 
+// === Held commands ===
+
+/**
+ * How long a command Govee rejected with "Device is offline" is held for
+ * delivery at the device's next sign of life. Measured (issue #46): the bulb
+ * was back 2 min 4 s after the rejection. Bounded on purpose — a command
+ * delivered much later is one nobody asked for any more.
+ */
+export const PENDING_INTENT_TTL_MS = 5 * 60 * 1000;
+
 // === LAN command-router ===
 
 /**

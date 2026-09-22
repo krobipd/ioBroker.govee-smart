@@ -21,6 +21,7 @@ import {
   type StateChangeRouterAdapter,
 } from "./state-change-router";
 import type { GoveeDevice } from "../types";
+import { CloudControlRejected } from "../govee-cloud-client";
 import { createTestDevice, mockLog } from "../test-helpers";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 
@@ -529,6 +530,17 @@ describe("onStateChange — command dispatch + ack ownership", () => {
     await write(rig, id("control.power"), true);
     expect(rig.acks).toHaveLength(0);
     expect(rig.warns.some(w => w.includes("Command failed"))).toBe(true);
+  });
+
+  it("does NOT ack a command Govee refused because the device is offline — holding it is the device manager's job, not an ack (2.39.0)", async () => {
+    const rig = makeRig([device]);
+    rig.setSendFailure(
+      () =>
+        new CloudControlRejected("Cloud control rejected for H6160/x/powerSwitch: code=400 — Device is offline.", true),
+    );
+    await write(rig, id("control.power"), true);
+    expect(rig.acks).toHaveLength(0);
+    expect(rig.warns.filter(w => w.includes("Command failed"))).toHaveLength(1);
   });
 
   it("power-off resets ALL mode dropdowns (off device has no active mode)", async () => {

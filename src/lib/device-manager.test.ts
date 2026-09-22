@@ -21,12 +21,14 @@ import {
 import {
   CLOUD_LIMITS,
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
+  PENDING_INTENT_TTL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   LAN_CAPABLE_MEMORY_MS,
 } from "./timing-constants";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
+import { CloudControlRejected } from "./govee-cloud-client";
 import { RateLimiter } from "./rate-limiter";
 import { DeviceRegistry } from "./device-registry";
 import { CommandRouter } from "./command-router";
@@ -4791,5 +4793,162 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
 
     expect(saved.filter(s => s.deviceId === "BULB000000000002").length).toBe(savesBefore);
     expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
+  });
+});
+
+describe("a command Govee rejected as 'device offline' is delivered when the device shows life (2.39.0, issue #46)", () => {
+  // The bulb was offline at Govee for two minutes; the user's write was lost.
+  // Held per device and command (newest wins), delivered ONCE per sign of
+  // life — the device's own status push, or a state read that says online —
+  // dropped after PENDING_INTENT_TTL_MS. The state is never acked before the
+  // delivery (rule 5).
+  const offlineErr = (): CloudControlRejected =>
+    new CloudControlRejected(
+      "Cloud control rejected for H6160/AABBCCDDEEFF0011/powerSwitch: code=400 — Device is offline.",
+      true,
+    );
+
+  function bench(opts: { rejectTimes?: number } = {}): {
+    dm: DeviceManager;
+    device: GoveeDevice;
+    controls: Array<{ instance: string; value: unknown }>;
+    updates: Array<Partial<DeviceState>>;
+    push: (state: Record<string, unknown>, transaction?: string) => void;
+  } {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    let rejectsLeft = opts.rejectTimes ?? 1;
+    const controls: Array<{ instance: string; value: unknown }> = [];
+    dm.setCloudClient({
+      controlDevice: (_sku: string, _id: string, _type: string, instance: string, value: unknown) => {
+        if (rejectsLeft > 0) {
+          rejectsLeft--;
+          return Promise.reject(offlineErr());
+        }
+        controls.push({ instance, value });
+        return Promise.resolve();
+      },
+    } as never);
+    const device = createTestDevice({
+      lanIp: undefined,
+      lastLanSeenAt: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+    const updates: Array<Partial<DeviceState>> = [];
+    dm.setCallbacks({
+      onUpdate: (_d, state) => {
+        updates.push(state);
+      },
+      onLanDeviceReady: () => {},
+      onCloudDataReady: () => {},
+      onGroupMembersReady: () => {},
+    });
+    const push = (state: Record<string, unknown>, transaction = `x_${Date.now()}001`): void => {
+      dm.handleMqttStatus({
+        sku: "H6160",
+        device: "AABBCCDDEEFF0011",
+        cmd: "status",
+        transaction,
+        state,
+      });
+    };
+    return { dm, device, controls, updates, push };
+  }
+
+  it("holds the rejected command, delivers it once on the device's own push, and mirrors the value as acked", async () => {
+    const { dm, device, controls, updates, push } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toEqual([{ kind: "command", command: "power", value: true }]);
+
+    push({ onOff: 0 }); // the bulb is back, still off
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
+    expect(dm.getPendingIntents(device)).toEqual([]);
+    // The confirmation path of a direct command: the mirrored state, acked.
+    expect(updates.some(u => u.power === true)).toBe(true);
+
+    push({ onOff: 1 }); // a second push delivers nothing more
+    await dm.whenIntentsSettled();
+    expect(controls).toHaveLength(1);
+  });
+
+  it("the newest write for the same command replaces the older one", async () => {
+    const { dm, device, controls, push } = bench({ rejectTimes: 2 });
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    await expect(dm.sendCommand(device, "power", false)).rejects.toThrow();
+    expect(dm.getPendingIntents(device)).toEqual([{ kind: "command", command: "power", value: false }]);
+    push({ onOff: 1 });
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "powerSwitch", value: 0 }]);
+  });
+
+  it("an intent older than the TTL is dropped, not delivered", async () => {
+    const { dm, device, controls, push } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power").at -= PENDING_INTENT_TTL_MS + 1;
+    push({ onOff: 0 });
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toEqual([]);
+  });
+
+  it("a delivery Govee rejects again waits for the next sign of life — one attempt per push, no loop", async () => {
+    const { dm, device, controls, push } = bench({ rejectTimes: 2 });
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    push({ onOff: 0 }); // attempt 1 → rejected again
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toHaveLength(1);
+    push({ onOff: 0 }); // attempt 2 → accepted
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
+  });
+
+  it("a push that already shows the wanted power is confirmation enough — nothing is sent", async () => {
+    const { dm, device, controls, push } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    push({ onOff: 1 }); // someone switched it on meanwhile
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toEqual([]);
+  });
+
+  it("brightness is resent even when the push shows the same value — only power has a known mapping", async () => {
+    const { dm, device, controls, push } = bench();
+    await expect(dm.sendCommand(device, "brightness", 40)).rejects.toThrow();
+    push({ onOff: 1, brightness: 40 });
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "brightness", value: 40 }]);
+  });
+
+  it("a state read that says online is a sign of life too", async () => {
+    const { dm, device, controls } = bench();
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    (dm as any).maybeApplyCloudOnline(device, [
+      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+    ]);
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
+  });
+
+  it("a light that answered over the LAN this week but was sent over the cloud still gets its delivery on a push", async () => {
+    const { dm, device, controls, push } = bench();
+    device.lastLanSeenAt = Date.now() - 60_000; // LAN-driven for reachability
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    push({ onOff: 0 });
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
+  });
+
+  it("a capability command (appliance work mode) is held and delivered through its own path", async () => {
+    const { dm, device, controls, push } = bench();
+    device.type = "devices.types.air_purifier";
+    await expect(
+      dm.sendCapabilityCommand(device, "devices.capabilities.work_mode", "workMode", { workMode: 1, modeValue: 2 }),
+    ).rejects.toThrow(/offline/i);
+    push({});
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([{ instance: "workMode", value: { workMode: 1, modeValue: 2 } }]);
   });
 });

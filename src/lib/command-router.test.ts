@@ -1,10 +1,11 @@
+import { CloudControlRejected } from "./govee-cloud-client";
 import { CommandRouter } from "./command-router";
 import { DeviceRegistry } from "./device-registry";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
 import { CLOUD_APPLIANCE_DAILY_LIMIT } from "./timing-constants";
-import { mockLog } from "./test-helpers";
+import { createTestDevice, mockLog } from "./test-helpers";
 import type { GoveeDevice, TimerAdapter } from "./types";
 
 /** A catalog with no entries — tests that don't care about quirks. */
@@ -958,6 +959,82 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
 
     await router.sendCommand(cloudOnly, "segmentBrightness:3", 50);
     expect(cloud.calls[1].instance).toBe("segmentedBrightness");
+  });
+});
+
+describe("a command Govee rejects because the device is offline is held, and the rejection still propagates (2.39.0, issue #46)", () => {
+  // Measured on the reporter's export: two `400 Device is offline` rejections
+  // at 13:13 and 13:14, the bulb's own status push at 13:15:36 — the user had
+  // to write again. The router reports the intent to its host; whether the
+  // state is acked stays with the caller, and it is NOT (rule 5).
+  function offlineCloud(): { client: unknown; calls: number } {
+    const box = { calls: 0 };
+    return {
+      calls: box.calls,
+      client: {
+        controlDevice: () => {
+          box.calls++;
+          return Promise.reject(
+            new CloudControlRejected(
+              "Cloud control rejected for H600D/AA/powerSwitch: code=400 — Device is offline.",
+              true,
+            ),
+          );
+        },
+      },
+    };
+  }
+
+  it("reports an offline rejection to onDeviceOffline with the command and value, and rethrows", async () => {
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient(offlineCloud().client as never);
+    const held: unknown[] = [];
+    router.onDeviceOffline = (device, intent) => {
+      held.push({ deviceId: device.deviceId, ...intent });
+    };
+    const device = createTestDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+    await expect(router.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
+    expect(held).toEqual([{ deviceId: "AA:BB:CC:DD:EE:FF:00:11", kind: "command", command: "power", value: true }]);
+  });
+
+  it("a capability command (appliances) is held the same way", async () => {
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient(offlineCloud().client as never);
+    const held: unknown[] = [];
+    router.onDeviceOffline = (_device, intent) => {
+      held.push(intent);
+    };
+    const device = createTestDevice({
+      type: "devices.types.air_purifier",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    await expect(
+      router.sendCapabilityCommand(device, "devices.capabilities.work_mode", "workMode", { workMode: 1, modeValue: 2 }),
+    ).rejects.toThrow(/offline/i);
+    expect(held).toEqual([
+      {
+        kind: "capability",
+        capabilityType: "devices.capabilities.work_mode",
+        capabilityInstance: "workMode",
+        value: { workMode: 1, modeValue: 2 },
+      },
+    ]);
+  });
+
+  it("any other rejection is not held — and still rethrown", async () => {
+    const router = new CommandRouter(mockLog, noopTimers, registry);
+    router.setCloudClient({
+      controlDevice: () =>
+        Promise.reject(new CloudControlRejected("Cloud control rejected: code=400 — Invalid parameter type", false)),
+    } as never);
+    const held: unknown[] = [];
+    router.onDeviceOffline = (_d, intent) => {
+      held.push(intent);
+    };
+    const device = createTestDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+    await expect(router.sendCommand(device, "power", true)).rejects.toThrow(/Invalid parameter/);
+    expect(held).toEqual([]);
   });
 });
 

@@ -1,5 +1,5 @@
 import { hasDynamicSceneCapability } from "./capability-mapper";
-import { CommandRouter, type TransportDecision } from "./command-router";
+import { CommandRouter, type HeldIntent, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
@@ -36,7 +36,7 @@ import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { decodeApplianceFrames } from "./appliance-frames";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
-import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
+import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS, PENDING_INTENT_TTL_MS } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
   classifyError,
@@ -102,6 +102,17 @@ export class DeviceManager {
   private readonly pendingSceneLoads = new Set<Promise<void>>();
   /** Reads main's `unloading` flag — one truth, not a second marker. */
   private readonly isUnloading: () => boolean;
+  /**
+   * Commands Govee refused with "Device is offline", per device and per
+   * command (the newest write wins), waiting for the device's next sign of
+   * life (issue #46, 2.39.0). In memory only: a restart forgets them, the
+   * TTL drops them, a success clears them.
+   */
+  private readonly pendingIntents = new Map<string, Map<string, HeldIntent & { at: number }>>();
+  /** Devices whose held commands are being delivered right now — one flush at a time. */
+  private readonly flushing = new Set<string>();
+  /** The running deliveries, for the tests and the bench. */
+  private readonly intentFlushes = new Set<Promise<void>>();
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -208,6 +219,159 @@ export class DeviceManager {
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };
+    this.commandRouter.onDeviceOffline = (device, intent) => this.holdIntent(device, intent);
+  }
+
+  // === Held commands (issue #46) ===
+
+  private static intentKey(intent: HeldIntent): string {
+    return intent.kind === "command"
+      ? `command:${intent.command}`
+      : `capability:${intent.capabilityType}/${intent.capabilityInstance}`;
+  }
+
+  /**
+   * Keep a command Govee refused because the device is offline, for the
+   * device's next sign of life. The newest write for the same command wins;
+   * the state is NOT acked here (the rejection propagated to the caller).
+   *
+   * @param device The device Govee reported offline
+   * @param intent What the user wanted
+   */
+  private holdIntent(device: GoveeDevice, intent: HeldIntent): void {
+    const key = limiterDeviceKey(device);
+    let held = this.pendingIntents.get(key);
+    if (!held) {
+      held = new Map();
+      this.pendingIntents.set(key, held);
+    }
+    held.set(DeviceManager.intentKey(intent), { ...intent, at: Date.now() });
+    const what = intent.kind === "command" ? intent.command : intent.capabilityInstance;
+    this.diagnostics.addLog(
+      device.deviceId,
+      "debug",
+      `held ${what}=${JSON.stringify(intent.value)} — Govee reports the device offline; delivered at its next sign of life (within ${Math.round(PENDING_INTENT_TTL_MS / 60000)} min)`,
+    );
+  }
+
+  /**
+   * The commands waiting for this device, oldest first — for the tests and
+   * the diagnostics report.
+   *
+   * @param device The device
+   */
+  getPendingIntents(device: GoveeDevice): HeldIntent[] {
+    const held = this.pendingIntents.get(limiterDeviceKey(device));
+    return held ? [...held.values()].map(({ at: _at, ...intent }) => intent) : [];
+  }
+
+  /**
+   * The device showed life (its own status push, or a state read that says
+   * online): deliver what waited, ONCE per sign of life. A delivery Govee
+   * refuses again stays held until the next sign or the TTL; a push that
+   * already shows the wanted power is confirmation enough and is not resent.
+   *
+   * @param device The device that came back
+   */
+  private startIntentFlush(device: GoveeDevice): void {
+    const key = limiterDeviceKey(device);
+    const held = this.pendingIntents.get(key);
+    if (!held || held.size === 0 || this.flushing.has(key)) {
+      return;
+    }
+    this.flushing.add(key);
+    const flush: Promise<void> = this.flushIntents(device, key, held)
+      .catch((e: unknown) => {
+        this.log.debug(`Held-command delivery for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+      })
+      .finally(() => {
+        this.flushing.delete(key);
+        this.intentFlushes.delete(flush);
+      });
+    this.intentFlushes.add(flush);
+  }
+
+  private async flushIntents(
+    device: GoveeDevice,
+    key: string,
+    held: Map<string, HeldIntent & { at: number }>,
+  ): Promise<void> {
+    const now = Date.now();
+    let delivered = 0;
+    for (const [intentKey, intent] of [...held]) {
+      if (now - intent.at > PENDING_INTENT_TTL_MS) {
+        held.delete(intentKey);
+        this.diagnostics.addLog(device.deviceId, "debug", `held ${intentKey} dropped — older than the TTL`);
+        continue;
+      }
+      // Already fulfilled — only where the mapping is known: power ↔ onOff. Every
+      // other datapoint is resent; a resend of a value the device already
+      // has is harmless, an invented mapping is not.
+      if (intent.kind === "command" && intent.command === "power" && device.state.power === intent.value) {
+        held.delete(intentKey);
+        delivered++;
+        continue;
+      }
+      try {
+        if (intent.kind === "command") {
+          await this.sendCommand(device, intent.command, intent.value);
+          this.mirrorDelivered(device, intent.command, intent.value);
+        } else {
+          await this.sendCapabilityCommand(device, intent.capabilityType, intent.capabilityInstance, intent.value);
+        }
+        held.delete(intentKey);
+        delivered++;
+        this.diagnostics.recordCommandResult(device.deviceId, {
+          stateId: intent.kind === "command" ? intent.command : intent.capabilityInstance,
+          value: intent.value,
+          transport: "held → delivered",
+          ok: true,
+        });
+      } catch (e) {
+        // Refused again (or no channel) — the next sign of life tries once more.
+        this.diagnostics.addLog(device.deviceId, "debug", `held ${intentKey} not delivered: ${errMessage(e)}`);
+      }
+    }
+    if (held.size === 0) {
+      this.pendingIntents.delete(key);
+    }
+    if (delivered > 0) {
+      this.log.info(`Delivered ${delivered} held command(s) to ${deviceLabel(device)} after it came back`);
+    }
+  }
+
+  /**
+   * The confirmation path of a direct command, for a delivered one: the four
+   * routed values mirror into their control states as acked (the same path a
+   * device push takes). Everything else is confirmed by the device's own push
+   * or the next state read.
+   *
+   * @param device The device
+   * @param command The routed command
+   * @param value The delivered value
+   */
+  private mirrorDelivered(device: GoveeDevice, command: string, value: unknown): void {
+    const mirror: Partial<DeviceState> = {};
+    if (command === "power" && typeof value === "boolean") {
+      mirror.power = value;
+    } else if (command === "brightness" && typeof value === "number") {
+      mirror.brightness = value;
+    } else if (command === "colorRgb" && typeof value === "string") {
+      mirror.colorRgb = value;
+    } else if (command === "colorTemperature" && typeof value === "number") {
+      mirror.colorTemperature = value;
+    } else {
+      return;
+    }
+    Object.assign(device.state, mirror);
+    this.onDeviceUpdate?.(device, mirror);
+  }
+
+  /** Settles once every running delivery has finished — for the tests. */
+  async whenIntentsSettled(): Promise<void> {
+    while (this.intentFlushes.size > 0) {
+      await Promise.allSettled([...this.intentFlushes]);
+    }
   }
 
   /**
@@ -1188,6 +1352,12 @@ export class DeviceManager {
     const state = this.parseMqttStateUpdate(device, update);
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);
+    // The device's own voice — outside the LAN guard of parseMqttStateUpdate:
+    // a light sent over the cloud while it is LAN-driven for reachability must
+    // not let its held command expire (issue #46, 2.39.0).
+    if (readDevicePushAt(update, Date.now()) !== undefined && readReportedReachability(update) !== false) {
+      this.startIntentFlush(device);
+    }
     if (update.op?.command) {
       this.processMqttSegmentPacket(device, update.op.command);
       // An appliance's own status push carries its state — mode, level,
@@ -1793,6 +1963,9 @@ export class DeviceManager {
    */
   private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[]): void {
     cloudMergeHelpers.applyOnlineCap(this, device, caps);
+    if (device.state.cloudReportedOnline === true) {
+      this.startIntentFlush(device);
+    }
   }
 
   /**

@@ -180,6 +180,7 @@ vi.mock("@iobroker/adapter-core", () => {
 
 import { GoveeAdapter } from "./main";
 import { CLOUD_LIMITS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
+import { CloudControlRejected } from "./lib/govee-cloud-client";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
 import type { DeviceManager } from "./lib/device-manager";
@@ -2538,5 +2539,79 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
       }
     )?.common?.states;
     expect(dropdown2).toEqual({ 0: "---", 1: "Sunrise" });
+  });
+});
+
+// ===========================================================================
+describe("scenario issue #46 — a command Govee refused as 'device offline' is delivered when the bulb pushes again", () => {
+  it("no ack at the refusal, one warn; the bulb's own push delivers the command and control.power ends acked", async () => {
+    const { adapter, f } = await setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
+    const i = internalOf(adapter);
+    const bulb = makeDevice({
+      sku: "H600D",
+      deviceId: "AA:BB:CC:DD:EE:7E",
+      lanIp: undefined,
+      lastLanSeenAt: undefined,
+      channels: { lan: false, mqtt: true, cloud: true },
+      state: { online: false, power: false },
+      capabilities: [
+        {
+          type: "devices.capabilities.on_off",
+          instance: "powerSwitch",
+          parameters: {
+            dataType: "ENUM",
+            options: [
+              { name: "on", value: 1 },
+              { name: "off", value: 0 },
+            ],
+          },
+        },
+      ],
+    });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H600D_aabbccddee7e", bulb);
+    const prefix = i.stateManager!.devicePrefix(bulb);
+    // Govee refuses the first control call (the bulb dropped off the Wi-Fi),
+    // accepts the next — the measured 13:13 / 13:14 → 13:16 sequence.
+    let refusals = 1;
+    const controls: unknown[] = [];
+    (f.cloud as unknown as Record<string, unknown>).controlDevice = vi.fn((...args: unknown[]) => {
+      if (refusals > 0) {
+        refusals--;
+        return Promise.reject(
+          new CloudControlRejected(
+            "Cloud control rejected for H600D/x/powerSwitch: code=400 — Device is offline.",
+            true,
+          ),
+        );
+      }
+      controls.push(args);
+      return Promise.resolve();
+    });
+    i.setState.mockClear();
+    i.log.warn.mockClear();
+
+    await i.onStateChange(`${i.namespace}.${prefix}.control.power`, { val: true, ack: false });
+    expect(i.setState.mock.calls.filter(c => String(c[0]).endsWith(".control.power"))).toHaveLength(0);
+    expect(i.log.warn.mock.calls.map(c => String(c[0]))).toEqual([expect.stringMatching(/Command failed .*offline/i)]);
+
+    // 2 min 4 s later in the export: the bulb's own status push (still off).
+    const onStatus = f.mqtt.connect.mock.calls[0][0] as (u: unknown) => void;
+    onStatus({
+      sku: "H600D",
+      device: "AA:BB:CC:DD:EE:7E",
+      cmd: "status",
+      transaction: `x_${Date.now()}008`,
+      state: { onOff: 0 },
+    });
+    await (i.deviceManager as unknown as { whenIntentsSettled: () => Promise<void> }).whenIntentsSettled();
+    await settle();
+
+    expect(controls).toHaveLength(1);
+    expect(i.states.get(`${prefix}.control.power`)).toEqual({ val: true, ack: true });
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Delivered 1 held command"));
   });
 });

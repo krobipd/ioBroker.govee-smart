@@ -10,7 +10,17 @@ import {
 } from "./types";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
-import type { GoveeCloudClient } from "./govee-cloud-client";
+
+/**
+ * A command Govee refused because the device was offline — kept by the host
+ * for the device's next sign of life. Two shapes, one per send path: the
+ * routed command (`power`, `brightness`, …) and the generic capability
+ * (appliance work mode, toggles, …).
+ */
+export type HeldIntent =
+  | { kind: "command"; command: string; value: unknown }
+  | { kind: "capability"; capabilityType: string; capabilityInstance: string; value: unknown };
+import { CloudControlRejected, type GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
@@ -73,6 +83,13 @@ export class CommandRouter {
    * accepted — which is precisely the gap in a "switching does not work"
    * report.
    */
+  /**
+   * A command Govee refused because the device is offline at the cloud. The
+   * host holds it for the device's next sign of life (issue #46, 2.39.0).
+   * Reporting is a side effect of the catch — the rejection still propagates,
+   * the caller still warns once and never acks (rule 5).
+   */
+  onDeviceOffline?: (device: GoveeDevice, intent: HeldIntent) => void;
   onCommandResult?: (
     deviceId: string,
     entry: {
@@ -337,6 +354,9 @@ export class CommandRouter {
         ok: false,
         error: errMessage(e),
       });
+      if (e instanceof CloudControlRejected && e.deviceOffline) {
+        this.onDeviceOffline?.(device, { kind: "command", command, value });
+      }
       throw e;
     }
   }
@@ -566,6 +586,9 @@ export class CommandRouter {
         ok: false,
         error: errMessage(e),
       });
+      if (e instanceof CloudControlRejected && e.deviceOffline) {
+        this.onDeviceOffline?.(device, { kind: "capability", capabilityType, capabilityInstance, value });
+      }
       throw e;
     }
   }

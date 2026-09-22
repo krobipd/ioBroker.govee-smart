@@ -1,4 +1,4 @@
-import { GoveeCloudClient } from "./govee-cloud-client";
+import { CloudControlRejected, GoveeCloudClient } from "./govee-cloud-client";
 import { HttpError, type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
 import { mockLog } from "./test-helpers";
 
@@ -369,6 +369,42 @@ describe("GoveeCloudClient", () => {
       const hookBody = captured[0] as { request: unknown; response: unknown };
       expect(Object.keys(hookBody).sort()).toEqual(["request", "response"]);
       expect(hookBody.response).toEqual(real);
+    });
+  });
+
+  describe("controlDevice — the rejection names whether the device was offline (2.39.0, issue #46)", () => {
+    it("'Device is offline' is a CloudControlRejected with deviceOffline=true", async () => {
+      const fake = makeFakeHttps(() => ({
+        requestId: "ctrl_1",
+        msg: "Device is offline. Please check the Wi-Fi connection.",
+        code: 400,
+        capability: {
+          type: "devices.capabilities.on_off",
+          instance: "powerSwitch",
+          state: {
+            status: "failure",
+            errorCode: 400,
+            errorMsg: "Device is offline. Please check the Wi-Fi connection.",
+          },
+        },
+      }));
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      const err = await client
+        .controlDevice("H600D", "AA:BB", "devices.capabilities.on_off", "powerSwitch", 1)
+        .catch(e => e);
+      expect(err).toBeInstanceOf(CloudControlRejected);
+      expect((err as CloudControlRejected).deviceOffline).toBe(true);
+      expect(String((err as Error).message)).toContain("Device is offline");
+    });
+
+    it("any other rejection is a CloudControlRejected with deviceOffline=false", async () => {
+      const fake = makeFakeHttps(() => ({ requestId: "ctrl_2", msg: "Invalid parameter type", code: 400 }));
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      const err = await client
+        .controlDevice("H7127", "AA:BB", "devices.capabilities.work_mode", "workMode", 1)
+        .catch(e => e);
+      expect(err).toBeInstanceOf(CloudControlRejected);
+      expect((err as CloudControlRejected).deviceOffline).toBe(false);
     });
   });
 

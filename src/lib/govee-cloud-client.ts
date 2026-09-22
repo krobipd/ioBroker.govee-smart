@@ -1,6 +1,35 @@
 import { formatFallback, httpsRequest, HttpError, type HttpsRequestFn } from "./http-client";
 
 /**
+ * Govee accepted the request but refused the command (payload-level `code` or
+ * a per-capability `failure`). `deviceOffline` names the one refusal the
+ * adapter acts on: the device is not talking to Govee right now — the command
+ * is held for the device's next sign of life (issue #46, 2.39.0).
+ */
+export class CloudControlRejected extends Error {
+  /**
+   * @param message The rejection line (sku/device/instance, code, reason)
+   * @param deviceOffline Whether Govee's reason says the device was offline
+   */
+  constructor(
+    message: string,
+    public readonly deviceOffline: boolean,
+  ) {
+    super(message);
+    this.name = "CloudControlRejected";
+  }
+}
+
+/**
+ * Whether a rejection reason says the device was offline — a whole word, never a substring.
+ *
+ * @param reason Govee's `msg` / `errorMsg`
+ */
+function reasonSaysOffline(reason: unknown): boolean {
+  return typeof reason === "string" && /\boffline\b/i.test(reason);
+}
+
+/**
  * What Govee says about its own budget, read off one answer's headers. The
  * named fields follow the v1 docs (`X-RateLimit-*` = day, `API-RateLimit-*` =
  * minute); `raw` keeps every header whose name mentions the rate limit, so
@@ -323,8 +352,9 @@ export class GoveeCloudClient {
     // (issue #47). `message` stays as a fallback for the older shape.
     const reason = resp?.msg ?? resp?.message ?? capState?.errorMsg;
     if (resp && typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
-      throw new Error(
+      throw new CloudControlRejected(
         `Cloud control rejected for ${sku}/${device}/${instance}: code=${resp.code}${reason ? ` — ${reason}` : ""}`,
+        reasonSaysOffline(reason),
       );
     }
     // A rejection can arrive with a 200 envelope while the per-capability state
@@ -332,8 +362,9 @@ export class GoveeCloudClient {
     // (issue #47). Either marker is enough: the captured payload sets both, and
     // a lone errorCode must not slip through.
     if (capState?.status === "failure" || typeof capState?.errorCode === "number") {
-      throw new Error(
+      throw new CloudControlRejected(
         `Cloud control rejected for ${sku}/${device}/${instance}: code=${capState.errorCode ?? "?"}${reason ? ` — ${reason}` : ""}`,
+        reasonSaysOffline(reason),
       );
     }
   }
