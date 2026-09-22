@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.39.1",
+    "version": "2.39.2",
     "news": {
+      "2.39.2": {
+        "en": "App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report\nA scene request Govee refuses is no longer taken as \"no scenes\" — the cached scenes and snapshots stay, and the report names the reason once",
+        "de": "App-Gruppen werden nicht mehr bei jedem Start nach einem Gerätezustand gefragt — Govee beantwortete jeden Aufruf mit einem Fehler, der nur den Diagnosebericht füllte\nEine von Govee abgelehnte Szenen-Abfrage gilt nicht mehr als „keine Szenen“ — gespeicherte Szenen und Snapshots bleiben, der Bericht nennt den Grund einmal",
+        "ru": "Группы приложения больше не опрашиваются о состоянии при каждом запуске — Govee отвечал на каждый вызов ошибкой, которая лишь засоряла диагностический отчёт\nОтклонённый Govee запрос сцен больше не считается «сцен нет» — сохранённые сцены и снимки остаются, а отчёт один раз называет причину",
+        "pt": "Os grupos da app já não são consultados sobre o estado em cada arranque — a Govee respondia a cada chamada com um erro que só enchia o relatório de diagnóstico\nUm pedido de cenas recusado pela Govee já não conta como «sem cenas» — as cenas e instantâneos guardados ficam, e o relatório indica o motivo uma vez",
+        "nl": "App-groepen worden niet meer bij elke start naar een apparaatstatus gevraagd — Govee beantwoordde elke oproep met een fout die alleen het diagnoserapport vulde\nEen door Govee geweigerde scène-aanvraag geldt niet meer als „geen scènes” — opgeslagen scènes en snapshots blijven, het rapport noemt de reden één keer",
+        "fr": "Les groupes de l'app ne sont plus interrogés sur leur état à chaque démarrage — Govee répondait à chaque appel par une erreur qui ne faisait que remplir le rapport\nUne requête de scènes refusée par Govee ne vaut plus « aucune scène » — les scènes et instantanés en cache restent, et le rapport indique la raison une fois",
+        "it": "I gruppi dell'app non vengono più interrogati sullo stato a ogni avvio — Govee rispondeva a ogni chiamata con un errore che riempiva solo il rapporto di diagnostica\nUna richiesta di scene rifiutata da Govee non vale più come «nessuna scena» — scene e istantanee salvate restano, e il rapporto indica il motivo una volta",
+        "es": "Los grupos de la app ya no se consultan por su estado en cada inicio — Govee respondía a cada llamada con un error que solo llenaba el informe de diagnóstico\nUna consulta de escenas rechazada por Govee ya no cuenta como «sin escenas» — las escenas e instantáneas guardadas se mantienen y el informe da el motivo una vez",
+        "pl": "Grupy aplikacji nie są już pytane o stan przy każdym starcie — Govee odpowiadało na każde wywołanie błędem, który tylko zaśmiecał raport diagnostyczny\nOdrzucone przez Govee zapytanie o sceny nie oznacza już „brak scen” — zapisane sceny i migawki zostają, a raport raz podaje przyczynę",
+        "uk": "Групи застосунку більше не опитуються про стан під час кожного запуску — Govee відповідав на кожен виклик помилкою, яка лише засмічувала діагностичний звіт\nВідхилений Govee запит сцен більше не вважається «сцен немає» — збережені сцени та знімки лишаються, а звіт один раз називає причину",
+        "zh-cn": "不再在每次启动时查询应用分组的设备状态——Govee 对每次调用都返回错误，只会填满诊断报告\n被 Govee 拒绝的场景请求不再被视为“没有场景”——已缓存的场景和快照保留，报告只记录一次原因"
+      },
       "2.39.1": {
         "en": "The diagnostics report no longer contains your Wi-Fi network name, the Govee app's device number or a group's id — they appeared in clear in every exported file\nThe diagnostics report keeps Govee's complete account-list entry and shows commands waiting for an offline device and when the adapter started",
         "de": "Der Diagnosebericht enthält nicht mehr den WLAN-Namen, die Gerätenummer der Govee-App oder die Kennung einer Gruppe — sie standen im Klartext in jeder exportierten Datei\nDer Diagnosebericht behält Govees vollständigen Eintrag der Kontoliste und zeigt Befehle, die auf ein Offline-Gerät warten, sowie den Startzeitpunkt des Adapters",
@@ -80,19 +93,6 @@
         "pl": "Naprawa listy wyboru nie usuwa już punktu danych wraz z wartością oraz przypisaniem pokoju i funkcji, zmieniona nazwa urządzenia dociera do istniejącego drzewa obiektów.",
         "uk": "Відновлення списку вибору більше не видаляє точку даних разом зі значенням і належністю до кімнати та функції, перейменований пристрій доходить до наявного дерева.",
         "zh-cn": "修复下拉列表时不再删除数据点及其数值和所属房间与功能，在 Govee 应用中改名的设备现在也会更新到已有的对象树中，日志中的错误信息也更易读。"
-      },
-      "2.37.1": {
-        "en": "The instance settings open on the Configuration tab again also when the admin keeps its settings on the server — 2.37.0 covered the browser storage only, so every open still landed on Expert.",
-        "de": "Die Instanz-Einstellungen öffnen auch dann wieder auf Konfiguration, wenn die Admin ihre Einstellungen am Server ablegt — 2.37.0 deckte nur den Browser-Speicher ab, jedes Öffnen landete auf Experte.",
-        "ru": "Настройки экземпляра снова открываются на «Конфигурации», даже если админ хранит свои настройки на сервере — 2.37.0 учитывала только хранилище браузера, и открытие всё ещё вело на «Эксперт».",
-        "pt": "As definições da instância abrem de novo em Configuração também quando o admin guarda as suas definições no servidor — a 2.37.0 só cobria o armazenamento do browser e cada abertura ia parar a Perito.",
-        "nl": "De instantie-instellingen openen weer op Configuratie, ook als de admin zijn instellingen op de server bewaart — 2.37.0 dekte alleen de browseropslag, elke keer openen kwam nog op Expert uit.",
-        "fr": "Les réglages de l'instance s'ouvrent sur Configuration même si l'admin garde ses réglages sur le serveur — 2.37.0 ne couvrait que le stockage du navigateur, chaque ouverture retombait sur Expert.",
-        "it": "Le impostazioni dell'istanza si aprono di nuovo su Configurazione anche se l'admin conserva le impostazioni sul server — 2.37.0 copriva solo la memoria del browser, ogni apertura finiva su Esperto.",
-        "es": "Los ajustes de la instancia vuelven a abrirse en Configuración cuando el admin guarda sus ajustes en el servidor — 2.37.0 solo cubría el almacenamiento del navegador y cada apertura caía en Experto.",
-        "pl": "Ustawienia instancji znów otwierają się na Konfiguracji także wtedy, gdy admin przechowuje ustawienia na serwerze — 2.37.0 obejmowała tylko pamięć przeglądarki, każde otwarcie lądowało na Ekspercie.",
-        "uk": "Налаштування екземпляра знову відкриваються на «Конфігурації», навіть якщо адмін зберігає налаштування на сервері — 2.37.0 охоплювала лише сховище браузера, кожне відкриття потрапляло на «Експерт».",
-        "zh-cn": "即使管理界面将其设置保存在服务器上，实例设置也会再次在“配置”页打开——2.37.0 只处理了浏览器存储，因此每次打开仍停在“专家”页。"
       }
     },
     "plugins": {

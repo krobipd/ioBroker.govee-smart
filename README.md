@@ -95,7 +95,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.39.2 (2026-09-22)
 
 - Fixed: App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report
 - Fixed: A scene request Govee refuses is no longer taken as "no scenes" — the cached scenes and snapshots stay, and the report names the reason once
@@ -123,10 +123,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.38.2 (2026-09-17)
 
 - Changed: Internal refactoring. No user-facing changes.
-
-### 2.38.1 (2026-09-16)
-
-- Fixed: Repairing a dropdown is now a single write — until 2.38.0 it was emptied first, so a restart in that moment left the datapoint with nothing to pick from until the next start
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
