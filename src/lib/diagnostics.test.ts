@@ -817,6 +817,19 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("the network name inside a raw MQTT envelope (issue #50)", () => {
+    it("never survives into the report — the envelope is text, not an object", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.addMqttPacket("dev1", "GA/account", {
+        rawJson: '{"msg":{"wifiName":"CANARY-X","matterId":"CANARY-M","deviceId":98765432}}',
+      });
+      const text = JSON.stringify(await c.generate(makeDevice({ deviceId: "dev1" }), "2.39.1"));
+      expect(text).not.toContain("CANARY-X");
+      expect(text).not.toContain("CANARY-M");
+      expect(text).not.toContain("98765432");
+    });
+  });
+
   describe("a group's id is only digits — the report still never shows it (issue #50)", () => {
     it("shortens it in the device section, the object prefix, log lines and API bodies", async () => {
       const c = new DiagnosticsCollector(registry);

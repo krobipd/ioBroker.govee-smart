@@ -158,6 +158,41 @@ describe("Anonymiser", () => {
     });
   });
 
+  describe("the same keys inside JSON that is still text — an MQTT envelope, a body that did not parse", () => {
+    it("replaces the network name, the Matter id and digit ids in plain JSON text", () => {
+      const a = new Anonymiser();
+      const out = a.text(
+        '{"msg":{"wifiName":"Jenny & Mirko","matterId":"E7A6","deviceId":49595162,"groupId":12345678}}',
+      );
+      expect(out).toBe(
+        '{"msg":{"wifiName":"wifi-1","matterId":"matter-1","deviceId":"app-id-1","groupId":"id-…5678"}}',
+      );
+      expect(() => JSON.parse(out)).not.toThrow();
+    });
+
+    it("replaces them in JSON nested inside a JSON string (escaped one level)", () => {
+      const a = new Anonymiser();
+      const inner = JSON.stringify({ wifiName: "Barmdorf2", deviceId: 30929584 });
+      const out = a.text(JSON.stringify({ deviceSettings: inner }));
+      expect(out).not.toContain("Barmdorf2");
+      expect(out).not.toContain("30929584");
+      expect(JSON.parse(JSON.parse(out).deviceSettings)).toEqual({ wifiName: "wifi-1", deviceId: "app-id-1" });
+    });
+
+    it("gives one network one marker, whether it came as an object or as text", () => {
+      const a = new Anonymiser();
+      const fromObject = (a.walk({ wifiName: "Home" }) as { wifiName: string }).wifiName;
+      expect(a.text('{"wifiName":"Home"}')).toBe(`{"wifiName":"${fromObject}"}`);
+    });
+
+    it("leaves an empty name, `groupId: 0` and a second pass alone", () => {
+      const a = new Anonymiser();
+      expect(a.text('{"wifiName":"","groupId":0}')).toBe('{"wifiName":"","groupId":0}');
+      const once = a.text('{"wifiName":"Home","deviceId":42}');
+      expect(a.text(once)).toBe(once);
+    });
+  });
+
   describe("group ids inside text — found by lookup, like names", () => {
     it("replaces a known digit id wherever it stands on its own", () => {
       const a = new Anonymiser();
@@ -171,9 +206,10 @@ describe("Anonymiser", () => {
       expect(a.text("at 1790098123456789 ms", [], ["123456"])).toBe("at 1790098123456789 ms");
     });
 
-    it("ignores ids shorter than six digits — they would hit byte counts and times", () => {
+    it("ignores ids of four digits or fewer — the shortened form would be the id itself", () => {
       const a = new Anonymiser();
-      expect(a.text("sent 12345 bytes", [], ["12345"])).toBe("sent 12345 bytes");
+      expect(a.text("sent 1234 bytes", [], ["1234"])).toBe("sent 1234 bytes");
+      expect(a.text("group 12345 on", [], ["12345"])).toBe("group id-…2345 on");
     });
   });
 
