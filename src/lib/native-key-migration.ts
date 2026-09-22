@@ -1,116 +1,209 @@
-import { errMessage } from "./types";
-
 /**
- * A renamed `native` key: the old spelling still sits in the instance object of
- * every installation that was upgraded, the new one arrives with the manifest
- * default. The value wins over the default.
+ * One-shot migration of instance settings keys (`system.adapter.<ns>.native`) — a key that
+ * was renamed or whose value type changed is carried over on the first start after the
+ * update, so an existing installation keeps what its user configured.
+ *
+ * Why this exists (fleet standard "listen-port declaration", 2026-09-15): the admin's
+ * port-conflict check only sees instances carrying `native.port` AND `native.bind`, so a
+ * listen address stored under any other key (`host`, `bindAddress`, `networkInterface`) is
+ * invisible to it. Renaming the key in the manifest is not enough — on an update
+ * js-controller ADDS every missing native key with its manifest default and never deletes
+ * the old one, so after the update both keys exist: the new one with the default, the old
+ * one with the user's value. A read fallback `new || old` therefore always picks the default.
+ * The old value must be moved explicitly, and the old key nulled (a merge cannot delete).
+ *
+ * Contract for every rename onto `bind`: supply a `coerce` that turns an empty legacy value into
+ * "0.0.0.0" — the admin's port-conflict check skips an instance whose `bind` is falsy
+ * (`if (!instance.native?.bind) return;` in ConfigPort), so a migrated `""` would leave the
+ * adapter exactly as invisible as before. The helper itself moves values verbatim.
+ *
+ * Two rules the write obeys, both learned in hassemu's legacy migration:
+ * - Merge, never write the whole object — `extendForeignObjectAsync` with only the touched
+ *   keys; `null` survives the merge (`undefined` would be skipped) and makes the old key
+ *   falsy, which is all a later read needs.
+ * - A write to the own instance object restarts the instance — so the caller aborts its
+ *   start when this reports a write, instead of binding a port in a process about to go down.
+ *
+ * Fleet master: `Entwicklung/.consistency-master/src/lib/native-key-migration.ts`. Every adapter
+ * that migrates native keys carries this file and its test byte for byte — the release run
+ * (consistency level 1) reports any difference. Change the master, then copy; never the copy.
+ * The file imports nothing adapter-specific: the caller hands in its own error-text helper.
  */
+
+/** Rename: the old value wins over the freshly added default; the old key is nulled. */
 export interface NativeKeyRename {
-  /** The key an earlier version wrote. */
-  readonly from: string;
-  /** The key this version reads. */
-  readonly to: string;
-  /**
-   * The old value in the new key's shape — `undefined` when it is not worth
-   * carrying (wrong type, empty), in which case only the old key is removed.
-   */
-  readonly coerce: (old: unknown) => unknown;
+  /** The key the value used to live under. */
+  from: string;
+  /** The key the value moves to. */
+  to: string;
+  /** Optional value conversion on the way (e.g. an empty legacy string → "0.0.0.0"). */
+  coerce?: (old: unknown) => unknown;
 }
 
-/** Adapter surface the migration needs — the instance object, nothing else. */
+/** In-place coercion (same key), e.g. the manifest default `"8080"` → `8080`. */
+export interface NativeKeyCoercion {
+  /** The key whose value type changed. */
+  key: string;
+  /** Returns the value in its new form; an unchanged result writes nothing. */
+  coerce: (value: unknown) => unknown;
+}
+
+export type NativeKeyMigration = NativeKeyRename | NativeKeyCoercion;
+
+/** The adapter surface the migration needs — object I/O, logging, the in-memory config. */
 export interface NativeKeyMigrationAdapter {
-  /** `<adapter>.<instance>` — names the instance object. */
-  readonly namespace: string;
-  /** info for the one-time carry-over, debug when the object cannot be read. */
-  readonly log: Pick<ioBroker.Logger, "info" | "debug">;
-  /** Reads the instance object (`system.adapter.<namespace>`). */
-  getForeignObjectAsync(id: string): Promise<{ native?: Record<string, unknown> } | null | undefined>;
-  /** Merges into the instance object — `null` deletes a key. */
+  /** Instance namespace, e.g. `adapter.0`. */
+  namespace: string;
+  /** Adapter log — one info line per migration, warnings for a failed read or write. */
+  log: { info: (msg: string) => void; warn: (msg: string) => void };
+  /** `adapter.config` — patched in memory only when the write fails. */
+  config: object;
+  /** Reads the instance object. */
+  getForeignObjectAsync(id: string): Promise<unknown>;
+  /** Merges the touched native keys into the instance object. */
   extendForeignObjectAsync(id: string, obj: { native: Record<string, unknown> }): Promise<unknown>;
 }
 
-/**
- * Renames of this adapter's settings keys, oldest first.
- *
- * 2.37.0: the LAN listen address moves from `networkInterface` to `bind`, the
- * key the admin's port-conflict check reads next to `native.port` (fleet
- * standard "listen-port declaration"). The old key was the same value under a
- * name the admin never looked at.
- */
-export const NATIVE_KEY_RENAMES: readonly NativeKeyRename[] = [
-  {
-    from: "networkInterface",
-    to: "bind",
-    coerce: old => (typeof old === "string" && old.trim() !== "" ? old.trim() : undefined),
-  },
-];
+const isRename = (m: NativeKeyMigration): m is NativeKeyRename => "from" in m;
+
+const isPresent = (v: unknown): boolean => v !== undefined && v !== null;
 
 /**
- * Carry renamed settings keys over from an earlier version — once, on the
- * first start after the upgrade.
+ * A value that says something — when several old keys compete for one new key, a source
+ * holding nothing but the manifest default ("" or "listen everywhere") must not beat a
+ * source holding the concrete address the user once entered.
  *
- * js-controller adds a missing `native` key with the manifest default when an
- * adapter is upgraded and never deletes an old one. So after the upgrade the
- * instance object carries BOTH spellings: the old key with the user's value and
- * the new key with the default. Reading `new || old` would not help — the
- * injected default always wins, and the user's choice would be silently gone.
- * Instead the old value is written into the new key and the old key is deleted
- * (`null` deletes in an extend). That write changes the instance object, which
- * makes the host restart the instance — the caller stops `onReady` right there.
+ * @param v the candidate value
+ */
+const isMeaningful = (v: unknown): boolean => {
+  if (!isPresent(v)) {
+    return false;
+  }
+  if (typeof v === "string") {
+    const s = v.trim();
+    return s !== "" && s !== "0.0.0.0";
+  }
+  return true;
+};
+
+/**
+ * A coercion result the migration can store — `undefined` and `NaN` would either be
+ * skipped by the merge or come back as `null`, and a value that never settles would
+ * restart the instance on every start.
  *
- * An old key that carries nothing worth keeping (empty, wrong type) is deleted
- * as well: the default that arrived with the manifest is then the right value,
- * and the instance object stops carrying a setting nobody reads.
+ * @param v the coerced value
+ */
+const isStorable = (v: unknown): boolean => v !== undefined && !(typeof v === "number" && Number.isNaN(v));
+
+/**
+ * Computes the native patch for the given migrations — pure, so the decision is testable
+ * without an adapter.
  *
- * "Deleted" means: the stored object keeps the key with the value `null` —
- * measured on the dev-server profile 2026-09-15 (the extend does not drop the
- * key, it stores the null). So a null-valued old key is the state AFTER the
- * migration, never a reason to migrate: treating it as "still there" wrote the
- * object on every start, and every write is a restart — an endless loop on
- * each installation that ever had the old key.
+ * Renames targeting the same key are evaluated together, in order: the first source whose
+ * value is meaningful wins; when none is, the first present one (its coercion may still turn
+ * an empty legacy value into a sensible one). Every present source is nulled. A coercion
+ * writes only when the coerced value differs from the stored one.
  *
- * @param adapter the adapter (instance object access + log)
- * @param renames the renames to apply — the adapter's list by default
- * @returns true when the instance object was changed and the restart is coming
+ * @param native the instance's current native settings
+ * @param migrations the renames and coercions to apply
+ * @returns the keys to merge into native — empty when nothing needs to change
+ */
+export function buildNativeKeyPatch(
+  native: Record<string, unknown>,
+  migrations: NativeKeyMigration[],
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+
+  const renamesByTarget = new Map<string, NativeKeyRename[]>();
+  for (const m of migrations) {
+    if (isRename(m)) {
+      const group = renamesByTarget.get(m.to) ?? [];
+      group.push(m);
+      renamesByTarget.set(m.to, group);
+    }
+  }
+  for (const [to, group] of renamesByTarget) {
+    const present = group.filter(r => isPresent(native[r.from]));
+    if (present.length === 0) {
+      continue;
+    }
+    const winner = present.find(r => isMeaningful(native[r.from])) ?? present[0];
+    const value = winner.coerce ? winner.coerce(native[winner.from]) : native[winner.from];
+    if (!isStorable(value)) {
+      // Nothing to carry over — leave the old keys untouched rather than null a value
+      // that never reached its new key.
+      continue;
+    }
+    patch[to] = value;
+    for (const r of present) {
+      patch[r.from] = null;
+    }
+  }
+
+  for (const m of migrations) {
+    if (isRename(m) || !isPresent(native[m.key])) {
+      continue;
+    }
+    const coerced = m.coerce(native[m.key]);
+    if (isStorable(coerced) && !Object.is(coerced, native[m.key])) {
+      patch[m.key] = coerced;
+    }
+  }
+  return patch;
+}
+
+/**
+ * Applies the migrations to `system.adapter.<ns>` with ONE merge of the touched keys.
+ *
+ * @param adapter the adapter (object I/O, log, in-memory config)
+ * @param migrations the renames and coercions to apply
+ * @param describeError the adapter's error-text helper (one per repository) — renders whatever
+ *   the object store threw, so a rejected plain object never reads `[object Object]`
+ * @returns true when the instance object was written — the caller must abort its start,
+ *   the host restarts the instance with the migrated settings. false when nothing had to
+ *   change, or when the write failed: then the in-memory config already carries the
+ *   migrated values and the start continues with them (the write is retried next start).
  */
 export async function migrateNativeKeys(
   adapter: NativeKeyMigrationAdapter,
-  renames: readonly NativeKeyRename[] = NATIVE_KEY_RENAMES,
+  migrations: NativeKeyMigration[],
+  describeError: (err: unknown) => string,
 ): Promise<boolean> {
   const id = `system.adapter.${adapter.namespace}`;
+  let native: Record<string, unknown> | undefined;
   try {
-    const obj = await adapter.getForeignObjectAsync(id);
-    const native = obj?.native;
-    if (!native) {
-      return false;
-    }
-    const patch: Record<string, unknown> = {};
-    const carried: string[] = [];
-    for (const rename of renames) {
-      const old = native[rename.from];
-      if (old === undefined || old === null) {
-        continue; // never had the key, or already migrated (null is what the delete leaves behind)
-      }
-      const value = rename.coerce(old);
-      if (value !== undefined) {
-        patch[rename.to] = value;
-        carried.push(`${rename.from} → ${rename.to}`);
-      }
-      // null DELETES the key in an extend (undefined would be skipped).
-      patch[rename.from] = null;
-    }
-    if (Object.keys(patch).length === 0) {
-      return false;
-    }
-    adapter.log.info(
-      carried.length > 0
-        ? `Carrying settings over from an earlier version (${carried.join(", ")}) — this instance restarts once`
-        : "Removing settings keys of an earlier version — this instance restarts once",
-    );
+    const obj = (await adapter.getForeignObjectAsync(id)) as { native?: Record<string, unknown> } | null | undefined;
+    native = obj?.native;
+  } catch (err) {
+    adapter.log.warn(`Settings migration skipped — could not read ${id}: ${describeError(err)}`);
+    return false;
+  }
+  if (!native) {
+    return false;
+  }
+  const patch = buildNativeKeyPatch(native, migrations);
+  const touched = Object.keys(patch);
+  if (touched.length === 0) {
+    return false;
+  }
+  const summary = touched
+    .filter(k => patch[k] !== null)
+    .map(k => `${k} = ${JSON.stringify(patch[k])}`)
+    .join(", ");
+  try {
     await adapter.extendForeignObjectAsync(id, { native: patch });
+    adapter.log.info(`Settings migrated to the standard keys (${summary}) — this instance restarts once`);
     return true;
-  } catch (e) {
-    adapter.log.debug(`Could not migrate the settings keys: ${errMessage(e)}`);
+  } catch (err) {
+    adapter.log.warn(`Settings migration could not be stored (${describeError(err)}) — using ${summary} for this run`);
+    const config = adapter.config as Record<string, unknown>;
+    for (const k of touched) {
+      if (patch[k] === null) {
+        delete config[k];
+      } else {
+        config[k] = patch[k];
+      }
+    }
     return false;
   }
 }

@@ -11,7 +11,7 @@ import { GoveeLanClient } from "./lib/govee-lan-client";
 import { GoveeMqttClient } from "./lib/govee-mqtt-client";
 import { GoveeOpenapiMqttClient } from "./lib/govee-openapi-mqtt-client";
 import { LocalSnapshotStore } from "./lib/local-snapshots";
-import { migrateNativeKeys } from "./lib/native-key-migration";
+import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
 import { installLogPrefix, type ChannelStatusSnapshot } from "./lib/log-prefix";
 import { SnapshotHandler } from "./lib/snapshot-handler";
 import { GroupFanoutHandler } from "./lib/group-fanout";
@@ -101,6 +101,15 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
  * runtime entry point below still constructs it the same way.
  */
 export class GoveeAdapter extends utils.Adapter {
+  /**
+   * Settings keys renamed by earlier releases, carried over once on the first start after
+   * the update (fleet helper `native-key-migration`, listen-port standard 2026-09-15):
+   * `networkInterface` → `bind` since 2.37.0; an empty legacy value becomes "0.0.0.0", the
+   * form the admin's port-conflict check reads (it skips an instance whose `bind` is falsy).
+   */
+  private static readonly NATIVE_KEY_MIGRATIONS: NativeKeyMigration[] = [
+    { from: "networkInterface", to: "bind", coerce: v => (typeof v === "string" && v.trim()) || "0.0.0.0" },
+  ];
   // ── Test seams ────────────────────────────────────────────────────────────
   // Network-facing collaborators are built through overridable factory fields
   // instead of inline `new` calls, so the orchestration tests can drive onReady
@@ -436,7 +445,7 @@ export class GoveeAdapter extends utils.Adapter {
       }
       // Same class of correction, same consequence: a settings key renamed by an
       // earlier release is carried over once, the write restarts the instance.
-      if (await migrateNativeKeys(this)) {
+      if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errMessage)) {
         return;
       }
       await I18n.init(path.join(this.adapterDir, "admin"), this);
