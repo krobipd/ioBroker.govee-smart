@@ -51,14 +51,6 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 
 For details and how to disable it, see the [Sentry plugin documentation](https://github.com/ioBroker/plugin-sentry#plugin-sentry). Error reporting requires js-controller 3.0 or newer.
 
-## Network connections
-
-Besides your devices on the LAN and the Govee servers (`openapi.api.govee.com`, `app2.govee.com`, `mqtt.openapi.govee.com` and Govee's AWS IoT endpoint), the adapter makes one more outbound call: once a day it looks up the current version of the Govee Home app in Apple's App Store directory (`itunes.apple.com`). Govee's undocumented endpoints reject requests that announce a stale app version, so the adapter keeps that version current on its own. The lookup carries no account data, no device data and no identifier of your installation.
-
-The per-device diagnostics report (Expert tab → Diagnostics) is meant to be attached to a public GitHub issue. It contains the device's model, its Govee device id, its LAN address, the name you gave it in the Govee Home app, recent adapter log lines and the last API responses for that device. Credentials, tokens and gateway secrets are masked before the report is written, and addresses, mail addresses and device names are replaced by stable markers.
-
----
-
 ## Requirements
 
 - Node.js >= 22
@@ -105,12 +97,12 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ### **WORK IN PROGRESS**
 
-- Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
+- New: A device that has gone quiet is asked for its status over the Govee account connection — a bulb or purifier that works but showed as unreachable now stays reachable
 - Improved: The cloud budget follows Govee's per-device limits — a command for one light no longer waits for another light's calls or for library downloads
 - New: A command Govee refused because the device was offline is delivered once the device reports back (within five minutes), instead of being lost
-- Improved: The libraries of one model are fetched once per start for all its lights, and an empty library answer is remembered for seven days
+- Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
 - Fixed: A scene list that shrank no longer leaves withdrawn scenes in the dropdown
-- Improved: The diagnostics report shows Govee's rate-limit headers and, for appliances, no longer promises a reachability refresh that skips them
+- Fixed: The diagnostics report no longer lists a reachability refresh for appliances, which never get one
 - New: H1771 Table Lamp reported working by a user
 
 ### 2.38.3 (2026-09-17) — stable
