@@ -92,6 +92,11 @@
           "maximum": 56,
           "description": "Override segment count — Govee's segment capabilities sometimes advertise more slots than the strip physically has. Hard override of Cloud, cache and MQTT. Mainly for cloud-only SKUs that can't self-correct via AA-A5 status packets. Range 1..56 — the Govee bitmask is 7 bytes x 8 bits, so it addresses 56 slots (0..55)."
         },
+        "statusCmdVersion": {
+          "type": "integer",
+          "enum": [1, 2],
+          "description": "cmdVersion of the status request published over the account broker (default 2). Only H6121 is known to need 1 (homebridge-govee device-capabilities.js). A device sent the wrong version stays silent."
+        },
         "brokenPlatformApi": {
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."

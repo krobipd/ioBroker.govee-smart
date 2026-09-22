@@ -258,14 +258,16 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    *
    * @param deviceTopic The device's publish topic from the account list
    * @param now Request time in ms — becomes the transaction stamp
+   * @param cmdVersion Protocol version of the request — 2 for every measured
+   *   device, 1 where the catalog's `statusCmdVersion` quirk says so (H6121)
    * @returns false when the broker is not connected (nothing sent)
    */
-  requestStatus(deviceTopic: string, now: number = Date.now()): boolean {
+  requestStatus(deviceTopic: string, now: number = Date.now(), cmdVersion: 1 | 2 = 2): boolean {
     const client = this.client;
     if (!client || !this.connected) {
       return false;
     }
-    const payload = JSON.stringify({ msg: { cmd: "status", cmdVersion: 2, transaction: `v_${now}000`, type: 0 } });
+    const payload = JSON.stringify({ msg: { cmd: "status", cmdVersion, transaction: `v_${now}000`, type: 0 } });
     client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
       if (err) {
         this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errMessage(err)}`);

@@ -1331,7 +1331,10 @@
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
-      "since": "2.33.0"
+      "since": "2.33.0",
+      "quirks": {
+        "statusCmdVersion": 1
+      }
     },
     "H6125": {
       "name": "Smart Light",

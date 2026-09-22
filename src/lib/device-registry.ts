@@ -45,6 +45,15 @@ export interface DeviceQuirks {
    * override automatically.
    */
   transportOverrides?: Partial<Record<ConfigurableOverrideCommand, TransportTarget>>;
+  /**
+   * `cmdVersion` of the status request over the account broker (2.39.0).
+   * Govee's devices answer version 2 (measured 2026-09-22); homebridge-govee
+   * carries one exception, H6121 ("requires cmdVersion 1 for status requests",
+   * `lib/utils/device-capabilities.js`). A device sent the wrong version stays
+   * silent — grey after the TTL, never a false green. Dormant on a `seed`
+   * entry like every quirk until the experimental toggle is on.
+   */
+  statusCmdVersion?: 1 | 2;
 }
 
 /**

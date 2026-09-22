@@ -552,6 +552,19 @@ describe("GoveeMqttClient", () => {
       expect(published[0].opts).toEqual({ qos: 0 });
     });
 
+    it("publishes cmdVersion 1 when the catalog says so — H6121 answers only that version (homebridge-govee device-capabilities.js)", async () => {
+      const { client, published } = connectedClient();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      (client as unknown as { client: { connected: boolean } }).client.connected = true;
+      expect(client.requestStatus("GD/0123456789abcdef0123456789abcdef", 1790071124009, 1)).toBe(true);
+      expect(published[0].payload).toBe(
+        '{"msg":{"cmd":"status","cmdVersion":1,"transaction":"v_1790071124009000","type":0}}',
+      );
+    });
+
     it("sends nothing and says so while the broker is not connected", async () => {
       const { client, published } = connectedClient();
       expect(client.requestStatus("GD/x", Date.now())).toBe(false); // no socket yet

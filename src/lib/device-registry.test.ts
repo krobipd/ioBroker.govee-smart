@@ -261,6 +261,28 @@ describe("DeviceRegistry", () => {
       expect(checked).toBeGreaterThanOrEqual(5);
     });
   });
+
+  describe("devices.json — statusCmdVersion (2.39.0)", () => {
+    // homebridge-govee `lib/utils/device-capabilities.js`: every model answers
+    // the status request with cmdVersion 2 except H6121, which needs 1.
+    it("H6121 carries statusCmdVersion 1 — active only with the experimental toggle, like every seed quirk", () => {
+      const file = path.resolve(__dirname, "..", "..", "devices.json");
+      const dormant = new DeviceRegistry({ filePath: file });
+      const active = new DeviceRegistry({ filePath: file, experimental: true });
+      expect(active.getEntry("H6121")?.quirks?.statusCmdVersion).toBe(1);
+      expect(active.getQuirks("H6121")?.statusCmdVersion).toBe(1);
+      expect(dormant.getQuirks("H6121")).toBeUndefined();
+      const realDevices = JSON.parse(fs.readFileSync(file, "utf-8")) as {
+        devices: Record<string, { quirks?: { statusCmdVersion?: unknown } }>;
+      };
+      for (const entry of Object.values(realDevices.devices)) {
+        const v = entry.quirks?.statusCmdVersion;
+        if (v !== undefined) {
+          expect([1, 2]).toContain(v);
+        }
+      }
+    });
+  });
 });
 
 describe("isSeedAndDormant — the experimental-toggle nudge", () => {

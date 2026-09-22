@@ -37,7 +37,13 @@ const ALLOWED_STATUS = new Set(["verified", "reported", "seed"]);
  * and the gap only surfaced on the first entry that did, as
  * "unknown quirk field 'segmentCount'".
  */
-const KNOWN_QUIRK_FIELDS = new Set(["colorTempRange", "brokenPlatformApi", "transportOverrides", "segmentCount"]);
+const KNOWN_QUIRK_FIELDS = new Set([
+  "colorTempRange",
+  "brokenPlatformApi",
+  "transportOverrides",
+  "segmentCount",
+  "statusCmdVersion",
+]);
 
 /**
  * The Govee segment bitmask is 7 bytes × 8 bits, so it addresses slots 0..55 —
@@ -165,6 +171,9 @@ function validate(devicesJsonPath: string): Issue[] {
               msg: `'segmentCount' must be an integer in 1..${SEGMENT_COUNT_MAX} (got ${JSON.stringify(n)})`,
             });
           }
+        }
+        if (q.statusCmdVersion !== undefined && q.statusCmdVersion !== 1 && q.statusCmdVersion !== 2) {
+          issues.push({ sku, msg: `'statusCmdVersion' must be 1 or 2 (got ${JSON.stringify(q.statusCmdVersion)})` });
         }
         if (q.transportOverrides !== undefined) {
           const t = q.transportOverrides;

@@ -2658,7 +2658,7 @@ describe("scenario issue #47 — the status request over the account broker keep
     const staggered = i.setTimeout.mock.calls.slice(timeoutsBefore).filter(c => c[1] === 0);
     expect(staggered).toHaveLength(1);
     (staggered[0][0] as () => void)();
-    expect(f.mqtt.requestStatus).toHaveBeenCalledWith("GD/0123456789abcdef0123456789abcdef");
+    expect(f.mqtt.requestStatus).toHaveBeenCalledWith("GD/0123456789abcdef0123456789abcdef", expect.any(Number), 2);
 
     // The answer, 903 ms later in the measurement: an ordinary status packet
     // carrying the request's transaction.

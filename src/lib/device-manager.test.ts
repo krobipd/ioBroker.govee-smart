@@ -5024,6 +5024,56 @@ describe("requestStaleStatuses — the status request over the account broker (i
     expect(asked).toEqual([]);
   });
 
+  it("hands the requester the catalog's statusCmdVersion — 1 for H6121 with the toggle on, 2 for everything else and for a dormant seed", () => {
+    const catalog = {
+      devices: {
+        H6121: { name: "Smart Light", type: "light", status: "seed", quirks: { statusCmdVersion: 1 } },
+        H600D: { name: "Bulb", type: "light", status: "reported" },
+      },
+    };
+    const run = (experimental: boolean): Array<[string, number]> => {
+      const reg = new DeviceRegistry({ data: catalog as never, experimental });
+      const timers = {
+        setInterval: () => undefined,
+        clearInterval: () => undefined,
+        clearTimeout: () => undefined,
+        delay: () => Promise.resolve(),
+        setTimeout: (cb: () => void) => {
+          cb();
+          return undefined;
+        },
+      } as never;
+      const dm = new DeviceManager(mockLog, timers, reg);
+      const seen: Array<[string, number]> = [];
+      dm.setStatusRequester((device, cmdVersion) => {
+        seen.push([device.sku, cmdVersion]);
+        return true;
+      });
+      for (const sku of ["H6121", "H600D"]) {
+        const d = createTestDevice({
+          sku,
+          deviceId: `${sku}:01`,
+          lanIp: undefined,
+          lastLanSeenAt: undefined,
+          channels: { lan: false, mqtt: true, cloud: true },
+          iotTopic: `GD/${sku}`,
+        });
+        (dm as any).devices.set(`${sku}_01`, d);
+      }
+      expect(dm.requestStaleStatuses(Date.now())).toBe(2);
+      return seen;
+    };
+    expect(run(true)).toEqual([
+      ["H6121", 1],
+      ["H600D", 2],
+    ]);
+    // A seed's quirk is dormant until the experimental toggle — like every quirk.
+    expect(run(false)).toEqual([
+      ["H6121", 2],
+      ["H600D", 2],
+    ]);
+  });
+
   it("without a requester (no account login) nothing is asked", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined, iotTopic: "GD/x" });

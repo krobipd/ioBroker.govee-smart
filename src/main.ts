@@ -867,8 +867,8 @@ export class GoveeAdapter extends utils.Adapter {
         this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
         // The status request over the account broker — the DeviceManager
         // decides WHOM to ask, the client only publishes.
-        this.deviceManager.setStatusRequester(device =>
-          device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic) ?? false) : false,
+        this.deviceManager.setStatusRequester((device, cmdVersion) =>
+          device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false,
         );
 
         // Forward every parsed MQTT message into the diagnostics ring buffer

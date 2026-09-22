@@ -123,7 +123,7 @@ export class DeviceManager {
    * Sends a status request to one device over the account broker (main wires
    * the MQTT client). Null without an account login — then nothing is asked.
    */
-  private statusRequester: ((device: GoveeDevice) => boolean) | null = null;
+  private statusRequester: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null = null;
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -239,9 +239,9 @@ export class DeviceManager {
   /**
    * Wire the status-request sender (the MQTT client's `requestStatus`).
    *
-   * @param fn Sends one request; false when the broker is not connected
+   * @param fn Sends one request with the given `cmdVersion`; false when the broker is not connected
    */
-  setStatusRequester(fn: ((device: GoveeDevice) => boolean) | null): void {
+  setStatusRequester(fn: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null): void {
     this.statusRequester = fn;
   }
 
@@ -278,13 +278,18 @@ export class DeviceManager {
         continue;
       }
       device.lastStatusRequestAt = now;
+      // The request's protocol version comes from the catalog: 2 for every
+      // measured device, 1 where a `statusCmdVersion` quirk says so (H6121 —
+      // the wrong version is answered with silence, so the device would stay
+      // grey for no reason). Dormant on a seed until the experimental toggle.
+      const cmdVersion = this.registry.getQuirks(device.sku)?.statusCmdVersion ?? 2;
       const delayMs = scheduled * 1000;
       scheduled++;
       this.timers.setTimeout(() => {
         if (this.isUnloading()) {
           return;
         }
-        if (send(device)) {
+        if (send(device, cmdVersion)) {
           this.diagnostics.addLog(device.deviceId, "debug", "status request sent over the account broker");
         }
       }, delayMs);
