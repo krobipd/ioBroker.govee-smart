@@ -10,6 +10,7 @@ import {
   resolveSegmentCount,
 } from "./device-manager/lookups";
 import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
+import { applianceBudget } from "./rate-limiter";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -1132,9 +1133,19 @@ export class DiagnosticsCollector {
       );
       renewers.push("app device list, every 2 min (needs email + password)");
       renewers.push("cloud event push, event-driven (needs the API key)");
-      renewers.push(
-        `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min (needs the API key)`,
-      );
+      // The refresh skips every device with its own daily budget (appliances,
+      // sensors — `applianceBudget`): 72 of its 90 calls a day would go to
+      // reachability alone. Promising it here sent the reader of an H7127
+      // report waiting for a call that never comes (issue #47, 2026-09-22).
+      if (applianceBudget(device) === undefined) {
+        renewers.push(
+          `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min (needs the API key)`,
+        );
+      } else {
+        silent.push(
+          "reachability refresh (the device keeps its own daily budget — start read, own push, command and list only)",
+        );
+      }
     }
 
     const refreshedBy = renewers.join("; ");

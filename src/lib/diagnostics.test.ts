@@ -324,6 +324,34 @@ describe("DiagnosticsCollector", () => {
       expect((src.silentSources as string[]).join(" ")).toContain("no local API");
     });
 
+    it("an appliance: the report does not promise the reachability refresh that skips it (issue #47, 2026-09-22)", async () => {
+      // `refreshExpiringReachability` skips every device with its own daily
+      // budget (appliances, sensors) — the reporter's H7127 export listed the
+      // refresh among its renewers anyway, and the reader waited for a call
+      // that never comes. The refresh belongs to the silent sources there.
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({
+          sku: "H7127",
+          type: "devices.types.air_purifier",
+          lanIp: undefined,
+          lastLanSeenAt: undefined,
+          state: { online: false },
+        }),
+        "2.39.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      const src = r.device.reachabilitySource!;
+      expect(String(src.refreshedBy)).not.toContain("reachability refresh");
+      expect((src.silentSources as string[]).join(" ")).toContain("reachability refresh");
+      expect((src.silentSources as string[]).join(" ")).toContain("daily budget");
+      // A cloud-only LIGHT keeps the renewer — it has no budget of its own.
+      const light = (await c.generate(
+        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
+        "2.39.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      expect(String(light.device.reachabilitySource!.refreshedBy)).toContain("reachability refresh");
+    });
+
     it("names the gateway as the deciding source when the gateway is down", async () => {
       // The gateway ceiling arrived in 2.30.0 and the report had no branch for
       // it at all: a sensor grey because its gateway is unplugged was reported
