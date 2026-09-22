@@ -80,19 +80,6 @@
         "pl": "Foldery główne snapshots i diagnostics zniknęły, ustawienia otwierają się znów na Konfiguracji, ikony widoczne w ciemnych motywach, admin ostrzega, gdy inny adapter zajmuje port LAN 4002.",
         "uk": "Кореневі теки snapshots і diagnostics зникли, налаштування знову відкриваються на «Конфігурації», значки видно на темних темах, адмін попереджає, якщо інший адаптер зайняв LAN-порт 4002.",
         "zh-cn": "对象树顶部的 snapshots 和 diagnostics 文件夹已移除，设置再次在“配置”页打开，图标在深色主题下可见，当其他适配器占用 LAN 端口 4002 时管理界面会发出警告。"
-      },
-      "2.36.0": {
-        "en": "A command that could not be sent is no longer confirmed, the segment wizard puts the brightness back, and an installation that kept its Govee account but removed the API key reads sensor values again.",
-        "de": "Ein nicht sendbarer Befehl wird nicht mehr bestätigt, der Segment-Assistent stellt die Helligkeit zurück, und eine Anlage mit Govee-Konto, aber entferntem API-Key liest wieder Sensorwerte.",
-        "ru": "Команда, которую не удалось отправить, больше не подтверждается, мастер сегментов возвращает яркость, а установка с аккаунтом Govee, но удалённым API-ключом снова читает значения датчиков.",
-        "pt": "Um comando que não pôde ser enviado deixa de ser confirmado, o assistente de segmentos repõe o brilho e uma instalação com conta Govee mas chave API removida volta a ler os valores dos sensores.",
-        "nl": "Een niet verstuurbare opdracht wordt niet meer bevestigd, de segmentassistent zet de helderheid terug, en een installatie met Govee-account maar verwijderde API-sleutel leest weer sensorwaarden.",
-        "fr": "Une commande impossible à envoyer n'est plus confirmée, l'assistant de segments rétablit la luminosité, et une installation gardant son compte Govee sans sa clé API relit ses valeurs de capteurs.",
-        "it": "Un comando che non è stato inviato non viene più confermato, l'assistente dei segmenti ripristina la luminosità e un'installazione con account Govee ma chiave API rimossa rilegge i valori dei sensori.",
-        "es": "Un comando que no pudo enviarse ya no se confirma, el asistente de segmentos restaura el brillo y una instalación con cuenta Govee pero clave API eliminada vuelve a leer los valores de sus sensores.",
-        "pl": "Polecenie, którego nie udało się wysłać, nie jest już potwierdzane, kreator segmentów przywraca jasność, a instalacja z kontem Govee, ale usuniętym kluczem API znów odczytuje wartości czujników.",
-        "uk": "Команда, яку не вдалося надіслати, більше не підтверджується, майстер сегментів повертає яскравість, а установка з обліковим записом Govee, але видаленим API-ключем знову читає значення датчиків.",
-        "zh-cn": "无法发送的指令不再被确认，分段向导会恢复亮度，保留 Govee 账户但已删除 API 密钥的安装也能重新读取传感器数值。"
       }
     },
     "plugins": {
