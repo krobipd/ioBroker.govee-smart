@@ -362,6 +362,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
       setPersistedCredentials: vi.fn(),
       setOnCredentialsRefresh: vi.fn(),
       getFailureReason: vi.fn(() => null),
+      requestStatus: vi.fn(() => true),
     },
     { connected: false },
   );
@@ -2613,5 +2614,73 @@ describe("scenario issue #46 — a command Govee refused as 'device offline' is 
     expect(controls).toHaveLength(1);
     expect(i.states.get(`${prefix}.control.power`)).toEqual({ val: true, ack: true });
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Delivered 1 held command"));
+  });
+});
+
+// ===========================================================================
+describe("scenario issue #47 — the status request over the account broker keeps a talking device green", () => {
+  it("the 2-minute tick asks a quiet cloud-only light after the list handed it its topic; its answer stamps the push and the list's `false` yields", async () => {
+    const { adapter, f } = await setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
+    const i = internalOf(adapter);
+    f.api.hasBearerToken.mockReturnValue(true);
+    const light = makeDevice({
+      sku: "H600D",
+      deviceId: "AA:BB:CC:DD:EE:7E",
+      lanIp: undefined,
+      lastLanSeenAt: undefined,
+      channels: { lan: false, mqtt: true, cloud: true },
+      state: { online: false },
+    });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H600D_aabbccddee7e", light);
+    // Govee's account list: `online:false` (81 of 81 recordings) — and the topic.
+    f.api.fetchDeviceList.mockResolvedValue([
+      {
+        sku: "H600D",
+        device: "AA:BB:CC:DD:EE:7E",
+        deviceName: "Bulb",
+        lastData: { online: false },
+        settings: { topic: "GD/0123456789abcdef0123456789abcdef" },
+      },
+    ] as never);
+    const pollCall = i.setInterval.mock.calls.find(c => c[1] === 2 * 60 * 1000);
+    const timeoutsBefore = i.setTimeout.mock.calls.length;
+    (pollCall![0] as () => void)();
+    await settle(6);
+
+    // The list said false and won (the old picture) — and the request was
+    // staggered onto the adapter's timer (the harness records timers, so the
+    // scheduled callback is fired by hand).
+    expect(light.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
+    const staggered = i.setTimeout.mock.calls.slice(timeoutsBefore).filter(c => c[1] === 0);
+    expect(staggered).toHaveLength(1);
+    (staggered[0][0] as () => void)();
+    expect(f.mqtt.requestStatus).toHaveBeenCalledWith("GD/0123456789abcdef0123456789abcdef");
+
+    // The answer, 903 ms later in the measurement: an ordinary status packet
+    // carrying the request's transaction.
+    const onStatus = f.mqtt.connect.mock.calls[0][0] as (u: unknown) => void;
+    onStatus({
+      sku: "H600D",
+      device: "AA:BB:CC:DD:EE:7E",
+      cmd: "status",
+      transaction: `v_${Date.now()}000`,
+      state: { onOff: 0, result: 1 },
+    });
+    await settle();
+    expect(light.state.devicePushAt).toBeTypeOf("number");
+
+    // The next list poll says false again — the device's own voice holds.
+    (pollCall![0] as () => void)();
+    await settle(6);
+    expect(light.state.online).toBe(true);
+    // The marker follows on the 20-second round.
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.states.get(`${i.stateManager!.devicePrefix(light)}.info.online`)?.val).toBe(true);
   });
 });

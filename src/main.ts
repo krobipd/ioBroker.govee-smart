@@ -856,6 +856,11 @@ export class GoveeAdapter extends utils.Adapter {
       // Initialize MQTT before Cloud so scene library can load on first cycle
       if (hasAccountCreds) {
         this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+        // The status request over the account broker — the DeviceManager
+        // decides WHOM to ask, the client only publishes.
+        this.deviceManager.setStatusRequester(device =>
+          device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic) ?? false) : false,
+        );
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
         // so the report contains the recent packets per device. v2.9.1: the
@@ -967,6 +972,9 @@ export class GoveeAdapter extends utils.Adapter {
                 logRejected(this.log, "best-effort write"),
               );
               connectionState.checkAllReady(this.handlerHost);
+              // A (re)connected broker: ask right away what went quiet while
+              // it was down — the topics are known from the last list poll.
+              this.deviceManager?.requestStaleStatuses();
             }
             connectionState.updateConnectionState(this.handlerHost);
           },
@@ -1026,6 +1034,10 @@ export class GoveeAdapter extends utils.Adapter {
                 this.appApiInitialPollDone = true;
                 connectionState.checkAllReady(this.handlerHost);
               }
+              // The list just handed every device its broker topic — ask the
+              // ones whose own voice has gone quiet (issue #47, 2.39.0). After
+              // the poll, not before: on the first tick the topics are new.
+              this.deviceManager?.requestStaleStatuses();
             })
             .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
         };

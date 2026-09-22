@@ -167,6 +167,18 @@ export const DIAGNOSTICS_EXPORT_THROTTLE_MS = 2_000;
 /** Idle timeout for the segment-detection wizard (5 min). */
 export const WIZARD_IDLE_TIMEOUT_MS = 5 * 60_000;
 
+// === Status request over the account broker ===
+
+/**
+ * How often a device is asked for its status over the account broker when
+ * its own push is older than this — the request the Govee app sends when it
+ * opens. Well under CLOUD_ONLINE_EVIDENCE_TTL_MS (30 min), so a device that
+ * answers never goes grey between two requests; a device that does not answer
+ * gets no stamp and goes grey with the TTL (measured 2026-09-22: 903 ms answer
+ * from a powered light, 25 s of silence from an unplugged one).
+ */
+export const STATUS_REQUEST_INTERVAL_MS = 10 * 60 * 1000;
+
 // === Held commands ===
 
 /**

@@ -36,7 +36,12 @@ import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { decodeApplianceFrames } from "./appliance-frames";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
-import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS, PENDING_INTENT_TTL_MS } from "./timing-constants";
+import {
+  CLOUD_ONLINE_EVIDENCE_TTL_MS,
+  CLOUD_REACHABILITY_REFRESH_MS,
+  PENDING_INTENT_TTL_MS,
+  STATUS_REQUEST_INTERVAL_MS,
+} from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
   classifyError,
@@ -113,6 +118,12 @@ export class DeviceManager {
   private readonly flushing = new Set<string>();
   /** The running deliveries, for the tests and the bench. */
   private readonly intentFlushes = new Set<Promise<void>>();
+  private readonly timers: TimerAdapter;
+  /**
+   * Sends a status request to one device over the account broker (main wires
+   * the MQTT client). Null without an account login — then nothing is asked.
+   */
+  private statusRequester: ((device: GoveeDevice) => boolean) | null = null;
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -203,6 +214,7 @@ export class DeviceManager {
     isUnloading: () => boolean = () => false,
   ) {
     this.log = log;
+    this.timers = timers;
     this.registry = registry;
     this.isUnloading = isUnloading;
     this.commandRouter = new CommandRouter(log, timers, registry);
@@ -220,6 +232,64 @@ export class DeviceManager {
       this.diagnostics.addLog(deviceId, level, msg);
     };
     this.commandRouter.onDeviceOffline = (device, intent) => this.holdIntent(device, intent);
+  }
+
+  // === Status requests over the account broker (issue #47) ===
+
+  /**
+   * Wire the status-request sender (the MQTT client's `requestStatus`).
+   *
+   * @param fn Sends one request; false when the broker is not connected
+   */
+  setStatusRequester(fn: ((device: GoveeDevice) => boolean) | null): void {
+    this.statusRequester = fn;
+  }
+
+  /**
+   * Ask every device whose own voice has gone quiet for its status — the
+   * request the Govee app sends when it opens. Candidates: a device with a
+   * broker topic that is not LAN-driven (the LAN decides there), not a group,
+   * whose `devicePushAt` is older than STATUS_REQUEST_INTERVAL_MS and that was
+   * not asked within that interval. Staggered one per second so a start does
+   * not burst the broker. A device that answers stamps `devicePushAt` through
+   * the ordinary push path; one that stays silent gets nothing — and goes
+   * grey with the evidence TTL, which is the right direction (issue #47).
+   *
+   * @param now Current time (ms)
+   * @returns How many requests were scheduled
+   */
+  requestStaleStatuses(now: number = Date.now()): number {
+    const send = this.statusRequester;
+    if (!send) {
+      return 0;
+    }
+    let scheduled = 0;
+    for (const device of this.devices.values()) {
+      const topic = device.iotTopic;
+      if (!topic || device.sku === "BaseGroup" || isLanDriven(device, now)) {
+        continue;
+      }
+      const pushAt = device.state.devicePushAt;
+      if (typeof pushAt === "number" && now - pushAt < STATUS_REQUEST_INTERVAL_MS) {
+        continue;
+      }
+      const askedAt = device.lastStatusRequestAt;
+      if (typeof askedAt === "number" && now - askedAt < STATUS_REQUEST_INTERVAL_MS) {
+        continue;
+      }
+      device.lastStatusRequestAt = now;
+      const delayMs = scheduled * 1000;
+      scheduled++;
+      this.timers.setTimeout(() => {
+        if (this.isUnloading()) {
+          return;
+        }
+        if (send(device)) {
+          this.diagnostics.addLog(device.deviceId, "debug", "status request sent over the account broker");
+        }
+      }, delayMs);
+    }
+    return scheduled;
   }
 
   // === Held commands (issue #46) ===
@@ -1797,6 +1867,12 @@ export class DeviceManager {
       // that omits gatewayInfo, so a flaky/partial response can't churn the
       // object tree. Independent of the reading caps below, so it happens even
       // on a poll that carried no fresh temperature.
+      // The broker topic — the address of a status request (2.39.0). Set only
+      // when present; a partial answer never clears it.
+      const topic = entry.settings?.topic;
+      if (typeof topic === "string" && topic) {
+        device.iotTopic = topic;
+      }
       const gw = formatGatewayLabel(entry.settings?.gatewayInfo);
       if (gw && device.gateway !== gw) {
         device.gateway = gw;

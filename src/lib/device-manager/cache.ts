@@ -60,9 +60,16 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     lanIp: _lanIp,
     groupMembers: _groupMembers,
     lastLanReplyAt: _lastLanReplyAt,
+    iotTopic: _iotTopic,
+    lastStatusRequestAt: _lastStatusRequestAt,
     ...rest
   } = cached as CachedDeviceData &
-    Partial<Pick<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt">>;
+    Partial<
+      Pick<
+        GoveeDevice,
+        "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt" | "iotTopic" | "lastStatusRequestAt"
+      >
+    >;
   return {
     ...rest,
     // Host-local, editable file: a corrupt count or index list must not become
@@ -93,6 +100,11 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
     lanIp: _lanIp,
     groupMembers: _groupMembers,
     lastLanReplyAt: _lastLanReplyAt,
+    // The broker topic and the request stamp are runtime-only: the topic is
+    // an address the account list hands over every two minutes, never data
+    // to keep on disk (2.39.0).
+    iotTopic: _iotTopic,
+    lastStatusRequestAt: _lastStatusRequestAt,
     ...cacheable
   } = device;
   return {
@@ -112,9 +124,12 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
  * `lanIp` / `groupMembers` here). Returns the same shape minus the dropped
  * keys.
  */
-function normalize<T extends Omit<GoveeDevice, "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt">>(
-  d: T,
-): Omit<CachedDeviceData, "cachedAt"> {
+function normalize<
+  T extends Omit<
+    GoveeDevice,
+    "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt" | "iotTopic" | "lastStatusRequestAt"
+  >,
+>(d: T): Omit<CachedDeviceData, "cachedAt"> {
   const segmentCount = typeof d.segmentCount === "number" && d.segmentCount > 0 ? d.segmentCount : undefined;
   const manualMode = d.manualMode ? true : undefined;
   const manualSegments =

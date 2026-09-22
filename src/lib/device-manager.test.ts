@@ -22,6 +22,7 @@ import {
   CLOUD_LIMITS,
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
   PENDING_INTENT_TTL_MS,
+  STATUS_REQUEST_INTERVAL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   LAN_CAPABLE_MEMORY_MS,
 } from "./timing-constants";
@@ -29,6 +30,7 @@ import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
 import { CloudControlRejected } from "./govee-cloud-client";
+import { goveeDeviceToCached } from "./device-manager/cache";
 import { RateLimiter } from "./rate-limiter";
 import { DeviceRegistry } from "./device-registry";
 import { CommandRouter } from "./command-router";
@@ -4950,5 +4952,104 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     push({});
     await dm.whenIntentsSettled();
     expect(controls).toEqual([{ instance: "workMode", value: { workMode: 1, modeValue: 2 } }]);
+  });
+});
+
+describe("requestStaleStatuses — the status request over the account broker (issue #47, 2.39.0)", () => {
+  // The account list says `online:false` for every Wi-Fi light and appliance
+  // in every recording (81 of 81), and it wins every two minutes. Asking the
+  // device itself over the broker — what the app does when it opens — gets a
+  // status packet within a second from a device that is there, and silence
+  // from one that is not. The packet stamps `devicePushAt`; nothing else in
+  // the reachability rules changes.
+  function bench(): {
+    dm: DeviceManager;
+    asked: string[];
+    delays: number[];
+    add: (id: string, o?: Partial<GoveeDevice>) => GoveeDevice;
+  } {
+    const asked: string[] = [];
+    const delays: number[] = [];
+    const timers = {
+      setInterval: () => undefined,
+      clearInterval: () => undefined,
+      clearTimeout: () => undefined,
+      delay: () => Promise.resolve(),
+      setTimeout: (cb: () => void, ms: number) => {
+        delays.push(ms);
+        cb();
+        return undefined;
+      },
+    } as never;
+    const dm = new DeviceManager(mockLog, timers, registry);
+    dm.setStatusRequester(device => {
+      asked.push(device.deviceId);
+      return true;
+    });
+    const add = (id: string, o: Partial<GoveeDevice> = {}): GoveeDevice => {
+      const d = createTestDevice({
+        deviceId: id,
+        lanIp: undefined,
+        lastLanSeenAt: undefined,
+        channels: { lan: false, mqtt: true, cloud: true },
+        iotTopic: `GD/${id}`,
+        ...o,
+      });
+      (dm as any).devices.set(`H6160_${id}`, d);
+      return d;
+    };
+    return { dm, asked, delays, add };
+  }
+
+  it("asks every device with a topic whose own push is stale, one per second, and none twice inside the interval", () => {
+    const { dm, asked, delays, add } = bench();
+    const now = Date.now();
+    add("AA:01"); // never pushed
+    add("AA:02", { state: { online: true, devicePushAt: now - STATUS_REQUEST_INTERVAL_MS - 1 } });
+    add("AA:03", { state: { online: true, devicePushAt: now - 60_000 } }); // fresh — no need to ask
+    expect(dm.requestStaleStatuses(now)).toBe(2);
+    expect(asked).toEqual(["AA:01", "AA:02"]);
+    expect(delays).toEqual([0, 1000]);
+    expect(dm.requestStaleStatuses(now + 60_000)).toBe(0); // asked a minute ago — wait for the interval
+    // An interval later all three are stale — the third one's push has aged past the interval by then.
+    expect(dm.requestStaleStatuses(now + STATUS_REQUEST_INTERVAL_MS + 1)).toBe(3);
+  });
+
+  it("leaves out LAN-driven lights, groups and devices without a topic", () => {
+    const { dm, asked, add } = bench();
+    add("BB:01", { lastLanSeenAt: Date.now() - 60_000 }); // LAN decides for this one
+    add("BB:02", { iotTopic: undefined });
+    add("BB:03", { sku: "BaseGroup" });
+    expect(dm.requestStaleStatuses(Date.now())).toBe(0);
+    expect(asked).toEqual([]);
+  });
+
+  it("without a requester (no account login) nothing is asked", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined, iotTopic: "GD/x" });
+    (dm as any).devices.set("H6160_x", d);
+    expect(dm.requestStaleStatuses(Date.now())).toBe(0);
+  });
+
+  it("the account list hands the device its topic — in memory, never in the cache", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
+    (dm as any).devices.set("H6160_aabbccddeeff0011", d);
+    const entry: AppDeviceEntry = {
+      sku: "H6160",
+      device: "AABBCCDDEEFF0011",
+      deviceName: "Strip",
+      lastData: { online: false },
+      settings: { topic: "GD/0123456789abcdef0123456789abcdef" },
+    };
+    (dm as any).applyAppEntry?.(d, entry);
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: () => Promise.resolve([entry]),
+    } as never);
+    return dm.pollAppApi().then(() => {
+      expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
+      expect(goveeDeviceToCached(d)).not.toHaveProperty("iotTopic");
+    });
   });
 });

@@ -9,7 +9,7 @@ import {
   resolveDeviceReachability,
   resolveSegmentCount,
 } from "./device-manager/lookups";
-import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
+import { CLOUD_REACHABILITY_REFRESH_MS, STATUS_REQUEST_INTERVAL_MS } from "./timing-constants";
 import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
 import type { GoveeRateLimit } from "./govee-cloud-client";
 
@@ -1142,6 +1142,9 @@ export class DiagnosticsCollector {
         "account push, event-driven (needs email + password) — the device's own status push holds against a polled offline for 30 min",
       );
       renewers.push("app device list, every 2 min (needs email + password)");
+      renewers.push(
+        `status request over the account broker once the device's own push is older than ${Math.round(STATUS_REQUEST_INTERVAL_MS / 60000)} min (needs email + password)`,
+      );
       renewers.push("cloud event push, event-driven (needs the API key)");
       // The refresh skips every device with its own daily budget (appliances,
       // sensors — `applianceBudget`): 72 of its 90 calls a day would go to

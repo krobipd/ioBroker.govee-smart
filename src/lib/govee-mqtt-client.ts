@@ -246,6 +246,35 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   }
 
   /**
+   * Ask a device for its status over the account broker — what the Govee app
+   * does when it opens, and what govee2mqtt sends: a publish on the device's
+   * own topic (`settings.topic` of the account list, already `GD/…`). The
+   * device answers on the account topic with an ordinary `status` packet
+   * carrying THIS request's `v_` transaction (measured 2026-09-22: 903 ms on
+   * an H61D5; an unplugged H70C5 stayed silent for 25 s) — the same packet the
+   * push path already reads, so the answer stamps `devicePushAt` and holds
+   * against the account list's stuck `online:false` (issue #47). Payload byte
+   * for byte as govee2mqtt: `cmdVersion 2`, `type 0`, `v_<ms>000`, QoS 0.
+   *
+   * @param deviceTopic The device's publish topic from the account list
+   * @param now Request time in ms — becomes the transaction stamp
+   * @returns false when the broker is not connected (nothing sent)
+   */
+  requestStatus(deviceTopic: string, now: number = Date.now()): boolean {
+    const client = this.client;
+    if (!client || !this.connected) {
+      return false;
+    }
+    const payload = JSON.stringify({ msg: { cmd: "status", cmdVersion: 2, transaction: `v_${now}000`, type: 0 } });
+    client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
+      if (err) {
+        this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errMessage(err)}`);
+      }
+    });
+    return true;
+  }
+
+  /**
    * Short user-facing reason for "MQTT not connected", or null if the
    * client has never seen an error. Used by the adapter ready-summary
    * to give a concrete message instead of "still pending".

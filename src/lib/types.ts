@@ -395,6 +395,14 @@ export interface GoveeDevice {
    */
   scenesChecked?: boolean;
   /**
+   * The device's publish topic on the account broker (`settings.topic` of the
+   * account list, `GD/…`) — the address of a status request. Memory only:
+   * never cached, never in the report.
+   */
+  iotTopic?: string;
+  /** When the last status request went to this device (ms). Runtime-only. */
+  lastStatusRequestAt?: number;
+  /**
    * When the SKU-level libraries (scene/music/DIY, SKU features) were last
    * confirmed — an EMPTY answer is remembered for {@link LIBRARY_RECHECK_MS}
    * and asked again after that; persisted. Never stamped by a call that the

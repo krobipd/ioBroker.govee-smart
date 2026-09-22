@@ -732,6 +732,29 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("the broker topic of a device (2.39.0)", () => {
+    it("never reaches the export — it is an address, not diagnostic data", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const device = makeDevice({
+        iotTopic: "GD/0123456789abcdef0123456789abcdef",
+        lastStatusRequestAt: 1_700_000_000_000,
+      });
+      const result = await c.generate(device, "2.39.0");
+      const text = JSON.stringify(result);
+      expect(text).not.toContain("0123456789abcdef0123456789abcdef");
+      expect(text).not.toContain("iotTopic");
+    });
+
+    it("names the status request among the renewers of a cloud-only device", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
+        "2.39.0",
+      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
+      expect(String(r.device.reachabilitySource!.refreshedBy)).toContain("status request over the account broker");
+    });
+  });
+
   describe("Govee's rate-limit headers in the report (2.39.0)", () => {
     it("a success entry carries the headers of its answer, and the runtime state the newest set", async () => {
       const c = new DiagnosticsCollector(registry);

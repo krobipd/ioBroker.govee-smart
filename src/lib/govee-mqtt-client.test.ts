@@ -491,6 +491,83 @@ describe("GoveeMqttClient", () => {
     });
   });
 
+  describe("requestStatus — the status request over the account broker (2.39.0, issue #47)", () => {
+    // Measured 2026-09-22 on krobi's account: a publish of this exact payload
+    // on the device's `settings.topic` (already `GD/…`) is answered within a
+    // second as an ordinary `status` packet carrying the request's `v_`
+    // transaction; an unplugged device stays silent. govee2mqtt sends the same.
+    function connectedClient(): {
+      client: GoveeMqttClient;
+      published: Array<{ topic: string; payload: string; opts: unknown }>;
+    } {
+      const published: Array<{ topic: string; payload: string; opts: unknown }> = [];
+      const fakeMqtt = {
+        on: () => fakeMqtt,
+        subscribe: (_t: string, _o: unknown, cb: (e: Error | null) => void) => cb(null),
+        publish: (topic: string, payload: string, opts: unknown, cb?: (e?: Error) => void) => {
+          published.push({ topic, payload, opts });
+          cb?.();
+        },
+        end: () => undefined,
+        removeAllListeners: () => undefined,
+      };
+      const client = new GoveeMqttClient(
+        "u@example.com",
+        "pw",
+        mockLog,
+        noopTimers,
+        makeFakeHttps(() => ({})).fn,
+        (() => fakeMqtt) as never,
+      );
+      (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
+        key: "k",
+        cert: "c",
+        ca: "a",
+      });
+      client.setPersistedCredentials({
+        bearerToken: "tok",
+        iotEndpoint: "iot.example.com",
+        p12Cert: "AAA=",
+        p12Pass: "x",
+        accountId: "acc",
+        accountTopic: "GA/topic",
+        tokenExpiresAt: Date.now() + 60 * 60 * 1000,
+      });
+      return { client, published };
+    }
+
+    it("publishes govee2mqtt's payload byte for byte on the device topic, QoS 0, and reports success", async () => {
+      const { client, published } = connectedClient();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      (client as unknown as { client: { connected: boolean } }).client.connected = true;
+      expect(client.requestStatus("GD/0123456789abcdef0123456789abcdef", 1790071124009)).toBe(true);
+      expect(published).toHaveLength(1);
+      expect(published[0].topic).toBe("GD/0123456789abcdef0123456789abcdef");
+      expect(published[0].payload).toBe(
+        '{"msg":{"cmd":"status","cmdVersion":2,"transaction":"v_1790071124009000","type":0}}',
+      );
+      expect(published[0].opts).toEqual({ qos: 0 });
+    });
+
+    it("sends nothing and says so while the broker is not connected", async () => {
+      const { client, published } = connectedClient();
+      expect(client.requestStatus("GD/x", Date.now())).toBe(false); // no socket yet
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      // A socket that exists but is not (or no longer) connected: a publish
+      // would be queued by mqtt.js and go out at some later reconnect — a
+      // status request from the past. Nothing is sent.
+      (client as unknown as { client: { connected: boolean } }).client.connected = false;
+      expect(client.requestStatus("GD/x", Date.now())).toBe(false);
+      expect(published).toHaveLength(0);
+    });
+  });
+
   describe("setPersistedCredentials — tryPersistedReuse skip-login behaviour", () => {
     it("falls back to a fresh login when the persisted p12 is broken even if the token TTL is valid (L25)", async () => {
       let httpCalls = 0;
