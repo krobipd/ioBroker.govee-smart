@@ -142,7 +142,7 @@
     "H1741": {
       "name": "Table Lamp",
       "type": "light",
-      "status": "seed",
+      "status": "reported",
       "since": "2.18.1"
     },
     "H1771": {
