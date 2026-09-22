@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.38.3",
+    "version": "2.39.0",
     "news": {
+      "2.39.0": {
+        "en": "A quiet device is asked for its status over the Govee account connection and stays reachable; a command refused while it was offline is delivered once it is back\n28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles and the gateways that carry battery sensors",
+        "de": "Ein verstummtes Gerät wird über die Govee-Kontoverbindung nach seinem Status gefragt und bleibt erreichbar; ein bei Offline abgelehnter Befehl wird zugestellt, sobald es zurück ist\n28 weitere Govee-Modelle werden erkannt — Fleischthermometer, Bewegungs- und Drucksensoren, Heizgeräte, Wasserkocher und die Gateways der Batteriesensoren",
+        "ru": "Замолчавшее устройство запрашивается о статусе через подключение к аккаунту Govee и остаётся доступным; команда, отклонённая офлайн, доставляется, когда оно снова на связи\nРаспознаются ещё 28 моделей Govee — термометры для мяса, датчики движения и давления, обогреватели, чайники и шлюзы для батарейных датчиков",
+        "pt": "Um dispositivo silencioso é consultado sobre o seu estado pela ligação à conta Govee e mantém-se acessível; um comando recusado offline é entregue quando ele volta\nMais 28 modelos Govee são reconhecidos — termómetros de carne, sensores de movimento e pressão, aquecedores, chaleiras e os gateways dos sensores a pilhas",
+        "nl": "Een stil geworden apparaat wordt via de Govee-accountverbinding naar zijn status gevraagd en blijft bereikbaar; een offline geweigerd commando wordt bezorgd zodra het terug is\n28 extra Govee-modellen worden herkend — vleesthermometers, bewegings- en druksensoren, kachels, waterkokers en de gateways van sensoren op batterijen",
+        "fr": "Un appareil devenu silencieux est interrogé sur son état via la connexion au compte Govee et reste joignable ; une commande refusée hors ligne est livrée dès son retour\n28 modèles Govee supplémentaires sont reconnus : thermomètres à viande, capteurs de mouvement et de pression, chauffages, bouilloires et passerelles des capteurs à pile",
+        "it": "Un dispositivo silenzioso viene interrogato sullo stato tramite la connessione all'account Govee e resta raggiungibile; un comando rifiutato offline viene consegnato al suo rientro\nVengono riconosciuti altri 28 modelli Govee — termometri per carne, sensori di movimento e pressione, stufe, bollitori e i gateway dei sensori a batteria",
+        "es": "Un dispositivo silencioso recibe una consulta de estado por la conexión de cuenta Govee y sigue accesible; un comando rechazado sin conexión se entrega cuando vuelve\nSe reconocen 28 modelos Govee más: termómetros de carne, sensores de movimiento y presión, calefactores, hervidores y las pasarelas de los sensores con pila",
+        "pl": "Milczące urządzenie jest pytane o stan przez połączenie z kontem Govee i pozostaje osiągalne; polecenie odrzucone offline jest dostarczane, gdy urządzenie wraca\nRozpoznawanych jest kolejnych 28 modeli Govee — termometry do mięsa, czujniki ruchu i nacisku, grzejniki, czajniki oraz bramki czujników bateryjnych",
+        "uk": "Пристрій, що замовк, запитується про стан через з'єднання з обліковим записом Govee і лишається доступним; команду, відхилену офлайн, буде доставлено після повернення\nРозпізнається ще 28 моделей Govee — термометри для м'яса, датчики руху й тиску, обігрівачі, чайники та шлюзи для датчиків на батарейках",
+        "zh-cn": "沉默的设备会通过 Govee 账户连接被询问状态并保持可达；设备离线时被拒绝的命令会在设备恢复后送达\n新增识别 28 款 Govee 设备——肉类温度计、移动与压力传感器、取暖器、电热水壶，以及电池传感器所依赖的网关"
+      },
       "2.38.3": {
         "en": "Internal cleanup. No user-facing changes.",
         "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
