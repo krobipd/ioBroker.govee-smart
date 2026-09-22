@@ -212,11 +212,13 @@ describe("loadCloudStates", () => {
     const rig = makeRig([d1, d2]);
     rig.setDeviceState(() => Promise.resolve([batteryCap]));
     const dispatched: number[] = [];
+    const lanes: string[] = [];
     const limited = {
       ...rig.adapter,
       rateLimiter: {
-        tryExecute: async (fn: () => Promise<void>, priority: number) => {
+        tryExecute: async (fn: () => Promise<void>, lane: { kind: string }, priority: number) => {
           dispatched.push(priority);
+          lanes.push(lane.kind);
           await fn();
           return true;
         },
@@ -228,6 +230,7 @@ describe("loadCloudStates", () => {
     // behind five queued library calls per light and arrived seven minutes
     // after the start on a 12-device installation (measured 2026-09-11).
     expect(dispatched).toEqual([1, 1]);
+    expect(lanes).toEqual(["device-read", "device-read"]); // each device's own read bucket (2.39.0)
     expect(rig.writes.filter(w => w.id.endsWith(".sensor.battery"))).toHaveLength(2);
   });
 

@@ -18,7 +18,12 @@ import {
   resolveDeviceReachability,
   resolveSegmentCount as resolveSegmentCountRaw,
 } from "./device-manager/lookups";
-import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS, LAN_CAPABLE_MEMORY_MS } from "./timing-constants";
+import {
+  CLOUD_LIMITS,
+  CLOUD_ONLINE_EVIDENCE_TTL_MS,
+  CLOUD_REACHABILITY_REFRESH_MS,
+  LAN_CAPABLE_MEMORY_MS,
+} from "./timing-constants";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
@@ -4642,7 +4647,10 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     scenesCalls: () => number;
   } {
     const dm = new DeviceManager(mockLog, mockTimers, registry, opts.isUnloading);
-    const rl = new RateLimiter(mockLog, mockTimers, 1, 1000); // one call per minute → the second light queues
+    // Every device has its own read bucket since 2.39.0, so the bench
+    // saturates the one counter every lane shares: the day. One call today →
+    // everything after the first scenes call queues until the bench frees it.
+    const rl = new RateLimiter(mockLog, mockTimers, { ...CLOUD_LIMITS, perDay: 1 });
     dm.setRateLimiter(rl);
     const saved: Array<{ deviceId: string; scenes: number; scenesChecked?: boolean }> = [];
     dm.setSkuCache({
@@ -4677,7 +4685,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     // scenes), so the bench keeps releasing until every job has settled.
     const settle = async (): Promise<void> => {
       for (let i = 0; i < 20 && (dm as any).pendingSceneLoads.size > 0; i++) {
-        (rl as any).callsThisMinute = 0;
+        (rl as any).callsToday = 0;
         (rl as any).processQueue();
         await new Promise(r => setTimeout(r, 0));
       }

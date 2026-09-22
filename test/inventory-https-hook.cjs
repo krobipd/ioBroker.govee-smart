@@ -80,13 +80,15 @@ const Module = require("node:module");
 const realLoad = Module._load;
 Module._load = function patchedLoad(request, parent, isMain) {
   const exp = realLoad.call(this, request, parent, isMain);
-  if (typeof request === "string" && /timing-constants(\.js)?$/.test(request) && exp) {
-    for (const key of Object.keys(exp)) {
-      const v = exp[key];
-      if (v && typeof v === "object" && typeof v.perMinute === "number") {
-        v.perMinute = 100000;
-      }
-    }
+  if (typeof request === "string" && /timing-constants(\.js)?$/.test(request) && exp && exp.CLOUD_LIMITS) {
+    // Every minute window and burst of the per-actor budget (CLOUD_LIMITS,
+    // 2.39.0) — the daily counter stays, nothing in a fixture run reaches it.
+    const limits = exp.CLOUD_LIMITS;
+    limits.accountListPerMinute = 100000;
+    limits.deviceReadPerMinute = 100000;
+    limits.appApiPerMinute = 100000;
+    limits.deviceControl = { perSecond: 100000, burst: 100000 };
+    limits.accountControl = { perSecond: 100000, burst: 100000 };
   }
   return exp;
 };

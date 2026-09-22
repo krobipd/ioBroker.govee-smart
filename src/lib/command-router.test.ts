@@ -963,26 +963,28 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
 
 describe("per-device Cloud budget", () => {
   /** Captures what budget (if any) each tracked send was given. */
-  function budgetCapturingLimiter(): { limiter: RateLimiter; budgets: Array<unknown> } {
+  function budgetCapturingLimiter(): { limiter: RateLimiter; budgets: Array<unknown>; lanes: Array<unknown> } {
     const budgets: unknown[] = [];
+    const lanes: unknown[] = [];
     const limiter = {
       tryExecute: async (fn: () => Promise<void>): Promise<boolean> => {
         await fn();
         return true;
       },
-      executeTracked: async (fn: () => Promise<void>, _p?: number, budget?: unknown): Promise<void> => {
+      executeTracked: async (fn: () => Promise<void>, lane: unknown, _p?: number, budget?: unknown): Promise<void> => {
+        lanes.push(lane);
         budgets.push(budget);
         await fn();
       },
     } as unknown as RateLimiter;
-    return { limiter, budgets };
+    return { limiter, budgets, lanes };
   }
 
   it("an appliance command carries its own daily allowance", async () => {
     // Govee gives an appliance 100 calls a day against the account's 10,000,
     // and appliance control has no local path — every write is a cloud call.
     const cloud = makeCloudStub();
-    const { limiter, budgets } = budgetCapturingLimiter();
+    const { limiter, budgets, lanes } = budgetCapturingLimiter();
     const router = new CommandRouter(mockLog, noopTimers, registry);
     router.setCloudClient(cloud.client);
     router.setRateLimiter(limiter);
@@ -995,6 +997,9 @@ describe("per-device Cloud budget", () => {
     await router.sendCommand(heater, "power", true);
     expect(cloud.calls).toHaveLength(1);
     expect(budgets[0]).toEqual({ key: "H7131:AA:BB:CC:DD:EE:FF:00:22", perDay: CLOUD_APPLIANCE_DAILY_LIMIT });
+    // And the control lane of THIS device (2.39.0): the command is charged to
+    // the device's own burst bucket, never to a pot shared with other devices.
+    expect(lanes[0]).toEqual({ kind: "device-control", deviceKey: "H7131:AA:BB:CC:DD:EE:FF:00:22" });
   });
 
   it("a light command carries none — its writes go over the LAN, the rest is the account budget", async () => {

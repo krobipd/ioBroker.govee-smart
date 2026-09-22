@@ -10,7 +10,7 @@ import {
   resolveSegmentCount,
 } from "./device-manager/lookups";
 import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
-import { applianceBudget } from "./rate-limiter";
+import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -88,13 +88,7 @@ export interface RuntimeStateSnapshot {
   /** GoveeMqttClient.getFailureReason() — user-facing reason for "MQTT not connected". */
   mqttFailureReason?: string | null;
   /** Rate-limiter usage snapshot or null if no Cloud client. Shape mirrors RateLimiter.getUsageSnapshot(). */
-  rateLimiter?: {
-    usedToday: number;
-    usedThisMinute: number;
-    dailyLimit: number;
-    perMinuteLimit: number;
-    queueLength: number;
-  } | null;
+  rateLimiter?: RateLimiterSnapshot | null;
   /** Live wizard session if any — captured for "wizard ran during diag-click" forensics. */
   wizardSession?: unknown;
   /** LAN client's `seenDeviceIps` set as `["sku-id:ip", ...]` — discovery trace. */

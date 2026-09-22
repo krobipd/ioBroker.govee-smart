@@ -9,7 +9,7 @@ import {
   type TimerAdapter,
 } from "./types";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
-import { applianceBudget, type RateLimiter } from "./rate-limiter";
+import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
@@ -136,7 +136,12 @@ export class CommandRouter {
    */
   private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
     if (this.rateLimiter) {
-      await this.rateLimiter.executeTracked(fn, 0, applianceBudget(device));
+      // The control lane of THIS device: a command never waits for another
+      // device's calls, only for its own burst of six per second (v2 docs).
+      const lane: CallLane = device
+        ? { kind: "device-control", deviceKey: limiterDeviceKey(device) }
+        : ACCOUNT_LIST_LANE;
+      await this.rateLimiter.executeTracked(fn, lane, 0, applianceBudget(device));
     } else {
       await fn();
     }

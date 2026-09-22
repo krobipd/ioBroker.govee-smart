@@ -179,7 +179,7 @@ vi.mock("@iobroker/adapter-core", () => {
 });
 
 import { GoveeAdapter } from "./main";
-import { STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
+import { CLOUD_LIMITS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
 import type { DeviceManager } from "./lib/device-manager";
@@ -473,8 +473,8 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.cloudClient).not.toBeNull();
     expect(i.openapiMqttClient).not.toBeNull();
     expect(f.limiter.start).toHaveBeenCalled();
-    // 8/min + 9000/day — the documented safety margin below Govee's 10/10000.
-    expect(f.calls.limiter[0].slice(2)).toEqual([8, 9000]);
+    // The per-actor budget of the v2 docs (2026-07-06) with margin — one object, not two numbers.
+    expect(f.calls.limiter[0][2]).toEqual(CLOUD_LIMITS);
     // The fake cloud client comes up → the channel must report "on".
     expect(i.channelStatus.cloud).toBe("on");
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Starting (LAN, Cloud)"));

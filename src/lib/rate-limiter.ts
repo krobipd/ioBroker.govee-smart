@@ -1,11 +1,93 @@
 import { errMessage, type GoveeDevice, type TimerAdapter } from "./types";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { CLOUD_APPLIANCE_DAILY_LIMIT } from "./timing-constants";
+import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
+
+/**
+ * The actor a cloud call is charged to — one of Govee's documented budgets
+ * (see {@link CLOUD_LIMITS}). A call carries its lane so that a command for
+ * device B never waits for device A, and a library call to app2.govee.com
+ * never stands in front of a command.
+ */
+export type CallLane =
+  | { kind: "account-list" }
+  | { kind: "device-read"; deviceKey: string }
+  | { kind: "device-control"; deviceKey: string }
+  | { kind: "appapi" };
+
+export const ACCOUNT_LIST_LANE: CallLane = { kind: "account-list" };
+export const APP_API_LANE: CallLane = { kind: "appapi" };
+
+/**
+ * The key a device's own buckets are kept under.
+ *
+ * @param device The device (sku + id suffice)
+ */
+export function limiterDeviceKey(device: Pick<GoveeDevice, "sku" | "deviceId">): string {
+  return `${device.sku}:${device.deviceId}`;
+}
+
+/**
+ * Govee's "rpu / burst" control limit as a token bucket: `burst` tokens at
+ * most, refilled `perSecond` continuously. A burst of six goes out at once,
+ * the seventh waits half a second — never a 429, never a minute.
+ */
+class TokenBucket {
+  private tokens: number;
+  private updatedAt: number;
+
+  constructor(
+    private readonly capacity: number,
+    private readonly perSecond: number,
+    now: number,
+  ) {
+    this.tokens = capacity;
+    this.updatedAt = now;
+  }
+
+  private refill(now: number): void {
+    if (now > this.updatedAt) {
+      this.tokens = Math.min(this.capacity, this.tokens + ((now - this.updatedAt) / 1000) * this.perSecond);
+      this.updatedAt = now;
+    }
+  }
+
+  /**
+   * Whether one token is available right now.
+   *
+   * @param now Current time (ms)
+   */
+  has(now: number): boolean {
+    this.refill(now);
+    return this.tokens >= 1;
+  }
+
+  /**
+   * Spend one token (the caller checked `has` first).
+   *
+   * @param now Current time (ms)
+   */
+  take(now: number): void {
+    this.refill(now);
+    this.tokens = Math.max(0, this.tokens - 1);
+  }
+
+  /**
+   * Whole tokens available, for the usage snapshot.
+   *
+   * @param now Current time (ms)
+   */
+  available(now: number): number {
+    this.refill(now);
+    return Math.floor(this.tokens);
+  }
+}
 
 /** A queued API call */
 interface QueuedCall {
   /** Function to execute */
   execute: () => Promise<void>;
+  /** The actor the call is charged to */
+  lane: CallLane;
   /** Priority (lower = higher priority) */
   priority: number;
   /**
@@ -71,15 +153,25 @@ export function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined 
 }
 
 /**
- * Rate limiter for Govee Cloud API calls.
- * Respects per-minute and daily limits, queues excess calls.
+ * Rate limiter for Govee Cloud API calls — one bucket per actor Govee names
+ * ({@link CLOUD_LIMITS}), a global daily counter over all of them, and one
+ * priority-sorted queue whose calls run as soon as THEIR bucket is free.
  */
 export class RateLimiter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
   private readonly queue: QueuedCall[] = [];
   private processTimer: ioBroker.Interval | undefined = undefined;
-  private callsThisMinute = 0;
+  /** `/user/devices` this minute. */
+  private accountListUsed = 0;
+  /** app2.govee.com calls this minute. */
+  private appApiUsed = 0;
+  /** `/device/state|scenes|diy-scenes` this minute, per device. */
+  private readonly deviceReadUsed = new Map<string, number>();
+  /** `/device/control` per device — Govee's rpu/burst as token buckets. */
+  private readonly deviceControl = new Map<string, TokenBucket>();
+  /** `/device/control` per account. */
+  private readonly accountControl: TokenBucket;
   private callsToday = 0;
   private minuteResetTimer: ioBroker.Interval | undefined = undefined;
   private dayResetTimer: ioBroker.Interval | undefined = undefined;
@@ -105,32 +197,34 @@ export class RateLimiter {
    */
   private readonly warnedDeviceBudget = new Set<string>();
 
-  /** Max calls per minute */
-  private perMinuteLimit: number;
-  /** Max calls per day (with safety buffer) */
-  private perDayLimit: number;
+  private readonly limits: CloudLimits;
+  /** Injectable clock — the token buckets refill against it. */
+  private readonly clock: () => number;
 
   /**
    * @param log ioBroker logger
    * @param timers Timer adapter
-   * @param perMinuteLimit Max calls per minute (default 8, safe margin from 10)
-   * @param perDayLimit Max calls per day (default 9000, safe margin from 10000)
+   * @param limits The per-actor budget (default: Govee's v2 limits with margin)
+   * @param clock Time source in ms (tests advance it by hand)
    */
-  constructor(log: ioBroker.Logger, timers: TimerAdapter, perMinuteLimit = 8, perDayLimit = 9000) {
+  constructor(
+    log: ioBroker.Logger,
+    timers: TimerAdapter,
+    limits: CloudLimits = CLOUD_LIMITS,
+    clock: () => number = () => Date.now(),
+  ) {
     this.log = log;
     this.timers = timers;
-    this.perMinuteLimit = perMinuteLimit;
-    this.perDayLimit = perDayLimit;
+    this.limits = limits;
+    this.clock = clock;
+    this.accountControl = new TokenBucket(limits.accountControl.burst, limits.accountControl.perSecond, clock());
   }
 
   /** Start the rate limiter — resets counters periodically */
   start(): void {
     this.stopped = false;
-    // Reset minute counter every 60s
-    this.minuteResetTimer = this.timers.setInterval(() => {
-      this.callsThisMinute = 0;
-      this.processQueue();
-    }, 60_000);
+    // Reset the minute windows every 60s
+    this.minuteResetTimer = this.timers.setInterval(() => this.resetMinuteWindow(), 60_000);
 
     // Reset daily counter aligned to UTC midnight — Govee's daily quota
     // resets on the API's clock (UTC). A plain setInterval(24h) starting
@@ -210,11 +304,18 @@ export class RateLimiter {
    * on debug so a hammering script can't spam the log).
    *
    * @param execute The API call to make
+   * @param lane The actor the call is charged to
    * @param priority Lower = higher priority (0 = control, 1 = status reads, 2 = scene libraries, 3 = reachability refresh)
    * @param reject Optional rejection callback, invoked if this queued call is later evicted to free a slot for a higher-priority one
    * @param budget The device's own daily allowance, when one applies — booked when the call actually runs, not when it is queued
    */
-  enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void, budget?: DeviceBudget): boolean {
+  enqueue(
+    execute: () => Promise<void>,
+    lane: CallLane = ACCOUNT_LIST_LANE,
+    priority = 1,
+    reject?: (err: Error) => void,
+    budget?: DeviceBudget,
+  ): boolean {
     // A stopped limiter never processes its queue again: a call queued after
     // stop() would wait forever, and a tracked caller with it — the leak the
     // stop() comment describes, reached from any late call during unload
@@ -242,7 +343,7 @@ export class RateLimiter {
       const evicted = this.queue.pop(); // evict the lowest-priority queued call to make room
       evicted?.reject?.(new Error("Cloud call evicted — rate-limiter queue full"));
     }
-    this.queue.push({ execute, priority, reject, budget });
+    this.queue.push({ execute, lane, priority, reject, budget });
     // Sort by priority (lower first)
     this.queue.sort((a, b) => a.priority - b.priority);
     return true;
@@ -253,19 +354,25 @@ export class RateLimiter {
    * Returns true if executed immediately.
    *
    * @param execute The API call to make
+   * @param lane The actor the call is charged to
    * @param priority Call priority
    * @param budget The device's own daily allowance, when one applies
    */
-  async tryExecute(execute: () => Promise<void>, priority = 0, budget?: DeviceBudget): Promise<boolean> {
+  async tryExecute(
+    execute: () => Promise<void>,
+    lane: CallLane = ACCOUNT_LIST_LANE,
+    priority = 0,
+    budget?: DeviceBudget,
+  ): Promise<boolean> {
     if (budget && this.deviceBudgetSpent(budget)) {
       return false;
     }
-    if (this.canMakeCall()) {
-      this.spend(budget);
+    if (this.canMakeCall(lane)) {
+      this.spend(lane, budget);
       await execute();
       return true;
     }
-    this.enqueue(execute, priority, undefined, budget);
+    this.enqueue(execute, lane, priority, undefined, budget);
     return false;
   }
 
@@ -296,17 +403,51 @@ export class RateLimiter {
   }
 
   /**
-   * Book one call against the global counters and, where one applies, the
-   * device's own allowance.
+   * Book one call against its lane, the daily counter (EVERY lane — the 9,000
+   * protection covers the account, not just the device lanes) and, where one
+   * applies, the device's own allowance.
    *
+   * @param lane The actor the call is charged to
    * @param budget The device's allowance, when the call belongs to one
    */
-  private spend(budget?: DeviceBudget): void {
-    this.callsThisMinute++;
+  private spend(lane: CallLane, budget?: DeviceBudget): void {
+    const now = this.clock();
+    switch (lane.kind) {
+      case "account-list":
+        this.accountListUsed++;
+        break;
+      case "appapi":
+        this.appApiUsed++;
+        break;
+      case "device-read":
+        this.deviceReadUsed.set(lane.deviceKey, (this.deviceReadUsed.get(lane.deviceKey) ?? 0) + 1);
+        break;
+      case "device-control":
+        this.controlBucket(lane.deviceKey, now).take(now);
+        this.accountControl.take(now);
+        break;
+    }
     this.callsToday++;
     if (budget) {
       this.callsTodayPerDevice.set(budget.key, (this.callsTodayPerDevice.get(budget.key) ?? 0) + 1);
     }
+  }
+
+  private controlBucket(deviceKey: string, now: number): TokenBucket {
+    let bucket = this.deviceControl.get(deviceKey);
+    if (!bucket) {
+      bucket = new TokenBucket(this.limits.deviceControl.burst, this.limits.deviceControl.perSecond, now);
+      this.deviceControl.set(deviceKey, bucket);
+    }
+    return bucket;
+  }
+
+  /** Zero the minute windows and run what waited for them. */
+  private resetMinuteWindow(): void {
+    this.accountListUsed = 0;
+    this.appApiUsed = 0;
+    this.deviceReadUsed.clear();
+    this.processQueue();
   }
 
   /**
@@ -320,15 +461,21 @@ export class RateLimiter {
    * capped queue evicts the call before it ever ran.
    *
    * @param execute The API call to make
+   * @param lane The actor the call is charged to
    * @param priority Call priority (0 = control)
    * @param budget The device's own daily allowance, when one applies
    */
-  async executeTracked(execute: () => Promise<void>, priority = 0, budget?: DeviceBudget): Promise<void> {
+  async executeTracked(
+    execute: () => Promise<void>,
+    lane: CallLane = ACCOUNT_LIST_LANE,
+    priority = 0,
+    budget?: DeviceBudget,
+  ): Promise<void> {
     if (budget && this.deviceBudgetSpent(budget)) {
       throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
     }
-    if (this.canMakeCall()) {
-      this.spend(budget);
+    if (this.canMakeCall(lane)) {
+      this.spend(lane, budget);
       await execute();
       return;
     }
@@ -342,6 +489,7 @@ export class RateLimiter {
             reject(e instanceof Error ? e : new Error(errMessage(e)));
           }
         },
+        lane,
         priority,
         reject,
         budget,
@@ -352,63 +500,116 @@ export class RateLimiter {
     });
   }
 
-  /** Whether a call can be made right now */
-  canMakeCall(): boolean {
-    return this.callsThisMinute < this.perMinuteLimit && this.callsToday < this.perDayLimit;
+  /**
+   * Whether a call on this lane can be made right now — the day counter first,
+   * then the lane's own bucket.
+   *
+   * @param lane The actor the call would be charged to
+   */
+  canMakeCall(lane: CallLane = ACCOUNT_LIST_LANE): boolean {
+    if (this.callsToday >= this.limits.perDay) {
+      return false;
+    }
+    const now = this.clock();
+    switch (lane.kind) {
+      case "account-list":
+        return this.accountListUsed < this.limits.accountListPerMinute;
+      case "appapi":
+        return this.appApiUsed < this.limits.appApiPerMinute;
+      case "device-read":
+        return (this.deviceReadUsed.get(lane.deviceKey) ?? 0) < this.limits.deviceReadPerMinute;
+      case "device-control":
+        return this.accountControl.has(now) && this.controlBucket(lane.deviceKey, now).has(now);
+    }
   }
 
   /**
-   * Snapshot of usage + limits for the diag runtime-state export. Returns
-   * plain values so the DiagnosticsCollector can clone-and-cap safely.
-   * Plus `queueLength` for "Cloud calls piling up?" forensics.
+   * Snapshot of usage + limits for the diag runtime-state export, one entry
+   * per lane. Returns plain values so the DiagnosticsCollector can
+   * clone-and-cap safely. Plus `queueLength` for "Cloud calls piling up?"
+   * forensics.
    */
-  getUsageSnapshot(): {
-    usedToday: number;
-    usedThisMinute: number;
-    dailyLimit: number;
-    perMinuteLimit: number;
-    queueLength: number;
-  } {
+  getUsageSnapshot(): RateLimiterSnapshot {
+    const now = this.clock();
     return {
       usedToday: this.callsToday,
-      usedThisMinute: this.callsThisMinute,
-      dailyLimit: this.perDayLimit,
-      perMinuteLimit: this.perMinuteLimit,
+      dailyLimit: this.limits.perDay,
       queueLength: this.queue.length,
+      lanes: {
+        accountList: { used: this.accountListUsed, limit: this.limits.accountListPerMinute },
+        appApi: { used: this.appApiUsed, limit: this.limits.appApiPerMinute },
+        deviceRead: {
+          limit: this.limits.deviceReadPerMinute,
+          devices: [...this.deviceReadUsed].map(([deviceKey, used]) => ({ deviceKey, used })),
+        },
+        deviceControl: {
+          perSecond: this.limits.deviceControl.perSecond,
+          burst: this.limits.deviceControl.burst,
+          accountTokens: this.accountControl.available(now),
+          devices: [...this.deviceControl].map(([deviceKey, bucket]) => ({ deviceKey, tokens: bucket.available(now) })),
+        },
+      },
     };
   }
 
-  /** Process queued calls */
+  /**
+   * Process queued calls: walk the priority-sorted queue and start every call
+   * whose lane is free right now. A call whose bucket is exhausted is skipped,
+   * not waited for — a saturated App-API lane never holds a command back.
+   */
   private processQueue(): void {
     if (this.stopped) {
       return;
     }
-    while (this.queue.length > 0 && this.canMakeCall()) {
-      const call = this.queue.shift();
-      if (call) {
-        // Re-check the device allowance HERE, not only when the call was
-        // queued: while this one waited, immediate calls for the same device
-        // may have spent the rest of its day. Running it anyway would overrun
-        // Govee's 100/day for an appliance — the exact case the allowance
-        // exists for, and the one the old code could not see because it never
-        // carried the budget into the queue.
-        if (call.budget && this.deviceBudgetSpent(call.budget)) {
-          call.reject?.(
-            new Error(`Daily Govee budget for ${call.budget.key} is used up (${call.budget.perDay} calls)`),
-          );
-          continue;
-        }
-        // spend(), not two raw increments: this was the second booking site and
-        // the only one that did not know about device allowances.
-        this.spend(call.budget);
-        call.execute().catch(err => {
-          this.log.debug(`Queued call failed: ${errMessage(err)}`);
-        });
+    for (let i = 0; i < this.queue.length;) {
+      const call = this.queue[i];
+      if (!this.canMakeCall(call.lane)) {
+        i++;
+        continue;
       }
+      this.queue.splice(i, 1);
+      // Re-check the device allowance HERE, not only when the call was
+      // queued: while this one waited, immediate calls for the same device
+      // may have spent the rest of its day. Running it anyway would overrun
+      // Govee's 100/day for an appliance — the exact case the allowance
+      // exists for, and the one the old code could not see because it never
+      // carried the budget into the queue.
+      if (call.budget && this.deviceBudgetSpent(call.budget)) {
+        call.reject?.(new Error(`Daily Govee budget for ${call.budget.key} is used up (${call.budget.perDay} calls)`));
+        continue;
+      }
+      // spend(), not two raw increments: this was the second booking site and
+      // the only one that did not know about device allowances.
+      this.spend(call.lane, call.budget);
+      call.execute().catch(err => {
+        this.log.debug(`Queued call failed: ${errMessage(err)}`);
+      });
     }
     if (this.queue.length === 0) {
       // Queue drained — the next overflow episode warns again.
       this.warnedQueueFull = false;
     }
   }
+}
+
+/** What `getUsageSnapshot` reports — one entry per lane. */
+export interface RateLimiterSnapshot {
+  /** OpenAPI + App-API calls made today, all lanes together. */
+  usedToday: number;
+  /** The daily ceiling those calls count against. */
+  dailyLimit: number;
+  /** Calls waiting for a free bucket right now. */
+  queueLength: number;
+  /** Per-lane usage against its own limit. */
+  lanes: {
+    accountList: { used: number; limit: number };
+    appApi: { used: number; limit: number };
+    deviceRead: { limit: number; devices: Array<{ deviceKey: string; used: number }> };
+    deviceControl: {
+      perSecond: number;
+      burst: number;
+      accountTokens: number;
+      devices: Array<{ deviceKey: string; tokens: number }>;
+    };
+  };
 }

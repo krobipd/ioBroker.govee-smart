@@ -35,7 +35,7 @@ import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { decodeApplianceFrames } from "./appliance-frames";
-import { applianceBudget, type RateLimiter } from "./rate-limiter";
+import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
@@ -313,13 +313,13 @@ export class DeviceManager {
           track.cancelled = true;
         }
       },
-      runLimited: async (fn: () => Promise<void>): Promise<void> => {
+      runLimited: async (fn: () => Promise<void>, lane: CallLane): Promise<void> => {
         if (!this.rateLimiter) {
           await fn();
           return;
         }
         try {
-          await this.rateLimiter.executeTracked(fn, 2);
+          await this.rateLimiter.executeTracked(fn, lane, 2);
         } catch (e) {
           if (track) {
             track.cancelled = true;
@@ -835,7 +835,7 @@ export class DeviceManager {
         rawCloudDevices = await this.cloudClient!.getDevices();
       };
       if (this.rateLimiter) {
-        await this.rateLimiter.executeTracked(fetchList, 1);
+        await this.rateLimiter.executeTracked(fetchList, ACCOUNT_LIST_LANE, 1);
       } else {
         await fetchList();
       }
@@ -1759,7 +1759,12 @@ export class DeviceManager {
       // scene-library loads (2): this is
       // a safety net, it must never crowd out a command the user just issued.
       if (this.rateLimiter) {
-        await this.rateLimiter.tryExecute(refreshOne, 3, applianceBudget(device));
+        await this.rateLimiter.tryExecute(
+          refreshOne,
+          { kind: "device-read", deviceKey: limiterDeviceKey(device) },
+          3,
+          applianceBudget(device),
+        );
       } else {
         await refreshOne();
       }

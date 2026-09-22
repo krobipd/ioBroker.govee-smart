@@ -2,7 +2,7 @@ import { LAN_STATE_IDS, mapCloudStateValues, planCloudCapabilityWrites } from ".
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
-import { applianceBudget, type RateLimiter } from "../rate-limiter";
+import { limiterDeviceKey, applianceBudget, type RateLimiter } from "../rate-limiter";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice } from "../types";
 
@@ -138,7 +138,12 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
       // seven minutes after the start on a 12-device installation (measured
       // 2026-09-11, first start on 2.35.0) — the values a user looks at first
       // arrived last. A priority-1 call overtakes the queued tier-2 loads.
-      await adapter.rateLimiter.tryExecute(loadOne, 1, applianceBudget(device));
+      await adapter.rateLimiter.tryExecute(
+        loadOne,
+        { kind: "device-read", deviceKey: limiterDeviceKey(device) },
+        1,
+        applianceBudget(device),
+      );
     } else {
       await loadOne();
     }

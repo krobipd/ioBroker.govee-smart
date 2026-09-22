@@ -178,25 +178,69 @@ export const FORCE_COLOR_MODE_SETTLE_MS = 150;
 
 // === Cloud rate-limiter ===
 
-/**
- * Govee Cloud-API budget (with safety margins). Govee allows 10/min and
- * 10,000/day — we stay at 8/min and 9,000/day so spikes (e.g. a parallel
- * refresh of all devices) don't run into a 429.
- */
-export const CLOUD_FULL_LIMITS = { perMinute: 8, perDay: 9000 };
+/** The Govee cloud budget, one bucket per actor Govee names (see {@link CLOUD_LIMITS}). */
+export interface CloudLimits {
+  /** `/user/devices` — per account and minute. */
+  accountListPerMinute: number;
+  /** `/device/state`, `/device/scenes`, `/device/diy-scenes` — per DEVICE and minute. */
+  deviceReadPerMinute: number;
+  /** `/device/control` — per DEVICE: a token bucket of `burst`, refilled `perSecond`. */
+  deviceControl: { perSecond: number; burst: number };
+  /** `/device/control` — per ACCOUNT: the same shape, the ceiling over all devices. */
+  accountControl: { perSecond: number; burst: number };
+  /** app2.govee.com (libraries, SKU features, snapshot packets) — undocumented, per minute, global. */
+  appApiPerMinute: number;
+  /** All OpenAPI calls together per day. */
+  perDay: number;
+}
 
 /**
- * Daily Cloud budget for ONE appliance (90 of Govee's 100). Appliances are the
- * exception in Govee's limits: lights get the 10,000/day account budget, an
- * appliance gets 100 per day for itself — and appliance control has no local
- * path at all, so every write is a cloud call.
+ * Govee's OpenAPI limits, per ACTOR, with a safety margin (v2 reference page
+ * `get-you-devices`, table "Friendly Reminder", page dated 2026-07-06):
  *
- * The global counters cannot protect this. Per minute they can: a global 8/min
- * is always below the 10/min a single device may use. Per day they cannot —
- * one appliance may spend the whole 9,000, ninety times its own allowance. The
- * adapter never does this by itself (there is no periodic per-device poll), but
- * a script switching a humidifier every five minutes reaches 288 a day and then
- * collects rejections until Govee's daily reset.
+ *   /user/devices    account  30/min          → 20
+ *   /device/state    device   30/min          → 20   (scenes and DIY scenes the same)
+ *   /device/control  device    2/s, burst  6  → as documented
+ *   /device/control  account  12/s, burst 80  → as documented
+ *
+ * Until 2.38.3 ONE global window of 8 calls per minute covered every device and
+ * every endpoint — the v1 API's "10 per minute" read as an account limit. Eight
+ * cloud-only bulbs then shared eight slots: the second half of a group switch
+ * waited for the next minute reset (issue #46, measured on the reporter's
+ * exports of 2.31.1 and 2.37.1). The app2.govee.com calls are not part of
+ * Govee's documented budget at all; they keep their own small window so an
+ * undocumented endpoint is never stormed, and they no longer block commands.
+ *
+ * The daily numbers are v1 inheritance: 10,000 per account and 100 per
+ * appliance stand in the v1 PDF only, the v2 page names no daily limit at all
+ * — neither withdrawn nor confirmed. They stay (a wager either way is the
+ * wrong move) until Govee's rate-limit response headers, recorded since
+ * 2.39.0, show what v2 actually enforces. Accepted with them: the global
+ * 8/min used to cap a day at ~11,500 calls by itself; now a script writing
+ * one light in a loop can reach the 9,000 within minutes, and for lights that
+ * counter is the only brake left (appliances keep their 90).
+ */
+export const CLOUD_LIMITS: CloudLimits = {
+  accountListPerMinute: 20,
+  deviceReadPerMinute: 20,
+  deviceControl: { perSecond: 2, burst: 6 },
+  accountControl: { perSecond: 12, burst: 80 },
+  appApiPerMinute: 8,
+  perDay: 9000,
+};
+
+/**
+ * Daily Cloud budget for ONE appliance (90 of the v1 PDF's 100 — see the note
+ * on daily numbers at {@link CLOUD_LIMITS}). Appliances were the exception in
+ * the v1 limits: lights got the 10,000/day account budget, an appliance 100 per
+ * day for itself — and appliance control has no local path at all, so every
+ * write is a cloud call.
+ *
+ * The global counters cannot protect this: one appliance may spend the whole
+ * 9,000, ninety times its own allowance. The adapter never does this by itself
+ * (there is no periodic per-device poll), but a script switching a humidifier
+ * every five minutes reaches 288 a day and then collects rejections until
+ * Govee's daily reset.
  */
 export const CLOUD_APPLIANCE_DAILY_LIMIT = 90;
 

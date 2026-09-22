@@ -4,6 +4,7 @@ import type { DiagnosticsCollector } from "../diagnostics";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { extractHttpStatus } from "../http-client";
 import { LIBRARY_RECHECK_MS } from "../timing-constants";
+import { APP_API_LANE, limiterDeviceKey, type CallLane } from "../rate-limiter";
 import {
   deviceLabel,
   errMessage,
@@ -36,7 +37,7 @@ export interface LibraryLoaderHost {
   readonly apiClient: GoveeApiClient | null;
   readonly log: ioBroker.Logger;
   readonly diagnostics: DiagnosticsCollector;
-  runLimited(fn: () => Promise<void>): Promise<void>;
+  runLimited(fn: () => Promise<void>, lane: CallLane): Promise<void>;
   /**
    * Per-run memo for the SKU-level fetches (scene/music/DIY library, SKU
    * features): the first device of a SKU fetches, every other device of that
@@ -89,7 +90,7 @@ async function sharedFetch<T>(
       } catch (e) {
         result = { ran: true, data: null, error: e };
       }
-    });
+    }, APP_API_LANE);
     return result;
   })();
   memo?.set(key, outcome);
@@ -187,7 +188,7 @@ export async function loadDeviceScenes(
       host.log.debug(`Could not load scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
     }
   };
-  await host.runLimited(loadScenes);
+  await host.runLimited(loadScenes, { kind: "device-read", deviceKey: limiterDeviceKey(device) });
 
   // DIY scenes from the dedicated endpoint. Gate on whether THIS /device/scenes
   // call carried DIY scenes — NOT on an empty cache. The old `diyScenes.length
@@ -207,7 +208,7 @@ export async function loadDeviceScenes(
         host.log.debug(`Could not load DIY scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
       }
     };
-    await host.runLimited(loadDiy);
+    await host.runLimited(loadDiy, { kind: "device-read", deviceKey: limiterDeviceKey(device) });
   }
 
   // Snapshots — three-way resolution:
@@ -453,7 +454,7 @@ export async function loadDeviceLibraries(
         host.diagnostics.recordApiFailure(device.deviceId, ep, e, extractHttpStatus(e));
         logUndocApiFailure(host.log, sku, "snapshot BLE", ep, hasBearer, e);
       }
-    });
+    }, APP_API_LANE);
   }
 
   return changed;

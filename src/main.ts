@@ -42,7 +42,8 @@ import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
   APP_VERSION_CHECK_INTERVAL_MS,
-  CLOUD_FULL_LIMITS,
+  CLOUD_LIMITS,
+  type CloudLimits,
   LAN_SCAN_INITIAL_WAIT_MS,
   LAN_SCAN_INTERVAL_MS,
   ONLINE_SYNC_INTERVAL_MS,
@@ -147,15 +148,13 @@ export class GoveeAdapter extends utils.Adapter {
   /**
    * @param log Adapter logger
    * @param timers Adapter timer wrapper
-   * @param perMinute Per-minute Cloud budget
-   * @param perDay Per-day Cloud budget
+   * @param limits The per-actor Cloud budget
    */
-  private makeRateLimiter: (
-    log: ioBroker.Logger,
-    timers: GoveeAdapter,
-    perMinute: number,
-    perDay: number,
-  ) => RateLimiter = (log, timers, perMinute, perDay) => new RateLimiter(log, timers, perMinute, perDay);
+  private makeRateLimiter: (log: ioBroker.Logger, timers: GoveeAdapter, limits: CloudLimits) => RateLimiter = (
+    log,
+    timers,
+    limits,
+  ) => new RateLimiter(log, timers, limits);
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
@@ -1046,7 +1045,7 @@ export class GoveeAdapter extends utils.Adapter {
         });
         this.deviceManager.setCloudClient(this.cloudClient);
 
-        this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_FULL_LIMITS.perMinute, CLOUD_FULL_LIMITS.perDay);
+        this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
         this.rateLimiter.start();
         this.deviceManager.setRateLimiter(this.rateLimiter);
 

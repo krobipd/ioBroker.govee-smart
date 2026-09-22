@@ -739,7 +739,22 @@ describe("DiagnosticsCollector", () => {
         deviceManagerLastErrorCategory: "TIMEOUT",
         cloudFailureReason: "Cloud request timeout",
         mqttFailureReason: null,
-        rateLimiter: { usedToday: 42, usedThisMinute: 3, dailyLimit: 9000, perMinuteLimit: 8, queueLength: 0 },
+        rateLimiter: {
+          usedToday: 42,
+          dailyLimit: 9000,
+          queueLength: 0,
+          lanes: {
+            accountList: { used: 1, limit: 20 },
+            appApi: { used: 2, limit: 8 },
+            deviceRead: { limit: 20, devices: [{ deviceKey: "H6172:AA:BB:CC:DD:EE:FF:00:11", used: 1 }] },
+            deviceControl: {
+              perSecond: 2,
+              burst: 6,
+              accountTokens: 79,
+              devices: [{ deviceKey: "H6172:AA:BB:CC:DD:EE:FF:00:11", tokens: 5 }],
+            },
+          },
+        },
         wizardSession: null,
         lanSeenDeviceIps: ["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"],
       }));
@@ -753,6 +768,11 @@ describe("DiagnosticsCollector", () => {
       expect(rt.lanSeenDeviceIps).toEqual(["id-…1d6f:address-local-1"]);
       expect(JSON.stringify(result)).not.toContain("10.0.0.1");
       expect(JSON.stringify(result)).not.toContain("AA:BB:CC:DD:EE:FF");
+      // The per-device buckets of the limiter (2.39.0) are keyed by device id —
+      // the keys go through the anonymiser like every other id in the report.
+      const lanes = (rt.rateLimiter as { lanes: { deviceRead: { devices: Array<{ deviceKey: string }> } } }).lanes;
+      expect(lanes.deviceRead.devices[0].deviceKey).not.toContain("AA:BB:CC:DD:EE:FF:00:11");
+      expect(lanes.deviceRead.devices[0].deviceKey).toMatch(/^H6172:/);
     });
 
     it("yields null runtimeState when no provider is wired", async () => {
