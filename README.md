@@ -103,7 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### 2.38.3 (2026-09-17)
+### 2.38.3 (2026-09-17) — stable
 
 - Changed: Internal cleanup. No user-facing changes.
 
