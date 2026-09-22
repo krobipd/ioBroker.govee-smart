@@ -22,10 +22,12 @@ import { CLOUD_ONLINE_EVIDENCE_TTL_MS, CLOUD_REACHABILITY_REFRESH_MS, LAN_CAPABL
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
+import { RateLimiter } from "./rate-limiter";
 import { DeviceRegistry } from "./device-registry";
 import { CommandRouter } from "./command-router";
 import { mockLog, mockTimers } from "./test-helpers";
 import type {
+  CloudDevice,
   CloudCapability,
   CloudStateCapability,
   DeviceState,
@@ -4608,5 +4610,131 @@ describe("Account push drives reachability for devices without a local interface
     dev.lanIp = undefined;
     dev.lastLanSeenAt = undefined;
     expect(dm.hasDeviceNeedingAppApi()).toBe(true);
+  });
+});
+
+describe("loadFromCloud — scene loads that the rate limiter queues (issue #46, 2026-09-22)", () => {
+  // Measured on the reporter's install (8 cloud-only H600D, 2.31.1 and
+  // 2.37.1): the scenes call of a device that did not fit into the minute
+  // window ran two minutes later, and NOTHING that ran afterwards persisted
+  // or rebuilt — the cache carried `scenes: []` with `scenesChecked: true`,
+  // the dropdown stayed at `---`, and every start refetched. The repo's own
+  // inventory shows the same for the two hand-built fixture lights.
+  const cloudLight = (id: string): CloudDevice => ({
+    sku: "H600D",
+    device: id,
+    deviceName: `Bulb ${id}`,
+    type: "devices.types.light",
+    capabilities: lightCapabilities(),
+  });
+  const scenesAnswer = {
+    lightScenes: [{ name: "Sunrise", value: { id: 1, paramId: 11 } }],
+    diyScenes: [],
+    snapshots: [],
+  };
+
+  function build(opts: { isUnloading?: () => boolean } = {}): {
+    dm: DeviceManager;
+    rl: RateLimiter;
+    saved: Array<{ deviceId: string; scenes: number; scenesChecked?: boolean }>;
+    cloudReady: string[];
+    settle: () => Promise<void>;
+    scenesCalls: () => number;
+  } {
+    const dm = new DeviceManager(mockLog, mockTimers, registry, opts.isUnloading);
+    const rl = new RateLimiter(mockLog, mockTimers, 1, 1000); // one call per minute → the second light queues
+    dm.setRateLimiter(rl);
+    const saved: Array<{ deviceId: string; scenes: number; scenesChecked?: boolean }> = [];
+    dm.setSkuCache({
+      loadAll: () => [],
+      save: (entry: { deviceId: string; scenes: unknown[]; scenesChecked?: boolean }) => {
+        saved.push({ deviceId: entry.deviceId, scenes: entry.scenes.length, scenesChecked: entry.scenesChecked });
+        return Promise.resolve();
+      },
+      pruneStale: () => 0,
+      clear: () => {},
+      evictDevice: () => {},
+    } as never);
+    const cloudReady: string[] = [];
+    dm.setCallbacks({
+      onUpdate: () => {},
+      onLanDeviceReady: () => {},
+      onCloudDataReady: dev => {
+        cloudReady.push(dev.deviceId);
+      },
+      onGroupMembersReady: () => {},
+    });
+    let scenesCalls = 0;
+    dm.setCloudClient({
+      getDevices: () => Promise.resolve([cloudLight("BULB000000000001"), cloudLight("BULB000000000002")]),
+      getScenes: () => {
+        scenesCalls++;
+        return Promise.resolve(scenesAnswer);
+      },
+      getDiyScenes: () => Promise.resolve([]),
+    } as any);
+    // One minute reset frees ONE slot; a job needs two calls (scenes + DIY
+    // scenes), so the bench keeps releasing until every job has settled.
+    const settle = async (): Promise<void> => {
+      for (let i = 0; i < 20 && (dm as any).pendingSceneLoads.size > 0; i++) {
+        (rl as any).callsThisMinute = 0;
+        (rl as any).processQueue();
+        await new Promise(r => setTimeout(r, 0));
+      }
+      await dm.whenSceneLoadsSettled();
+    };
+    return { dm, rl, saved, cloudReady, settle, scenesCalls: () => scenesCalls };
+  }
+
+  it("returns ok while the second light's scenes still wait, then persists AND rebuilds that light once its call ran", async () => {
+    const { dm, saved, cloudReady, settle } = build();
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    const [first, second] = dm.getDevices();
+    expect(first.scenes.map(s => s.name)).toEqual(["Sunrise"]); // ran immediately
+    expect(second.scenes).toEqual([]); // queued — nothing to show yet
+    expect(second.scenesChecked).toBeFalsy(); // not checked until the answer is in
+    const rebuildsBefore = cloudReady.filter(id => id === "BULB000000000002").length;
+
+    await settle();
+
+    expect(second.scenes.map(s => s.name)).toEqual(["Sunrise"]);
+    expect(second.scenesChecked).toBe(true);
+    const persisted = saved.filter(s => s.deviceId === "BULB000000000002");
+    expect(persisted.at(-1)).toEqual({ deviceId: "BULB000000000002", scenes: 1, scenesChecked: true });
+    // Exactly one rebuild for the late light after its data arrived.
+    expect(cloudReady.filter(id => id === "BULB000000000002").length - rebuildsBefore).toBe(1);
+  });
+
+  it("a queued call the limiter cancels keeps loadFromCloud ok, persists the light with scenesChecked=false and rebuilds nothing", async () => {
+    const { dm, rl, saved, cloudReady, settle, scenesCalls } = build();
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    const second = dm.getDevices()[1];
+    const rebuildsBefore = cloudReady.filter(id => id === "BULB000000000002").length;
+
+    rl.stop(); // rejects every queued tracked call
+    await settle();
+
+    expect(scenesCalls()).toBe(1); // the cancelled call never ran
+    expect(second.scenes).toEqual([]);
+    expect(second.scenesChecked).toBe(false);
+    // Persisted anyway — the capability entry must survive a cloud hiccup —
+    // but WITHOUT the checked flag, so the next start fetches again.
+    const persisted = saved.filter(s => s.deviceId === "BULB000000000002");
+    expect(persisted.at(-1)).toEqual({ deviceId: "BULB000000000002", scenes: 0, scenesChecked: false });
+    expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
+  });
+
+  it("neither persists nor rebuilds when the adapter is unloading by the time the queued call ran", async () => {
+    let unloading = false;
+    const { dm, saved, cloudReady, settle } = build({ isUnloading: () => unloading });
+    await dm.loadFromCloud();
+    const savesBefore = saved.filter(s => s.deviceId === "BULB000000000002").length;
+    const rebuildsBefore = cloudReady.filter(id => id === "BULB000000000002").length;
+
+    unloading = true;
+    await settle();
+
+    expect(saved.filter(s => s.deviceId === "BULB000000000002").length).toBe(savesBefore);
+    expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
   });
 });

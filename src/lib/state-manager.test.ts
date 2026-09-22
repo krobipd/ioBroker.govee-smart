@@ -845,6 +845,83 @@ describe("StateManager", () => {
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.some(c => c.method === "setForeignObject")).toBe(false);
     });
+
+    // A scene list can SHRINK (Govee withdraws a scene, or a device's real
+    // answer is shorter than what an older release cached). extendObject
+    // deep-merges, so the withdrawn keys would survive as phantom options that
+    // resolve to nothing when written. The whole-write path exists for
+    // exactly this — but it must never be triggered by the early build of a
+    // start-up, which carries `{0: "---"}` before the scene job has run: that
+    // would wipe last session's list for the whole session whenever the job
+    // then fails (issue #46 analysis, 2026-09-22).
+    it("replaces the map whole when a persisted key is missing from a REAL fresh map — no phantom option survives a shrink", async () => {
+      const { adapter, objects, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      objects.set("devices.h6160_0011.scenes.light_scene", {
+        type: "state",
+        common: { name: "Scene", type: "mixed", role: "state", states: { 0: "---", 1: "Aurora", 2: "Sunrise" } },
+        native: {},
+      });
+
+      const fresh: Record<string, string> = { 0: "---", 1: "Aurora" };
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "light_scene",
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          write: true,
+          channel: "scenes",
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+          states: fresh,
+          def: "0",
+        },
+      ]);
+
+      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+        common: { states: Record<string, unknown> };
+      };
+      expect(obj.common.states).toEqual(fresh);
+      const repairPath = "devices.h6160_0011.scenes.light_scene";
+      const whole = calls.filter(c => c.method === "setForeignObject" && c.args[0] === `govee-smart.0.${repairPath}`);
+      expect(whole).toHaveLength(1);
+      expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
+    });
+
+    it("never lets the early '---'-only build wipe a filled map — the late scene job fills it, a failed job must not empty it", async () => {
+      const { adapter, objects, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      const filled = { 0: "---", 1: "Aurora", 2: "Sunrise" };
+      objects.set("devices.h6160_0011.scenes.light_scene", {
+        type: "state",
+        common: { name: "Scene", type: "mixed", role: "state", states: { ...filled } },
+        native: {},
+      });
+
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "light_scene",
+          name: "Scene",
+          type: "mixed",
+          role: "state",
+          write: true,
+          channel: "scenes",
+          capabilityType: "devices.capabilities.dynamic_scene",
+          capabilityInstance: "lightScene",
+          states: { 0: "---" },
+          def: "0",
+        },
+      ]);
+
+      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+        common: { states: Record<string, unknown> };
+      };
+      expect(obj.common.states).toEqual(filled);
+      expect(calls.some(c => c.method === "setForeignObject")).toBe(false);
+    });
   });
 
   describe("createDeviceStates", () => {

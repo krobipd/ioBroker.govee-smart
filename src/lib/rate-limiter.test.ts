@@ -581,3 +581,28 @@ describe("per-device daily budget", () => {
     limiter.stop();
   });
 });
+
+describe("RateLimiter — calls after stop()", () => {
+  it("a tracked call queued AFTER stop() rejects instead of waiting forever", async () => {
+    const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
+    await rl.tryExecute(async () => {}); // burn the minute budget
+    rl.stop();
+    await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow("stopped");
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+
+  it("a fire-and-queue call after stop() is dropped, not queued", async () => {
+    const rl = new RateLimiter(mockLog, mockTimers, 1, 100);
+    await rl.tryExecute(async () => {});
+    rl.stop();
+    let ran = 0;
+    expect(
+      await rl.tryExecute(() => {
+        ran++;
+        return Promise.resolve();
+      }),
+    ).toBe(false);
+    expect(ran).toBe(0);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+});

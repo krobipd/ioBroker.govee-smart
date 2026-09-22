@@ -589,7 +589,9 @@ export class GoveeAdapter extends utils.Adapter {
       await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => undefined);
       // General groups online state (reflects Cloud connection)
       await this.stateManager.createGroupsOnlineState(false);
-      this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry);
+      // The unloading reader: a scene job that finishes after onUnload began
+      // must not persist or rebuild into a closing database (2026-09-22).
+      this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry, () => this.unloading);
       const dataDir = utils.getAbsoluteInstanceDataDir(this);
 
       this.skuCache = new SkuCache(dataDir, this.log);

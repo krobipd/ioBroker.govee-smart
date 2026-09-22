@@ -345,17 +345,23 @@ async function feedFixtures(harness, lan) {
   // round trip than the device list — on a slower run that landed after the
   // fixed 12 s and the inventory came out four objects short. A fixed sleep
   // makes the machine decide what the inventory contains; the settle check
-  // makes the adapter decide.
-  let previous = -1;
+  // makes the adapter decide. The check reads CONTENT, not a count: a scene
+  // answer that lands late fills `common.states` of an object that already
+  // exists (2.39.0), and a count would have called that tree settled.
+  let previous = "";
   let stable = 0;
   for (let i = 0; i < 120 && stable < 5; i++) {
-    const count = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}\u9999` })).rows.length;
-    stable = count === previous ? stable + 1 : 0;
-    previous = count;
+    const rows = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}\u9999` })).rows;
+    const signature = rows
+      .map(r => `${r.id}:${Object.keys((r.value && r.value.common && r.value.common.states) || {}).length}`)
+      .sort()
+      .join("|");
+    stable = signature === previous ? stable + 1 : 0;
+    previous = signature;
     await new Promise(r => setTimeout(r, 1000));
   }
   if (stable < 5) {
-    throw new Error(`object tree never settled — still changing after 120 s (last count ${previous})`);
+    throw new Error(`object tree never settled — still changing after 120 s (${previous.split("|").length} objects)`);
   }
 }
 

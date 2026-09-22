@@ -215,6 +215,14 @@ export class RateLimiter {
    * @param budget The device's own daily allowance, when one applies — booked when the call actually runs, not when it is queued
    */
   enqueue(execute: () => Promise<void>, priority = 1, reject?: (err: Error) => void, budget?: DeviceBudget): boolean {
+    // A stopped limiter never processes its queue again: a call queued after
+    // stop() would wait forever, and a tracked caller with it — the leak the
+    // stop() comment describes, reached from any late call during unload
+    // (measured 2026-09-22: a scene job's second call after stop()).
+    if (this.stopped) {
+      reject?.(new Error("Rate limiter stopped — Cloud call cancelled"));
+      return false;
+    }
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
       // Queue full. The queue is sorted ascending, so the tail is the
       // lowest-priority call. Evict it in favour of the new call when the new

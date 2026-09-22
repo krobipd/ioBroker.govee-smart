@@ -64,3 +64,29 @@ tls.connect = function patchedTlsConnect(...args) {
   });
   return socket;
 };
+
+// The fixture server has no rate limit, and the inventory is a picture of the
+// FINISHED tree: with the production minute window (8 cloud calls per minute
+// until 2.38.3) the scene and library answers of most fixture lights would
+// arrive minutes after the start, and the dump would depend on when the settle
+// loop looked. So the window is lifted for this process only — the queued
+// path itself is pinned by the unit tests (device-manager.test.ts,
+// main.test.ts: "more lights than the minute window holds"), the inventory
+// proves what the tree carries once every answer is in. Done by intercepting
+// the module load: the harness copies the adapter into a temp install, so a
+// require() of the source tree from here would patch a different instance.
+// krobi-Go 2026-09-22.
+const Module = require("node:module");
+const realLoad = Module._load;
+Module._load = function patchedLoad(request, parent, isMain) {
+  const exp = realLoad.call(this, request, parent, isMain);
+  if (typeof request === "string" && /timing-constants(\.js)?$/.test(request) && exp) {
+    for (const key of Object.keys(exp)) {
+      const v = exp[key];
+      if (v && typeof v === "object" && typeof v.perMinute === "number") {
+        v.perMinute = 100000;
+      }
+    }
+  }
+  return exp;
+};

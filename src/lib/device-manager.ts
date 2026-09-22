@@ -93,6 +93,16 @@ export class DeviceManager {
   /** Shared Cloud budget — owned here for the data loaders since M12. */
   private rateLimiter: RateLimiter | null = null;
   /**
+   * The scene/library loads of the current cloud run, one job per light. A job
+   * that the rate limiter queues finishes minutes after `loadFromCloud`
+   * returned; until 2.39.0 nothing ran after that — the cache kept an empty
+   * scene list with `scenesChecked: true` and the dropdown stayed at `---`
+   * for every install whose start-up exceeded the minute window (issue #46).
+   */
+  private readonly pendingSceneLoads = new Set<Promise<void>>();
+  /** Reads main's `unloading` flag — one truth, not a second marker. */
+  private readonly isUnloading: () => boolean;
+  /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
    * to debug on repeats. Separate from `lastErrorCategory` (which lives in
@@ -172,10 +182,18 @@ export class DeviceManager {
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
    *   onUnload-safe delays).
    * @param registry This instance's device catalog (quirks, trust tiers)
+   * @param isUnloading Reads main's `unloading` flag — a scene job that
+   *   finishes after onUnload began neither persists nor rebuilds
    */
-  constructor(log: ioBroker.Logger, timers: TimerAdapter, registry: DeviceRegistry) {
+  constructor(
+    log: ioBroker.Logger,
+    timers: TimerAdapter,
+    registry: DeviceRegistry,
+    isUnloading: () => boolean = () => false,
+  ) {
     this.log = log;
     this.registry = registry;
+    this.isUnloading = isUnloading;
     this.commandRouter = new CommandRouter(log, timers, registry);
     this.diagnostics = new DiagnosticsCollector(registry);
     // v2.9.1 — funnel command-router routing decisions into the per-device
@@ -262,24 +280,100 @@ export class DeviceManager {
 
   /**
    * Host for the extracted library loaders (device-manager/library-loader).
-   * runLimited pins the budget semantics: fire-and-queue tryExecute at
-   * background priority — see the LibraryLoaderHost doc for why this must
-   * not become executeTracked.
+   * `runLimited` settles when the call actually RAN — including when it had
+   * to queue for the minute window (executeTracked, background priority).
+   * Until 2.39.0 it was fire-and-queue: the loaders then returned "no data"
+   * before a byte had arrived, and the data that landed minutes later reached
+   * neither the cache nor the state tree. A call the limiter cancels (queue
+   * full, evicted by a command, limiter stopped) is caught HERE, not in the
+   * loaders: their `await host.runLimited(...)` sits outside their own
+   * try/catch, and a rejection escaping through `loadFromCloud` would turn a
+   * dropped library call into a cloud failure with a 5-minute retry. The
+   * keep-cache paths hold either way — the fetch closures assign only on a
+   * non-empty answer.
+   *
+   * @param track Optional outcome tracker for one job
+   * @param track.cancelled Set when a call never ran, so the caller can tell
+   *   "checked, empty" from "not checked this round"
    */
-  private libraryHost(): libraryLoader.LibraryLoaderHost {
+  private libraryHost(track?: { cancelled: boolean }): libraryLoader.LibraryLoaderHost {
     return {
       cloudClient: this.cloudClient!,
       apiClient: this.apiClient,
       log: this.log,
       diagnostics: this.diagnostics,
       runLimited: async (fn: () => Promise<void>): Promise<void> => {
-        if (this.rateLimiter) {
-          await this.rateLimiter.tryExecute(fn, 2);
-        } else {
+        if (!this.rateLimiter) {
           await fn();
+          return;
+        }
+        try {
+          await this.rateLimiter.executeTracked(fn, 2);
+        } catch (e) {
+          if (track) {
+            track.cancelled = true;
+          }
+          this.log.debug(`Cloud data call did not run this round: ${errMessage(e)}`);
         }
       },
     };
+  }
+
+  /**
+   * Scenes + libraries for one light, as a background job of the cloud run:
+   * fetch (queued or not), then — once the answers are in — the same
+   * follow-up the manual refresh does: scenes from the library, cache, and
+   * the cloud-phase rebuild that fills the dropdowns. Nothing of that runs
+   * once the adapter is unloading: a job mid-HTTP at that moment would write
+   * into a closing database.
+   *
+   * @param device The light to load for
+   * @param cd Its cloud list entry (capabilities feed the snapshot fallback)
+   */
+  private startSceneLoad(device: GoveeDevice, cd: CloudDevice): void {
+    const job: Promise<void> = this.loadSceneDataFor(device, cd)
+      .catch((e: unknown) => {
+        this.log.debug(`Scene load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+      })
+      .finally(() => {
+        this.pendingSceneLoads.delete(job);
+      });
+    this.pendingSceneLoads.add(job);
+  }
+
+  private async loadSceneDataFor(device: GoveeDevice, cd: CloudDevice): Promise<void> {
+    const track = { cancelled: false };
+    const host = this.libraryHost(track);
+    const scenesChanged = await libraryLoader.loadDeviceScenes(host, device, cd);
+    const librariesChanged = await libraryLoader.loadDeviceLibraries(host, device, cd.sku);
+    if (this.isUnloading()) {
+      return;
+    }
+    // Checked = the cloud answered this round, even with an empty list (empty
+    // is legitimate and must not refetch forever). A cancelled call is NOT
+    // checked: the light is persisted anyway — its capability entry has to
+    // survive a cloud hiccup — but without the flag, so the next start asks
+    // again instead of trusting an answer that never came.
+    device.scenesChecked = !track.cancelled;
+    if (track.cancelled) {
+      this.persistDeviceToCache(device);
+      return;
+    }
+    cacheHelpers.populateScenesFromLibrary(this, device);
+    this.persistDeviceToCache(device);
+    if (scenesChanged || librariesChanged) {
+      this.onCloudDataReady?.(device, this.getDevices());
+    }
+  }
+
+  /**
+   * Settles once every scene job of the current run has finished — for tests
+   * and the inventory bench, which must not dump a tree the jobs still fill.
+   */
+  async whenSceneLoadsSettled(): Promise<void> {
+    while (this.pendingSceneLoads.size > 0) {
+      await Promise.allSettled([...this.pendingSceneLoads]);
+    }
   }
 
   /**
@@ -559,7 +653,7 @@ export class DeviceManager {
       }
 
       // Step 1: Merge Cloud devices into local device map
-      let changed = this.mergeCloudDevices(cloudDevices);
+      const changed = this.mergeCloudDevices(cloudDevices);
 
       // Step 2: Load scenes, snapshots, and libraries for any device that
       // exposes a `dynamic_scene` capability — independent of `cd.type`.
@@ -577,16 +671,12 @@ export class DeviceManager {
         if (isLight) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
-            const host = this.libraryHost();
-            if (await libraryLoader.loadDeviceScenes(host, device, cd)) {
-              changed = true;
-            }
-            if (await libraryLoader.loadDeviceLibraries(host, device, cd.sku)) {
-              changed = true;
-            }
-            // Mark scenes as checked regardless of result — empty is legitimate,
-            // and we've now confirmed that via Cloud. Prevents refetch loop.
-            device.scenesChecked = true;
+            // Not awaited: with more lights than the minute window holds, the
+            // calls queue for minutes, and cloudInitWithTimeout gives this
+            // method 60 s. Each job persists and rebuilds its own light when
+            // its answers are in (loadSceneDataFor); `changed` here stays the
+            // list merge — a new device gets its tree from the loop below.
+            this.startSceneLoad(device, cd);
           }
         }
       }

@@ -239,6 +239,7 @@ function internalOf(adapter: GoveeAdapter): {
   log: Record<"silly" | "debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   namespace: string;
   deviceManager: { getDevices(): GoveeDevice[]; [k: string]: unknown } | null;
+  skuCache: unknown;
   stateManager: {
     devicePrefix(d: GoveeDevice): string;
     markAllOffline(): Promise<string[]>;
@@ -2419,5 +2420,111 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     expect(JSON.parse(result.content).device.sku).toBe("H61BE");
     // And the datapoint says WHEN, not which file.
     expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+  });
+});
+
+// ===========================================================================
+describe("start-up with more lights than the minute window holds (issue #46, 2026-09-22)", () => {
+  // The reporter's install: eight cloud-only bulbs, eight calls per minute.
+  // The scene answers of the lights beyond the window arrive minutes after
+  // onReady. Measured on 2.31.1 and 2.37.1: they reached neither the cache
+  // nor the dropdown — every start refetched, `scenes.light_scene` stayed
+  // at `---`. This bench holds every tracked call after the first, then
+  // releases them, and expects the tree and the cache to carry the answer.
+  const light = (id: string): Record<string, unknown> => ({
+    sku: "H600D",
+    device: id,
+    deviceName: `Bulb ${id.slice(-2)}`,
+    type: "devices.types.light",
+    capabilities: [
+      { type: "devices.capabilities.on_off", instance: "powerSwitch" },
+      {
+        type: "devices.capabilities.dynamic_scene",
+        instance: "lightScene",
+        parameters: { dataType: "ENUM", options: [] },
+      },
+    ],
+  });
+
+  function holdingLimiter(f: Fakes, immediate: number): { release: () => Promise<void> } {
+    const held: Array<() => Promise<void>> = [];
+    let ran = 0;
+    const limiter = f.limiter as unknown as {
+      executeTracked: (fn: () => Promise<void>, prio?: number) => Promise<void>;
+    };
+    limiter.executeTracked = (fn: () => Promise<void>) => {
+      if (ran < immediate) {
+        ran++;
+        return fn();
+      }
+      return new Promise<void>((resolve, reject) => {
+        held.push(() => fn().then(resolve, reject));
+      });
+    };
+    return {
+      release: async () => {
+        while (held.length > 0) {
+          const next = held.shift()!;
+          await next();
+        }
+      },
+    };
+  }
+
+  it("a light whose scenes were queued gets its dropdown and its cache entry once the call ran; the next start has them from the cache", async () => {
+    const dataDir = currentDataDir();
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDevices.mockResolvedValue([light("AA:BB:CC:DD:EE:01"), light("AA:BB:CC:DD:EE:02")]);
+    (ctx.f.cloud as unknown as Record<string, unknown>).getScenes = vi.fn(() =>
+      Promise.resolve({
+        lightScenes: [{ name: "Sunrise", value: { id: 1, paramId: 11 } }],
+        diyScenes: [],
+        snapshots: [],
+      }),
+    );
+    (ctx.f.cloud as unknown as Record<string, unknown>).getDiyScenes = vi.fn(() => Promise.resolve([]));
+    // Jobs interleave: both scene calls, then both DIY calls. Holding all but
+    // the first call keeps every job open until the release below.
+    const gate = holdingLimiter(ctx.f, 1);
+    await i.onReady();
+    await settle(6);
+
+    const dropdown = (id: string): Record<string, string> | undefined =>
+      (i.objects.get(`devices.h600d_${id}.scenes.light_scene`) as { common?: { states?: Record<string, string> } })
+        ?.common?.states;
+    expect(dropdown("ee01")).toEqual({ 0: "---" }); // still waiting — nothing invented
+    expect(dropdown("ee02")).toEqual({ 0: "---" });
+
+    await gate.release();
+    await (i.deviceManager as unknown as { whenSceneLoadsSettled: () => Promise<void> }).whenSceneLoadsSettled();
+    await settle();
+
+    expect(dropdown("ee01")).toEqual({ 0: "---", 1: "Sunrise" });
+    expect(dropdown("ee02")).toEqual({ 0: "---", 1: "Sunrise" });
+    // save() is asynchronous (temp file + flush + rename) — wait for the disk.
+    const inFlight = (i.skuCache as { inFlight: Map<string, Promise<void>> }).inFlight;
+    await Promise.allSettled([...inFlight.values()]);
+    const cached = JSON.parse(fsReal.readFileSync(pathReal.join(dataDir, "cache", "h600d_ee02.json"), "utf8")) as {
+      scenes: unknown[];
+      scenesChecked?: boolean;
+    };
+    expect(cached.scenes).toHaveLength(1);
+    expect(cached.scenesChecked).toBe(true);
+
+    // Second start, same data directory: the cache phase builds the dropdown
+    // before any cloud call — no wait for the window this time.
+    const ctx2 = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i2 = internalOf(ctx2.adapter);
+    ctx2.f.cloud.getDevices.mockResolvedValue([light("AA:BB:CC:DD:EE:01"), light("AA:BB:CC:DD:EE:02")]);
+    holdingLimiter(ctx2.f, 0); // nothing fits — everything queues
+    await i2.onReady();
+    await settle();
+    const dropdown2 = (
+      i2.objects.get("devices.h600d_ee02.scenes.light_scene") as {
+        common?: { states?: Record<string, string> };
+      }
+    )?.common?.states;
+    expect(dropdown2).toEqual({ 0: "---", 1: "Sunrise" });
   });
 });

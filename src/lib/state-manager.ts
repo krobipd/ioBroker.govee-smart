@@ -263,7 +263,9 @@ export class StateManager {
 
   /**
    * Force-replace `common.states` on a persisted state object if any existing
-   * value is non-string (= translation object from older releases).
+   * value is non-string (= translation object from older releases), or if a
+   * persisted key is missing from a fresh map that carries real options (a
+   * shrunken list, 2026-09-22 — see the guard below).
    *
    * A full replace of the MAP is required: js-controller's `extendObject`
    * deep-merges via node.extend (verified against js-controller 7.2.2 /
@@ -307,8 +309,18 @@ export class StateManager {
     if (!states || typeof states !== "object") {
       return;
     }
-    const buggy = Object.values(states as Record<string, unknown>).some(v => typeof v !== "string");
-    if (!buggy) {
+    const persisted = states as Record<string, unknown>;
+    const buggy = Object.values(persisted).some(v => typeof v !== "string");
+    // A shrunken list is the second reason for a whole write: a scene Govee
+    // withdrew keeps its key through the merge and stays selectable while it
+    // resolves to nothing. Only a REAL fresh map may shrink the persisted one —
+    // the early build of a start-up carries `{0: "---"}` before the scene job
+    // has run, and letting it wipe last session's list would leave the
+    // dropdown empty for the whole session whenever that job then fails
+    // (issue #46 analysis, 2026-09-22).
+    const freshHasOptions = Object.keys(fresh).length > 1;
+    const shrunk = freshHasOptions && Object.keys(persisted).some(k => !(k in fresh));
+    if (!buggy && !shrunk) {
       return;
     }
     // The read-back object with the corrected map, written whole — one write,

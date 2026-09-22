@@ -19,12 +19,16 @@ import {
  * cache persistence, error dedup) stays in DeviceManager; these functions
  * only fetch and mutate the passed device.
  *
- * `runLimited` deliberately encodes the budget semantics at ONE place in
- * the host: fire-and-queue (RateLimiter.tryExecute) — on an exhausted
- * budget the fetch closures run later and the callers' "no data this
- * round" paths (e.g. the Issue-#13 three-way snapshot resolution) keep
- * the cache. Do NOT swap in executeTracked here: it would either block
- * loadFromCloud for minutes or change the documented keep-cache paths.
+ * `runLimited` encodes the budget semantics at ONE place in the host and
+ * settles when the call actually RAN — queued or not (since 2.39.0; before,
+ * fire-and-queue returned "no data this round" before a byte had arrived,
+ * and an answer that landed minutes later reached neither cache nor tree,
+ * issue #46). A call the limiter cancels is caught by the host, never by the
+ * loaders: their `await host.runLimited(...)` is outside their own try/catch.
+ * The keep-cache paths (e.g. the Issue-#13 three-way snapshot resolution)
+ * still hold — the fetch closures assign only on a non-empty answer. The
+ * orchestration keeps `loadFromCloud` from waiting on these calls by running
+ * each light's load as a background job (DeviceManager.startSceneLoad).
  */
 export interface LibraryLoaderHost {
   readonly cloudClient: GoveeCloudClient;
