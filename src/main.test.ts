@@ -370,6 +370,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     getDeviceState: vi.fn(() => Promise.resolve([])),
     setResponseHook: vi.fn(),
     getFailureReason: vi.fn(() => null),
+    getLastRateLimit: vi.fn(() => null),
   };
   const api = {
     setEmail: vi.fn(),

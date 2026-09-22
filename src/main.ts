@@ -620,6 +620,7 @@ export class GoveeAdapter extends utils.Adapter {
           cloudFailureReason: this.cloudClient?.getFailureReason() ?? null,
           mqttFailureReason: this.mqttClient?.getFailureReason() ?? null,
           rateLimiter: this.rateLimiter?.getUsageSnapshot() ?? null,
+          cloudRateLimit: this.cloudClient?.getLastRateLimit() ?? null,
           wizardSession: this.segmentWizard?.getSessionSnapshot() ?? null,
           lanSeenDeviceIps: this.lanClient?.getDiagSnapshot().seenDeviceIps ?? [],
         };
@@ -1040,8 +1041,8 @@ export class GoveeAdapter extends utils.Adapter {
         this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
         // Capture the most recent Cloud response per (deviceId, endpoint) for
         // diagnostics — bounded by the DiagnosticsCollector's response slot cap.
-        this.cloudClient.setResponseHook((deviceId, endpoint, body) => {
-          this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body);
+        this.cloudClient.setResponseHook((deviceId, endpoint, body, rateLimit) => {
+          this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body, undefined, rateLimit);
         });
         this.deviceManager.setCloudClient(this.cloudClient);
 

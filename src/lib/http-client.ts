@@ -67,6 +67,13 @@ export interface HttpResult<T> {
    * log "why is this null" without enabling silly-level wire logging.
    */
   bodySnippet?: string;
+  /**
+   * The response headers, lower-cased names (Node's form). Govee's rate-limit
+   * headers live here — until 2.39.0 they were dropped at this point, so no
+   * export ever showed what the API actually enforces. Optional only for the
+   * test fakes that build envelopes by hand; the real request always sets it.
+   */
+  headers?: Record<string, string | string[] | undefined>;
 }
 
 /**
@@ -188,7 +195,7 @@ export function httpsRequest<T>(
         // unit-tested interpretOkBody() (the Issue #13 fallbacks). It throws on
         // invalid JSON, which we surface as a rejected promise.
         try {
-          resolve(interpretOkBody<T>(raw, statusCode));
+          resolve({ ...interpretOkBody<T>(raw, statusCode), headers: res.headers });
         } catch (parseErr) {
           reject(parseErr instanceof Error ? parseErr : new Error(errMessage(parseErr)));
         }

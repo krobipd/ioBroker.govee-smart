@@ -732,6 +732,33 @@ describe("DiagnosticsCollector", () => {
     });
   });
 
+  describe("Govee's rate-limit headers in the report (2.39.0)", () => {
+    it("a success entry carries the headers of its answer, and the runtime state the newest set", async () => {
+      const c = new DiagnosticsCollector(registry);
+      const rateLimit = {
+        endpoint: "/router/api/v1/device/state",
+        at: 1_700_000_000_000,
+        dayLimit: 10000,
+        dayRemaining: 9876,
+        minuteLimit: 10,
+        minuteRemaining: 7,
+        raw: { "x-ratelimit-limit": "10000", "api-ratelimit-remaining": "7" },
+      };
+      const device = makeDevice();
+      c.recordApiSuccess(device.deviceId, "/router/api/v1/device/state", { ok: 1 }, undefined, rateLimit);
+      c.recordApiSuccess(device.deviceId, "/router/api/v1/device/scenes", { ok: 1 });
+      c.setRuntimeStateProvider(() => ({ cloudRateLimit: rateLimit }));
+      const result = await c.generate(device, "2.39.0");
+      const history = result.apiHistory as Record<string, Array<Record<string, unknown>>>;
+      expect(history["/router/api/v1/device/state"][0].rateLimit).toMatchObject({
+        dayLimit: 10000,
+        minuteRemaining: 7,
+      });
+      expect(history["/router/api/v1/device/scenes"][0].rateLimit).toBeUndefined();
+      expect((result.runtimeState as Record<string, unknown>).cloudRateLimit).toMatchObject({ dayRemaining: 9876 });
+    });
+  });
+
   describe("v2.9.1 Class K — runtime-state provider", () => {
     it("provider returns a snapshot pulled at generate-time", async () => {
       const c = new DiagnosticsCollector(registry);

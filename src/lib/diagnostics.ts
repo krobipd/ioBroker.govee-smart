@@ -11,6 +11,7 @@ import {
 } from "./device-manager/lookups";
 import { CLOUD_REACHABILITY_REFRESH_MS } from "./timing-constants";
 import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
+import type { GoveeRateLimit } from "./govee-cloud-client";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -48,6 +49,11 @@ export interface ApiResponseEntry {
   body: unknown;
   /** Serialised size of `body` — what this entry costs against the per-device byte budget. */
   bytes: number;
+  /**
+   * Govee's rate-limit headers on this answer (2.39.0) — the measurement the
+   * daily numbers of the budget wait for; absent when the answer carried none.
+   */
+  rateLimit?: GoveeRateLimit;
 }
 
 /**
@@ -89,6 +95,8 @@ export interface RuntimeStateSnapshot {
   mqttFailureReason?: string | null;
   /** Rate-limiter usage snapshot or null if no Cloud client. Shape mirrors RateLimiter.getUsageSnapshot(). */
   rateLimiter?: RateLimiterSnapshot | null;
+  /** The newest rate-limit headers Govee sent (GoveeCloudClient.getLastRateLimit), null before the first. */
+  cloudRateLimit?: GoveeRateLimit | null;
   /** Live wizard session if any — captured for "wizard ran during diag-click" forensics. */
   wizardSession?: unknown;
   /** LAN client's `seenDeviceIps` set as `["sku-id:ip", ...]` — discovery trace. */
@@ -699,8 +707,15 @@ export class DiagnosticsCollector {
    * @param endpoint Endpoint identifier
    * @param body Response body
    * @param statusCode Optional HTTP status (200 by default if omitted)
+   * @param rateLimit Govee's rate-limit headers on this answer, when it carried any
    */
-  recordApiSuccess(deviceId: string, endpoint: string, body: unknown, statusCode?: number): void {
+  recordApiSuccess(
+    deviceId: string,
+    endpoint: string,
+    body: unknown,
+    statusCode?: number,
+    rateLimit?: GoveeRateLimit | null,
+  ): void {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
     }
@@ -715,6 +730,7 @@ export class DiagnosticsCollector {
       statusCode: statusCode ?? 200,
       body: stored,
       bytes: byteSize(stored),
+      ...(rateLimit ? { rateLimit: this.cloneAndCap(rateLimit) as GoveeRateLimit } : {}),
     });
   }
 

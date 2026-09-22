@@ -1,4 +1,69 @@
 import { formatFallback, httpsRequest, HttpError, type HttpsRequestFn } from "./http-client";
+
+/**
+ * What Govee says about its own budget, read off one answer's headers. The
+ * named fields follow the v1 docs (`X-RateLimit-*` = day, `API-RateLimit-*` =
+ * minute); `raw` keeps every header whose name mentions the rate limit, so
+ * a v2 rename still shows up in the report.
+ */
+export interface GoveeRateLimit {
+  /** The endpoint whose answer carried the headers. */
+  endpoint: string;
+  /** When that answer arrived (ms epoch). */
+  at: number;
+  /** `X-RateLimit-Limit` — the day's ceiling, when Govee names one. */
+  dayLimit?: number;
+  /** `X-RateLimit-Remaining` — what is left of the day. */
+  dayRemaining?: number;
+  /** `X-RateLimit-Reset` — when the day's window resets (epoch seconds). */
+  dayReset?: number;
+  /** `API-RateLimit-Limit` — the minute's ceiling. */
+  minuteLimit?: number;
+  /** `API-RateLimit-Remaining` — what is left of the minute. */
+  minuteRemaining?: number;
+  /** `API-RateLimit-Reset` — when the minute's window resets (epoch seconds). */
+  minuteReset?: number;
+  /** Every header whose name mentions the rate limit, verbatim (lower-cased names). */
+  raw: Record<string, string>;
+}
+
+/**
+ * Pull the rate-limit headers out of an answer. Null when the answer carries
+ * none — an unchanged `lastRateLimit` then says "Govee said nothing new".
+ *
+ * @param headers Response headers (any case)
+ */
+export function readRateLimitHeaders(
+  headers: Record<string, string | string[] | undefined>,
+): Omit<GoveeRateLimit, "endpoint" | "at"> | null {
+  const raw: Record<string, string> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (!/ratelimit/i.test(name) || value === undefined) {
+      continue;
+    }
+    raw[name.toLowerCase()] = Array.isArray(value) ? value.join(",") : String(value);
+  }
+  if (Object.keys(raw).length === 0) {
+    return null;
+  }
+  const num = (key: string): number | undefined => {
+    const v = raw[key];
+    if (v === undefined) {
+      return undefined;
+    }
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  return {
+    dayLimit: num("x-ratelimit-limit"),
+    dayRemaining: num("x-ratelimit-remaining"),
+    dayReset: num("x-ratelimit-reset"),
+    minuteLimit: num("api-ratelimit-limit"),
+    minuteRemaining: num("api-ratelimit-remaining"),
+    minuteReset: num("api-ratelimit-reset"),
+    raw,
+  };
+}
 import {
   classifyError,
   type CapabilityOption,
@@ -62,6 +127,7 @@ export class GoveeCloudClient {
   private readonly apiKey: string;
   private readonly log: ioBroker.Logger;
   private readonly httpsRequestImpl: HttpsRequestFn;
+  private lastRateLimit: GoveeRateLimit | null = null;
   /**
    * True if a previous getDevices call returned an empty array — the first
    * empty result emits an info log so the user has a starting point for
@@ -73,7 +139,8 @@ export class GoveeCloudClient {
    * response. Optional; the adapter wires it to a DiagnosticsCollector
    * for the diagnostics report.
    */
-  private onResponse: ((deviceId: string, endpoint: string, body: unknown) => void) | null = null;
+  private onResponse:
+    ((deviceId: string, endpoint: string, body: unknown, rateLimit?: GoveeRateLimit | null) => void) | null = null;
 
   /**
    * Last error category for getFailureReason() — set on every HTTP error in
@@ -122,8 +189,19 @@ export class GoveeCloudClient {
    *
    * @param cb Callback receiving (deviceId, endpoint, body)
    */
-  setResponseHook(cb: ((deviceId: string, endpoint: string, body: unknown) => void) | null): void {
+  setResponseHook(
+    cb: ((deviceId: string, endpoint: string, body: unknown, rateLimit?: GoveeRateLimit | null) => void) | null,
+  ): void {
     this.onResponse = cb;
+  }
+
+  /**
+   * The newest set of rate-limit headers Govee sent, or null before the first
+   * answer that carried any. The diagnostics report shows it; that is the
+   * measurement the daily numbers of the budget wait for (see CLOUD_LIMITS).
+   */
+  getLastRateLimit(): GoveeRateLimit | null {
+    return this.lastRateLimit;
   }
 
   /** Fetch all devices with their capabilities */
@@ -140,7 +218,7 @@ export class GoveeCloudClient {
     if (this.onResponse) {
       for (const cd of devices) {
         if (cd && typeof cd.device === "string" && cd.device) {
-          this.onResponse(cd.device, "/router/api/v1/user/devices", cd);
+          this.onResponse(cd.device, "/router/api/v1/user/devices", cd, this.lastRateLimit);
         }
       }
     }
@@ -168,7 +246,7 @@ export class GoveeCloudClient {
       requestId: nextRequestId("state"),
       payload: { sku, device },
     });
-    this.onResponse?.(device, "/router/api/v1/device/state", resp);
+    this.onResponse?.(device, "/router/api/v1/device/state", resp, this.lastRateLimit);
     if (resp === null) {
       // HTTP 200 without a body — the http client's word for "nothing came".
       return [];
@@ -227,7 +305,12 @@ export class GoveeCloudClient {
       message?: string;
       capability?: { state?: { status?: string; errorCode?: number; errorMsg?: string } };
     }>("POST", "/router/api/v1/device/control", reqBody);
-    this.onResponse?.(device, "/router/api/v1/device/control", { request: reqBody.payload.capability, response: resp });
+    this.onResponse?.(
+      device,
+      "/router/api/v1/device/control",
+      { request: reqBody.payload.capability, response: resp },
+      this.lastRateLimit,
+    );
     // Govee returns 200 with a payload-level `code`/`msg` on logical failures
     // (capability not allowed, wrong value shape, device offline as seen by
     // Cloud). The field is `msg` — reading `message` dropped the only
@@ -274,7 +357,7 @@ export class GoveeCloudClient {
       requestId: nextRequestId("scenes"),
       payload: { sku, device },
     });
-    this.onResponse?.(device, "/router/api/v1/device/scenes", resp);
+    this.onResponse?.(device, "/router/api/v1/device/scenes", resp, this.lastRateLimit);
 
     const lightScenes: CloudScene[] = [];
     const diyScenes: CloudScene[] = [];
@@ -312,7 +395,7 @@ export class GoveeCloudClient {
       requestId: nextRequestId("diy"),
       payload: { sku, device },
     });
-    this.onResponse?.(device, "/router/api/v1/device/diy-scenes", resp);
+    this.onResponse?.(device, "/router/api/v1/device/diy-scenes", resp, this.lastRateLimit);
 
     const scenes: CloudScene[] = [];
     const caps = Array.isArray(resp?.payload?.capabilities) ? resp.payload.capabilities : [];
@@ -335,6 +418,27 @@ export class GoveeCloudClient {
    * @param path API endpoint path
    * @param body Optional request body
    */
+  /**
+   * Read Govee's rate-limit headers off one answer and keep the newest set.
+   * The v1 docs name `X-RateLimit-*` (day) and `API-RateLimit-*` (minute);
+   * every header whose name mentions the rate limit is kept verbatim as well,
+   * so a renamed header on v2 still reaches the report.
+   *
+   * @param path The endpoint the answer belongs to
+   * @param headers The answer's headers
+   */
+  private noteRateLimit(path: string, headers: Record<string, string | string[] | undefined>): void {
+    const info = readRateLimitHeaders(headers);
+    if (!info) {
+      return;
+    }
+    const first = this.lastRateLimit === null;
+    this.lastRateLimit = { ...info, endpoint: path, at: Date.now() };
+    if (first) {
+      this.log.debug(`Cloud API rate-limit headers (first seen): ${JSON.stringify(info.raw)}`);
+    }
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T | null> {
     this.log.debug(`Cloud API: ${method} ${path} auth=apiKey`);
     try {
@@ -347,6 +451,7 @@ export class GoveeCloudClient {
       if (result.fallback) {
         this.log.debug(`Cloud API: ${method} ${path}: ${formatFallback(result)}`);
       }
+      this.noteRateLimit(path, result.headers ?? {});
       // Reset the failure category on success — getFailureReason() then returns
       // null until the next error.
       this.lastErrorCategory = null;
@@ -356,6 +461,11 @@ export class GoveeCloudClient {
       // err.message, and HttpError("Too many requests", 429, …) has no "429"
       // or "Rate limit" marker in the text. Without this branch 429 lands as
       // UNKNOWN and getFailureReason() returns the wrong ready hint.
+      if (err instanceof HttpError) {
+        // A rejection carries headers too — a 429 is the one answer whose
+        // rate-limit headers matter most.
+        this.noteRateLimit(path, err.headers);
+      }
       if (err instanceof HttpError && err.statusCode === 429) {
         this.lastErrorCategory = "RATE_LIMIT";
         const retryAfter = String(err.headers["retry-after"] ?? "unknown");

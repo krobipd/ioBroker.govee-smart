@@ -184,6 +184,21 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     await stub.stop();
   });
 
+  it("carries the response headers on the envelope — Govee's rate-limit headers were never seen because they were dropped here (2.39.0)", async () => {
+    stub.queue.push({
+      statusCode: 200,
+      body: "{}",
+      headers: { "X-RateLimit-Limit": "10000", "API-RateLimit-Remaining": "9" },
+    });
+    const result = await httpRequestPlain<Record<string, never>>({
+      method: "GET",
+      url: `http://127.0.0.1:${stub.port}/foo`,
+      headers: {},
+    });
+    expect(result.headers?.["x-ratelimit-limit"]).toBe("10000");
+    expect(result.headers?.["api-ratelimit-remaining"]).toBe("9");
+  });
+
   it("parses 200 JSON response into HttpResult envelope", async () => {
     stub.queue.push({ statusCode: 200, body: JSON.stringify({ hello: "world" }) });
     const result = await httpRequestPlain<{ hello: string }>({

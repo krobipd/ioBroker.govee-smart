@@ -160,6 +160,77 @@ describe("GoveeCloudClient", () => {
     });
   });
 
+  describe("Govee's rate-limit headers (2.39.0, measurement for the daily numbers)", () => {
+    // The daily limits in the adapter (9,000 / 90 per appliance) come from the
+    // v1 PDF; the v2 page names none. Whether v2 sends the rate-limit headers
+    // the v1 docs describe — and with which numbers — no export had ever
+    // shown, because the client dropped them. Now every answer's headers are
+    // read, the newest set is kept, and the per-device history carries them.
+    const withHeaders = (headers: Record<string, string>): HttpResult<unknown> => ({
+      value: { data: [] },
+      statusCode: 200,
+      headers,
+    });
+
+    it("reads day and minute headers case-insensitively and remembers the newest set", async () => {
+      const fake = makeFakeHttps(() =>
+        withHeaders({
+          "x-ratelimit-limit": "10000",
+          "x-ratelimit-remaining": "9876",
+          "x-ratelimit-reset": "1790000000",
+          "API-RateLimit-Limit": "10",
+          "API-RateLimit-Remaining": "7",
+          "API-RateLimit-Reset": "1789999960",
+        }),
+      );
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      expect(client.getLastRateLimit()).toBeNull();
+      await client.getDevices();
+      expect(client.getLastRateLimit()).toMatchObject({
+        endpoint: "/router/api/v1/user/devices",
+        dayLimit: 10000,
+        dayRemaining: 9876,
+        dayReset: 1790000000,
+        minuteLimit: 10,
+        minuteRemaining: 7,
+        minuteReset: 1789999960,
+      });
+    });
+
+    it("keeps every header whose name mentions the rate limit verbatim — the measurement must not depend on the v1 names", async () => {
+      const fake = makeFakeHttps(() =>
+        withHeaders({ "x-govee-ratelimit-device": "30", "content-type": "application/json" }),
+      );
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      await client.getDevices();
+      expect(client.getLastRateLimit()?.raw).toEqual({ "x-govee-ratelimit-device": "30" });
+      expect(client.getLastRateLimit()?.dayLimit).toBeUndefined();
+    });
+
+    it("an answer without such headers leaves the last set untouched and records none", async () => {
+      const fake = makeFakeHttps(() => withHeaders({ "content-type": "application/json" }));
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      await client.getDevices();
+      expect(client.getLastRateLimit()).toBeNull();
+    });
+
+    it("hands the headers of THAT answer to the response hook", async () => {
+      const fake = makeFakeHttps(() => ({
+        value: H7127_STATE_ENVELOPE,
+        statusCode: 200,
+        headers: { "API-RateLimit-Remaining": "29" },
+      }));
+      const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
+      const seen: unknown[] = [];
+      client.setResponseHook((_d, _e, _b, rateLimit) => {
+        seen.push(rateLimit);
+      });
+      await client.getDeviceState("H7127", "18:A9:CC:8D:A2:A1:9A:E4");
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toMatchObject({ minuteRemaining: 29 });
+    });
+  });
+
   describe("getDevices", () => {
     it("should return the data array on success", async () => {
       const fake = makeFakeHttps(() => ({ data: [{ sku: "H6160", device: "AABBCC", deviceName: "Test" }] }));
