@@ -103,6 +103,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
 - Fixed: A scene list that shrank no longer leaves withdrawn scenes in the dropdown
 - Fixed: The diagnostics report no longer lists a reachability refresh for appliances, which never get one
+- New: 28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles, a composter and the gateways that carry battery sensors
 - New: H1771 Table Lamp reported working by a user
 
 ### 2.38.3 (2026-09-17) — stable
