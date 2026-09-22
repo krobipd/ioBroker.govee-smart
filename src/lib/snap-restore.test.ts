@@ -53,7 +53,7 @@ function makeHost(opts: { initialSnapshots?: LocalSnapshot[]; initialState?: Rec
     store,
     namespace: "govee-smart.0",
     devicePrefix: () => "devices.h6160_dead",
-    getState: id => Promise.resolve(states.get(id) ?? null),
+    getState: id => Promise.resolve(structuredClone(states.get(id) ?? null)),
     sendCommand: (_dev, command, value) => {
       commands.push({ command, value });
       return Promise.resolve();

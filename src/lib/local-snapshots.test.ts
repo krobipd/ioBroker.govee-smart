@@ -48,7 +48,7 @@ function createMockAdapter(namespace = "govee-smart.0"): {
         return Promise.resolve({ rows });
       },
       getObjectAsync(id) {
-        return Promise.resolve(objects.get(rel(id)) ?? null);
+        return Promise.resolve(structuredClone(objects.get(rel(id)) ?? null));
       },
       extendObject(id, obj) {
         extendCalls.push({ id, obj });

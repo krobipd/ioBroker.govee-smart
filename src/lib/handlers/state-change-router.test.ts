@@ -136,7 +136,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       acks.push({ id, val: (state as { val: unknown }).val });
       return Promise.resolve();
     },
-    getObjectAsync: id => Promise.resolve(objects.get(id) ?? null),
+    getObjectAsync: id => Promise.resolve(structuredClone(objects.get(id) ?? null)),
     loadCloudStates: () => {
       loadCloudStatesCalls.push(1);
       return Promise.resolve();

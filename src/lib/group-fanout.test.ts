@@ -112,7 +112,7 @@ function makeHost(opts: {
         ? `groups.basegroup_${device.deviceId}`
         : `devices.${device.sku.toLowerCase()}_${device.deviceId.replace(/:/g, "").slice(-4).toLowerCase()}`,
     stateToCommand: suffix => stateToCommandMap[suffix],
-    getObject: id => Promise.resolve(objects.get(id) ?? null),
+    getObject: id => Promise.resolve(structuredClone(objects.get(id) ?? null)),
     sendMusicCommand: (device, devicePrefix, stateSuffix, value) => {
       musicCalls.push({ device: device.deviceId, prefix: devicePrefix, suffix: stateSuffix, value });
       return Promise.resolve(opts.musicResult ? opts.musicResult(device) : true);

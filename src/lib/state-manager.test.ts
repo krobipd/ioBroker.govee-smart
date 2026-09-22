@@ -138,11 +138,11 @@ function createMockAdapter(): {
     },
     getStateAsync: (id: string) => {
       calls.push({ method: "getStateAsync", args: [id] });
-      return Promise.resolve(states.get(id) ?? null);
+      return Promise.resolve(structuredClone(states.get(id) ?? null));
     },
     getObjectAsync: (id: string) => {
       calls.push({ method: "getObjectAsync", args: [id] });
-      return Promise.resolve(objects.get(id) ?? null);
+      return Promise.resolve(structuredClone(objects.get(id) ?? null));
     },
     delObjectAsync: (id: string, opts?: Record<string, unknown>) => {
       calls.push({ method: "delObjectAsync", args: opts === undefined ? [id] : [id, opts] });

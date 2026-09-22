@@ -94,7 +94,7 @@ vi.mock("@iobroker/adapter-core", () => {
       return Promise.resolve();
     });
     public getStateAsync = vi.fn((id: string) =>
-      Promise.resolve(this.states.get(id.replace(`${this.namespace}.`, "")) ?? null),
+      Promise.resolve(structuredClone(this.states.get(id.replace(`${this.namespace}.`, "")) ?? null)),
     );
     public getState = this.getStateAsync;
     public extendObject = vi.fn((id: string, obj: Record<string, unknown>) => {
@@ -118,7 +118,7 @@ vi.mock("@iobroker/adapter-core", () => {
       return Promise.resolve();
     });
     public getObjectAsync = vi.fn((id: string) =>
-      Promise.resolve(this.objects.get(id.replace(`${this.namespace}.`, "")) ?? null),
+      Promise.resolve(structuredClone(this.objects.get(id.replace(`${this.namespace}.`, "")) ?? null)),
     );
     public delObjectAsync = vi.fn((id: string, opts?: { recursive?: boolean }) => {
       const key = id.replace(`${this.namespace}.`, "");
