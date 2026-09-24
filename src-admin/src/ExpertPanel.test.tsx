@@ -11,14 +11,16 @@ vi.mock("./useDeviceList", async importOriginal => ({
   makeDeviceListApi: () => mockList,
 }));
 
+const mockWizard = vi.hoisted(() => ({
+  start: vi.fn(),
+  yes: vi.fn(),
+  no: vi.fn(),
+  abort: vi.fn(),
+  apply: vi.fn(),
+}));
+
 vi.mock("./useWizardApi", () => ({
-  makeWizardApi: () => ({
-    start: vi.fn(),
-    yes: vi.fn(),
-    no: vi.fn(),
-    abort: vi.fn(),
-    apply: vi.fn(),
-  }),
+  makeWizardApi: () => mockWizard,
 }));
 
 vi.mock("./useDiagnosticsApi", async importOriginal => ({
@@ -63,6 +65,20 @@ describe("ExpertPanel", () => {
     fireEvent.click(screen.getByTestId("expert-tool-diagnostics"));
     await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
     expect(screen.queryByTestId("wiz-start")).toBeNull();
+  });
+
+  it("switching away from a running measurement aborts it (audit M13)", async () => {
+    mockWizard.start.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
+      active: true,
+    });
+    mockWizard.abort.mockResolvedValue({ aborted: true });
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    await screen.findByTestId("wiz-finish");
+
+    fireEvent.click(screen.getByTestId("expert-tool-diagnostics"));
+    await waitFor(() => expect(mockWizard.abort).toHaveBeenCalledTimes(1));
   });
 
   it("re-reads the device list on every switch — reachability is live state", async () => {

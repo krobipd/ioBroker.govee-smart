@@ -3,7 +3,8 @@ import React from "react";
 import { Alert, Box, Button, CircularProgress, Collapse, Divider, Stack, TextField, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
-import { makeConnectionApi, type AuthStatus } from "./useConnectionApi";
+import { errMessage } from "../../src/lib/err-message";
+import { makeConnectionApi, type AuthResponse, type AuthStatus } from "./useConnectionApi";
 
 /**
  * Socket seam the panel needs: the `sendTo` round-trip (login test / code
@@ -141,6 +142,31 @@ function severityFor(status: AuthStatus): "success" | "info" | "warning" | "erro
   }
 }
 
+/** Every case the backend answers with — anything else is not a status. */
+const AUTH_STATUSES: ReadonlySet<string> = new Set<AuthStatus>([
+  "ok",
+  "verifyRequired",
+  "codeInvalid",
+  "passwordRejected",
+  "emailNotRegistered",
+  "rateLimited",
+  "accountLocked",
+  "loginFailed",
+  "mqttNotUp",
+  "codeSent",
+  "codeRejected",
+  "needCredentials",
+  "throttled",
+  "unknownAction",
+]);
+
+/**
+ * The cases whose answer carries the reason — Govee's own text, the seconds
+ * to wait. The card shows the adapter's text for them, its own fixed text
+ * would drop exactly that (audit E11).
+ */
+const REASONED: ReadonlySet<AuthStatus> = new Set<AuthStatus>(["loginFailed", "codeRejected", "throttled"]);
+
 /**
  * Whether an outcome means the 2FA code field should be shown.
  *
@@ -243,8 +269,25 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
 
   const t = (key: string, ...args: (string | number)[]): string => I18n.t(key, ...args);
 
-  const showFeedback = (status: AuthStatus): void => {
-    setFeedback({ status, text: t(`gsw_conn_st_${status}`) });
+  const showError = (reason: string): void => {
+    setFeedback({ status: "loginFailed", text: t("gsw_conn_err", reason) });
+  };
+
+  /**
+   * Show what the adapter answered. An answer without a known status — the
+   * `{ error }` of an adapter that is still starting, a foreign reply — shows
+   * its reason instead of the raw key `gsw_conn_st_undefined` (audit E11).
+   *
+   * @param res The adapter's answer
+   */
+  const showFeedback = (res: Partial<AuthResponse> & { error?: unknown }): void => {
+    const status = res?.status;
+    if (typeof status !== "string" || !AUTH_STATUSES.has(status)) {
+      showError(typeof res?.error === "string" && res.error ? res.error : I18n.t("gsw_conn_st_loginFailed"));
+      return;
+    }
+    const reason = REASONED.has(status) && typeof res.result === "string" && res.result ? res.result : "";
+    setFeedback({ status, text: reason || t(`gsw_conn_st_${status}`) });
     if (wantsCode(status)) {
       setCodeOpen(true);
     }
@@ -253,10 +296,9 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
   const runLogin = async (): Promise<void> => {
     setBusy("login");
     try {
-      const res = await api.testLogin({ email: draft.email, password: draft.password, code: draft.code });
-      showFeedback(res.status);
-    } catch {
-      showFeedback("loginFailed");
+      showFeedback(await api.testLogin({ email: draft.email, password: draft.password, code: draft.code }));
+    } catch (e) {
+      showError(errMessage(e));
     } finally {
       setBusy("");
     }
@@ -265,10 +307,9 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
   const runRequestCode = async (): Promise<void> => {
     setBusy("code");
     try {
-      const res = await api.requestCode({ email: draft.email, password: draft.password });
-      showFeedback(res.status);
-    } catch {
-      showFeedback("loginFailed");
+      showFeedback(await api.requestCode({ email: draft.email, password: draft.password }));
+    } catch (e) {
+      showError(errMessage(e));
     } finally {
       setBusy("");
     }

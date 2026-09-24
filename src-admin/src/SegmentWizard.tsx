@@ -3,6 +3,7 @@ import React from "react";
 import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
+import { errMessage } from "../../src/lib/err-message";
 import { DeviceListStatus, useDeviceList } from "./DeviceListLoader";
 import { SegmentGrid } from "./SegmentGrid";
 import { segmentCapable } from "./useDeviceList";
@@ -73,10 +74,27 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
   const [reviewConfirmed, setReviewConfirmed] = React.useState<number[]>([]);
   const [appliedCount, setAppliedCount] = React.useState(0);
   const [error, setError] = React.useState("");
+  // Whether a backend session is open (started, not yet applied/aborted). A
+  // card that goes away mid-measurement — tab switch, dialog closed — aborts
+  // it, or the backend held the global session lock and a half-lit strip
+  // until its 5-minute idle timeout (audit M13).
+  const sessionOpenRef = React.useRef(false);
 
   React.useEffect(() => {
     setDevice(devices.length ? devices[0].value : "");
   }, [devices]);
+
+  React.useEffect(
+    () => () => {
+      if (sessionOpenRef.current) {
+        sessionOpenRef.current = false;
+        void Promise.resolve()
+          .then(() => api.abort())
+          .catch(() => undefined);
+      }
+    },
+    [api],
+  );
 
   const resetToSelect = (): void => {
     setSnapshot(null);
@@ -93,16 +111,19 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
    */
   const reduce = (res: WizardResponse): boolean => {
     if (res.error) {
+      sessionOpenRef.current = false;
       setError(res.error);
       resetToSelect();
       return true;
     }
     if (res.aborted) {
+      sessionOpenRef.current = false;
       setError("");
       resetToSelect();
       return true;
     }
     if (res.applied || res.done) {
+      sessionOpenRef.current = false;
       // `applied` = review-corrected apply; `done` = backend auto-finalize at the
       // protocol limit (already applied + closed — no editable review).
       setAppliedCount(res.segmentCount ?? 0);
@@ -117,19 +138,40 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     return false;
   };
 
+  /**
+   * A step whose sendTo rejects (adapter stopped, socket gone) shows the error
+   * screen instead of leaving the card hanging on its last screen (audit N7).
+   *
+   * @param e What the step threw
+   */
+  const fail = (e: unknown): void => {
+    sessionOpenRef.current = false;
+    setError(errMessage(e));
+    resetToSelect();
+  };
+
   const onStart = async (): Promise<void> => {
     if (!device) {
       return;
     }
     setError("");
-    const res = await api.start(device);
-    if (!reduce(res)) {
-      setScreen("measure");
+    try {
+      const res = await api.start(device);
+      if (!reduce(res)) {
+        sessionOpenRef.current = true;
+        setScreen("measure");
+      }
+    } catch (e) {
+      fail(e);
     }
   };
 
   const onAnswer = async (lit: boolean): Promise<void> => {
-    reduce(await (lit ? api.yes() : api.no()));
+    try {
+      reduce(await (lit ? api.yes() : api.no()));
+    } catch (e) {
+      fail(e);
+    }
   };
 
   const onFinish = (): void => {
@@ -153,20 +195,35 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     if (!reviewConfirmed.length) {
       return;
     }
-    reduce(await api.apply(device, reviewConfirmed));
+    try {
+      reduce(await api.apply(device, reviewConfirmed));
+    } catch (e) {
+      fail(e);
+    }
   };
 
   const onRemeasure = async (): Promise<void> => {
-    await api.abort();
-    const res = await api.start(device);
-    if (!reduce(res)) {
-      setScreen("measure");
+    try {
+      await api.abort();
+      sessionOpenRef.current = false;
+      const res = await api.start(device);
+      if (!reduce(res)) {
+        sessionOpenRef.current = true;
+        setScreen("measure");
+      }
+    } catch (e) {
+      fail(e);
     }
   };
 
   const onCancel = async (): Promise<void> => {
-    await api.abort();
-    resetToSelect();
+    try {
+      await api.abort();
+      sessionOpenRef.current = false;
+      resetToSelect();
+    } catch (e) {
+      fail(e);
+    }
   };
 
   const onClose = (): void => {

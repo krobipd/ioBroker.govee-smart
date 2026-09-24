@@ -42,8 +42,8 @@ beforeEach(() => {
   mockApi.abort.mockResolvedValue({ aborted: true, done: true });
 });
 
-function renderWizard(): void {
-  render(
+function renderWizard(): ReturnType<typeof render> {
+  return render(
     <SegmentWizard
       socket={{} as never}
       namespace="govee-smart.0"
@@ -150,6 +150,60 @@ describe("SegmentWizard", () => {
     fireEvent.click(await screen.findByTestId("wiz-start"));
     await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/already active/i));
     await screen.findByTestId("wiz-start");
+  });
+
+  it("a card unmounted mid-measurement aborts the backend session once (audit M13)", async () => {
+    mockApi.start.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
+      active: true,
+    });
+    const view = renderWizard();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    await screen.findByTestId("wiz-finish");
+    view.unmount();
+    await waitFor(() => expect(mockApi.abort).toHaveBeenCalledTimes(1));
+  });
+
+  it("a card unmounted without a session aborts nothing", async () => {
+    const view = renderWizard();
+    await screen.findByTestId("wiz-start");
+    view.unmount();
+    await new Promise(r => setTimeout(r, 0));
+    expect(mockApi.abort).not.toHaveBeenCalled();
+  });
+
+  it("a card unmounted after the session was cancelled aborts nothing more", async () => {
+    mockApi.start.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
+      active: true,
+    });
+    const view = renderWizard();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    fireEvent.click(await screen.findByTestId("wiz-cancel"));
+    await screen.findByTestId("wiz-start");
+    view.unmount();
+    await new Promise(r => setTimeout(r, 0));
+    expect(mockApi.abort).toHaveBeenCalledTimes(1);
+  });
+
+  it("a step whose sendTo rejects shows the error instead of hanging (audit N7)", async () => {
+    mockApi.start.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
+      active: true,
+    });
+    mockApi.yes.mockRejectedValue(new Error("socket closed"));
+    renderWizard();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    fireEvent.click(await screen.findByTestId("wiz-lit"));
+    await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/socket closed/));
+    await screen.findByTestId("wiz-start");
+  });
+
+  it("a start that rejects shows the error on the select screen (audit N7)", async () => {
+    mockApi.start.mockRejectedValue(new Error("adapter stopped"));
+    renderWizard();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/adapter stopped/));
   });
 
   it("Finished is disabled until at least one segment is answered", async () => {

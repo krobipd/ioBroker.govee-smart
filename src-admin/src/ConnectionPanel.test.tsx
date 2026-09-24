@@ -132,6 +132,56 @@ describe("ConnectionPanel", () => {
     expect(await screen.findByText(I18n.t("gsw_conn_st_ok"))).toBeTruthy();
   });
 
+  it("a failed login shows the adapter's text with Govee's reason, not the fixed one (audit E11)", async () => {
+    renderPanel({ auth: { result: "Login failed: account frozen", status: "loginFailed" } });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText("Login failed: account frozen")).toBeTruthy();
+    expect(screen.queryByText(I18n.t("gsw_conn_st_loginFailed"))).toBeNull();
+  });
+
+  it("a case without a reason keeps the card's own text", async () => {
+    renderPanel({ auth: { result: "anything the adapter says", status: "passwordRejected" } });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_st_passwordRejected"))).toBeTruthy();
+  });
+
+  it("an answer without a status shows its error, never the raw key (audit E11)", async () => {
+    renderPanel({ auth: { error: "Adapter is starting" } as never });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_err", "Adapter is starting"))).toBeTruthy();
+    expect(screen.queryByText(/gsw_conn_st_/)).toBeNull();
+  });
+
+  it("a sendTo that rejects shows the reason (audit E11)", async () => {
+    const { socket } = fakeSocket({});
+    (socket as { sendTo: unknown }).sendTo = () => Promise.reject(new Error("timeout after 20 s"));
+    render(
+      <ConnectionPanel
+        socket={socket}
+        namespace="govee-smart.0"
+        values={{ apiKey: "", email: "user@example.com", password: "secret", code: "" }}
+        onChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_err", "timeout after 20 s"))).toBeTruthy();
+  });
+
+  it("a code request whose sendTo rejects shows the reason too (audit E11)", async () => {
+    const { socket } = fakeSocket({ states: { "govee-smart.0.info.verificationPending": true } });
+    (socket as { sendTo: unknown }).sendTo = () => Promise.reject(new Error("socket closed"));
+    render(
+      <ConnectionPanel
+        socket={socket}
+        namespace="govee-smart.0"
+        values={{ apiKey: "", email: "user@example.com", password: "secret", code: "" }}
+        onChange={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: I18n.t("gsw_conn_request_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_err", "socket closed"))).toBeTruthy();
+  });
+
   it("a verifyRequired result opens the 2FA code field", async () => {
     renderPanel({ auth: { result: "needs code", status: "verifyRequired" } });
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
