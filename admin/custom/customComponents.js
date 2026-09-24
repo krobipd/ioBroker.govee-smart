@@ -1,1 +1,1 @@
-import{n as e,t}from"./assets/virtual_mf-REMOTE_ENTRY_ID___mfe_internal__ConfigCustomGoveeSegmentSet__customComponents_js-CCw_j_Hm.js";export{t as get,e as init};
+import{n as e,t}from"./assets/virtual_mf-REMOTE_ENTRY_ID___mfe_internal__ConfigCustomGoveeSegmentSet__customComponents_js-DZNsZXdi.js";export{t as get,e as init};
