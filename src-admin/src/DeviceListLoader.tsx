@@ -3,6 +3,7 @@ import React from "react";
 import { Alert, Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
+import { errMessage } from "../../src/lib/err-message";
 import { DeviceListError, makeDeviceListApi, type DeviceEntry, type DeviceListSocket } from "./useDeviceList";
 
 /**
@@ -59,7 +60,7 @@ export function useDeviceList(socket: unknown, namespace: string): DeviceListSta
         if (alive) {
           setState({
             status: "failed",
-            message: e instanceof DeviceListError && e.message ? e.message : I18n.t("gsw_listFailed"),
+            message: e instanceof DeviceListError && e.message ? errMessage(e) : I18n.t("gsw_listFailed"),
           });
         }
       });

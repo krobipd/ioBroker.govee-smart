@@ -26,4 +26,13 @@ describe("deriveGoveeClientId", () => {
   it("returns a 32-char hex client id (no dashes — Govee's format)", () => {
     expect(deriveGoveeClientId("someone@example.com")).toMatch(/^[0-9a-f]{32}$/);
   });
+
+  it("keeps the exact id every installation already registered with Govee", () => {
+    // Govee binds the one-time account verification (login code 454) to this
+    // id. Any other value — even a correct UUIDv5 of a different namespace —
+    // makes every user re-verify by email. Golden values of UUIDv5(seed, NIL),
+    // cross-checked against the `uuid` package and Python's uuid.uuid5.
+    expect(deriveGoveeClientId("someone@example.com")).toBe("59fd741edc7e5f98aac49ea17ad61950");
+    expect(deriveGoveeClientId(undefined)).toBe("185ab25f93035db58b9a8ffc40fe14e7");
+  });
 });

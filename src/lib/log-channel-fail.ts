@@ -88,7 +88,7 @@ export function formatChannelFail(
     case "TIMEOUT": {
       // Timeout-Errors carry their own URL+ms in the message (since v2.10.1
       // http-client.ts:170 enriches the message). Use that directly.
-      const detail = err instanceof Error ? err.message : "Timeout";
+      const detail = err instanceof Error ? errMessage(err) : "Timeout";
       return `${channel}: ${detail}${retrySuffix}`;
     }
     case "NETWORK": {
