@@ -48,6 +48,7 @@ const KNOWN_QUIRK_FIELDS = new Set([
   "segmentCount",
   "statusCmdVersion",
   "platformTempUnit",
+  "ignoredCloudCapabilities",
 ]);
 
 /**
@@ -182,6 +183,20 @@ function validate(devicesJsonPath: string): Issue[] {
         }
         if (q.platformTempUnit !== undefined && q.platformTempUnit !== "F") {
           issues.push({ sku, msg: `'platformTempUnit' must be "F" (got ${JSON.stringify(q.platformTempUnit)})` });
+        }
+        if (q.ignoredCloudCapabilities !== undefined) {
+          const list = q.ignoredCloudCapabilities;
+          if (
+            !Array.isArray(list) ||
+            list.length === 0 ||
+            list.some(i => typeof i !== "string" || i === "") ||
+            new Set(list).size !== list.length
+          ) {
+            issues.push({
+              sku,
+              msg: `'ignoredCloudCapabilities' must be a non-empty list of distinct capability instances (got ${JSON.stringify(list)})`,
+            });
+          }
         }
         if (q.transportOverrides !== undefined) {
           const t = q.transportOverrides;

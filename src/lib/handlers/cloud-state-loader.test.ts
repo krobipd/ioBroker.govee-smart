@@ -433,6 +433,48 @@ describe("a model whose platform API reports °F (catalog quirk platformTempUnit
   });
 });
 
+describe("a reading of a capability the catalog marks as ignored (quirk ignoredCloudCapabilities, audit C-O3)", () => {
+  // homebridge-govee lib/utils/device-capabilities.js: on the H8120 "the
+  // OpenAPI colorRgb write is accepted but does nothing on this model" — the
+  // datapoint is not offered, so its reading has nowhere to go.
+  it("is not written", async () => {
+    const iceMaker = createTestDevice({
+      sku: "H8120",
+      deviceId: "AA:BB:CC:DD:EE:FF:81:20",
+      type: "devices.types.ice_maker",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+      capabilities: [
+        { type: "devices.capabilities.color_setting", instance: "colorRgb", parameters: {} },
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: {} },
+      ] as never,
+    });
+    const registry = new DeviceRegistry({
+      data: {
+        devices: {
+          H8120: {
+            name: "Ice Maker",
+            type: "ice_maker",
+            status: "seed",
+            quirks: { ignoredCloudCapabilities: ["colorRgb"] },
+          },
+        },
+      },
+      experimental: true,
+    });
+    const rig = makeRig([iceMaker], registry);
+    rig.setDeviceState(() =>
+      Promise.resolve([
+        { type: "devices.capabilities.color_setting", instance: "colorRgb", state: { value: 16711680 } },
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+      ]),
+    );
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.some(w => /color/i.test(w.id))).toBe(false);
+    expect(rig.writes.some(w => w.id.endsWith(".power"))).toBe(true);
+  });
+});
+
 describe("an account-list reading carries its own measurement time (audit D9)", () => {
   // Issue #18 (v2.15.0 export, 2026-06-08): the H5074's list entry reported
   // tem 2120 / hum 4860 with lastTime 1770838320000 — four months old, written

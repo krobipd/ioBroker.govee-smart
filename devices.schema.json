@@ -103,6 +103,13 @@
           "enum": ["F"],
           "description": "Unit of the OpenAPI /device/state sensorTemperature — 'F' converts it to °C. Models per govee2mqtt quirks.rs (with_platform_temperature_sensor_units). The account list's reading is unaffected (hundredths of °C)."
         },
+        "ignoredCloudCapabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "uniqueItems": true,
+          "description": "Cloud capability instances Govee acknowledges but the device never acts on — no datapoint is offered for them (homebridge-govee constants.js / device-capabilities.js)."
+        },
         "brokenPlatformApi": {
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."

@@ -1870,6 +1870,17 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
 }
 
 /**
+ * The capability instances the catalog marks as acknowledged-but-ignored for
+ * a SKU (quirk `ignoredCloudCapabilities`) — empty when there are none.
+ *
+ * @param sku Govee SKU
+ * @param registry Device catalog of this instance
+ */
+export function ignoredCloudCapabilities(sku: string, registry: DeviceRegistry): ReadonlySet<string> {
+  return new Set(registry.getQuirks(sku)?.ignoredCloudCapabilities ?? []);
+}
+
+/**
  * Build Cloud-owned state definitions for a device — everything that needs
  * Cloud capabilities or local synthetic decoration. Excludes LAN-default IDs
  * (the LAN phase owns those). Returns intersection state for BaseGroup
@@ -1914,9 +1925,15 @@ export function buildCloudStateDefs(
   // Local-first stays, local-only does not. Sensors carry no such caps; groups
   // returned earlier. LAN lights are unchanged.
   const noLanPhase = !device.lanIp;
+  // Capabilities Govee acknowledges but the device ignores get no datapoint
+  // (catalog quirk ignoredCloudCapabilities, audit C-O3).
+  const ignored = ignoredCloudCapabilities(device.sku, registry);
   const stateDefs: StateDefinition[] = skipCapabilities
     ? []
-    : mapCapabilities(device.capabilities, log).filter(d => noLanPhase || !LAN_STATE_IDS.has(d.id));
+    : mapCapabilities(
+        device.capabilities.filter(c => !ignored.has(c.instance)),
+        log,
+      ).filter(d => noLanPhase || !LAN_STATE_IDS.has(d.id));
 
   if (skipCapabilities) {
     log.debug(`${device.sku}: brokenPlatformApi quirk active — skipping capability-derived states + dropdowns`);

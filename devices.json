@@ -1,5 +1,5 @@
 {
-  "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi, transportOverrides).",
+  "_comment": "Govee device support catalog. See Wiki for the rendered list. Schema: devices.schema.json. Status: verified (multiple confirmed reports), reported (1 user with diagnostics), seed (imported from external source, untested). Quirks: only fields actually wired in code (colorTempRange, brokenPlatformApi, transportOverrides, segmentCount, statusCmdVersion, platformTempUnit, ignoredCloudCapabilities).",
   "devices": {
     "B5178": {
       "name": "Thermo-Hygrometer",
@@ -59,7 +59,10 @@
       "name": "18-Inch Ceiling Light Pro",
       "type": "light",
       "status": "seed",
-      "since": "2.33.0"
+      "since": "2.33.0",
+      "quirks": {
+        "ignoredCloudCapabilities": ["mainLightToggle", "backgroundLightToggle"]
+      }
     },
     "H1252": {
       "name": "Ceiling Light",
@@ -231,12 +234,6 @@
     },
     "H2A41": {
       "name": "TV Backlight 3",
-      "type": "light",
-      "status": "seed",
-      "since": "2.33.0"
-    },
-    "H3001": {
-      "name": "bluetooth-only solar string lights",
       "type": "light",
       "status": "seed",
       "since": "2.33.0"
@@ -655,12 +652,6 @@
         "platformTempUnit": "F"
       }
     },
-    "H5183": {
-      "name": "Thermo-Hygrometer",
-      "type": "thermometer",
-      "status": "seed",
-      "since": "2.33.0"
-    },
     "H5190": {
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
@@ -714,6 +705,12 @@
       "type": "thermometer",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H5610": {
+      "name": "Meat Thermometer",
+      "type": "thermometer",
+      "status": "seed",
+      "since": "2.40.0"
     },
     "H5830": {
       "name": "Water Leak Detector",
@@ -3721,7 +3718,10 @@
       "name": "Ice Maker",
       "type": "ice_maker",
       "status": "seed",
-      "since": "2.33.0"
+      "since": "2.33.0",
+      "quirks": {
+        "ignoredCloudCapabilities": ["colorRgb"]
+      }
     },
     "H8121": {
       "name": "Ice Maker",

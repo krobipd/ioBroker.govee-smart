@@ -2911,3 +2911,52 @@ describe("the heater's auto stop is its own dropdown (audit C-O2)", () => {
     ]);
   });
 });
+
+describe("capabilities Govee acknowledges but the device ignores (catalog quirk ignoredCloudCapabilities, audit C-O3)", () => {
+  // homebridge-govee lib/utils/constants.js (#1333): the H1250 lists
+  // mainLightToggle + backgroundLightToggle, Govee answers "success", the
+  // device never acts. The toggle blocks are Govee's own toggle shape.
+  const toggle = (instance: string): CloudCapability => ({
+    type: "devices.capabilities.toggle",
+    instance,
+    parameters: {
+      dataType: "ENUM",
+      options: [
+        { name: "on", value: 1 },
+        { name: "off", value: 0 },
+      ],
+    },
+  });
+  const ceiling = (): GoveeDevice =>
+    createTestDevice({
+      sku: "H1250",
+      lanIp: undefined,
+      capabilities: [toggle("mainLightToggle"), toggle("backgroundLightToggle"), toggle("gradientToggle")],
+    });
+  const catalog = (experimental: boolean): DeviceRegistry =>
+    new DeviceRegistry({
+      data: {
+        devices: {
+          H1250: {
+            name: "18-Inch Ceiling Light Pro",
+            type: "light",
+            status: "seed",
+            quirks: { ignoredCloudCapabilities: ["mainLightToggle", "backgroundLightToggle"] },
+          },
+        },
+      } as never,
+      experimental,
+    });
+
+  it("offers no datapoint for an ignored capability, the others stay", () => {
+    const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(true)).map(d => d.id);
+    expect(ids).not.toContain("main_light_toggle");
+    expect(ids).not.toContain("background_light_toggle");
+    expect(ids).toContain("gradient_toggle");
+  });
+
+  it("a seed entry stays dormant without the experimental switch", () => {
+    const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(false)).map(d => d.id);
+    expect(ids).toContain("main_light_toggle");
+  });
+});

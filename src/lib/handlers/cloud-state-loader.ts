@@ -3,6 +3,7 @@ import {
   mapCloudStateValues,
   planCloudCapabilityWrites,
   platformReadingsToCelsius,
+  ignoredCloudCapabilities,
 } from "../capability-mapper";
 import type { DeviceRegistry } from "../device-registry";
 import type { DeviceManager } from "../device-manager";
@@ -124,10 +125,14 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         const writes: Promise<unknown>[] = [];
         // A model whose platform API speaks °F (catalog quirk, M18) — the
         // datapoint is °C.
+        // A capability the catalog marks as ignored by the device has no
+        // datapoint (C-O3) — its reading goes nowhere.
+        const ignored = ignoredCloudCapabilities(device.sku, adapter.deviceRegistry);
+        const kept = caps.filter(c => !ignored.has(c.instance));
         const readings =
           adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F"
-            ? platformReadingsToCelsius(caps)
-            : caps;
+            ? platformReadingsToCelsius(kept)
+            : kept;
         // One capability can carry two datapoints (work_mode → mode + level),
         // so the list is flattened first and the LAN-shadow rule below applies
         // per RESULT — same shape and same nesting level as before.

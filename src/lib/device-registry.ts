@@ -19,6 +19,7 @@ import * as path from "node:path";
  *  3. Map-Override: per-operation routing/behaviour map (transportOverrides)
  *  4. Number-Override: API reports a wrong scalar (segmentCount, statusCmdVersion)
  *  5. Unit-Override: API reports a value in another unit (platformTempUnit)
+ *  6. Capability-Ignore: API offers a capability the device never acts on (ignoredCloudCapabilities)
  */
 export interface DeviceQuirks {
   /** Override color-temperature range (Govee API often claims a flat 2000-9000K, real range is narrower). */
@@ -67,6 +68,16 @@ export interface DeviceQuirks {
    * °C whatever the app shows (#18).
    */
   platformTempUnit?: "F";
+  /**
+   * Cloud capability instances Govee lists and acknowledges with "success"
+   * that the device never acts on — no datapoint is offered for them, so a
+   * user is not left with a switch that does nothing. Sources: homebridge-govee
+   * `lib/utils/constants.js` (H1250 `mainLightToggle`/`backgroundLightToggle`,
+   * "its cloud answers {"status":"success"} to both, but the command never
+   * reaches the device", #1333) and `lib/utils/device-capabilities.js` (H8120:
+   * "the OpenAPI colorRgb write is accepted but does nothing on this model").
+   */
+  ignoredCloudCapabilities?: string[];
 }
 
 /**

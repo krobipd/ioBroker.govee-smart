@@ -331,6 +331,21 @@ describe("devices.json — platformTempUnit (2.40.0, audit M18)", () => {
   });
 });
 
+describe("devices.json — ignoredCloudCapabilities and the Bluetooth-only removal (2.40.0, audit C-O3, C15)", () => {
+  const file = path.resolve(__dirname, "..", "..", "devices.json");
+
+  it("marks exactly the capabilities homebridge-govee documents as acknowledged but ignored", () => {
+    const active = new DeviceRegistry({ filePath: file, experimental: true });
+    expect(active.getQuirks("H1250")?.ignoredCloudCapabilities).toEqual(["mainLightToggle", "backgroundLightToggle"]);
+    expect(active.getQuirks("H8120")?.ignoredCloudCapabilities).toEqual(["colorRgb"]);
+  });
+
+  it("no longer lists the Bluetooth-only H3001 — the catalog is for Wi-Fi products", () => {
+    const real = JSON.parse(fs.readFileSync(file, "utf-8")) as { devices: Record<string, unknown> };
+    expect(real.devices.H3001).toBeUndefined();
+  });
+});
+
 describe("isSeedAndDormant — the experimental-toggle nudge", () => {
   it("is true only for a seed entry while the experimental toggle is OFF", () => {
     const reg = new DeviceRegistry({ data: SAMPLE });
