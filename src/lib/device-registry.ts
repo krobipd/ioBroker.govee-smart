@@ -56,13 +56,15 @@ export interface DeviceQuirks {
    */
   statusCmdVersion?: 1 | 2;
   /**
-   * The unit the OpenAPI `/device/state` reports `sensorTemperature` in. Govee
-   * sends whatever unit the app is set to for these models (homebridge-govee
-   * `response-parser.js`: "in whatever unit the Govee app is set to"); `"F"`
-   * converts it to °C before it reaches the °C datapoint. The list follows
-   * govee2mqtt `src/service/quirks.rs` (`with_platform_temperature_sensor_units`,
-   * 15 models, read 2026-09-24). Only the `/device/state` reading — the account
-   * list's `tem` is hundredths of °C whatever the app shows (#18).
+   * The unit the OpenAPI `/device/state` reports `sensorTemperature` in; `"F"`
+   * converts it to °C before it reaches the °C datapoint. The model list is
+   * govee2mqtt's `src/service/quirks.rs` (`with_platform_temperature_sensor_units`,
+   * 15 models, read 2026-09-24) — govee2mqtt reads the platform reading as °F
+   * (`src/hass_mqtt/sensor.rs`). homebridge-govee reads it differently ("in
+   * whatever unit the Govee app is set to", `response-parser.js`) and decides per
+   * reading (setting, declared unit, comparison with the account list's °C).
+   * Only the `/device/state` reading — the account list's `tem` is hundredths of
+   * °C whatever the app shows (#18).
    */
   platformTempUnit?: "F";
 }
