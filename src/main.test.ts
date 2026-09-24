@@ -1168,10 +1168,31 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(f.lan.start).not.toHaveBeenCalled();
   });
 
+  it("settings no release reads any more are dropped once — the plaintext MQTT session of 2.1.x and pollInterval", async () => {
+    // js-controller never deletes a native key. The blanked session fields of an old
+    // installation and the poll interval of 0.9.x are nulled once; the write restarts us.
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
+    i.getForeignObjectAsync.mockResolvedValueOnce({
+      native: { bind: "0.0.0.0", port: 4002, pollInterval: 60, mqttBearerToken: "", mqttTokenExpiresAt: 0 },
+    });
+    i.extendForeignObjectAsync.mockClear();
+    f.lan.start.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
+      native: { pollInterval: null, mqttBearerToken: null, mqttTokenExpiresAt: null },
+    });
+    expect(f.lan.start).not.toHaveBeenCalled();
+  });
+
   it("an instance without the old key — or with the null the delete left behind — starts without a write", async () => {
     for (const native of [
       { bind: "0.0.0.0", port: 4002 },
       { bind: "192.168.1.9", port: 4002, networkInterface: null }, // the state after the one-time migration
+      { bind: "0.0.0.0", port: 4002, pollInterval: null, mqttBearerToken: null }, // after the drop
     ]) {
       const { adapter } = await setupReady();
       const i = internalOf(adapter);

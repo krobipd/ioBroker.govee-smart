@@ -108,9 +108,20 @@ export class GoveeAdapter extends utils.Adapter {
    * the update (fleet helper `native-key-migration`, listen-port standard 2026-09-15):
    * `networkInterface` → `bind` since 2.37.0; an empty legacy value becomes "0.0.0.0", the
    * form the admin's port-conflict check reads (it skips an instance whose `bind` is falsy).
+   * Dropped (nothing reads them any more): `pollInterval` (until 0.9.6) and the plaintext MQTT
+   * session of 2.1.0–2.1.2, which a cleanup of its own blanked until 2.40.0 — blanking left the
+   * keys in every installation, and next to a drop it would have written them back on every start.
    */
   private static readonly NATIVE_KEY_MIGRATIONS: NativeKeyMigration[] = [
     { from: "networkInterface", to: "bind", coerce: v => (typeof v === "string" && v.trim()) || "0.0.0.0" },
+    { drop: "pollInterval" },
+    { drop: "mqttBearerToken" },
+    { drop: "mqttIotEndpoint" },
+    { drop: "mqttP12Cert" },
+    { drop: "mqttP12Pass" },
+    { drop: "mqttAccountId" },
+    { drop: "mqttAccountTopic" },
+    { drop: "mqttTokenExpiresAt" },
   ];
   // ── Test seams ────────────────────────────────────────────────────────────
   // Network-facing collaborators are built through overridable factory fields
@@ -989,10 +1000,8 @@ export class GoveeAdapter extends utils.Adapter {
         // login). loadPersistedCreds migrates an older info.mqttCredentials
         // state into the file on first run; the v2.18.x meta object is
         // migrated + dropped earlier in onReady (migrateCredentialsMetaOnce).
-        //
-        // One-shot: clean up legacy v2.1.0/v2.1.1/v2.1.2 native fields
-        // that contained plaintext credentials. Best-effort.
-        await cloudCreds.cleanupLegacyMqttNativeOnce(this.handlerHost);
+        // The plaintext native fields of 2.1.0–2.1.2 are dropped by
+        // NATIVE_KEY_MIGRATIONS at the very start of onReady.
         const cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir, accountEmail);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);

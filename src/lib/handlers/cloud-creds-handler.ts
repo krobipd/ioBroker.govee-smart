@@ -286,38 +286,3 @@ export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dat
     await adapter.delObjectAsync("credentials").catch(() => undefined);
   }
 }
-
-/**
- * One-shot cleanup of legacy v2.1.0/v2.1.1/v2.1.2 plaintext credentials
- * sitting in `system.adapter.X.native`.
- *
- * Idempotent via dirty-check: if all legacy fields are already empty/zero,
- * returns immediately without side-effects.
- */
-export async function cleanupLegacyMqttNativeOnce(adapter: CloudCredsAdapter): Promise<void> {
-  try {
-    const obj = await adapter.getForeignObjectAsync(`system.adapter.${adapter.namespace}`);
-    const native = (obj?.native ?? {}) as Record<string, unknown>;
-    const legacy = [
-      "mqttBearerToken",
-      "mqttIotEndpoint",
-      "mqttP12Cert",
-      "mqttP12Pass",
-      "mqttAccountId",
-      "mqttAccountTopic",
-      "mqttTokenExpiresAt",
-    ];
-    const dirty = legacy.some(k => k in native && native[k] !== "" && native[k] !== 0);
-    if (!dirty) {
-      return;
-    }
-    adapter.log.info(`Removing legacy plaintext MQTT credentials from native (one-time migration)`);
-    const wipe: Record<string, unknown> = {};
-    for (const k of legacy) {
-      wipe[k] = k === "mqttTokenExpiresAt" ? 0 : "";
-    }
-    await adapter.extendForeignObjectAsync(`system.adapter.${adapter.namespace}`, { native: wipe });
-  } catch (e) {
-    adapter.log.debug(`legacy MQTT cleanup skipped: ${errMessage(e)}`);
-  }
-}
