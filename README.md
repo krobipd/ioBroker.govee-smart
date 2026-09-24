@@ -97,6 +97,27 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 ### **WORK IN PROGRESS**
 
+- New: Optional additional scan addresses — lights in another subnet or behind a router that blocks multicast are found by asking them directly
+- New: Heaters with an auto-stop setting get `control.auto_stop` — stop heating at the target temperature or keep it
+- New: Models that report the cloud temperature in °F (govee2mqtt's list of 15) are converted to °C — the H5179 by default, the others with the experimental switch
+- Fixed: Cloud events (lack of water, presence, ice bucket full) now reach their datapoints — until now none did
+- Fixed: The segment count of strips that report in groups of three is measured correctly — H61A8 and H7020 no longer grow phantom or lose real segments
+- Fixed: A strip nothing had measured yet accepts segment commands, uses its scenes over LAN and works in the wizard and in snapshots
+- Fixed: A device the account still lists is no longer deleted when the cached device list misses it
+- Fixed: A fresh account login is kept for the next reconnect, and successful logins are capped per hour — repeated logins can make Govee lock the account for 24 hours
+- Fixed: After an account change the saved login of the previous account is no longer reused
+- Fixed: Dropdowns send the value Govee declared, and a LAN light's colour-temperature range follows what the device reports
+- Fixed: Group music plays the same mode on every member, and a member without music or without the scene no longer counts as reached
+- Fixed: A Govee snapshot is activated by its name — reordering snapshots in the app no longer triggers the wrong one
+- Fixed: A command that could not be sent is no longer confirmed, and a day whose cloud budget is spent refuses commands instead of queueing them until midnight
+- Fixed: With the account connected, lights are still asked for their status once a minute and after every LAN command, so a lost command is corrected
+- Fixed: Port 4002 taken by another program is now reported instead of silently losing the lights' replies, and `info.connection` turns false when the last device goes quiet
+- Fixed: Stopping the adapter during its start no longer leaves parts of it running, and a message sent during the start is answered
+- Fixed: The segment wizard is cancelled when you leave the card, and the connection card shows Govee's reason instead of a raw text key
+- Fixed: The diagnostics report hides Govee account topics and the device's LAN address in number form, and a device name only replaces whole words
+- Improved: Temperature, humidity, battery, air quality and filter life carry translated names — the cloud path wrote Govee's English wording in every language
+- Improved: Bluetooth-only models are no longer listed as supported, and the Wi-Fi meat thermometer H5610 was added
+
 ### 2.39.2 (2026-09-22)
 
 - Fixed: App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report
