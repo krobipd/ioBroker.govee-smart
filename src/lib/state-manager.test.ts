@@ -1038,6 +1038,25 @@ describe("StateManager", () => {
       expect(objects.has("devices.h6160_0011.info.ip")).toBe(true);
     });
 
+    it("info.name/model/serial carry the catalog roles — also on an existing tree with `text` (B10)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      // An installation from before 2.40.0: the three datapoints exist with role text.
+      for (const id of ["name", "model", "serial"]) {
+        objects.set(`devices.h6160_0011.info.${id}`, {
+          type: "state",
+          common: { name: id, type: "string", role: "text", read: true, write: false },
+          native: {},
+        });
+      }
+      const sm = new StateManager(adapter as never, registry);
+      await createAllStatesForTest(sm, createTestDevice(), []);
+      const role = (id: string): unknown =>
+        (objects.get(`devices.h6160_0011.info.${id}`) as { common: { role: string } }).common.role;
+      expect(role("name")).toBe("info.name");
+      expect(role("model")).toBe("info.model");
+      expect(role("serial")).toBe("info.serial");
+    });
+
     it("should set info state values from device", async () => {
       const { adapter, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

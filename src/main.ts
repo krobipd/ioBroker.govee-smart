@@ -1034,6 +1034,9 @@ export class GoveeAdapter extends utils.Adapter {
             this.deviceManager?.onBearerToken();
           },
         );
+        if (this.unloading) {
+          return; // stopped during the wait — nothing may start behind onUnload (audit B6)
+        }
       }
 
       // --- Device data: Cache first, Cloud only on cache miss ---
@@ -1161,6 +1164,9 @@ export class GoveeAdapter extends utils.Adapter {
           // No cache — first start, fetch from Cloud with 60s hard-timeout.
           // If Cloud hangs/fails, we don't want to block adapter startup indefinitely.
           const result = await cloudRetryHandler.cloudInitWithTimeout(this.handlerHost);
+          if (this.unloading) {
+            return; // stopped during the wait — nothing may start behind onUnload (audit B6)
+          }
           if (result.ok) {
             cloudRetryHandler.setCloudConnected(this.handlerHost, true);
             cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
@@ -1183,6 +1189,9 @@ export class GoveeAdapter extends utils.Adapter {
         }
         // Load group membership from undocumented API (needs bearer token + device map)
         await this.deviceManager.loadGroupMembers();
+        if (this.unloading) {
+          return; // stopped during the wait — nothing may start behind onUnload (audit B6)
+        }
 
         this.cloudInitDone = true;
       }
@@ -1196,6 +1205,9 @@ export class GoveeAdapter extends utils.Adapter {
         const pending = this.stateCreationQueue;
         this.stateCreationQueue = [];
         await Promise.all(pending);
+      }
+      if (this.unloading) {
+        return; // stopped during the wait — nothing may start behind onUnload (audit B6)
       }
 
       // The device STATE is read here, after the drain, for every cloud device
@@ -1212,6 +1224,9 @@ export class GoveeAdapter extends utils.Adapter {
       // loadCloudStates).
       if (cloudStateReadable) {
         await cloudStateLoader.loadCloudStates(this.handlerHost);
+      }
+      if (this.unloading) {
+        return; // stopped during the wait — nothing may start behind onUnload (audit B6)
       }
 
       if (this.stateManager && this.deviceManager) {
@@ -1261,6 +1276,9 @@ export class GoveeAdapter extends utils.Adapter {
         }
       }
 
+      if (this.unloading) {
+        return;
+      }
       this.statesReady = true;
       // The tree exists and the start-up seed is read: apply the appliance
       // pushes held during the start (the device's own, newer word) and let
@@ -1325,6 +1343,12 @@ export class GoveeAdapter extends utils.Adapter {
           await this.stateManager!.writeDeviceRollup().catch(e => {
             this.log.debug(`Device rollup failed: ${errMessage(e)}`);
           });
+          // info.connection rides on the same round: the evidence of the last
+          // device ages out here, and no other event would notice (audit B7 —
+          // it stayed green until the next channel change).
+          if (!this.unloading) {
+            connectionState.updateConnectionState(this.handlerHost);
+          }
         })();
       }, ONLINE_SYNC_INTERVAL_MS);
 
@@ -1368,7 +1392,14 @@ export class GoveeAdapter extends utils.Adapter {
 
   private onMessage(obj: ioBroker.Message): void {
     try {
-      this.messageRouter?.onMessage(obj);
+      // Before onReady built the router a message would go unanswered and the
+      // card's sendTo hang until its timeout (audit B8) — answer with an error,
+      // never an empty list (DeviceListError rule).
+      if (!this.messageRouter) {
+        this.sendMessageResponse(obj, { error: "Adapter is starting" });
+        return;
+      }
+      this.messageRouter.onMessage(obj);
     } catch (e) {
       this.log.warn(`onMessage crashed: ${errMessage(e)}`);
     }

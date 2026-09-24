@@ -784,6 +784,25 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.states.get("devices.h6172_ee11.info.online")?.val).toBe(true);
   });
 
+  it("the 20 s round re-evaluates info.connection — the last device aging out turns it false (B7)", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const device = makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: Date.now() });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.states.get("info.connection")?.val).toBe(true);
+
+    // The light's last LAN answer ages past the freshness window; no channel
+    // event follows — only the round can notice.
+    device.lastLanReplyAt = Date.now() - 10 * 60_000;
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.states.get("info.connection")?.val).toBe(false);
+  });
+
   it("the first online-sync round rebuilds the group rollup even when nothing changed", async () => {
     // The rollup used to ride purely on CHANGES. After a restart on a stable
     // installation nothing ever changes, so info.membersUnreachable kept
@@ -843,6 +862,163 @@ describe("GoveeAdapter onReady — timers", () => {
     await settle(5);
     expect(i.states.get("groups.basegroup_g1.info.membersUnreachable")?.val).toBe("h6172_ee11");
     expect(i.groupReachabilityPrimed).toBe(true);
+  });
+
+  // Audit B6: onReady awaits the broker login and the Cloud start; a stop in
+  // that window used to let the rest of the start run behind onUnload —
+  // rate limiter, event broker, subscriptions, timers.
+  it("a stop during the broker login ends the start — nothing starts behind onUnload (B6)", async () => {
+    const { adapter, f } = setup({ apiKey: "key", goveeEmail: "a@b.c", goveePassword: "pw" });
+    const i = internalOf(adapter);
+    let release!: () => void;
+    f.mqtt.connect.mockImplementation(() => new Promise<void>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.mqtt.connect).toHaveBeenCalled());
+    i.onUnload(() => undefined);
+    release();
+    await ready;
+    expect(f.limiter.start).not.toHaveBeenCalled();
+    expect(f.openapi.connect).not.toHaveBeenCalled();
+    expect(
+      (adapter as unknown as { subscribeStatesAsync: ReturnType<typeof vi.fn> }).subscribeStatesAsync,
+    ).not.toHaveBeenCalled();
+    expect(i.statesReady).toBe(false);
+  });
+
+  it("a stop during the Cloud start ends the start before the tree counts as ready (B6)", async () => {
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    let release!: (v: unknown[]) => void;
+    f.cloud.getDevices.mockImplementation(() => new Promise<unknown[]>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.cloud.getDevices).toHaveBeenCalled());
+    i.onUnload(() => undefined);
+    release([]);
+    await ready;
+    expect(f.api.fetchGroupMembers).not.toHaveBeenCalled();
+    expect(
+      (adapter as unknown as { subscribeStatesAsync: ReturnType<typeof vi.fn> }).subscribeStatesAsync,
+    ).not.toHaveBeenCalled();
+    expect(i.statesReady).toBe(false);
+  });
+
+  /** A cached appliance: the start runs without a Cloud list, straight to the state read. */
+  function cacheAppliance(): void {
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h7127_ee11.json"),
+      JSON.stringify({
+        sku: "H7127",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "H7127",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+  }
+
+  it("a stop during the group-member load ends the start before the Cloud start counts as done (B6)", async () => {
+    cacheAppliance();
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    f.api.hasBearerToken.mockReturnValue(true);
+    let release!: (v: unknown[]) => void;
+    f.api.fetchGroupMembers.mockImplementation(() => new Promise<unknown[]>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.api.fetchGroupMembers).toHaveBeenCalled());
+    i.onUnload(() => undefined);
+    release([]);
+    await ready;
+    expect(i.cloudInitDone).toBe(false);
+  });
+
+  it("a stop while the start waits for the state tree reads no device state behind onUnload (B6)", async () => {
+    cacheAppliance();
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    let release!: () => void;
+    // A build still running when the start reaches the drain.
+    (adapter as unknown as { stateCreationQueue: Promise<void>[] }).stateCreationQueue.push(
+      new Promise<void>(r => (release = r)),
+    );
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(i.cloudInitDone).toBe(true));
+    i.onUnload(() => undefined);
+    release();
+    await ready;
+    expect(f.cloud.getDeviceState).not.toHaveBeenCalled();
+  });
+
+  it("a stop during the state read runs no migration behind onUnload (B6)", async () => {
+    cacheAppliance();
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    let release!: (v: unknown[]) => void;
+    f.cloud.getDeviceState.mockImplementation(() => new Promise<unknown[]>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.cloud.getDeviceState).toHaveBeenCalled());
+    // A colour datapoint of the old camelCase name, once the tree is built —
+    // the B2 migration after the read would delete it.
+    i.objects.set("devices.h7127_ee11.control.colorRgb", {
+      type: "state",
+      common: { name: "colorRgb", type: "string", role: "level.color.rgb", read: true, write: true },
+      native: {},
+    });
+    i.onUnload(() => undefined);
+    release([]);
+    await ready;
+    expect(i.objects.has("devices.h7127_ee11.control.colorRgb")).toBe(true);
+  });
+
+  it("a stop during the start-up migrations leaves the tree not ready and unsubscribed (B6)", async () => {
+    cacheAppliance();
+    const { adapter } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    const host = adapter as unknown as {
+      getObjectAsync: (id: string) => Promise<unknown>;
+      subscribeStatesAsync: ReturnType<typeof vi.fn>;
+    };
+    const original = host.getObjectAsync.bind(adapter);
+    let release: ((v: unknown) => void) | undefined;
+    let migrationReached = false;
+    host.getObjectAsync = (id: string) => {
+      // The B2 colour migration looks the old id up first — hold it there.
+      if (id.endsWith("control.colorTemperature") && !release) {
+        migrationReached = true;
+        return new Promise(r => (release = r));
+      }
+      return original(id);
+    };
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(migrationReached).toBe(true));
+    i.onUnload(() => undefined);
+    release!(null);
+    await ready;
+    expect(i.statesReady).toBe(false);
+    expect(host.subscribeStatesAsync).not.toHaveBeenCalled();
+  });
+
+  it("a cloud start that answers after the stop marks nothing connected (B6)", async () => {
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    let release!: (v: unknown[]) => void;
+    f.cloud.getDevices.mockImplementation(() => new Promise<unknown[]>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.cloud.getDevices).toHaveBeenCalled());
+    i.onUnload(() => undefined);
+    release([]);
+    await ready;
+    expect(i.states.get("info.cloudConnected")?.val).not.toBe(true);
   });
 
   it("onUnload clears every timer, stops the sub-clients and always calls back", async () => {
@@ -1342,6 +1518,18 @@ describe("GoveeAdapter — message handling", () => {
       "totallyUnknown",
       expect.objectContaining({ error: expect.stringContaining("Unknown command") }),
       expect.anything(),
+    );
+  });
+
+  it("answers a message that arrives before the start built the router with an error (B8)", () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.onMessage({ command: "diagnostics", from: "system.adapter.admin.0", callback: { id: 1 } });
+    expect(i.sendTo).toHaveBeenCalledWith(
+      "system.adapter.admin.0",
+      "diagnostics",
+      { error: "Adapter is starting" },
+      { id: 1 },
     );
   });
 

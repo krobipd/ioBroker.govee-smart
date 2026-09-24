@@ -854,7 +854,7 @@ export class StateManager {
     // snapshot save/delete, …) with mostly identical values — only a real
     // change should write and bump the timestamp. No consumer reads the
     // ts/lc of these states as a freshness signal (grep-verified).
-    await this.ensureState(`${prefix}.info.name`, tName("stateName"), "string", "text", false);
+    await this.ensureState(`${prefix}.info.name`, tName("stateName"), "string", "info.name", false);
     await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true,
@@ -876,8 +876,16 @@ export class StateManager {
       // ts-rewrite-spam). The initial sync happens right after this method
       // returns — see syncInfoOnline. Direct write here was the source of
       // periodic false→true bounces (captured 2026-05-13).
-      await this.ensureState(`${prefix}.info.model`, tName("model"), "string", "text", false, undefined, "");
-      await this.ensureState(`${prefix}.info.serial`, tName("serialNumber"), "string", "text", false, undefined, "");
+      await this.ensureState(`${prefix}.info.model`, tName("model"), "string", "info.model", false, undefined, "");
+      await this.ensureState(
+        `${prefix}.info.serial`,
+        tName("serialNumber"),
+        "string",
+        "info.serial",
+        false,
+        undefined,
+        "",
+      );
       // A BLE→gateway sensor (device.gateway set) reaches the cloud only via a
       // gateway and never has an own LAN IP — show which gateway it hangs off
       // (info.gateway) instead of a permanently-empty info.ip. Everything else
