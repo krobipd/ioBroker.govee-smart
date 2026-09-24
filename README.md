@@ -39,7 +39,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 - **Scenes, DIY scenes, music mode, gradient toggle** — activated locally via BLE-over-LAN where possible, Cloud fallback otherwise
 - **Cloud and local snapshots** — Govee-app snapshots and ioBroker-side snapshots side by side
 - **Groups** — bridge Govee groups into ioBroker with capability intersection across members
-- **Diagnostics export button per device** — one-click JSON dump for bug reports
+- **Diagnostics report per device** — tab Expert → Diagnostics: an anonymised JSON report to attach to a bug report
 - **Works without credentials** — LAN-only out of the box, each credential tier unlocks more
 - **Rate-limited Cloud usage** — daily and per-minute budgets aligned to Govee's quota
 
@@ -96,8 +96,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 -->
 
 ### **WORK IN PROGRESS**
-
-- Fixed: Exporting the diagnostics report of an app group no longer writes to a datapoint the group does not have — the log showed a warning on every export
 
 ### 2.39.2 (2026-09-22)
 

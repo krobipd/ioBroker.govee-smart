@@ -27,10 +27,10 @@ export interface DiagnosticsPanelProps {
 }
 
 /**
- * Hand the browser a file. The report exists on the instance either way — this
- * is the convenient path, so the reporter can attach it to a GitHub issue
- * without first finding the admin file browser. That extra step is exactly
- * where bug reports were dying.
+ * Hand the browser a file. This download is the only place the report exists —
+ * the adapter stores none (since 2.37.0) — so the reporter can attach it to a
+ * GitHub issue straight away. A detour through the admin file browser is
+ * exactly where bug reports used to die.
  *
  * @param fileName Name the file should be saved under
  * @param content The report JSON

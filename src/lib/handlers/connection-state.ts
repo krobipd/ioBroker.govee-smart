@@ -249,7 +249,7 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   }
   if (!lanOk) {
     adapter.log.warn(
-      "LAN: no lights reachable on local network — cloud-only mode is ~100× slower (5-10s vs 50ms per command) and rate-limited (10/min). Enable the local API in the Govee Home app: https://app-h5.govee.com/user-manual/wlan-guide",
+      "LAN: no lights reachable on local network — cloud-only mode is ~100× slower (5-10s vs 50ms per command) and rate-limited by Govee (2 commands per second per device). Enable the local API in the Govee Home app: https://app-h5.govee.com/user-manual/wlan-guide",
     );
     for (const d of lights) {
       if (!d.lanIp) {

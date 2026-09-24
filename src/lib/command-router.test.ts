@@ -1111,7 +1111,8 @@ describe("CommandRouter — invariants without a test (mutation audit)", () => {
     expect(lan.calls.find(c => c.method === "setScene")).toBeUndefined();
 
     // Everything else stays LAN-first — routing every command to the Cloud
-    // would burn the 10/min budget on plain power/brightness writes.
+    // would spend Govee's control budget (2 per second per device) and the
+    // 5-10 s cloud round trip on plain power/brightness writes.
     await router.sendCommand(noSegments, "power", true);
     await router.sendCommand(noSegments, "brightness", 40);
     expect(cloud.calls).toHaveLength(1);

@@ -2124,7 +2124,7 @@ function memberHasControlState(member: GoveeDevice, stateId: string): boolean {
 /**
  * Build state definitions for a BaseGroup device.
  * Capabilities = intersection of controllable member devices.
- * No snapshots, no segments; diag-states (export/result/tier) included since v2.9.1.
+ * No snapshots, no segments, no diag channel (a group's report is built but not stamped).
  *
  * @param members Resolved member devices
  */

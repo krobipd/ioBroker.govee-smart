@@ -1733,7 +1733,7 @@ export class GoveeAdapter extends utils.Adapter {
         }
         const prefix = this.stateManager.devicePrefix(device);
         const report = await diagnosticsHandlerImpl.handleDiagnosticsExport(
-          this,
+          this.handlerHost,
           this.deviceManager,
           this.diagnosticsLastRun,
           device,

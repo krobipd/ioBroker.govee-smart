@@ -8,7 +8,7 @@
 // shared that way), but the backend module carries imports the component must
 // not drag into its bundle, so only an import-free module is shared.
 
-/** A finished report: the file name it was stored under, plus its content. */
+/** A finished report: the file name to save it under, plus its content. */
 export interface DiagnosticsReport {
   fileName: string;
   content: string;

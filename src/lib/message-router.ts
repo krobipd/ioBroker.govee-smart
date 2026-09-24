@@ -71,10 +71,9 @@ export interface MessageRouterHost {
    */
   getDeviceList: () => Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
   /**
-   * Builds the report for one device and returns it WITH its content, so the
-   * admin card can hand the user a file straight away. The report is written to
-   * the instance's file storage as well — the card is the convenient path, the
-   * file browser is the one that still works when the card is not open.
+   * Builds the report for one device and returns it WITH its content — the
+   * admin card hands it to the browser as a download. Nothing is stored on the
+   * adapter side (no report store since 2.37.0).
    */
   buildDiagnosticsReport: (deviceKey: string) => Promise<{ fileName: string; content: string } | { error: string }>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
@@ -93,7 +92,7 @@ export interface MessageRouterHost {
  * Router for ioBroker.Message events (sendTo from the admin UI).
  *
  * Dispatches 3 commands:
- *  - `segmentWizard` — wizard step (start/yes/no/done/abort)
+ *  - `segmentWizard` — wizard step (start/yes/no/apply/abort)
  *  - `mqttAuth` — login test + verification-code request (with live credentials)
  *  - `diagnostics` — device list + report build for the diagnostics card
  */
