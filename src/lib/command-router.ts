@@ -25,7 +25,7 @@ import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed } from "./govee-lan-client";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
+import { resolveSegmentCount, SEGMENT_HARD_MAX } from "./device-manager/lookups";
 
 /**
  * Outcome of `resolveTransport` — decides which channel handles a command
@@ -227,8 +227,9 @@ export class CommandRouter {
     if (command !== "lightScene") {
       return false;
     }
-    const hasSegments = typeof device.segmentCount === "number" && device.segmentCount > 0;
-    return !hasSegments;
+    // The count the tree is built from, not the learned value: an unmeasured
+    // strip with segment capabilities sent every scene over the cloud.
+    return resolveSegmentCount(device, this.registry) === 0;
   }
 
   /**
@@ -431,7 +432,8 @@ export class CommandRouter {
     // ever dispatches to a segment handler, so `decision` is lan|cloud here.
     const segIdx = parseInt(command.split(":")[1], 10);
     if (isNaN(segIdx) || segIdx < 0) {
-      return;
+      // Principle 5: a command that does not go out is not confirmed.
+      throw new Error(`invalid segment index in ${command}`);
     }
     if (decision.kind === "lan" && device.lanIp && this.lanClient) {
       await this.forceColorMode(device);
@@ -458,15 +460,15 @@ export class CommandRouter {
     const parsed = typeof value === "string" ? this.parseSegmentBatch(device, value) : this.coerceParsedBatch(value);
     if (!parsed) {
       // A malformed string (wrong separator, bad range, …) used to be swallowed
-      // silently while the state still acked "ok" — the user got no feedback
-      // (A4, live: h61d5 "1-15;#ffca91"). Warn with the offending value + syntax.
-      if (typeof value === "string") {
-        this.log.warn(
-          `${deviceLabel(device)}: could not parse segment command "${value}" — ` +
-            `expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`,
-        );
-      }
-      return;
+      // silently while the state still acked "ok" (A4, live: h61d5
+      // "1-15;#ffca91"), and after the warn of 2.x it still acked (audit
+      // 2026-09-24 D2). Principle 5: thrown — the router warns once with this
+      // text and does not confirm.
+      throw new Error(
+        typeof value === "string"
+          ? `could not parse segment command "${value}" — expected e.g. "1-5:#ff0000:80", "all:#00ff00" or "0,3,7::50"`
+          : "invalid segment batch",
+      );
     }
     this.onSegmentBatchUpdate?.(device, parsed);
     if (decision.kind === "lan" && device.lanIp && this.lanClient) {
@@ -504,7 +506,7 @@ export class CommandRouter {
     // sendCommand() already returned on a skip decision — `decision` is lan|cloud.
     const segIdx = parseInt(command.split(":")[1], 10);
     if (isNaN(segIdx) || segIdx < 0) {
-      return;
+      throw new Error(`invalid segment index in ${command}`);
     }
     if (decision.kind === "lan" && device.lanIp && this.lanClient) {
       await this.forceColorMode(device);
@@ -684,7 +686,9 @@ export class CommandRouter {
       device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? new Set(device.manualSegments)
         : null;
-    const segCount = device.segmentCount ?? 0;
+    // Physical length incl. cloud capabilities — the learned value alone is
+    // unset on a strip nothing has measured yet, and every index was rejected.
+    const segCount = resolveSegmentCount(device, this.registry);
     const isValid = (i: number): boolean => (validIndices ? validIndices.has(i) : i >= 0 && i < segCount);
 
     // Parse segment indices

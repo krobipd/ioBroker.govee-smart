@@ -33,6 +33,7 @@ export function buildSnapshotHost(adapter: SnapshotHandlerGlueAdapter): Snapshot
     sendCommand: async (device, command, value) => {
       await adapter.deviceManager?.sendCommand(device, command, value);
     },
+    segmentCount: device => adapter.deviceManager?.syncSegmentCount(device) ?? 0,
     refreshDeviceStates: device => {
       // Snapshot save/delete = new content in the snapshot_local dropdown —
       // Cloud-phase event. Fires onCloudDataReady to surface the change.

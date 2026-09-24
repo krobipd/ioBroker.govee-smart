@@ -15,6 +15,7 @@ function makeAdapter(devices: GoveeDevice[]): {
     localSnapshots: {} as never,
     deviceManager: {
       getDevices: () => devices,
+      syncSegmentCount: () => 12,
       sendCommand: (device: GoveeDevice, command: string, value: unknown) => {
         commands.push({ device: device.deviceId, command, value });
         return Promise.resolve();
@@ -45,6 +46,14 @@ describe("buildSnapshotHost", () => {
     const host = buildSnapshotHost(adapter);
     await host.sendCommand(d1, "power", true);
     expect(commands).toEqual([{ device: "AA:01", command: "power", value: true }]);
+  });
+
+  it("segmentCount is the tree size the device manager builds for, not the learned value (audit 2026-09-24 H4)", () => {
+    const d1 = createTestDevice({ segmentCount: undefined });
+    const { adapter } = makeAdapter([d1]);
+    expect(buildSnapshotHost(adapter).segmentCount(d1)).toBe(12);
+    (adapter as { deviceManager: unknown }).deviceManager = null;
+    expect(buildSnapshotHost(adapter).segmentCount(d1)).toBe(0);
   });
 
   it("devicePrefix falls back to '' when the state manager is gone (teardown race)", () => {

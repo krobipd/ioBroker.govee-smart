@@ -119,6 +119,12 @@ export interface WizardHost {
   namespace: string;
   /** Derive the device's state-tree prefix (channel path below namespace). */
   devicePrefix(device: GoveeDevice): string;
+  /**
+   * Segment channels of the device's tree (DeviceManager.syncSegmentCount) —
+   * what a restore has to cover. The learned count alone is 0 on a strip no
+   * push has measured yet, and the strip then stayed in the test pattern.
+   */
+  segmentCount(device: GoveeDevice): number;
   /** Schedule a managed timeout; must be cancellable via clearTimeout. */
   setTimeout: (cb: () => void, ms: number) => unknown;
   /** Cancel a previously scheduled timeout. */
@@ -206,7 +212,7 @@ export class SegmentWizard {
       const device = this.host.findDevice(session.deviceKey);
       if (device) {
         try {
-          const total = device.segmentCount ?? 0;
+          const total = this.host.segmentCount(device);
           if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
             const color = parseInt(session.baseline.colorRgb.slice(1), 16);
             // The DEVICE brightness on purpose, unlike restoreBaseline (F3):
@@ -618,7 +624,7 @@ export class SegmentWizard {
    * @param baseline Previously captured baseline values
    */
   private async restoreBaseline(device: GoveeDevice, baseline: SegmentWizardSession["baseline"]): Promise<void> {
-    const total = device.segmentCount ?? 0;
+    const total = this.host.segmentCount(device);
     const segs = baseline.segmentColors;
     // Prefer the real per-segment gradient when one was genuinely captured: a
     // FULL set of segments (matching the current count) carrying ≥2 distinct

@@ -74,6 +74,7 @@ export function buildWizardHost(adapter: WizardHandlerAdapter): WizardHost {
     findDevice: key => findDeviceByKey(adapter, key),
     namespace: adapter.namespace,
     devicePrefix: device => adapter.stateManager?.devicePrefix(device) ?? "",
+    segmentCount: device => adapter.deviceManager?.syncSegmentCount(device) ?? 0,
     setTimeout: (cb, ms) => adapter.setTimeout(cb, ms),
     clearTimeout: h => adapter.clearTimeout(h as ioBroker.Timeout),
     applyWizardResult: (device, result) => applyWizardResult(adapter, device, result),

@@ -292,24 +292,30 @@ describe("CommandRouter", () => {
       expect(segBrightCall!.args).toEqual(["192.168.1.42", 50, [5]]);
     });
 
-    it("rejects negative segment index", async () => {
+    it("rejects negative segment index — and says so, so the router does not confirm it", async () => {
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
-      await router.sendCommand(makeDevice(), "segmentColor:-1", "#FF0000");
+      await expect(router.sendCommand(makeDevice(), "segmentColor:-1", "#FF0000")).rejects.toThrow(
+        /invalid segment index/,
+      );
+      await expect(router.sendCommand(makeDevice(), "segmentBrightness:x", 50)).rejects.toThrow(
+        /invalid segment index/,
+      );
       expect(lan.calls).toHaveLength(0);
     });
 
-    it("warns instead of silently swallowing a malformed segment batch command (A4)", async () => {
-      const warns: string[] = [];
-      const capturingLog = { ...mockLog, warn: (m: string) => warns.push(m) } as unknown as ioBroker.Logger;
+    it("refuses a malformed segment batch with the reason instead of confirming it (A4, audit 2026-09-24 D2)", async () => {
       const lan = makeLanStub();
-      const router = new CommandRouter(capturingLog, noopTimers, registry);
+      const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       // ';' where a ':' is required — parseSegmentBatch returns null (live: h61d5).
-      await router.sendCommand(makeDevice(), "segmentBatch", "1-15;#ffca91");
+      // The router's single "Command failed" warn carries this text and the
+      // datapoint is not acked.
+      await expect(router.sendCommand(makeDevice(), "segmentBatch", "1-15;#ffca91")).rejects.toThrow(
+        /could not parse segment command "1-15;#ffca91"/,
+      );
       expect(lan.calls).toHaveLength(0); // nothing sent
-      expect(warns.some(w => w.includes("segment command") && w.includes("1-15;#ffca91"))).toBe(true);
     });
 
     it("emits onSegmentBatchUpdate exactly once on the Cloud path (I2)", async () => {
@@ -396,6 +402,53 @@ describe("CommandRouter", () => {
     it("rejects non-string input", () => {
       const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.parseSegmentBatch(makeDevice(), 42 as unknown as string)).toBeNull();
+    });
+  });
+
+  describe("a strip whose length nothing has measured yet (audit 2026-09-24 H4)", () => {
+    // The capability block as issue #44 recorded it for the H6076: 15 segments
+    // declared, no learned count (no AA-A5 push yet, no wizard run). Until
+    // 2.39.2 the batch parser and the lightScene heuristic read only the
+    // learned value — every index was rejected and every scene went over the cloud.
+    const recordedSegmentCap = {
+      type: "devices.capabilities.segment_color_setting",
+      instance: "segmentedColorRgb",
+      parameters: {
+        dataType: "STRUCT",
+        fields: [
+          {
+            fieldName: "segment",
+            size: { min: 1, max: 15 },
+            dataType: "Array",
+            elementRange: { min: 0, max: 14 },
+            elementType: "INTEGER",
+            required: true,
+          },
+          { fieldName: "rgb", dataType: "INTEGER", range: { min: 0, max: 16777215, precision: 1 }, required: true },
+        ],
+      },
+    } as unknown as GoveeDevice["capabilities"][number];
+
+    it('"all" addresses the 15 declared segments', async () => {
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      const device = makeDevice({ segmentCount: undefined, capabilities: [recordedSegmentCap] });
+      await router.sendCommand(device, "segmentBatch", "all:#ff0000");
+      const call = lan.calls.find(c => c.method === "setSegmentColor");
+      expect(call?.args[4]).toEqual(Array.from({ length: 15 }, (_, i) => i));
+    });
+
+    it("a scene goes over LAN (ptReal), not the cloud", () => {
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(makeLanStub().client);
+      const device = makeDevice({ segmentCount: undefined, capabilities: [recordedSegmentCap] });
+      expect(router.resolveTransport(device, "lightScene").kind).toBe("lan");
+      // Without any segment source the heuristic still picks the cloud.
+      router.setCloudClient(makeCloudStub().client);
+      expect(
+        router.resolveTransport(makeDevice({ segmentCount: undefined, capabilities: [] }), "lightScene").kind,
+      ).toBe("cloud");
     });
   });
 

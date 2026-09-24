@@ -24,6 +24,8 @@ export interface SnapshotHandlerHost {
   sendCommand: (device: GoveeDevice, command: string, value: unknown) => Promise<void>;
   /** Targeted state-tree refresh after save/delete (snapshot_local dropdown). */
   refreshDeviceStates: (device: GoveeDevice) => void;
+  /** Segment channels of the device's tree (DeviceManager.syncSegmentCount). */
+  segmentCount: (device: GoveeDevice) => number;
 }
 
 /**

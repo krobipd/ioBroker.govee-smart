@@ -22,6 +22,13 @@ export interface BaselineReadSurface {
   devicePrefix: (device: GoveeDevice) => string;
   /** Read a state value by full id. */
   getState: (id: string) => Promise<{ val: unknown } | null | undefined>;
+  /**
+   * How many segment channels the device's tree has (DeviceManager.syncSegmentCount).
+   * Not the LEARNED `device.segmentCount`: a strip whose length no AA-A5 push
+   * or wizard has measured yet has a tree built from its cloud capabilities,
+   * and a snapshot of it used to save no segments at all.
+   */
+  segmentCount: (device: GoveeDevice) => number;
 }
 
 /**
@@ -44,7 +51,7 @@ export async function readDeviceBaseline(
 ): Promise<DeviceBaseline> {
   const prefix = surface.devicePrefix(device);
   const ns = surface.namespace;
-  const segCount = device.segmentCount ?? 0;
+  const segCount = surface.segmentCount(device);
   const segIds: string[] = [];
   for (let i = 0; i < segCount; i++) {
     segIds.push(`${ns}.${prefix}.segments.${i}.color`, `${ns}.${prefix}.segments.${i}.brightness`);

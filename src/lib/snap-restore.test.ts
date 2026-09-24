@@ -61,6 +61,7 @@ function makeHost(opts: { initialSnapshots?: LocalSnapshot[]; initialState?: Rec
     refreshDeviceStates: device => {
       refreshes.push(device);
     },
+    segmentCount: device => device.segmentCount ?? 0,
   };
 
   return { host, commands, saved, deletedNames, refreshes };
@@ -115,6 +116,14 @@ describe("SnapshotHandler", () => {
       // Default fallback for missing segments
       expect(saved[0].segments![2]).toEqual({ color: "#000000", brightness: 100 });
       expect(refreshes).toHaveLength(1);
+    });
+
+    it("saves the segments of a strip whose length only the tree knows (no learned count — audit 2026-09-24 H4)", async () => {
+      const { host, saved } = makeHost({});
+      host.segmentCount = () => 3;
+      const handler = new SnapshotHandler(host);
+      await handler.save({ ...makeDevice(), segmentCount: undefined }, "Tree");
+      expect(saved[0].segments).toHaveLength(3);
     });
 
     it("falls back to safe defaults when state values are unset", async () => {

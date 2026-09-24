@@ -46,6 +46,12 @@ class TestHost implements WizardHost {
   public states = new Map<string, unknown>();
   public devices = new Map<string, GoveeDevice>();
   public namespace = "govee-smart.0";
+  /** Tree size the host reports; null = the device's learned count (the old reading). */
+  public treeSize: number | null = null;
+
+  public segmentCount(device: GoveeDevice): number {
+    return this.treeSize ?? device.segmentCount ?? 0;
+  }
 
   public log = {
     debug: (m: string): void => {

@@ -308,8 +308,10 @@ export async function handleManualSegmentsChange(
     return;
   }
 
-  const maxIndex =
-    typeof device.segmentCount === "number" && device.segmentCount > 0 ? device.segmentCount - 1 : SEGMENT_HARD_MAX;
+  // Bounded by the physical length the tree is built from — the learned value
+  // alone is unset on a strip nothing has measured yet (then the protocol limit).
+  const physical = adapter.deviceManager?.physicalSegmentCount(device) ?? 0;
+  const maxIndex = physical > 0 ? physical - 1 : SEGMENT_HARD_MAX;
   const parsed = parseSegmentList(listVal, maxIndex);
   if (parsed.error) {
     adapter.log.warn(`${deviceLabel(device)}: manual_list invalid (${parsed.error}) — disabling manual mode`);

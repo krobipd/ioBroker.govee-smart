@@ -75,6 +75,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
     deviceManager: {
       getDevices: () => devices,
       getDiagnostics: () => ({ addLog: () => undefined }),
+      // The real rule without the registry: learned value, else 0 (no caps in these fixtures).
+      physicalSegmentCount: (device: GoveeDevice) => device.segmentCount ?? 0,
       sendCommand: (device: GoveeDevice, command: string, value: unknown) => {
         const err = sendFailure();
         if (err) {

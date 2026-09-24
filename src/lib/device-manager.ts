@@ -14,7 +14,9 @@ import {
   plausibleSegmentIndices,
   readDevicePushAt,
   readReportedReachability,
+  resolveSegmentCount,
   SEGMENT_COUNT_MAX,
+  segmentCountFromSnapshotFrames,
   type MqttSegmentData,
 } from "./device-manager/lookups";
 import {
@@ -128,6 +130,8 @@ export class DeviceManager {
   private statusRequester: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null = null;
   /** Asks the account client for a fresh bearer — see {@link setBearerRefresher}. */
   private bearerRefresher: (() => void) | null = null;
+  /** Lowered segment counts that wait for the app's snapshot masks — see mayLowerSegmentCount. */
+  private readonly deferredSegmentShrink = new Map<string, number>();
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -655,6 +659,9 @@ export class DeviceManager {
     }
     cacheHelpers.populateScenesFromLibrary(this, device);
     this.persistDeviceToCache(device);
+    // The snapshot masks may have arrived with the libraries — a lowered
+    // segment count that waited for them is judged now.
+    this.reviewDeferredSegmentShrink(device);
     if (scenesChanged || librariesChanged) {
       this.onCloudDataReady?.(device, this.getDevices());
     }
@@ -1568,30 +1575,27 @@ export class DeviceManager {
 
   /**
    * Parse per-segment data from a BLE notification packet (AA A5) and either
-   * grow the segment tree if the device just reported a higher index than
-   * known, or forward filtered per-segment updates to the state-tree.
-   * MQTT is authoritative for segment count — the device tells us what it
-   * actually has; Cloud only gives an initial best-guess from capabilities.
+   * adopt a different segment count or forward filtered per-segment updates to
+   * the state tree. MQTT is authoritative for the count — the device tells us
+   * what it has; Cloud only gives an initial best-guess from capabilities —
+   * but a LOWER count deletes segment datapoints (values and room/function
+   * assignments), and deleting needs knowledge, not absence: see
+   * {@link mayLowerSegmentCount}.
    *
    * @param device Target device (segmentCount + manualSegments owner)
    * @param opCommand Raw `op.command` payload from the MQTT update (string[] when AA A5)
    */
   private processMqttSegmentPacket(device: GoveeDevice, opCommand: string[]): void {
-    const { segments: segData, complete } = parseMqttSegmentData(opCommand);
+    const { segments: segData, complete, trailGuess } = parseMqttSegmentData(opCommand);
     if (segData.length === 0) {
       return;
     }
     // reduce() rather than Math.max(...spread) so a large segData can never blow
-    // the call stack with a huge argument spread (SEC-GC1 defence-in-depth;
-    // parseMqttSegmentData already caps it to ≤20).
+    // the call stack with a huge argument spread (SEC-GC1 defence-in-depth).
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
-    const current = device.segmentCount ?? 0;
     // L6 — plausibility cap: the Govee bitmask addresses SEGMENT_COUNT_MAX slots.
-    // Values above it only come from broken/spoofed packets. Untestable through
-    // the public path and kept anyway: the parser above only yields packet
-    // numbers 1-5 → indices 0-19, so maxSeen can never exceed 20 (equivalent
-    // mutant, 2026-08-22 test audit). Guards the day the parser learns more
-    // packet numbers. Same gate as every other count source (plausibleSegmentCount).
+    // Reachable since the parser reads up to 19 packets (76 slots in the
+    // four-slot layout). Same gate as every other count source (plausibleSegmentCount).
     if (maxSeen > SEGMENT_COUNT_MAX) {
       this.log.debug(
         `${deviceLabel(device)}: ignoring segmentCount=${maxSeen} (above protocol limit ${SEGMENT_COUNT_MAX})`,
@@ -1603,29 +1607,24 @@ export class DeviceManager {
     // must never fight it.
     const quirk = this.registry.getQuirks(device.sku)?.segmentCount;
     const quirkLocked = typeof quirk === "number" && quirk > 0;
-    // Adopt the packet count when it disagrees with the stored total: always
-    // upward (a bigger real strip); downward ONLY when the push proved complete
-    // (trailing padding was stripped), so a set truncated at the 20-slot parser
-    // cap can never delete real segments (e.g. 20-29 on a 30-segment strip).
-    // MQTT is authoritative — the device reports what it physically has — but
-    // only as far as the parser can see. Same rebuild path both ways:
-    // createSegmentStates adds the missing / prunes the excess.
+    // Compared with the count the tree is built from (quirk, learned value or
+    // the cloud capability) — not with the learned value alone: a first push
+    // on a fresh installation (learned 0) used to "grow" a 30-segment H7020 to
+    // the 19 its four-slot misreading produced, deleting segments 19-29.
+    const current = resolveSegmentCount(device, this.registry);
     const grow = maxSeen > current;
-    const shrink = maxSeen < current && complete;
-    if (!quirkLocked && maxSeen > 0 && (grow || shrink)) {
-      this.log.info(
-        `${deviceLabel(device)}: ${grow ? "detected" : "corrected to"} ${maxSeen} segments via MQTT (was ${current}) — rebuilding state tree`,
-      );
+    const lower = maxSeen < current && this.mayLowerSegmentCount(device, maxSeen, complete, trailGuess);
+    if (!quirkLocked && (grow || lower)) {
+      this.adoptSegmentCount(device, maxSeen, grow ? "detected" : "corrected to", current);
+      return;
+    }
+    // The push confirms the count the tree already has — learn it, so
+    // everything that needs the physical length has it without a rebuild.
+    if (!quirkLocked && maxSeen === current && device.segmentCount !== maxSeen) {
       device.segmentCount = maxSeen;
-      // Persist now so a restart starts from the real value instead of
-      // falling back to Cloud capabilities.
       if (this.skuCache) {
         void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
       }
-      // Skip per-segment sync for this push — the datapoints are being rebuilt.
-      // The next AA A5 push hits the fully-built tree.
-      this.onSegmentCountChanged?.(device);
-      return;
     }
     // Filter by manual-segments override if active — ignore indices the user
     // has declared as "not physically present" (cut strip).
@@ -1636,6 +1635,75 @@ export class DeviceManager {
     if (filtered.length > 0) {
       this.onMqttSegmentUpdate?.(device, filtered);
     }
+  }
+
+  /**
+   * Whether a push may LOWER the segment count to `seen`. Only a complete push
+   * can say where the strip ends; a count that rests on the trailing-slot rule
+   * (an observed pattern, not a documented one) additionally needs the app's
+   * snapshot masks to agree. Masks that have not loaded yet park the decision
+   * until they arrive ({@link reviewDeferredSegmentShrink}).
+   *
+   * @param device Target device
+   * @param seen Count read from the push
+   * @param complete The push carries the whole list
+   * @param trailGuess The count depends on the trailing-slot rule
+   */
+  private mayLowerSegmentCount(device: GoveeDevice, seen: number, complete: boolean, trailGuess: boolean): boolean {
+    if (!complete) {
+      return false;
+    }
+    if (!trailGuess) {
+      return true;
+    }
+    const reference = segmentCountFromSnapshotFrames(device.snapshotBleCmds);
+    if (reference === seen) {
+      return true;
+    }
+    if (reference === null) {
+      this.deferredSegmentShrink.set(deviceKeyHelper(device.sku, device.deviceId), seen);
+    }
+    return false;
+  }
+
+  /**
+   * Re-judge a lowered count that waited for the snapshot masks — called once
+   * the scene/library job of a light has loaded them.
+   *
+   * @param device The light whose masks just arrived
+   */
+  private reviewDeferredSegmentShrink(device: GoveeDevice): void {
+    const key = deviceKeyHelper(device.sku, device.deviceId);
+    const seen = this.deferredSegmentShrink.get(key);
+    if (seen === undefined) {
+      return;
+    }
+    this.deferredSegmentShrink.delete(key);
+    const current = resolveSegmentCount(device, this.registry);
+    if (seen < current && segmentCountFromSnapshotFrames(device.snapshotBleCmds) === seen) {
+      this.adoptSegmentCount(device, seen, "corrected to", current);
+    }
+  }
+
+  /**
+   * Take a new segment count: remember it, persist it and rebuild the tree.
+   *
+   * @param device Target device
+   * @param count New count
+   * @param verb Log wording ("detected" / "corrected to")
+   * @param was Count before
+   */
+  private adoptSegmentCount(device: GoveeDevice, count: number, verb: string, was: number): void {
+    this.log.info(`${deviceLabel(device)}: ${verb} ${count} segments via MQTT (was ${was}) — rebuilding state tree`);
+    device.segmentCount = count;
+    // Persist now so a restart starts from the real value instead of
+    // falling back to Cloud capabilities.
+    if (this.skuCache) {
+      void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
+    }
+    // Skip per-segment sync for this push — the datapoints are being rebuilt.
+    // The next AA A5 push hits the fully-built tree.
+    this.onSegmentCountChanged?.(device);
   }
 
   /**
@@ -1815,6 +1883,16 @@ export class DeviceManager {
    */
   public syncSegmentCount(device: GoveeDevice): number {
     return effectiveSegmentCount(device, this.registry);
+  }
+
+  /**
+   * The PHYSICAL segment length (quirk, learned value or cloud capability) —
+   * the bound a user-supplied index list is validated against.
+   *
+   * @param device Target device
+   */
+  public physicalSegmentCount(device: GoveeDevice): number {
+    return resolveSegmentCount(device, this.registry);
   }
 
   /**

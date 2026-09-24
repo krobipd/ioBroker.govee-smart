@@ -23,45 +23,67 @@ export interface ParsedMqttSegments {
   /** Per-segment data with trailing padding slots removed. */
   segments: MqttSegmentData[];
   /**
-   * True when trailing padding was actually stripped — the device ended its
-   * list, so `segments.length` is the real count and may be trusted to SHRINK
-   * the stored total. False when nothing was stripped: the list may have been
-   * truncated at the 20-slot parser cap, so the count must only grow.
+   * True when the push carries the device's WHOLE segment list: its AA-A5 run
+   * is numbered without a gap from 1 and sits inside a full status report
+   * (an `aa 05` frame before it, `aa 11`/`aa 41` after it — every `v_`/`x_`/
+   * `a_`/`y_` push in the recordings). Only a complete push may lower a
+   * stored count; a lone A5 frame (`u_` push, #49) proves nothing about the end.
    */
   complete: boolean;
+  /**
+   * True when the count depends on the trailing-slot rule (a last slot
+   * `(x,B,B,B)` read as filler) — an OBSERVED pattern (H6076 ×3, H6072 ×1),
+   * not a documented one. Such a count may lower a stored one only when an
+   * independent reference (the app's snapshot masks) confirms it.
+   */
+  trailGuess: boolean;
 }
 
 /**
+ * Highest AA-A5 packet number read: 56 addressable slots in the 3-slot layout
+ * need 19 packets. Recordings carry up to 10 (H7020, H6062).
+ */
+const MAX_AA_A5_PACKETS = 19;
+
+/**
  * Parse AA A5 BLE notification packets from MQTT op.command.
- * 5 packets × 4 segment slots = max 20 segments per push. The device sends
- * exactly as many packets as it has physical segments — so parsing out all
- * slots (and filtering empty-slot padding) gives us a reliable count of
- * what actually exists on the strip.
  *
- * Format per slot: [Brightness 0-100] [R] [G] [B].
+ * Format per slot: [Brightness 0-100] [R] [G] [B], four slots per 20-byte
+ * frame. Rules, each measured against every AA-A5 recording in
+ * `Ressourcen/govee-smart/github-exports/` (audit 2026-09-24):
  *
- * An "empty" slot (brightness = 0 AND r = g = b = 0) is treated as padding
- * in a partially-filled final packet, not as a real unlit segment — this
- * matters for devices that don't pad their last packet to 4 slots.
+ * 1. Packet numbers run past 5 — the H7020 and the H6062 send 10 packets. A
+ *    number is read once per push (a repeat is corrupt/malicious, SEC-GC1).
+ * 2. Some models fill only three slots per packet: when the fourth slot is
+ *    empty in EVERY packet of a push with at least two packets, the layout is
+ *    three slots (H61A8, H7020, H6072), index `(packet−1)·3 + slot`. Read as
+ *    four slots, a 30-segment H7020 became 19 with a black segment at every
+ *    fourth index.
+ * 3. Trailing empty slots and slots with an impossible brightness (>100 — the
+ *    H6076 pads with 0x92 = 146) are filler.
+ * 4. A last slot `(x,B,B,B)` whose colour bytes equal the brightness of the
+ *    segment before it, while its own brightness differs, is filler — seen on
+ *    the H6076 (`02 64 64 64`, `00 32 32 32`; confirmed by the app's snapshot
+ *    mask `7f` = 7) and the H6072. Flagged as {@link ParsedMqttSegments.trailGuess}.
+ * 5. Completeness: see {@link ParsedMqttSegments.complete}.
  *
  * @param commands Base64-encoded BLE packets from MQTT op.command
  */
 export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
   if (!Array.isArray(commands)) {
-    return { segments: [], complete: false };
+    return { segments: [], complete: false, trailGuess: false };
   }
 
-  const segments: MqttSegmentData[] = [];
-  // There are only 5 valid AA-A5 packet numbers (1-5 → segment indices 0-19).
-  // Dedupe by packet number and bound the scan so a malicious broker can't send
-  // a huge `op.command` array of duplicate/valid packets and blow the segments
-  // list up into ~80k setState writes / a Math.max(...spread) RangeError (SEC-GC1).
-  const seenPackets = new Set<number>();
+  // Valid 20-byte frames in push order. Dedupe AA-A5 by packet number and bound
+  // the scan so a malicious broker can't send a huge `op.command` array and
+  // blow the segment list up into ~80k setState writes (SEC-GC1).
+  const frames: Buffer[] = [];
+  const packets = new Map<number, Buffer>();
+  const packetPos: number[] = [];
   const MAX_SCAN = 512;
   let scanned = 0;
-
   for (const cmd of commands) {
-    if (seenPackets.size >= 5 || scanned >= MAX_SCAN) {
+    if (scanned >= MAX_SCAN) {
       break;
     }
     scanned++;
@@ -69,10 +91,9 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
       continue;
     }
     const bytes = Buffer.from(cmd, "base64");
-    if (bytes.length < 20 || bytes[0] !== 0xaa || bytes[1] !== 0xa5) {
+    if (bytes.length < 20) {
       continue;
     }
-
     // M2 — XOR checksum validation. Govee BLE packets carry an XOR over bytes
     // 0-18 in the last byte (index 19). Spoofed/malformed packets would
     // otherwise slip through and persist a wrong segmentCount.
@@ -83,22 +104,32 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
     if (xor !== bytes[19]) {
       continue;
     }
-
-    const packetNum = bytes[2];
-    if (packetNum < 1 || packetNum > 5) {
+    frames.push(bytes);
+    if (bytes[0] !== 0xaa || bytes[1] !== 0xa5) {
       continue;
     }
-    if (seenPackets.has(packetNum)) {
-      continue; // one packet per number — a repeat is corrupt/malicious (SEC-GC1)
+    const packetNum = bytes[2];
+    if (packetNum < 1 || packetNum > MAX_AA_A5_PACKETS || packets.has(packetNum)) {
+      continue;
     }
-    seenPackets.add(packetNum);
+    packets.set(packetNum, bytes);
+    packetPos.push(frames.length - 1);
+  }
+  if (packets.size === 0) {
+    return { segments: [], complete: false, trailGuess: false };
+  }
 
-    const baseIndex = (packetNum - 1) * 4;
-    for (let slot = 0; slot < 4; slot++) {
-      const segIdx = baseIndex + slot;
+  const numbers = [...packets.keys()].sort((x, y) => x - y);
+  const emptyFourth = (p: Buffer): boolean => p[15] === 0 && p[16] === 0 && p[17] === 0 && p[18] === 0;
+  const slotsPerPacket = numbers.length >= 2 && numbers.every(n => emptyFourth(packets.get(n)!)) ? 3 : 4;
+
+  const segments: MqttSegmentData[] = [];
+  for (const n of numbers) {
+    const bytes = packets.get(n)!;
+    for (let slot = 0; slot < slotsPerPacket; slot++) {
       const offset = 3 + slot * 4;
       segments.push({
-        index: segIdx,
+        index: (n - 1) * slotsPerPacket + slot,
         brightness: bytes[offset],
         r: bytes[offset + 1],
         g: bytes[offset + 2],
@@ -107,26 +138,81 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
     }
   }
 
-  // Strip trailing padding. The final packet is padded to 4 slots when the real
-  // segment count isn't a multiple of 4. Padding is either all-zero OR carries
-  // an impossible brightness (>100 can never be a real segment — the H6076 pads
-  // with 0x92 = 146). If we stripped anything, the device ended its list here →
-  // `complete`, and the count may shrink the stored total. If we stripped
-  // nothing, the list may be truncated at the 20-slot parser cap → grow-only.
-  let strippedPadding = false;
+  let trailGuess = false;
   while (segments.length > 0) {
     const tail = segments[segments.length - 1];
     const allZero = tail.brightness === 0 && tail.r === 0 && tail.g === 0 && tail.b === 0;
     if (allZero || tail.brightness > 100) {
       segments.pop();
-      strippedPadding = true;
-    } else {
-      break;
+      continue;
     }
+    const before = segments.length >= 2 ? segments[segments.length - 2] : undefined;
+    if (
+      before &&
+      tail.r === tail.g &&
+      tail.g === tail.b &&
+      tail.r === before.brightness &&
+      tail.brightness !== before.brightness
+    ) {
+      segments.pop();
+      trailGuess = true;
+      continue;
+    }
+    break;
   }
 
-  return { segments, complete: strippedPadding };
+  const gapless = numbers.every((n, i) => n === i + 1);
+  const firstPos = Math.min(...packetPos);
+  const lastPos = Math.max(...packetPos);
+  const statusBefore = frames.slice(0, firstPos).some(f => f[0] === 0xaa && f[1] === 0x05);
+  const statusAfter = frames.slice(lastPos + 1).some(f => f[0] === 0xaa && (f[1] === 0x11 || f[1] === 0x41));
+  return { segments, complete: gapless && statusBefore && statusAfter, trailGuess };
 }
+
+/**
+ * The segment count the app's own snapshots address — an independent
+ * reference for a count read from an AA-A5 push. Decodes the `33 05 15 01`
+ * frames (`RR GG BB`, five bytes, then the 7-byte segment mask in bytes 12-18,
+ * least significant bit first — the layout `buildSegmentBitmask` writes) and
+ * returns the highest addressed segment + 1 over all snapshots; `null` when no
+ * snapshot carries such a frame (other sub-commands, e.g. the H1310's `03`/`04`,
+ * are not decoded — their layout is not known).
+ *
+ * Measured on the recordings: H6076 7 (mask `7f`), H61E5 9 (`ff 01`),
+ * H1741 8 (`ff 00`) — each equal to the model's AA-A5 count.
+ *
+ * @param snapshotBleCmds Snapshot BLE packets (per snapshot, per command group)
+ */
+export function segmentCountFromSnapshotFrames(snapshotBleCmds: unknown): number | null {
+  if (!Array.isArray(snapshotBleCmds)) {
+    return null;
+  }
+  let highest = -1;
+  for (const snapshot of snapshotBleCmds) {
+    for (const group of Array.isArray(snapshot) ? snapshot : []) {
+      for (const frame of Array.isArray(group) ? group : []) {
+        if (typeof frame !== "string") {
+          continue;
+        }
+        const b = Buffer.from(frame, "base64");
+        if (b.length !== 20 || b[0] !== 0x33 || b[1] !== 0x05 || b[2] !== 0x15 || b[3] !== 0x01) {
+          continue;
+        }
+        for (let i = 0; i < 7; i++) {
+          for (let bit = 0; bit < 8; bit++) {
+            if ((b[12 + i] >> bit) & 1) {
+              highest = Math.max(highest, i * 8 + bit);
+            }
+          }
+        }
+      }
+    }
+  }
+  return highest >= 0 ? highest + 1 : null;
+}
+
+/** Where a device's segment count comes from — see {@link resolveSegmentCountWithSource}. */
+export type SegmentCountSource = "quirk" | "learned" | "cloudCapability" | "none";
 
 /**
  * Resolve the authoritative segment count for a device.
@@ -147,15 +233,31 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
  * @param registry This instance's device catalog (segmentCount quirk lookup)
  */
 export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistry): number {
+  return resolveSegmentCountWithSource(device, registry).count;
+}
+
+/**
+ * {@link resolveSegmentCount} together with the source that settled it. The
+ * diagnostics report names the source from THIS answer — it used to re-derive
+ * it with its own copy of the priority, without the plausibility gate, and
+ * reported "cloud capability" next to a count of 0.
+ *
+ * @param device Target device
+ * @param registry This instance's device catalog (segmentCount quirk lookup)
+ */
+export function resolveSegmentCountWithSource(
+  device: GoveeDevice,
+  registry: DeviceRegistry,
+): { count: number; source: SegmentCountSource } {
   // A segmentCount quirk is a hard override — Govee's capability count lies for
   // some SKUs; this wins over Cloud, cache and the live MQTT value.
   const override = plausibleSegmentCount(registry.getQuirks(device.sku)?.segmentCount);
   if (override !== undefined) {
-    return override;
+    return { count: override, source: "quirk" };
   }
   const stored = plausibleSegmentCount(device.segmentCount);
   if (stored !== undefined) {
-    return stored;
+    return { count: stored, source: "learned" };
   }
   const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
   let min = Number.POSITIVE_INFINITY;
@@ -180,7 +282,7 @@ export function resolveSegmentCount(device: GoveeDevice, registry: DeviceRegistr
       }
     }
   }
-  return Number.isFinite(min) ? min : 0;
+  return Number.isFinite(min) ? { count: min, source: "cloudCapability" } : { count: 0, source: "none" };
 }
 
 /**

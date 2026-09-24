@@ -1600,5 +1600,23 @@ describe("GoveeMqttClient", () => {
       expect(frames).toEqual(["qqUB", "qqUC"]);
       h.client.disconnect();
     });
+
+    it("no silent refresh after the #39 reject cap or after the adapter stopped — both would reach Govee's login", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      (h.client as unknown as { authFailCount: number }).authFailCount = 3; // cap reached
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(1);
+      (h.client as unknown as { authFailCount: number }).authFailCount = 0;
+      h.client.disconnect();
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(1);
+    });
   });
 });

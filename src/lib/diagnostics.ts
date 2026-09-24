@@ -8,6 +8,7 @@ import {
   isLanDriven,
   resolveDeviceReachability,
   resolveSegmentCount,
+  resolveSegmentCountWithSource,
 } from "./device-manager/lookups";
 import { CLOUD_REACHABILITY_REFRESH_MS, STATUS_REQUEST_INTERVAL_MS } from "./timing-constants";
 import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
@@ -1268,23 +1269,24 @@ export class DiagnosticsCollector {
   }
 
   /**
-   * Which source settled this device's segment count. Mirrors the priority in
-   * `resolveSegmentCount` without importing it — the report states a fact about
-   * the device, it does not re-derive the number.
+   * Which source settled this device's segment count — the answer of
+   * `resolveSegmentCountWithSource`, put into words. A second copy of the
+   * priority here drifted (no plausibility gate: "cloud capability" next to
+   * a count of 0; a quirk of 99 reported as the source of a different count).
    *
    * @param device The device being reported on
    */
   private segmentCountSource(device: GoveeDevice): string {
-    if (this.registry.getQuirks(device.sku)?.segmentCount !== undefined) {
-      return "quirk (hard override for this SKU)";
+    switch (resolveSegmentCountWithSource(device, this.registry).source) {
+      case "quirk":
+        return "quirk (hard override for this SKU)";
+      case "learned":
+        return "learned at runtime (cache, MQTT push or wizard)";
+      case "cloudCapability":
+        return "smallest cloud segment capability";
+      case "none":
+      default:
+        return "unknown (no segment source)";
     }
-    if (typeof device.segmentCount === "number" && device.segmentCount > 0) {
-      return "learned at runtime (cache, MQTT push or wizard)";
-    }
-    const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
-    if (caps.some(c => typeof c?.type === "string" && c.type.includes("segment_color_setting"))) {
-      return "smallest cloud segment capability";
-    }
-    return "unknown (no segment source)";
   }
 }

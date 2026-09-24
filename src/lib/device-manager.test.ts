@@ -158,6 +158,33 @@ function createCallTracker(): { calls: CallRecord[]; track: (method: string) => 
 }
 
 /**
+ * A 20-byte status frame `aa <fn> 00…` with a valid checksum.
+ *
+ * @param fn Function byte (0x05 opens a full status report, 0x11/0x41 follow the A5 run)
+ */
+function buildStatusFrame(fn: number): string {
+  const bytes = new Uint8Array(20);
+  bytes[0] = 0xaa;
+  bytes[1] = fn;
+  let xor = 0;
+  for (let i = 0; i < 19; i++) {
+    xor ^= bytes[i];
+  }
+  bytes[19] = xor;
+  return Buffer.from(bytes).toString("base64");
+}
+
+/**
+ * The shape of a FULL status report as every recorded push has it: an `aa 05`
+ * frame, the A5 run, an `aa 11` frame. Only such a push may lower a count.
+ *
+ * @param a5 The A5 packets
+ */
+function inStatusReport(a5: string[]): string[] {
+  return [buildStatusFrame(0x05), ...a5, buildStatusFrame(0x11)];
+}
+
+/**
  * Build a 20-byte AA A5 packet with 4 segment slots
  *
  * @param packetNum Packet sequence number written to byte 2
@@ -828,9 +855,10 @@ describe("DeviceManager", () => {
       expect(brightCalls[0].args[1]).toBe(80);
     });
 
-    it("sendCommand(segmentBatch, null/undefined) sends nothing and does not throw", async () => {
+    it("sendCommand(segmentBatch, null/undefined) sends nothing and is refused, not confirmed", async () => {
       // Internal callers (wizard, restore) hand over objects; a null/undefined
-      // value carries no segments — dropped without a LAN frame, without a crash.
+      // value carries no segments — no LAN frame, and a rejection (principle 5)
+      // instead of a silent success.
       const lanTracker = createCallTracker();
       dm.setLanClient({
         setColor: lanTracker.track("setColor"),
@@ -839,8 +867,8 @@ describe("DeviceManager", () => {
       } as any);
       const device = createTestDevice();
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-      await dm.sendCommand(device, "segmentBatch", null);
-      await dm.sendCommand(device, "segmentBatch", undefined);
+      await expect(dm.sendCommand(device, "segmentBatch", null)).rejects.toThrow(/invalid segment batch/);
+      await expect(dm.sendCommand(device, "segmentBatch", undefined)).rejects.toThrow(/invalid segment batch/);
       expect(lanTracker.calls).toHaveLength(0);
     });
 
@@ -2080,10 +2108,12 @@ describe("DeviceManager", () => {
       const real: [number, number, number, number] = [100, 255, 206, 146];
       const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
       const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
-      const { segments, complete } = parseMqttSegmentData([pkt1, pkt2]);
+      const { segments, complete } = parseMqttSegmentData(inStatusReport([pkt1, pkt2]));
       expect(segments).toHaveLength(7);
       expect(segments[6].index).toBe(6);
       expect(complete).toBe(true);
+      // The same packets without the surrounding report prove nothing about the end.
+      expect(parseMqttSegmentData([pkt1, pkt2]).complete).toBe(false);
     });
 
     it("does NOT strip a >100 slot mid-list — trailing-only (no mid-list filter)", () => {
@@ -2285,7 +2315,7 @@ describe("DeviceManager", () => {
       const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
       const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
 
-      dm.handleMqttStatus({ sku: "H6076", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
+      dm.handleMqttStatus({ sku: "H6076", device: "AABBCCDDEEFF0011", op: { command: inStatusReport([pkt1, pkt2]) } });
 
       expect(changed).not.toBeNull();
       expect(dm.getDevices()[0].segmentCount).toBe(7);

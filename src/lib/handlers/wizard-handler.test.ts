@@ -35,7 +35,11 @@ function makeAdapter(devices: GoveeDevice[]): {
     log: mockLog,
     namespace: "govee-smart.0",
     lanClient: null,
-    deviceManager: { getDevices: () => devices, sendCommand: () => Promise.resolve(undefined) } as never,
+    deviceManager: {
+      getDevices: () => devices,
+      sendCommand: () => Promise.resolve(undefined),
+      syncSegmentCount: () => 12,
+    } as never,
     stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
     segmentWizard: null,
     getStateAsync: () => Promise.resolve(null),
@@ -108,6 +112,16 @@ describe("runWizardStep", () => {
     const first = adapter.segmentWizard;
     await runWizardStep(adapter, "bogus", deviceKeyFor(device));
     expect(adapter.segmentWizard).toBe(first); // no second instance
+  });
+});
+
+describe("buildWizardHost — segment count", () => {
+  it("reports the tree size the device manager builds for — the restore covers an unmeasured strip too", () => {
+    const device = createTestDevice({ segmentCount: undefined });
+    const { adapter } = makeAdapter([device]);
+    expect(buildWizardHost(adapter).segmentCount(device)).toBe(12);
+    (adapter as { deviceManager: unknown }).deviceManager = null;
+    expect(buildWizardHost(adapter).segmentCount(device)).toBe(0);
   });
 });
 
