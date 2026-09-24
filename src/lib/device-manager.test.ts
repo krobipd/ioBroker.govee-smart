@@ -2992,6 +2992,21 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(await dm2.pollAppApi()).toBe(0); // unknown entry ignored despite a known device present
     });
 
+    it("a 401 from the App API asks for a fresh bearer; any other failure does not (audit 2026-09-24 M1)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" });
+      dm2.getDevices()[0].type = "devices.types.thermometer";
+      const refresh = vi.fn();
+      dm2.setBearerRefresher(refresh);
+      let failure: Error = new HttpError("Govee rejected the device list: status=401 — please login", 401, {}, "");
+      dm2.setApiClient({ hasBearerToken: () => true, fetchDeviceList: () => Promise.reject(failure) } as never);
+      await dm2.pollAppApi();
+      expect(refresh).toHaveBeenCalledTimes(1);
+      failure = new Error("socket hang up");
+      await dm2.pollAppApi();
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
     it("gateway is sticky — set when gatewayInfo is present, never cleared on a poll that omits it", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
       const dev = createTestDevice({

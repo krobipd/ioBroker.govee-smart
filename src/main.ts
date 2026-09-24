@@ -876,6 +876,8 @@ export class GoveeAdapter extends utils.Adapter {
         this.deviceManager.setStatusRequester((device, cmdVersion) =>
           device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false,
         );
+        // A 401 from the App API asks the account client for a fresh bearer.
+        this.deviceManager.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
 
         // Forward every parsed MQTT message into the diagnostics ring buffer
         // so the report contains the recent packets per device. v2.9.1: the
@@ -959,12 +961,12 @@ export class GoveeAdapter extends utils.Adapter {
         // One-shot: clean up legacy v2.1.0/v2.1.1/v2.1.2 native fields
         // that contained plaintext credentials. Best-effort.
         await cloudCreds.cleanupLegacyMqttNativeOnce(this.handlerHost);
-        const cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir);
+        const cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir, accountEmail);
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
         this.mqttClient.setOnCredentialsRefresh(creds => {
-          cloudCreds.persistCreds(this.handlerHost, dataDir, creds).catch(e => {
+          cloudCreds.persistCreds(this.handlerHost, dataDir, creds, accountEmail).catch(e => {
             this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
           });
         });

@@ -1,10 +1,15 @@
 import { vi } from "vitest";
 import { GoveeApiClient, parseLastData, parseSettings } from "./govee-api-client";
 import { httpsRequest } from "./http-client";
+import type * as HttpClientModule from "./http-client";
+import { classifyError } from "./types";
 
 // The scene / music / DIY library walkers call the module-level httpsRequest
 // (no DI), so mock it to drive walkCategories + the per-walker extraction.
-vi.mock("./http-client", () => ({ httpsRequest: vi.fn() }));
+vi.mock("./http-client", async importOriginal => ({
+  ...(await importOriginal<typeof HttpClientModule>()),
+  httpsRequest: vi.fn(),
+}));
 const mockHttp = vi.mocked(httpsRequest);
 
 const apiLog = {
@@ -331,6 +336,10 @@ describe("GoveeApiClient — fetchDeviceList (sensor device list)", () => {
     const client = new GoveeApiClient(apiLog);
     client.setBearerToken("tok");
     await expect(client.fetchDeviceList()).rejects.toThrow(/status=401 — please login/);
+    // …and as an AUTH failure, so the caller can ask for a fresh bearer
+    // (a plain Error was classified UNKNOWN — audit 2026-09-24 M1).
+    const err = await client.fetchDeviceList().catch((e: unknown) => e);
+    expect(classifyError(err)).toBe("AUTH");
   });
 });
 

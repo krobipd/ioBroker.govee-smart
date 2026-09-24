@@ -536,7 +536,7 @@ describe("GoveeMqttClient", () => {
       return { client, published };
     }
 
-    it("publishes govee2mqtt's payload byte for byte on the device topic, QoS 0, and reports success", async () => {
+    it("publishes govee2mqtt's payload plus the account topic homebridge-govee adds, on the device topic, QoS 0", async () => {
       const { client, published } = connectedClient();
       await client.connect(
         () => {},
@@ -547,7 +547,7 @@ describe("GoveeMqttClient", () => {
       expect(published).toHaveLength(1);
       expect(published[0].topic).toBe("GD/0123456789abcdef0123456789abcdef");
       expect(published[0].payload).toBe(
-        '{"msg":{"cmd":"status","cmdVersion":2,"transaction":"v_1790071124009000","type":0}}',
+        '{"msg":{"cmd":"status","cmdVersion":2,"transaction":"v_1790071124009000","type":0,"accountTopic":"GA/topic"}}',
       );
       expect(published[0].opts).toEqual({ qos: 0 });
     });
@@ -561,7 +561,7 @@ describe("GoveeMqttClient", () => {
       (client as unknown as { client: { connected: boolean } }).client.connected = true;
       expect(client.requestStatus("GD/0123456789abcdef0123456789abcdef", 1790071124009, 1)).toBe(true);
       expect(published[0].payload).toBe(
-        '{"msg":{"cmd":"status","cmdVersion":1,"transaction":"v_1790071124009000","type":0}}',
+        '{"msg":{"cmd":"status","cmdVersion":1,"transaction":"v_1790071124009000","type":0,"accountTopic":"GA/topic"}}',
       );
     });
 
@@ -1160,18 +1160,38 @@ describe("GoveeMqttClient", () => {
   // driven: message → status callback, close → reconnect, error → classified,
   // plus the proactive bearer refresh timer. A fake broker emits them here.
   describe("broker event wiring + bearer refresh", () => {
-    function liveClient(): {
+    function liveClient(
+      log: ioBroker.Logger = mockLog,
+      tokenCycle: unknown = 3600,
+      accountId = "acc",
+      declineLaterLogins = false,
+    ): {
       client: GoveeMqttClient;
       fake: FakeHttpsRequest;
       fakeMqtt: { connected: boolean };
       emit: (ev: string, ...args: unknown[]) => void;
       scheduled: Array<{ cb: () => void; ms: number }>;
+      ends: () => number;
     } {
-      const fake = makeFakeHttps((_opts, idx) =>
-        idx === 0
-          ? { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } }
-          : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
+      // Every login succeeds; the first call is the login of connect(), the
+      // IoT key follows it. A later login (refresh/reconnect) answers with a
+      // client too, only the very first IoT call differs from a plain login.
+      let loginCount = 0;
+      const fake = makeFakeHttps(opts =>
+        opts.url.includes("/login") && declineLaterLogins && ++loginCount > 1
+          ? { status: 400, message: "declined" }
+          : opts.url.includes("/login")
+            ? {
+                client: {
+                  accountId,
+                  topic: `GA/${accountId}/topic`,
+                  token: "bearer",
+                  token_expire_cycle: tokenCycle,
+                },
+              }
+            : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
       );
+      let endCount = 0;
       const handlers: Record<string, Array<(...a: unknown[]) => void>> = {};
       const fakeMqtt = {
         connected: false,
@@ -1183,6 +1203,7 @@ describe("GoveeMqttClient", () => {
           cb(null);
         },
         end() {
+          endCount += 1;
           fakeMqtt.connected = false;
         },
         removeAllListeners() {
@@ -1202,7 +1223,7 @@ describe("GoveeMqttClient", () => {
         clearTimeout: () => {},
         delay: () => Promise.resolve(),
       } as never;
-      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, timers, fake.fn, (() => fakeMqtt) as never);
+      const client = new GoveeMqttClient("u@example.com", "pw", log, timers, fake.fn, (() => fakeMqtt) as never);
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
         cert: "c",
@@ -1214,6 +1235,7 @@ describe("GoveeMqttClient", () => {
         fakeMqtt,
         emit: (ev, ...args) => (handlers[ev] ?? []).forEach(h => h(...args)),
         scheduled,
+        ends: () => endCount,
       };
     }
 
@@ -1273,13 +1295,309 @@ describe("GoveeMqttClient", () => {
       // token_expire_cycle 3600 s → refresh armed at 55 min.
       const refresh = h.scheduled.find(s => s.ms > 3_000_000 && s.ms <= 3_300_000);
       expect(refresh, "refresh timer must be armed after a login").toBeDefined();
-      const loginsBefore = h.fake.calls.length;
+      const callsBefore = h.fake.calls.length;
       h.fakeMqtt.connected = true;
       refresh!.cb();
       await new Promise(r => setTimeout(r, 10));
-      expect(h.fake.calls.length).toBe(loginsBefore + 1);
-      expect(h.fake.calls[h.fake.calls.length - 1].url).toContain("/login");
+      // A silent re-login, then the IoT key for the refreshed bundle.
+      expect(h.fake.calls.slice(callsBefore).map(c => c.url.includes("/login"))).toEqual([true, false]);
       expect(h.client.token).toBe("bearer");
+      h.client.disconnect();
+    });
+
+    // Audit 2026-09-24 H1: the #39 cap counted only rejected logins. Every
+    // reconnect after the startup bundle expired — and every reconnect of a
+    // first installation — was a full login, without any limit (govee2mqtt
+    // #702: an account locked for 24 h by ~6 successful logins per hour).
+    it("a reconnect after a fresh login reuses the bundle in memory — no second login", async () => {
+      const h = liveClient();
+      const tokens: string[] = [];
+      await h.client.connect(
+        () => {},
+        () => {},
+        t => tokens.push(t),
+      );
+      h.emit("connect");
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      expect(logins()).toBe(1);
+      h.emit("close");
+      h.scheduled.at(-1)!.cb(); // the backoff timer fires
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(1);
+      expect(tokens).toEqual(["bearer"]); // the reuse hands over the same bearer — dependents stay quiet
+      h.client.disconnect();
+    });
+
+    it("a network close before CONNACK keeps the bundle; three in a row or a certificate rejection retire it", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      h.emit("close");
+      for (let i = 0; i < 3; i++) {
+        h.scheduled.at(-1)!.cb(); // reuse attempt
+        await new Promise(r => setTimeout(r, 5));
+        expect(logins(), `reuse attempt ${i + 1} must not log in`).toBe(1);
+        h.emit("close"); // closed before any CONNACK — a network failure
+      }
+      h.scheduled.at(-1)!.cb(); // bundle retired after three → fresh login
+      await new Promise(r => setTimeout(r, 5));
+      expect(logins()).toBe(2);
+      // A certificate rejection retires it at once.
+      h.emit("connect");
+      h.emit("close");
+      h.scheduled.at(-1)!.cb(); // reuse attempt …
+      await new Promise(r => setTimeout(r, 5));
+      h.emit("error", Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }));
+      h.emit("close"); // … rejected by the broker
+      h.scheduled.at(-1)!.cb();
+      await new Promise(r => setTimeout(r, 5));
+      expect(logins()).toBe(3);
+      h.client.disconnect();
+    });
+
+    it("caps SUCCESSFUL logins per hour — a broker that keeps refusing the certificate cannot loop the login", async () => {
+      const warns: string[] = [];
+      const h = liveClient({ ...mockLog, warn: (m: string) => void warns.push(m) });
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      for (let i = 0; i < 12; i++) {
+        h.emit("error", Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }));
+        h.emit("close");
+        h.scheduled.at(-1)!.cb();
+        await new Promise(r => setTimeout(r, 5));
+      }
+      expect(logins()).toBe(3);
+      expect(h.client.getFailureReason()).toContain("too many logins");
+      expect(warns.filter(w => w.includes("pausing logins"))).toHaveLength(1);
+      // The pause is one timer to the end of the window, not a tight loop.
+      expect(h.scheduled.at(-1)!.ms).toBeGreaterThan(50 * 60 * 1000);
+      h.client.disconnect();
+    });
+
+    it("a declined silent refresh is scheduled again instead of letting the bearer expire", async () => {
+      const h = liveClient(mockLog, 3600, "acc", true);
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      h.fakeMqtt.connected = true;
+      const refresh = h.scheduled.find(s => s.ms > 3_000_000 && s.ms <= 3_300_000)!;
+      const before = h.scheduled.length;
+      refresh.cb(); // the fake answers the login with a non-client body → declined
+      await new Promise(r => setTimeout(r, 10));
+      const retry = h.scheduled.slice(before).find(s => s.ms === 5 * 60 * 1000);
+      expect(retry, "a declined refresh must arm a retry").toBeDefined();
+      h.client.disconnect();
+    });
+
+    it("a bundle reused inside its last five minutes still gets a refresh", async () => {
+      const h = liveClient();
+      h.client.setPersistedCredentials({
+        bearerToken: "b",
+        iotEndpoint: "iot.example.com",
+        p12Cert: "AAA=",
+        p12Pass: "x",
+        accountId: "acc",
+        accountTopic: "GA/acc/topic",
+        tokenExpiresAt: Date.now() + 2 * 60 * 1000,
+      });
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      expect(h.fake.calls).toHaveLength(0); // reused, no login
+      expect(h.scheduled.some(s => s.ms >= 60_000 && s.ms <= 90_000)).toBe(true);
+      h.client.disconnect();
+    });
+
+    it("a token lifetime too large for a timer, or not a number, never throws and is bounded", async () => {
+      for (const cycle of [1e10, "soon", -5]) {
+        const h = liveClient(undefined, cycle);
+        await expect(
+          h.client.connect(
+            () => {},
+            () => {},
+          ),
+        ).resolves.toBeUndefined();
+        const refresh = h.scheduled.at(-1)!;
+        expect(refresh.ms).toBeLessThanOrEqual(7 * 24 * 60 * 60 * 1000);
+        expect(h.client.getFailureReason()).toBeNull(); // no failure recorded
+        h.client.disconnect();
+      }
+    });
+
+    it("ends the previous broker client before a reconnect replaces it — on the reuse and on the login path", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      let endsBefore = h.ends();
+      await h.client.connect(
+        () => {},
+        () => {},
+      ); // reuse path (bundle in memory)
+      expect(h.ends()).toBe(endsBefore + 1);
+      h.client.setPersistedCredentials(null);
+      endsBefore = h.ends();
+      await h.client.connect(
+        () => {},
+        () => {},
+      ); // fresh login path
+      expect(h.ends()).toBe(endsBefore + 1);
+      h.client.disconnect();
+    });
+
+    it("reads sku/device from `state` when the envelope carries none (govee2mqtt iot.rs)", async () => {
+      const h = liveClient();
+      const statuses: Array<{ sku: string; device: string }> = [];
+      await h.client.connect(
+        s => statuses.push(s),
+        () => {},
+      );
+      h.emit(
+        "message",
+        "GA/acc/topic",
+        Buffer.from(JSON.stringify({ state: { sku: "H6199", device: "AA:CC", onOff: 1 } })),
+      );
+      expect(statuses[0]).toMatchObject({ sku: "H6199", device: "AA:CC" });
+      h.client.disconnect();
+    });
+
+    it("a throwing status handler is not a parse error — and the packet still reaches the report", async () => {
+      const debugs: string[] = [];
+      const h = liveClient({ ...mockLog, debug: (m: string) => void debugs.push(m) });
+      const packets: string[] = [];
+      h.client.setPacketHook(dev => packets.push(dev));
+      await h.client.connect(
+        () => {
+          throw new Error("handler broke");
+        },
+        () => {},
+      );
+      h.emit("message", "GA/acc/topic", Buffer.from(JSON.stringify({ sku: "H61BE", device: "AA:BB", state: {} })));
+      expect(packets).toEqual(["AA:BB"]);
+      expect(debugs.some(d => d.includes("Failed to parse"))).toBe(false);
+      expect(debugs.some(d => d.includes("status handler failed: handler broke"))).toBe(true);
+      h.client.disconnect();
+    });
+
+    it("keeps the account id and the account topic out of every log line", async () => {
+      const lines: string[] = [];
+      const collect = (m: string): void => void lines.push(m);
+      const h = liveClient({ ...mockLog, debug: collect, info: collect, warn: collect }, 3600, "12345678901");
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      h.emit("close");
+      h.scheduled.at(-1)!.cb();
+      await new Promise(r => setTimeout(r, 5));
+      h.emit("connect");
+      const all = lines.join("\n");
+      expect(all).toContain("MQTT connected");
+      expect(all).not.toContain("12345678901");
+      h.client.disconnect();
+    });
+
+    it("requestBearerRefresh logs in again even while the broker is down (App API answered 401)", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(2);
+      h.client.disconnect();
+    });
+
+    it("a refresh respects the login window, and a second trigger while one runs does not log in twice", async () => {
+      const h = liveClient();
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      h.client.requestBearerRefresh();
+      h.client.requestBearerRefresh(); // still running → ignored
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(2);
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(3); // window full now (3 per hour)
+      const before = h.scheduled.length;
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins()).toBe(3);
+      expect(h.scheduled.slice(before).some(t => t.ms > 50 * 60 * 1000)).toBe(true); // retried when the window has room
+      h.client.disconnect();
+    });
+
+    it("a refresh whose IoT-key call fails keeps the certificate and stores the NEW bearer", async () => {
+      const bundles: Array<{ bearerToken: string; iotEndpoint: string }> = [];
+      let iotCalls = 0;
+      const h = liveClient();
+      h.client.setOnCredentialsRefresh(b => bundles.push(b));
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      // From here on the IoT key fails.
+      (h.client as unknown as { httpsRequestImpl: unknown }).httpsRequestImpl = (opts: { url: string }) => {
+        if (!opts.url.includes("/login")) {
+          iotCalls += 1;
+          return Promise.reject(new Error("iot key down"));
+        }
+        return Promise.resolve({
+          value: { client: { accountId: "acc", topic: "GA/acc/topic", token: "fresh", token_expire_cycle: 3600 } },
+          statusCode: 200,
+        });
+      };
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(iotCalls).toBe(1);
+      expect(bundles.at(-1)).toMatchObject({ bearerToken: "fresh", iotEndpoint: "iot.example.com" });
+      h.client.disconnect();
+    });
+
+    it("a refresh that finishes after the adapter stopped arms no new timer", async () => {
+      const h = liveClient(mockLog, 3600, "acc", true); // the refresh login is declined → would re-arm
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.client.requestBearerRefresh();
+      h.client.disconnect();
+      const before = h.scheduled.length;
+      await new Promise(r => setTimeout(r, 10));
+      expect(h.scheduled.length).toBe(before);
+    });
+
+    it("hands each BLE frame of a packet to the report — and nothing that is not a frame", async () => {
+      const h = liveClient();
+      const frames: Array<string | undefined> = [];
+      h.client.setPacketHook((_dev, _topic, payload) => frames.push(payload.hex));
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit(
+        "message",
+        "GA/acc/topic",
+        Buffer.from(JSON.stringify({ sku: "H6076", device: "AA:BB", op: { command: ["qqUB", 7, "", null, "qqUC"] } })),
+      );
+      expect(frames).toEqual(["qqUB", "qqUC"]);
       h.client.disconnect();
     });
   });

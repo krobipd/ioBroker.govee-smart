@@ -115,6 +115,16 @@ export abstract class ReconnectingMqttClient {
       this.reconnectTimer = undefined;
     }
     this.disposeExtras();
+    this.releaseClient();
+  }
+
+  /**
+   * End the current client, if any, before a new one takes its place. Both
+   * connect paths assign `this.client` anew; without this the previous socket
+   * stayed open (its handlers attached) whenever a reconnect replaced a client
+   * that had not closed — e.g. after a throw between creating and wiring it.
+   */
+  protected releaseClient(): void {
     if (this.client) {
       this.client.removeAllListeners();
       this.client.on("error", () => {

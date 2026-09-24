@@ -1,4 +1,4 @@
-import { formatFallback, httpsRequest, type HttpResult } from "./http-client";
+import { formatFallback, HttpError, httpsRequest, type HttpResult } from "./http-client";
 import {
   GOVEE_APP_BASE_URL,
   buildGoveeAppHeaders,
@@ -239,9 +239,15 @@ export class GoveeApiClient {
     // §4.2). Until 2.35.0 that became an empty list: nothing warned, the sensor
     // values simply stopped. A failed fetch throws — the caller warns once and
     // records it in the diagnostics report (device-manager.ts pollAppApi).
+    // Thrown as HttpError with the body-level status as its code, so
+    // classifyError sees a 401 as AUTH (a plain Error read as UNKNOWN) and the
+    // caller can ask for a fresh bearer (audit 2026-09-24 M1).
     if (typeof resp?.status === "number" && resp.status !== 200 && !Array.isArray(resp.devices)) {
-      throw new Error(
+      throw new HttpError(
         `Govee rejected the device list: status=${resp.status}${resp.message ? ` — ${resp.message}` : ""}`,
+        resp.status,
+        {},
+        "",
       );
     }
 

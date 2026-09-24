@@ -3,7 +3,15 @@ import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
 import { buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
-import { MQTT_MAX_AUTH_FAILURES, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
+import {
+  MQTT_LOGIN_WINDOW_MS,
+  MQTT_MAX_AUTH_FAILURES,
+  MQTT_MAX_LOGINS_PER_WINDOW,
+  MQTT_REFRESH_RETRY_MS,
+  VERIFICATION_REQUEST_THROTTLE_MS,
+  clampTimerMs,
+  tokenTtlSeconds,
+} from "./timing-constants";
 import { ReconnectingMqttClient } from "./reconnecting-mqtt-client";
 import {
   classifyError,
@@ -15,6 +23,7 @@ import {
   type PersistedMqttCredentials,
   type TimerAdapter,
   errMessage,
+  maskSecret,
 } from "./types";
 
 const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
@@ -147,6 +156,20 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * against Govee marking the account as suspicious from rapid-fire user clicks.
    */
   private lastVerificationRequestMs = 0;
+  /** Times of the account logins inside the last {@link MQTT_LOGIN_WINDOW_MS} — successful or not. */
+  private loginTimes: number[] = [];
+  /** Logins are paused until this time (ms) once the window is full; 0 = not paused. */
+  private loginPausedUntil = 0;
+  /** Broker host of the current bundle — for the log line, fresh login and reuse alike. */
+  private brokerEndpoint = "";
+  /** Last bearer handed to {@link onToken} — a reuse or refresh with the same token stays quiet. */
+  private lastEmittedToken = "";
+  /** Consecutive reuse attempts that closed before the broker's CONNACK. */
+  private reuseFailures = 0;
+  /** The broker rejected the current client's certificate (CONNACK not authorized). */
+  private clientAuthRejected = false;
+  /** A silent bearer refresh is running — a second trigger waits for it. */
+  private refreshInFlight = false;
 
   /**
    * @param email Govee account email
@@ -267,7 +290,15 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     if (!client || !this.connected) {
       return false;
     }
-    const payload = JSON.stringify({ msg: { cmd: "status", cmdVersion, transaction: `v_${now}000`, type: 0 } });
+    // homebridge-govee (lib/connection/aws.js) adds the account topic to every
+    // status request, and so does the reference in Ressourcen/mqtt-aws-iot.md;
+    // govee2mqtt sends it without. With it, a model that expects the field is
+    // not left silent — without it, the measured H61D5 answered as well.
+    const msg: Record<string, unknown> = { cmd: "status", cmdVersion, transaction: `v_${now}000`, type: 0 };
+    if (this.accountTopic) {
+      msg.accountTopic = this.accountTopic;
+    }
+    const payload = JSON.stringify({ msg });
     client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
       if (err) {
         this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errMessage(err)}`);
@@ -292,6 +323,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       return this.lastErrorCategory === "AUTH"
         ? "login rejected — check email/password"
         : "login retries stopped — Govee rejected repeatedly (account may be locked); check the account, then restart";
+    }
+    if (this.loginPausedUntil > Date.now()) {
+      return "too many logins within an hour — paused to protect the Govee account, resumes by itself";
     }
     switch (this.lastErrorCategory) {
       case "VERIFICATION_PENDING":
@@ -387,9 +421,18 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         return;
       }
 
-      // Step 1: Login
+      // Step 1: Login — at most MQTT_MAX_LOGINS_PER_WINDOW per window, a
+      // successful one counts as much as a rejected one (issue #39 class).
+      const waitMs = this.loginWaitMs(Date.now());
+      if (waitMs > 0) {
+        this.pauseLogins(waitMs);
+        return;
+      }
       const codeWasSent = (this.verificationCode ?? "").trim().length > 0;
       const loginResp = await this.login();
+      // Counted once Govee ANSWERED — a POST that failed on the network never
+      // reached the account and must not use up the window.
+      this.noteLogin(Date.now());
       if (!loginResp.client) {
         const apiStatus = loginResp.status ?? 0;
         const apiMsg = loginResp.message ?? "unknown error";
@@ -449,7 +492,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       this.accountTopic = topicRaw;
       // Notify dependents (e.g. api-client for authenticated library endpoints)
       // so they don't keep a stale token after a long-delay reconnect.
-      this.onToken?.(this._bearerToken);
+      this.emitToken(this._bearerToken);
 
       // Bail if the adapter unloaded while login was in flight — otherwise we'd
       // keep going and open a live TLS socket after onUnload (L12).
@@ -477,9 +520,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // whole login dance (and avoids the 2FA email storm). TTL comes from
       // Govee — `token_expire_cycle` (snake) or `tokenExpireCycle` (camel),
       // depending on the response variant. 1h fallback if Govee sends nothing.
-      const ttlSec = loginResp.client.token_expire_cycle ?? loginResp.client.tokenExpireCycle ?? 3600;
+      const ttlSec = tokenTtlSeconds(loginResp.client.token_expire_cycle ?? loginResp.client.tokenExpireCycle);
       const expiresAt = Date.now() + ttlSec * 1000;
-      this.onCredentialsRefresh?.({
+      this.rememberCredentials({
         bearerToken: this._bearerToken,
         iotEndpoint: endpoint,
         p12Cert: p12,
@@ -492,6 +535,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
 
       // Step 4: Connect MQTT with mutual TLS
       const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
+      this.releaseClient();
+      this.brokerEndpoint = endpoint;
+      this.clientAuthRejected = false;
       this.client = this.mqttConnectImpl(`mqtts://${endpoint}:8883`, {
         clientId,
         key,
@@ -629,14 +675,21 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       return;
     }
     const rawText = payload.toString();
+    let update: MqttStatusUpdate;
     try {
       const raw = JSON.parse(rawText) as Record<string, unknown>;
 
       // Defensive — blind casts would crash downstream if Govee pushes
       // unexpected types. Validate each field before constructing the update.
-      const sku = typeof raw.sku === "string" ? raw.sku : "";
-      const device = typeof raw.device === "string" ? raw.device : "";
       const state = raw.state && typeof raw.state === "object" ? (raw.state as MqttStatusUpdate["state"]) : undefined;
+      // The sku/device pair usually sits on the envelope, but govee2mqtt
+      // (src/service/iot.rs, "The sku can be in a couple of different
+      // places(!)") also reads it from `state` — a packet in that shape was
+      // dropped here without a trace.
+      const inState = (state ?? {}) as Record<string, unknown>;
+      const sku = typeof raw.sku === "string" ? raw.sku : typeof inState.sku === "string" ? inState.sku : "";
+      const device =
+        typeof raw.device === "string" ? raw.device : typeof inState.device === "string" ? inState.device : "";
       const op = raw.op && typeof raw.op === "object" ? (raw.op as MqttStatusUpdate["op"]) : undefined;
       // v2.30.0 — Govee announces reachability in its own packet kind
       // (`cmd:"online"`), which was dropped here until then, so a device with
@@ -649,27 +702,39 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       const cmd = typeof raw.cmd === "string" ? raw.cmd : undefined;
       // The transaction id dates the packet itself (see MqttStatusUpdate.transaction).
       const transaction = typeof raw.transaction === "string" ? raw.transaction : undefined;
-
-      if (sku || device) {
-        this.onStatus?.({ sku, device, cmd, state, op, transaction });
-        if (this.onPacket && device) {
-          // v2.9.1 — always forward the raw envelope so state-only pushes
-          // (state with no op.command) are visible in diag. Previously the
-          // hook only fired on op.command BLE bytes — state changes from
-          // the Govee app / physical remote went uncaptured.
-          if (Array.isArray(op?.command)) {
-            for (const cmd of op.command) {
-              if (typeof cmd === "string" && cmd) {
-                this.onPacket(device, topic, { hex: cmd, rawJson: rawText });
-              }
-            }
-          } else {
-            this.onPacket(device, topic, { rawJson: rawText });
-          }
-        }
+      if (!sku && !device) {
+        this.log.debug(`MQTT: message without sku/device ignored: ${rawText.slice(0, 200)}`);
+        return;
       }
+      update = { sku, device, cmd, state, op, transaction };
     } catch {
       this.log.debug(`MQTT: Failed to parse message: ${rawText.slice(0, 200)}`);
+      return;
+    }
+
+    // Hand-over, outside the parse `try`: an exception downstream is not a
+    // parse error, and the packet reaches the diagnostics buffer FIRST — a
+    // handler that throws would otherwise also erase the one packet that
+    // shows why.
+    try {
+      if (this.onPacket && update.device) {
+        // v2.9.1 — always forward the raw envelope so state-only pushes
+        // (state with no op.command) are visible in diag. Previously the
+        // hook only fired on op.command BLE bytes — state changes from
+        // the Govee app / physical remote went uncaptured.
+        if (Array.isArray(update.op?.command)) {
+          for (const frame of update.op.command) {
+            if (typeof frame === "string" && frame) {
+              this.onPacket(update.device, topic, { hex: frame, rawJson: rawText });
+            }
+          }
+        } else {
+          this.onPacket(update.device, topic, { rawJson: rawText });
+        }
+      }
+      this.onStatus?.(update);
+    } catch (e) {
+      this.log.debug(`MQTT: status handler failed: ${errMessage(e)}`);
     }
   }
 
@@ -714,10 +779,13 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this._bearerToken = creds.bearerToken;
     this.accountId = creds.accountId;
     this.accountTopic = creds.accountTopic;
-    this.onToken?.(this._bearerToken);
+    this.emitToken(this._bearerToken);
     const clientId = `AP/${creds.accountId}/${this.sessionUuid}`;
     this.log.debug("MQTT: trying cached credentials (no fresh login)");
     this.persistedAttemptInFlight = true;
+    this.releaseClient();
+    this.brokerEndpoint = creds.iotEndpoint;
+    this.clientAuthRejected = false;
     this.client = this.mqttConnectImpl(`mqtts://${creds.iotEndpoint}:8883`, {
       clientId,
       key: extracted.key,
@@ -745,8 +813,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this.client.on("connect", () => {
       const wasCached = this.persistedAttemptInFlight;
       this.persistedAttemptInFlight = false;
-      const broker = this.persisted?.iotEndpoint ?? "?";
-      const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
+      this.reuseFailures = 0;
+      const broker = this.brokerEndpoint || "?";
+      // Account id and topic stay out of the log: users paste debug logs into
+      // issues, and the topic is the address of the account's push channel.
+      const clientId = this.clientIdLabel();
       const authMode = wasCached ? "cached" : "fresh";
       // CONNACK only — do NOT reset the backoff/fail counters or clear the
       // error category yet. A persistent post-CONNACK subscribe failure must
@@ -763,7 +834,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
             this.lastErrorCategory = null;
           }
           this.lastErrorMessage = null;
-          this.log.debug(`MQTT subscribed to account topic: topic=${this.accountTopic} qos=0`);
+          this.log.debug(`MQTT subscribed to account topic: topic=${this.topicLabel()} qos=0`);
           this.onConnection?.(true);
         },
         // Subscribe-fail is rare (AWS-IoT policy mismatch, account flagged) but
@@ -779,6 +850,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // H10 — classify error events, otherwise the user only sees debug. The
       // close-event fallback catches a lot, but not spurious network errors
       // that don't lead to a disconnect.
+      if (classifyError(err) === "AUTH") {
+        this.clientAuthRejected = true;
+      }
       this.lastErrorCategory = logDedup(this.log, this.lastErrorCategory, "MQTT", err);
     });
     this.client.on("close", () => {
@@ -787,10 +861,18 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // connect — assume the bundle is stale (cert revoked, token
       // expired before our TTL guess, account topic changed). Wipe it
       // so scheduleReconnect → connect() falls through to a fresh login.
+      // Only a REJECTION retires the bundle: the broker refused the
+      // certificate (CONNACK not authorized), or three reuse attempts in a row
+      // closed before any CONNACK. A plain network failure keeps it — wiping
+      // it there turned every blocked port 8883 into a fresh login per retry.
       if (this.persistedAttemptInFlight) {
         this.persistedAttemptInFlight = false;
-        this.persisted = null;
-        this.log.debug("MQTT: cached credentials rejected — falling back to fresh login");
+        this.reuseFailures++;
+        if (this.clientAuthRejected || this.reuseFailures >= 3) {
+          this.persisted = null;
+          this.reuseFailures = 0;
+          this.log.debug("MQTT: cached credentials rejected — falling back to fresh login");
+        }
       }
       if (!this.lastErrorCategory) {
         this.lastErrorCategory = "NETWORK";
@@ -818,79 +900,219 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param expiresAt ms-timestamp at which the bearer token will be rejected
    */
   private scheduleProactiveRefresh(expiresAt: number): void {
+    const refreshAt = expiresAt - 5 * 60 * 1000;
+    const delay = refreshAt - Date.now();
+    // A bundle reused inside its last five minutes (or one whose lifetime is
+    // shorter than that) used to schedule nothing — the bearer then simply
+    // expired and every bearer endpoint answered 401 until a reconnect.
+    this.armRefresh(delay > 0 ? delay : 60_000 + Math.round(Math.random() * 30_000));
+  }
+
+  /**
+   * (Re)arm the silent-refresh timer.
+   *
+   * @param delay Delay in ms (clamped to what a timer accepts)
+   */
+  private armRefresh(delay: number): void {
     if (this.refreshTimer) {
       this.timers.clearTimeout(this.refreshTimer);
       this.refreshTimer = undefined;
     }
-    const refreshAt = expiresAt - 5 * 60 * 1000;
-    const delay = refreshAt - Date.now();
-    if (delay <= 0) {
+    if (this.disposed) {
       return;
     }
-    this.refreshTimer = this.timers.setTimeout(() => {
-      this.refreshTimer = undefined;
-      void this.refreshBearerSilently();
-    }, delay);
+    this.refreshTimer = this.timers.setTimeout(
+      () => {
+        this.refreshTimer = undefined;
+        void this.refreshBearerSilently();
+      },
+      clampTimerMs(delay, MQTT_REFRESH_RETRY_MS),
+    );
+  }
+
+  /**
+   * Ask for a fresh bearer now — the App API answered 401. Runs the same
+   * silent login as the timer (inside the login window), also while the
+   * broker is down: the bearer serves the REST calls, not the push channel.
+   */
+  requestBearerRefresh(): void {
+    void this.refreshBearerSilently(true);
   }
 
   /**
    * Refresh the bearer token without disconnecting MQTT. Called by the
-   * proactive-refresh timer. Failures don't disrupt the live session —
-   * the next reconnect-cycle (if Govee invalidates the cert) handles
-   * recovery via the normal connect() path.
+   * proactive-refresh timer and by {@link requestBearerRefresh}. Failures don't
+   * disrupt the live session; every failed or skipped attempt is scheduled
+   * again (a single declined refresh used to leave the bearer to expire — and
+   * with it the App-API list, group members, libraries and snapshot data).
+   *
+   * @param force Also run while the broker is disconnected (a 401 from the App API)
    */
-  private async refreshBearerSilently(): Promise<void> {
-    // Bail if the adapter stopped, the reject-cap is already hit, or the live
-    // MQTT session is gone. This refresh is a full /login POST; running it
-    // after the storm-cap (issue #39) would bypass the guard, and running it
-    // while disconnected is pointless — the reconnect path rebuilds the bearer
-    // and counts rejections through connect(). Only a live session that needs
-    // its bearer kept fresh should reach Govee here.
-    if (this.disposed || this.reconnectExhausted() || !this.connected) {
+  private async refreshBearerSilently(force = false): Promise<void> {
+    // Bail if the adapter stopped or the reject-cap is already hit: this is a
+    // full /login POST, and running it after the storm-cap (issue #39) would
+    // bypass the guard.
+    if (this.disposed || this.reconnectExhausted()) {
       return;
     }
+    if (this.refreshInFlight) {
+      return;
+    }
+    // While the broker is down the reconnect path logs in anyway once the
+    // token has expired; keep the timer alive rather than dropping it.
+    if (!force && !this.connected) {
+      this.armRefresh(MQTT_REFRESH_RETRY_MS);
+      return;
+    }
+    const waitMs = this.loginWaitMs(Date.now());
+    if (waitMs > 0) {
+      this.armRefresh(waitMs);
+      return;
+    }
+    this.refreshInFlight = true;
     this.log.debug("Proactive MQTT bearer refresh triggered");
     try {
       const loginResp = await this.login();
+      this.noteLogin(Date.now());
       if (!loginResp.client) {
-        // Login was rejected (454 / 455 / locked / rate-limited). Keep
-        // the current MQTT connection alive. If the bearer is needed
-        // for a REST call later, that call's catch path will surface
-        // the actual error to the user.
+        // Login was rejected (454 / 455 / locked / rate-limited). Keep the
+        // current MQTT connection alive and try again later.
         const status = loginResp.status ?? 0;
         this.log.debug(`Silent bearer refresh declined by Govee (status ${status}) — current session kept`);
+        this.armRefresh(MQTT_REFRESH_RETRY_MS);
         return;
       }
       this._bearerToken = loginResp.client.token;
-      this.onToken?.(this._bearerToken);
-      // Persist the new bearer + cert so the next restart skips full
-      // login. Cert may be the same as before (unchanged P12) — js-controller
-      // re-encrypts identical bytes anyway, no harm done.
-      const ttlSec = loginResp.client.token_expire_cycle ?? loginResp.client.tokenExpireCycle ?? 3600;
+      this.emitToken(this._bearerToken);
+      const ttlSec = tokenTtlSeconds(loginResp.client.token_expire_cycle ?? loginResp.client.tokenExpireCycle);
       const newExpiresAt = Date.now() + ttlSec * 1000;
+      // Persist the new bearer + cert so the next restart skips full login.
+      // When the IoT-key request fails, the current certificate stays in the
+      // bundle with the NEW bearer — otherwise the bundle in memory would keep
+      // the old, expiring token.
+      let iot: { iotEndpoint: string; p12Cert: string; p12Pass: string } | null = null;
       try {
         const iotResp = await this.getIotKey();
         if (iotResp?.data?.endpoint) {
-          this.onCredentialsRefresh?.({
-            bearerToken: this._bearerToken,
-            iotEndpoint: iotResp.data.endpoint,
-            p12Cert: iotResp.data.p12,
-            p12Pass: iotResp.data.p12Pass,
-            accountId: this.accountId,
-            accountTopic: this.accountTopic,
-            tokenExpiresAt: newExpiresAt,
-          });
+          iot = { iotEndpoint: iotResp.data.endpoint, p12Cert: iotResp.data.p12, p12Pass: iotResp.data.p12Pass };
         }
       } catch (e) {
         this.log.debug(`Silent IoT-key refresh failed: ${errMessage(e)}`);
       }
+      if (!iot && this.persisted) {
+        iot = {
+          iotEndpoint: this.persisted.iotEndpoint,
+          p12Cert: this.persisted.p12Cert,
+          p12Pass: this.persisted.p12Pass,
+        };
+      }
+      if (iot) {
+        this.rememberCredentials({
+          ...iot,
+          bearerToken: this._bearerToken,
+          accountId: this.accountId,
+          accountTopic: this.accountTopic,
+          tokenExpiresAt: newExpiresAt,
+        });
+      }
       this.scheduleProactiveRefresh(newExpiresAt);
     } catch (e) {
-      // Network error / 5xx — not a release-blocker. The live MQTT
-      // session continues; the next reconnect-cycle (if needed) will
-      // try a full login.
-      this.log.debug(`Silent bearer refresh failed: ${errMessage(e)} — current session kept`);
+      // Network error / 5xx — the live MQTT session continues.
+      this.log.debug(`Silent bearer refresh failed: ${errMessage(e)} — current session kept, retrying later`);
+      this.armRefresh(MQTT_REFRESH_RETRY_MS);
+    } finally {
+      this.refreshInFlight = false;
     }
+  }
+
+  /**
+   * Keep a freshly issued bundle — in memory for the next reconnect (until
+   * 2.40.0 only the startup bundle was reused, so every reconnect after its
+   * expiry, and every reconnect of a first installation, was a full login)
+   * and on disk via {@link onCredentialsRefresh} for the next start.
+   *
+   * @param bundle The bundle of a successful login or refresh
+   */
+  private rememberCredentials(bundle: PersistedMqttCredentials): void {
+    const tokenExpiresAt = Number.isFinite(bundle.tokenExpiresAt)
+      ? bundle.tokenExpiresAt
+      : Date.now() + tokenTtlSeconds(undefined) * 1000;
+    const kept = { ...bundle, tokenExpiresAt };
+    this.persisted = kept;
+    this.onCredentialsRefresh?.(kept);
+  }
+
+  /**
+   * Hand a bearer to the dependents — only when it changed.
+   *
+   * @param token The current bearer
+   */
+  private emitToken(token: string): void {
+    if (!token || token === this.lastEmittedToken) {
+      return;
+    }
+    this.lastEmittedToken = token;
+    this.onToken?.(token);
+  }
+
+  /**
+   * Milliseconds until the next login is allowed — 0 while the window has room.
+   *
+   * @param now Current time in ms
+   */
+  private loginWaitMs(now: number): number {
+    this.loginTimes = this.loginTimes.filter(t => now - t < MQTT_LOGIN_WINDOW_MS);
+    if (this.loginTimes.length < MQTT_MAX_LOGINS_PER_WINDOW) {
+      return 0;
+    }
+    return this.loginTimes[0] + MQTT_LOGIN_WINDOW_MS - now;
+  }
+
+  /**
+   * Count a login against the window.
+   *
+   * @param now Current time in ms
+   */
+  private noteLogin(now: number): void {
+    this.loginTimes.push(now);
+  }
+
+  /**
+   * The login window is full: no login now, one retry when it has room again.
+   *
+   * @param waitMs Time until the window has room
+   */
+  private pauseLogins(waitMs: number): void {
+    const until = Date.now() + waitMs;
+    if (this.loginPausedUntil <= Date.now()) {
+      this.log.warn(
+        `MQTT: ${MQTT_MAX_LOGINS_PER_WINDOW} Govee logins within an hour — pausing logins until ${new Date(until).toLocaleTimeString()} to protect the account from a lock`,
+      );
+    }
+    this.loginPausedUntil = until;
+    this.onConnection?.(false);
+    // connect() runs at start and from the reconnect timer, which clears its
+    // own handle before calling — no timer is armed here.
+    this.reconnectTimer = this.timers.setTimeout(
+      () => {
+        this.reconnectTimer = undefined;
+        if (!this.disposed) {
+          this.reconnect();
+        }
+      },
+      clampTimerMs(waitMs, MQTT_LOGIN_WINDOW_MS),
+    );
+  }
+
+  /** The client id with the account id masked — for log lines. */
+  private clientIdLabel(): string {
+    return `AP/${maskSecret(this.accountId)}/${this.sessionUuid.slice(0, 8)}`;
+  }
+
+  /** The account topic with its id masked — for log lines. */
+  private topicLabel(): string {
+    const [prefix, rest] = this.accountTopic.split("/", 2);
+    return rest ? `${prefix}/${maskSecret(rest)}` : maskSecret(this.accountTopic);
   }
 
   /** Login to Govee account */

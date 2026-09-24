@@ -150,6 +150,12 @@ describe("CloudRetryLoop", () => {
       expect(host.lastWarn()).toContain("5s");
     });
 
+    it("caps a huge Retry-After at one hour — a timer above 2^31−1 ms throws in js-controller (audit 2026-09-24 A12)", () => {
+      loop.handleResult({ ok: false, reason: "rate-limited", retryAfterMs: 1e13 });
+      expect(host.timers).toHaveLength(1);
+      expect(host.timers[0].ms).toBe(60 * 60 * 1000);
+    });
+
     it("should not double-schedule when called twice", () => {
       loop.handleResult({
         ok: false,

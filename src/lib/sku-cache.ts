@@ -2,6 +2,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { deviceLabel, errMessage, type CloudCapability, type CloudScene } from "./types";
 import { treeKey } from "./device-key";
+import { writeFileAtomic } from "./atomic-file";
 
 /** Data persisted per device in the SKU cache */
 export interface CachedDeviceData {
@@ -148,17 +149,7 @@ export class SkuCache {
     }
     this.lastWritten.set(file, fingerprint);
     const json = JSON.stringify(data, null, 2);
-    const write = async (): Promise<void> => {
-      const tmp = `${file}.tmp`;
-      const handle = await fs.promises.open(tmp, "w");
-      try {
-        await handle.writeFile(json, "utf-8");
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
-      await fs.promises.rename(tmp, file);
-    };
+    const write = (): Promise<void> => writeFileAtomic(file, json);
     const previous = this.inFlight.get(file) ?? Promise.resolve();
     const current = previous
       .catch(() => undefined)

@@ -18,6 +18,70 @@
  */
 export const MQTT_MAX_AUTH_FAILURES = 3;
 
+/**
+ * Successful account logins allowed inside {@link MQTT_LOGIN_WINDOW_MS}. The
+ * #39 cap above counts only REJECTED logins; a broker that keeps dropping the
+ * connection after a good login (port 8883 blocked, CONNACK "not authorized")
+ * turned every reconnect into another successful login — govee2mqtt #702 got
+ * its account locked for 24 h exactly that way (~6 logins/h for 8 h). Since
+ * 2.40.0 a reconnect reuses the last bundle, so a fresh login only follows an
+ * expired token or a rejected certificate; this window is the backstop.
+ */
+export const MQTT_MAX_LOGINS_PER_WINDOW = 3;
+
+/** Window for {@link MQTT_MAX_LOGINS_PER_WINDOW} (1 h). */
+export const MQTT_LOGIN_WINDOW_MS = 60 * 60 * 1000;
+
+/**
+ * Token lifetime used when Govee's `token_expire_cycle` is missing or not a
+ * finite number (1 h). Measured value 2026-09: ~57 600 s.
+ */
+export const MQTT_TOKEN_TTL_DEFAULT_S = 3600;
+
+/** Lower bound for a reported token lifetime (10 min — the refresh runs 5 min before expiry). */
+export const MQTT_TOKEN_TTL_MIN_S = 10 * 60;
+
+/** Upper bound for a reported token lifetime (7 days). */
+export const MQTT_TOKEN_TTL_MAX_S = 7 * 24 * 60 * 60;
+
+/** Delay before a failed or skipped silent bearer refresh is tried again (5 min). */
+export const MQTT_REFRESH_RETRY_MS = 5 * 60 * 1000;
+
+/**
+ * Largest delay a timer accepts. js-controller's `setTimeout` THROWS above
+ * 2^31−1 ms (`Validator.assertTimeout`) instead of clamping — a server-supplied
+ * duration that large broke the login flow (the throw landed in connect()'s
+ * catch as a TIMEOUT and looped successful logins) and aborted onReady on a 429.
+ */
+export const MAX_TIMER_MS = 2_147_483_647;
+
+/**
+ * Clamp a computed timer delay into what a timer accepts: a non-finite value
+ * becomes `fallback`, the result lies in [0, min(max, MAX_TIMER_MS)].
+ *
+ * @param ms Computed delay
+ * @param fallback Delay to use when `ms` is not a finite number
+ * @param max Upper bound (defaults to the timer limit)
+ */
+export function clampTimerMs(ms: number, fallback: number, max: number = MAX_TIMER_MS): number {
+  const value = Number.isFinite(ms) ? ms : fallback;
+  return Math.min(Math.max(0, value), Math.min(max, MAX_TIMER_MS));
+}
+
+/**
+ * A token lifetime from Govee, bounded: missing/non-finite → the 1 h default,
+ * otherwise clamped to [10 min, 7 days].
+ *
+ * @param raw `token_expire_cycle` / `tokenExpireCycle` from the login answer
+ */
+export function tokenTtlSeconds(raw: unknown): number {
+  const n = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+  if (!Number.isFinite(n) || n <= 0) {
+    return MQTT_TOKEN_TTL_DEFAULT_S;
+  }
+  return Math.min(Math.max(n, MQTT_TOKEN_TTL_MIN_S), MQTT_TOKEN_TTL_MAX_S);
+}
+
 // === App API (sensor polling) ===
 
 /** Interval for the App-API poll (sensor values). 2 min. */
@@ -115,9 +179,17 @@ export const READY_TIMEOUT_MS = 60_000;
 /**
  * Floor for a rate-limit retry pause (5 s). A malformed/zero server `Retry-After`
  * must not collapse into an immediate-retry tight loop that hammers the Cloud
- * (Govee allows 10 requests/min) — clamp the server value up to this minimum.
+ * (Govee's v2 limits allow 30 list calls per minute; the adapter keeps to 20) —
+ * clamp the server value up to this minimum.
  */
 export const MIN_RATE_LIMIT_RETRY_MS = 5_000;
+
+/**
+ * Ceiling for a rate-limit retry pause (1 h). The server's `Retry-After` went
+ * into the timer unbounded; above 2^31−1 ms js-controller's timer throws, which
+ * aborted onReady on a first-start 429 and killed the retry loop.
+ */
+export const MAX_RATE_LIMIT_RETRY_MS = 60 * 60 * 1000;
 
 /** Minimum gap between two `mqttAuth: requestCode` calls (30 s). */
 export const VERIFICATION_REQUEST_THROTTLE_MS = 30_000;

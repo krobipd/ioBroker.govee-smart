@@ -1,6 +1,8 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { errMessage, type PersistedMqttCredentials } from "../types";
+import { writeFileAtomic } from "../atomic-file";
+import { deriveGoveeClientId } from "../govee-constants";
 
 /**
  * Adapter surface required by the cloud-creds handler — only the ioBroker
@@ -118,6 +120,21 @@ function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedM
 }
 
 /**
+ * The account key a stored blob was bound to, or "" for a blob written before
+ * the binding existed (or one that does not parse).
+ *
+ * @param raw The stored JSON blob
+ */
+function readAccountKey(raw: string): string {
+  try {
+    const obj = JSON.parse(raw) as { accountKey?: unknown };
+    return typeof obj.accountKey === "string" ? obj.accountKey : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
  * Load persisted MQTT credentials from the encrypted file in the instance data
  * directory. The sensitive fields are encrypted (see {@link persistCreds}).
  * Returns null when nothing is stored.
@@ -137,12 +154,25 @@ function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedM
 export async function loadPersistedCreds(
   adapter: CloudCredsAdapter,
   dataDir: string,
+  accountEmail?: string,
 ): Promise<PersistedMqttCredentials | null> {
   // 1. Preferred: the encrypted file in the instance data directory.
   try {
     const raw = fs.readFileSync(credentialsFilePath(dataDir), "utf-8");
     const creds = raw ? parsePersistedBlob(adapter, raw) : null;
     if (creds) {
+      // The session belongs to the account it was issued for. After the user
+      // switched to another Govee account the stored bundle would subscribe the
+      // OLD account's topic and read the OLD account's lists until its token
+      // expires — and the new account's sensors, missing from that list, would
+      // be reaped after two polls. A blob written before 2.40.0 carries no
+      // account key: it is accepted once and bound on the next save (refusing
+      // it would send every upgraded installation a verification mail).
+      const storedKey = readAccountKey(raw);
+      if (storedKey && accountEmail !== undefined && storedKey !== deriveGoveeClientId(accountEmail)) {
+        adapter.log.debug("Stored MQTT session belongs to another Govee account — fresh login");
+        return null;
+      }
       return creds;
     }
   } catch {
@@ -194,8 +224,12 @@ export async function persistCreds(
   adapter: CloudCredsAdapter,
   dataDir: string,
   creds: PersistedMqttCredentials,
+  accountEmail?: string,
 ): Promise<void> {
   const blob = JSON.stringify({
+    // Binds the session to its account (see loadPersistedCreds) — the derived
+    // client id, not the address itself.
+    ...(accountEmail !== undefined ? { accountKey: deriveGoveeClientId(accountEmail) } : {}),
     bearerToken: adapter.encrypt(creds.bearerToken),
     iotEndpoint: creds.iotEndpoint,
     p12Cert: adapter.encrypt(creds.p12Cert),
@@ -204,10 +238,12 @@ export async function persistCreds(
     accountTopic: creds.accountTopic,
     tokenExpiresAt: creds.tokenExpiresAt,
   });
-  // async fs on the hot path (runs on every login/token refresh); the sync
-  // writeCredentialsFile stays for the two one-shot startup migrations.
+  // async fs on the hot path (runs on every login/token refresh), written
+  // atomically: a login and a token refresh can overlap, and a torn file costs
+  // a fresh login (and possibly a verification mail) on the next start. The
+  // sync writeCredentialsFile stays for the two one-shot startup migrations.
   await fs.promises.mkdir(dataDir, { recursive: true });
-  await fs.promises.writeFile(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 0o600 });
+  await writeFileAtomic(credentialsFilePath(dataDir), blob, 0o600);
 }
 
 /**

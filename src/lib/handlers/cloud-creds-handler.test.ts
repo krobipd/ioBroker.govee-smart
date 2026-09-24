@@ -149,6 +149,24 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     expect(await loadPersistedCreds(adapter, dataDir)).toEqual(creds); // decrypted back
   });
 
+  it("binds the session to its account: another account's bundle is not reused (audit 2026-09-24 M11)", async () => {
+    // Switching the configured Govee account used to reuse the OLD account's
+    // bundle until its token expired — its topic, its lists, and after two
+    // polls the new account's sensors were reaped as "gone".
+    const { adapter } = makeCredAdapter();
+    await persistCreds(adapter, dataDir, creds, "first@example.com");
+    expect(await loadPersistedCreds(adapter, dataDir, "first@example.com")).toEqual(creds);
+    expect(await loadPersistedCreds(adapter, dataDir, "  FIRST@example.com ")).toEqual(creds); // same account, re-typed
+    expect(await loadPersistedCreds(adapter, dataDir, "second@example.com")).toBeNull();
+    expect(JSON.stringify(JSON.parse(fs.readFileSync(credsFile(), "utf-8")))).not.toContain("first@example.com");
+  });
+
+  it("accepts a bundle written before the binding existed — refusing it would mail every upgraded user a code", async () => {
+    const { adapter } = makeCredAdapter();
+    fs.writeFileSync(credsFile(), encBlob);
+    expect(await loadPersistedCreds(adapter, dataDir, "anyone@example.com")).toEqual(creds);
+  });
+
   it("the credentials file is owner-only — on both write paths", async () => {
     // Encryption and file mode are two independent guards, and only the content one
     // was ever asserted: a mutation run on 2026-09-07 flipped 0o600 to 0o644 on BOTH
@@ -162,12 +180,14 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     const { adapter, metaFiles } = makeCredAdapter();
     // `fs.writeFileSync` is a plain ESM export and cannot be spied on, so the sync path
     // is only provable where the mode exists.
-    const asyncWrite = vi.spyOn(fs.promises, "writeFile");
+    // The hot path writes atomically (temp file + rename): the mode is handed
+    // over when the temp file is created.
+    const asyncOpen = vi.spyOn(fs.promises, "open");
     const posix = process.platform !== "win32";
 
     // async writer — the hot path, runs on every login and token refresh
     await persistCreds(adapter, dataDir, creds);
-    expect(asyncWrite.mock.calls.at(-1)?.[2]).toMatchObject({ mode: 0o600 });
+    expect(asyncOpen.mock.calls.at(-1)?.[2]).toBe(0o600);
     if (posix) {
       expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
     }
@@ -180,7 +200,7 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
       expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
     }
 
-    asyncWrite.mockRestore();
+    asyncOpen.mockRestore();
   });
 
   it("persist creates the data directory when it does not exist yet", async () => {

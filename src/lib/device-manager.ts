@@ -39,8 +39,10 @@ import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, ty
 import {
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
+  MAX_RATE_LIMIT_RETRY_MS,
   PENDING_INTENT_TTL_MS,
   STATUS_REQUEST_INTERVAL_MS,
+  clampTimerMs,
 } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
@@ -124,6 +126,8 @@ export class DeviceManager {
    * the MQTT client). Null without an account login — then nothing is asked.
    */
   private statusRequester: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null = null;
+  /** Asks the account client for a fresh bearer — see {@link setBearerRefresher}. */
+  private bearerRefresher: (() => void) | null = null;
   /**
    * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
    * so the user-zentrierte warn message fires once per category and drops
@@ -244,6 +248,18 @@ export class DeviceManager {
    */
   setStatusRequester(fn: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null): void {
     this.statusRequester = fn;
+  }
+
+  /**
+   * Wire the bearer refresher (the MQTT client's `requestBearerRefresh`). The
+   * App API answers `401 please login` once the bearer has expired; without a
+   * refresh every bearer endpoint stayed dead until the next reconnect or
+   * restart (govee2mqtt drops its login cache on a 401 the same way).
+   *
+   * @param fn Starts one silent re-login (limited by the client's login window)
+   */
+  setBearerRefresher(fn: (() => void) | null): void {
+    this.bearerRefresher = fn;
   }
 
   /**
@@ -1017,7 +1033,8 @@ export class DeviceManager {
         return {
           ok: false,
           reason: "rate-limited",
-          retryAfterMs: retryAfterSec * 1000,
+          // Bounded: a timer throws above 2^31−1 ms, and no pause needs more than an hour.
+          retryAfterMs: clampTimerMs(retryAfterSec * 1000, 60_000, MAX_RATE_LIMIT_RETRY_MS),
         };
       }
 
@@ -1844,6 +1861,9 @@ export class DeviceManager {
     } catch (err) {
       const category = classifyError(err);
       const msg = `App API fetch failed: ${errMessage(err)}`;
+      if (category === "AUTH") {
+        this.bearerRefresher?.();
+      }
       if (category !== this.lastAppApiErrorCategory) {
         this.lastAppApiErrorCategory = category;
         this.log.warn(msg);
