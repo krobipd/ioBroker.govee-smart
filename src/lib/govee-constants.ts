@@ -7,7 +7,7 @@
  * mirror them 1:1.
  */
 
-import { v5 as uuidv5, NIL as UUID_NIL } from "uuid";
+import { createHash } from "node:crypto";
 
 /**
  * Govee Cloud API `capability.type` strings that the adapter references by
@@ -117,6 +117,9 @@ export function buildGoveeAppHeaders(
 /** Base URL for the undocumented Govee app API (devices/v1/list, scene library, etc.). */
 export const GOVEE_APP_BASE_URL = "https://app2.govee.com";
 
+/** The nil UUID (all zero bytes) — the namespace every client id has been derived in. */
+const NIL_NAMESPACE = Buffer.alloc(16);
+
 /**
  * Derive a stable, account-specific client ID from the user's email.
  *
@@ -132,5 +135,13 @@ export const GOVEE_APP_BASE_URL = "https://app2.govee.com";
  */
 export function deriveGoveeClientId(email: string | undefined): string {
   const seed = (email ?? "").trim().toLowerCase() || "anonymous";
-  return uuidv5(seed, UUID_NIL).replace(/-/g, "");
+  // RFC 4122 UUIDv5: SHA-1 over namespace + name, first 16 bytes, version and
+  // variant bits set. Byte-identical to the `uuid` package's v5(seed, NIL)
+  // that produced every id Govee has already verified (golden-value test) —
+  // done with node:crypto because `uuid` 14 is ESM-only and cannot be
+  // require()d below Node 22.12, which `engines` still admits.
+  const hash = createHash("sha1").update(NIL_NAMESPACE).update(seed, "utf8").digest().subarray(0, 16);
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  return hash.toString("hex");
 }
