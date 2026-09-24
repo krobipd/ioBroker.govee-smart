@@ -4,7 +4,7 @@
     "supports, not just the maintainer's own hardware (feedback_user_hardware_ist_sample):",
     "a LAN light with segments, a cloud-only light without a local interface (H6199,",
     "verbatim), a captured outdoor light with scenes/DIY/snapshots (H61A8, verbatim), a",
-    "thermometer, a gateway-backed battery sensor plus its gateway, a heater, a",
+    "thermometer, a gateway-backed battery sensor plus its gateway, a CO2 monitor, a heater, a",
     "humidifier, a fan, an air purifier, a kettle, an ice maker, an aroma diffuser,",
     "a socket, a button and an app device group.",
     "Provenance: a device with `_source` is a WHOLE Govee list entry copied verbatim from",
@@ -15,7 +15,10 @@
     "Three verbatim entries were added on 2026-09-12 (audit): H1310 (ceiling-fan light with",
     "main/background light, fan and airflow toggles), H66A1 (movie mode) and H607C (pillar and",
     "base light) — nine capability instances that real captures show and no fixture device had,",
-    "so no gate had ever judged their datapoints."
+    "so no gate had ever judged their datapoints.",
+    "2.40.0 (audit E13/N37/N15): H5109 and H7127 carry their recorded capability lists, H5140 comes from",
+    "Govee's own example answer, and the account list names the H5042 as the H5109's gateway (gatewayInfo) —",
+    "the gateway's own capability set is still hand-picked (no export of a gateway entry exists)."
   ],
   "devices": [
     {
@@ -751,32 +754,11 @@
       "device": "AA:BB:CC:DD:EE:FF:00:05",
       "deviceName": "Battery Sensor Cellar",
       "type": "devices.types.sensor",
+      "_source": "Ressourcen/govee-smart/github-exports/issue-31.json capabilities[] — the capability LIST only (the export's device section; no parameters recorded). Gateway, battery and readings come from the account-list entry the fixture server answers (test/inventory.js).",
       "capabilities": [
         {
           "type": "devices.capabilities.property",
-          "instance": "sensorTemperature",
-          "parameters": {
-            "dataType": "INTEGER",
-            "unit": "unit.celsius",
-            "range": {
-              "min": -20,
-              "max": 60,
-              "precision": 1
-            }
-          }
-        },
-        {
-          "type": "devices.capabilities.property",
-          "instance": "battery",
-          "parameters": {
-            "dataType": "INTEGER",
-            "unit": "unit.percent",
-            "range": {
-              "min": 0,
-              "max": 100,
-              "precision": 1
-            }
-          }
+          "instance": "sensorTemperature"
         }
       ]
     },
@@ -1197,6 +1179,7 @@
       "device": "AA:BB:CC:DD:EE:FF:00:10",
       "deviceName": "Air Purifier Bedroom",
       "type": "devices.types.air_purifier",
+      "_source": "Ressourcen/govee-smart/github-exports/issue-47-h7127-v2.35.2-offline-2026-09-14.json capabilities[] — the capability LIST verbatim (four instances; the two properties carry no parameters, as recorded).",
       "capabilities": [
         {
           "type": "devices.capabilities.on_off",
@@ -1216,7 +1199,6 @@
           }
         },
         {
-          "_source": "issue #47 diagnostics export — see Ressourcen/govee-smart/research-issue47-h7127-2026-09-10.md",
           "type": "devices.capabilities.work_mode",
           "instance": "workMode",
           "parameters": {
@@ -1225,7 +1207,6 @@
               {
                 "fieldName": "workMode",
                 "dataType": "ENUM",
-                "required": true,
                 "options": [
                   {
                     "name": "gearMode",
@@ -1239,12 +1220,12 @@
                     "name": "Auto",
                     "value": 3
                   }
-                ]
+                ],
+                "required": true
               },
               {
                 "fieldName": "modeValue",
                 "dataType": "ENUM",
-                "required": true,
                 "options": [
                   {
                     "name": "gearMode",
@@ -1264,30 +1245,26 @@
                     ]
                   },
                   {
-                    "name": "Custom",
-                    "defaultValue": 0
+                    "defaultValue": 0,
+                    "name": "Custom"
                   },
                   {
-                    "name": "Auto",
-                    "defaultValue": 0
+                    "defaultValue": 0,
+                    "name": "Auto"
                   }
-                ]
+                ],
+                "required": true
               }
             ]
           }
         },
         {
           "type": "devices.capabilities.property",
-          "instance": "filterLifeTime",
-          "parameters": {
-            "dataType": "INTEGER",
-            "unit": "unit.percent",
-            "range": {
-              "min": 0,
-              "max": 100,
-              "precision": 1
-            }
-          }
+          "instance": "filterLifeTime"
+        },
+        {
+          "type": "devices.capabilities.property",
+          "instance": "airQuality"
         }
       ]
     },
@@ -2732,6 +2709,31 @@
         }
       ],
       "_source": "Ressourcen/govee-smart/github-exports/issue-15-diag.json apiHistory[/router/api/v1/user/devices][0].body (issue #15, adapter 2.13.0); device id and name are the fixture's"
+    },
+    {
+      "sku": "H5140",
+      "device": "AA:BB:CC:DD:EE:FF:00:16",
+      "deviceName": "CO2 Monitor Office",
+      "type": "devices.types.sensor",
+      "_source": "Govee OpenAPI docs, developer.govee.com/reference/get-devices-status (read 2026-09-24): the H5140 example answer — its four capability instances, without parameters (the example is a state answer). The state answer itself is test/fixtures/inventory/govee-h5140-state.json.",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.online",
+          "instance": "online"
+        },
+        {
+          "type": "devices.capabilities.property",
+          "instance": "carbonDioxideConcentration"
+        },
+        {
+          "type": "devices.capabilities.property",
+          "instance": "sensorTemperature"
+        },
+        {
+          "type": "devices.capabilities.property",
+          "instance": "sensorHumidity"
+        }
+      ]
     }
   ]
 }

@@ -25,6 +25,7 @@ import {
   type StateDefinition,
 } from "./capability-mapper";
 import { DeviceRegistry } from "./device-registry";
+import { tDesc, tName } from "./i18n";
 import { createTestDevice, mockLog } from "./test-helpers";
 import type { CapabilityOption, CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
 
@@ -2958,5 +2959,50 @@ describe("capabilities Govee acknowledges but the device ignores (catalog quirk 
   it("a seed entry stays dormant without the experimental switch", () => {
     const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(false)).map(d => d.id);
     expect(ids).toContain("main_light_toggle");
+  });
+});
+
+describe("a reading two paths create carries ONE name (found in the AP13 upgrade run)", () => {
+  // The Cloud capability path and the synthetic path (account list, cloud
+  // events) both create sensor.temperature/humidity/battery/co2. Until 2.40.0
+  // the Cloud path wrote Govee's wording ("Sensor Temperature") in all eleven
+  // languages — the datapoint's name depended on which path ran last.
+  const property = (instance: string): CloudCapability =>
+    ({ type: "devices.capabilities.property", instance, parameters: {} }) as CloudCapability;
+
+  for (const [instance, id] of [
+    ["sensorTemperature", "temperature"],
+    ["sensorHumidity", "humidity"],
+    ["battery", "battery"],
+    ["carbonDioxideConcentration", "co2"],
+  ] as const) {
+    it(`${instance} → ${id}: the synthetic path's name`, () => {
+      const def = mapCapabilitiesRaw([property(instance)], mockLog).find(d => d.id === id);
+      expect(def?.name).toEqual(tName(SYNTHETIC_STATE_META[id].nameKey));
+    });
+  }
+
+  it("air quality and filter life are translated, not Govee's wording in every language", () => {
+    for (const instance of ["airQuality", "filterLifeTime"]) {
+      const name = mapCapabilitiesRaw([property(instance)], mockLog)[0]?.name as Record<string, string>;
+      expect(new Set(Object.values(name)).size).toBeGreaterThan(1);
+    }
+  });
+});
+
+describe("scene speed slider", () => {
+  // The H6199's own library (issue #26): "Easter" carries speedInfo with three
+  // moveIn steps per page.
+  const config = JSON.stringify([{ page: 0, defaultIndex: 2, moveIn: [242, 247, 252] }]);
+  const light = (): GoveeDevice =>
+    createTestDevice({
+      sku: "H6199",
+      sceneLibrary: [{ name: "Easter", sceneCode: 11217, speedInfo: { supSpeed: true, speedIndex: 0, config } }],
+    });
+
+  it("appears for a library with an adjustable scene, 0..steps-1, and says when it takes effect", () => {
+    const def = buildCloudStateDefsRaw(light(), mockLog, emptyRegistry()).find(d => d.id === "scene_speed");
+    expect(def).toMatchObject({ min: 0, max: 2, channel: "scenes" });
+    expect(def?.desc).toEqual(tDesc("descSceneSpeed"));
   });
 });

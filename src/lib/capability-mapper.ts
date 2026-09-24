@@ -1363,6 +1363,16 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
   leftLightToggle: "capLeftLightToggle",
   rightLightToggle: "capRightLightToggle",
   hdmiSource: "capHdmiSource",
+  // Readings that two paths create (Cloud capability and the account list /
+  // cloud events via SYNTHETIC_STATE_META): one name, the synthetic path's.
+  // Until 2.40.0 the Cloud path wrote Govee's "Sensor Temperature" in all
+  // eleven languages and the name of the datapoint depended on which path ran
+  // last (found in the AP13 upgrade run).
+  sensorTemperature: "temperature",
+  sensorHumidity: "humidity",
+  battery: "battery",
+  airQuality: "capAirQuality",
+  filterLifeTime: "capFilterLifeTime",
   // The CO2 reading carries the synthetic path's name whatever Govee calls it.
   carbonDioxideConcentration: "co2",
   co2Concentration: "co2",
@@ -1995,6 +2005,7 @@ export function buildCloudStateDefs(
     stateDefs.push({
       id: "scene_speed",
       name: tName("sceneSpeed"),
+      desc: tDesc("descSceneSpeed"),
       type: "number",
       role: "level",
       write: true,

@@ -517,7 +517,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -542,7 +542,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -604,7 +604,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -1935,7 +1935,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -1960,7 +1960,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -2022,7 +2022,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -2314,7 +2314,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -2339,7 +2339,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -2401,7 +2401,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -2594,35 +2594,35 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Body Appeared Event",
-        "de": "Body Appeared Event",
-        "ru": "Body Appeared Event",
-        "pt": "Body Appeared Event",
-        "nl": "Body Appeared Event",
-        "fr": "Body Appeared Event",
-        "it": "Body Appeared Event",
-        "es": "Body Appeared Event",
-        "pl": "Body Appeared Event",
-        "uk": "Body Appeared Event",
-        "zh-cn": "Body Appeared Event"
+        "de": "Person erkannt",
+        "en": "Body Detected",
+        "es": "Cuerpo detectado",
+        "fr": "Présence détectée",
+        "it": "Corpo rilevato",
+        "nl": "Persoon gedetecteerd",
+        "pl": "Wykryto osobę",
+        "pt": "Corpo detetado",
+        "ru": "Обнаружено тело",
+        "uk": "Виявлено тіло",
+        "zh-cn": "检测到人体"
       },
       "type": "boolean",
-      "role": "indicator.alarm",
+      "role": "sensor.motion",
       "read": true,
       "write": false,
       "def": false,
       "desc": {
-        "de": "Meldet den Moment, in dem der Sensor jemanden sieht; setzt sich von selbst zurück.",
-        "en": "Reports the moment the sensor sees someone; it clears itself again.",
-        "es": "Informa del momento en que el sensor detecta a alguien; se restablece solo.",
-        "fr": "Signale l'instant où le capteur détecte quelqu'un ; se réinitialise seul.",
-        "it": "Segnala il momento in cui il sensore rileva qualcuno; si azzera da solo.",
-        "nl": "Meldt het moment waarop de sensor iemand ziet; herstelt zichzelf.",
-        "pl": "Zgłasza moment, w którym czujnik wykrywa kogoś; sam się resetuje.",
-        "pt": "Comunica o momento em que o sensor deteta alguém; repõe-se sozinho.",
-        "ru": "Сообщает момент, когда датчик кого-то обнаруживает; сбрасывается сам.",
-        "uk": "Повідомляє момент, коли датчик когось виявляє; скидається самостійно.",
-        "zh-cn": "在传感器检测到有人的瞬间上报；随后自行复位。"
+        "de": "Anwesenheit, wie der Sensor sie zuletzt gemeldet hat: wahr, wenn er jemanden erkennt, falsch, wenn er Abwesenheit meldet.",
+        "en": "Presence as the sensor last reported it: true when it detects someone, false when it reports absence.",
+        "es": "Presencia tal como la notificó el sensor por última vez: verdadero cuando detecta a alguien, falso cuando notifica ausencia.",
+        "fr": "Présence telle que le capteur l'a signalée en dernier : vrai s'il détecte quelqu'un, faux s'il signale une absence.",
+        "it": "Presenza come segnalata per ultima dal sensore: vero quando rileva qualcuno, falso quando segnala assenza.",
+        "nl": "Aanwezigheid zoals de sensor die het laatst meldde: waar als hij iemand ziet, onwaar als hij afwezigheid meldt.",
+        "pl": "Obecność według ostatniego raportu czujnika: prawda, gdy kogoś wykrywa, fałsz, gdy zgłasza nieobecność.",
+        "pt": "Presença tal como o sensor a comunicou por último: verdadeiro quando deteta alguém, falso quando comunica ausência.",
+        "ru": "Присутствие по последнему сообщению датчика: истина, когда он кого-то обнаружил, ложь, когда сообщает об отсутствии.",
+        "uk": "Присутність за останнім повідомленням датчика: істина, коли він когось виявив, хибність, коли повідомляє про відсутність.",
+        "zh-cn": "传感器最近一次报告的人员存在状态：检测到有人时为真，报告无人时为假。"
       }
     },
     "native": {
@@ -2706,7 +2706,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -2731,7 +2731,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -2793,7 +2793,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -2982,43 +2982,43 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5109_0005.info"
   },
-  "govee-smart.0.devices.h5109_0005.info.ip": {
+  "govee-smart.0.devices.h5109_0005.info.gateway": {
     "type": "state",
     "common": {
       "name": {
-        "de": "IP-Adresse",
-        "en": "IP Address",
-        "es": "Dirección IP",
-        "fr": "Adresse IP",
-        "it": "Indirizzo IP",
-        "nl": "IP-adres",
-        "pl": "Adres IP",
-        "pt": "Endereço IP",
-        "ru": "IP-адрес",
-        "uk": "IP-адреса",
-        "zh-cn": "IP地址"
+        "de": "Gateway",
+        "en": "Gateway",
+        "es": "Puerta de enlace",
+        "fr": "Passerelle",
+        "it": "Gateway",
+        "nl": "Gateway",
+        "pl": "Brama",
+        "pt": "Gateway",
+        "ru": "Шлюз",
+        "uk": "Шлюз",
+        "zh-cn": "网关"
       },
       "type": "string",
-      "role": "info.ip",
+      "role": "text",
       "read": true,
       "write": false,
       "desc": {
-        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
-        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
-        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
-        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
-        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
-        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
-        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
-        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
-        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
-        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
-        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+        "de": "Das Govee-Gateway, über das dieses Gerät die Cloud erreicht — es hat keine eigene Verbindung.",
+        "en": "The Govee gateway this device reaches the cloud through — it has no connection of its own.",
+        "es": "La pasarela Govee a través de la cual este dispositivo llega a la nube — no tiene conexión propia.",
+        "fr": "La passerelle Govee par laquelle cet appareil atteint le cloud — il n'a pas de connexion propre.",
+        "it": "Il gateway Govee attraverso cui questo dispositivo raggiunge il cloud — non ha una connessione propria.",
+        "nl": "De Govee-gateway waarmee dit apparaat de cloud bereikt — het heeft geen eigen verbinding.",
+        "pl": "Brama Govee, przez którą to urządzenie łączy się z chmurą — nie ma własnego połączenia.",
+        "pt": "O gateway Govee através do qual este dispositivo chega à nuvem — não tem ligação própria.",
+        "ru": "Шлюз Govee, через который устройство достигает облака — собственного соединения у него нет.",
+        "uk": "Шлюз Govee, через який пристрій дістається хмари — власного з'єднання він не має.",
+        "zh-cn": "此设备借以连接云端的 Govee 网关 —— 它本身没有独立连接。"
       },
       "def": ""
     },
     "native": {},
-    "_id": "govee-smart.0.devices.h5109_0005.info.ip"
+    "_id": "govee-smart.0.devices.h5109_0005.info.gateway"
   },
   "govee-smart.0.devices.h5109_0005.info.model": {
     "type": "state",
@@ -3037,7 +3037,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -3062,7 +3062,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -3124,7 +3124,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -3194,17 +3194,17 @@
     "type": "state",
     "common": {
       "name": {
+        "de": "Batterie",
         "en": "Battery",
-        "de": "Battery",
-        "ru": "Battery",
-        "pt": "Battery",
-        "nl": "Battery",
-        "fr": "Battery",
-        "it": "Battery",
-        "es": "Battery",
-        "pl": "Battery",
-        "uk": "Battery",
-        "zh-cn": "Battery"
+        "es": "Batería",
+        "fr": "Batterie",
+        "it": "Batteria",
+        "nl": "Batterij",
+        "pl": "Bateria",
+        "pt": "Bateria",
+        "ru": "Аккумулятор",
+        "uk": "Акумулятор",
+        "zh-cn": "电池"
       },
       "type": "number",
       "role": "value.battery",
@@ -3213,27 +3213,24 @@
       "unit": "%",
       "def": 0
     },
-    "native": {
-      "capabilityType": "devices.capabilities.property",
-      "capabilityInstance": "battery"
-    },
+    "native": {},
     "_id": "govee-smart.0.devices.h5109_0005.sensor.battery"
   },
   "govee-smart.0.devices.h5109_0005.sensor.temperature": {
     "type": "state",
     "common": {
       "name": {
-        "en": "Sensor Temperature",
-        "de": "Sensor Temperature",
-        "ru": "Sensor Temperature",
-        "pt": "Sensor Temperature",
-        "nl": "Sensor Temperature",
-        "fr": "Sensor Temperature",
-        "it": "Sensor Temperature",
-        "es": "Sensor Temperature",
-        "pl": "Sensor Temperature",
-        "uk": "Sensor Temperature",
-        "zh-cn": "Sensor Temperature"
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
       },
       "type": "number",
       "role": "value.temperature",
@@ -3247,6 +3244,444 @@
       "capabilityInstance": "sensorTemperature"
     },
     "_id": "govee-smart.0.devices.h5109_0005.sensor.temperature"
+  },
+  "govee-smart.0.devices.h5140_0016": {
+    "type": "device",
+    "common": {
+      "name": "CO2 Monitor Office",
+      "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTUgMTNWNWMwLTEuNjYtMS4zNC0zLTMtM1M5IDMuMzQgOSA1djhjLTEuMjEuOTEtMiAyLjM1LTIgNCAwIDIuNzYgMi4yNCA1IDUgNXM1LTIuMjQgNS01YzAtMS42NS0uNzktMy4wOS0yLTR6bS00LThjMC0uNTUuNDUtMSAxLTFzMSAuNDUgMSAxaC0ydjFoMnYyaC0ydjFoMnYyaC0ydjEuMWMxLjQ0LjQ3IDIuNSAxLjggMi41IDMuNCAwIDIuMDktMS43MSAzLjc1LTMuNzUgMy43NVM3IDE5LjE5IDcgMTcuMWMwLTEuNiAxLjA2LTIuOTMgMi41LTMuNFY1eiIvPjwvc3ZnPg==",
+      "statusStates": {
+        "onlineId": "govee-smart.0.devices.h5140_0016.info.online"
+      }
+    },
+    "native": {
+      "sku": "H5140",
+      "deviceId": "AA:BB:CC:DD:EE:FF:00:16"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016"
+  },
+  "govee-smart.0.devices.h5140_0016.diag": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Diagnose",
+        "en": "Diagnostics",
+        "es": "Diagnóstico",
+        "fr": "Diagnostic",
+        "it": "Diagnostica",
+        "nl": "Diagnose",
+        "pl": "Diagnostyka",
+        "pt": "Diagnóstico",
+        "ru": "Диагностика",
+        "uk": "Діагностика",
+        "zh-cn": "诊断"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.diag"
+  },
+  "govee-smart.0.devices.h5140_0016.diag.lastExport": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Letzter Diagnose-Export",
+        "en": "Last diagnostics export",
+        "es": "Última exportación de diagnóstico",
+        "fr": "Dernier export de diagnostic",
+        "it": "Ultima esportazione diagnostica",
+        "nl": "Laatste diagnose-export",
+        "pl": "Ostatni eksport diagnostyki",
+        "pt": "Última exportação de diagnóstico",
+        "ru": "Последний экспорт диагностики",
+        "uk": "Останній експорт діагностики",
+        "zh-cn": "上次诊断导出"
+      },
+      "type": "string",
+      "role": "date",
+      "read": true,
+      "write": false,
+      "def": "",
+      "desc": {
+        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
+        "en": "When the most recent diagnostics report was taken for this device.",
+        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
+        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
+        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
+        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
+        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
+        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
+        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
+        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
+        "zh-cn": "上次为该设备生成诊断报告的时间。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsLastExport"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016.diag.lastExport"
+  },
+  "govee-smart.0.devices.h5140_0016.diag.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016.diag.tier"
+  },
+  "govee-smart.0.devices.h5140_0016.info": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Geräte-Informationen",
+        "en": "Device Information",
+        "es": "Información del dispositivo",
+        "fr": "Informations sur l'appareil",
+        "it": "Informazioni dispositivo",
+        "nl": "Apparaatgegevens",
+        "pl": "Informacje o urządzeniu",
+        "pt": "Informações do dispositivo",
+        "ru": "Информация об устройстве",
+        "uk": "Інформація про пристрій",
+        "zh-cn": "设备信息"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info"
+  },
+  "govee-smart.0.devices.h5140_0016.info.ip": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "IP-Adresse",
+        "en": "IP Address",
+        "es": "Dirección IP",
+        "fr": "Adresse IP",
+        "it": "Indirizzo IP",
+        "nl": "IP-adres",
+        "pl": "Adres IP",
+        "pt": "Endereço IP",
+        "ru": "IP-адрес",
+        "uk": "IP-адреса",
+        "zh-cn": "IP地址"
+      },
+      "type": "string",
+      "role": "info.ip",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Die Adresse des Geräts im lokalen Netz; leer, wenn seine lokale Schnittstelle aus ist und es über die Cloud läuft.",
+        "en": "The device's address on the local network; empty when its local interface is off and it is driven through the cloud.",
+        "es": "La dirección del dispositivo en la red local; vacía si su interfaz local está desactivada y funciona por la nube.",
+        "fr": "L'adresse de l'appareil sur le réseau local ; vide si son interface locale est désactivée et qu'il passe par le cloud.",
+        "it": "L'indirizzo del dispositivo nella rete locale; vuoto se la sua interfaccia locale è disattivata e passa dal cloud.",
+        "nl": "Het adres van het apparaat in het lokale netwerk; leeg als de lokale interface uit staat en het via de cloud loopt.",
+        "pl": "Adres urządzenia w sieci lokalnej; puste, gdy jego interfejs lokalny jest wyłączony i działa przez chmurę.",
+        "pt": "O endereço do dispositivo na rede local; vazio quando a interface local está desligada e ele funciona pela nuvem.",
+        "ru": "Адрес устройства в локальной сети; пусто, если локальный интерфейс выключен и оно работает через облако.",
+        "uk": "Адреса пристрою в локальній мережі; порожньо, якщо локальний інтерфейс вимкнено і він працює через хмару.",
+        "zh-cn": "设备在本地网络中的地址；本地接口关闭、改由云端驱动时为空。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.ip"
+  },
+  "govee-smart.0.devices.h5140_0016.info.model": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Modell",
+        "en": "Model",
+        "es": "Modelo",
+        "fr": "Modèle",
+        "it": "Modello",
+        "nl": "Model",
+        "pl": "Model",
+        "pt": "Modelo",
+        "ru": "Модель",
+        "uk": "Модель",
+        "zh-cn": "型号"
+      },
+      "type": "string",
+      "role": "info.model",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.model"
+  },
+  "govee-smart.0.devices.h5140_0016.info.name": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Name",
+        "en": "Name",
+        "es": "Nombre",
+        "fr": "Nom",
+        "it": "Nome",
+        "nl": "Naam",
+        "pl": "Nazwa",
+        "pt": "Nome",
+        "ru": "Имя",
+        "uk": "Ім'я",
+        "zh-cn": "名称"
+      },
+      "type": "string",
+      "role": "info.name",
+      "read": true,
+      "write": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.name"
+  },
+  "govee-smart.0.devices.h5140_0016.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "Conectado",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Ob das Gerät selbst erreichbar ist — belegt durch eine lokale Antwort oder eine Meldung von Govee, nie geraten.",
+        "en": "Whether the device itself is reachable — proven by a local reply or by Govee reporting it, never guessed.",
+        "es": "Si el propio dispositivo es accesible — probado por una respuesta local o por un informe de Govee, nunca supuesto.",
+        "fr": "Si l'appareil lui-même est joignable — prouvé par une réponse locale ou un rapport de Govee, jamais deviné.",
+        "it": "Se il dispositivo stesso è raggiungibile — provato da una risposta locale o da una segnalazione di Govee, mai supposto.",
+        "nl": "Of het apparaat zelf bereikbaar is — bewezen door een lokaal antwoord of een melding van Govee, nooit geraden.",
+        "pl": "Czy samo urządzenie jest osiągalne — potwierdzone lokalną odpowiedzią lub zgłoszeniem Govee, nigdy zgadywane.",
+        "pt": "Se o próprio dispositivo está acessível — provado por uma resposta local ou por um relato da Govee, nunca adivinhado.",
+        "ru": "Доступно ли само устройство — подтверждено локальным ответом или сообщением Govee, никогда не угадано.",
+        "uk": "Чи доступний сам пристрій — підтверджено локальною відповіддю або повідомленням Govee, ніколи не вгадано.",
+        "zh-cn": "设备本身是否可达 —— 由本地应答或 Govee 的报告证实，绝不猜测。"
+      },
+      "def": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.online"
+  },
+  "govee-smart.0.devices.h5140_0016.info.serial": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Seriennummer",
+        "en": "Serial Number",
+        "es": "Número de serie",
+        "fr": "Numéro de série",
+        "it": "Numero di serie",
+        "nl": "Serienummer",
+        "pl": "Numer seryjny",
+        "pt": "Número de série",
+        "ru": "Серийный номер",
+        "uk": "Серійний номер",
+        "zh-cn": "序列号"
+      },
+      "type": "string",
+      "role": "info.serial",
+      "read": true,
+      "write": false,
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.serial"
+  },
+  "govee-smart.0.devices.h5140_0016.info.type": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Gerätetyp",
+        "en": "Device Type",
+        "es": "Tipo de dispositivo",
+        "fr": "Type d'appareil",
+        "it": "Tipo di dispositivo",
+        "nl": "Apparaattype",
+        "pl": "Typ urządzenia",
+        "pt": "Tipo de dispositivo",
+        "ru": "Тип устройства",
+        "uk": "Тип пристрою",
+        "zh-cn": "设备类型"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
+        "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
+        "es": "Tipo breve de dispositivo, como light o thermometer, para que un script filtre sin analizar el modelo.",
+        "fr": "Type d'appareil abrégé comme light ou thermometer, pour qu'un script filtre sans analyser le modèle.",
+        "it": "Tipo di dispositivo abbreviato come light o thermometer, così uno script filtra senza analizzare il modello.",
+        "nl": "Korte apparaatsoort zoals light of thermometer, zodat een script kan filteren zonder het model te ontleden.",
+        "pl": "Krótki rodzaj urządzenia, np. light lub thermometer, aby skrypt mógł filtrować bez analizy modelu.",
+        "pt": "Tipo breve de dispositivo, como light ou thermometer, para um script filtrar sem analisar o modelo.",
+        "ru": "Краткий вид устройства, например light или thermometer, чтобы скрипт фильтровал без разбора модели.",
+        "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
+        "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
+      },
+      "def": ""
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.info.type"
+  },
+  "govee-smart.0.devices.h5140_0016.sensor": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Sensordaten",
+        "en": "Sensor Data",
+        "es": "Datos del sensor",
+        "fr": "Données des capteurs",
+        "it": "Dati dei sensori",
+        "nl": "Sensorgegevens",
+        "pl": "Dane czujników",
+        "pt": "Dados do sensor",
+        "ru": "Данные датчиков",
+        "uk": "Дані датчиків",
+        "zh-cn": "传感器数据"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.devices.h5140_0016.sensor"
+  },
+  "govee-smart.0.devices.h5140_0016.sensor.co2": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "CO₂",
+        "en": "CO₂",
+        "es": "CO₂",
+        "fr": "CO₂",
+        "it": "CO₂",
+        "nl": "CO₂",
+        "pl": "CO₂",
+        "pt": "CO₂",
+        "ru": "CO₂",
+        "uk": "CO₂",
+        "zh-cn": "CO₂"
+      },
+      "type": "number",
+      "role": "value.co2",
+      "read": true,
+      "write": false,
+      "unit": "ppm",
+      "def": 0
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.property",
+      "capabilityInstance": "carbonDioxideConcentration"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016.sensor.co2"
+  },
+  "govee-smart.0.devices.h5140_0016.sensor.humidity": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Luftfeuchtigkeit",
+        "en": "Humidity",
+        "es": "Humedad",
+        "fr": "Humidité",
+        "it": "Umidità",
+        "nl": "Luchtvochtigheid",
+        "pl": "Wilgotność",
+        "pt": "Humidade",
+        "ru": "Влажность",
+        "uk": "Вологість",
+        "zh-cn": "湿度"
+      },
+      "type": "number",
+      "role": "value.humidity",
+      "read": true,
+      "write": false,
+      "unit": "%",
+      "def": 0
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.property",
+      "capabilityInstance": "sensorHumidity"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016.sensor.humidity"
+  },
+  "govee-smart.0.devices.h5140_0016.sensor.temperature": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
+      },
+      "type": "number",
+      "role": "value.temperature",
+      "read": true,
+      "write": false,
+      "unit": "°C",
+      "def": 0
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.property",
+      "capabilityInstance": "sensorTemperature"
+    },
+    "_id": "govee-smart.0.devices.h5140_0016.sensor.temperature"
   },
   "govee-smart.0.devices.h5179_0003": {
     "type": "device",
@@ -3446,7 +3881,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -3471,7 +3906,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -3533,7 +3968,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -3603,17 +4038,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Sensor Humidity",
-        "de": "Sensor Humidity",
-        "ru": "Sensor Humidity",
-        "pt": "Sensor Humidity",
-        "nl": "Sensor Humidity",
-        "fr": "Sensor Humidity",
-        "it": "Sensor Humidity",
-        "es": "Sensor Humidity",
-        "pl": "Sensor Humidity",
-        "uk": "Sensor Humidity",
-        "zh-cn": "Sensor Humidity"
+        "de": "Luftfeuchtigkeit",
+        "en": "Humidity",
+        "es": "Humedad",
+        "fr": "Humidité",
+        "it": "Umidità",
+        "nl": "Luchtvochtigheid",
+        "pl": "Wilgotność",
+        "pt": "Humidade",
+        "ru": "Влажность",
+        "uk": "Вологість",
+        "zh-cn": "湿度"
       },
       "type": "number",
       "role": "value.humidity",
@@ -3632,17 +4067,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Sensor Temperature",
-        "de": "Sensor Temperature",
-        "ru": "Sensor Temperature",
-        "pt": "Sensor Temperature",
-        "nl": "Sensor Temperature",
-        "fr": "Sensor Temperature",
-        "it": "Sensor Temperature",
-        "es": "Sensor Temperature",
-        "pl": "Sensor Temperature",
-        "uk": "Sensor Temperature",
-        "zh-cn": "Sensor Temperature"
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
       },
       "type": "number",
       "role": "value.temperature",
@@ -4157,7 +4592,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -4182,7 +4617,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -4244,7 +4679,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -6423,7 +6858,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -6448,7 +6883,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -6510,7 +6945,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -8131,7 +8566,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -8156,7 +8591,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -8218,7 +8653,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -8748,6 +9183,49 @@
       "capabilityInstance": "lightScene"
     },
     "_id": "govee-smart.0.devices.h6199_0002.scenes.light_scene"
+  },
+  "govee-smart.0.devices.h6199_0002.scenes.scene_speed": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Szenen-Geschwindigkeit",
+        "en": "Scene Speed",
+        "es": "Velocidad de escena",
+        "fr": "Vitesse de la scène",
+        "it": "Velocità scena",
+        "nl": "Scènesnelheid",
+        "pl": "Prędkość sceny",
+        "pt": "Velocidade da cena",
+        "ru": "Скорость сцены",
+        "uk": "Швидкість сцени",
+        "zh-cn": "场景速度"
+      },
+      "type": "number",
+      "role": "level",
+      "read": true,
+      "write": true,
+      "min": 0,
+      "max": 2,
+      "def": 0,
+      "desc": {
+        "de": "Geschwindigkeit für Szenen, die sie unterstützen, 0 = am langsamsten. Sie wirkt beim nächsten Auswählen einer Szene, nicht auf die gerade laufende.",
+        "en": "Speed for scenes that support it, 0 = slowest. It takes effect the next time a scene is selected, not on the one already running.",
+        "es": "Velocidad de las escenas que la admiten, 0 = la más lenta. Se aplica la próxima vez que se elige una escena, no a la que ya está en marcha.",
+        "fr": "Vitesse des scènes qui la prennent en charge, 0 = la plus lente. Elle s'applique au prochain choix d'une scène, pas à celle déjà en cours.",
+        "it": "Velocità delle scene che la supportano, 0 = la più lenta. Vale dalla prossima scena selezionata, non per quella già in corso.",
+        "nl": "Snelheid voor scènes die dat ondersteunen, 0 = langzaamst. Werkt bij de volgende keuze van een scène, niet op de scène die al loopt.",
+        "pl": "Prędkość scen, które ją obsługują, 0 = najwolniej. Działa przy następnym wyborze sceny, nie na już uruchomionej.",
+        "pt": "Velocidade das cenas que a suportam, 0 = a mais lenta. Aplica-se na próxima vez que uma cena é escolhida, não à que já está a correr.",
+        "ru": "Скорость для сцен, которые её поддерживают, 0 = самая медленная. Действует при следующем выборе сцены, а не на уже запущенную.",
+        "uk": "Швидкість для сцен, які її підтримують, 0 = найповільніша. Діє під час наступного вибору сцени, а не на вже запущену.",
+        "zh-cn": "支持调速的场景的速度，0 = 最慢。它在下次选择场景时生效，不影响正在运行的场景。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "sceneSpeed"
+    },
+    "_id": "govee-smart.0.devices.h6199_0002.scenes.scene_speed"
   },
   "govee-smart.0.devices.h6199_0002.segments": {
     "type": "channel",
@@ -10624,7 +11102,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -10649,7 +11127,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -10711,7 +11189,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -13166,7 +13644,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -13191,7 +13669,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -13253,7 +13731,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -15323,7 +15801,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -15348,7 +15826,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -15410,7 +15888,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -15749,7 +16227,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -15774,7 +16252,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -15836,7 +16314,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -15906,17 +16384,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Air Quality",
-        "de": "Air Quality",
-        "ru": "Air Quality",
-        "pt": "Air Quality",
-        "nl": "Air Quality",
-        "fr": "Air Quality",
-        "it": "Air Quality",
-        "es": "Air Quality",
-        "pl": "Air Quality",
-        "uk": "Air Quality",
-        "zh-cn": "Air Quality"
+        "de": "Luftqualität",
+        "en": "Air quality",
+        "es": "Calidad del aire",
+        "fr": "Qualité de l'air",
+        "it": "Qualità dell'aria",
+        "nl": "Luchtkwaliteit",
+        "pl": "Jakość powietrza",
+        "pt": "Qualidade do ar",
+        "ru": "Качество воздуха",
+        "uk": "Якість повітря",
+        "zh-cn": "空气质量"
       },
       "type": "number",
       "role": "value",
@@ -15947,17 +16425,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Filter Life Time",
-        "de": "Filter Life Time",
-        "ru": "Filter Life Time",
-        "pt": "Filter Life Time",
-        "nl": "Filter Life Time",
-        "fr": "Filter Life Time",
-        "it": "Filter Life Time",
-        "es": "Filter Life Time",
-        "pl": "Filter Life Time",
-        "uk": "Filter Life Time",
-        "zh-cn": "Filter Life Time"
+        "de": "Filter-Restlaufzeit",
+        "en": "Filter life",
+        "es": "Vida útil del filtro",
+        "fr": "Durée de vie du filtre",
+        "it": "Durata del filtro",
+        "nl": "Levensduur filter",
+        "pl": "Żywotność filtra",
+        "pt": "Vida útil do filtro",
+        "ru": "Ресурс фильтра",
+        "uk": "Ресурс фільтра",
+        "zh-cn": "滤网寿命"
       },
       "type": "number",
       "role": "value",
@@ -16323,7 +16801,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -16348,7 +16826,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -16410,7 +16888,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -16476,21 +16954,62 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7127_0010.sensor"
   },
+  "govee-smart.0.devices.h7127_0010.sensor.air_quality": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Luftqualität",
+        "en": "Air quality",
+        "es": "Calidad del aire",
+        "fr": "Qualité de l'air",
+        "it": "Qualità dell'aria",
+        "nl": "Luchtkwaliteit",
+        "pl": "Jakość powietrza",
+        "pt": "Qualidade do ar",
+        "ru": "Качество воздуха",
+        "uk": "Якість повітря",
+        "zh-cn": "空气质量"
+      },
+      "type": "number",
+      "role": "value",
+      "read": true,
+      "write": false,
+      "def": 0,
+      "desc": {
+        "de": "Der Luftqualitätsindex, den das Gerät misst; niedriger ist sauberer.",
+        "en": "The air-quality index the device measures; lower is cleaner.",
+        "es": "El índice de calidad del aire que mide el dispositivo; más bajo es más limpio.",
+        "fr": "L'indice de qualité de l'air mesuré par l'appareil ; plus bas est plus propre.",
+        "it": "L'indice di qualità dell'aria misurato dal dispositivo; più basso è più pulito.",
+        "nl": "De luchtkwaliteitsindex die het apparaat meet; lager is schoner.",
+        "pl": "Indeks jakości powietrza mierzony przez urządzenie; niższy oznacza czystsze.",
+        "pt": "O índice de qualidade do ar medido pelo dispositivo; mais baixo é mais limpo.",
+        "ru": "Индекс качества воздуха, измеряемый устройством; меньше — чище.",
+        "uk": "Індекс якості повітря, який вимірює пристрій; менше — чистіше.",
+        "zh-cn": "设备测得的空气质量指数；数值越低越洁净。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.property",
+      "capabilityInstance": "airQuality"
+    },
+    "_id": "govee-smart.0.devices.h7127_0010.sensor.air_quality"
+  },
   "govee-smart.0.devices.h7127_0010.sensor.filter_life_time": {
     "type": "state",
     "common": {
       "name": {
-        "en": "Filter Life Time",
-        "de": "Filter Life Time",
-        "ru": "Filter Life Time",
-        "pt": "Filter Life Time",
-        "nl": "Filter Life Time",
-        "fr": "Filter Life Time",
-        "it": "Filter Life Time",
-        "es": "Filter Life Time",
-        "pl": "Filter Life Time",
-        "uk": "Filter Life Time",
-        "zh-cn": "Filter Life Time"
+        "de": "Filter-Restlaufzeit",
+        "en": "Filter life",
+        "es": "Vida útil del filtro",
+        "fr": "Durée de vie du filtre",
+        "it": "Durata del filtro",
+        "nl": "Levensduur filter",
+        "pl": "Żywotność filtra",
+        "pt": "Vida útil do filtro",
+        "ru": "Ресурс фильтра",
+        "uk": "Ресурс фільтра",
+        "zh-cn": "滤网寿命"
       },
       "type": "number",
       "role": "value",
@@ -16883,7 +17402,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -16908,7 +17427,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -16970,7 +17489,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -17050,6 +17569,51 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7131_0012.control"
+  },
+  "govee-smart.0.devices.h7131_0012.control.auto_stop": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Automatisch stoppen",
+        "en": "Auto stop",
+        "es": "Parada automática",
+        "fr": "Arrêt automatique",
+        "it": "Arresto automatico",
+        "nl": "Automatisch stoppen",
+        "pl": "Automatyczne zatrzymanie",
+        "pt": "Paragem automática",
+        "ru": "Автоостановка",
+        "uk": "Автозупинка",
+        "zh-cn": "自动停止"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "0": "Maintain",
+        "1": "Auto Stop"
+      },
+      "def": "0",
+      "desc": {
+        "de": "Was das Heizgerät bei der Zieltemperatur tut: aufhören zu heizen (Auto Stop) oder sie halten (Maintain).",
+        "en": "What the heater does at the target temperature: stop heating (Auto Stop) or keep it (Maintain).",
+        "es": "Qué hace el calefactor a la temperatura objetivo: deja de calentar (Auto Stop) o la mantiene (Maintain).",
+        "fr": "Ce que fait le radiateur à la température cible : arrêter de chauffer (Auto Stop) ou la maintenir (Maintain).",
+        "it": "Cosa fa il riscaldatore alla temperatura obiettivo: smette di scaldare (Auto Stop) o la mantiene (Maintain).",
+        "nl": "Wat de kachel doet bij de doeltemperatuur: stoppen met verwarmen (Auto Stop) of die vasthouden (Maintain).",
+        "pl": "Co robi grzejnik po osiągnięciu temperatury docelowej: przestaje grzać (Auto Stop) albo ją utrzymuje (Maintain).",
+        "pt": "O que o aquecedor faz à temperatura alvo: para de aquecer (Auto Stop) ou mantém-na (Maintain).",
+        "ru": "Что делает обогреватель при заданной температуре: прекращает нагрев (Auto Stop) или поддерживает её (Maintain).",
+        "uk": "Що робить обігрівач за цільової температури: припиняє нагрів (Auto Stop) або підтримує її (Maintain).",
+        "zh-cn": "加热器达到目标温度时的行为：停止加热（Auto Stop）或保持温度（Maintain）。"
+      }
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.temperature_setting",
+      "capabilityInstance": "targetTemperature"
+    },
+    "_id": "govee-smart.0.devices.h7131_0012.control.auto_stop"
   },
   "govee-smart.0.devices.h7131_0012.control.brightness": {
     "type": "state",
@@ -17535,7 +18099,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -17560,7 +18124,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -17622,7 +18186,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -17692,17 +18256,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Sensor Temperature",
-        "de": "Sensor Temperature",
-        "ru": "Sensor Temperature",
-        "pt": "Sensor Temperature",
-        "nl": "Sensor Temperature",
-        "fr": "Sensor Temperature",
-        "it": "Sensor Temperature",
-        "es": "Sensor Temperature",
-        "pl": "Sensor Temperature",
-        "uk": "Sensor Temperature",
-        "zh-cn": "Sensor Temperature"
+        "de": "Temperatur",
+        "en": "Temperature",
+        "es": "Temperatura",
+        "fr": "Température",
+        "it": "Temperatura",
+        "nl": "Temperatuur",
+        "pl": "Temperatura",
+        "pt": "Temperatura",
+        "ru": "Температура",
+        "uk": "Температура",
+        "zh-cn": "温度"
       },
       "type": "number",
       "role": "value.temperature",
@@ -17943,17 +18507,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Lack Water Event",
-        "de": "Lack Water Event",
-        "ru": "Lack Water Event",
-        "pt": "Lack Water Event",
-        "nl": "Lack Water Event",
-        "fr": "Lack Water Event",
-        "it": "Lack Water Event",
-        "es": "Lack Water Event",
-        "pl": "Lack Water Event",
-        "uk": "Lack Water Event",
-        "zh-cn": "Lack Water Event"
+        "de": "Wassermangel",
+        "en": "Lack of Water",
+        "es": "Falta de agua",
+        "fr": "Manque d'eau",
+        "it": "Mancanza d'acqua",
+        "nl": "Watertekort",
+        "pl": "Brak wody",
+        "pt": "Falta de água",
+        "ru": "Недостаток воды",
+        "uk": "Брак води",
+        "zh-cn": "缺水"
       },
       "type": "boolean",
       "role": "indicator.maintenance",
@@ -17961,17 +18525,17 @@
       "write": false,
       "def": false,
       "desc": {
-        "de": "Meldet den Moment, in dem das Gerät einen leeren Wassertank signalisiert; setzt sich von selbst zurück.",
-        "en": "Reports the moment the device signals an empty water tank; it clears itself again.",
-        "es": "Informa del momento en que el aparato señala el depósito de agua vacío; se restablece solo.",
-        "fr": "Signale l'instant où l'appareil annonce un réservoir d'eau vide ; se réinitialise seul.",
-        "it": "Segnala il momento in cui l'apparecchio indica il serbatoio dell'acqua vuoto; si azzera da solo.",
-        "nl": "Meldt het moment waarop het apparaat een leeg waterreservoir aangeeft; herstelt zichzelf.",
-        "pl": "Zgłasza moment, w którym urządzenie sygnalizuje pusty zbiornik wody; sam się resetuje.",
-        "pt": "Comunica o momento em que o aparelho sinaliza o depósito de água vazio; repõe-se sozinho.",
-        "ru": "Сообщает момент, когда прибор сигнализирует о пустом баке для воды; сбрасывается сам.",
-        "uk": "Повідомляє момент, коли прилад сигналізує про порожній бак води; скидається самостійно.",
-        "zh-cn": "在设备提示水箱见底的瞬间上报；随后自行复位。"
+        "de": "Letzter Wasseralarm des Geräts (leerer Tank, beim Entfeuchter ein voller). Govee meldet keine Entwarnung, der Wert bleibt wahr, bis eine andere Meldung etwas anderes sagt.",
+        "en": "Last water alarm the device sent (an empty tank; on a dehumidifier a full one). Govee sends no all-clear, so it stays true until another report says otherwise.",
+        "es": "Última alarma de agua enviada por el dispositivo (depósito vacío; en un deshumidificador, lleno). Govee no envía fin de alarma, así que sigue verdadero hasta que otro informe diga lo contrario.",
+        "fr": "Dernière alerte d'eau envoyée par l'appareil (réservoir vide ; plein sur un déshumidificateur). Govee n'envoie pas de fin d'alerte : la valeur reste vraie jusqu'à ce qu'un autre rapport dise le contraire.",
+        "it": "Ultimo allarme acqua inviato dal dispositivo (serbatoio vuoto; pieno su un deumidificatore). Govee non invia il cessato allarme, quindi resta vero finché un altro rapporto non dice altrimenti.",
+        "nl": "Laatste wateralarm van het apparaat (lege tank; bij een ontvochtiger een volle). Govee stuurt geen opheffing, dus het blijft waar tot een andere melding iets anders zegt.",
+        "pl": "Ostatni alarm wody wysłany przez urządzenie (pusty zbiornik; w osuszaczu pełny). Govee nie wysyła odwołania, więc wartość pozostaje prawdą, dopóki inny raport nie powie inaczej.",
+        "pt": "Último alarme de água enviado pelo dispositivo (depósito vazio; num desumidificador, cheio). A Govee não envia fim de alarme, por isso fica verdadeiro até outro relatório dizer o contrário.",
+        "ru": "Последний сигнал устройства о воде (пустой бак, у осушителя — полный). Govee не присылает отмену, значение остаётся истинным, пока другое сообщение не скажет иное.",
+        "uk": "Останній сигнал пристрою про воду (порожній бак, в осушувача — повний). Govee не надсилає скасування, тож значення лишається істинним, доки інше повідомлення не скаже інакше.",
+        "zh-cn": "设备最近一次发出的水位警报（水箱缺水；除湿机为水箱已满）。Govee 不发送解除通知，因此该值保持为真，直到其他报告另有说明。"
       }
     },
     "native": {
@@ -18055,7 +18619,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -18080,7 +18644,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -18142,7 +18706,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -18564,7 +19128,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -18589,7 +19153,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -18651,7 +19215,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -18974,7 +19538,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -18999,7 +19563,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -19061,7 +19625,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -19474,7 +20038,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -19499,7 +20063,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -19561,7 +20125,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -19802,17 +20366,17 @@
     "type": "state",
     "common": {
       "name": {
-        "en": "Ice Full Event",
-        "de": "Ice Full Event",
-        "ru": "Ice Full Event",
-        "pt": "Ice Full Event",
-        "nl": "Ice Full Event",
-        "fr": "Ice Full Event",
-        "it": "Ice Full Event",
-        "es": "Ice Full Event",
-        "pl": "Ice Full Event",
-        "uk": "Ice Full Event",
-        "zh-cn": "Ice Full Event"
+        "de": "Eisbehälter voll",
+        "en": "Ice Bucket Full",
+        "es": "Cubo de hielo lleno",
+        "fr": "Bac à glace plein",
+        "it": "Cestello ghiaccio pieno",
+        "nl": "IJsbak vol",
+        "pl": "Pojemnik na lód pełny",
+        "pt": "Recipiente de gelo cheio",
+        "ru": "Контейнер льда полон",
+        "uk": "Контейнер для льоду повний",
+        "zh-cn": "冰桶已满"
       },
       "type": "boolean",
       "role": "indicator.maintenance",
@@ -19820,17 +20384,17 @@
       "write": false,
       "def": false,
       "desc": {
-        "de": "Meldet den Moment, in dem der Eisbehälter als voll gemeldet wird; setzt sich von selbst zurück.",
-        "en": "Reports the moment the ice bucket is signalled as full; it clears itself again.",
-        "es": "Informa del momento en que el cubo de hielo se señala como lleno; se restablece solo.",
-        "fr": "Signale l'instant où le bac à glaçons est annoncé plein ; se réinitialise seul.",
-        "it": "Segnala il momento in cui il cestello del ghiaccio è indicato come pieno; si azzera da solo.",
-        "nl": "Meldt het moment waarop de ijsbak als vol wordt gemeld; herstelt zichzelf.",
-        "pl": "Zgłasza moment, w którym pojemnik na lód sygnalizowany jest jako pełny; sam się resetuje.",
-        "pt": "Comunica o momento em que o balde de gelo é sinalizado como cheio; repõe-se sozinho.",
-        "ru": "Сообщает момент, когда контейнер для льда сигнализируется как полный; сбрасывается сам.",
-        "uk": "Повідомляє момент, коли контейнер для льоду сигналізується як повний; скидається самостійно.",
-        "zh-cn": "在冰桶被报告为已满的瞬间上报；随后自行复位。"
+        "de": "Letzter Eisbehälter-Alarm des Geräts. Govee meldet keine Entwarnung, der Wert bleibt wahr, bis eine andere Meldung etwas anderes sagt.",
+        "en": "Last ice-bucket alarm the device sent. Govee sends no all-clear, so it stays true until another report says otherwise.",
+        "es": "Última alarma del depósito de hielo enviada por el dispositivo. Govee no envía fin de alarma, así que sigue verdadero hasta que otro informe diga lo contrario.",
+        "fr": "Dernière alerte du bac à glaçons envoyée par l'appareil. Govee n'envoie pas de fin d'alerte : la valeur reste vraie jusqu'à ce qu'un autre rapport dise le contraire.",
+        "it": "Ultimo allarme del contenitore del ghiaccio inviato dal dispositivo. Govee non invia il cessato allarme, quindi resta vero finché un altro rapporto non dice altrimenti.",
+        "nl": "Laatste ijsbak-alarm van het apparaat. Govee stuurt geen opheffing, dus het blijft waar tot een andere melding iets anders zegt.",
+        "pl": "Ostatni alarm pojemnika na lód wysłany przez urządzenie. Govee nie wysyła odwołania, więc wartość pozostaje prawdą, dopóki inny raport nie powie inaczej.",
+        "pt": "Último alarme do depósito de gelo enviado pelo dispositivo. A Govee não envia fim de alarme, por isso fica verdadeiro até outro relatório dizer o contrário.",
+        "ru": "Последний сигнал устройства о заполненном контейнере для льда. Govee не присылает отмену, значение остаётся истинным, пока другое сообщение не скажет иное.",
+        "uk": "Останній сигнал пристрою про повний контейнер для льоду. Govee не надсилає скасування, тож значення лишається істинним, доки інше повідомлення не скаже інакше.",
+        "zh-cn": "设备最近一次发出的冰桶已满警报。Govee 不发送解除通知，因此该值保持为真，直到其他报告另有说明。"
       }
     },
     "native": {
@@ -19914,7 +20478,7 @@
         "zh-cn": "型号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.model",
       "read": true,
       "write": false,
       "def": ""
@@ -19939,7 +20503,7 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
@@ -20001,7 +20565,7 @@
         "zh-cn": "序列号"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.serial",
       "read": true,
       "write": false,
       "def": ""
@@ -20331,12 +20895,65 @@
         "zh-cn": "名称"
       },
       "type": "string",
-      "role": "text",
+      "role": "info.name",
       "read": true,
       "write": false
     },
     "native": {},
     "_id": "govee-smart.0.groups.basegroup_0001.info.name"
+  },
+  "govee-smart.0.groups.basegroup_0001.music": {
+    "type": "channel",
+    "common": {
+      "name": {
+        "de": "Musik",
+        "en": "Music",
+        "es": "Música",
+        "fr": "Musique",
+        "it": "Musica",
+        "nl": "Muziek",
+        "pl": "Muzyka",
+        "pt": "Música",
+        "ru": "Музыка",
+        "uk": "Музика",
+        "zh-cn": "音乐"
+      }
+    },
+    "native": {},
+    "_id": "govee-smart.0.groups.basegroup_0001.music"
+  },
+  "govee-smart.0.groups.basegroup_0001.music.music_mode": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Musik-Modus",
+        "en": "Music Mode",
+        "es": "Modo música",
+        "fr": "Mode musique",
+        "it": "Modalità musica",
+        "nl": "Muziekmodus",
+        "pl": "Tryb muzyki",
+        "pt": "Modo música",
+        "ru": "Режим музыки",
+        "uk": "Режим музики",
+        "zh-cn": "音乐模式"
+      },
+      "type": "mixed",
+      "role": "state",
+      "read": true,
+      "write": true,
+      "states": {
+        "0": "---",
+        "1": "Energic",
+        "2": "Rhythm"
+      },
+      "def": "0"
+    },
+    "native": {
+      "capabilityType": "devices.capabilities.music_setting",
+      "capabilityInstance": "musicMode"
+    },
+    "_id": "govee-smart.0.groups.basegroup_0001.music.music_mode"
   },
   "govee-smart.0.groups.basegroup_0001.scenes": {
     "type": "channel",

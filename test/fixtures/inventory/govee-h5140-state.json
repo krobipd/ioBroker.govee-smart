@@ -1,0 +1,35 @@
+{
+  "_source": "Govee OpenAPI docs, developer.govee.com/reference/get-devices-status (read 2026-09-24), the H5140 example `payload` verbatim; only the device id is the fixture's.",
+  "sku": "H5140",
+  "device": "AA:BB:CC:DD:EE:FF:00:16",
+  "capabilities": [
+    {
+      "type": "devices.capabilities.online",
+      "instance": "online",
+      "state": {
+        "value": true
+      }
+    },
+    {
+      "type": "devices.capabilities.property",
+      "instance": "carbonDioxideConcentration",
+      "state": {
+        "value": 1590
+      }
+    },
+    {
+      "type": "devices.capabilities.property",
+      "instance": "sensorTemperature",
+      "state": {
+        "value": 79.52
+      }
+    },
+    {
+      "type": "devices.capabilities.property",
+      "instance": "sensorHumidity",
+      "state": {
+        "value": 61.2
+      }
+    }
+  ]
+}

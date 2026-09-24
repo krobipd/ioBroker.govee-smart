@@ -152,6 +152,71 @@ for (const sku of ["h61a8", "h6199"]) {
   };
 }
 
+// H5140 (audit N15): Govee's own example state answer, so `sensor.co2` is built
+// from a documented reading.
+CAPTURED["AA:BB:CC:DD:EE:FF:00:16"] = { state: require("./fixtures/inventory/govee-h5140-state.json") };
+
+/** The H6199's own scene library in wire form — the scenes with speedInfo build `scenes.scene_speed`. */
+const SCENE_LIBRARIES = { H6199: require("./fixtures/inventory/govee-h6199-scene-library.json") };
+
+/**
+ * The account-list entry of the gateway-backed H5109, in Govee's wire form
+ * (settings and last data as JSON strings, as every raw capture since 2.39.1
+ * shows them). Values from issue #31 (the export's list entry of 2026-07-05),
+ * every identifying value replaced by a canary: the fixture's device id, the
+ * gateway's secret, topic, BLE name and addresses.
+ */
+const APP_LIST = [
+  {
+    sku: "H5109",
+    device: "AA:BB:CC:DD:EE:FF:00:05",
+    deviceName: "Battery Sensor Cellar",
+    deviceId: 98765001,
+    groupId: 0,
+    spec: "",
+    versionHard: "1.4",
+    versionSoft: "1.9",
+    deviceExt: {
+      deviceSettings: JSON.stringify({
+        temMin: 1500,
+        temMax: 3500,
+        temWarning: true,
+        fahOpen: false,
+        temCali: 0,
+        humMin: 0,
+        humMax: 10000,
+        humWarning: true,
+        humCali: 0,
+        netWaring: true,
+        uploadRate: 10,
+        battery: 100,
+        wifiLevel: 0,
+        sno: 0,
+        powerSaveModeState: false,
+        emailWarningOnOff: false,
+        criticalOnOff: false,
+        normalPushOnOff: true,
+        gatewayId: 1000004,
+        gatewayInfo: {
+          device: "AA:BB:CC:DD:EE:FF:00:04",
+          sku: "H5042",
+          topic: "GD/c0dec0dec0dec0dec0dec0dec0dec0",
+          bleName: "ihoment_H5042_C0DE",
+          address: "AA:BB:CC:DD:EE:04",
+          secretCode: "CANARYsecret0=",
+        },
+        wifiFuncList: "",
+        sku: "H5109",
+        device: "AA:BB:CC:DD:EE:FF:00:05",
+        deviceName: "Battery Sensor Cellar",
+        versionHard: "1.4",
+        versionSoft: "1.9",
+      }),
+      lastDeviceData: JSON.stringify({ online: false, tem: 2343, hum: 0, lastTime: 1783279200000 }),
+    },
+  },
+];
+
 /** Scenes + snapshots for a light, from the separate scenes endpoint (hand-built lights only). */
 function scenesFor() {
   return {
@@ -205,10 +270,10 @@ function startFakeCloud() {
         );
       } else if (url.includes("/router/api/v1/device/diy-scenes")) {
         const captured = CAPTURED[parsed.payload?.device];
-        reply(okPayload(captured ? captured.diyScenes : scenesFor()));
+        reply(okPayload(captured?.diyScenes ?? scenesFor()));
       } else if (url.includes("/router/api/v1/device/scenes")) {
         const captured = CAPTURED[parsed.payload?.device];
-        reply(okPayload(captured ? captured.scenes : scenesFor()));
+        reply(okPayload(captured?.scenes ?? scenesFor()));
       } else if (url.includes("/router/api/v1/device/control")) {
         // The control answer is NOT wrapped in `data` — measured on 12 captures (issue #47).
         reply(
@@ -272,10 +337,12 @@ function startFakeCloud() {
           }),
         );
       } else if (url.includes("/device/rest/devices/v1/list")) {
-        // The App-API device list drives the sensor/appliance readings. Empty
-        // and well-formed: those values come from the OpenAPI state read in
-        // this fixture, and an empty list keeps the inventory deterministic.
-        reply(JSON.stringify({ status: 200, message: "ok", devices: [] }));
+        // The App-API device list: the gateway-backed H5109 — its battery and
+        // gateway reach the tree only through this list (audit N15).
+        reply(JSON.stringify({ status: 200, message: "ok", devices: APP_LIST }));
+      } else if (url.includes("/appsku/v1/light-effect-libraries")) {
+        const sku = new URL(url, "http://fixture").searchParams.get("sku") ?? "";
+        reply(JSON.stringify(SCENE_LIBRARIES[sku] ?? { status: 200, message: "ok", data: {} }));
       } else if (url.includes("/appsku/v1/") || url.includes("/bff-app/v1/")) {
         // Scene / music / DIY libraries and snapshots are public app-API
         // reads. Empty but well-formed: the adapter must build its tree

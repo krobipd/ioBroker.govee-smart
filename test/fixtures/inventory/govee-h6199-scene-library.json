@@ -1,0 +1,2622 @@
+{
+  "_source": "Ressourcen/govee-smart/github-exports/issue-26-H6199.txt sceneLibrary.entries (the H6199's own library, 236 scenes) in Govee's /appsku/v1/light-effect-libraries wire form (layout as govee2mqtt test-data/light-effect-library-h6072.json: data.categories[].scenes[].lightEffects[]); one light effect per recorded entry.",
+  "message": "success",
+  "status": 200,
+  "data": {
+    "categories": [
+      {
+        "categoryId": 1,
+        "categoryName": "Recorded",
+        "scenes": [
+          {
+            "sceneName": "Sunset",
+            "sceneCode": 1,
+            "lightEffects": [
+              {
+                "sceneCode": 1,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Forest",
+            "sceneCode": 212,
+            "lightEffects": [
+              {
+                "sceneCode": 212,
+                "scenceName": "",
+                "scenceParam": "AyYAAQAKAgH/GQG0CgoCyBQF//8AAP//////AP//lP8AFAGWAAAAACMAAg8FAgH/FAH7AAAB+goEBP8AtP8AR///4/8AAAAAAAAAABoAAAABAgH/BQHIFBQC7hQBAP8AAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Rustling leaves",
+            "sceneCode": 218,
+            "lightEffects": [
+              {
+                "sceneCode": 218,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAH//wEAAAAA3DICAP8AAf+WAAAAAAAAABoAAigBAgH/KAHMIBQAADIB//8AAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Universe-A",
+            "sceneCode": 200,
+            "lightEffects": [
+              {
+                "sceneCode": 200,
+                "scenceName": "",
+                "scenceParam": "AyNQAQAPAgH/CgIAAAACAAAEAAD/AKr/AP//////AAD6EAH+ACNVAQAPAgH/CgAAAAACAAAE////AP//AKr/AAD/AAD6EgH+ABoAAAABAAH6AAHIMhQA/zIBAAD/EQCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Universe-B",
+            "sceneCode": 2499,
+            "lightEffects": [
+              {
+                "sceneCode": 2499,
+                "scenceName": "",
+                "scenceParam": "BSkAAzIAAAEzMwIAAQGDNAEGAAD/iwD/AAD/AP//AAD/iwD/AADXAAAdACYAAg8BAAL/AALMAQH/AADIAQEDNAEDAP//AAD//wAABAD/AACAACklAAABAAP/AALJAf//AADJBwEAAAAAATIDAAECAAAA////FgD0EgD8ACkjAAABAAP/AALKAf//AADLBwEAAAAAAY8DAAECAAAA////FADzEAD7ACkkAAABAAP/AALKAf//AADKBwEAAAAAASMDAAECAAAA////FAD2EAD+AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Meteor",
+            "sceneCode": 205,
+            "lightEffects": [
+              {
+                "sceneCode": 205,
+                "scenceName": "",
+                "scenceParam": "ASAgAQAKAgH/CgIAAAACAAADAKr/AP//////AAD6EAH+AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Meteor shower",
+            "sceneCode": 228,
+            "lightEffects": [
+              {
+                "sceneCode": 228,
+                "scenceName": "",
+                "scenceParam": "AyAgAQAKAgH/CgIAAAACAAADANv/AP//////AAD6EAH9ACAAAQAKAgH/CgIAAAACAAADANv/AP//////AAD6EAH8ACBVAQAKAgH/CgIAAAACAAADAAD/AP//////AAD6EAH9AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Aurora-A",
+            "sceneCode": 215,
+            "lightEffects": [
+              {
+                "sceneCode": 215,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAgH/MgEAAAAA+jIDAP8AAP//qv8AAwCAAAAAACMAAAADAgH/GQD6AAAC+gAEf/8A//8AoP//AP//FAH6AAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Aurora-B",
+            "sceneCode": 2289,
+            "lightEffects": [
+              {
+                "sceneCode": 2289,
+                "scenceName": "",
+                "scenceParam": "BCNAAAABAgH/GQPCCgMC5jIED/8ICwf/B/j//wbpAAL4AQCAACNCAAABAAH/GAO7CgOC5zIE/9Nyy4X/DUv/Uv+ZEgHNAAPkACNEAAABAAH/GAO7CgMC5TIECwf/D/8I/wbpB/j/EAHMAQCAACZGAAABAAH/GAO7CgMC5TIFB/j/Cwf//wbpD/8I3P8REgHdAQCAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Lightning-A",
+            "sceneCode": 214,
+            "lightEffects": [
+              {
+                "sceneCode": 214,
+                "scenceName": "",
+                "scenceParam": "Ah0AAg8FAAH/AAD/AgIA/zIC////AAAAEQCAAAAAAB0AAAABAAH/AAH/AgIA/zICAAAA////EQCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Lightning-B",
+            "sceneCode": 2133,
+            "lightEffects": [
+              {
+                "sceneCode": 2133,
+                "scenceName": "",
+                "scenceParam": "ASmBAgEBAgH/AAH/AQEC/yMG////AAAA////AAAA////AAAAFQXMEQXNAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Lightning-C",
+            "sceneCode": 2100,
+            "lightEffects": [
+              {
+                "sceneCode": 2100,
+                "scenceName": "",
+                "scenceParam": "BRokAAABAgH/AAP/FBQAABQBAAD/AACAAACAARoAAAABAgH/AAH/FBQAABQBAAD/AACAAACAARogAQAKAgH/AAKAFBQAgBQB////AACAEAH7AhooAQAKAgH/AACAFBQAgBQB////AACAEgH7Ah0kAQAKAgH/AAP/BAEA/woCAAD/////AACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Starry Sky",
+            "sceneCode": 217,
+            "lightEffects": [
+              {
+                "sceneCode": 217,
+                "scenceName": "",
+                "scenceParam": "AiAAAAACAAH/GQF4MjICyDIDAAD/AH7/AAD/AAAAAAAAACMAAg8DAAH/FAH6FBQC/TIEAAD/////AOz/AAD/AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Star",
+            "sceneCode": 213,
+            "lightEffects": [
+              {
+                "sceneCode": 213,
+                "scenceName": "",
+                "scenceParam": "Ah0AAg8FAgH/AACWMjIA3DIC////b///AAAAAAAAAB0AAgoDAgH/AADcFBQA3DIC////b///AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Snow flake-A",
+            "sceneCode": 15,
+            "lightEffects": [
+              {
+                "sceneCode": 15,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Snow flake-B",
+            "sceneCode": 2154,
+            "lightEffects": [
+              {
+                "sceneCode": 2154,
+                "scenceName": "",
+                "scenceParam": "BSkAAAAyAAH/AAB/FBQAthQGAAAAAAAA//n3aZH/AAAAAAAAFAD3AAB/ASlQAgUBAAH/AAB/FBQA/xQG+//7AAAA////AAAAg5j/AAAAFAD8AAB/BSZSAgUBAAH/AAF/FBQA/xQF+//7AAAA////AAAA/4D9FQT8EQbZASZVAgEBAAH/AAB/FBQA/xQF+//7AAAA////AAAAorH/FQT8AAB/ASkAAgUBAAH/AAB/FBQA/xQG+//7AAAA////AAAAvX//f4T/FQD8AAB/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Spring",
+            "sceneCode": 210,
+            "lightEffects": [
+              {
+                "sceneCode": 210,
+                "scenceName": "",
+                "scenceParam": "AykAAgoFAgH/GQAAAAAC+jIG/zgA/38AAP8AAAAAAP//iwD/AACAAAAAACMAAh4KAAH//wAAAAAB+gAE8QAd/3UA/8AA/0sAAAD/AAH6AB0AAAABAAEyAAHIMjICyDICAP8A//8AAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Summer",
+            "sceneCode": 223,
+            "lightEffects": [
+              {
+                "sceneCode": 223,
+                "scenceName": "",
+                "scenceParam": "AhoAAAABAgH//wAAAAAA/zIBM///AwCAAAAAACYAAh4KAAH//wAAAAAA+gAFAAD/AP///8AA//8AAAX/AAAAAAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fall",
+            "sceneCode": 202,
+            "lightEffects": [
+              {
+                "sceneCode": 202,
+                "scenceName": "",
+                "scenceParam": "AhoAAAABAgH//wAAAAAA/zIB/zgAAwCAAAAAACkAAh4KAAH//wAAAAAA+gAG8QAd/3UA/8AA/0sA/wAAAAAAEADcAAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Winter",
+            "sceneCode": 201,
+            "lightEffects": [
+              {
+                "sceneCode": 201,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAgH/CgHIFAoA/TIB////AwCAAAAAACMAAh4KAAH/BQCgFBQB/QAE////t///pv//d///FAHIEQH9/yMAAh4KAAH/BQCgFBQB/QoE////t///pv//d///EQHIEgH8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Rainbow-A",
+            "sceneCode": 22,
+            "lightEffects": [
+              {
+                "sceneCode": 22,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Rainbow-B",
+            "sceneCode": 10187,
+            "lightEffects": [
+              {
+                "sceneCode": 10187,
+                "scenceName": "",
+                "scenceParam": "ASkAAAAHAgH/gQD5FBQD+RQG/wAA/38A//8AAP8AAP//AAD/EAD8AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fire-A",
+            "sceneCode": 216,
+            "lightEffects": [
+              {
+                "sceneCode": 216,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAgL//wAAAAD/GQAAAAAA/zIB/zgAAwCAAAAAACMAAh4KAAH//wAAAAAA/wAE8QAd/3UA/8AA/0sAAAD/AAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fire-B",
+            "sceneCode": 2098,
+            "lightEffects": [
+              {
+                "sceneCode": 2098,
+                "scenceName": "",
+                "scenceParam": "BR0AAAAWAAFwMgO7FBQC1RQC/1kH////AwD/EwD/ASknAAAFAgH/mQL/Xx4CAP8GAAAA/////20H/00H/w4H/wgJEgD8EACAAikhAAAGAgH/mQL/Xx4CAP8GAAAA/////20H/00H/w4H/wgJEAD+EAD9AilDAhQUAAH//wCAFBQB6hQG/xUH/wgJ/wgJ/ykH/wcTAAAAEwD8AACAAykkAAABAAH/AACAFBQB6RQG/xUH/zkH/44H/14H/wcT/w8HFwD5AAD/BA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fire-C",
+            "sceneCode": 2293,
+            "lightEffects": [
+              {
+                "sceneCode": 2293,
+                "scenceName": "",
+                "scenceParam": "BCAAAAABAgH/cQG9FBQAORQD/z4A/ygA/1sAECCAAACAACBQAAABAAH//wCAFBQDgBQD/2UA/1EA/30AEAiAEAD8ASBVAAABAAH//wCAFBQDgBQD/1Ew/0cA/1YAEBeAEAD7AiMzAAABAAH/UQGsFBQAgBQE/2IA/1cO/0QA/2YAEQ2AEAD4Aw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Ripple",
+            "sceneCode": 204,
+            "lightEffects": [
+              {
+                "sceneCode": 204,
+                "scenceName": "",
+                "scenceParam": "AyNQAQAZAgH/CgIAAAACAAAE////Qv//AKD/ALX/FgH9AAAAACNVAQAZAgH/CgIAAAACAAAE////Qv//AKD/ALX/FAH9AAAAABoAAQAAAAEUFAAAAAAAAP8BgP//AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Wave-A",
+            "sceneCode": 227,
+            "lightEffects": [
+              {
+                "sceneCode": 227,
+                "scenceName": "",
+                "scenceParam": "ASMAAAACAAH//wAAAAAC/TIEAAD/AH7/AOz/AAD/EwH8AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Wave-B",
+            "sceneCode": 2498,
+            "lightEffects": [
+              {
+                "sceneCode": 2498,
+                "scenceName": "",
+                "scenceParam": "Ax1VAAABAAH//wAAFBQA9wUC/wf9AP//FgD8AwJwAB1QAAABAAH//wAAFBQA9wUC/wf/AP//FAD8AwJwABoAAAABAAFBQQAAFBQAgBQB/6N4AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Deep sea",
+            "sceneCode": 203,
+            "lightEffects": [
+              {
+                "sceneCode": 203,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAH//wAAAAAA3DICAGT/AAD/AAAAAAAAABoAAgoBAgH/KAHXAAAAADIBAP+WAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Desert",
+            "sceneCode": 2006,
+            "lightEffects": [
+              {
+                "sceneCode": 2006,
+                "scenceName": "",
+                "scenceParam": "AhoAAQAyAgH/GQEAFBQA/TIByHgAAwCAAAAAACkAAh4PAAH/MgDIFBQA+gAG//8A/28A/6AA/3MA/8IA+v8AFAH9AAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Karst Cave-A",
+            "sceneCode": 2007,
+            "lightEffects": [
+              {
+                "sceneCode": 2007,
+                "scenceName": "",
+                "scenceParam": "AyYAAQAKAgH/GQFkCgoCyBQFvQD//0kA/5YAnv8AFP//FgFkAAAAACkAAh4PAgH/ZAHmAAAB+hQGBP8AAP8AiwD//0v/8QAe//8AAAAAAAAAACAAAAABAAGWMgDmFBQC+hQDAMz/AG7/AAP/AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Karst Cave-B",
+            "sceneCode": 2024,
+            "lightEffects": [
+              {
+                "sceneCode": 2024,
+                "scenceName": "",
+                "scenceParam": "ASkAAAAyAgH/AAH/UmQC4mQGiwD//wAA/38AAP8AAAD///8AER7jER7iBQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Karst Cave-C",
+            "sceneCode": 2502,
+            "lightEffects": [
+              {
+                "sceneCode": 2502,
+                "scenceName": "",
+                "scenceParam": "BSkyAAABAgE4AAP/BhMAmRQG/wAA/38A//8AAP8AAAD/iwD/EgD6AACAAClgAAABAgF1AAP/BhMA/hQGiwD/AAD/AP8A//8A/38A/wAAEgD9AACAACk1AAABAgE5AAP/BhMAzBQGiwD/AAD/AP8A//8A/38A/wAAEAD6AgCAAClkAAABAgF1AAP/BhMA9xQG/wAA/38A//8AAP8AAAD/iwD/EAD9AACAACkkAAABAgEOAAP/BhMAzRQG/wAA//8AAAD//38AAP8AiwD/AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Glacier",
+            "sceneCode": 2008,
+            "lightEffects": [
+              {
+                "sceneCode": 2008,
+                "scenceName": "",
+                "scenceParam": "BCBQAQAZAAH/AAD/MjICZAADAAD/AP//////FgD/AAAAACBVAQAZAAH/AAD/MjICZAADAAD/AP//////FAD/AAAAACkAAh4FAAH/AAL/MjIC/xQGAP//AAAA////AAAA////AP//AAAAEgD6ACYAAh4FAAH/AAL/MjIC3AIFAP//AAAA////AAAAAP//AAAAEgDrAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Gobi Desert",
+            "sceneCode": 2009,
+            "lightEffects": [
+              {
+                "sceneCode": 2009,
+                "scenceName": "",
+                "scenceParam": "AiCgAQAyAAGWlgAAAAAA3BQDljIAyDwA0jIAAAAAAAAAAB0AAgUBAAH/FAHwFFAC+kYC/38A/7QAAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Moonlight-A",
+            "sceneCode": 2010,
+            "lightEffects": [
+              {
+                "sceneCode": 2010,
+                "scenceName": "",
+                "scenceParam": "AiBgAgoFAgFkZABkAAAC/RQD//8A//+g////AAAAEAXcAB2gAQAyAAFkHgAAAAAA/RQCAABQAB6gAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Moonlight-B",
+            "sceneCode": 2025,
+            "lightEffects": [
+              {
+                "sceneCode": 2025,
+                "scenceName": "",
+                "scenceParam": "BB0AAQAyAAHOZwNqFBQBABQC////AAAAAACAAAD1AB0AAQAyAAH/lgH8FBQBABQCAAAA/4EAAACAAAD0ABoQAQABAAH/AAN+LWkBABQB////AACAEAD6ABoQAQABAAH/AANkLXABABQB/0kHAACAEAD5AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cornfield",
+            "sceneCode": 2011,
+            "lightEffects": [
+              {
+                "sceneCode": 2011,
+                "scenceName": "",
+                "scenceParam": "Bh0gAQAIAgH/AAD/FBQA/xQC/0EA/4IAEQDyAAAAAB0iAQAIAgH/AAD/FBQA/xQC/0EA/2MAEQDyAAAAAB0kAQAIAgH/AAD/FBQA/xQC/0EA/2MAEQDyAAAAAB0mAQAIAgH/AAD/FBQA/xQC/0EA/5YAEQDyAAAAAB0oAQAIAgH/AAD/FBQA/xQC/0EA/2MAEQDyAAAAABqgAQAyAAFkCgAAAAAA/zIBPCMAERTwAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flower Field-A",
+            "sceneCode": 2012,
+            "lightEffects": [
+              {
+                "sceneCode": 2012,
+                "scenceName": "",
+                "scenceParam": "AiygAh4ZAgH/lgDSAAAC/gAH0QBe/wMA/2wA//8A/38A/wAA9QD/AAAAEADwABqgAQAyAAEyFAAAAAAA+hQBzwBiAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flower Field-B",
+            "sceneCode": 2285,
+            "lightEffects": [
+              {
+                "sceneCode": 2285,
+                "scenceName": "",
+                "scenceParam": "BR0gAAABAAH//wCAFBQD9gECAAD//wAAEAD7AAD8AB0iAAABAAH//wCAFBQD9gECAP//AP8AEAD7AAD8AB0kAAABAAH//wCAFBQD9gECiwD//38AEAD7AAD8AB0mAAABAAH//wCAFBQD9gECAP8A//8AEAD7AAD8AB0oAAABAAH//wCAFBQD9gECiwD/AP//EAD7AAD8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Volcano-A",
+            "sceneCode": 2013,
+            "lightEffects": [
+              {
+                "sceneCode": 2013,
+                "scenceName": "",
+                "scenceParam": "BSNQAQAPAgH/CgD6AAACAAAE/wAAyAAAlgAAMgAAFgH/AAAAACNVAQAPAgH/CgD6AAACAAAE/wAAyAAAlgAAMgAAFAH/AAAAACNVAQAPAgH/CgD6AAACAAAE/wAAyAAAlgAAMgAAFAH/AAAAACNQAQAPAgH/CgD6AAACAAAE/wAAyAAAlgAAMgAAFgH/AAAAAB2gAh4PAgH/CgD/AAACAAACMgAA/wAAEADJAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Volcano-B",
+            "sceneCode": 2026,
+            "lightEffects": [
+              {
+                "sceneCode": 2026,
+                "scenceName": "",
+                "scenceParam": "BSYwAQAPAgH/AAD/FBQB/w8F/wAAAAAA/ysGAAAA/1EHEgD1AADUACY3AQAPAgH/AAD/FBQB/w8F/wAAAAAA/yoHAAAA/1kHEAD1AADUAB1DAQASAAH/GgD/FBQB0w8C/wAA/xEHEQD4AADUAB0lAAABAgGyDQDTGRkA0w8C/0UH/wAAEAD4AADUAB0jAAABAgGyDADTGRkA0w8C/zoH/wAAEgD4AADUAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Downpour",
+            "sceneCode": 2127,
+            "lightEffects": [
+              {
+                "sceneCode": 2127,
+                "scenceName": "",
+                "scenceParam": "BCMwAgQBAAH/AAL/AgIA/2QE////AAAAAAAAAAAAAACAEQD0ACkUAgIBAAH/AAD/AQQA/yYGAAAAAAAA////AAAA////AAAAAACAEwDfAC9CAgUDAAL/AAL/AgH/AAD7KMgA/x4GAAAAAAAAAAAAAAAA////AAAAAACAAACAACAAAAAyAgIHAgGbgMgEAwOZfMAAgBQB////AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sunny-A",
+            "sceneCode": 2129,
+            "lightEffects": [
+              {
+                "sceneCode": 2129,
+                "scenceName": "",
+                "scenceParam": "Ax0AAAABAAHxwwB/FBQAkgICAP//AAD/AAB/AAB/AR0AAhkBAAHxwwDKFBQAfxQC////AAAAAAB/EQD8AR0AAhkBAAHxwwDKFBQAfxQC////AAAAAAB/EwD8AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sunny-B",
+            "sceneCode": 2159,
+            "lightEffects": [
+              {
+                "sceneCode": 2159,
+                "scenceName": "",
+                "scenceParam": "Ax0AAAABAAH//wB/FBQAfxQC//8A/+cAAAB/AAB/ARoAAgcEAAH//wABFBQA+BQBxf/9AAB/EADxAhoAAgcEAAH//wABFBQA+BQBKsn/AAB/EgDxAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Desert B",
+            "sceneCode": 10001,
+            "lightEffects": [
+              {
+                "sceneCode": 10001,
+                "scenceName": "",
+                "scenceParam": "AyYAAAAFAgHLMwPJFBQDABQF/x4H/zcH/1oH/zcH/x4HAACAAACAABpQAwEFAAH/AACAFBQAgBQB/zIHFgD5AACAABpVAwEFAAH/AACAFBQAgBQB/zEHFAD5AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sand Grains",
+            "sceneCode": 10002,
+            "lightEffects": [
+              {
+                "sceneCode": 10002,
+                "scenceName": "",
+                "scenceParam": "Ah0AAw8KAAGgoAAAFBQDABQC/4Mw/3EVAACAEAH8ARoAAAABAAH/jAH5FBQDAAcB/2MaAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Watermelon",
+            "sceneCode": 12531,
+            "lightEffects": [
+              {
+                "sceneCode": 12531,
+                "scenceName": "",
+                "scenceParam": "BBoQAAABAAH//wCAFBQCABQBAP8AAACAAACAABqBAhkUAAH//wCAFBQCABQB/1FJAACAAACAARqBAhkUAAH//wCAFBQCABQB/wAAAACAAACAAhoZAAABAAH//wCAFBQCABQBAP8AAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sky",
+            "sceneCode": 12803,
+            "lightEffects": [
+              {
+                "sceneCode": 12803,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAgH/iwGZCiMD3RQDBj7+udn/Bk7+EgD8AACAABoAAwEHAAHX1wHJFBQAVBQBB0P/AACAEgD5AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sailboat",
+            "sceneCode": 12804,
+            "lightEffects": [
+              {
+                "sceneCode": 12804,
+                "scenceName": "",
+                "scenceParam": "AyBQAAABAgH/gAOZCiMD5RQDE1H+////Bk7+EgD3AACAACBVAAABAgH/gAOZCiMD5RQDBk7+////DEL/EAD3AACAACkAAwUFAAHl5QAAFBQC/BQG/5YNGUe+GUe+GUe+GUe+GUe+AACAAQC/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "New Years",
+            "sceneCode": 222,
+            "lightEffects": [
+              {
+                "sceneCode": 222,
+                "scenceName": "",
+                "scenceParam": "BSCgAQAKAgH/CgIAAAACAAADAKr/AP//////AAD6EAH8ACCiAQAKAgH/CgIAAAACAAADiwD/uwD//zv/AAD6EAH8ACCkAQAKAgH/CgIAAAACAAAD/wAA/zxQ////AAD6EAH8ACCmAQAKAgH/CgIAAAACAAADAP8AaP8AuP8AAAD6EAH8ACCoAQAKAgH/CgIAAAACAAAD/38A/8QA9P8AAAD6EAH8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Christmas-A",
+            "sceneCode": 221,
+            "lightEffects": [
+              {
+                "sceneCode": 221,
+                "scenceName": "",
+                "scenceParam": "AykAAgoFAgH/GQAAAAAC+jIG/zgA/38AAP8AAAAAAP///wAAFAH6AAAAACMAAg8DAAH/GQHmMjIB+jIE8QAdAP8AAP//////FgH6EgHcACAAAAABAgH/AAD+FBQA/xQD/wAAAAAAAP8AEQCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Christmas-B",
+            "sceneCode": 2027,
+            "lightEffects": [
+              {
+                "sceneCode": 2027,
+                "scenceName": "",
+                "scenceParam": "AikAAQAyAAH//wGAFBQB/QEG/wAAAAAAAAAAAAAAAAAAAAAAFAD9EACAASkAAQAyAAH//wGAFBQB/QEGAAAAAAAAAAAAAP8AAAAAAAAAFgD9EgCAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Halloween-B",
+            "sceneCode": 2497,
+            "lightEffects": [
+              {
+                "sceneCode": 2497,
+                "scenceName": "",
+                "scenceParam": "BCYwAAADAAH//wCAFBQD/gEFiwD//38AAAAA/38AiwD/FQD+AACAACYyAAADAAH//wCAFBQD/gEFiwD//38AAAAA/38AiwD/FwD+AACAACY1AAADAAH//wCAFBQD/gEFiwD//38AAAAA/38AiwD/FQD+AACAACY3AAADAAH//wCAFBQD/gEFiwD//38AAAAA/38AiwD/FwD+AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Halloween-A",
+            "sceneCode": 110,
+            "lightEffects": [
+              {
+                "sceneCode": 110,
+                "scenceName": "",
+                "scenceParam": "gwb/9QAFAP///wUA/+n/BQD///8FAP/p2QUA//j/BgAE/x4A/1oA/zIA/3gA"
+              }
+            ]
+          },
+          {
+            "sceneName": "Valentine's Day",
+            "sceneCode": 211,
+            "lightEffects": [
+              {
+                "sceneCode": 211,
+                "scenceName": "",
+                "scenceParam": "AiMAAAABAgH/GQHIMhQC+jIE/yz/2AD/9QD//yAAEADcAAAAACMAAhkKAAH/GQD6MhQC+hQE8QAdowD//07//6X/AAAAAAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Candlelight",
+            "sceneCode": 9,
+            "lightEffects": [
+              {
+                "sceneCode": 9,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Birthday",
+            "sceneCode": 209,
+            "lightEffects": [
+              {
+                "sceneCode": 209,
+                "scenceName": "",
+                "scenceParam": "Ai8AAgoFAgL/GQAAAAD/GQAAAAAC+jIG/zgA/38AAP8AAAAAAP//iwD/AACAAAAAACMAAh4KAAH//wAAAAAB+gAE8QAd/3UA/8AA/0sAAAD/AAH6AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fireworks-A",
+            "sceneCode": 208,
+            "lightEffects": [
+              {
+                "sceneCode": 208,
+                "scenceName": "",
+                "scenceParam": "BCNQAQAZAAH/AAD/MjICZAAE/wAAAAD/AP//////FAD/AAAAACNVAQAZAAH/AAD/MjICZAAE/wAAAAD/AP//////FgD/AAAAACkAAg8FAAH/AAL/MjIC/wIG/wAAAAAA//8AAAAAAAD/AP//AAAAEgH6ACkAAg8FAAH/AAL/MjIC/wIGiwD/AAAA//8AAAAA/3L/AP//AAAAEgH6AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fireworks-B",
+            "sceneCode": 2028,
+            "lightEffects": [
+              {
+                "sceneCode": 2028,
+                "scenceName": "",
+                "scenceParam": "AiagAQAMAAH/AAD/PHgCZAAF/wAAiwD/AAD/AP//////FAD/AAAAADIAAh4UAAH/AAL/eDwC/gAJ/wAAAAAA//8AAAAAAAD/AAAAAP//AAAAiwD/AAAAEgP6AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Ghost-A",
+            "sceneCode": 220,
+            "lightEffects": [
+              {
+                "sceneCode": 220,
+                "scenceName": "",
+                "scenceParam": "BCNQAQAKAgH/CgIAAAACAAAEiwD//3T/AP//////FAH8AAAAACNVAQAKAgH/CgIAAAACAAAEiwD/3AD/AP//////FgH8AAAAACMAAQAKAgH/CgIAAAACAAAEiwD//x3/AP//////FAH8AAAAACMFAQAKAgH/CgIAAAACAAAEiwD/4AD//1L/////FgH8AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Ghost-B",
+            "sceneCode": 2494,
+            "lightEffects": [
+              {
+                "sceneCode": 2494,
+                "scenceName": "",
+                "scenceParam": "ASMAAwUBAAH/AACAFBQDgBQEAAD/AAAAAAAA////EAD9EAD4AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Party-A",
+            "sceneCode": 226,
+            "lightEffects": [
+              {
+                "sceneCode": 226,
+                "scenceName": "",
+                "scenceParam": "AzgAAh4KAgH/GQEUAAAC/xQL/wAAAP//AAD/////AAD//wAAiwD/AAAA////AP8AiwD/AAD/AAAAACwAAh4PAgH/GQMAMjIC+gAH/wAAAP//AAD/////AAD//wAAiwD/FADIAAAAACAAAAABAAEyMgAAMjIC/woD/xP//38AAAD/EQCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Party-B",
+            "sceneCode": 2029,
+            "lightEffects": [
+              {
+                "sceneCode": 2029,
+                "scenceName": "",
+                "scenceParam": "BCkAAQAyAgH/AAP/CgoBpQUG/wAA/38A//8AAP8AAP//iwD/FAD/AAiAACkAAQAyAgH/sgP/CgoBowUG/wAA/38A//8AAP8AAP//iwD/FgD/EAGAASkAAQAyAAGUlACAFBQA5xQG/wAA/38A//8AAP8AAP//iwD/AACAAACAACkAAhkBAAH//wCAFBQA/xQG/wAA/38A//8AAP8AAP//iwD/AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Party-C",
+            "sceneCode": 2291,
+            "lightEffects": [
+              {
+                "sceneCode": 2291,
+                "scenceName": "",
+                "scenceParam": "BCAAAhgBAAH//wCAFBQAgBQD/wAA/wAA/wAAEQD9AACAAiAAAhgBAAH//wCAFBQAgBQDAP8AAP8AAP8AEwD9AACAAxoAAwoKAAH//wCAFBQAgBQB/wAAAACAAACAARoAAAABAAH//wCAFBQAgBQBAP8AAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dance Party-A",
+            "sceneCode": 225,
+            "lightEffects": [
+              {
+                "sceneCode": 225,
+                "scenceName": "",
+                "scenceParam": "AiwAAh4PAgH/GQEUAAAC+gAH/wAAAP//AAD/////AAD//wAAiwD/AAD/AAAAACwAAh4PAgH/GQMAMjIC+gAH/wAAAP//AAD/////AAD//wAAiwD/AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dance Party-B",
+            "sceneCode": 2213,
+            "lightEffects": [
+              {
+                "sceneCode": 2213,
+                "scenceName": "",
+                "scenceParam": "AiZQAQANAAH//wD/FBQB/wEFAP//iwD//////wAA//8AFQD9AACAACZVAQANAAH//wD/FBQB/wEF//8A/wAA////iwD/AP//FwD9AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Disco-A",
+            "sceneCode": 206,
+            "lightEffects": [
+              {
+                "sceneCode": 206,
+                "scenceName": "",
+                "scenceParam": "AiwAAhQKAgH//wAAAAAB/wAH/wAAAP//AAD/////AAD//wAAiwD/AAD/EAH+ACkAAg8FAgH/CgAZAAAC/zIGiwD/AAD/AAAA////AAAA/wAAAwCAEgH+AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Disco-B",
+            "sceneCode": 2216,
+            "lightEffects": [
+              {
+                "sceneCode": 2216,
+                "scenceName": "",
+                "scenceParam": "BSMgAQABAgH//wD/FBQB/wYE/wAAAP////8AAP8AFAD/AACAACMkAQABAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FgD/AACAACMiAQABAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FAD/AACAACMmAQABAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FgD/AACAACMoAQABAgH//wD/FBQB/wYE/wAAAP8A//8AAP//EAD/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Carnival",
+            "sceneCode": 230,
+            "lightEffects": [
+              {
+                "sceneCode": 230,
+                "scenceName": "",
+                "scenceParam": "BRogAQAFAgH/KAHwAAACADIB/wAAEQD8EQH8ABoiAQAFAgH/KAHwAAACADIB/38AEQD8EQH8ABokAQAFAgH/KAHwAAACADIB//8AEQD8EQH8ABomAQAFAgH/KAHwAAACADIBf/8AEAD8EQH8ABooAQAFAgH/KAHwAAACADIBAP8AEQD8EQH8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Mother's Day",
+            "sceneCode": 231,
+            "lightEffects": [
+              {
+                "sceneCode": 231,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAAH//wEAAAAA3DID/wsA6QD/zAD/AAAAAAAAACAAAigBAgH/KAHXIBQAADID/3///z8A////AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Father's Day",
+            "sceneCode": 232,
+            "lightEffects": [
+              {
+                "sceneCode": 232,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAH//wEAAAAA3DICAAD/AP//AAAAAAAAABoAAigBAgH/KAHXIBQAADIB////AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Christmas Tree",
+            "sceneCode": 5010,
+            "lightEffects": [
+              {
+                "sceneCode": 5010,
+                "scenceName": "",
+                "scenceParam": "AyYAAAAEAgGZSwOAFBQDABQFAMgeAP8A//8AAP8AAMgeAACAAACAACMAAgUDAgH/ZQPRFBQB6hQE/z9CB4H//38A/wAAAACAAACAASMAAgYDAgH/ZQPRFBQB6hQE/wAA/10H////iwD/AACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sled",
+            "sceneCode": 5011,
+            "lightEffects": [
+              {
+                "sceneCode": 5011,
+                "scenceName": "",
+                "scenceParam": "AyAAAAABAAHMzAAAFBQD8hQDlvH+Wt/+PMj+AgD8AACAACkAAQAGAgH/sgP5FBQBABQG/wAA/wAAUAoA/////6wI/38AEAD3EAD3ASkAAgwFAgHUsgP5FBQBABQGAP8AAP8A/38A//8AMv8I////EAD3EAD3AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Christmas Gift",
+            "sceneCode": 5012,
+            "lightEffects": [
+              {
+                "sceneCode": 5012,
+                "scenceName": "",
+                "scenceParam": "AykAAgUDAAH/AAHbFBQBgBQG/wAA/38A//8AAP8AAP//iwD/AACAAACAACkAAgUDAAH/AAHoFBQBgBQG/wAA/38A//8AAP8AAP//iwD/AACAAACAABoAAAABAAH/AAHMFBQAgBQBB/8eAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Easter",
+            "sceneCode": 11217,
+            "lightEffects": [
+              {
+                "sceneCode": 11217,
+                "scenceName": "",
+                "scenceParam": "BSAyAAADAgH/CwP3FBQD/BQD/wAAAP8A////FAD8AACABSA1AAADAgH/DAP3FBQD/BQD////AP8A/08PFgD8AACABSNQAQAFAgH/DAP3FBQD8hQE/wAA//////8A/w4HEgD8AAD8BR0AAAABAgH/MwH3FBQD/xQC////uv4VAACAAACAASBVAQAFAgH/CwP3FBQD8hQD/wAA//8A////EAD8AAD8BQ==",
+                "speedInfo": {
+                  "supSpeed": true,
+                  "speedIndex": 0,
+                  "config": "[{\"bright\":[{\"brightValue\":[221,221,247],\"brightPage\":\"0\"}],\"page\":0,\"defaultIndex\":2,\"moveIn\":[242,247,252],\"color\":[244,244,252]},{\"bright\":[{\"brightPage\":\"0\",\"brightValue\":[221,221,247]}],\"color\":[244,244,252],\"page\":1,\"defaultIndex\":2,\"moveIn\":[242,247,252]},{\"moveIn\":[242,247,252],\"defaultIndex\":2,\"bright\":[{\"brightValue\":[221,221,247],\"brightPage\":\"0\"}],\"page\":2},{\"bright\":[{\"brightValue\":[226,226,247],\"brightPage\":\"0\"}],\"color\":[244,244,255],\"page\":3,\"defaultIndex\":2},{\"moveIn\":[242,247,252],\"page\":4,\"bright\":[{\"brightValue\":[221,221,247],\"brightPage\":\"0\"}],\"defaultIndex\":2}]"
+                }
+              }
+            ]
+          },
+          {
+            "sceneName": "Thanksgiving",
+            "sceneCode": 12863,
+            "lightEffects": [
+              {
+                "sceneCode": 12863,
+                "scenceName": "",
+                "scenceParam": "AyBQAAADAAH//wAAFBQDgBQDl/4I/y8H/5AHFgD5AACABCBVAAADAAH//wAAFBQDgBQDe/4J/zEH/4AHFAD5AACABCMAAAADAAGVAAAAFBQD/BQEEf4H/wYl/30H/wgHAACAAACAAQ==",
+                "speedInfo": {
+                  "supSpeed": true,
+                  "speedIndex": 0,
+                  "config": "[{\"page\":0,\"moveIn\":[242,249,254],\"defaultIndex\":1},{\"defaultIndex\":1,\"page\":1,\"moveIn\":[242,249,254]}]"
+                }
+              }
+            ]
+          },
+          {
+            "sceneName": "Mother's Hug",
+            "sceneCode": 16180,
+            "lightEffects": [
+              {
+                "sceneCode": 16180,
+                "scenceName": "",
+                "scenceParam": "AS8AAAAMAgL/UAHIFAr/IgPIFAoDvAoG/2gY/0Yr/4FU/4OK/3M0/1oTAAD4AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "White Light",
+            "sceneCode": 10564,
+            "lightEffects": [
+              {
+                "sceneCode": 10564,
+                "scenceName": "",
+                "scenceParam": "ARoAAAABAAH//wAAFBQAABQB9P+lAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sweet",
+            "sceneCode": 107,
+            "lightEffects": [
+              {
+                "sceneCode": 107,
+                "scenceName": "",
+                "scenceParam": "gwH/tP8yAATwAB7qACu8AP/jAP8="
+              }
+            ]
+          },
+          {
+            "sceneName": "Romantic",
+            "sceneCode": 7,
+            "lightEffects": [
+              {
+                "sceneCode": 7,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Dating",
+            "sceneCode": 5,
+            "lightEffects": [
+              {
+                "sceneCode": 5,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Movie",
+            "sceneCode": 4,
+            "lightEffects": [
+              {
+                "sceneCode": 4,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Sports",
+            "sceneCode": 224,
+            "lightEffects": [
+              {
+                "sceneCode": 224,
+                "scenceName": "",
+                "scenceParam": "ASYAAAACAAH//wAAAAAC/zIF/wAAAAD/AAAAAP////8AEwH/AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Siren-A",
+            "sceneCode": 219,
+            "lightEffects": [
+              {
+                "sceneCode": 219,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAAKAAH//wAAAAAC/xQC/wAAAAD/EADIAAAAACMAAhQKAAH//wAAAAAA/woE////AP//AAD/////EQD+AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Siren-B",
+            "sceneCode": 2031,
+            "lightEffects": [
+              {
+                "sceneCode": 2031,
+                "scenceName": "",
+                "scenceParam": "BR0QAAABAAH//wCAFBQA/xQCAAD//wAAAACAEQD/AB0ZAAABAAH//wCAFBQA/xQC/wAAAAD/AACAEwD/ABoRAQABAAH/AAD/FBQA//8B////EAH/AAD/ABoYAQABAAH/AAD/FBQA//8B////EAH/AACAABokAQABAAH/AAD/FBQA//8B////EAH/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Game-A",
+            "sceneCode": 229,
+            "lightEffects": [
+              {
+                "sceneCode": 229,
+                "scenceName": "",
+                "scenceParam": "AiYAAAAFAAH//wAAAAAC/zIFiwD/AAD//xP//38A/wAAEwH/AAAAACYAAAADAAH//wAAAAAC/zIFiwD/AAD/AAAA////AP//EwH/AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Game-B",
+            "sceneCode": 2125,
+            "lightEffects": [
+              {
+                "sceneCode": 2125,
+                "scenceName": "",
+                "scenceParam": "AxoQAAABAAH/AAHtCnoAgBQB/wAAAACAAACAABoZAAABAAH/AAPuCkIAgBQBAAD/AACAAACAABqBAQABAAH/AACAFBQAgBQB////EQD+AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Game-C",
+            "sceneCode": 2292,
+            "lightEffects": [
+              {
+                "sceneCode": 2292,
+                "scenceName": "",
+                "scenceParam": "BB0AAAABAAH//wCAFBQAgBQCAP9BAP8AAACAAACAAB0AAg0DAgH//wPPFBQAyhQCAAv/ALn/AACAEAbnBBoAAg0DAgH//wPPFBQAyhQB9wD/AACAEgboBB0ZAAAFAAH//wCAFBQC9RQC////o///AADtEQD8BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Game-D",
+            "sceneCode": 2492,
+            "lightEffects": [
+              {
+                "sceneCode": 2492,
+                "scenceName": "",
+                "scenceParam": "BR0QAAABAAH//wCAFBQA/xQCiwD/AP8AAACAEQD/AB0ZAAABAAH//wD/FBQA/xQCAP8AiwD/AACAEwD/ABoRAQABAAH/AAD/FBQA//8B////EAH/AAD/AhoYAQABAAH/AAD/FBQA//8B////EAH/AACAAh0kAgoBAAH//wD/FBQA/xQCiwD/AP8AEQH/AACAAw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Crossing",
+            "sceneCode": 21,
+            "lightEffects": [
+              {
+                "sceneCode": 21,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Night-A",
+            "sceneCode": 233,
+            "lightEffects": [
+              {
+                "sceneCode": 233,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAAFAAGWBQGWMjIC3DICAAD/nADIAAAAAAAAACAAAAADAgGWBQHXMjICADIDiwD/AAAAAAD/AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Night-B",
+            "sceneCode": 2215,
+            "lightEffects": [
+              {
+                "sceneCode": 2215,
+                "scenceName": "",
+                "scenceParam": "BB0AAAAFAAH//wAAFBQDyBQCJU/+/wb9AACAAACAABoAAhAQAAEREQAvFBQAERQB////AACAAACAARoAAQABAAEREQAAFBQAgBQB////EAD9AACAARoAAQABAAEREQAAFBQAgBQB////EgD9AACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sleep-A",
+            "sceneCode": 234,
+            "lightEffects": [
+              {
+                "sceneCode": 234,
+                "scenceName": "",
+                "scenceParam": "ASAAAAAFAAFMMwGWMjIC3DID/38A/0EA/7AAAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sleep-B",
+            "sceneCode": 2201,
+            "lightEffects": [
+              {
+                "sceneCode": 2201,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAEiIgAAFBQAAGoBWgz+AACAAACAACMAAwIEAAH/OwHIFBQB3xQEAAD/LMD/P2P/V0L+EgCoAACAACMAAwIEAAH/OwHIFBQB3xQEAAD/LMD/P2P/V0L+EACoAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Sleep-C",
+            "sceneCode": 2294,
+            "lightEffects": [
+              {
+                "sceneCode": 2294,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAAFAAH/YQGnFBQCuRQCAP//iwD/AACAAACAAB0wAAAJAAH//wCAFBQCgAgCAAD/AP8AAACAEQHrAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Morning",
+            "sceneCode": 235,
+            "lightEffects": [
+              {
+                "sceneCode": 235,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAHIMgFkMjIAyDIC////AP//AAAAAAAAABoAAgoBAgH/KAG0MjIAADIBAP+WAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Afternoon",
+            "sceneCode": 236,
+            "lightEffects": [
+              {
+                "sceneCode": 236,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAH//wAAAAAA3DIC////AP//AAAAAAAAAB0AAgoBAgH/KAHXAAAA+jICAMX/////AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Study",
+            "sceneCode": 237,
+            "lightEffects": [
+              {
+                "sceneCode": 237,
+                "scenceName": "",
+                "scenceParam": "AiAAAAAKAAH//wGWMjICyDID////fP//AAAAAAAAAAAAAB0AAAAFAAH//wD/AAACljICtv//////AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Business",
+            "sceneCode": 238,
+            "lightEffects": [
+              {
+                "sceneCode": 238,
+                "scenceName": "",
+                "scenceParam": "ASMAAAAFAAH/lgGWMjIC3DIE////YP//0P//////AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Reading",
+            "sceneCode": 239,
+            "lightEffects": [
+              {
+                "sceneCode": 239,
+                "scenceName": "",
+                "scenceParam": "ASAAAAAFAAH//wGWMjIC3DID/38A/7AA/7oAAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Work",
+            "sceneCode": 2014,
+            "lightEffects": [
+              {
+                "sceneCode": 2014,
+                "scenceName": "",
+                "scenceParam": "AR0AAAABAgH//wAAAAAA+pYC////j///AAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Leisure-A",
+            "sceneCode": 2015,
+            "lightEffects": [
+              {
+                "sceneCode": 2015,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAgH/MgAAAAAA9TID/wAA/2wA/38AAwCAAAAAAB2gAAAFAgH/MgD/FBQA8DIC/1AA7AAmAwCAEQD8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Leisure-B",
+            "sceneCode": 2500,
+            "lightEffects": [
+              {
+                "sceneCode": 2500,
+                "scenceName": "",
+                "scenceParam": "AyMAAhkDAAH/GgOAFBQAgBQE/wAAAP8ACwv//38AEQD+AACAACMAAQAZAAHLZgNBFBQA8hQEAAD/AP8A/wAAiwD/EAD7AACAACkAAQAQAgH/AAOAFBQBzRQG////AAAAAAAA////////AAAAEQDzAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Meditation-A",
+            "sceneCode": 2016,
+            "lightEffects": [
+              {
+                "sceneCode": 2016,
+                "scenceName": "",
+                "scenceParam": "AiMAAh4eAgH/lgAAAAAA+jIEAAB4ADJ4AAD/AHv/AwCAAAAAAB0AAQAyAgH/MgAAMgAA+jICAAB4AABQAwCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Meditation-B",
+            "sceneCode": 2207,
+            "lightEffects": [
+              {
+                "sceneCode": 2207,
+                "scenceName": "",
+                "scenceParam": "BBoAAwMDAgH/AACAFBQAgBQBAP//EgD5AACAABoAAwQEAgH/AACAFBQAgBQBiwD/EAD4AACAASkAAAAyAgH/AACAFBQA7hQGAAD/AAAAAAAAAAAAAAAAAP/CFAD9AACAAy8AAAAyAgL/AALIFBQAAACsFBQA7hQGiwD/AAAAAAAA/wDLAAAAAP+8FgD9AACABA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Meditation-C",
+            "sceneCode": 2208,
+            "lightEffects": [
+              {
+                "sceneCode": 2208,
+                "scenceName": "",
+                "scenceParam": "AR0AAAABAAH//wCAFBQD2BQCAP9SAAAAAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Care-A",
+            "sceneCode": 2017,
+            "lightEffects": [
+              {
+                "sceneCode": 2017,
+                "scenceName": "",
+                "scenceParam": "AxoAAQAyAAH/lgEAFBQA+gABUBIAAwCAAAAAAB1QAAAUAAH/ZADIFBQA+gAC/wAA/yEAFAD6AAD/AB1VAAAUAAH/ZADIFBQA+gAC/yMA/wAAFgD6AAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Care-B",
+            "sceneCode": 2032,
+            "lightEffects": [
+              {
+                "sceneCode": 2032,
+                "scenceName": "",
+                "scenceParam": "BRoAAAABAAH//wAAFBQAABQB/wAAAACAAACAAB0iAQAFAAH/GAPFZFAAhhQCAAD//wAAAAGAEQD6AB0gAQAFAAH/GAPFZFAAfhQCAAD//wAAAAGAEQD7AB0mAQAFAAH/GAPFZFAAghQCAAD//wAAAAGAEQD7AB0oAQAFAAH/GAPFZFAAgBQCAAD//wAAAAGAEQD7AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fight",
+            "sceneCode": 2071,
+            "lightEffects": [
+              {
+                "sceneCode": 2071,
+                "scenceName": "",
+                "scenceParam": "BSMgAQADAgH//wD/FBQB/wYE/wAAAP////8AAP8AFAD/AACAACMkAQADAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FgD/AACAACMiAQADAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FAD/AACAACMmAQADAgH//wD/FBQB/wYE/wAAAP8A//8AAP//FgD/AACAACMoAQADAgH//wD/FBQB/wYE/wAAAP8A//8AAP//EAD/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamlike-A",
+            "sceneCode": 10114,
+            "lightEffects": [
+              {
+                "sceneCode": 10114,
+                "scenceName": "",
+                "scenceParam": "AiMAAAAEAgH/UACAFBQDtgoEElP+iwD/MU7/iwD/AAD6AACAACAAAggBAAH//wM9CgoA/gED////AP//Nsn+AADuAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamlike-B",
+            "sceneCode": 10190,
+            "lightEffects": [
+              {
+                "sceneCode": 10190,
+                "scenceName": "",
+                "scenceParam": "ASkAAAAKAgH/sQDqFBQD7woGHVP+bTf+/3lH/0hc/2HCWRz/AAD6AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Undersea King",
+            "sceneCode": 10424,
+            "lightEffects": [
+              {
+                "sceneCode": 10424,
+                "scenceName": "",
+                "scenceParam": "Ax1QAQAKAgH/OwIAFEYD2xQC/+MI/8wtEgD8AACAAyYAAAAFAAHliwHJFBQCABQFADwAAEYAyJYAAEYAADwAAACAAAD5Ah1VAQAKAgH/OwIAFEYD2xQC/+MI/8wtEAD8AACAAw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Deep Sea B",
+            "sceneCode": 10426,
+            "lightEffects": [
+              {
+                "sceneCode": 10426,
+                "scenceName": "",
+                "scenceParam": "BR0AAAAFAAH/0wEAFBQD0xQCAABQAChQEQD8AACAARoAAggFAAH/AAAAFBQD9BQBev/aAACAEACAAx0AAwQKAAHGQAHJFBQCzBQCDP7ACP/5AACAAQZ/Ah0AAwIUAAH/QAPMFBQCzBQCBlT+HIH+AACAAQZ/AhpiAwQUAAH/QAPRFBQCzBQBB5b/AACAAQZ/Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Awaken A",
+            "sceneCode": 13892,
+            "lightEffects": [
+              {
+                "sceneCode": 13892,
+                "scenceName": "",
+                "scenceParam": "ASkAAAAGAAH//wAAFBQD8hQG/9RaB/7GPJj+rqH/AAAAAAAAAAD8AgD8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Awaken B",
+            "sceneCode": 13893,
+            "lightEffects": [
+              {
+                "sceneCode": 13893,
+                "scenceName": "",
+                "scenceParam": "ASMAAAAFAgH/sgMAFBQDABQEc/+6guT+/91v/7FQAAD8EgD5AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Awaken C",
+            "sceneCode": 13894,
+            "lightEffects": [
+              {
+                "sceneCode": 13894,
+                "scenceName": "",
+                "scenceParam": "AilVAAAFAgH/sgMAFBSDABQGc/+6guT+AAAA/91v/7FQAAAAAAD8EAD5ACZQAAAEAgH/sgMAFBQDABQFc/+6guT+/91v/7FQAAAAAAD8EAD5AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Twinkle",
+            "sceneCode": 8,
+            "lightEffects": [
+              {
+                "sceneCode": 8,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-A",
+            "sceneCode": 207,
+            "lightEffects": [
+              {
+                "sceneCode": 207,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAgH/FAHcFBQA+jIBAP//AwCAAAAAACwAAh4KAAH/GQHIFBQC+hQH/7v/zQD/////uQD/AOD/ABH/iwD/AAAAAAD/ACwAAAAKAAH/GQHIFBQC3DIH/7v/zQD/////uQD/AOD/ABH/iwD/EQD8AAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-B",
+            "sceneCode": 2033,
+            "lightEffects": [
+              {
+                "sceneCode": 2033,
+                "scenceName": "",
+                "scenceParam": "BRoAAQAFAAH//wCAFBQB/xQB2gf/FQD/AACAARoAAQAFAAH//wCAFBQB/xQB/7cHFQH9AACAARoAAQAFAAH//wCAFBQB/xQB/zkHEQL6AwCAARoAAQAFAAH//wCAFBQB/xQB/wbZFQD6AACAAR0AAAAwAAH//wCAFBQAwxQC/0AH/weNBQT3AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-C",
+            "sceneCode": 2075,
+            "lightEffects": [
+              {
+                "sceneCode": 2075,
+                "scenceName": "",
+                "scenceParam": "AyYAAAABAgH//wAAAQEA0AEF/wAA/2UHAP8AAAD/iwD/AACAAACAACYAAQAMAAH//wCAFBQCAAEFiwD/AAD/AP8A/zEH/wAAFgD9AACAASYAAQAMAAH//wCAFBQCAAEFiwD/AAD/AP8A/zkH/wAAFAD9AACAAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-D",
+            "sceneCode": 2034,
+            "lightEffects": [
+              {
+                "sceneCode": 2034,
+                "scenceName": "",
+                "scenceParam": "Ah0AAhkBAAG7NgF9FBQC6zsCAP8A//8AFQzJExrYASAAAAABAgGmRACAFBQBRQEDAAD/iwD/AP//ACCYAADdAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-E",
+            "sceneCode": 2203,
+            "lightEffects": [
+              {
+                "sceneCode": 2203,
+                "scenceName": "",
+                "scenceParam": "BClQAAABAAGMjAAAFBQB9xQG/wfP3gb+lgf+Twf/CAb/Bxf/EgCWAACAAClVAAABAAGMjAAAFBQB9xQG/wfP3gb+lgf+Twf/CAb/Bxf/EACWAACAAB0AAwEIAAEgIAAAFBQCAP8C/wAAAAAAEAClAACAAR0AAwEIAAEgIAAAFBQCAP8C/wAAAAAAEgClAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-F",
+            "sceneCode": 2205,
+            "lightEffects": [
+              {
+                "sceneCode": 2205,
+                "scenceName": "",
+                "scenceParam": "Ax1QAAABAAH/5wCAFBQDzRQC+RH/BHr/AACAAACAAB1VAAABAAH/6ACAFBQDzBQCdwD/AP+BAACAAACAACMkAQAHAAH/zgCAFBQD5xQE/wCW/wAA//cAAGX/AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dreamland-G",
+            "sceneCode": 2206,
+            "lightEffects": [
+              {
+                "sceneCode": 2206,
+                "scenceName": "",
+                "scenceParam": "BCYAAAABAAEaAACAFBQAgBQFx1L/AAAAAAAAAAAAAAAAAACAAACAACwAAzIKAAKSAACAFBQSAACoFBQBABQFAP//AAAAAAAAyl3/AAAAAACAAACAASkAAQAmAAH/AACAFBQDgBQGAP+eAAAAAAAAAIT/AAAAAAAAFAD7AACAAi8AAQAyAgL/AACqFBQAAAC4FBQC8hQGAAD/AAAAAAAAAP9bAAAAAAAAAACAEgD9BA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Breathe",
+            "sceneCode": 10,
+            "lightEffects": [
+              {
+                "sceneCode": 10,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Energetic-A",
+            "sceneCode": 16,
+            "lightEffects": [
+              {
+                "sceneCode": 16,
+                "scenceName": "",
+                "scenceParam": ""
+              }
+            ]
+          },
+          {
+            "sceneName": "Energetic-B",
+            "sceneCode": 2286,
+            "lightEffects": [
+              {
+                "sceneCode": 2286,
+                "scenceName": "",
+                "scenceParam": "BSBQAAADAAH//wCAFBQDgBQDAAD/wwD/AP+6FgD+AACABCBVAAADAAH//wCAFBQDgBQDAAD/wwD/AP+6FAD+AACABCAAAAABAAE0NACAFBQD9hQDAP/iAAD/5wD/AACAAACAASBVAAADAAH//wCAFBQDgBQDAAD/wwD/AP+6FgD+AACABCBQAAADAAH//wCAFBQDgBQDAAD/wwD/AP+6FAD+AACABA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Energetic-C",
+            "sceneCode": 2288,
+            "lightEffects": [
+              {
+                "sceneCode": 2288,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAH/AACAFBQAgBQBCwf+AACAAACAABoAAAABAAH/AACAFBQAgBQB//T1FQHaAACAABoAAAABAAEMAAD/FBQA/xQB/wYOFAH/EAHmAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Energetic-D",
+            "sceneCode": 2501,
+            "lightEffects": [
+              {
+                "sceneCode": 2501,
+                "scenceName": "",
+                "scenceParam": "AykAAAAGAgH//wOAFBQCgBQG/wAA/38A//8AAP8AAAD/iwD/EAD/AACAACkAAAAMAgH/AAOAFBQCwBQG/wAA/38A//8AAP8AAAD/iwD/EgD/AACAACkAAhkGAAH/fwCAFBQB/xQG/wAA/38A////AP8AAAD/iwD/EQD+AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Excited-A",
+            "sceneCode": 240,
+            "lightEffects": [
+              {
+                "sceneCode": 240,
+                "scenceName": "",
+                "scenceParam": "BSAZAQAFAAH/AAHwDwUBljID/wAAiwD//ywAEQGAAAAAACAXAQAFAAH/AAHwDwUBljID//8A/38AAP8AEQGAAAAAACAVAQAFAAH/AAHwDwUBljIDAP8AAP//////EQGAAAAAACATAQAFAAH/AAHwDwUBljIDAAD/iwD//AD/EQGAAAAAACARAQAFAAH/AAPwDwUBljIDiwD//38A//8AEQGAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Excited-B",
+            "sceneCode": 2035,
+            "lightEffects": [
+              {
+                "sceneCode": 2035,
+                "scenceName": "",
+                "scenceParam": "ASkAAhkBAAH/AAD//wEA/xQGiwD/AAD/AP//AP8A//8A/38AEQD9EQH8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Excited-C",
+            "sceneCode": 2108,
+            "lightEffects": [
+              {
+                "sceneCode": 2108,
+                "scenceName": "",
+                "scenceParam": "AikAAQAyAAH//wCAFBQBxRQG/wAAAP8AAAD//wAAAP8AAAD/FgH4EgE4ACkAAQAyAAH//wCAFBQBxRQG/wAAAP8AAAD//wAAAP8AAAD/FAH4EAE4AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Happy-A",
+            "sceneCode": 241,
+            "lightEffects": [
+              {
+                "sceneCode": 241,
+                "scenceName": "",
+                "scenceParam": "BSkAAAAIAAH/AAP/ZGQCADIG/wAA/38A//8AAP//AAD/AP8AEgD/AAAAAhoRAAABAgH/AAAAAAAA/zIBiwD/AAAAEgH/ARoTAAABAgH/AAAAAAAA/zIBAAD/AAAAEgH/ARoVAAABAgH/AAAAAAAA/zIBAP8AAAAAEgH/ARoVAAABAgH/AAAAAAAA/zIBAP//AAAAEgH/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Happy-B",
+            "sceneCode": 2221,
+            "lightEffects": [
+              {
+                "sceneCode": 2221,
+                "scenceName": "",
+                "scenceParam": "AyMAAwEBAAH/AACAFBQD/wgE/+M1/9cA/94A/7UAFAD/AACAACMAAwEBAAH/AACAFBQD/wgE/+M1/9cA/94A/7UAFgD/AACAABoAAAABAAH/AAP/AjwAghQB//8AAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Enthusiastic",
+            "sceneCode": 242,
+            "lightEffects": [
+              {
+                "sceneCode": 242,
+                "scenceName": "",
+                "scenceParam": "BRogAQAFAgH/KAHwAAACADIB/wAAEAD+AAAAABoiAQAFAgH/KAHwAAACADIB/38AEAD+AAAAACAkAQAFAgH/KAHwAAACADID//8A/wAAAAD/EAD+AAAAACAmAQAFAgH/KAHwAAACADIDf/8AAP//xwD/EAD+AAAAACMoAQAFAgH/KAHwAAACADIEAP8A/38AAAAAAAD/EAD+AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Profound",
+            "sceneCode": 243,
+            "lightEffects": [
+              {
+                "sceneCode": 243,
+                "scenceName": "",
+                "scenceParam": "AiMAAAAKAgH/CgIAAAACAAAEAAD/AHr/AMf/AP//EAH6AAAAACMAAAAKAgH/CgIAAAACAAAEAAD/AHH/ALL/AP//EgH6AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Mysterious-A",
+            "sceneCode": 244,
+            "lightEffects": [
+              {
+                "sceneCode": 244,
+                "scenceName": "",
+                "scenceParam": "AikAAAABAAH/AAH/ZGQA/AMG/wAAAP8AAAD//38A//8AiwD/AAAAAAAAAikAAAAIAAH/AAP/ZGQCADIG/3D//38A//8AAP//AKD/AP8AEgD/AAAAAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Mysterious-B",
+            "sceneCode": 2036,
+            "lightEffects": [
+              {
+                "sceneCode": 2036,
+                "scenceName": "",
+                "scenceParam": "ASMUAQAFAAH/AAL//5YB/xcEAAD//+Xu/9/m/6/jAACAEQ3/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Quiet-A",
+            "sceneCode": 245,
+            "lightEffects": [
+              {
+                "sceneCode": 245,
+                "scenceName": "",
+                "scenceParam": "ASAAAAAIAgH/MgHIMhQC+jIDbv8A1f8A1f8AEQKAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Quiet-B",
+            "sceneCode": 2222,
+            "lightEffects": [
+              {
+                "sceneCode": 2222,
+                "scenceName": "",
+                "scenceParam": "AywAAxQAAAP/AACzFBQAAADHFBT/AACAFBQDgBQDAP//AAAAiwD/EQD9AAD+Ah1VAxkAAAH/AACAFBQDABQCAAD/AAAAEQD+AACAASkAAw8oAAH/AACAFBQD/hQG9wD/AAAAIAD/AAAA/+8AAAAAFwD9AACABA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Longing",
+            "sceneCode": 246,
+            "lightEffects": [
+              {
+                "sceneCode": 246,
+                "scenceName": "",
+                "scenceParam": "AiMAAAACAgH/MgHIMlAB0zIEAAD/AHr/swCb/zP/AAAAAAAAACMAAg8FAgH/CgPIMjIByDIEjAD/AHH/iwD//0n/FAGWAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Warm-A",
+            "sceneCode": 247,
+            "lightEffects": [
+              {
+                "sceneCode": 247,
+                "scenceName": "",
+                "scenceParam": "AyNQAQAPAgH/CgIAAAACAAAE/wAA/1oA/3gA5QA2EAD6AAAAACMAAQAPAgH/CgIAAAACAAAE/wAA/1oA/3gA8gAcEAD6AAAAABoAAAABAgGWMgAAAAAA+jIB/4H/EQCAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Warm-B",
+            "sceneCode": 2037,
+            "lightEffects": [
+              {
+                "sceneCode": 2037,
+                "scenceName": "",
+                "scenceParam": "AyBQAQAUAAH//wAAFBQAABQD/1QHAAAA/2oHFQD6AACAACBVAQAUAAH//wAAFBQAABQD/1QHAAAA/2oHFwD6AACAABoAAQAyAgGPPgH/FBQAABQB/1QHBwD9AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Stacking",
+            "sceneCode": 248,
+            "lightEffects": [
+              {
+                "sceneCode": 248,
+                "scenceName": "",
+                "scenceParam": "AiAAAAABAAH//wAAAAAAyDID/wAAAP8AAAD/FADOAAAAACAAAQABAAH//wAAAAAAyDID/wAAAP8AAAD/EgD/AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Release-A",
+            "sceneCode": 2018,
+            "lightEffects": [
+              {
+                "sceneCode": 2018,
+                "scenceName": "",
+                "scenceParam": "AiZQAQAKAAH/AAAAZAoCyBQFAAD/AP//AP8A//8A/38AFgD/AAAAACZVAQAKAAH/AAAAZAoCyBQFAAD/AP//AP8A//8A/38AFAD/AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Release-B",
+            "sceneCode": 2136,
+            "lightEffects": [
+              {
+                "sceneCode": 2136,
+                "scenceName": "",
+                "scenceParam": "BSlQAQAUAgH/AAMAFBQDAAEG/wAA/38A//8AAP8AAP//AAD/AACAEAH/ABokAQAKAgH/AAOAFBQDAP8B////AACAAACAACMkAQAFAgH/AAMAFBSDABQEAAAA////AAAA////AACAEAD/ACAlAQAFAgH/AAMAFBQDABQDAAAA////AAAAAACAEgD/AClVAQAUAgH/AAMAFBSDAAEG/wAA/38A//8AAP8AAP//AAD/AACAEgH/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flow-A",
+            "sceneCode": 2019,
+            "lightEffects": [
+              {
+                "sceneCode": 2019,
+                "scenceName": "",
+                "scenceParam": "ASkAAQAyAgH/MgD/MhkB/AAGAP//AKP/AHT/AAAAAAAAAAAAAAAAAAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flow-B",
+            "sceneCode": 2284,
+            "lightEffects": [
+              {
+                "sceneCode": 2284,
+                "scenceName": "",
+                "scenceParam": "ASkAAAABAAH//wEB//8B+gEGAP//AEz/AAD/AAAAAAAAAAAAAAB/AAB/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flash",
+            "sceneCode": 2020,
+            "lightEffects": [
+              {
+                "sceneCode": 2020,
+                "scenceName": "",
+                "scenceParam": "ASagAQAKAAH//wAAAAAA/hQF//8A/38A/0UA/wAA2wBIFAH/AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Swing",
+            "sceneCode": 2021,
+            "lightEffects": [
+              {
+                "sceneCode": 2021,
+                "scenceName": "",
+                "scenceParam": "BSMgAQAGAgH/AAD/FBQA/xQE/0EA/4IA1ABX/5YAEQD9AAAAACMiAQAGAgH/AAD/FBQA/xQE/0EA/2MA4wA5/7kAEQD9AAAAACMkAQAGAgH/AAD/FBQA/xQE/0EA/2MA3gBE/7AAEQD9AAAAACMmAQAGAgH/AAD/FBQA/xQE/0EA/5YA1QBV/64AEQD9AAAAACMoAQAGAgH/AAD/FBQA/xQE/0EA/5YA7QAk/7IAEQD9AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Tension-A",
+            "sceneCode": 2022,
+            "lightEffects": [
+              {
+                "sceneCode": 2022,
+                "scenceName": "",
+                "scenceParam": "AiAAAQAKAgH/FAAAAAACAAADUAAAyAAA/wAAEQH+AAAAACAAAQAKAgH/FAAAAAACAAAD/wAAyAAAUAAAEwH+AAAAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Tension-B",
+            "sceneCode": 2220,
+            "lightEffects": [
+              {
+                "sceneCode": 2220,
+                "scenceName": "",
+                "scenceParam": "AhpEAAABAAH//wB/FBQAfxQB/wAAAAB/EQr2AiAAAAABAAFoMAB/FBQBABQDiwD/AAD/iwD/AAB/EABSAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cheerful",
+            "sceneCode": 2038,
+            "lightEffects": [
+              {
+                "sceneCode": 2038,
+                "scenceName": "",
+                "scenceParam": "Ah0AAAABAAH/fQGAFBQAgBQC/wAAAAD/AACAAACAAC8AAQAyAAL//wCAFBT/AAGAFBQBABQGAP//AAAAAP//AAAAAP//AAAAFQD7AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Rush",
+            "sceneCode": 2072,
+            "lightEffects": [
+              {
+                "sceneCode": 2072,
+                "scenceName": "",
+                "scenceParam": "BBpAAAACAAH/AACAFBQAgBQBiwD/EgD/EgD/ABphAAACAAH/AACAFBQAgBQBAAD/EQD/EQD/ARpiAAADAAH/AAAAFBQAgBQBAP//EwD/EwD/ARpkAAABAAH/AACAFBQAgBQB+Af+EAD/EAD/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Heartbeat-A",
+            "sceneCode": 2217,
+            "lightEffects": [
+              {
+                "sceneCode": 2217,
+                "scenceName": "",
+                "scenceParam": "ASAAAAABAAH/AALZCgED+BQD/wAAAAAA/wAAAACAEAD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Heartbeat-B",
+            "sceneCode": 2223,
+            "lightEffects": [
+              {
+                "sceneCode": 2223,
+                "scenceName": "",
+                "scenceParam": "BBoAAwEDAAH/AAHNMhQAABQB/wAAEADgAACAABoAAwEEAAH/AAHNMhQAABQBAAD/EADlAACAARoAAwEFAAH/AAHNMhQAABQB/wbpEADpAACAABoAAAABAAENDQAAFBQAABQB////AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Crazy",
+            "sceneCode": 2218,
+            "lightEffects": [
+              {
+                "sceneCode": 2218,
+                "scenceName": "",
+                "scenceParam": "AiMAAQAyAAH/gQHoFBQD9RcE/5EA/wCEpwD/L/+QFQP/AACAACMAAQAyAAH/gQHoFBQD9RcE/5EA/wCEpwD/L/+QFwP/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fascination",
+            "sceneCode": 2219,
+            "lightEffects": [
+              {
+                "sceneCode": 2219,
+                "scenceName": "",
+                "scenceParam": "BSBgAxQAAAH/AACAFBQCABQDAP//AAAAAAAAEQD9AACAASBGAw0BAAH/AACAFBQDABQDAAD/AAAAAP+oEQD+AACAARoAAAABAAH/AACAFBQAgBQBiwD/AACAAACAACYAAQAyAAIvAADDFBT/AADUFBQBABQDiwD/AAAAAP+eFQD+AACAAyYAAQAZAAIoAACsFBT/AAC6FBQBgBQD/wDkAAAAAP//FwD9AACAAw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-A",
+            "sceneCode": 2039,
+            "lightEffects": [
+              {
+                "sceneCode": 2039,
+                "scenceName": "",
+                "scenceParam": "AiMAAhkBAgH/4QCAFBQCABQE//8AAP8AAAAAAAAAFAD/EQD/AB0AAQAIAAEDAgH/FBQAgBQC//8AAP8AFQD/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-B",
+            "sceneCode": 2074,
+            "lightEffects": [
+              {
+                "sceneCode": 2074,
+                "scenceName": "",
+                "scenceParam": "ASkAAhQBAAH/AAH//wEA/wUG/wAA//8AAP8AAP//iwD//wbTEwrzAQH4AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-C",
+            "sceneCode": 2104,
+            "lightEffects": [
+              {
+                "sceneCode": 2104,
+                "scenceName": "",
+                "scenceParam": "ATUAAhkEAgP/AAHbYQf/AADTWwb/AADZPQ0C7gMG/xElAAAAAP8AAAAAAAD/AAAAEAXPEgXiAw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-D",
+            "sceneCode": 2135,
+            "lightEffects": [
+              {
+                "sceneCode": 2135,
+                "scenceName": "",
+                "scenceParam": "BRoAAQABAAH/AACAFBQAgBQBAP//AACAEAD/ABoAAQABAAH/AACAFBQAgBQBzAD/EgD/EgD9ABoAAQABAAH/AACAFBQAgBQB////EwD/EAD7ABoAAQABAAH/AACAFBQAgBQBAP8AEQD/EAD5ACAAAAABAAFNAAG0CgqB/xQDAP+udQD//1kAAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-E",
+            "sceneCode": 2138,
+            "lightEffects": [
+              {
+                "sceneCode": 2138,
+                "scenceName": "",
+                "scenceParam": "AxoAAyUwAAG5AACAFBQDohQB/wAAEAD+EQD8ARoAAxYuAAFIAACAFBQDgBQBAAD/EAD7EQD+AhoAAQARAAExAACAFBQBgBQBAP//AACAEwD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-F",
+            "sceneCode": 2141,
+            "lightEffects": [
+              {
+                "sceneCode": 2141,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAFERAAA/wEAgBQBNP/pAACAAACAAR0AAwQEAAH/AACAFBQC9xQCAAD/2gf/EADxAACABR0AAwQEAAEYGACAFBQC9xQCAAD/2gf/EgDxAACABA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-G",
+            "sceneCode": 2148,
+            "lightEffects": [
+              {
+                "sceneCode": 2148,
+                "scenceName": "",
+                "scenceParam": "AikAAQAyAAH//wCAFBQD5woG/wAA/38A//8AAP8AAAD/AP//EA/mAACAABoAAwEBAAH/mQD0FBQAgBQB////AACAEArzAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-H",
+            "sceneCode": 2149,
+            "lightEffects": [
+              {
+                "sceneCode": 2149,
+                "scenceName": "",
+                "scenceParam": "AikAAhkZAAH/AACAFBQAgBQG/wAA/0sH//8AAP8AAAD/iwD/EBvOEBvwACMAAhkZAAH/AACAFBQAgBQE/waBB/n/kv8JBlr+EBvVEBvTAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Poppin-I",
+            "sceneCode": 2287,
+            "lightEffects": [
+              {
+                "sceneCode": 2287,
+                "scenceName": "",
+                "scenceParam": "BSAAAwIDAAHGAACAFBQA7AkD/wAh/wD+FgD/AACAAACAAiAAAggDAAH/AACAFBQA9gID/wAh/wD+FgD/EQLGAACAACYAAwELAAH/AACAFBQB/wYF////AAAAAAAAAAAAAAAAAACAAACABSMAAgoEAAFNAACAFBQB2RQEAP/3Ff8A/+0A/wYAFADyAACAAiMAAgoEAAFOAACAFBQB2RQEAP/3Ff8A/+0A/wYAFgDyAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Electro Dance-A",
+            "sceneCode": 2481,
+            "lightEffects": [
+              {
+                "sceneCode": 2481,
+                "scenceName": "",
+                "scenceParam": "BSAQAAABAAH//wD/FBQB/wED/wAAAP8AAAD/AACAAACAACASAAABAAH//wD/FBQB/wED/y8HAP//iwD/AACAAACAACAUAAABAAH//wD/FBQB/wED/wAAAP8AAAD/AACAAACAACAWAAABAAH//wD/FBQB/wED/y8HAP//iwD/AACAAACAACAYAAABAAH//wD/FBQB/wED/wAAAP8AAAD/AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Electro Dance-B",
+            "sceneCode": 2073,
+            "lightEffects": [
+              {
+                "sceneCode": 2073,
+                "scenceName": "",
+                "scenceParam": "AiAAAQAyAAH//wCAFBQBfhQD/wAAAP8AAAD/FAD+AAD6ACAAAQAyAAH//wCAFBQBfhQD/wAAAP8AAAD/FgD+AAD6AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Electro Dance-C",
+            "sceneCode": 2102,
+            "lightEffects": [
+              {
+                "sceneCode": 2102,
+                "scenceName": "",
+                "scenceParam": "AyAxAAABAAH/AACaFGQA9xQDAP//AF7/AP/aFAD/EwD9AR03AAABAAH/AACaFGQA9xQCKv8AAP9MFAD/EQD5ASA0AAABAAH/AACaFGQB9xQD6wD/aAD/6AD/FAD/EwD9AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Electro Dance-D",
+            "sceneCode": 2103,
+            "lightEffects": [
+              {
+                "sceneCode": 2103,
+                "scenceName": "",
+                "scenceParam": "BSlVAQAUAgH/AAD/FBQCAAEG/wAA/38A//8AAP8AAAD/iwD/FgD7EgH7AylQAQAUAgH/AAD/FBQCAAEG/wAA/38A//8AAP8AAAD/iwD/FAD7EAH7AykAAAAGAgH/AAD/FBQC9QEG/wAA/38A//8AAP8AAAD/iwD/FQD+AAHlAikAAgUBAAH/AAD/FBQA/wEG////AAAA////AAAAAP//AAAAAQD9EwH/BRoAAAABAAH//wCAFBQAABQBiwD/AACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Electro Dance-E",
+            "sceneCode": 2153,
+            "lightEffects": [
+              {
+                "sceneCode": 2153,
+                "scenceName": "",
+                "scenceParam": "Ax0wAAABAAH/AAB/FBQA1w4C/wAb/wCMEAD/EgD/ASA3AAABAAH/AAB/FBQA2A4DkQD/4AD/+QD/EAD/EgD/ASBDAAABAAH/AAB/FBQA1wsD/wCD/wDc3AD/EAD/EgD/Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Tango",
+            "sceneCode": 2130,
+            "lightEffects": [
+              {
+                "sceneCode": 2130,
+                "scenceName": "",
+                "scenceParam": "AiAAAQAyAAGRkQCAFBQBgBQDAP//AAD//wAAFwH1AwH/ACMAAQAyAAGRkQCAFBQBgBQEAAAA/38A9/+M/wAAFAH1AQDpAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cha-Cha-A",
+            "sceneCode": 2131,
+            "lightEffects": [
+              {
+                "sceneCode": 2131,
+                "scenceName": "",
+                "scenceParam": "Ax1QAAABAAH/+wL///8A/WQCAAD//1QHAACAEAD6BR1VAAABAAH/8AD///8A8lYC/wAAB/9eAACAEgD9BSAAAAABAAF/fwD///8A8xQDAAD//wAAAP8AAACAEgD9AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cha-Cha-B",
+            "sceneCode": 2140,
+            "lightEffects": [
+              {
+                "sceneCode": 2140,
+                "scenceName": "",
+                "scenceParam": "ASYAAwEBAAH/AACAFBQBgBQF/wAA/wf0CQ7/CP78CP8KAACAEAP1AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Waltz-A",
+            "sceneCode": 2134,
+            "lightEffects": [
+              {
+                "sceneCode": 2134,
+                "scenceName": "",
+                "scenceParam": "AiAAAQAyAAH/AACAFBQD9AED/wAA//8AAAD/AACAAACAACMAAwEBAAH/AACAFBQA/xQEAP+a/3b7ALD/////EQDoAACAAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Waltz-B",
+            "sceneCode": 2152,
+            "lightEffects": [
+              {
+                "sceneCode": 2152,
+                "scenceName": "",
+                "scenceParam": "Ah1wAAABAAH/AAGAFBQA2wEC/wAA/38AAACAAACAAB03AAABAAH/AAGBFBQA2gEC/38A/wAAAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Ballet-A",
+            "sceneCode": 2137,
+            "lightEffects": [
+              {
+                "sceneCode": 2137,
+                "scenceName": "",
+                "scenceParam": "AiAAAAAGAAH/AACAFBQCywED/0nLi07+/Qb/AACAAACAAB2BAwoFAAH/AAPXZGQBzxQCiwD/LAf+AACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Ballet-B",
+            "sceneCode": 2151,
+            "lightEffects": [
+              {
+                "sceneCode": 2151,
+                "scenceName": "",
+                "scenceParam": "BCAwAAAGAAH//wB/FBQC8RQD+5j/uDf/Kv/tEgD4AwL4AiA3AAAGAAH//wB/FBQC8RQD+5j/uDf/Kv/tEgD4AwL4AiAlAAAEAAH//wB/FBQC8RQD+5j/uDf/Kv/tEgD4AwL4AiAjAAAEAAH//wB/FBQC8RQD+5j/uDf/Kv/tEgD4AwL4Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Breaking-A",
+            "sceneCode": 2139,
+            "lightEffects": [
+              {
+                "sceneCode": 2139,
+                "scenceName": "",
+                "scenceParam": "Ax1QAw0XAAFHAACAFBQDgBQCAP//iwD/EAD9EQD9ACBVAw4XAAFJAACAFBQDgBQDAAD/AAAA/wAAEwD+EwD+ACYAAwowAAEiAACAFBQBgBQFAP8AAAAAAAAAAAj/AAAAFAD9EAD3AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Breaking-B",
+            "sceneCode": 2155,
+            "lightEffects": [
+              {
+                "sceneCode": 2155,
+                "scenceName": "",
+                "scenceParam": "AykAAwEBAAEnAACAFBQBgBQGAP//AAAA/wAAAAAAAAAAAAAAFQD9AACAACkAAwEBAAElAACAFBQBgBQGAAD/AAAAAP8AAAAAAAAAAAAAFwD9AACAAiYAAxQBAAEhAACAFBQBgBQF/wDpAAAAAAAAAAAAAAAAFwD+AACAAw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Latin Dance",
+            "sceneCode": 2142,
+            "lightEffects": [
+              {
+                "sceneCode": 2142,
+                "scenceName": "",
+                "scenceParam": "AykAAQAyAAH/gQHoFBQDABQGiwD//wCJ3wD/7CX//7T1////FwL/AwL/ACkAAQAyAAH/gQHoFBQDABQGiwD//wCJ3wD/7CX//7T1////FQL/AwL/AB0AAwEEAAH/AACAFBQDpgMC/////wAAFQD/AAH/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Jazz-A",
+            "sceneCode": 2144,
+            "lightEffects": [
+              {
+                "sceneCode": 2144,
+                "scenceName": "",
+                "scenceParam": "AiAAAAAKAAH//wD3FBQCABQD/wAA/38AiwD/AAB/AAB/AyMAAAAKAAH//wB/FBQC+hQE/wAA/38AiwD/AP/+AAB/EwD/Aw=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Jazz-B",
+            "sceneCode": 2282,
+            "lightEffects": [
+              {
+                "sceneCode": 2282,
+                "scenceName": "",
+                "scenceParam": "BSAAAQAeAAHMzAAABAMBAB4D/wAAAAAAAAAAFwD+AgKPASAAAQAeAAHMzAAABAMBABQD/38AAAAAAAAAFQD+AgLIASlQAAABAAH//wD/AQGA/zwGAAAAAAAAAAD/AAAA/wAAAP8AFwD+AwDdAilVAAABAAH//wD/AQEA/zwGAAD/AAAAAAAAAP8A/wAAAAD/FQD+AwDdAilVAAABAAEAAAD/AQEA/zwGAAAAAAAAAAAAiwD//wz9AAAAEwD+AwDdAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Pole dance-A",
+            "sceneCode": 2145,
+            "lightEffects": [
+              {
+                "sceneCode": 2145,
+                "scenceName": "",
+                "scenceParam": "BSAzAAAGAAH/AAB/FBQA+y0DAP/x/wDZAAAAEAD8EgD/ASAjAAABAAH/AAB/FBQA/C0D/wDqAP/8AAAAEgD+EgD/AiA0AAAGAAH/AAB/FBQA/C0DAP/x/wDZAAAAEgD8EAD/ASAoAAABAAH/AAB/FBQA+y0D/wDZAP/yAAAAEAD9EAD/AhooAAABAAH/iQGtHRQAfxQB////AAB/EQD/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Pole dance-B",
+            "sceneCode": 2290,
+            "lightEffects": [
+              {
+                "sceneCode": 2290,
+                "scenceName": "",
+                "scenceParam": "BSZiAAASAgH/AAC2BQUBzxQFAAAAF2j/AAAA/wAAAAAAFQH7AACAACZCAAASAgH/AAC2BQUBShQFAAAAAAAAAAAADP8AAAAAFQH7AACAACZiAAAMAgH/AAC2BQUBShQFAAAA/wD+AAAAAAAAAAAAFQH7AACAACZEAAAMAgH/AAC2BQUBShQFAAAAAAAAAAAAAAAA/f8AFQH7AACAACliAwEBAgH/AAC2BQWBShQGAAAA////AAAAAAAA/Pv/AAAAFQD7AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Street Dance-A",
+            "sceneCode": 2146,
+            "lightEffects": [
+              {
+                "sceneCode": 2146,
+                "scenceName": "",
+                "scenceParam": "ASkAAAABAAH//wD/FBSD/x4G/wAA/38A//8AAP8AAAD/AP//FwH/EQH/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Street Dance-B",
+            "sceneCode": 2495,
+            "lightEffects": [
+              {
+                "sceneCode": 2495,
+                "scenceName": "",
+                "scenceParam": "AilQAAABAAH//wD/FBQA/wEG/wAA/38A//8AAP8AAAD/iwD/FAH9AACAAClVAAABAAH//wD/FBQA/wEGiwD/AAD/AP8A//8A/38A/wAAFAH9AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Comedies",
+            "sceneCode": 2109,
+            "lightEffects": [
+              {
+                "sceneCode": 2109,
+                "scenceName": "",
+                "scenceParam": "AikAAQAyAAH//wAAFBQBgBQG/wAA/38A//8AAP8AAAD/iwD/AACAEAD4ABoAAAAyAgElAAPzFBQAgBQB////AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dramas",
+            "sceneCode": 2110,
+            "lightEffects": [
+              {
+                "sceneCode": 2110,
+                "scenceName": "",
+                "scenceParam": "BR0wAQAPAAH/AAAB//8BABQCAAD//wAAEAD6AAB/BB1DAQAUAAH/AAABFBQBABQCAP///wD4EAD7AAB/AR03AQAPAAH/AAABFBQBABQCAP/i/wAAEAD4AAB/BB1QAAABAAH/AADz//8C+BQCAP//AQD/AAB/AAB/BR1VAAABAAH/AAD1//8C+xQC/wAAiwD/AAB/AAB/BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Thrillers",
+            "sceneCode": 2111,
+            "lightEffects": [
+              {
+                "sceneCode": 2111,
+                "scenceName": "",
+                "scenceParam": "AiZDAQABAAH/AAPkFBQA/xQF/xFO/xIA/54JAAAA////EAT/EAPjBSMVAAABAAL/AADYFBT/AAHSCg8C/xQCDwz/IwD/EAMXEAPWBQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Romance-A",
+            "sceneCode": 2112,
+            "lightEffects": [
+              {
+                "sceneCode": 2112,
+                "scenceName": "",
+                "scenceParam": "AxpQAAAZAAH/AAB/FBQCfxQBAP//AAB/AAB/ARpkAAABAAH/AAABFBQCABQB/wD6AAB/AAB/ASMAAQAsAAH/AAABFBQBABQEAAAAAAAAAAAAAP//AAB/EAD7BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Romance-B",
+            "sceneCode": 2113,
+            "lightEffects": [
+              {
+                "sceneCode": 2113,
+                "scenceName": "",
+                "scenceParam": "AikAAAABAAH/AAABFBQA+hQGAAD/AAAA/wDsAAAAAP//AAAABACEAAB/BSkAAQAyAAH/AAABFBQBABQGAAD/AAAAAP//AAAA8AD/AAAAEAD2AAB/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Documentaries",
+            "sceneCode": 2114,
+            "lightEffects": [
+              {
+                "sceneCode": 2114,
+                "scenceName": "",
+                "scenceParam": "AyMAAAAEAAG7SgHGFAECgBQEmf8JVv52AP8AKv4rAACAAACAASAAAQADAAH//wCAFBQBwxQDAAD/NXr/EDz+EADbAACABSAAAQADAAH//wCAFBQBwxQDAAD/NXr/EDz+EgDbAACABQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Science Fiction-A",
+            "sceneCode": 2115,
+            "lightEffects": [
+              {
+                "sceneCode": 2115,
+                "scenceName": "",
+                "scenceParam": "BSkiAQABAAH//wCAFBQB/30G/wAA/38A//8AAP8AAAD/iwD/EwD5AACAACkkAQABAAH//wCAFBQB/30G/wAA/38A//8AAP8AAAD/iwD/EQD5AACAACkmAQABAAH//wCAFBQB/30G/wAA/38A//8AAP8AAAD/iwD/EwD5AACAACkoAQABAAH//wCAFBQB/30G/wAA/38A//8AAP8AAAD/iwD/EQD5AACAACkgAQABAAH//wCAFBQB/30G/wAA/38A//8AAP8AAAD/iwD/EQD5AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Science Fiction-B",
+            "sceneCode": 2116,
+            "lightEffects": [
+              {
+                "sceneCode": 2116,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAH/AAB/FBQAfxQBAP//AAB/AAB/ASkAAQAyAAH/AADvFBQBABQGAAD/AAAAAAAAAAD/AAAAAAAAAAB/AAB/BSNVAQAZAAH/AAD8FBQAABQEAAAAAAAAAAAAAP//AAB/AAB/BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Suspense",
+            "sceneCode": 2117,
+            "lightEffects": [
+              {
+                "sceneCode": 2117,
+                "scenceName": "",
+                "scenceParam": "Ax0AAQAyAAH/AADs//8CABQCAP///wAAAAB/AAB/BR1QAQAZAAH/AAABFBQBABQCAP8AAAD/EAD2AAB/AR1VAQAZAAH/AAABFBQBABQCAAD//gD/EAD0AAB/Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "War Films-A",
+            "sceneCode": 2118,
+            "lightEffects": [
+              {
+                "sceneCode": 2118,
+                "scenceName": "",
+                "scenceParam": "BBoAAAABAAENDQCAFBQAAAEBB/8lAACAAACAAR0AAhkUAAH/bgDbASgA/hQC/+kH/xMHAACAAACABR0xAAAJAAH/AAD/AWQCgBQC////AAAAAACAAACAAh02AAAJAAH/AAL/AWQCgBQC////AAAAAACAAACAAg=="
+              }
+            ]
+          },
+          {
+            "sceneName": "War Films-B",
+            "sceneCode": 2119,
+            "lightEffects": [
+              {
+                "sceneCode": 2119,
+                "scenceName": "",
+                "scenceParam": "BClQAQAZAAH/AAABFBQBABQGAAD/AAAAAAAA/wAAAAAAAAAAFwD9AAB/ASlVAAAZAAH/AAABFBQBABQGAP//AAAAAAAA//8AAAAAAAAAFQD9AAB/ARpQAAABAAH/AAD///8AABQBAAD/AAB/AAB/BRpVAAABAAH/AAD///8AABQBAP//AAB/AAB/BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Action-A",
+            "sceneCode": 2120,
+            "lightEffects": [
+              {
+                "sceneCode": 2120,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAgF/GgH0KBQAgBQB+ADfAACAAACAABoAAgQBAgH/fwPmAQEAgBQB////AQD8AACAABoAAAAZAgFLAAP7OP8AgBQBAAD/AACAEQD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Action-B",
+            "sceneCode": 2121,
+            "lightEffects": [
+              {
+                "sceneCode": 2121,
+                "scenceName": "",
+                "scenceParam": "BR0AAQAJAAH/AAD/lpYBABQCAAD///8AEADsAACABB0AAAABAAENAAAA/wEA/5YCCQj+/wsHAACAAACAAB0AAQAJAAH/AAL/lpYBABQC/wAAAP8AEADsAACABB0AAQAJAAH/AAL/lpYBABQC/wAAAP8AEgDsAACABR0AAQAJAAH/AAD/lpYBABQCAAD///8AEgDsAACABQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Action-C",
+            "sceneCode": 2122,
+            "lightEffects": [
+              {
+                "sceneCode": 2122,
+                "scenceName": "",
+                "scenceParam": "BR0QAQABAAH//wB/FBQA/wQC/wAHAAP/AAB/EAD/ARoTAQABAAH//wB/FBQBfxQB/wAEAAB/EAD/ARoZAQABAAH//wB/FBQBsAoB/8UAAAB/EgD/AR0ZAQACAAH//wB/FBQBAAEC/38A/38AAAB/EgD6ARogAQACAAH/AAB/FBQAfxQB/1MAAAB/EQD2AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Action-D",
+            "sceneCode": 2212,
+            "lightEffects": [
+              {
+                "sceneCode": 2212,
+                "scenceName": "",
+                "scenceParam": "BR1AAgIBAAH//wD/FBQA/xQCiwD/AP8AEQH/AACAAB1GAgIBAAH//wD/FBQA/xQCAP8AiwD/EwH/AACAAB0QAAABAAH//wAAFBQA/xQCAP8AiwD/AACAEQD/AR0ZAAABAAH//wAAFBQA/xQCiwD/AP8ABwH/EwD/AR0kAgoBAAH//wCAFBQA/xQCiwD/AP8AEQH/AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "High",
+            "sceneCode": 2123,
+            "lightEffects": [
+              {
+                "sceneCode": 2123,
+                "scenceName": "",
+                "scenceParam": "AhpAAgoFAAH/vwH/WkYB41AB/wAAFQD/EAD/ARpCAhQKAAH/sAP/FBQB/2QBABT/EQD/EwD/BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dancing-A",
+            "sceneCode": 2124,
+            "lightEffects": [
+              {
+                "sceneCode": 2124,
+                "scenceName": "",
+                "scenceParam": "Ax0AAAABAAH/AAB/UhQAzQMCAwD/ZwD/EAN/EAN/ARooAAABAAH/AACpZBQAoAEB/wDdEAHLEAD/ARogAAABAAH/AAB/FBQAfwEBAP/aEgF/EgD/Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dancing-B",
+            "sceneCode": 2209,
+            "lightEffects": [
+              {
+                "sceneCode": 2209,
+                "scenceName": "",
+                "scenceParam": "BSkAAQAyAAH/AAD/ZMgCAAEGiwD/AAD/AP8A//8A/38A/wAAFAD/AACABSkAAQAyAAH/AAD/ZMgCAAEGiwD/AAD/AP8A//8A/38A/wAAFgD/AACABSkAAQAyAAH/AAL/ZMgCAAEG/wAA/38A//8AAP8AAAD/iwD/FAD/AACABCkAAQAyAAH/AAL/ZMgCAAEG/wAA/38A//8AAP8AAAD/iwD/FgD/AACABCkAAhkUAgH//wP/ZMgCWwEG/wAA/38A//8AAP8AAAD/iwD/EQH0AACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Dancing-C",
+            "sceneCode": 2496,
+            "lightEffects": [
+              {
+                "sceneCode": 2496,
+                "scenceName": "",
+                "scenceParam": "AxozAg8PAAE0IwL//2aA//8B////FgD/Ah3/BSZDAhQMAAH//wH/Af+D//8FAAAA////AAAA////iwD/FBL4EhT6BSYAAwEwAAL/AALiExX/AADoFBSDqwwDJSX/fwj+/QDdEAAAEQD+AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Soothing-A",
+            "sceneCode": 2214,
+            "lightEffects": [
+              {
+                "sceneCode": 2214,
+                "scenceName": "",
+                "scenceParam": "AiAAAwYAAgGaDAOaMjKAThQDAP//YML+TN/+EgGBAACAACAAAhkBAgHKZQMeMjIAThQDAP//YML+TN/+EgExAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Soothing-B",
+            "sceneCode": 2283,
+            "lightEffects": [
+              {
+                "sceneCode": 2283,
+                "scenceName": "",
+                "scenceParam": "ASMAAwYAAgE2DAMA/2QDPhQEQK/+OW3/Spr/e7T+AgPwEAD8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Shooting Game-A",
+            "sceneCode": 2160,
+            "lightEffects": [
+              {
+                "sceneCode": 2160,
+                "scenceName": "",
+                "scenceParam": "BB0gAQADAAH/AAP/AwMByhQC/24A/+QAAAB/AAB/ASARAQADAAH/AAB/FBQBfxQD/6wCAAAA//8AAAB/EAP8ASARAQADAAH/AAB/FBQBfxQD/+lJAAAA/44AAAB/EAT8ASAZAQADAAH/AADqAgQA0RQD/wAD/wAA/wAAAAB/AAB/AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Shooting Game-B",
+            "sceneCode": 2161,
+            "lightEffects": [
+              {
+                "sceneCode": 2161,
+                "scenceName": "",
+                "scenceParam": "BSMQAgUBAAL/AADuFBT/AADcFBQC/xQCFQD//wAAAACAEQL9AB0ZAgUBAAH/AADuFBQC/xQC/wAAAAD/AACAEQL+ACkyAAABAAEfAAPmFA8B+A8G/38AAP8AcgD/Df9S/z8A7/8dAwDbEwf/ACMwAwMBAAEhAADpFBQB9hQE//////YByQD//wZDAACAAACAACM3AwMBAAEhAADpFBQB9xQE/wBEqAD///UaAP//AACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Shooting Game-C",
+            "sceneCode": 2162,
+            "lightEffects": [
+              {
+                "sceneCode": 2162,
+                "scenceName": "",
+                "scenceParam": "BBogAgMBAAH//wCAFBQA/yIBALL/EAH9AACAABooAgMBAAH//wCAFBQA/yIB/wCLEgH8AACAACZiAQADAAH//wD/FBQC/wEF/wAA/wAA/0AA//8A//8AFQD/AADNACZiAQADAAH//wD/FBQC/wEF/wAA/wAA/z0A//8A//8AFwD/AgAkAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cards Game",
+            "sceneCode": 2163,
+            "lightEffects": [
+              {
+                "sceneCode": 2163,
+                "scenceName": "",
+                "scenceParam": "AiMAAAAQAAH//wCAFBQCABQEAwD/LP8A/wcA/9UAAADoEgHMABoAAhkBAAH/gADmFBQAgBQB////AACAEADOAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Racing Game-A",
+            "sceneCode": 2164,
+            "lightEffects": [
+              {
+                "sceneCode": 2164,
+                "scenceName": "",
+                "scenceParam": "BSAAAQADAAGrAAABFBQBABQD/38AAAD//38AEAD9AAD4ASAAAQADAAGKAAABFBQBABQDAP///wAAAP//EAD9EADWAiAAAQADAAF6AAABFBQBABQDAP8AAAD/AP8AEAD9EADvAyAAAQADAAGFAAABFBQAABQDAP///wD5AP//EAD9EADzBCAAAQADAAGIAAABFBQAABQDEQD///8AAwD/EAD8EAD4BQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Racing Game-B",
+            "sceneCode": 2165,
+            "lightEffects": [
+              {
+                "sceneCode": 2165,
+                "scenceName": "",
+                "scenceParam": "BCMAAQADAgH//wD/FBQC/wEE/wAA/wAA/0AA//8AFAD+AAD9ACOAAQADAAH//wD/FBQC/wEE/wCg/wDDiwD///8ABAD+EAD9ACkAAwEBAgEeCAPOBgUC8wEGiwD/iwD/iwD/iwD/AAAAAAAAEgD/AgD/ACOQAQADAAH//wD/FBQC/wEEAAD/AAD/AP////8ABAD+EAD+AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Cosplay",
+            "sceneCode": 2166,
+            "lightEffects": [
+              {
+                "sceneCode": 2166,
+                "scenceName": "",
+                "scenceParam": "AiYAAwIDAAH//wDyFBQB/xQFAAD/AP//AAAAAAAA/wAAAACAEQD9ASAAAwYBAAESAACAFBQDgBQDiwD/AAAAAAD/EQD7AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fighting Game-A",
+            "sceneCode": 2167,
+            "lightEffects": [
+              {
+                "sceneCode": 2167,
+                "scenceName": "",
+                "scenceParam": "BB0AAAABAAF7ewIAFBQAsxQC////AAAAAACAAACAAR0XAAABAAH/AACAFBQBABQC/wAAAAAAEwD/EwD/BR0SAAABAAH/AACAFBQBABQC/wAAAAAAEQD/EQD/BSMAAAAIAAH//wAAFBQC9QEEAAAA/38AAAAA//UIAACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Fighting Game-B",
+            "sceneCode": 2168,
+            "lightEffects": [
+              {
+                "sceneCode": 2168,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAH//wB/FBQAfxQBALT/AAB/AAB/ASkAAAAFAAH//wB/FBQCABQG/wBs/woA/10AAAAAAAAAAAAAEAD/AAB/AikAAAAFAAH//wB/FBQCABQG/wBs/woA/10AAAAAAAAAAAAAEgD/AAB/Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Adventure Game-A",
+            "sceneCode": 2169,
+            "lightEffects": [
+              {
+                "sceneCode": 2169,
+                "scenceName": "",
+                "scenceParam": "Ax1GAAACAAH/AACAFBQCAP8C/wAAiwD/EAD9EgD1BR1AAAACAAH/AACAFBQCAP8C/wAAiwD/EgD9EAD1BRoAAAABAAEdHQAAFBQAAP8BiwD/AACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Adventure Game-B",
+            "sceneCode": 2170,
+            "lightEffects": [
+              {
+                "sceneCode": 2170,
+                "scenceName": "",
+                "scenceParam": "AxoAAAABAAGzswCAFBQAgBQBAP8AAACAAACAACBEAwMSAAH/AAD/ZH0BABQD//8A//////8AAACAAACAAB0ZAQACAAH/AACAFBQBABQC/wAAAAD/AACAEgH3Ag=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Puzzle Game-A",
+            "sceneCode": 2171,
+            "lightEffects": [
+              {
+                "sceneCode": 2171,
+                "scenceName": "",
+                "scenceParam": "ASMAAwICAAH/AACAFBQAgQUEAAD//wAA/wf/B/3/EQP3AACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Puzzle Game-B",
+            "sceneCode": 2172,
+            "lightEffects": [
+              {
+                "sceneCode": 2172,
+                "scenceName": "",
+                "scenceParam": "BRoQAAABAAH/AAH/GRkAgBQB/wAAAACAAACAABoZAAABAAH//wD/KDIAgBQBbgD/AACAAACAABpxAQABAAH/AACAFBQAgBQB////EQD/AQD/ABoYAAABAAH/AAH/GRQCABQBIv8AAACAAgD/ABowAQABAAH/AACAFBQA+xQB//8AAACAEgD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Puzzle Game-C",
+            "sceneCode": 2173,
+            "lightEffects": [
+              {
+                "sceneCode": 2173,
+                "scenceName": "",
+                "scenceParam": "BRogAAABAAH/AACAFBQAgBQB//8AFADBEAC9ABoiAAABAAH/AACAFBQAgBQB/wAAFADAEAC9ABokAAABAAH/AACAFBQAgBQBAAD/FADBEADAABomAAABAAH/AACAFBQAgBQBAP8AFAC/EAC/ABooAAACAAH/AACAFBQAgBQBiwD/FADBEAC/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Puzzle Game-D",
+            "sceneCode": 2174,
+            "lightEffects": [
+              {
+                "sceneCode": 2174,
+                "scenceName": "",
+                "scenceParam": "BSkAAysUAAGoAACAFBQBABQGAP//AAAAiwD//wD/AAAAAAAAAACAAACAACkAAwUoAAH/AACAFBQDgBQGAB//AAAA/wD7AAAAAAAAAAAAEgD6EgDwASkAAwUFAAF0AACAFBQAgBQGAP//AAAAAAAA/wDiAAAAAAAAEAD8AACAAikAAQAyAAH/AACAFBQD9RQG/wAAAAAAAAAAAP//AAAAAAAAEAD+AACAAykAAyAwAAGAAACAFBQBgBQGAP//AAAAAAAAAAAA/wDoAAAAFAD9AACABQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Puzzle Game-E",
+            "sceneCode": 2175,
+            "lightEffects": [
+              {
+                "sceneCode": 2175,
+                "scenceName": "",
+                "scenceParam": "BCkZAAABAAH/AAD1FBQB/xQG/+AhAAAA/yoDAAAAA/8AAAAAAACAEAH/ACkQAAABAAH/AAD3FBQB/xQG//8AAAAA/wkAAAAADf8AAAAAAACAEgH/ACMAAwEBAAGsAAH/KBQA/xQEuAD/MC7/zAD//38AAACAAACAACAkAwMCAAGkAAP/PBQA/xQDAP//JB3/AP//AACAETD/AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Daze",
+            "sceneCode": 2202,
+            "lightEffects": [
+              {
+                "sceneCode": 2202,
+                "scenceName": "",
+                "scenceParam": "AyAAAhAQAAH/AAPLS0sBoAED1f8n/4kl+P8nAQDeAACAACAAAhAQAAH/AAHLS0sBoAED/2TFQDr+xF3/AQDeAACAABoAAAABAAEICAEAS0sBAAEB////AQDeAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Awaken",
+            "sceneCode": 2204,
+            "lightEffects": [
+              {
+                "sceneCode": 2204,
+                "scenceName": "",
+                "scenceParam": "AyMlAAABAAH/gAG1FBQD6BQECW7/SJ7///31AAAAAACAEAD/ACMjAAABAAH/gQG1FBQD5hQECW7/SJ7///31AAAAAACAEgD/ABoAAhEBAAH/AAL/FGQAgBQB////AACAEQDtAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "MDL",
+            "sceneCode": 14730,
+            "lightEffects": [
+              {
+                "sceneCode": 14730,
+                "scenceName": "",
+                "scenceParam": "BRoAAAABAAH/zQMAUhQAmQMB////AAN/AAN/ABo3AAABAAH//wAAZBQAfxQB/z4AAADLEQD8AhowAAABAAH//wAAFBQAfxQBCv+YAgB/EwD8ARo1AAABAAH//wAAZBQAfxQBCv+YAADLEQD8ARojAAABAAH//wAAFBQAfxQB/z4AAgB/EwD8AQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Halloween Night",
+            "sceneCode": 14857,
+            "lightEffects": [
+              {
+                "sceneCode": 14857,
+                "scenceName": "",
+                "scenceParam": "AiliAgwGAAFoAAPOFBQD9xQG/xgE/////z4H/38A/y8HAAAABQD8AACAAS8AAAAEAgL/IgPOFBT/JQHOFBQD5Q8G/xoG/y0G/2sZB/+2ASTVB//PAACAAACAAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Flash",
+            "sceneCode": 14769,
+            "lightEffects": [
+              {
+                "sceneCode": 14769,
+                "scenceName": "",
+                "scenceParam": "ASAAAAADAAH//wDGFBQDghQDVIxHRJAyt58yAADYAADMAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Gary",
+            "sceneCode": 14770,
+            "lightEffects": [
+              {
+                "sceneCode": 14770,
+                "scenceName": "",
+                "scenceParam": "BR0AAAABAgH/AAKAFBQDshQCAAD/Lnz+FAD8AACAAB1zAAABAgH/AAKAFBQAshQCLor/AAD/BAD5EAD8ABpwAAABAgH/AAOEFBQAgBQBAAD/EAD8AACAABpzAAABAgH/AAOEFBQAgBQBAAD/EAD8AACAAB1RAAABAgH/AAKAFBQAshQCAAD/Lor/BAD5EAD8AA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Judy",
+            "sceneCode": 14771,
+            "lightEffects": [
+              {
+                "sceneCode": 14771,
+                "scenceName": "",
+                "scenceParam": "BSlQAAABAgP/HAPyFBT/LwHdFBT/EQDlFBQDqhQCAyf+Tkj/AAD5AACAAClVAAABAgP/KQPqFBT/EgHdFBT/DwDYFBQDxBQCSkb+AA3QAAD5AACAABoAAAABAgHSIwPYFBQAgBQBRTH/AAD5EAD8AB0AAgMBAAGYAAPgFBQBABQC/xBE////AACAAACAAB0AAgMBAAGYAAPYFBQBABQC/////xxRAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "Nick",
+            "sceneCode": 14772,
+            "lightEffects": [
+              {
+                "sceneCode": 14772,
+                "scenceName": "",
+                "scenceParam": "BCMAAAACAgH/fgGAFBQDxBQE/z4D/3UH/0YD/38AAACAAACAACBQAAABAgKYAAOyFBQAAADMFBQAgBQB/0nAAACAEwDyACBUAAABAgK0AAPBFBQAAAC/FBQAgBQB/0nAAACAEQD3ABoAAgUCAAGpRAPYFBQBgBQB//8AAACAAACAAA=="
+              }
+            ]
+          },
+          {
+            "sceneName": "ZDP Duo",
+            "sceneCode": 14773,
+            "lightEffects": [
+              {
+                "sceneCode": 14773,
+                "scenceName": "",
+                "scenceParam": "Ax1gAAACAgH//wIAFBQCABQC/1IHAAD/EQD8AAHyAB1kAAACAgH//wIAFBQCABQC/1cMAAD/EwD8AgHyAB1DAAACAgH//wIAFBQCABQC/1gJAAD/EQD5AAHyAQ=="
+              }
+            ]
+          },
+          {
+            "sceneName": "ZDP Trio",
+            "sceneCode": 14774,
+            "lightEffects": [
+              {
+                "sceneCode": 14774,
+                "scenceName": "",
+                "scenceParam": "BB1CAAABAAH//wMBZFADABQCAAD/Mpj/AAGAEwD5AR0gAAACAAH//wMBZFACABQC/z8J/1WTAAGAEwD5AhokAAABAAH//wMBZFACfhQBWxH+AAGAEQD5BR0AAAABAgH/agGAFBQDgBQCAAD//38AAACAAACAAA=="
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "supportSpeed": 1
+  }
+}
