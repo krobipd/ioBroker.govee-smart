@@ -1,5 +1,5 @@
 import type { DeviceRegistry } from "../device-registry";
-import { GOVEE_CAP_TYPE } from "../govee-constants";
+import { GOVEE_CAP_TYPE, isPseudoGroupSku } from "../govee-constants";
 import type { CloudDevice, CloudStateCapability, DeviceState, GoveeDevice } from "../types";
 import { cloudDeviceToGoveeDevice } from "./mapping";
 import { deviceKey, isDevicePushFresh } from "./lookups";
@@ -37,13 +37,13 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
     }
     // Govee's /user/devices returns app device-groups as pseudo-devices. BaseGroup
     // is supported (members resolved via the app-API group list, fan-out built in
-    // capability-mapper); SameModeGroup has no member-resolution path here, so
-    // merging it verbatim would build a generic light from its capabilities and
-    // leave an orphaned control tree that never actually drives anything. Skip it.
-    if (cd.sku === "SameModeGroup") {
-      adapter.log.debug(
-        `Cloud: skipping SameModeGroup pseudo-device ${cd.deviceName ?? cd.device} (not a real device)`,
-      );
+    // capability-mapper); SameModeGroup and DreamViewScenic (every Feature Hub
+    // group, homebridge-govee #1357) have no member-resolution path, so merging
+    // them verbatim would build a generic light from their capabilities — state
+    // reads and status requests against a group, a device forever grey, counted
+    // in the totals (audit M6). Skip them.
+    if (isPseudoGroupSku(cd.sku)) {
+      adapter.log.debug(`Cloud: skipping ${cd.sku} pseudo-device ${cd.deviceName ?? cd.device} (not a real device)`);
       continue;
     }
     const existing = adapter.devices.get(deviceKey(cd.sku, cd.device));

@@ -1904,26 +1904,37 @@ describe("CapabilityMapper", () => {
       expect(sceneDef!.type).toBe("mixed");
     });
 
-    it("should compute music intersection across members", () => {
+    it("should compute the music intersection of the modes the members DECLARE (M5)", () => {
+      // #41 (H61E5) and #25 (H66A1): the same modes, written differently and numbered differently.
+      const music = (options: Array<{ name: string; value: number }>): GoveeDevice["capabilities"][number] => ({
+        type: "devices.capabilities.music_setting",
+        instance: "musicMode",
+        parameters: { dataType: "STRUCT", fields: [{ fieldName: "musicMode", dataType: "ENUM", options }] },
+      });
       const m1 = createMember({
-        musicLibrary: [
-          { name: "Energic", musicCode: 1 },
-          { name: "Rhythm", musicCode: 2 },
+        capabilities: [
+          music([
+            { name: "Energic", value: 1 },
+            { name: "PianoKeys", value: 7 },
+            { name: "DayAndNight", value: 9 },
+          ]),
         ],
+        // The app library must not decide any more.
+        musicLibrary: [{ name: "Spectrum", musicCode: 4 }],
       });
       const m2 = createMember({
-        musicLibrary: [
-          { name: "Rhythm", musicCode: 3 },
-          { name: "Spectrum", musicCode: 4 },
+        capabilities: [
+          music([
+            { name: "Piano Keys", value: 6 },
+            { name: "Day and Night", value: 8 },
+            { name: "Spectrum", value: 2 },
+          ]),
         ],
       });
       const group = createGroup();
       const result = buildAllStateDefsForTest(group, undefined, [m1, m2]);
       const musicDef = result.find(d => d.id === "music_mode");
-      expect(musicDef).toBeDefined();
-      expect(Object.values(musicDef!.states!)).toContain("Rhythm");
-      expect(Object.values(musicDef!.states!)).not.toContain("Energic");
-      expect(Object.values(musicDef!.states!)).not.toContain("Spectrum");
+      expect(Object.values(musicDef!.states!)).toEqual(["---", "PianoKeys", "DayAndNight"]);
     });
 
     it("should skip scenes when a member has no scenes", () => {

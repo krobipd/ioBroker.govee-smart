@@ -2,7 +2,7 @@ import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter, type HeldIntent, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
 import { DiagnosticsCollector, type HeldCommandEntry } from "./diagnostics";
-import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup, isPseudoGroupSku, APP_GROUP_SKU } from "./govee-constants";
 import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
 import {
   deviceKey as deviceKeyHelper,
@@ -302,7 +302,7 @@ export class DeviceManager {
     let scheduled = 0;
     for (const device of this.devices.values()) {
       const topic = device.iotTopic;
-      if (!topic || device.sku === "BaseGroup" || isLanDriven(device, now)) {
+      if (!topic || isAppGroup(device) || isLanDriven(device, now)) {
         continue;
       }
       const pushAt = device.state.devicePushAt;
@@ -356,7 +356,17 @@ export class DeviceManager {
       held = new Map();
       this.pendingIntents.set(key, held);
     }
-    held.set(DeviceManager.intentKey(intent), { ...intent, at: Date.now() });
+    // A delivery attempt Govee refused again re-holds the SAME intent — it keeps
+    // its original time, or every refusal would restart the TTL and the intent
+    // would never expire (audit M4). Only a new write outside a delivery sets
+    // the clock anew.
+    const intentKey = DeviceManager.intentKey(intent);
+    const existing = held.get(intentKey);
+    const redelivery =
+      existing !== undefined &&
+      this.flushing.has(key) &&
+      JSON.stringify(existing.value) === JSON.stringify(intent.value);
+    held.set(intentKey, { ...intent, at: redelivery ? existing.at : Date.now() });
     const what = intent.kind === "command" ? intent.command : intent.capabilityInstance;
     this.diagnostics.addLog(
       device.deviceId,
@@ -737,7 +747,7 @@ export class DeviceManager {
     if (!this.bearerFollowUpsEnabled || !this.apiClient?.hasBearerToken() || this.isUnloading()) {
       return;
     }
-    if (!this.lastGroupList?.ok && [...this.devices.values()].some(d => d.sku === "BaseGroup")) {
+    if (!this.lastGroupList?.ok && [...this.devices.values()].some(d => isAppGroup(d))) {
       this.loadGroupMembers().catch((e: unknown) => {
         this.log.debug(`Group members after the first token failed: ${errMessage(e)}`);
       });
@@ -842,7 +852,7 @@ export class DeviceManager {
     return {
       ok,
       keys: new Set(listed.map(l => this.deviceKey(l.sku, l.deviceId))),
-      trees: new Set(listed.map(l => `${l.sku === "BaseGroup" ? "groups" : "devices"}.${treeKey(l.sku, l.deviceId)}`)),
+      trees: new Set(listed.map(l => `${isAppGroup(l) ? "groups" : "devices"}.${treeKey(l.sku, l.deviceId)}`)),
     };
   }
 
@@ -1041,11 +1051,11 @@ export class DeviceManager {
    * @param nowMs Cached `Date.now()` for age calculation across the batch
    */
   private applyCachedEntry(entry: CachedDeviceData, nowMs: number): void {
-    // A SameModeGroup pseudo-device may sit in a cache written by an older build
-    // that merged it before we learned to skip it (see mergeCloudDevices). Never
-    // restore it — it has no member-resolution path and only creates an orphaned
-    // control tree.
-    if (entry.sku === "SameModeGroup") {
+    // A pseudo-device (SameModeGroup, DreamViewScenic) may sit in a cache written
+    // by an older build that merged it before we learned to skip it (see
+    // mergeCloudDevices). Never restore it — it has no member-resolution path
+    // and only creates an orphaned control tree.
+    if (isPseudoGroupSku(entry.sku)) {
       return;
     }
     const key = this.deviceKey(entry.sku, entry.deviceId);
@@ -1064,7 +1074,7 @@ export class DeviceManager {
       existing.musicLibrary = entry.musicLibrary;
       existing.diyLibrary = entry.diyLibrary;
       existing.skuFeatures = entry.skuFeatures;
-      existing.snapshotBleCmds = entry.snapshotBleCmds;
+      existing.snapshotBleCmds = cacheHelpers.snapshotPacketsFromCache(entry.snapshotBleCmds);
       existing.scenesChecked = entry.scenesChecked;
       existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
       // The cache file is host-local and editable — a corrupt count must not
@@ -1210,7 +1220,7 @@ export class DeviceManager {
       if (changed) {
         const allDevices = this.getDevices();
         for (const device of allDevices) {
-          if (device.sku === "BaseGroup") {
+          if (isAppGroup(device)) {
             // Groups go through onGroupMembersReady — see loadGroupMembers
             continue;
           }
@@ -1386,12 +1396,12 @@ export class DeviceManager {
       // transient empty never evicts a still-existing group.
       this.lastGroupList = this.listSource(
         apiGroups.length > 0,
-        apiGroups.map(g => ({ sku: "BaseGroup", deviceId: String(g.groupId) })),
+        apiGroups.map(g => ({ sku: APP_GROUP_SKU, deviceId: String(g.groupId) })),
       );
       // v2.9.1 — record per-group response in apiHistory of each BaseGroup
       // device. The fetch is account-wide so we tag every group's deviceId.
       for (const group of this.devices.values()) {
-        if (group.sku === "BaseGroup") {
+        if (isAppGroup(group)) {
           const apiGroup = apiGroups.find(g => String(g.groupId) === group.deviceId);
           this.diagnostics.recordApiSuccess(
             group.deviceId,
@@ -1407,7 +1417,7 @@ export class DeviceManager {
 
       let changed = false;
       for (const group of this.devices.values()) {
-        if (group.sku !== "BaseGroup") {
+        if (!isAppGroup(group)) {
           continue;
         }
         // Match by groupId: BaseGroup deviceId is the numeric group ID as string
@@ -1439,7 +1449,7 @@ export class DeviceManager {
         // Per-group Group-phase fire — only the BaseGroup state-trees need
         // rebuilding (intersection of member caps). Members themselves
         // haven't changed, so their phase callbacks don't fire.
-        for (const group of allDevices.filter(d => d.sku === "BaseGroup")) {
+        for (const group of allDevices.filter(d => isAppGroup(d))) {
           this.onGroupMembersReady?.(group, allDevices);
         }
       }
@@ -1456,7 +1466,7 @@ export class DeviceManager {
       // why group fan-out doesn't work without needing the adapter log.
       const status = extractHttpStatus(e);
       for (const group of this.devices.values()) {
-        if (group.sku === "BaseGroup") {
+        if (isAppGroup(group)) {
           this.diagnostics.recordApiFailure(group.deviceId, ep, e, status);
         }
       }
@@ -2280,7 +2290,7 @@ export class DeviceManager {
     const attemptFloorMs = CLOUD_REACHABILITY_REFRESH_MS / 4;
     let dispatched = 0;
     for (const device of this.devices.values()) {
-      if (device.sku === "BaseGroup" || !device.channels.cloud) {
+      if (isAppGroup(device) || !device.channels.cloud) {
         continue;
       }
       // A device that pays for its cloud calls from its own daily allowance —
@@ -2470,7 +2480,7 @@ export class DeviceManager {
    */
   public hasDeviceNeedingAppApi(): boolean {
     for (const dev of this.devices.values()) {
-      if (dev.sku === "BaseGroup") {
+      if (isAppGroup(dev)) {
         continue;
       }
       if (dev.type !== GOVEE_DEVICE_TYPE.LIGHT) {

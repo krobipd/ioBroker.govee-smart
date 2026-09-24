@@ -1,3 +1,14 @@
+import { vi } from "vitest";
+
+// The fan-out resolves music modes through the capability mapper, which reads
+// its names from adapter-core's I18n — no js-controller in a unit test.
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+    translate: vi.fn((key: string) => key),
+  },
+}));
+
 import { buildGroupFanoutHost, updateGroupReachability, type GroupFanoutHandlerAdapter } from "./group-fanout-handler";
 import type { GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../test-helpers";

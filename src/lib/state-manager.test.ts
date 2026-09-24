@@ -623,7 +623,7 @@ describe("StateManager", () => {
     });
   });
 
-  describe("cleanupSameModeGroupOrphansOnce", () => {
+  describe("cleanupPseudoGroupOrphansOnce", () => {
     it("deletes a leftover devices.samemodegroup_* tree but leaves real devices untouched", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
@@ -635,7 +635,7 @@ describe("StateManager", () => {
       objects.set("devices.h6160_0011", { type: "device" });
       objects.set("devices.h6160_0011.control.power", { type: "state" });
 
-      const removed = await sm.cleanupSameModeGroupOrphansOnce();
+      const removed = await sm.cleanupPseudoGroupOrphansOnce();
 
       const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
       expect(deleted).toContain("devices.samemodegroup_9100");
@@ -643,12 +643,23 @@ describe("StateManager", () => {
       expect(removed).toEqual(["devices.samemodegroup_9100"]);
     });
 
+    it("deletes a leftover devices.dreamviewscenic_* tree too (M6)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      objects.set("devices.dreamviewscenic_9200", { type: "device" });
+      objects.set("devices.dreamviewscenic_9200.control.power", { type: "state" });
+      objects.set("devices.h6160_0011", { type: "device" });
+      const removed = await sm.cleanupPseudoGroupOrphansOnce();
+      expect(removed).toEqual(["devices.dreamviewscenic_9200"]);
+      expect(calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0])).not.toContain("devices.h6160_0011");
+    });
+
     it("is a no-op on a clean install (no samemodegroup objects)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       objects.set("devices.h6160_0011", { type: "device" });
 
-      const removed = await sm.cleanupSameModeGroupOrphansOnce();
+      const removed = await sm.cleanupPseudoGroupOrphansOnce();
 
       expect(removed).toEqual([]);
       expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);

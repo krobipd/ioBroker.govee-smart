@@ -145,7 +145,10 @@ describe("library-loader — loadDeviceLibraries", () => {
         { name: "Snap1", value: 1 },
         { name: "Snap2", value: 2 },
       ],
-      snapshotBleCmds: [[["STALE_CACHE_PACKET_A"]], [["STALE_CACHE_PACKET_B"]]],
+      snapshotBleCmds: [
+        { name: "Snap1", cmds: [["STALE_CACHE_PACKET_A"]] },
+        { name: "Snap2", cmds: [["STALE_CACHE_PACKET_B"]] },
+      ],
     });
 
     let fetchSnapshotsCallCount = 0;
@@ -168,12 +171,18 @@ describe("library-loader — loadDeviceLibraries", () => {
     // Without force: the sticky gate must keep the cache untouched.
     await loadDeviceLibraries(host, device, device.sku, /* force */ false);
     expect(fetchSnapshotsCallCount).toBe(0);
-    expect(device.snapshotBleCmds).toEqual([[["STALE_CACHE_PACKET_A"]], [["STALE_CACHE_PACKET_B"]]]);
+    expect(device.snapshotBleCmds).toEqual([
+      { name: "Snap1", cmds: [["STALE_CACHE_PACKET_A"]] },
+      { name: "Snap2", cmds: [["STALE_CACHE_PACKET_B"]] },
+    ]);
 
     // With force: refetch and replace.
     await loadDeviceLibraries(host, device, device.sku, /* force */ true);
     expect(fetchSnapshotsCallCount).toBe(1);
-    expect(device.snapshotBleCmds).toEqual([[["FRESH_PACKET_1"]], [["FRESH_PACKET_2"]]]);
+    expect(device.snapshotBleCmds).toEqual([
+      { name: "Snap1", cmds: [["FRESH_PACKET_1"]] },
+      { name: "Snap2", cmds: [["FRESH_PACKET_2"]] },
+    ]);
   });
 });
 
@@ -441,5 +450,57 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
     const line = debugs.find(m => m.startsWith("Could not load scene library"));
     expect(line).toContain('body="<html>maintenance</html>"');
     expect(line).toContain("bearer=no");
+  });
+});
+
+describe("snapshot packets are keyed by name and follow the app's list (audit M10/N33)", () => {
+  // /bff-app/v1/devices/snapshots?sku=H1310, issue #40 export — first command group of each.
+  const LESEN = [["MwQnAAAAAAAAAAAAAAAAAAAAABA="]];
+  const COUCH1 = [["MwQGAAAAAAAAAAAAAAAAAAAAADE="]];
+  function api(calls: { n: number }): unknown {
+    return {
+      hasBearerToken: () => true,
+      fetchSceneLibrary: () => Promise.resolve([]),
+      fetchMusicLibrary: () => Promise.resolve([]),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => {
+        calls.n++;
+        return Promise.resolve([
+          { name: "lesen", bleCmds: LESEN },
+          { name: "couch1", bleCmds: COUCH1 },
+        ]);
+      },
+    };
+  }
+
+  it("a snapshot added or moved in the app fetches the packets anew — without the refresh button", async () => {
+    const calls = { n: 0 };
+    const device = createTestDevice({
+      snapshots: [
+        { name: "couch1", value: 2 },
+        { name: "lesen", value: 1 },
+      ],
+      snapshotBleCmds: [
+        { name: "lesen", cmds: LESEN },
+        { name: "couch1", cmds: COUCH1 },
+      ],
+    });
+    await loadDeviceLibraries(makeHost(setupMockCloud([]), api(calls)), device, device.sku);
+    expect(calls.n).toBe(1);
+    expect(device.snapshotBleCmds).toEqual([
+      { name: "couch1", cmds: COUCH1 },
+      { name: "lesen", cmds: LESEN },
+    ]);
+  });
+
+  it("an unchanged list is not fetched again", async () => {
+    const calls = { n: 0 };
+    const device = createTestDevice({
+      snapshots: [{ name: "lesen", value: 1 }],
+      snapshotBleCmds: [{ name: "lesen", cmds: LESEN }],
+    });
+    await loadDeviceLibraries(makeHost(setupMockCloud([]), api(calls)), device, device.sku);
+    expect(calls.n).toBe(0);
   });
 });

@@ -1,5 +1,5 @@
 import { errMessage, type GoveeDevice, type TimerAdapter } from "./types";
-import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 
 /**
@@ -115,6 +115,9 @@ interface QueuedCall {
  */
 export const MAX_QUEUE_LENGTH = 200;
 
+/** The refusal of a call on a spent daily counter (A10). */
+const DAY_BUDGET_SPENT = "Daily Govee Cloud budget is used up — the call is skipped until the daily reset";
+
 /**
  * A per-device daily allowance on top of the global budget.
  *
@@ -146,7 +149,7 @@ export interface DeviceBudget {
  * @returns The device's allowance, or undefined when only the global one applies
  */
 export function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined {
-  if (!device || device.type === GOVEE_DEVICE_TYPE.LIGHT || device.sku === "BaseGroup") {
+  if (!device || device.type === GOVEE_DEVICE_TYPE.LIGHT || isAppGroup(device)) {
     return undefined;
   }
   return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
@@ -196,6 +199,8 @@ export class RateLimiter {
    * hits it again a minute later.
    */
   private readonly warnedDeviceBudget = new Set<string>();
+  /** The account's daily counter was reported as spent today — warn once. */
+  private warnedDayBudget = false;
 
   private readonly limits: CloudLimits;
   /** Injectable clock — the token buckets refill against it. */
@@ -283,6 +288,7 @@ export class RateLimiter {
       `Rate limiter: daily reset (used ${this.callsToday} calls today, ${this.callsTodayPerDevice.size} device(s) tracked)`,
     );
     this.callsToday = 0;
+    this.warnedDayBudget = false;
     // The per-device allowances reset with the global one — Govee rolls both
     // over at the same time. The warn-once set goes too, so a device that hit
     // its limit yesterday says so again if it hits it today.
@@ -322,6 +328,10 @@ export class RateLimiter {
     // (measured 2026-09-22: a scene job's second call after stop()).
     if (this.stopped) {
       reject?.(new Error("Rate limiter stopped — Cloud call cancelled"));
+      return false;
+    }
+    if (this.dayBudgetSpent()) {
+      reject?.(new Error(DAY_BUDGET_SPENT));
       return false;
     }
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
@@ -364,7 +374,7 @@ export class RateLimiter {
     priority = 0,
     budget?: DeviceBudget,
   ): Promise<boolean> {
-    if (budget && this.deviceBudgetSpent(budget)) {
+    if ((budget && this.deviceBudgetSpent(budget)) || this.dayBudgetSpent()) {
       return false;
     }
     if (this.canMakeCall(lane)) {
@@ -374,6 +384,28 @@ export class RateLimiter {
     }
     this.enqueue(execute, lane, priority, undefined, budget);
     return false;
+  }
+
+  /**
+   * Whether the account's daily counter is spent — and if so, say so once. Like
+   * an exhausted device budget it does NOT queue: the counter resets at the
+   * daily rollover, and a queued command would run hours later, at a moment
+   * nobody asked for (audit A10; until 2.40.0 such calls queued until then).
+   *
+   * @returns true when no call may be made today
+   */
+  private dayBudgetSpent(): boolean {
+    if (this.callsToday < this.limits.perDay) {
+      return false;
+    }
+    if (!this.warnedDayBudget) {
+      this.warnedDayBudget = true;
+      this.log.warn(
+        `The adapter has made ${this.limits.perDay} Govee Cloud calls today — the daily ceiling. Further Cloud ` +
+          `calls are skipped until the daily reset; LAN control keeps working.`,
+      );
+    }
+    return true;
   }
 
   /**
@@ -474,6 +506,9 @@ export class RateLimiter {
     if (budget && this.deviceBudgetSpent(budget)) {
       throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
     }
+    if (this.dayBudgetSpent()) {
+      throw new Error(DAY_BUDGET_SPENT);
+    }
     if (this.canMakeCall(lane)) {
       this.spend(lane, budget);
       await execute();
@@ -559,6 +594,14 @@ export class RateLimiter {
    */
   private processQueue(): void {
     if (this.stopped) {
+      return;
+    }
+    if (this.dayBudgetSpent()) {
+      // Calls queued for a minute window, then the day ran out: they would wait
+      // until the rollover — refuse them now instead (A10).
+      for (const call of this.queue.splice(0)) {
+        call.reject?.(new Error(DAY_BUDGET_SPENT));
+      }
       return;
     }
     for (let i = 0; i < this.queue.length;) {

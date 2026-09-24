@@ -2,7 +2,7 @@ import { HttpError } from "./http-client";
 import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
 import { errMessage, type GoveeDevice } from "./types";
-import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import {
   effectiveSegmentCount,
   isLanDriven,
@@ -1081,9 +1081,9 @@ export class DiagnosticsCollector {
         // snapshot debugging (Issue #13, H61A8 tukey42). Previously the only
         // way to get this was to ask the user for the cache file.
         bleCmds: device.snapshotBleCmds
-          ? device.snapshots.map((s, idx) => ({
+          ? device.snapshots.map(s => ({
               name: s.name,
-              packets: device.snapshotBleCmds?.[idx] ?? [],
+              packets: device.snapshotBleCmds?.find(p => p.name === s.name)?.cmds ?? [],
             }))
           : [],
       },
@@ -1195,7 +1195,7 @@ export class DiagnosticsCollector {
     // reachability datapoint of its own. Run through the device rule it read
     // "nothing ever reported — reported as not reachable" next to five renewers
     // that never touch a group (krobi's installation, 2.39.1).
-    if (device.sku === "BaseGroup") {
+    if (isAppGroup(device)) {
       return {
         decidedBy:
           "not applicable — an app group has no reachability of its own; groups.info.online shows the cloud connection, the group's info.membersUnreachable names members that cannot be reached",

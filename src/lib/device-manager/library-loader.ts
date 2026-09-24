@@ -331,6 +331,20 @@ async function loadLibrary<T>(
 }
 
 /**
+ * Whether the stored snapshot packets belong to exactly the snapshots the
+ * device has now — same names, same order.
+ *
+ * @param device The light
+ */
+export function snapshotPacketsMatch(device: GoveeDevice): boolean {
+  const packets = device.snapshotBleCmds;
+  if (!packets || packets.length !== device.snapshots.length) {
+    return false;
+  }
+  return device.snapshots.every((s, i) => packets[i].name === s.name);
+}
+
+/**
  * Load scene/music/DIY libraries and SKU features from the undocumented API.
  *
  * Each fetch runs through the rate-limiter so a fresh install with 10
@@ -450,9 +464,12 @@ export async function loadDeviceLibraries(
   // user re-creates a snapshot in the Govee app and re-imports it. Without
   // the force-branch the gate was sticky — cached snapshot packets stayed
   // until the cache file was manually deleted (Issue #13 v2.8.2, tukey42).
-  if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0 && !hasBearer) {
+  // Fetched anew when the name list changed (a snapshot added, renamed or
+  // removed in the app), not only when none are stored (N33).
+  const packetsStale = force || !snapshotPacketsMatch(device);
+  if (packetsStale && device.snapshots.length > 0 && !hasBearer) {
     host.noteSkipped?.();
-  } else if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0) {
+  } else if (packetsStale && device.snapshots.length > 0) {
     await host.runLimited(async () => {
       const ep = `/bff-app/v1/devices/snapshots?sku=${sku}`;
       try {
@@ -465,10 +482,10 @@ export async function loadDeviceLibraries(
           `Snapshot BLE for ${sku}: ${snaps.length} snapshot(s) with local data${snaps.length === 0 ? " — Govee returned no BLE-cmds for this SKU/device" : ""}`,
         );
         if (snaps.length > 0) {
-          device.snapshotBleCmds = device.snapshots.map(ds => {
-            const match = snaps.find(s => s.name === ds.name);
-            return match?.bleCmds ?? [];
-          });
+          device.snapshotBleCmds = device.snapshots.map(ds => ({
+            name: ds.name,
+            cmds: snaps.find(s => s.name === ds.name)?.bleCmds ?? [],
+          }));
           changed = true;
         }
       } catch (e) {

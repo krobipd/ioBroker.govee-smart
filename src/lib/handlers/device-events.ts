@@ -1,7 +1,7 @@
 import { buildCloudStateDefs } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import type { DeviceRegistry } from "../device-registry";
-import { GOVEE_DEVICE_TYPE } from "../govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
 import {
@@ -160,12 +160,12 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   // cache path of every restart, so an installation grew objects a fresh
   // install never creates. The phase-3 callback (`onGroupMembersReady`)
   // builds the tree the moment the members are actually there.
-  if (device.sku === "BaseGroup" && !device.groupMembers?.length) {
+  if (isAppGroup(device) && !device.groupMembers?.length) {
     return;
   }
   const localSnaps = adapter.localSnapshots?.getSnapshots(device.sku, device.deviceId);
   let memberDevices: GoveeDevice[] | undefined;
-  if (device.sku === "BaseGroup" && device.groupMembers) {
+  if (isAppGroup(device) && device.groupMembers) {
     memberDevices = groupFanoutHandler.resolveGroupMembers(device, allDevices);
   }
   const cloudDefs = buildCloudStateDefs(device, adapter.log, adapter.deviceRegistry, localSnaps, memberDevices);

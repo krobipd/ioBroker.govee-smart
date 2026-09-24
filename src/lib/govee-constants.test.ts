@@ -1,4 +1,4 @@
-import { deriveGoveeClientId } from "./govee-constants";
+import { APP_GROUP_SKU, deriveGoveeClientId, isAppGroup, isPseudoGroupSku } from "./govee-constants";
 
 describe("deriveGoveeClientId", () => {
   it("derives a distinct, stable id per account", () => {
@@ -34,5 +34,16 @@ describe("deriveGoveeClientId", () => {
     // cross-checked against the `uuid` package and Python's uuid.uuid5.
     expect(deriveGoveeClientId("someone@example.com")).toBe("59fd741edc7e5f98aac49ea17ad61950");
     expect(deriveGoveeClientId(undefined)).toBe("185ab25f93035db58b9a8ffc40fe14e7");
+  });
+});
+
+describe("app groups and pseudo-devices (audit M6)", () => {
+  it("BaseGroup is the supported app group; SameModeGroup and DreamViewScenic are pseudo-devices", () => {
+    expect(isAppGroup({ sku: APP_GROUP_SKU })).toBe(true);
+    expect(isAppGroup({ sku: "H6160" })).toBe(false);
+    expect(isPseudoGroupSku("SameModeGroup")).toBe(true);
+    expect(isPseudoGroupSku("DreamViewScenic")).toBe(true);
+    expect(isPseudoGroupSku(APP_GROUP_SKU)).toBe(false);
+    expect(isPseudoGroupSku("H6160")).toBe(false);
   });
 });

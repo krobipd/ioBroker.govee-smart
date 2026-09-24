@@ -50,6 +50,7 @@ import {
   READY_SAFETY_TIMEOUT_MS,
   STALE_DEVICE_CLEANUP_DELAY_MS,
 } from "./lib/timing-constants";
+import { isAppGroup } from "./lib/govee-constants";
 
 // Rate-limit defaults moved to lib/timing-constants.ts as CLOUD_FULL_LIMITS so
 // every module that touches Govee budgeting reads the same canonical values.
@@ -600,11 +601,12 @@ export class GoveeAdapter extends utils.Adapter {
       // session's numbers standing until the first 20 s round (F8).
       await this.stateManager.ensureDeviceRollupStates().catch(() => undefined);
       await this.stateManager.markAllOffline().catch(() => undefined);
-      // One-shot orphan cleanup: builds up to v2.21.0 merged a Govee app
-      // "SameModeGroup" pseudo-device into a generic device; the fix skips it at
-      // intake, but an object tree already created that way never re-enters the
-      // device map and so is never reaped. Drop any leftover on upgraded installs.
-      await this.stateManager.cleanupSameModeGroupOrphansOnce().catch(() => undefined);
+      // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
+      // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
+      // generic device; intake skips them now, but a tree already created that
+      // way never re-enters the device map and so is never reaped. Drop any
+      // leftover on upgraded installs.
+      await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
       // General groups online state (reflects Cloud connection)
       await this.stateManager.createGroupsOnlineState(false);
       // The unloading reader: a scene job that finishes after onUnload began
@@ -1652,7 +1654,7 @@ export class GoveeAdapter extends utils.Adapter {
         // filtered by on this side; the keys were already identical
         // (`sessionKey` builds the same `sku:deviceId`), so one list serves both.
         return (this.deviceManager?.getDevices() ?? [])
-          .filter(d => d.sku !== "BaseGroup")
+          .filter(d => !isAppGroup(d))
           .map(d => ({
             value: `${d.sku}:${d.deviceId}`,
             label: deviceLabel(d),

@@ -12,7 +12,7 @@ import {
   type GoveeDevice,
 } from "./types";
 import type { DeviceRegistry } from "./device-registry";
-import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { resolveLabel, tDesc, tName, type I18nKey } from "./i18n";
 
 /** ioBroker state definition derived from a Govee capability */
@@ -1104,6 +1104,28 @@ export function musicModeNameUsesRgb(name: string | undefined): boolean {
 }
 
 /**
+ * A music-mode name reduced to letters and digits, lower case — Govee writes
+ * the same mode as "PianoKeys" on one model and "Piano Keys" on another.
+ *
+ * @param name Mode name
+ */
+export function musicNameKey(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * The music modes a device declares in its Cloud `music_setting`, or [].
+ *
+ * @param device The device
+ */
+export function memberMusicModes(device: GoveeDevice): NamedCapabilityOption[] {
+  const cap = (Array.isArray(device.capabilities) ? device.capabilities : []).find(
+    c => c && c.type === GOVEE_CAP_TYPE.MUSIC_SETTING && c.instance === "musicMode",
+  );
+  return cap ? getMusicModeOptions(cap) : [];
+}
+
+/**
  * Ordered list of valid music-mode options from a music_setting capability.
  * Both the dropdown builder ({@link mapMusicSetting}) and the send path
  * (`sendMusicCommand` in state-change-router) resolve music modes through THIS
@@ -1869,7 +1891,7 @@ export function buildCloudStateDefs(
   localSnapshots?: { name: string }[],
   memberDevices?: GoveeDevice[],
 ): StateDefinition[] {
-  if (device.sku === "BaseGroup") {
+  if (isAppGroup(device)) {
     return buildGroupStateDefs(memberDevices || []);
   }
 
@@ -2113,18 +2135,25 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
     }
   }
 
-  // Music: intersection of member music libraries
-  if (controllable.every(m => m.musicLibrary.length > 0)) {
-    const firstNames = controllable[0].musicLibrary.map(m => m.name);
-    const commonNames = firstNames.filter(name => controllable.every(m => m.musicLibrary.some(ml => ml.name === name)));
-    if (commonNames.length > 0) {
+  // Music: the modes every music-capable member DECLARES (its Cloud
+  // `music_setting` options) — the same list the member's own send resolves
+  // against. Until 2.40.0 the group offered the app-library names, and the
+  // member resolved the library index against the Cloud list: another order,
+  // another mode (audit M5). Names match normalised — Govee writes
+  // "PianoKeys" on one model and "Piano Keys" on another (#41 vs #25).
+  const memberModes = controllable.map(memberMusicModes).filter(modes => modes.length > 0);
+  if (memberModes.length > 0) {
+    const common = memberModes[0].filter(o =>
+      memberModes.every(modes => modes.some(m => musicNameKey(m.name) === musicNameKey(o.name))),
+    );
+    if (common.length > 0) {
       stateDefs.push({
         id: "music_mode",
         name: tName("musicMode"),
         type: "mixed",
         role: "state",
         write: true,
-        states: buildUniqueLabelMap(commonNames.map(name => ({ name }))),
+        states: buildUniqueLabelMap(common.map(o => ({ name: o.name }))),
         def: "0",
         capabilityType: GOVEE_CAP_TYPE.MUSIC_SETTING,
         capabilityInstance: "musicMode",

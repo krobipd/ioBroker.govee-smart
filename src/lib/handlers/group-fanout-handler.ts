@@ -3,6 +3,7 @@ import type { GroupFanoutHost } from "../group-fanout";
 import { resolveGroupMembers } from "../group-fanout";
 import type { StateManager } from "../state-manager";
 import { logRejected, type GoveeDevice } from "../types";
+import { isAppGroup } from "../govee-constants";
 
 /**
  * Adapter surface required by the group-fanout glue. Loose
@@ -43,7 +44,7 @@ export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): num
   const devices = adapter.deviceManager.getDevices();
   let written = 0;
   for (const group of devices) {
-    if (group.sku !== "BaseGroup" || !group.groupMembers) {
+    if (!isAppGroup(group) || !group.groupMembers) {
       continue;
     }
     const memberDevices = resolveGroupMembers(group, devices);

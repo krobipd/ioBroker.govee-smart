@@ -943,8 +943,8 @@ describe("DeviceManager", () => {
 
       const device = createTestDevice({
         snapshotBleCmds: [
-          [["cGFja2V0MQ==", "cGFja2V0Mg=="]], // Snap1
-          [], // Snap2 has no BLE data
+          { name: "Snap1", cmds: [["cGFja2V0MQ==", "cGFja2V0Mg=="]] },
+          { name: "Snap2", cmds: [] }, // no BLE data
         ],
       });
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
@@ -973,7 +973,10 @@ describe("DeviceManager", () => {
       dm.setCloudClient(mockCloud as any);
 
       const device = createTestDevice({
-        snapshotBleCmds: [[], []], // no BLE data
+        snapshotBleCmds: [
+          { name: "Snap1", cmds: [] },
+          { name: "Snap2", cmds: [] },
+        ], // no BLE data
       });
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
@@ -1051,9 +1054,8 @@ describe("DeviceManager", () => {
       expect(result).toEqual({ id: 2, paramId: "def" }); // Rainbow
     });
 
-    it("should fall back to raw value for invalid lightScene index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "lightScene", "99");
-      expect(result).toBe("99");
+    it("refuses an invalid lightScene index (N21)", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "lightScene", "99")).toThrow("invalid scene index");
     });
 
     it("should resolve snapshot index to integer value", () => {
@@ -1419,6 +1421,23 @@ describe("DeviceManager", () => {
       const skus = dm.getDevices().map(d => d.sku);
       expect(skus).toContain("H6160");
       expect(skus).not.toContain("SameModeGroup");
+    });
+
+    it("a Feature Hub group (DreamViewScenic) is no device either (M6)", () => {
+      // homebridge-govee device-merge.js GROUP_SKUS; #1357: every Feature Hub group is DreamViewScenic.
+      (dm as any).mergeCloudDevices([
+        {
+          sku: "DreamViewScenic",
+          device: "9200",
+          deviceName: "Feature Hub",
+          type: "devices.types.light",
+          capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+        },
+        { sku: "H6160", device: "real124", deviceName: "Real Strip", type: "devices.types.light", capabilities: [] },
+      ]);
+      const skus = dm.getDevices().map(d => d.sku);
+      expect(skus).toContain("H6160");
+      expect(skus).not.toContain("DreamViewScenic");
     });
   });
 
@@ -1915,29 +1934,29 @@ describe("DeviceManager", () => {
   describe("toCloudValue — bounds checks", () => {
     const device = createTestDevice();
 
-    it("should return raw value for NaN diyScene index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "diyScene", "abc");
-      expect(result).toBe("abc");
+    // Until 2.40.0 every one of these handed the raw value on to Govee (N21).
+    it("refuses a NaN diyScene index", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "diyScene", "abc")).toThrow("invalid scene index");
     });
 
-    it("should return raw value for zero snapshot index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "0");
-      expect(result).toBe("0");
+    it("refuses a zero snapshot index", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "snapshot", "0")).toThrow("invalid snapshot index");
     });
 
-    it("should return raw value for out-of-range snapshot index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "snapshot", "999");
-      expect(result).toBe("999");
+    it("refuses an out-of-range snapshot index", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "snapshot", "999")).toThrow("invalid snapshot index");
     });
 
-    it("should return raw value for invalid segment index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "segmentColor:-1", "#ff0000");
-      expect(result).toBe("#ff0000");
+    it("refuses an invalid segment index", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "segmentColor:-1", "#ff0000")).toThrow(
+        "invalid segment index",
+      );
     });
 
-    it("should return raw value for NaN segment brightness index", () => {
-      const result = (dm as any).commandRouter.toCloudValue(device, "segmentBrightness:abc", 50);
-      expect(result).toBe(50);
+    it("refuses a NaN segment brightness index", () => {
+      expect(() => (dm as any).commandRouter.toCloudValue(device, "segmentBrightness:abc", 50)).toThrow(
+        "invalid segment index",
+      );
     });
   });
 
@@ -2767,6 +2786,31 @@ describe("DeviceManager — loadFromCache merge", () => {
     const skus = dm.getDevices().map(d => d.sku);
     expect(skus).toContain("H6102");
     expect(skus).not.toContain("SameModeGroup");
+  });
+
+  it("never restores a DreamViewScenic pseudo-device from an older cache (M6)", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const entry = (sku: string, deviceId: string): Record<string, unknown> => ({
+      sku,
+      deviceId,
+      name: sku,
+      type: "devices.types.light",
+      capabilities: lightCapabilities(),
+      scenes: [],
+      diyScenes: [],
+      snapshots: [],
+      sceneLibrary: [],
+      musicLibrary: [],
+      diyLibrary: [],
+      skuFeatures: null,
+      scenesChecked: true,
+      cachedAt: Date.now(),
+    });
+    dm.setSkuCache(
+      makeMockSkuCache([entry("DreamViewScenic", "9200"), entry("H6102", "00:11:22:33:44:55:66:89")]) as never,
+    );
+    dm.loadFromCache();
+    expect(dm.getDevices().map(d => d.sku)).toEqual(["H6102"]);
   });
 
   /**
@@ -4782,10 +4826,20 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     scenesCalls: () => number;
   } {
     const dm = new DeviceManager(mockLog, mockTimers, registry, opts.isUnloading);
-    // Every device has its own read bucket since 2.39.0, so the bench
-    // saturates the one counter every lane shares: the day. One call today →
-    // everything after the first scenes call queues until the bench frees it.
-    const rl = new RateLimiter(mockLog, mockTimers, { ...CLOUD_LIMITS, perDay: 1 });
+    // Every device has its own read bucket since 2.39.0, so the bench holds
+    // its own gate over all lanes: one free slot → everything after the first
+    // scenes call queues until the bench frees the next. (Until 2.40.0 the
+    // bench used the day counter; a spent day now refuses instead of queuing,
+    // audit A10.)
+    const rl = new RateLimiter(mockLog, mockTimers, CLOUD_LIMITS);
+    const gate = { slots: 1 };
+    const canMakeCall = rl.canMakeCall.bind(rl);
+    (rl as any).canMakeCall = (lane: unknown): boolean => gate.slots > 0 && canMakeCall(lane as never);
+    const spend = (rl as any).spend.bind(rl) as (lane: unknown, budget: unknown) => void;
+    (rl as any).spend = (lane: unknown, budget: unknown): void => {
+      gate.slots--;
+      spend(lane, budget);
+    };
     dm.setRateLimiter(rl);
     const saved: Array<{ deviceId: string; scenes: number; scenesChecked?: boolean }> = [];
     dm.setSkuCache({
@@ -4820,7 +4874,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     // scenes), so the bench keeps releasing until every job has settled.
     const settle = async (): Promise<void> => {
       for (let i = 0; i < 20 && (dm as any).pendingSceneLoads.size > 0; i++) {
-        (rl as any).callsToday = 0;
+        gate.slots = 1;
         (rl as any).processQueue();
         await new Promise(r => setTimeout(r, 0));
       }
@@ -5119,6 +5173,32 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     push({ onOff: 0 }); // attempt 2 → accepted
     await dm.whenIntentsSettled();
     expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
+  });
+
+  it("a refused delivery keeps the intent's original time — the TTL still runs out (M4)", async () => {
+    const { dm, device, controls, push } = bench({ rejectTimes: 3 });
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    const entry = (): { at: number } => (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power");
+    entry().at -= 60_000; // a minute ago — a restarted clock would read "now"
+    const firstAt = entry().at;
+    push({ onOff: 0 }); // delivery → refused again
+    await dm.whenIntentsSettled();
+    expect(entry().at).toBe(firstAt);
+    entry().at -= PENDING_INTENT_TTL_MS + 1;
+    push({ onOff: 0 }); // the next sign of life finds it expired
+    await dm.whenIntentsSettled();
+    expect(controls).toEqual([]);
+    expect(dm.getPendingIntents(device)).toEqual([]);
+  });
+
+  it("a new write of the user sets the clock anew", async () => {
+    const { dm, device } = bench({ rejectTimes: 2 });
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    const entry = (): { at: number } => (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power");
+    entry().at -= 60_000;
+    const aged = entry().at;
+    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
+    expect(entry().at).toBeGreaterThan(aged);
   });
 
   it("a push that already shows the wanted power is confirmation enough — nothing is sent", async () => {

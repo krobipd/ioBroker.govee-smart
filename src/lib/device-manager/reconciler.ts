@@ -1,4 +1,4 @@
-import { GOVEE_DEVICE_TYPE } from "../govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup } from "../govee-constants";
 import type { GoveeDevice } from "../types";
 
 /**
@@ -71,7 +71,7 @@ export type SourceKind = "cloud" | "app" | "group";
  * @param device Device to classify
  */
 export function authoritativeKind(device: GoveeDevice): SourceKind {
-  if (device.sku === "BaseGroup") {
+  if (isAppGroup(device)) {
     return "group";
   }
   return isSensorType(device.type) ? "app" : "cloud";

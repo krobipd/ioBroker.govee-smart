@@ -1,6 +1,6 @@
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import type { CachedDeviceData, SkuCache } from "../sku-cache";
-import { deviceLabel, type GoveeDevice } from "../types";
+import { deviceLabel, type GoveeDevice, type SnapshotPackets } from "../types";
 import { plausibleSegmentCount, plausibleSegmentIndices } from "./lookups";
 
 /**
@@ -46,6 +46,35 @@ export function populateScenesFromLibrary(adapter: DeviceCacheAdapter, device: G
  * - lanIp           — re-discovered by LAN UDP scan each restart
  * - groupMembers    — re-resolved by loadGroupMembers via App-API each restart
  */
+/**
+ * The snapshot packets of a cache entry, or undefined when the entry holds
+ * none — or holds the index-aligned form written before 2.40.0, which cannot
+ * be told apart from a reordered list and is fetched anew (M10). A host-local
+ * file: every element is checked.
+ *
+ * @param raw The cached `snapshotBleCmds`
+ */
+export function snapshotPacketsFromCache(raw: unknown): SnapshotPackets[] | undefined {
+  if (!Array.isArray(raw)) {
+    return undefined;
+  }
+  const packets: SnapshotPackets[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      return undefined; // the index-aligned form of 2.39.x and earlier
+    }
+    const { name, cmds } = entry as { name?: unknown; cmds?: unknown };
+    if (typeof name !== "string" || !Array.isArray(cmds)) {
+      return undefined;
+    }
+    packets.push({
+      name,
+      cmds: cmds.filter((g): g is string[] => Array.isArray(g)).map(g => g.filter(p => typeof p === "string")),
+    });
+  }
+  return packets;
+}
+
 export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
   // Strip cachedAt (cache-metadata) AND any runtime-only field that might
   // have leaked into the cache from a tampered file or an old broken save.
@@ -76,6 +105,7 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     // the device's segment map (same gate as the Cloud/MQTT/wizard sources).
     segmentCount: plausibleSegmentCount(rest.segmentCount),
     manualSegments: plausibleSegmentIndices(rest.manualSegments),
+    snapshotBleCmds: snapshotPacketsFromCache(rest.snapshotBleCmds),
     state: { online: false },
     channels: { lan: false, mqtt: false, cloud: false },
   };

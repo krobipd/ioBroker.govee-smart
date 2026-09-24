@@ -523,9 +523,9 @@ describe("CommandRouter", () => {
       expect(router.toCloudValue(makeDevice(), "snapshot", "1")).toBe(7);
     });
 
-    it("returns input value for invalid scene index", () => {
+    it("refuses an invalid scene index — never Govee's raw dropdown key as a payload (N21)", () => {
       const router = new CommandRouter(mockLog, noopTimers, registry);
-      expect(router.toCloudValue(makeDevice(), "lightScene", "99")).toBe("99");
+      expect(() => router.toCloudValue(makeDevice(), "lightScene", "99")).toThrow("invalid scene index 99");
     });
 
     it("converts segmentColor:N to {segment, rgb}", () => {
@@ -705,12 +705,50 @@ describe("CommandRouter", () => {
       return makeDevice({
         sku: "H70B3",
         snapshots: [{ name: "Test", value: 3814455 }],
-        // snapshotBleCmds is base64-encoded packet groups (string[][][])
-        snapshotBleCmds: [[["MwRk", "pAAAAQ"]]],
+        // snapshotBleCmds: base64-encoded packet groups by snapshot name
+        snapshotBleCmds: [{ name: "Test", cmds: [["MwRk", "pAAAAQ"]] }],
         segmentCount: 0,
         ...opts,
       });
     }
+
+    it("an invalid scene, DIY or snapshot index on the LAN path is refused — nothing sent, nothing acked (C9)", async () => {
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      await expect(router.sendCommand(makeDevice(), "lightScene", "99")).rejects.toThrow("invalid scene index");
+      await expect(router.sendCommand(makeDevice(), "diyScene", "abc")).rejects.toThrow("invalid scene index");
+      await expect(router.sendCommand(makeDevice(), "snapshot", "42")).rejects.toThrow("invalid snapshot index");
+      expect(lan.calls).toEqual([]);
+    });
+
+    it("a LAN send whose client is gone by then (adapter stopping) is refused, not silently confirmed (C9)", async () => {
+      // The transport decision saw a LAN client; the unload dropped it before
+      // the dispatch — the only way to reach this guard.
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      await expect((router as any).sendLanCommand(makeDevice(), "power", true)).rejects.toThrow("No LAN path");
+    });
+
+    it("a local snapshot sends the packets stored under ITS name, not under its position (M10)", async () => {
+      // Issue #40 (H1310) names; the packets were fetched in the order lesen, couch1,
+      // and the app list now reads couch1, lesen.
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      const device = makeDevice({
+        snapshots: [
+          { name: "couch1", value: 2 },
+          { name: "lesen", value: 1 },
+        ],
+        snapshotBleCmds: [
+          { name: "lesen", cmds: [["MwQnAAAAAAAAAAAAAAAAAAAAABA="]] },
+          { name: "couch1", cmds: [["MwQGAAAAAAAAAAAAAAAAAAAAADE="]] },
+        ],
+      });
+      await router.sendCommand(device, "snapshot", "1");
+      const sent = lan.calls.find(c => c.method === "sendPtReal");
+      expect(sent?.args[1]).toEqual(["MwQGAAAAAAAAAAAAAAAAAAAAADE="]);
+    });
 
     it("snapshot=cloud + Cloud ready → sendCloudCommand, no ptReal", async () => {
       registry = new DeviceRegistry({ data: TEST_CATALOG });
@@ -789,6 +827,31 @@ describe("CommandRouter", () => {
       expect(cloud.calls).toHaveLength(1);
       expect(cloud.calls[0].instance).toBe("gradientToggle");
       expect(cloud.calls[0].value).toBe(1);
+    });
+
+    it("segmentBatch over Cloud on a device that declares no segment capability is refused (C9)", async () => {
+      registry = new DeviceRegistry({
+        data: {
+          devices: {
+            H6160: {
+              name: "Test",
+              type: "light",
+              status: "verified",
+              quirks: { transportOverrides: { segmentBatch: "cloud" } },
+            },
+          },
+        } as never,
+      });
+      const cloud = makeCloudStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(makeLanStub().client);
+      router.setCloudClient(cloud.client);
+      router.setRateLimiter(makeRateLimiter());
+      const device = makeDevice({ capabilities: [], segmentCount: 15 });
+      await expect(router.sendCommand(device, "segmentBatch", "0-2:#ff0000")).rejects.toThrow(
+        "declares no segment capability",
+      );
+      expect(cloud.calls).toEqual([]);
     });
 
     it("segmentBatch=cloud → Cloud via sendSegmentBatchParsed (not sendCloudCommand)", async () => {

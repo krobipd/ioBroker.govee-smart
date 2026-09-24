@@ -2,6 +2,7 @@ import type { DeviceManager } from "../device-manager";
 import { deviceLabel, errMessage, type GoveeDevice } from "../types";
 import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
+import { isAppGroup } from "../govee-constants";
 
 /**
  * Adapter surface required for diagnostics export. Loose `setState`
@@ -93,7 +94,7 @@ export async function handleDiagnosticsExport(
     // datapoints), but the card lists it and exports its report: stamping it
     // wrote into a missing object and js-controller warned on every export
     // (krobi's installation, 2.39.2).
-    if (device.sku !== "BaseGroup") {
+    if (!isAppGroup(device)) {
       await adapter.setState(`${adapter.namespace}.${prefix}.diag.lastExport`, {
         val: new Date(now).toISOString().replace(/\.\d{3}Z$/, "Z"),
         ack: true,

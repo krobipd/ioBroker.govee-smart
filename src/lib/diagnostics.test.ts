@@ -559,7 +559,7 @@ describe("DiagnosticsCollector", () => {
       const result = await c.generate(
         makeDevice({
           snapshots: [{ name: "n8licht", value: 2719361 }],
-          snapshotBleCmds: [N8LICHT_BLE_CMDS],
+          snapshotBleCmds: [{ name: "n8licht", cmds: N8LICHT_BLE_CMDS }],
         }),
         "2.9.1",
       );

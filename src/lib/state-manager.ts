@@ -9,7 +9,7 @@ import {
 import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
 import { SEGMENT_COUNT_MAX, resolveDeviceReachability } from "./device-manager/lookups";
 import type { DeviceRegistry } from "./device-registry";
-import { GOVEE_DEVICE_TYPE } from "./govee-constants";
+import { GOVEE_DEVICE_TYPE, isAppGroup, PSEUDO_GROUP_SKUS } from "./govee-constants";
 import type { I18nKey } from "./i18n";
 import { tDesc, tName, tNameWith } from "./i18n";
 import { errMessage, type DeviceState, type GoveeDevice } from "./types";
@@ -419,7 +419,7 @@ export class StateManager {
    * @param tier Canonical tier label
    */
   async updateDeviceTier(device: GoveeDevice, tier: string): Promise<void> {
-    if (device.sku === "BaseGroup") {
+    if (isAppGroup(device)) {
       return;
     }
     const prefix = this.devicePrefix(device);
@@ -588,7 +588,7 @@ export class StateManager {
    * @param device Govee device
    */
   async migrateLegacyDiagnostics(device: GoveeDevice): Promise<void> {
-    if (device.sku === "BaseGroup") {
+    if (isAppGroup(device)) {
       return;
     }
     const prefix = this.devicePrefix(device);
@@ -806,7 +806,7 @@ export class StateManager {
     this.prefixMap.set(key, newPrefix);
 
     const prefix = newPrefix;
-    const isGroup = device.sku === "BaseGroup";
+    const isGroup = isAppGroup(device);
 
     // Device object with online status indicator + type-aware icon.
     // Groups use the general groups.info.online state instead of per-group online.
@@ -1554,40 +1554,40 @@ export class StateManager {
   }
 
   /**
-   * One-shot orphan cleanup: a Govee app "SameModeGroup" pseudo-device
-   * (sku `SameModeGroup`) was merged verbatim into a generic device by builds
-   * up to and including v2.21.0 (see cloud-merge.ts). The fix skips it at
-   * intake, but an object tree already created under an earlier build lingers
-   * under `devices.samemodegroup_*` — it never re-enters the device map, so the
-   * account-reconciler's {@link cleanupDevices} never reaps it. Delete any such
-   * orphan tree once on start. Same enumerate → recursive delete shape as
-   * cleanupDevices, scoped to the `samemodegroup_` prefix.
+   * One-shot orphan cleanup: a Govee app pseudo-device without a member path
+   * (`PSEUDO_GROUP_SKUS`: `SameModeGroup`, `DreamViewScenic`) was built as a
+   * generic device by earlier builds — `SameModeGroup` up to v2.21.0,
+   * `DreamViewScenic` up to v2.39.x (audit M6). Intake skips them now, but a
+   * tree created earlier lingers under `devices.<sku>_*` — it never re-enters
+   * the device map, so {@link cleanupDevices} never reaps it. Deleting it is
+   * knowledge, not absence: the SKU itself says it is no device. Delete such
+   * orphan trees once on start, scoped to each pseudo SKU's prefix.
    *
    * @returns Prefixes of removed orphans (empty on a clean install)
    */
-  async cleanupSameModeGroupOrphansOnce(): Promise<string[]> {
+  async cleanupPseudoGroupOrphansOnce(): Promise<string[]> {
     const removed: string[] = [];
-    let existing;
-    try {
-      existing = await this.adapter.getObjectViewAsync("system", "device", {
-        startkey: `${this.adapter.namespace}.devices.samemodegroup_`,
-        endkey: `${this.adapter.namespace}.devices.samemodegroup_${SORT_KEY_END}`,
-      });
-    } catch (e) {
-      this.adapter.log.debug(`cleanupSameModeGroupOrphansOnce: getObjectViewAsync failed: ${errMessage(e)}`);
-      return removed;
-    }
-    if (!existing?.rows) {
-      return removed;
-    }
-    for (const row of existing.rows) {
-      const localId = row.id.replace(`${this.adapter.namespace}.`, "");
-      // The recursive delete removes the values with the objects (js-controller
-      // 7.2.2, `_deleteObjects`) — a removed pseudo-device keeps no data.
-      await this.adapter.delObjectAsync(localId, { recursive: true }).catch(() => undefined);
-      this.forgetPrefix(localId);
-      this.adapter.log.info(`Removed a leftover SameModeGroup pseudo-device (${localId})`);
-      removed.push(localId);
+    for (const sku of PSEUDO_GROUP_SKUS) {
+      const stem = `${this.adapter.namespace}.devices.${sku.toLowerCase()}_`;
+      let existing;
+      try {
+        existing = await this.adapter.getObjectViewAsync("system", "device", {
+          startkey: stem,
+          endkey: `${stem}${SORT_KEY_END}`,
+        });
+      } catch (e) {
+        this.adapter.log.debug(`cleanupPseudoGroupOrphansOnce: getObjectViewAsync failed: ${errMessage(e)}`);
+        continue;
+      }
+      for (const row of existing?.rows ?? []) {
+        const localId = row.id.replace(`${this.adapter.namespace}.`, "");
+        // The recursive delete removes the values with the objects (js-controller
+        // 7.2.2, `_deleteObjects`) — a removed pseudo-device keeps no data.
+        await this.adapter.delObjectAsync(localId, { recursive: true }).catch(() => undefined);
+        this.forgetPrefix(localId);
+        this.adapter.log.info(`Removed a leftover ${sku} pseudo-device (${localId})`);
+        removed.push(localId);
+      }
     }
     return removed;
   }
@@ -1696,7 +1696,7 @@ export class StateManager {
    * @param device Govee device
    */
   devicePrefix(device: GoveeDevice): string {
-    const folder = device.sku === "BaseGroup" ? "groups" : "devices";
+    const folder = isAppGroup(device) ? "groups" : "devices";
     return `${folder}.${treeKey(device.sku, device.deviceId)}`;
   }
 
@@ -1835,7 +1835,7 @@ export class StateManager {
    *          refresh group-reachability), false otherwise
    */
   async syncInfoOnline(device: GoveeDevice): Promise<boolean> {
-    if (device.sku === "BaseGroup") {
+    if (isAppGroup(device)) {
       return false;
     }
     const prefix = this.devicePrefix(device);

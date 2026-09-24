@@ -189,7 +189,9 @@ export function segmentCountFromSnapshotFrames(snapshotBleCmds: unknown): number
   }
   let highest = -1;
   for (const snapshot of snapshotBleCmds) {
-    for (const group of Array.isArray(snapshot) ? snapshot : []) {
+    // `{name, cmds}` since 2.40.0; the bare index-aligned array before.
+    const groups: unknown = Array.isArray(snapshot) ? snapshot : (snapshot as { cmds?: unknown } | null)?.cmds;
+    for (const group of Array.isArray(groups) ? groups : []) {
       for (const frame of Array.isArray(group) ? group : []) {
         if (typeof frame !== "string") {
           continue;

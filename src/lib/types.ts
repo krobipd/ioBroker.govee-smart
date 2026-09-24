@@ -330,6 +330,14 @@ export interface LanMessage {
 
 // --- Internal Device Model ---
 
+/** The local activation packets of one cloud snapshot, by name (M10). */
+export interface SnapshotPackets {
+  /** The snapshot's name, as `GoveeDevice.snapshots` carries it */
+  name: string;
+  /** Command groups of Base64 BLE packets */
+  cmds: string[][];
+}
+
 /** Unified device representation used by device-manager */
 export interface GoveeDevice {
   /** Product model (e.g. H6160) */
@@ -397,8 +405,13 @@ export interface GoveeDevice {
    * Persisted via SKU cache so learned values survive restarts.
    */
   segmentCount?: number;
-  /** BLE packets per cloud snapshot for ptReal activation [snapshotIdx][cmdIdx][packetBase64] */
-  snapshotBleCmds?: string[][][];
+  /**
+   * BLE packets per cloud snapshot for ptReal activation, keyed by the
+   * snapshot's NAME (`cmds`: [cmdIdx][packetBase64]). Until 2.40.0 they were
+   * index-aligned with `snapshots` at fetch time — a snapshot added or moved in
+   * the app made "B" send A's packets (audit M10).
+   */
+  snapshotBleCmds?: SnapshotPackets[];
   /** Current speed level for scene playback (0-based, applied on next scene activation) */
   sceneSpeed?: number;
   /**

@@ -82,8 +82,8 @@ export class SnapshotHandler {
     const snaps = this.host.store.getSnapshots(device.sku, device.deviceId);
     const snap = snaps[idx - 1];
     if (!snap) {
-      this.host.log.warn(`Local snapshot index ${idx} not found for ${deviceLabel(device)}`);
-      return;
+      // Throw, not return: the caller acks a restore that ran (N22).
+      throw new Error(`Local snapshot index ${String(val)} not found for ${deviceLabel(device)}`);
     }
     this.host.log.info(`Restoring local snapshot "${snap.name}" for ${deviceLabel(device)}`);
 

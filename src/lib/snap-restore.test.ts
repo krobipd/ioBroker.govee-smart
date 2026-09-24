@@ -237,7 +237,7 @@ describe("SnapshotHandler", () => {
       expect(segmentBatchCalls).toHaveLength(3);
     });
 
-    it("warns and bails on out-of-range index", async () => {
+    it("refuses an out-of-range index — the caller must not ack a restore that never ran (N22)", async () => {
       const snap: LocalSnapshot = {
         name: "Snap",
         power: true,
@@ -248,7 +248,7 @@ describe("SnapshotHandler", () => {
       };
       const { host, commands } = makeHost({ initialSnapshots: [snap] });
       const handler = new SnapshotHandler(host);
-      await handler.restore(makeDevice(), "99");
+      await expect(handler.restore(makeDevice(), "99")).rejects.toThrow("Local snapshot index 99 not found");
       expect(commands).toHaveLength(0);
     });
 

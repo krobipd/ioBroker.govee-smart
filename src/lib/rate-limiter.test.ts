@@ -829,3 +829,63 @@ describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #4
     expect(snap.lanes.deviceControl.accountTokens).toBe(CLOUD_LIMITS.accountControl.burst - 1);
   });
 });
+
+describe("a spent daily counter refuses, it does not queue (audit A10)", () => {
+  function spentLimiter(): { rl: RateLimiter; warns: string[] } {
+    const warns: string[] = [];
+    const log = { ...mockLog, warn: (m: string) => warns.push(m) } as ioBroker.Logger;
+    const rl = new RateLimiter(log, mockTimers, limitsOf(100, 1));
+    return { rl, warns };
+  }
+
+  it("a tracked command after the last call of the day is refused at once — not held until the rollover", async () => {
+    const { rl } = spentLimiter();
+    await rl.executeTracked(() => Promise.resolve());
+    await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow("Daily Govee Cloud budget is used up");
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+
+  it("tryExecute and enqueue queue nothing on a spent day", async () => {
+    const { rl } = spentLimiter();
+    await rl.tryExecute(() => Promise.resolve());
+    expect(await rl.tryExecute(() => Promise.resolve())).toBe(false);
+    let rejected = 0;
+    expect(
+      rl.enqueue(
+        () => Promise.resolve(),
+        ACCOUNT_LIST_LANE,
+        1,
+        () => rejected++,
+      ),
+    ).toBe(false);
+    expect(rejected).toBe(1);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+
+  it("calls queued for a minute window are refused once the day runs out", async () => {
+    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 2));
+    await rl.executeTracked(() => Promise.resolve()); // minute full, day 1/2
+    const waiting = rl.executeTracked(() => Promise.resolve()); // queued for the minute
+    const late = rl.executeTracked(() => Promise.resolve()); // queued too
+    (rl as any).resetMinuteWindow(); // first waiter runs → day 2/2
+    await waiting;
+    (rl as any).resetMinuteWindow(); // day spent → the second waiter is refused
+    await expect(late).rejects.toThrow("Daily Govee Cloud budget is used up");
+  });
+
+  it("warns once per day, and again after the reset", async () => {
+    const t = makeCapturingTimers();
+    const warns: string[] = [];
+    const rl = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, t.timers, limitsOf(100, 1));
+    rl.start();
+    await rl.executeTracked(() => Promise.resolve());
+    await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
+    await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
+    expect(warns.filter(w => w.includes("daily ceiling"))).toHaveLength(1);
+    t.timeouts[0](); // day reset
+    await rl.executeTracked(() => Promise.resolve());
+    await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
+    expect(warns.filter(w => w.includes("daily ceiling"))).toHaveLength(2);
+    rl.stop();
+  });
+});

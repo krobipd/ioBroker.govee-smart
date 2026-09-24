@@ -7,6 +7,7 @@ import {
   persistDeviceToCache,
   populateScenesFromLibrary,
   saveDevicesToCache,
+  snapshotPacketsFromCache,
 } from "./cache";
 
 const glueLog = {
@@ -54,7 +55,7 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       manualMode: true,
       manualSegments: [0, 1, 2, 5, 6, 7],
       sceneSpeed: 3,
-      snapshotBleCmds: [[["aGV4ZGF0YQ=="]]],
+      snapshotBleCmds: [{ name: "Movie Night", cmds: [["aGV4ZGF0YQ=="]] }],
       scenesChecked: true,
       librariesCheckedAt: 1700000000000,
       lastSeenOnNetwork: 1234567890,
@@ -228,5 +229,22 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       saveDevicesToCache(adapter);
       expect(saved).toHaveLength(1); // only the checked light is persisted
     });
+  });
+});
+
+describe("snapshotPacketsFromCache (audit M10)", () => {
+  it("keeps the by-name form", () => {
+    expect(snapshotPacketsFromCache([{ name: "lesen", cmds: [["MwQn"]] }])).toEqual([
+      { name: "lesen", cmds: [["MwQn"]] },
+    ]);
+  });
+
+  it("drops the index-aligned form of 2.39.x — it is fetched anew, never trusted by position", () => {
+    expect(snapshotPacketsFromCache([[["MwQn"]], []])).toBeUndefined();
+  });
+
+  it("drops a malformed entry of the editable file", () => {
+    expect(snapshotPacketsFromCache([{ name: 5, cmds: [] }])).toBeUndefined();
+    expect(snapshotPacketsFromCache("x")).toBeUndefined();
   });
 });

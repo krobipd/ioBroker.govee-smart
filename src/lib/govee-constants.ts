@@ -145,3 +145,38 @@ export function deriveGoveeClientId(email: string | undefined): string {
   hash[8] = (hash[8] & 0x3f) | 0x80;
   return hash.toString("hex");
 }
+
+/**
+ * SKU of a Govee app group — Govee's `/user/devices` lists the groups made in
+ * the app as pseudo-devices under this model; the adapter resolves their
+ * members through the account's group list and fans commands out.
+ */
+export const APP_GROUP_SKU = "BaseGroup";
+
+/**
+ * App pseudo-devices WITHOUT a member path — never built as a device.
+ * homebridge-govee `lib/utils/device-merge.js` `GROUP_SKUS` (`BaseGroup`,
+ * `DreamViewScenic`, `SameModeGroup`; homebridge-govee #1357: every Feature
+ * Hub group is `DreamViewScenic`, whatever its name). `BaseGroup` is the one
+ * this adapter supports (audit M6).
+ */
+export const PSEUDO_GROUP_SKUS: ReadonlySet<string> = new Set(["SameModeGroup", "DreamViewScenic"]);
+
+/**
+ * Whether a device (or a list entry) is an app group.
+ *
+ * @param d Anything carrying a SKU
+ * @param d.sku Its Govee SKU
+ */
+export function isAppGroup(d: { sku: string }): boolean {
+  return d.sku === APP_GROUP_SKU;
+}
+
+/**
+ * Whether a SKU is an app pseudo-device without a member path.
+ *
+ * @param sku Govee SKU
+ */
+export function isPseudoGroupSku(sku: string): boolean {
+  return PSEUDO_GROUP_SKUS.has(sku);
+}

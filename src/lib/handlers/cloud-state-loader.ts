@@ -7,7 +7,7 @@ import {
 import type { DeviceRegistry } from "../device-registry";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
-import { GOVEE_CAP_TYPE } from "../govee-constants";
+import { GOVEE_CAP_TYPE, isAppGroup } from "../govee-constants";
 import { limiterDeviceKey, applianceBudget, type RateLimiter } from "../rate-limiter";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice } from "../types";
@@ -93,7 +93,7 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
   // failure line in the group's report. The reachability refresh skips them too.
   const targets = adapter.deviceManager
     .getDevices()
-    .filter(d => d.channels.cloud && d.capabilities.length > 0 && d.sku !== "BaseGroup" && (!only || d === only));
+    .filter(d => d.channels.cloud && d.capabilities.length > 0 && !isAppGroup(d) && (!only || d === only));
 
   for (const device of targets) {
     const loadOne = async (): Promise<void> => {

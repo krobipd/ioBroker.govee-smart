@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { deviceLabel, errMessage, type CloudCapability, type CloudScene } from "./types";
+import { deviceLabel, errMessage, type CloudCapability, type CloudScene, type SnapshotPackets } from "./types";
 import { treeKey } from "./device-key";
 import { writeFileAtomic } from "./atomic-file";
 
@@ -48,8 +48,12 @@ export interface CachedDeviceData {
   }>;
   /** SKU feature flags from undocumented API */
   skuFeatures: Record<string, unknown> | null;
-  /** BLE packets per cloud snapshot for ptReal [snapshotIdx][cmdIdx][packetBase64] */
-  snapshotBleCmds?: string[][][];
+  /**
+   * BLE packets per cloud snapshot for ptReal, by name. A cache written before
+   * 2.40.0 holds the old index-aligned `string[][][]` — read as absent and
+   * fetched anew (`snapshotPacketsFromCache`).
+   */
+  snapshotBleCmds?: SnapshotPackets[] | string[][][];
   /** Timestamp when data was cached */
   cachedAt: number;
   /** True after a Cloud scene-fetch attempt has completed (success or confirmed empty). */

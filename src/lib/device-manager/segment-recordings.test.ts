@@ -449,7 +449,7 @@ describe("DeviceManager — adopting the count of a recorded push (deleting need
     const device = dm.getDevices()[0];
     device.segmentCount = opts.learned;
     device.capabilities = opts.caps ? segmentCaps(opts.caps - 1) : [];
-    device.snapshotBleCmds = opts.snapshots;
+    device.snapshotBleCmds = opts.snapshots?.map((cmds, i) => ({ name: `snapshot ${i + 1}`, cmds }));
     const rebuilds: number[] = [];
     dm.onSegmentCountChanged = d => rebuilds.push(d.segmentCount ?? -1);
     dm.onMqttSegmentUpdate = () => {};
@@ -487,9 +487,12 @@ describe("DeviceManager — adopting the count of a recorded push (deleting need
     push(withoutMasks.dm, "H6076", recording("issue-44-h6076-diag.json.txt", "a_"));
     expect(withoutMasks.rebuilds).toEqual([]); // parked, not deleted
     // …and judged once the masks have loaded with the libraries.
-    withoutMasks.device.snapshotBleCmds = [
-      ...SNAPSHOT_RECORDINGS["issue-44-h6076-diag.json.txt"],
-    ] as unknown as string[][][];
+    withoutMasks.device.snapshotBleCmds = (
+      SNAPSHOT_RECORDINGS["issue-44-h6076-diag.json.txt"] as unknown as string[][][]
+    ).map((cmds, i) => ({
+      name: `snapshot ${i + 1}`,
+      cmds,
+    }));
     (withoutMasks.dm as unknown as { reviewDeferredSegmentShrink(d: GoveeDevice): void }).reviewDeferredSegmentShrink(
       withoutMasks.device,
     );
@@ -650,9 +653,12 @@ describe("DeviceManager — a parked shrink whose masks disagree", () => {
       op: { command: recording("issue-44-h6076-diag.json.txt", "a_") },
     });
     // masks of an 8-segment light arrive
-    device.snapshotBleCmds = [
-      ...SNAPSHOT_RECORDINGS["issue-50-h1741-v2.39.2-2026-09-23.json"],
-    ] as unknown as string[][][];
+    device.snapshotBleCmds = (
+      SNAPSHOT_RECORDINGS["issue-50-h1741-v2.39.2-2026-09-23.json"] as unknown as string[][][]
+    ).map((cmds, i) => ({
+      name: `snapshot ${i + 1}`,
+      cmds,
+    }));
     (dm as unknown as { reviewDeferredSegmentShrink(d: GoveeDevice): void }).reviewDeferredSegmentShrink(device);
     expect(rebuilds).toEqual([]);
     expect(device.segmentCount).toBe(8);

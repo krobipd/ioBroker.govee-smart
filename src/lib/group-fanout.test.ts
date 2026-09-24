@@ -1,3 +1,14 @@
+import { vi } from "vitest";
+
+// The fan-out resolves music modes through the capability mapper, which reads
+// its names from adapter-core's I18n — no js-controller in a unit test.
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+    translate: vi.fn((key: string) => key),
+  },
+}));
+
 import { GroupFanoutHandler, type GroupFanoutHost } from "./group-fanout";
 import type { GoveeDevice } from "./types";
 
@@ -286,6 +297,26 @@ describe("GroupFanoutHandler", () => {
   });
 
   describe("fanOut — scene matching by name", () => {
+    it("a group whose members know none of the scene sends nothing — and reports it (C10)", async () => {
+      const memberA = makeMember({ deviceId: "MA:02", scenes: [{ name: "Boring", value: { x: 1 } }] });
+      const group = makeGroup([{ sku: memberA.sku, deviceId: memberA.deviceId }]);
+      const { host, commands } = makeHost({ devices: [memberA], groupSceneStates: { 0: "---", 1: "Aurora" } });
+      expect(await new GroupFanoutHandler(host).fanOut(group, "scenes.light_scene", "1")).toBe(false);
+      expect(commands).toEqual([]);
+    });
+
+    it("one member that knows the scene is enough", async () => {
+      const knows = makeMember({ deviceId: "MA:03", scenes: [{ name: "Aurora", value: { x: 2 } }] });
+      const not = makeMember({ deviceId: "MA:04", scenes: [{ name: "Boring", value: { x: 1 } }] });
+      const group = makeGroup([
+        { sku: knows.sku, deviceId: knows.deviceId },
+        { sku: not.sku, deviceId: not.deviceId },
+      ]);
+      const { host, commands } = makeHost({ devices: [knows, not], groupSceneStates: { 0: "---", 1: "Aurora" } });
+      expect(await new GroupFanoutHandler(host).fanOut(group, "scenes.light_scene", "1")).toBe(true);
+      expect(commands).toHaveLength(1);
+    });
+
     it("looks up the group dropdown name and resolves to the per-member scene index", async () => {
       const memberA = makeMember({
         deviceId: "MA:01",
@@ -342,23 +373,73 @@ describe("GroupFanoutHandler", () => {
   });
 
   describe("fanOut — music", () => {
-    it("matches musicLibrary by name", async () => {
-      const m1 = makeMember({
-        deviceId: "MM:01",
-        musicLibrary: [
-          { name: "Spectrum", musicCode: 1, mode: 0 },
-          { name: "Rolling", musicCode: 2, mode: 1 },
-        ],
-      });
-      const group = makeGroup([{ sku: m1.sku, deviceId: m1.deviceId }]);
-      const { host, musicCalls } = makeHost({
-        devices: [m1],
-        groupMusicStates: { 0: "---", 1: "Rolling" },
-      });
+    // The members' declared music modes, verbatim: #44 (H6076, 0-based) and
+    // #41 (H61E5, 1-based, "PianoKeys" where #25 writes "Piano Keys").
+    const musicCap = (options: Array<{ name: string; value: number }>): GoveeDevice["capabilities"][number] => ({
+      type: "devices.capabilities.music_setting",
+      instance: "musicMode",
+      parameters: { dataType: "STRUCT", fields: [{ fieldName: "musicMode", dataType: "ENUM", options }] },
+    });
+    const H6076_MODES = [
+      "Energic",
+      "Dynamic",
+      "Calm",
+      "Bounce",
+      "Hopping",
+      "Strike",
+      "Vibrate",
+      "Skittles",
+      "Torch",
+      "CandyCrush",
+      "Fusion",
+      "Luminous",
+      "Separation",
+    ].map((name, value) => ({ name, value }));
+    const H61E5_MODES = [
+      "Energic",
+      "Rhythm",
+      "Spectrum",
+      "Rolling",
+      "Separation",
+      "Hopping",
+      "PianoKeys",
+      "Fountain",
+      "DayAndNight",
+      "Sprouting",
+      "Shiny",
+    ].map((name, i) => ({ name, value: i + 1 }));
+
+    it("resolves the group's mode against each member's OWN declared list — not the app library (M5)", async () => {
+      const a = makeMember({ deviceId: "MM:01", capabilities: [musicCap(H6076_MODES)], musicLibrary: [] });
+      const b = makeMember({ deviceId: "MM:02", capabilities: [musicCap(H61E5_MODES)], musicLibrary: [] });
+      const group = makeGroup([
+        { sku: a.sku, deviceId: a.deviceId },
+        { sku: b.sku, deviceId: b.deviceId },
+      ]);
+      const { host, musicCalls } = makeHost({ devices: [a, b], groupMusicStates: { 0: "---", 1: "Separation" } });
       const handler = new GroupFanoutHandler(host);
       await handler.fanOut(group, "music.music_mode", "1");
-      expect(musicCalls).toHaveLength(1);
-      expect(musicCalls[0].value).toBe(2); // index 2 in memberA's musicLibrary (1-based)
+      // index in each member's own dropdown (1-based): H6076 13th, H61E5 5th
+      expect(musicCalls.map(c => [c.device, c.value])).toEqual([
+        ["MM:01", 13],
+        ["MM:02", 5],
+      ]);
+    });
+
+    it("matches a mode Govee writes differently on another model", async () => {
+      const b = makeMember({ deviceId: "MM:02", capabilities: [musicCap(H61E5_MODES)], musicLibrary: [] });
+      const group = makeGroup([{ sku: b.sku, deviceId: b.deviceId }]);
+      const { host, musicCalls } = makeHost({ devices: [b], groupMusicStates: { 0: "---", 1: "Piano Keys" } });
+      await new GroupFanoutHandler(host).fanOut(group, "music.music_mode", "1");
+      expect(musicCalls.map(c => c.value)).toEqual([7]);
+    });
+
+    it("a member without music_setting does not count — nothing sent, no ack", async () => {
+      const lanOnly = makeMember({ deviceId: "MM:03", capabilities: [] });
+      const group = makeGroup([{ sku: lanOnly.sku, deviceId: lanOnly.deviceId }]);
+      const { host, musicCalls } = makeHost({ devices: [lanOnly], groupMusicStates: { 0: "---", 1: "Spectrum" } });
+      expect(await new GroupFanoutHandler(host).fanOut(group, "music.music_mode", "1")).toBe(false);
+      expect(musicCalls).toEqual([]);
     });
 
     it("forwards sensitivity directly to sendMusicCommand", async () => {

@@ -1,5 +1,6 @@
 import { deviceLabel, errMessage, type GoveeDevice } from "./types";
 import { sessionKey } from "./device-key";
+import { memberMusicModes, musicNameKey } from "./capability-mapper";
 
 /**
  * Resolve a group's member references to the actual device objects. Builds a
@@ -116,7 +117,10 @@ export class GroupFanoutHandler {
     for (const member of members) {
       try {
         if (command === "lightScene") {
-          await this.fanOutScene(group, member, value);
+          // Same rule as music: a member without the scene took nothing (C10).
+          if (!(await this.fanOutScene(group, member, value))) {
+            continue;
+          }
         } else if (command === "music") {
           // A member that took nothing is not "reached" (F10): until 2026-09-14
           // the answer was ignored and a group of LAN lights acked a
@@ -176,19 +180,22 @@ export class GroupFanoutHandler {
    * @param group BaseGroup device
    * @param member Target member device
    * @param value Dropdown index value
+   * @returns true when a command went out to this member
    */
-  private async fanOutScene(group: GoveeDevice, member: GoveeDevice, value: ioBroker.StateValue): Promise<void> {
+  private async fanOutScene(group: GoveeDevice, member: GoveeDevice, value: ioBroker.StateValue): Promise<boolean> {
     const groupPrefix = this.host.devicePrefix(group);
     const obj = await this.host.getObject(`${this.host.namespace}.${groupPrefix}.scenes.light_scene`);
     const groupStates = obj?.common?.states as Record<string, string> | undefined;
     const sceneName = groupStates?.[String(value)];
     if (!sceneName) {
-      return;
+      return false;
     }
     const memberIdx = member.scenes.findIndex(s => s.name === sceneName);
-    if (memberIdx >= 0) {
-      await this.host.sendCommand(member, "lightScene", memberIdx + 1);
+    if (memberIdx < 0) {
+      return false; // this member does not know the scene — nothing sent
     }
+    await this.host.sendCommand(member, "lightScene", memberIdx + 1);
+    return true;
   }
 
   /**
@@ -216,9 +223,13 @@ export class GroupFanoutHandler {
     if (!musicName) {
       return false;
     }
-    const memberIdx = member.musicLibrary.findIndex(m => m.name === musicName);
+    // The member's OWN declared modes, by normalised name — the same list its
+    // send resolves the index against (M5). A member without music_setting
+    // does not know the mode: nothing is sent, and it does not count.
+    const key = musicNameKey(musicName);
+    const memberIdx = memberMusicModes(member).findIndex(m => musicNameKey(m.name) === key);
     if (memberIdx < 0) {
-      return false; // this member does not know the mode — nothing sent
+      return false;
     }
     return this.host.sendMusicCommand(member, this.host.devicePrefix(member), "music.music_mode", memberIdx + 1);
   }

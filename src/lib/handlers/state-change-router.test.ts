@@ -25,6 +25,7 @@ import type { GoveeDevice } from "../types";
 import { CloudControlRejected } from "../govee-cloud-client";
 import { createTestDevice, mockLog } from "../test-helpers";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
+import { GroupFanoutHandler } from "../group-fanout";
 
 const NS = "govee-smart.0";
 
@@ -1105,5 +1106,89 @@ describe("the heater's auto stop travels in the temperature STRUCT (audit C-O2, 
     await write(rig, id("control.target_temperature"), 99);
     expect(rig.capCommands[0].value).toMatchObject({ temperature: 30 });
     expect(rig.acks).toEqual([{ id: id("control.target_temperature"), val: 30 }]);
+  });
+});
+
+describe("group music end to end — fan-out plus the real music sender (audit M5)", () => {
+  // Declared music modes, verbatim: #44 (H6076, 0-based) and #41 (H61E5, 1-based).
+  const musicCap = (names: string[], base: number): GoveeDevice["capabilities"][number] => ({
+    type: GOVEE_CAP_TYPE.MUSIC_SETTING,
+    instance: "musicMode",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        { fieldName: "musicMode", dataType: "ENUM", options: names.map((name, i) => ({ name, value: i + base })) },
+      ],
+    },
+  });
+  const cloudMember = (deviceId: string, cap: GoveeDevice["capabilities"][number]): GoveeDevice => ({
+    ...createTestDevice({ deviceId, lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } }),
+    capabilities: [cap],
+  });
+
+  it("each member receives ITS value for the group's mode", async () => {
+    const h6076 = cloudMember(
+      "AABBCCDDEEFF6076",
+      musicCap(
+        [
+          "Energic",
+          "Dynamic",
+          "Calm",
+          "Bounce",
+          "Hopping",
+          "Strike",
+          "Vibrate",
+          "Skittles",
+          "Torch",
+          "CandyCrush",
+          "Fusion",
+          "Luminous",
+          "Separation",
+        ],
+        0,
+      ),
+    );
+    const h61e5 = cloudMember(
+      "AABBCCDDEEFF61E5",
+      musicCap(
+        [
+          "Energic",
+          "Rhythm",
+          "Spectrum",
+          "Rolling",
+          "Separation",
+          "Hopping",
+          "PianoKeys",
+          "Fountain",
+          "DayAndNight",
+          "Sprouting",
+          "Shiny",
+        ],
+        1,
+      ),
+    );
+    const rig = makeRig([h6076, h61e5]);
+    const group = {
+      ...createTestDevice({ sku: "BaseGroup", deviceId: "1234567" }),
+      groupMembers: [
+        { sku: h6076.sku, deviceId: h6076.deviceId },
+        { sku: h61e5.sku, deviceId: h61e5.deviceId },
+      ],
+    };
+    const handler = new GroupFanoutHandler({
+      log: mockLog,
+      namespace: "govee-smart.0",
+      getDevices: () => [h6076, h61e5],
+      sendCommand: () => Promise.resolve(),
+      devicePrefix: d => `devices.${d.deviceId.toLowerCase()}`,
+      stateToCommand: suffix => (suffix === "music.music_mode" ? "music" : undefined),
+      getObject: () => Promise.resolve({ common: { states: { 0: "---", 1: "Separation" } } } as never),
+      sendMusicCommand: (device, prefix, suffix, value) => sendMusicCommand(rig.adapter, device, prefix, suffix, value),
+    });
+    expect(await handler.fanOut(group, "music.music_mode", "1")).toBe(true);
+    expect(rig.capCommands.map(c => [c.device, (c.value as { musicMode: number }).musicMode])).toEqual([
+      [h6076.deviceId, 12],
+      [h61e5.deviceId, 5],
+    ]);
   });
 });

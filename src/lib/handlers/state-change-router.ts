@@ -7,7 +7,7 @@ import {
 } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { SEGMENT_HARD_MAX } from "../device-manager/lookups";
-import { GOVEE_CAP_TYPE } from "../govee-constants";
+import { GOVEE_CAP_TYPE, isAppGroup } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
@@ -480,7 +480,7 @@ export async function onStateChange(
   // fan-out actually reached a member — a group with no reachable members (or
   // where every member send failed) must NOT report success (L3/A6); fanOut
   // has already warned in that case.
-  if (device.sku === "BaseGroup" && device.groupMembers) {
+  if (isAppGroup(device) && device.groupMembers) {
     const reached = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
     if (reached) {
       await adapter.setState(id, { val, ack: true });

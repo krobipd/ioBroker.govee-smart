@@ -618,19 +618,21 @@ export class CommandRouter {
       brightness?: number;
     } | null,
   ): Promise<void> {
+    // Principle 5 — every refusal throws, so the caller never acks what did
+    // not go out (audit C9; these three returned silently until 2.40.0).
     if (!this.cloudClient) {
-      return;
+      throw new Error(
+        `No Cloud connection for ${deviceLabel(device)} segment command (no API key, or adapter stopping)`,
+      );
     }
 
     if (!parsed) {
-      this.log.warn(`Invalid segment command "${commandStr}" for ${deviceLabel(device)}`);
-      return;
+      throw new Error(`Invalid segment command "${commandStr}" for ${deviceLabel(device)}`);
     }
 
     const cap = this.findCapabilityForCommand(device, "segmentColor:0");
     if (!cap) {
-      this.log.debug(`No segment capability for ${deviceLabel(device)}`);
-      return;
+      throw new Error(`${deviceLabel(device)} declares no segment capability`);
     }
 
     if (parsed.color !== undefined) {
@@ -824,24 +826,22 @@ export class CommandRouter {
         // Value is the dropdown index (string) — resolve to scene activation payload
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.scenes.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
-          return value;
+          // Never Govee's raw dropdown key as a scene payload (N21).
+          throw new Error(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
         }
         return device.scenes[idx - 1].value;
       }
       case "diyScene": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.diyScenes.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
-          return value;
+          throw new Error(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
         }
         return device.diyScenes[idx - 1].value;
       }
       case "snapshot": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid snapshot index ${String(value)}`);
-          return value;
+          throw new Error(`${deviceLabel(device)}: invalid snapshot index ${String(value)}`);
         }
         return device.snapshots[idx - 1].value;
       }
@@ -849,8 +849,9 @@ export class CommandRouter {
         if (command.startsWith("segmentColor:")) {
           const segIdx = parseInt(command.split(":")[1], 10);
           if (isNaN(segIdx) || segIdx < 0) {
-            this.log.warn(`${deviceLabel(device)}: invalid segment index in ${command}`);
-            return value;
+            // Unreachable from the dispatchers, which validate first (N41) —
+            // kept as the last guard, and it refuses like they do.
+            throw new Error(`${deviceLabel(device)}: invalid segment index in ${command}`);
           }
           const { r, g, b } = hexToRgb(value as string);
           return { segment: [segIdx], rgb: (r << 16) | (g << 8) | b };
@@ -858,8 +859,9 @@ export class CommandRouter {
         if (command.startsWith("segmentBrightness:")) {
           const segIdx = parseInt(command.split(":")[1], 10);
           if (isNaN(segIdx) || segIdx < 0) {
-            this.log.warn(`${deviceLabel(device)}: invalid segment index in ${command}`);
-            return value;
+            // Unreachable from the dispatchers, which validate first (N41) —
+            // kept as the last guard, and it refuses like they do.
+            throw new Error(`${deviceLabel(device)}: invalid segment index in ${command}`);
           }
           return { segment: [segIdx], brightness: value };
         }
@@ -936,7 +938,7 @@ export class CommandRouter {
    */
   private async sendLanCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
     if (!device.lanIp || !this.lanClient) {
-      return;
+      throw new Error(`No LAN path for ${deviceLabel(device)}/${command} (no address, or adapter stopping)`);
     }
 
     switch (command) {
@@ -961,8 +963,7 @@ export class CommandRouter {
         // Try ptReal BLE-over-LAN if DIY scene is in library
         const diyIdx = parseInt(String(value), 10);
         if (isNaN(diyIdx) || diyIdx < 1 || diyIdx > device.diyScenes.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
-          return;
+          throw new Error(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
         }
         const diyScene = device.diyScenes[diyIdx - 1];
         if (diyScene) {
@@ -986,8 +987,7 @@ export class CommandRouter {
         // worth trying.
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.scenes.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
-          return;
+          throw new Error(`${deviceLabel(device)}: invalid scene index ${String(value)}`);
         }
         const scene = device.scenes[idx - 1];
         if (scene) {
@@ -1018,10 +1018,10 @@ export class CommandRouter {
       case "snapshot": {
         const idx = parseInt(String(value), 10);
         if (isNaN(idx) || idx < 1 || idx > device.snapshots.length) {
-          this.log.warn(`${deviceLabel(device)}: invalid snapshot index ${String(value)}`);
-          return;
+          throw new Error(`${deviceLabel(device)}: invalid snapshot index ${String(value)}`);
         }
-        const cmdGroups = device.snapshotBleCmds?.[idx - 1];
+        // By name, never by position (M10): the index is the dropdown's.
+        const cmdGroups = device.snapshotBleCmds?.find(p => p.name === device.snapshots[idx - 1].name)?.cmds;
         if (cmdGroups && cmdGroups.length > 0) {
           const allPackets = cmdGroups.flat();
           if (allPackets.length > 0) {
