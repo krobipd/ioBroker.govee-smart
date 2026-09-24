@@ -27,9 +27,12 @@ const dgramMock = vi.hoisted(() => {
     sends: SentDatagram[];
     /** When set, every send() reports this error to its callback instead of success. */
     sendError: Error | null;
+    /** The options createSocket() was called with (A5: reuseAddr on the listen socket). */
+    opts: unknown;
   }> = [];
-  const make = (): unknown => {
+  const make = (opts?: unknown): unknown => {
     const s = {
+      opts,
       binds: [] as Array<[unknown, unknown]>,
       mcastIf: [] as unknown[],
       handlers: {} as Record<string, Array<(...a: unknown[]) => void>>,
@@ -71,7 +74,7 @@ const dgramMock = vi.hoisted(() => {
   };
   return { sockets, make };
 });
-vi.mock("node:dgram", () => ({ createSocket: () => dgramMock.make() }));
+vi.mock("node:dgram", () => ({ createSocket: (opts: unknown) => dgramMock.make(opts) }));
 
 const lanLog = {
   silly: () => {},
@@ -993,10 +996,14 @@ describe("GoveeLanClient — discovery loop + socket wiring", () => {
     expect(intervals, "the periodic scan must be armed").toHaveLength(1);
     intervals[0]();
     intervals[0]();
-    expect(scanSock.sends).toHaveLength(before + 2);
-    const last = scanSock.sends[scanSock.sends.length - 1];
-    expect([last.address, last.port]).toEqual(["239.255.255.250", 4001]);
-    expect(JSON.parse(last.buf.toString())).toEqual({ msg: { cmd: "scan", data: { account_topic: "reserve" } } });
+    // Each tick: the multicast group and the limited broadcast (A-O1).
+    expect(scanSock.sends).toHaveLength(before + 4);
+    const tick = scanSock.sends.slice(-2);
+    expect(tick.map(t => [t.address, t.port])).toEqual([
+      ["239.255.255.250", 4001],
+      ["255.255.255.255", 4001],
+    ]);
+    expect(JSON.parse(tick[0].buf.toString())).toEqual({ msg: { cmd: "scan", data: { account_topic: "reserve" } } });
     client.stop();
   });
 
@@ -1057,5 +1064,94 @@ describe("GoveeLanClient — discovery loop + socket wiring", () => {
     client.stop();
     expect(cleared).toBe(1);
     expect(client.getDiagSnapshot().lastCommandSentMs).toEqual({});
+  });
+});
+
+describe("GoveeLanClient — audit 2026-09-24 (A5, N1, M2, A9, A-O1)", () => {
+  const start = (client: GoveeLanClient, onDiscovery: (d: unknown) => void = () => {}): void =>
+    client.start(onDiscovery, () => {}, 30_000, "0.0.0.0");
+  const listen = (): (typeof dgramMock.sockets)[number] => dgramMock.sockets[dgramMock.sockets.length - 2];
+  const scan = (): (typeof dgramMock.sockets)[number] => dgramMock.sockets[dgramMock.sockets.length - 1];
+
+  it("the listen socket on 4002 is NOT shared (no reuseAddr) — a second process fails loudly (A5)", () => {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    start(client);
+    expect(listen().opts).toBe("udp4");
+    client.stop();
+  });
+
+  it("a busy port 4002 reports itself and the channel counts as not listening (A5, N1)", () => {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    const busy: string[] = [];
+    client.onListenPortBusy = m => busy.push(m);
+    start(client);
+    expect(client.isListening()).toBe(true);
+    const err = Object.assign(new Error("bind EADDRINUSE"), { code: "EADDRINUSE" });
+    for (const h of listen().handlers.error ?? []) {
+      h(err);
+    }
+    expect(busy).toHaveLength(1);
+    expect(busy[0]).toContain("already in use by another process");
+    expect(client.isListening()).toBe(false);
+    client.stop();
+  });
+
+  it("a stopped client no longer counts as listening (N1)", () => {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    start(client);
+    expect(client.isListening()).toBe(true);
+    client.stop();
+    expect(client.isListening()).toBe(false);
+  });
+
+  it("a scan reply without `ip` is a device all the same — the address is the UDP source (M2)", () => {
+    const found: Array<{ ip: string; sku: string }> = [];
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    start(client, d => found.push(d as { ip: string; sku: string }));
+    const reply = Buffer.from(
+      JSON.stringify({ msg: { cmd: "scan", data: { device: "AA:BB:CC:DD:EE:FF:00:11", sku: "H6076" } } }),
+    );
+    for (const h of listen().handlers.message ?? []) {
+      h(reply, { address: "192.168.1.77" });
+    }
+    expect(found).toEqual([{ ip: "192.168.1.77", device: "AA:BB:CC:DD:EE:FF:00:11", sku: "H6076" }]);
+    client.stop();
+  });
+
+  it("a throwing discovery handler is a handler failure, not a parse failure (A9)", () => {
+    const debugs: string[] = [];
+    const client = new GoveeLanClient({ ...lanLog, debug: (m: string) => debugs.push(m) }, lanTimers);
+    start(client, () => {
+      throw new Error("consumer broke");
+    });
+    const reply = Buffer.from(JSON.stringify({ msg: { cmd: "scan", data: { device: "AA:BB", sku: "H6076" } } }));
+    for (const h of listen().handlers.message ?? []) {
+      h(reply, { address: "192.168.1.78" });
+    }
+    expect(debugs.some(d => d.includes("scan handler failed") && d.includes("consumer broke"))).toBe(true);
+    expect(debugs.some(d => d.includes("Failed to parse"))).toBe(false);
+    client.stop();
+  });
+
+  it("the scan also asks every device address seen and the configured targets; bad targets are ignored (A-O1)", () => {
+    const intervals: Array<() => void> = [];
+    const timers = { ...lanTimers, setInterval: (cb: () => void) => (intervals.push(cb), intervals.length) } as never;
+    const infos: string[] = [];
+    const client = new GoveeLanClient({ ...lanLog, info: (m: string) => infos.push(m) }, timers);
+    client.setScanTargets(["10.0.5.20", " ", "not-an-ip", "300.1.1.1"]);
+    start(client);
+    const reply = Buffer.from(JSON.stringify({ msg: { cmd: "scan", data: { device: "AA:BB:CC:DD", sku: "H6076" } } }));
+    for (const h of listen().handlers.message ?? []) {
+      h(reply, { address: "192.168.1.79" });
+    }
+    const before = scan().sends.length;
+    intervals[0]();
+    expect(
+      scan()
+        .sends.slice(before)
+        .map(t => t.address),
+    ).toEqual(["239.255.255.250", "255.255.255.255", "192.168.1.79", "10.0.5.20"]);
+    expect(infos.some(i => i.includes("not-an-ip") && i.includes("300.1.1.1"))).toBe(true);
+    client.stop();
   });
 });

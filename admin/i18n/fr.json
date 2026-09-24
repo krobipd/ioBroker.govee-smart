@@ -74,6 +74,8 @@
   "musicSensitivity": "Sensibilité musicale",
   "bindLabel": "Interface réseau",
   "bindTooltip": "Sélectionnez l'interface réseau pour la découverte et le contrôle LAN. Conservez la valeur par défaut (0.0.0.0 = toutes) sauf si cet hôte possède plusieurs interfaces.",
+  "scanTargetsLabel": "Adresses de recherche supplémentaires",
+  "scanTargetsTooltip": "Adresses IPv4 de lampes Govee que la recherche doit aussi interroger directement, séparées par des virgules — pour des lampes dans un autre sous-réseau ou derrière un routeur qui bloque le multicast et le broadcast. Laisser vide en temps normal.",
   "online": "En ligne",
   "power": "Marche/Arrêt",
   "refreshCloud": "Actualiser données Cloud",

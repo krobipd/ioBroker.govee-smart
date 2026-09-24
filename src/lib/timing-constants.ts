@@ -208,6 +208,22 @@ export const LAN_SCAN_INITIAL_WAIT_MS = 3_000;
 /** Multicast LAN-discovery scan interval (30 s). */
 export const LAN_SCAN_INTERVAL_MS = 30_000;
 
+/**
+ * With the account broker connected, a LAN light is asked for its status only
+ * once its last LAN answer is older than this (audit B5) — at most one request
+ * per light and minute. govee2mqtt polls every 30 s (`serve.rs`), homebridge
+ * has `lanRefreshTime`.
+ */
+export const LAN_STATUS_REFRESH_MS = 60_000;
+
+/**
+ * A LAN command is followed by one status request this long after the last
+ * command to the light (audit B5) — a lost UDP datagram is corrected by the
+ * read instead of waiting for the next change push. Long enough for the light
+ * to have applied the command, so the read does not report the old state.
+ */
+export const LAN_STATUS_AFTER_COMMAND_MS = 2_000;
+
 /** info.online re-evaluation interval for all devices (20 s). */
 export const ONLINE_SYNC_INTERVAL_MS = 20_000;
 

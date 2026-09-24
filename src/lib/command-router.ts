@@ -8,7 +8,7 @@ import {
   type GoveeDevice,
   type TimerAdapter,
 } from "./types";
-import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import { FORCE_COLOR_MODE_SETTLE_MS, LAN_STATUS_AFTER_COMMAND_MS } from "./timing-constants";
 import { declaredOptionValue } from "./capability-mapper";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 
@@ -49,6 +49,8 @@ export type TransportDecision =
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
+  /** Pending read-back after a LAN command, per light IP (audit B5). */
+  private readonly lanReadBack = new Map<string, ReturnType<TimerAdapter["setTimeout"]>>();
   private readonly registry: DeviceRegistry;
   private lanClient: GoveeLanClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
@@ -413,6 +415,7 @@ export class CommandRouter {
     // Generic dispatch
     if (decision.kind === "lan") {
       await this.sendLanCommand(device, command, value);
+      this.scheduleLanReadBack(device);
       // The LAN packet carries 2000–9000 K whatever the device declares (N19).
       return command === "colorTemperature" && typeof value === "number" ? lanColorTemperatureK(value) : value;
     }
@@ -927,6 +930,32 @@ export class CommandRouter {
       }
     }
     return undefined;
+  }
+
+  /**
+   * One status request after the last LAN command to a light (audit B5) — the
+   * read corrects a datapoint whose UDP command was lost, instead of waiting
+   * for the next change push. Debounced per light: a burst of commands asks
+   * once, {@link LAN_STATUS_AFTER_COMMAND_MS} after the last.
+   *
+   * @param device The light the command went to
+   */
+  private scheduleLanReadBack(device: GoveeDevice): void {
+    const ip = device.lanIp;
+    if (!ip || !this.lanClient) {
+      return;
+    }
+    const pending = this.lanReadBack.get(ip);
+    if (pending !== undefined) {
+      this.timers.clearTimeout(pending);
+    }
+    this.lanReadBack.set(
+      ip,
+      this.timers.setTimeout(() => {
+        this.lanReadBack.delete(ip);
+        this.lanClient?.requestStatus(ip);
+      }, LAN_STATUS_AFTER_COMMAND_MS),
+    );
   }
 
   /**

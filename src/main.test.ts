@@ -179,7 +179,7 @@ vi.mock("@iobroker/adapter-core", () => {
 });
 
 import { GoveeAdapter } from "./main";
-import { CLOUD_LIMITS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
+import { CLOUD_LIMITS, LAN_STATUS_REFRESH_MS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import { CloudControlRejected } from "./lib/govee-cloud-client";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
@@ -213,7 +213,10 @@ interface Fakes {
     setStatusRecordHook: ReturnType<typeof vi.fn>;
     setScanRecordHook: ReturnType<typeof vi.fn>;
     getDiagSnapshot: ReturnType<typeof vi.fn>;
+    setScanTargets: ReturnType<typeof vi.fn>;
+    isListening: ReturnType<typeof vi.fn>;
     onInterfaceError: ((m: string) => void) | null;
+    onListenPortBusy: ((m: string) => void) | null;
     onListenReady: (() => void) | null;
     /** Captured (onDiscovery, onStatus, intervalMs, iface) from start(). */
     startArgs: unknown[];
@@ -344,7 +347,10 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     setStatusRecordHook: vi.fn(),
     setScanRecordHook: vi.fn(),
     getDiagSnapshot: vi.fn(() => ({ seenDeviceIps: [], lastCommandSentMs: {} })),
+    setScanTargets: vi.fn(),
+    isListening: vi.fn(() => true),
     onInterfaceError: null,
+    onListenPortBusy: null,
     onListenReady: null,
     startArgs: [],
   };
@@ -1110,19 +1116,57 @@ describe("GoveeAdapter onReady — timers", () => {
 });
 
 describe("GoveeAdapter — LAN discovery wiring", () => {
-  it("polls devStatus only while MQTT is down (no duplicate traffic)", async () => {
+  // Until 2.39.x the scan asked only while the account broker was down ("no
+  // duplicate traffic"). The push comes only on a change or every 1-11 min, and
+  // only a read corrects a datapoint after a lost UDP command — so a light is
+  // now also asked with the broker up, at most once per LAN_STATUS_REFRESH_MS
+  // (audit B5; govee2mqtt serve.rs polls every 30 s).
+  it("asks a light for its status on the scan — always without the broker, with it once its values are stale", async () => {
     const { adapter, f } = await setupReady({ goveeEmail: "a@b.c", goveePassword: "pw" });
     const onDiscovery = f.lan.startArgs[0] as (d: { ip: string; device: string; sku: string }) => void;
+    const onStatus = f.lan.startArgs[1] as (ip: string, s: unknown) => void;
+    const light = { ip: "10.0.0.5", device: "AA:BB:CC:DD:EE:11", sku: "H6172" };
 
     f.mqtt.connected = false;
-    onDiscovery({ ip: "10.0.0.5", device: "AA:BB:CC:DD:EE:11", sku: "H6172" });
-    expect(f.lan.requestStatus).toHaveBeenCalledWith("10.0.0.5");
+    onDiscovery(light);
+    onDiscovery(light);
+    expect(f.lan.requestStatus).toHaveBeenCalledTimes(2);
 
+    // Broker up, the light has just answered a devStatus → its values are
+    // fresh, even though the last request lies past the interval.
     f.lan.requestStatus.mockClear();
     f.mqtt.connected = true;
-    onDiscovery({ ip: "10.0.0.6", device: "AA:BB:CC:DD:EE:22", sku: "H6172" });
+    const dev = internalOf(adapter)
+      .deviceManager!.getDevices()
+      .find(d => d.lanIp === "10.0.0.5")!;
+    dev.lastLanStatusAskedAt = Date.now() - LAN_STATUS_REFRESH_MS;
+    onStatus("10.0.0.5", { onOff: 1, brightness: 50, color: { r: 1, g: 2, b: 3 }, colorTemInKelvin: 0 });
+    onDiscovery(light);
     expect(f.lan.requestStatus).not.toHaveBeenCalled();
-    void adapter;
+
+    // The last answer ages past the interval → one request, then quiet again
+    // even though the light does not answer.
+    dev.lastLanStatusAt = Date.now() - LAN_STATUS_REFRESH_MS;
+    dev.lastLanStatusAskedAt = Date.now() - LAN_STATUS_REFRESH_MS;
+    onDiscovery(light);
+    expect(f.lan.requestStatus).toHaveBeenCalledTimes(1);
+    expect(f.lan.requestStatus).toHaveBeenCalledWith("10.0.0.5");
+    onDiscovery(light);
+    expect(f.lan.requestStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("port 4002 taken by another process becomes a user-actionable problem, cleared once listening (audit A5)", async () => {
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    f.lan.onListenPortBusy!("Port 4002 is in use");
+    expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("LAN port 4002 is taken by another process"));
+    f.lan.onListenReady!();
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("LAN listening on port 4002"));
+  });
+
+  it("hands the configured extra scan targets to the LAN client, split on space, comma and semicolon (audit A-O1)", async () => {
+    const { f } = await setupReady({ scanTargets: "10.0.0.7, 10.0.0.8;10.0.0.9  10.0.0.10" });
+    expect(f.lan.setScanTargets).toHaveBeenCalledWith(["10.0.0.7", "10.0.0.8", "10.0.0.9", "10.0.0.10"]);
   });
 
   it("the LAN-scan settle timer enables the account reconcile only afterwards", async () => {

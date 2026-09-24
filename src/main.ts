@@ -46,6 +46,7 @@ import {
   type CloudLimits,
   LAN_SCAN_INITIAL_WAIT_MS,
   LAN_SCAN_INTERVAL_MS,
+  LAN_STATUS_REFRESH_MS,
   ONLINE_SYNC_INTERVAL_MS,
   READY_SAFETY_TIMEOUT_MS,
   STALE_DEVICE_CLEANUP_DELAY_MS,
@@ -822,7 +823,18 @@ export class GoveeAdapter extends utils.Adapter {
       };
       this.lanClient.onListenReady = () => {
         this.actionableProblems.resolve("lan-interface", "LAN listening on the selected network interface");
+        this.actionableProblems.resolve("lan-port", `LAN listening on port 4002`);
       };
+      // Port 4002 taken by another process: the LAN channel is down as a whole
+      // (the listen socket no longer shares the port, audit A5).
+      this.lanClient.onListenPortBusy = message => {
+        this.actionableProblems.report({
+          key: "lan-port",
+          title: "LAN port 4002 is taken by another process",
+          action: `${message}. Stop the other process (or the second instance) and restart this one.`,
+        });
+      };
+      this.lanClient.setScanTargets((config.scanTargets ?? "").split(/[\s,;]+/));
 
       // v2.9.1 — wire LAN-traffic into the diag-collector. Resolves
       // destination-IP → device on every send/status/scan so the diag
@@ -851,10 +863,21 @@ export class GoveeAdapter extends utils.Adapter {
       this.lanClient.start(
         lanDevice => {
           this.deviceManager!.handleLanDiscovery(lanDevice);
-          // Poll status only when MQTT is unavailable. With an active MQTT
-          // subscription Govee pushes state changes authoritatively, so the
-          // LAN devStatus request would be duplicate traffic.
-          if (!this.mqttClient?.connected) {
+          // Without the account broker every scan asks. With it, a light is
+          // still asked once its last LAN answer is older than a minute (audit
+          // B5): the account push comes only on a change or every 1–11 min, and
+          // only a read corrects a datapoint after a lost UDP command — at most
+          // one request per light and minute.
+          // The discovery reply stamps lastLanReplyAt itself, so the age of
+          // the VALUES is the last devStatus answer — or the last request, so
+          // a light that never answers is not asked on every scan.
+          const light = this.deviceManager!.getDevices().find(d => d.lanIp === lanDevice.ip);
+          const now = Date.now();
+          const lastRead = Math.max(light?.lastLanStatusAt ?? 0, light?.lastLanStatusAskedAt ?? 0);
+          if (!this.mqttClient?.connected || now - lastRead >= LAN_STATUS_REFRESH_MS) {
+            if (light) {
+              light.lastLanStatusAskedAt = now;
+            }
             this.lanClient!.requestStatus(lanDevice.ip);
           }
         },

@@ -67,7 +67,8 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
       resolveDeviceReachability(d).online ||
       (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected),
   );
-  const lanRunning = adapter.lanClient !== null;
+  // A LAN client whose listen socket is not bound (port taken) hears nothing (audit N1).
+  const lanRunning = adapter.lanClient?.isListening() ?? false;
   const connected = hasDevices ? anyOnline : lanRunning;
   if (connected !== adapter.lastConnectionState) {
     adapter.lastConnectionState = connected;

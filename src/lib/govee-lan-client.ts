@@ -1,5 +1,5 @@
 import * as dgram from "node:dgram";
-import { clampByte, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
+import { clampByte, errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import {
   SEGMENT_BRIGHTNESS_BITMASK_BYTES,
@@ -10,6 +10,10 @@ import {
 const MULTICAST_ADDR = "239.255.255.250";
 const SCAN_PORT = 4001;
 const LISTEN_PORT = 4002;
+/** Limited broadcast — reaches devices that ignore the multicast scan (govee2mqtt `lan_api.rs`, homebridge `lan.js`). */
+const BROADCAST_ADDR = "255.255.255.255";
+/** A plain dotted IPv4 address — the only form a scan target may take. */
+const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 const COMMAND_PORT = 4003;
 /** Cap on distinct LAN device identities we track/create — bounds a spoofed-discovery flood (SEC-H2). */
 const MAX_DISTINCT_LAN_DEVICES = 512;
@@ -83,6 +87,16 @@ export class GoveeLanClient {
   public onInterfaceError: ((message: string) => void) | null = null;
   /** Fired when the listen socket is up — resolves a prior interface problem. */
   public onListenReady: (() => void) | null = null;
+  /**
+   * Fired when port 4002 is taken by another process (a second instance,
+   * homebridge-govee, govee2mqtt). The LAN channel is down then — the adapter
+   * reports it as an actionable problem (audit A5).
+   */
+  public onListenPortBusy: ((message: string) => void) | null = null;
+  /** The listen socket is bound — the LAN channel can hear replies (audit N1). */
+  private listening = false;
+  /** Extra unicast scan targets from the settings (audit A-O1). */
+  private scanTargets: string[] = [];
   /** warn-once guard for non-EADDRINUSE socket errors. */
   private socketErrorWarned = false;
   private onSend: LanSendCallback | null = null;
@@ -203,18 +217,24 @@ export class GoveeLanClient {
       this.sendSocket.bind(0, bindAddr);
     }
 
-    // Listen socket for responses (port 4002) — must be ready before first scan
-    this.listenSocket = dgram.createSocket({ type: "udp4", reuseAddr: true });
+    // Listen socket for responses (port 4002) — must be ready before first scan.
+    // NOT reuseAddr (audit A5): UDP has no TIME_WAIT, a restart does not need it,
+    // and with it two processes both got the port and each heard only part of
+    // the replies — silently. Without it a second process fails loudly.
+    this.listenSocket = dgram.createSocket("udp4");
     this.listenSocket.on("message", (msg, rinfo) => {
       this.handleMessage(msg, rinfo.address);
     });
     this.listenSocket.on("error", err => {
-      // EADDRINUSE = port 4002 already taken (a second adapter instance?). The
-      // user needs to know — otherwise the adapter is half-dead (discovery via
-      // scan works, status replies are lost).
+      this.listening = false;
+      // EADDRINUSE = port 4002 already taken by another process. The bind
+      // fails, so no scan starts and the LAN channel is down as a whole — the
+      // user has to free the port (audit A5).
       const code = (err as NodeJS.ErrnoException).code;
       if (code === "EADDRINUSE") {
-        this.log.warn(`LAN listen port ${LISTEN_PORT} already in use — second instance? Status updates will be lost.`);
+        const message = `LAN listen port ${LISTEN_PORT} is already in use by another process (a second instance, homebridge-govee, govee2mqtt) — local control is off until it is free`;
+        this.log.warn(message);
+        this.onListenPortBusy?.(message);
       } else {
         this.reportSocketError("listen", err, bindAddr);
       }
@@ -226,6 +246,7 @@ export class GoveeLanClient {
       if (this.stopped) {
         return;
       }
+      this.listening = true;
       this.log.debug(`LAN listening on port ${LISTEN_PORT}`);
       this.onListenReady?.();
 
@@ -298,6 +319,7 @@ export class GoveeLanClient {
   /** Stop all sockets and timers */
   stop(): void {
     this.stopped = true;
+    this.listening = false;
     if (this.scanTimer) {
       this.timers.clearInterval(this.scanTimer);
       this.scanTimer = undefined;
@@ -638,17 +660,47 @@ export class GoveeLanClient {
     this.sendCommand(ip, "devStatus", {});
   }
 
-  /** Send multicast scan */
+  /** Whether the listen socket is bound — the LAN channel can hear replies. */
+  isListening(): boolean {
+    return this.listening;
+  }
+
+  /**
+   * Extra addresses the scan asks directly — for devices in another subnet or
+   * behind a router that drops multicast and broadcast. Entries that are no
+   * plain IPv4 address are ignored (one info line).
+   *
+   * @param targets IPv4 addresses from the settings
+   */
+  setScanTargets(targets: readonly string[]): void {
+    const valid = targets.map(t => t.trim()).filter(t => t !== "");
+    const bad = valid.filter(t => !IPV4.test(t));
+    if (bad.length > 0) {
+      this.log.info(`LAN: ignoring scan target(s) that are no IPv4 address: ${bad.join(", ")}`);
+    }
+    this.scanTargets = valid.filter(t => IPV4.test(t));
+  }
+
+  /**
+   * Send the scan — to the multicast group, the limited broadcast, every
+   * address a device answered from, and the configured targets (audit A-O1).
+   * Multicast alone missed devices whose network drops it; govee2mqtt and
+   * homebridge-govee scan all of these.
+   */
   private sendScan(): void {
     const scanMsg: LanMessage = {
       msg: { cmd: "scan", data: { account_topic: "reserve" } },
     };
     const buf = Buffer.from(JSON.stringify(scanMsg));
-    this.scanSocket?.send(buf, 0, buf.length, SCAN_PORT, MULTICAST_ADDR, err => {
-      if (err) {
-        this.log.debug(`LAN scan send error: ${err.message}`);
-      }
-    });
+    const known = [...this.seenDeviceIps].map(key => key.slice(key.lastIndexOf(":") + 1));
+    const targets = new Set<string>([MULTICAST_ADDR, BROADCAST_ADDR, ...known, ...this.scanTargets]);
+    for (const target of targets) {
+      this.scanSocket?.send(buf, 0, buf.length, SCAN_PORT, target, err => {
+        if (err) {
+          this.log.debug(`LAN scan send error (${target}): ${err.message}`);
+        }
+      });
+    }
   }
 
   /**
@@ -665,6 +717,8 @@ export class GoveeLanClient {
       this.log.debug(`LAN message dropped from ${sourceIp}: oversize ${msg.length} bytes`);
       return;
     }
+    let cmd: string;
+    let payload: Record<string, unknown>;
     try {
       const data = JSON.parse(msg.toString()) as {
         msg?: { cmd?: string; data?: Record<string, unknown> };
@@ -672,19 +726,24 @@ export class GoveeLanClient {
       if (!data.msg?.cmd || typeof data.msg.cmd !== "string") {
         return;
       }
-
-      const cmd: string = data.msg.cmd;
+      cmd = data.msg.cmd;
       const rawPayload = data.msg.data;
-      const payload: Record<string, unknown> =
-        rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload : {};
-
+      payload = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload : {};
+    } catch {
+      this.log.debug(`LAN: Failed to parse message: ${msg.toString().slice(0, 200)}`);
+      return;
+    }
+    // Handing on is separate from parsing (audit A9): a handler that throws
+    // is a handler failure, never "failed to parse" — the old single try
+    // blamed the packet for the adapter's own error.
+    try {
       if (cmd === "scan") {
         this.handleScanResponse(payload, sourceIp);
       } else if (cmd === "devStatus") {
         this.handleStatusResponse(payload, sourceIp);
       }
-    } catch {
-      this.log.debug(`LAN: Failed to parse message: ${msg.toString().slice(0, 200)}`);
+    } catch (e) {
+      this.log.debug(`LAN: ${cmd} handler failed for ${sourceIp}: ${errMessage(e)}`);
     }
   }
 
@@ -699,14 +758,10 @@ export class GoveeLanClient {
    */
   private handleScanResponse(data: Record<string, unknown>, sourceIp: string): void {
     // Defensive type checks — LAN payload comes over the wire, treat as untrusted
-    if (
-      typeof data.ip !== "string" ||
-      typeof data.device !== "string" ||
-      typeof data.sku !== "string" ||
-      !data.ip ||
-      !data.device ||
-      !data.sku
-    ) {
+    // `ip` is not required (audit M2): the address comes from the UDP source,
+    // and firmware that omits the field was ignored until 2.40.0
+    // (homebridge-govee #1313; govee2mqtt `lan_api.rs` reads the source too).
+    if (typeof data.device !== "string" || typeof data.sku !== "string" || !data.device || !data.sku) {
       return;
     }
 
@@ -717,8 +772,7 @@ export class GoveeLanClient {
     }
 
     const lanDevice: LanDevice = {
-      // data.ip is validated above as part of a well-formed reply but is NOT
-      // trusted for the binding — the authentic address is the UDP source.
+      // data.ip is never trusted for the binding — the authentic address is the UDP source.
       ip: sourceIp,
       device: data.device,
       sku: data.sku,

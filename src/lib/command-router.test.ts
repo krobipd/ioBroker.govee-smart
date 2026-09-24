@@ -15,7 +15,7 @@ import { DeviceRegistry } from "./device-registry";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
-import { CLOUD_APPLIANCE_DAILY_LIMIT } from "./timing-constants";
+import { CLOUD_APPLIANCE_DAILY_LIMIT, LAN_STATUS_AFTER_COMMAND_MS } from "./timing-constants";
 import { createTestDevice, mockLog } from "./test-helpers";
 import type { GoveeDevice, TimerAdapter } from "./types";
 
@@ -90,13 +90,12 @@ function makeRateLimiter(): RateLimiter {
   } as unknown as RateLimiter;
 }
 
+// setTimeout never fires here: the router's only one-shot timer is the LAN
+// read-back (audit B5), which has its own tests with a recording clock.
 const noopTimers: TimerAdapter = {
   setInterval: () => undefined,
   clearInterval: () => undefined,
-  setTimeout: (cb): ioBroker.Timeout | undefined => {
-    cb();
-    return undefined;
-  },
+  setTimeout: (): ioBroker.Timeout | undefined => undefined,
   clearTimeout: () => undefined,
   delay: () => Promise.resolve(),
 };
@@ -135,6 +134,88 @@ function makeDevice(overrides: Partial<GoveeDevice> = {}): GoveeDevice {
 }
 
 describe("CommandRouter", () => {
+  describe("LAN read-back after a command (audit B5)", () => {
+    /** A clock that records every one-shot timer instead of firing it. */
+    function recordingTimers(): {
+      timers: TimerAdapter;
+      pending: Array<{ cb: () => void; ms: number; handle: number; cleared: boolean }>;
+    } {
+      const pending: Array<{ cb: () => void; ms: number; handle: number; cleared: boolean }> = [];
+      const timers: TimerAdapter = {
+        ...noopTimers,
+        setTimeout: (cb, ms) => {
+          const handle = pending.length + 1;
+          pending.push({ cb, ms, handle, cleared: false });
+          return handle as unknown as ioBroker.Timeout;
+        },
+        clearTimeout: t => {
+          const entry = pending.find(p => p.handle === (t as unknown as number));
+          if (entry) {
+            entry.cleared = true;
+          }
+        },
+      };
+      return { timers, pending };
+    }
+
+    it("asks the light for its status once, LAN_STATUS_AFTER_COMMAND_MS after the command", async () => {
+      const lan = makeLanStub();
+      const clock = recordingTimers();
+      const router = new CommandRouter(mockLog, clock.timers, registry);
+      router.setLanClient(lan.client);
+      await router.sendCommand(makeDevice(), "power", true);
+      expect(lan.calls.map(c => c.method)).toEqual(["setPower"]);
+      expect(clock.pending).toHaveLength(1);
+      expect(clock.pending[0].ms).toBe(LAN_STATUS_AFTER_COMMAND_MS);
+      clock.pending[0].cb();
+      expect(lan.calls[1]).toEqual({ method: "requestStatus", args: ["192.168.1.42"] });
+    });
+
+    it("a burst of commands asks once — every new command restarts the wait", async () => {
+      const lan = makeLanStub();
+      const clock = recordingTimers();
+      const router = new CommandRouter(mockLog, clock.timers, registry);
+      router.setLanClient(lan.client);
+      await router.sendCommand(makeDevice(), "power", true);
+      await router.sendCommand(makeDevice(), "brightness", 40);
+      expect(clock.pending).toHaveLength(2);
+      expect(clock.pending[0].cleared).toBe(true);
+      expect(clock.pending[1].cleared).toBe(false);
+    });
+
+    it("two lights keep their own wait", async () => {
+      const lan = makeLanStub();
+      const clock = recordingTimers();
+      const router = new CommandRouter(mockLog, clock.timers, registry);
+      router.setLanClient(lan.client);
+      await router.sendCommand(makeDevice(), "power", true);
+      await router.sendCommand(makeDevice({ deviceId: "AA:BB:CC:DD:EE:02", lanIp: "192.168.1.43" }), "power", true);
+      expect(clock.pending.map(p => p.cleared)).toEqual([false, false]);
+    });
+
+    it("a LAN command that throws schedules no read-back", async () => {
+      const lan = makeLanStub();
+      (lan.client as unknown as { setPower: () => void }).setPower = () => {
+        throw new Error("send failed");
+      };
+      const clock = recordingTimers();
+      const router = new CommandRouter(mockLog, clock.timers, registry);
+      router.setLanClient(lan.client);
+      await expect(router.sendCommand(makeDevice(), "power", true)).rejects.toThrow("send failed");
+      expect(clock.pending).toHaveLength(0);
+    });
+
+    it("a light without LAN address schedules nothing", async () => {
+      const lan = makeLanStub();
+      const clock = recordingTimers();
+      const router = new CommandRouter(mockLog, clock.timers, registry);
+      router.setLanClient(lan.client);
+      router.setCloudClient(makeCloudStub().client);
+      await router.sendCommand(makeDevice({ lanIp: undefined }), "power", true);
+      expect(clock.pending).toHaveLength(0);
+    });
+  });
+
   describe("sendCommand — LAN priority", () => {
     it("routes power to LAN setPower when device has lanIp", async () => {
       const lan = makeLanStub();

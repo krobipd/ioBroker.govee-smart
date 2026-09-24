@@ -74,6 +74,8 @@
   "musicSensitivity": "Muziekgevoeligheid",
   "bindLabel": "Netwerkinterface",
   "bindTooltip": "Selecteer de netwerkinterface voor LAN-detectie en -besturing. Behoud de standaard (0.0.0.0 = alle interfaces), tenzij deze host meerdere netwerkinterfaces heeft.",
+  "scanTargetsLabel": "Extra zoekadressen",
+  "scanTargetsTooltip": "IPv4-adressen van Govee-lampen die de zoekactie ook rechtstreeks moet bevragen, gescheiden door komma's — voor lampen in een ander subnet of achter een router die multicast en broadcast blokkeert. Normaal leeg laten.",
   "online": "Online",
   "power": "Aan/Uit",
   "refreshCloud": "Cloudgegevens vernieuwen",

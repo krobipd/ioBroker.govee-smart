@@ -1525,7 +1525,8 @@ export class DeviceManager {
    * device. Marks it online and fires `onDeviceUpdate` if it was offline —
    * a discovery reply proves the device is on the network; without this path
    * info.online stays forever false for cached lights (MQTT only pushes on
-   * state changes, main.ts skips the devStatus poll when MQTT is up).
+   * state changes, and with MQTT up main.ts asks for devStatus at most once
+   * a minute).
    *
    * @param matched The existing device to update
    * @param lanDevice Discovery frame
@@ -1953,6 +1954,7 @@ export class DeviceManager {
     device.lastSeenOnNetwork = Date.now();
     device.lastLanReplyAt = Date.now();
     device.lastLanSeenAt = Date.now();
+    device.lastLanStatusAt = Date.now();
     const { r, g, b } = status.color;
     const state: Partial<DeviceState> = {
       brightness: status.brightness,

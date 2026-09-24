@@ -19,6 +19,12 @@ declare global {
       /** Listen address for the LAN sockets ("0.0.0.0" = all interfaces); `networkInterface` until 2.36.0 */
       bind: string;
       /**
+       * Extra IPv4 addresses the LAN scan asks directly, comma-separated — for
+       * lights in another subnet or behind a router that drops multicast and
+       * broadcast (2.40.0). Empty by default.
+       */
+      scanTargets: string;
+      /**
        * Activate device entries with status `seed` from `devices.json`. Off by
        * default — these devices are prepared in code but unconfirmed by any
        * tester. The Wiki lists every device and its status.

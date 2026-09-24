@@ -497,6 +497,14 @@ export interface GoveeDevice {
    */
   lastLanReplyAt?: number;
   /**
+   * When this light last answered a devStatus request (in memory only). A
+   * discovery reply stamps `lastLanReplyAt` too, so only this one tells how
+   * old the light's VALUES are (audit B5).
+   */
+  lastLanStatusAt?: number;
+  /** When the scan path last asked this light for its status (in memory only, audit B5). */
+  lastLanStatusAskedAt?: number;
+  /**
    * When this device last answered on the LOCAL interface — PERSISTED, unlike
    * `lastLanReplyAt` (which is a live freshness stamp and deliberately dropped
    * on save, see device-manager/cache.ts).

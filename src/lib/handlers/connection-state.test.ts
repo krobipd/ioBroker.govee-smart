@@ -33,6 +33,8 @@ interface Rig {
 function makeRig(opts: {
   devices?: GoveeDevice[];
   lanClient?: boolean;
+  /** Whether the LAN listen socket is bound (default true when a client exists). */
+  lanListening?: boolean;
   cloudClient?: boolean;
   cloudWasConnected?: boolean;
   mqttConnected?: boolean | null; // null = no mqtt client
@@ -87,7 +89,7 @@ function makeRig(opts: {
       opts.openapiConnected === null || opts.openapiConnected === undefined
         ? null
         : ({ connected: opts.openapiConnected } as never),
-    lanClient: opts.lanClient === false ? null : ({} as never),
+    lanClient: opts.lanClient === false ? null : ({ isListening: () => opts.lanListening ?? true } as never),
     stateManager: {
       cleanupDevices: (current: GoveeDevice[], listed?: Set<string>) => {
         cleanupCalls.push(current);
@@ -138,6 +140,12 @@ describe("updateConnectionState", () => {
     const down = makeRig({ devices: [], lanClient: false });
     updateConnectionState(down.adapter);
     expect(down.stateWrites).toEqual([{ id: "info.connection", val: false }]);
+  });
+
+  it("a LAN client whose listen socket never bound counts as down (audit N1 — port 4002 taken)", () => {
+    const unbound = makeRig({ devices: [], lanClient: true, lanListening: false });
+    updateConnectionState(unbound.adapter);
+    expect(unbound.stateWrites).toEqual([{ id: "info.connection", val: false }]);
   });
 
   it("writes only on change — repeated evaluation with the same result is silent (H4)", () => {

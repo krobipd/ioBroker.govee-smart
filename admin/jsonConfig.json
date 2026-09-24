@@ -77,6 +77,16 @@
           "lg": 6,
           "xl": 6
         },
+        "scanTargets": {
+          "type": "text",
+          "label": "scanTargetsLabel",
+          "tooltip": "scanTargetsTooltip",
+          "xs": 12,
+          "sm": 12,
+          "md": 6,
+          "lg": 6,
+          "xl": 6
+        },
         "_advancedInfo": {
           "newLine": true,
           "type": "staticText",

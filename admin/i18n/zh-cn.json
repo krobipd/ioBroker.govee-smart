@@ -74,6 +74,8 @@
   "musicSensitivity": "音乐灵敏度",
   "bindLabel": "网络接口",
   "bindTooltip": "选择用于局域网发现和控制的网络接口。除非此主机有多个网络接口，否则请保留默认值（0.0.0.0 = 所有接口）。",
+  "scanTargetsLabel": "附加扫描地址",
+  "scanTargetsTooltip": "发现过程还应直接询问的 Govee 灯的 IPv4 地址，用逗号分隔——适用于位于其他子网或位于阻止组播和广播的路由器之后的灯。通常留空。",
   "online": "在线",
   "power": "电源",
   "refreshCloud": "刷新云数据",

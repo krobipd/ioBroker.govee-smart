@@ -1353,7 +1353,7 @@ export class StateManager {
 
     const set = (id: string, val: ioBroker.StateValue): void => {
       // setStateChangedAsync (not setState): the LAN devStatus poll (every
-      // 30 s when no MQTT is connected) re-delivers identical power / brightness
+      // 30 s without MQTT, once a minute with it) re-delivers identical power / brightness
       // / colorRgb / colorTemperature each cycle — only write (and bump the
       // timestamp) on a real value change. Freshness lives on the device object
       // (lastLanReplyAt / lastSeenOnNetwork), not on these control-state ts.

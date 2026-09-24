@@ -501,9 +501,12 @@ describe("DeviceManager", () => {
       (dm as any).devices.set("H6160_aabbccddeeff0011", device);
 
       await dm.sendCommand(device, "power", true);
-      expect(tracker.calls).toHaveLength(1);
+      // The command, then ONE read-back of the light (audit B5 — the test
+      // timers fire at once, the adapter asks LAN_STATUS_AFTER_COMMAND_MS later).
+      expect(tracker.calls).toHaveLength(2);
       expect(tracker.calls[0].method).toBe("setPower");
       expect(tracker.calls[0].args).toEqual(["192.168.1.100", true]);
+      expect(tracker.calls[1]).toEqual({ method: "requestStatus", args: ["192.168.1.100"] });
     });
 
     it("should route brightness to LAN", async () => {
@@ -513,6 +516,7 @@ describe("DeviceManager", () => {
         setBrightness: tracker.track("setBrightness"),
         setColor: tracker.track("setColor"),
         setColorTemperature: tracker.track("setColorTemperature"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -531,6 +535,7 @@ describe("DeviceManager", () => {
         setBrightness: tracker.track("setBrightness"),
         setColor: tracker.track("setColor"),
         setColorTemperature: tracker.track("setColorTemperature"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -740,6 +745,7 @@ describe("DeviceManager", () => {
         setColor: tracker.track("setColor"),
         setColorTemperature: tracker.track("setColorTemperature"),
         setScene: tracker.track("setScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -766,6 +772,7 @@ describe("DeviceManager", () => {
         setColor: tracker.track("setColor"),
         setColorTemperature: tracker.track("setColorTemperature"),
         setScene: tracker.track("setScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -790,6 +797,7 @@ describe("DeviceManager", () => {
         setColor: lanTracker.track("setColor"),
         setColorTemperature: lanTracker.track("setColorTemperature"),
         setScene: lanTracker.track("setScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -823,6 +831,7 @@ describe("DeviceManager", () => {
         setColor: lanTracker.track("setColor"),
         setSegmentColor: lanTracker.track("setSegmentColor"),
         setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -857,6 +866,7 @@ describe("DeviceManager", () => {
         setColor: lanTracker.track("setColor"),
         setSegmentColor: lanTracker.track("setSegmentColor"),
         setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -877,6 +887,7 @@ describe("DeviceManager", () => {
         setColor: lanTracker.track("setColor"),
         setSegmentColor: lanTracker.track("setSegmentColor"),
         setSegmentBrightness: lanTracker.track("setSegmentBrightness"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -938,6 +949,7 @@ describe("DeviceManager", () => {
       const mockLan = {
         setPower: lanTracker.track("setPower"),
         sendPtReal: lanTracker.track("sendPtReal"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -960,6 +972,7 @@ describe("DeviceManager", () => {
       const mockLan = {
         setPower: lanTracker.track("setPower"),
         sendPtReal: lanTracker.track("sendPtReal"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -994,6 +1007,7 @@ describe("DeviceManager", () => {
         setColorTemperature: lanTracker.track("setColorTemperature"),
         setGradient: lanTracker.track("setGradient"),
         setScene: lanTracker.track("setScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -1795,6 +1809,7 @@ describe("DeviceManager", () => {
         setScene: lanTracker.track("setScene"),
         setGradient: lanTracker.track("setGradient"),
         setDiyScene: lanTracker.track("setDiyScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -1820,6 +1835,7 @@ describe("DeviceManager", () => {
         setScene: lanTracker.track("setScene"),
         setGradient: lanTracker.track("setGradient"),
         setDiyScene: lanTracker.track("setDiyScene"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
@@ -1854,6 +1870,7 @@ describe("DeviceManager", () => {
         setBrightness: tracker.track("setBrightness"),
         setColor: tracker.track("setColor"),
         setColorTemperature: tracker.track("setColorTemperature"),
+        requestStatus: (): void => undefined,
       };
       dm.setLanClient(mockLan as any);
 
