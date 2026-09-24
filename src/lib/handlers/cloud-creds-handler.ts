@@ -121,17 +121,14 @@ function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedM
 
 /**
  * The account key a stored blob was bound to, or "" for a blob written before
- * the binding existed (or one that does not parse).
+ * the binding existed. Only called on a blob `parsePersistedBlob` has already
+ * parsed, so it cannot throw.
  *
  * @param raw The stored JSON blob
  */
 function readAccountKey(raw: string): string {
-  try {
-    const obj = JSON.parse(raw) as { accountKey?: unknown };
-    return typeof obj.accountKey === "string" ? obj.accountKey : "";
-  } catch {
-    return "";
-  }
+  const obj = JSON.parse(raw) as { accountKey?: unknown };
+  return typeof obj.accountKey === "string" ? obj.accountKey : "";
 }
 
 /**

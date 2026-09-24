@@ -254,6 +254,34 @@ describe("Anonymiser", () => {
       expect(a.walk({ lanInfo: { addr: 3377309888 } })).toEqual({ lanInfo: { addr: "address-local-2" } });
       expect(a.walk({ addr: 0 })).toEqual({ addr: 0 });
     });
+
+    it("reads the address from a digit string too, and leaves what is no IPv4 number as it was", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ addr: "604045834" })).toEqual({ addr: "address-local-1" });
+      expect(a.walk({ addr: "10.2.1.36x" })).toEqual({ addr: "10.2.1.36x" });
+      expect(a.walk({ addr: 4294967296 })).toEqual({ addr: 4294967296 });
+      // A zero in text is no address either.
+      expect(a.text('{"addr":0}')).toBe('{"addr":0}');
+    });
+  });
+
+  describe("address classification at the edges", () => {
+    it("an IPv6 address whose first group is no hex number is routed, not local", () => {
+      expect(new Anonymiser().ip("zz::1")).toMatch(/^address-public-/);
+    });
+
+    it("an IPv4 that is not four octets in range is routed, not local", () => {
+      const a = new Anonymiser();
+      expect(a.ip("10.0.0")).toMatch(/^address-public-/);
+      expect(a.ip("10.0.0.300")).toMatch(/^address-public-/);
+    });
+
+    it("an empty shapeless value stays empty — nothing to hide, in text and in objects", () => {
+      const a = new Anonymiser();
+      expect(a.text('{"wifiName":""}')).toBe('{"wifiName":""}');
+      expect(a.text('{\\"wifiName\\":\\"\\"}')).toBe('{\\"wifiName\\":\\"\\"}');
+      expect(a.walk({ wifiName: "", ssid: true })).toEqual({ wifiName: "", ssid: true });
+    });
   });
 
   describe("device names — whole words, longest first, never in keys (E6, N8, N9)", () => {

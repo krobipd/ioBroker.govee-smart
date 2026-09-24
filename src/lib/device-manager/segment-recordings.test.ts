@@ -424,6 +424,11 @@ describe("segmentCountFromSnapshotFrames — the app's snapshot masks", () => {
     expect(segmentCountFromSnapshotFrames(undefined)).toBeNull();
     expect(segmentCountFromSnapshotFrames([[["not base64 of 20 bytes"]]])).toBeNull();
   });
+
+  it("skips every entry that is not the stored shape — a snapshot, group or frame of the wrong type", () => {
+    const frames = SNAPSHOT_RECORDINGS["issue-44-h6076-diag.json.txt"] as unknown as unknown[];
+    expect(segmentCountFromSnapshotFrames([null, { cmds: "x" }, ["no group"], [[42, null]], ...frames])).toBe(7);
+  });
 });
 
 describe("DeviceManager — adopting the count of a recorded push (deleting needs knowledge)", () => {

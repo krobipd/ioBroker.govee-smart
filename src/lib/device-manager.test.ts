@@ -1978,6 +1978,16 @@ describe("DeviceManager", () => {
   });
 
   describe("parseMqttSegmentData", () => {
+    it("a single lit segment stays — the filler rule needs a segment before it to compare with", () => {
+      const packet = buildAaA5Packet(1, [
+        [50, 10, 10, 10],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+        [0, 0, 0, 0],
+      ]);
+      expect(parseMqttSegmentData([packet]).segments).toEqual([{ index: 0, brightness: 50, r: 10, g: 10, b: 10 }]);
+    });
+
     it("reads at most 512 entries of op.command — a packet behind them is not looked at (SEC-GC1)", () => {
       const packet = buildAaA5Packet(1, [
         [100, 255, 0, 0],
@@ -3755,6 +3765,12 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
 });
 
 describe("DeviceManager — internal logic helpers", () => {
+  it("physicalSegmentCount answers the settled strip length — quirk, learned value, capability", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    expect(dm.physicalSegmentCount(createTestDevice({ segmentCount: 12 }))).toBe(12);
+    expect(dm.physicalSegmentCount(createTestDevice({ segmentCount: undefined, capabilities: [] }))).toBe(0);
+  });
+
   it("removeDevice deletes the device and returns its deviceId, or null if absent", () => {
     const dm = new DeviceManager(mockLog, mockTimers, registry);
     const device = createTestDevice({ sku: "H61BE", deviceId: "AA:BB:CC:DD" });
@@ -5664,6 +5680,28 @@ describe("what waits for an account token — libraries and group members (M3/M9
     expect(failure.mock.calls.map(c => c[0])).toEqual(["1234567"]);
   });
 
+  it("a token follow-up that throws is logged, never an unhandled rejection", async () => {
+    const { dm, bearer } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    const debugs: string[] = [];
+    (dm as any).log = { ...mockLog, debug: (m: string) => debugs.push(m) };
+    (dm as any).devices.set(
+      (dm as any).deviceKey("BaseGroup", "1234567"),
+      createTestDevice({ sku: "BaseGroup", deviceId: "1234567", name: "Living room" }),
+    );
+    vi.spyOn(dm, "loadGroupMembers").mockRejectedValue(new Error("groups broke"));
+    vi.spyOn(dm as any, "loadLibrariesWithBearer").mockRejectedValue(new Error("libraries broke"));
+    bearer.on = true;
+    dm.enableBearerFollowUps();
+    await dm.whenSceneLoadsSettled();
+    await new Promise(r => setTimeout(r, 0));
+    expect(
+      debugs.some(d => d.includes("Group members after the first token failed") && d.includes("groups broke")),
+    ).toBe(true);
+    expect(debugs.some(d => d.includes("Library load for") && d.includes("libraries broke"))).toBe(true);
+  });
+
   it("no app group — the token asks for no group members", async () => {
     const { dm, bearer, groupCalls } = bench();
     bearer.on = true;
@@ -5741,6 +5779,16 @@ describe("a cache start that lost a light — the account lists protect its tree
     expect(dm.reloadForAccountGap()).toBe(false);
     expect((dm as any).gapCalls).toBe(1);
     expect(listCalls()).toBe(0);
+  });
+
+  it("a gap reload that throws is logged, never an unhandled rejection", async () => {
+    const { dm } = gapBench();
+    const debugs: string[] = [];
+    (dm as any).log = { ...mockLog, debug: (m: string) => debugs.push(m) };
+    vi.spyOn(dm, "loadFromCloud").mockRejectedValue(new Error("boom"));
+    expect(dm.reloadForAccountGap()).toBe(true);
+    await new Promise(r => setTimeout(r, 0));
+    expect(debugs.some(d => d.includes("account gap failed") && d.includes("boom"))).toBe(true);
   });
 
   it("no reload once a Cloud list was read this session — its gaps are devices the Cloud does not list", () => {

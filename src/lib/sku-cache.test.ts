@@ -92,6 +92,16 @@ describe("SkuCache", () => {
     expect(fs.existsSync(path.join(dir, "cache"))).toBe(true);
   });
 
+  it("a cache directory that cannot be created leaves loads empty; one removed later reads as a miss", () => {
+    // A file where the data directory should be — mkdir fails, as on a read-only FS.
+    const blocked = path.join(dir, "blocked");
+    fs.writeFileSync(blocked, "");
+    expect(new SkuCache(blocked, mockLog).loadAll()).toEqual([]);
+    const cache = new SkuCache(dir, mockLog);
+    fs.rmSync(path.join(dir, "cache"), { recursive: true, force: true });
+    expect(cache.loadAll()).toEqual([]);
+  });
+
   it("should return empty for non-existent cache", () => {
     const cache = new SkuCache(dir, mockLog);
     expect(cache.loadAll()).toEqual([]);

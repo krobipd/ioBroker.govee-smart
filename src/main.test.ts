@@ -1176,7 +1176,7 @@ describe("GoveeAdapter onReady — timers", () => {
       const { adapter } = await setupReady();
       const i = internalOf(adapter);
       i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
-      i.getForeignObjectAsync.mockResolvedValueOnce({ native });
+      i.getForeignObjectAsync.mockResolvedValueOnce({ native: structuredClone(native) });
       i.extendForeignObjectAsync.mockClear();
 
       await i.onReady();

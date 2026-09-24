@@ -20,7 +20,7 @@ function makeAdapter(native: Record<string, unknown> = {}): CloudCredsAdapter & 
     log: noopLog,
     namespace: "govee-smart.0",
     getStateAsync: () => Promise.resolve(null),
-    getForeignObjectAsync: () => Promise.resolve({ native }),
+    getForeignObjectAsync: () => Promise.resolve({ native: structuredClone(native) }),
     extendForeignObjectAsync: (_id, obj) => {
       calls.push(`extend:${JSON.stringify(obj.native)}`);
       return Promise.resolve();
