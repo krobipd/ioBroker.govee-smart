@@ -675,7 +675,7 @@ describe("StateManager", () => {
         deviceId: "AA:BB:CC:DD:00:00:00:15:FF:FF:00:14:FF:FF:00:1A",
         type: "devices.types.thermometer",
         lanIp: undefined,
-        gateway: "H5042 (ihoment_H5042_3795)",
+        gateway: "H5042 (ihoment_H5042_C0DE)",
       });
       const prefix = sm.devicePrefix(dev);
       await sm.createInfoStates(dev);
@@ -698,7 +698,7 @@ describe("StateManager", () => {
       expect(objects.has(`${prefix}.info.ip`)).toBe(true);
       expect(objects.has(`${prefix}.info.gateway`)).toBe(false);
       // Now it's discovered behind a gateway.
-      dev.gateway = "H5042 (ihoment_H5042_3795)";
+      dev.gateway = "H5042 (ihoment_H5042_C0DE)";
       await sm.createInfoStates(dev);
       expect(objects.has(`${prefix}.info.gateway`)).toBe(true);
       expect(objects.has(`${prefix}.info.ip`)).toBe(false);

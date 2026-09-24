@@ -75,11 +75,13 @@ describe("DiagnosticsCollector", () => {
   describe("addMqttPacket", () => {
     it("captures packets with topic + hex", async () => {
       const c = new DiagnosticsCollector(registry);
-      c.addMqttPacket("dev1", "GA/abc/123", "qqgFAQEEAAAAA=");
+      // An account topic in Govee's shape (`GA/` + 32 hex) — a marker keeps
+      // the prefix, the account hash never ships (audit M12).
+      c.addMqttPacket("dev1", "GA/0123456789abcdef0123456789abcdef", "qqgFAQEEAAAAA=");
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
       expect(packets).toHaveLength(1);
-      expect(packets[0].topic).toBe("GA/abc/123");
+      expect(packets[0].topic).toBe("GA/topic-1");
       expect(packets[0].hex).toBe("qqgFAQEEAAAAA=");
     });
 
@@ -124,18 +126,18 @@ describe("DiagnosticsCollector", () => {
         sku: "H5109",
         settings: {
           battery: 100,
-          gatewayInfo: { secretCode: "VYb5QvZVkjE=", topic: "GD/f501fb9140eaf7", bleName: "ihoment_H5042_3795" },
+          gatewayInfo: { secretCode: "CANARYsecret0=", topic: "GD/c0dec0dec0dec0", bleName: "ihoment_H5042_C0DE" },
         },
       });
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const json = JSON.stringify(result);
-      expect(json).not.toContain("VYb5QvZVkjE="); // gateway secret must be masked
+      expect(json).not.toContain("CANARYsecret0="); // gateway secret must be masked
       expect(json).not.toContain("GD/f501fb"); // gateway push topic must be masked
-      expect(json).toContain("ihoment_H5042_3795"); // non-secret device metadata is kept
+      expect(json).toContain("ihoment_H5042_C0DE"); // non-secret device metadata is kept
       const entry = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/device/rest/devices/v1/list"][0];
       const gw = (entry.body as { settings: { gatewayInfo: Record<string, unknown> } }).settings.gatewayInfo;
       expect(gw.secretCode).toBe("***");
-      expect(gw.bleName).toBe("ihoment_H5042_3795");
+      expect(gw.bleName).toBe("ihoment_H5042_C0DE");
     });
 
     // Audit 2026-09-12 (T4): moving the redaction BEHIND the size cap survived
@@ -149,14 +151,14 @@ describe("DiagnosticsCollector", () => {
       c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
         sku: "H5109",
         settings: {
-          gatewayInfo: { secretCode: "VYb5QvZVkjE=", topic: "GD/f501fb9140eaf7" },
+          gatewayInfo: { secretCode: "CANARYsecret0=", topic: "GD/c0dec0dec0dec0" },
         },
         // pushes the serialised body past MAX_BODY_BYTES (65_536)
         pad: "x".repeat(70_000),
       });
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const json = JSON.stringify(result);
-      expect(json).not.toContain("VYb5QvZVkjE=");
+      expect(json).not.toContain("CANARYsecret0=");
       expect(json).not.toContain("GD/f501fb");
       // and it really is the truncated shape, not a body that stayed small
       const entry = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/device/rest/devices/v1/list"][0];
@@ -795,6 +797,36 @@ describe("DiagnosticsCollector", () => {
         expect(text).not.toContain(String(canary));
       }
       expect(text).not.toContain("20:15:EB:E7:54:95:B2:4D");
+    });
+
+    it("an MQTT envelope keeps no identifying value — not even behind the size cap (audit E4, E3, M12)", async () => {
+      // A push envelope as the account broker sends it (shape of #13/#49/#50:
+      // `lanInfo.addr` is the device's IPv4 as a little-endian number), padded
+      // past the 4 KB cap. Capped FIRST, the cut leaves text that no longer
+      // parses — and the identifying fields in front of the cut would reach
+      // the report without the key-based redaction.
+      const accountTopic = "GA/0badc0de0badc0de0badc0de0badc0de";
+      const envelope = JSON.stringify({
+        topic: accountTopic,
+        state: { onOff: 1, wifiName: CANARIES.ssid, secretCode: CANARIES.secretCode, ip: "203.0.113.77" },
+        lanInfo: { addr: 3377309888, lastTimeStamp: 1790140381 },
+        msg: JSON.stringify({ cmd: "status", padding: "x".repeat(20_000) }),
+      });
+      const c = new DiagnosticsCollector(registry);
+      const deviceId = "20:15:EB:E7:54:95:B2:4D";
+      c.addMqttPacket(deviceId, accountTopic, { rawJson: envelope });
+      const text = JSON.stringify(await c.generate(makeDevice({ sku: "H1741", deviceId }), "2.40.0"));
+      for (const secret of [
+        CANARIES.ssid,
+        CANARIES.secretCode,
+        "203.0.113.77",
+        "3377309888",
+        "192.168.77.201",
+        accountTopic,
+      ]) {
+        expect(text).not.toContain(secret);
+      }
+      expect(text).toContain("GA/topic-1");
     });
 
     it("keeps what a diagnosis needs: every field Govee sent in the last data, and the network as a marker", async () => {

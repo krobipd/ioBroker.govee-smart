@@ -60,8 +60,23 @@ describe("Anonymiser", () => {
 
     it("still catches a real IPv6", () => {
       const a = new Anonymiser();
-      expect(a.text("endpoint 2001:0db8:85a3:0000:0000:8a2e:0370:7334 up")).toMatch(/endpoint address-local-1 up/);
+      // A global-unicast IPv6 is routed, not local (audit E5 — until 2.39.x
+      // every IPv6 was marked local).
+      expect(a.text("endpoint 2001:0db8:85a3:0000:0000:8a2e:0370:7334 up")).toMatch(/endpoint address-public-1 up/);
       expect(a.text("bound to fe80::1")).not.toContain("fe80::1");
+    });
+
+    it("keeps loopback, link-local and unique-local IPv6 local; an IPv4-mapped one follows the IPv4 rule (E5)", () => {
+      const a = new Anonymiser();
+      expect(a.ip("::1")).toMatch(/^address-local-/);
+      expect(a.ip("fe80::1")).toMatch(/^address-local-/);
+      expect(a.ip("febf::1")).toMatch(/^address-local-/);
+      expect(a.ip("fd00::1")).toMatch(/^address-local-/);
+      expect(a.ip("fc12::1")).toMatch(/^address-local-/);
+      expect(a.ip("fec0::1")).toMatch(/^address-public-/);
+      expect(a.ip("2a00:1450::1")).toMatch(/^address-public-/);
+      expect(a.ip("::ffff:192.168.1.5")).toMatch(/^address-local-/);
+      expect(a.ip("::ffff:8.8.8.8")).toMatch(/^address-public-/);
     });
 
     it("leaves ordinary numbers and versions alone", () => {
@@ -210,6 +225,60 @@ describe("Anonymiser", () => {
       const a = new Anonymiser();
       expect(a.text("sent 1234 bytes", [], ["1234"])).toBe("sent 1234 bytes");
       expect(a.text("group 12345 on", [], ["12345"])).toBe("group id-…2345 on");
+    });
+  });
+
+  describe("Govee account topics and the little-endian lanInfo address", () => {
+    it("marks an account or device topic and keeps its prefix (M12)", () => {
+      const a = new Anonymiser();
+      const out = a.text("push on GA/0123456789abcdef0123456789abcdef and GD/fedcba9876543210fedcba9876543210");
+      expect(out).toBe("push on GA/topic-1 and GD/topic-2");
+      // A second pass leaves the markers alone.
+      expect(a.text(out)).toBe(out);
+    });
+
+    it("leaves base64 that merely contains GA/ alone", () => {
+      const a = new Anonymiser();
+      expect(a.text("qqGA/zwGAAAAAAAAA=")).toBe("qqGA/zwGAAAAAAAAA=");
+    });
+
+    it("decodes lanInfo.addr as a little-endian IPv4 and marks it — in text, escaped text and objects (E3)", () => {
+      const a = new Anonymiser();
+      // 604045834 = 10.2.1.36, the byte order measured in seven exports.
+      expect(a.text('{"lanInfo":{"addr":604045834}}')).toBe('{"lanInfo":{"addr":"address-local-1"}}');
+      expect(a.text('{\\"lanInfo\\":{\\"addr\\":604045834}}')).toBe(
+        '{\\"lanInfo\\":{\\"addr\\":\\"address-local-1\\"}}',
+      );
+      expect(a.walk({ lanInfo: { addr: 604045834 } })).toEqual({ lanInfo: { addr: "address-local-1" } });
+      // 3377309888 = 192.168.77.201 — same device family, a second address.
+      expect(a.walk({ lanInfo: { addr: 3377309888 } })).toEqual({ lanInfo: { addr: "address-local-2" } });
+      expect(a.walk({ addr: 0 })).toEqual({ addr: 0 });
+    });
+  });
+
+  describe("device names — whole words, longest first, never in keys (E6, N8, N9)", () => {
+    it("a name does not rename a longer word", () => {
+      const a = new Anonymiser();
+      expect(a.text("Lamp and Lamps", ["Lamp"])).toBe("device-1 and Lamps");
+    });
+
+    it("the longer of two overlapping names wins, nothing of it is left behind", () => {
+      const a = new Anonymiser();
+      const out = a.text("Floor Lamp Hall answered, Floor Lamp did not", ["Floor Lamp", "Floor Lamp Hall"]);
+      expect(out).not.toContain("Hall");
+      expect(out).not.toContain("Floor Lamp");
+    });
+
+    it("a name with regex characters is matched literally", () => {
+      const a = new Anonymiser();
+      expect(a.text("TV (links) is off", ["TV (links)"])).toBe("device-1 is off");
+    });
+
+    it("a device named like a key renames no key of the report", () => {
+      const a = new Anonymiser();
+      expect(a.walk({ state: { value: "state of state" } }, ["state"])).toEqual({
+        state: { value: "device-1 of device-1" },
+      });
     });
   });
 

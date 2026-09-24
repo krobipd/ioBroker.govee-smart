@@ -42,7 +42,7 @@ describe("Types utilities", () => {
 
   describe("formatGatewayLabel", () => {
     it("formats gateway SKU plus BLE name", () => {
-      expect(formatGatewayLabel({ sku: "H5042", bleName: "ihoment_H5042_3795" })).toBe("H5042 (ihoment_H5042_3795)");
+      expect(formatGatewayLabel({ sku: "H5042", bleName: "ihoment_H5042_C0DE" })).toBe("H5042 (ihoment_H5042_C0DE)");
     });
 
     it("falls back to the bare SKU when no BLE name is present", () => {
@@ -63,12 +63,12 @@ describe("Types utilities", () => {
     it("never surfaces auth secrets even if present on the object", () => {
       const label = formatGatewayLabel({
         sku: "H5042",
-        bleName: "ihoment_H5042_3795",
-        secretCode: "VYb5QvZVkjE=",
+        bleName: "ihoment_H5042_C0DE",
+        secretCode: "CANARYsecret0=",
         topic: "GD/deadbeef",
       } as never);
-      expect(label).toBe("H5042 (ihoment_H5042_3795)");
-      expect(label).not.toContain("VYb5QvZVkjE=");
+      expect(label).toBe("H5042 (ihoment_H5042_C0DE)");
+      expect(label).not.toContain("CANARYsecret0=");
       expect(label).not.toContain("GD/");
     });
   });

@@ -3164,13 +3164,13 @@ describe("DeviceManager — loadFromCache merge", () => {
               device: "AABBCCDDEEFF0002",
               deviceName: "Pool",
               lastData: { tem: 2341 },
-              settings: { gatewayInfo: { sku: "H5042", bleName: "ihoment_H5042_3795" } },
+              settings: { gatewayInfo: { sku: "H5042", bleName: "ihoment_H5042_C0DE" } },
             },
           ],
         }) as never,
       );
       await dm2.pollAppApi();
-      expect(dev.gateway).toBe("H5042 (ihoment_H5042_3795)");
+      expect(dev.gateway).toBe("H5042 (ihoment_H5042_C0DE)");
 
       // Poll 2: a flaky/partial response omits gatewayInfo — the gateway must
       // NOT be cleared (set-only, so no create/delete churn on the object tree).
@@ -3188,7 +3188,7 @@ describe("DeviceManager — loadFromCache merge", () => {
         }) as never,
       );
       await dm2.pollAppApi();
-      expect(dev.gateway).toBe("H5042 (ihoment_H5042_3795)");
+      expect(dev.gateway).toBe("H5042 (ihoment_H5042_C0DE)");
     });
 
     it("removes a sold sensor absent from the App-API account list after the debounce (reported H5179 bug)", async () => {
@@ -4065,7 +4065,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     });
     dm2.setApiClient({
       hasBearerToken: () => true,
-      fetchDeviceList: () => Promise.resolve([entry("ihoment_H5042_3795")]),
+      fetchDeviceList: () => Promise.resolve([entry("ihoment_H5042_C0DE")]),
     } as never);
 
     await dm2.pollAppApi();

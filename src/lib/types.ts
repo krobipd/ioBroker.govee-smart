@@ -474,7 +474,7 @@ export interface GoveeDevice {
    * Human-readable identifier of the Govee gateway this device reaches the
    * cloud through, when it has no own WiFi (BLE→gateway sensors like the H5109
    * pool thermometer behind an H5042). Format `<gateway SKU> (<gateway BLE
-   * name>)`, e.g. `H5042 (ihoment_H5042_3795)`. Set from the App-API
+   * name>)`, e.g. `H5042 (ihoment_H5042_C0DE)`. Set from the App-API
    * `settings.gatewayInfo`; **set-only, never cleared** once seen (sticky), so
    * a flaky poll that omits it can't churn the object tree. When present the
    * device shows `info.gateway` instead of an always-empty `info.ip`.

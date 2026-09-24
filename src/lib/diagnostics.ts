@@ -691,8 +691,9 @@ export class DiagnosticsCollector {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
     }
-    // The topic embeds the account id (`GD/<hash>`), so it is a marker like any
-    // other identifier — and it is already in the redaction key list for bodies.
+    // The topic embeds the account id (`GA/<hash>`, `GD/<hash>`): the
+    // anonymiser turns it into `GA/topic-N` (audit M12 — until 2.39.x it had
+    // no pattern for it and the topic shipped as it was).
     const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: this.anon.text(String(topic)) };
     if (typeof payload === "string") {
       if (!payload) {
@@ -704,7 +705,7 @@ export class DiagnosticsCollector {
         entry.hex = capText(payload.hex, MAX_PACKET_RAW_BYTES);
       }
       if (typeof payload.rawJson === "string" && payload.rawJson) {
-        entry.rawJson = capText(payload.rawJson, MAX_PACKET_RAW_BYTES);
+        entry.rawJson = capText(this.cleanRawJson(payload.rawJson), MAX_PACKET_RAW_BYTES);
       }
       if (!entry.hex && !entry.rawJson) {
         return;
@@ -713,6 +714,24 @@ export class DiagnosticsCollector {
       return;
     }
     pushBounded(this.get(deviceId).packets, entry, MAX_PACKETS);
+  }
+
+  /**
+   * Redact and pseudonymise an MQTT envelope BEFORE it is capped — the same
+   * order as {@link recordApiFailure}. Capped first, the envelope was text that
+   * no longer parses, and a secret in front of the cut stayed out of reach of
+   * the key-based redaction (audit E4).
+   *
+   * @param rawJson The envelope as received
+   */
+  private cleanRawJson(rawJson: string): string {
+    try {
+      const parsed: unknown = JSON.parse(rawJson);
+      redactSecretsInPlace(parsed);
+      return JSON.stringify(this.anon.walk(parsed));
+    } catch {
+      return this.anon.text(rawJson);
+    }
   }
 
   /**

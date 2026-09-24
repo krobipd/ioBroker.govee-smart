@@ -89,6 +89,43 @@ const KEYED_TEXT_ESCAPED_RE = /\\"(wifiName|ssid|matterId)\\"(\s*:\s*)\\"((?:(?!
 const DIGIT_ID_TEXT_RE = /(\\?)"(deviceId|groupId)\1"(\s*:\s*)(\d+)(?![\d.])/gi;
 
 /**
+ * A Govee account or device topic (`GA/<32 hex>`, `GD/<32 hex>`) — the account
+ * push topic every MQTT envelope carries, and the gateway topic of the account
+ * list. Measured in every export under `github-exports/` (all lower-case hex);
+ * the prefix stays, it tells account from device topic.
+ */
+const TOPIC_RE = /\bG([AD])\/([0-9a-f]{12,})\b/g;
+
+/**
+ * `lanInfo.addr` of a Govee push: the device's IPv4 as one little-endian
+ * number (`604045834` = 10.2.1.36, measured in seven exports) — an address no
+ * dotted-quad pattern can see. Plain or escaped JSON inside text.
+ */
+const ADDR_TEXT_RE = /(\\?)"addr\1"(\s*:\s*)(\d+)(?![\d.])/g;
+
+/**
+ * Decode a little-endian IPv4 number, or undefined when it is not one.
+ *
+ * @param value The number as it appeared
+ */
+function littleEndianIpv4(value: unknown): string | undefined {
+  const n = typeof value === "number" ? value : typeof value === "string" && /^\d+$/.test(value) ? Number(value) : NaN;
+  if (!Number.isInteger(n) || n <= 0 || n > 0xffffffff) {
+    return undefined;
+  }
+  return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff].join(".");
+}
+
+/**
+ * Escape a device name for use inside a regular expression.
+ *
+ * @param text The literal text
+ */
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
  * Whether an IPv4 address is in a private range — worth preserving as a fact.
  *
  * @param ip The address to classify
@@ -110,6 +147,25 @@ function isPrivateIpv4(ip: string): boolean {
   // Link-local (169.254/16) — what a device shows when DHCP failed, which is
   // itself a diagnosis, so it must stay distinguishable from a routed address.
   return p[0] === 169 && p[1] === 254;
+}
+
+/**
+ * Whether an IPv6 address is local: loopback `::1`, link-local `fe80::/10`,
+ * unique-local `fc00::/7`. Everything else is routed — until 2.39.x every IPv6
+ * address was marked local (audit E5).
+ *
+ * @param ip The address to classify
+ */
+function isPrivateIpv6(ip: string): boolean {
+  const lower = ip.toLowerCase();
+  if (lower === "::1" || lower === "::") {
+    return true;
+  }
+  const first = parseInt(lower.split(":")[0] || "0", 16);
+  if (!Number.isInteger(first)) {
+    return false;
+  }
+  return (first & 0xffc0) === 0xfe80 || (first & 0xfe00) === 0xfc00;
 }
 
 /**
@@ -153,9 +209,10 @@ export class Anonymiser {
    * @param ip The address as it appeared
    */
   ip(ip: string): string {
-    const scope = IPV4_RE.test(ip) || ip.includes(".") ? (isPrivateIpv4(ip) ? "local" : "public") : "local";
-    IPV4_RE.lastIndex = 0;
-    return this.marker(`address-${scope}`, ip);
+    // An IPv4-mapped IPv6 address (`::ffff:a.b.c.d`) follows the IPv4 rule.
+    const v4 = ip.replace(/^::ffff:/i, "");
+    const local = v4.includes(".") ? isPrivateIpv4(v4) : isPrivateIpv6(ip);
+    return this.marker(`address-${local ? "local" : "public"}`, ip);
   }
 
   /**
@@ -233,15 +290,27 @@ export class Anonymiser {
         const replaced = this.digitId(lower, lower === "deviceid" ? Number(digits) : digits);
         return replaced === undefined ? m : `${esc}"${key}${esc}"${sep}${esc}"${replaced}${esc}"`;
       })
+      .replace(ADDR_TEXT_RE, (m: string, esc: string, sep: string, digits: string) => {
+        const ip = littleEndianIpv4(digits);
+        return ip === undefined ? m : `${esc}"addr${esc}"${sep}${esc}"${this.ip(ip)}${esc}"`;
+      })
+      .replace(TOPIC_RE, (m: string, kind: string) => `G${kind}/${this.marker("topic", m)}`)
       .replace(EMAIL_RE, m => this.marker("mail", m))
       .replace(IPV4_RE, m => this.ip(m))
       .replace(DEVICE_ID_RE, m => this.deviceId(m));
     // IPv6 last: its pattern also matches a run of hex groups, so device ids
     // must already be gone or they would be swallowed as addresses.
     out = out.replace(IPV6_RE, m => this.ip(m));
-    for (const name of names) {
-      if (name && name.length >= 3 && out.includes(name)) {
-        out = out.split(name).join(this.deviceName(name));
+    // Longest name first — "Floor Lamp Hall" before "Floor Lamp", or the
+    // shorter one would eat the start of the longer and leave "Hall" behind;
+    // and only as a whole word, so "Lamp" does not rename "Lamps" (audit E6/N8).
+    const byLength = [...new Set(names)].filter(n => n && n.length >= 3).sort((a, b) => b.length - a.length);
+    for (const name of byLength) {
+      if (out.includes(name)) {
+        out = out.replace(
+          new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(name)}(?![\\p{L}\\p{N}])`, "gu"),
+          this.deviceName(name),
+        );
       }
     }
     // Whole numbers only (a group id sits among timestamps and byte counts).
@@ -280,13 +349,19 @@ export class Anonymiser {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
         const key = k.toLowerCase();
         const kind = SHAPELESS_KEYS.get(key);
+        const addr = key === "addr" ? littleEndianIpv4(v) : undefined;
         const byKey =
           kind !== undefined && (typeof v === "string" || typeof v === "number") && v !== ""
             ? this.marker(kind, String(v))
             : ID_KEYS.has(key)
               ? this.digitId(key, v)
-              : undefined;
-        out[this.text(k, names, digitIds)] = byKey ?? this.walk(v, names, digitIds);
+              : addr !== undefined
+                ? this.ip(addr)
+                : undefined;
+        // A key is renamed by shape (a device id as a map key), never by a
+        // device NAME — a device called "state" would rename every `state`
+        // key of the report (audit N9).
+        out[this.text(k, [], digitIds)] = byKey ?? this.walk(v, names, digitIds);
       }
       return out;
     }

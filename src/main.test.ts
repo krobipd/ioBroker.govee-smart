@@ -1485,7 +1485,7 @@ describe("GoveeAdapter — gateway sensors", () => {
       sku: "H5109",
       deviceId: "11:22:33:44:55:66",
       type: "devices.types.thermometer",
-      gateway: "H5042 (ihoment_H5042_3795)",
+      gateway: "H5042 (ihoment_H5042_C0DE)",
     });
     const dm = i.deviceManager as unknown as { onLanIpChanged: (d: GoveeDevice, ip: string) => void };
     dm.onLanIpChanged(sensor, "10.0.0.9");
