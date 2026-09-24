@@ -1,4 +1,10 @@
-import { getMusicModeOptions, musicModeNameUsesRgb, resolveWorkModeStruct } from "../capability-mapper";
+import {
+  declaredOptionValue,
+  pickOption,
+  getMusicModeOptions,
+  musicModeNameUsesRgb,
+  resolveWorkModeStruct,
+} from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { SEGMENT_HARD_MAX } from "../device-manager/lookups";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -156,25 +162,43 @@ export async function sendWorkModeCommand(
  * `required: true` and comes from the capability's own `unit` FIELD — the
  * display string on the datapoint is an ioBroker label, not an API token.
  *
- * @param adapter  Adapter surface
- * @param device   Target device
- * @param newValue The written temperature
- * @returns true when a command was dispatched (the caller acks the state)
+ * A heater that declares `autoStop` (H7131) gets that field in the same
+ * STRUCT, from its own dropdown `control.auto_stop` (audit C-O2); either
+ * datapoint can be the one written, the other is read from the tree.
+ *
+ * @param adapter       Adapter surface
+ * @param device        Target device
+ * @param prefix        The device's state-tree prefix
+ * @param changedSuffix Which datapoint the user wrote
+ * @param newValue      The written value
+ * @returns The value to ack on the written datapoint — for the temperature the
+ *   one that went out after the range clamp (N45) — or null when nothing was sent
  */
 export async function sendTargetTemperatureCommand(
   adapter: StateChangeRouterAdapter,
   device: GoveeDevice,
+  prefix: string,
+  changedSuffix: string,
   newValue: ioBroker.StateValue,
-): Promise<boolean> {
+): Promise<{ ack: ioBroker.StateValue } | null> {
   const cap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.TEMPERATURE_SETTING);
   if (!cap) {
     adapter.log.warn(`${deviceLabel(device)}: no temperature capability — ignoring the write`);
-    return false;
+    return null;
   }
-  const written = typeof newValue === "number" ? newValue : Number(newValue);
-  if (!Number.isFinite(written)) {
-    adapter.log.warn(`${deviceLabel(device)}: ${JSON.stringify(newValue)} is not a temperature — ignoring the write`);
-    return false;
+  const base = `${adapter.namespace}.${prefix}.control`;
+  const autoStopChanged = changedSuffix === "control.auto_stop";
+  const rawTemperature = autoStopChanged
+    ? ((await adapter.getStateAsync(`${base}.target_temperature`))?.val ?? null)
+    : newValue;
+  const written = typeof rawTemperature === "number" ? rawTemperature : Number(rawTemperature);
+  if (rawTemperature === null || rawTemperature === "" || !Number.isFinite(written)) {
+    adapter.log.warn(
+      autoStopChanged
+        ? `${deviceLabel(device)}: no target temperature known yet — set it first, the auto stop goes out with it`
+        : `${deviceLabel(device)}: ${JSON.stringify(newValue)} is not a temperature — ignoring the write`,
+    );
+    return null;
   }
   const fields = cap.parameters?.fields ?? [];
   const range = fields.find(f => f && f.fieldName === "temperature")?.range;
@@ -188,8 +212,21 @@ export async function sendTargetTemperatureCommand(
   if (typeof unitField?.defaultValue === "string" && unitField.defaultValue) {
     struct.unit = unitField.defaultValue;
   }
+  const autoStopField = fields.find(f => f && f.fieldName === "autoStop");
+  if (autoStopField && Array.isArray(autoStopField.options)) {
+    const key = autoStopChanged ? newValue : ((await adapter.getStateAsync(`${base}.auto_stop`))?.val ?? null);
+    const opt = key === null ? undefined : pickOption(autoStopField.options, key);
+    if (opt) {
+      struct.autoStop = opt.value;
+    } else if (autoStopChanged) {
+      adapter.log.warn(
+        `${deviceLabel(device)}: ${JSON.stringify(newValue)} is no auto-stop option — ignoring the write`,
+      );
+      return null;
+    }
+  }
   await adapter.deviceManager!.sendCapabilityCommand(device, cap.type, cap.instance, struct);
-  return true;
+  return { ack: autoStopChanged ? newValue : temperature };
 }
 
 export async function sendMusicCommand(
@@ -350,7 +387,9 @@ export async function handleGenericCapabilityCommand(
       adapter.log.debug(
         `Routing to generic capability for ${deviceLabel(device)}: cap=${capType}/${capInstance} state=${stateSuffix} val=${JSON.stringify(val)}`,
       );
-      await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, val);
+      // A dropdown key goes out as the value Govee declared for it (M16).
+      const sendValue = declaredOptionValue(device.capabilities, capType, capInstance, val);
+      await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, sendValue);
       await adapter.setState(id, { val, ack: true });
     } catch (err) {
       adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
@@ -557,8 +596,9 @@ export async function onStateChange(
     }
 
     if (command === "targetTemperature") {
-      if (await sendTargetTemperatureCommand(adapter, device, val)) {
-        await adapter.setState(id, { val, ack: true });
+      const sent = await sendTargetTemperatureCommand(adapter, device, prefix, stateSuffix, val);
+      if (sent) {
+        await adapter.setState(id, { val: sent.ack, ack: true });
       }
       return;
     }
@@ -584,8 +624,13 @@ export async function onStateChange(
       return;
     }
 
-    await adapter.deviceManager.sendCommand(device, command, val);
-    await adapter.setState(id, { val, ack: true });
+    // Ack what went out — the LAN colour temperature is clamped to 2000–9000 K
+    // even where the device declares a wider range (N19).
+    const sent = await adapter.deviceManager.sendCommand(device, command, val);
+    await adapter.setState(id, {
+      val: command === "colorTemperature" && typeof sent === "number" ? sent : val,
+      ack: true,
+    });
     // Power-off resets all mode dropdowns (device off → no active mode).
     if (command === "power" && val === false) {
       await dropdownReset.resetModeDropdowns(adapter, prefix, "");

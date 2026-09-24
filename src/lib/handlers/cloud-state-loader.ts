@@ -1,4 +1,10 @@
-import { LAN_STATE_IDS, mapCloudStateValues, planCloudCapabilityWrites } from "../capability-mapper";
+import {
+  LAN_STATE_IDS,
+  mapCloudStateValues,
+  planCloudCapabilityWrites,
+  platformReadingsToCelsius,
+} from "../capability-mapper";
+import type { DeviceRegistry } from "../device-registry";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -16,9 +22,28 @@ export interface CloudStateLoaderAdapter {
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
   readonly rateLimiter: RateLimiter | null;
+  /** Catalog — the `platformTempUnit` quirk of a model reporting °F. */
+  readonly deviceRegistry: DeviceRegistry;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   /** `setStateChangedAsync` of the real adapter — see applyCloudCapabilities. */
   setStateChanged(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+}
+
+/** Measurement time last written per state path, per adapter (D9). */
+const measuredWrites = new WeakMap<CloudStateLoaderAdapter, Map<string, number>>();
+
+/**
+ * The measurement times this adapter already wrote.
+ *
+ * @param adapter Adapter surface
+ */
+function measuredWritesOf(adapter: CloudStateLoaderAdapter): Map<string, number> {
+  let map = measuredWrites.get(adapter);
+  if (!map) {
+    map = new Map();
+    measuredWrites.set(adapter, map);
+  }
+  return map;
 }
 
 /**
@@ -97,14 +122,20 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         const prefix = adapter.stateManager.devicePrefix(device);
 
         const writes: Promise<unknown>[] = [];
+        // A model whose platform API speaks °F (catalog quirk, M18) — the
+        // datapoint is °C.
+        const readings =
+          adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F"
+            ? platformReadingsToCelsius(caps)
+            : caps;
         // One capability can carry two datapoints (work_mode → mode + level),
         // so the list is flattened first and the LAN-shadow rule below applies
         // per RESULT — same shape and same nesting level as before.
-        for (const mapped of caps.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
+        for (const mapped of readings.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
           if (device.lanIp && LAN_STATE_IDS.has(mapped.stateId)) {
             continue;
           }
-          const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId);
+          const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId, mapped.channel);
           // Fire-and-forget — States are created before loadCloudStates runs;
           // a rejection here means the state was deleted out-of-band and
           // can be safely ignored.
@@ -182,7 +213,7 @@ export async function applyCloudCapabilities(
   const prefix = adapter.stateManager.devicePrefix(device);
   const planned = planCloudCapabilityWrites(caps, Boolean(device.lanIp), LAN_STATE_IDS, device.capabilities);
   for (const mapped of planned) {
-    await adapter.stateManager.ensureSyntheticStateObject(prefix, mapped.stateId);
+    await adapter.stateManager.ensureSyntheticStateObject(prefix, mapped.stateId, mapped.channel);
     // v2.9.1 — mirror appliance/sensor values into device.state so the diag-
     // export `state` field is honest about non-Light runtime state. Without
     // this, `state` only ever held Light fields (power/brightness/color/
@@ -202,8 +233,23 @@ export async function applyCloudCapabilities(
   // Every other repeating writer of this adapter suppresses the unchanged
   // write; this one did not (audit 2026-09-12, F6). Freshness is not carried by
   // `ts` here — `info.online` and `isSensorDataFresh` answer that question.
+  //
+  // A reading that carries its measurement time (the account list's
+  // `lastTime`, D9) is written once per MEASUREMENT with that time as `ts` —
+  // an unchanged value from a newer measurement still has to move `ts`, the
+  // same measurement polled again does not.
+  const measured = measuredWritesOf(adapter);
   const writes = planned.map(mapped => {
-    const statePath = adapter.stateManager!.resolveStatePath(prefix, mapped.stateId);
+    const statePath = adapter.stateManager!.resolveStatePath(prefix, mapped.stateId, mapped.channel);
+    if (mapped.ts !== undefined) {
+      if (measured.get(statePath) === mapped.ts) {
+        return Promise.resolve();
+      }
+      measured.set(statePath, mapped.ts);
+      return adapter
+        .setState(statePath, { val: mapped.value, ack: true, ts: mapped.ts })
+        .catch(logRejected(adapter.log, `write ${statePath}`));
+    }
     return adapter
       .setStateChanged(statePath, { val: mapped.value, ack: true })
       .catch(logRejected(adapter.log, `write ${statePath}`));

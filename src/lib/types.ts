@@ -139,6 +139,12 @@ export interface CloudStateCapability {
   instance: string;
   /** Current state value */
   state: { value: unknown };
+  /**
+   * When the device measured the value (ms epoch) — the account list's
+   * `lastData.lastTime` (audit D9, #18: a reading four months old looked
+   * current). Absent = the moment of the answer.
+   */
+  ts?: number;
 }
 
 /**

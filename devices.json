@@ -365,7 +365,10 @@
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H5052": {
       "name": "Thermo-Hygrometer",
@@ -473,7 +476,10 @@
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H5101": {
       "name": "Thermo-Hygrometer",
@@ -491,7 +497,10 @@
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H5104": {
       "name": "Thermo-Hygrometer",
@@ -641,7 +650,10 @@
       "name": "Wifi Thermometer",
       "type": "thermometer",
       "status": "verified",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H5183": {
       "name": "Thermo-Hygrometer",
@@ -3184,37 +3196,55 @@
       "name": "Smart Space Heater",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7131": {
-      "name": "Smart Space Heater (mit Nachtlicht)",
+      "name": "Smart Space Heater (with night light)",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7132": {
       "name": "Smart Space Heater",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7133": {
-      "name": "Smart Space Heater (mit Nachtlicht)",
+      "name": "Smart Space Heater (with night light)",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7134": {
-      "name": "Smart Space Heater (mit Nachtlicht)",
+      "name": "Smart Space Heater (with night light)",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7135": {
       "name": "Smart Space Heater",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7136": {
       "name": "Space Heater",
@@ -3238,13 +3268,19 @@
       "name": "Smart Space Heater",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H713B": {
       "name": "Smart Space Heater",
       "type": "heater",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H713C": {
       "name": "Space Heater",
@@ -3364,13 +3400,19 @@
       "name": "Smart Kettle",
       "type": "kettle",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7171": {
       "name": "Smart Kettle (M1-M4)",
       "type": "kettle",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7172": {
       "name": "Smart Ice Maker",
@@ -3382,7 +3424,10 @@
       "name": "Smart Kettle (Tea/Coffee/DIY)",
       "type": "kettle",
       "status": "seed",
-      "since": "2.0.0"
+      "since": "2.0.0",
+      "quirks": {
+        "platformTempUnit": "F"
+      }
     },
     "H7175": {
       "name": "Smart Kettle",

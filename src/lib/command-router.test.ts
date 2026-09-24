@@ -1,3 +1,14 @@
+import { vi } from "vitest";
+
+// The router resolves dropdown keys through the capability mapper, which reads
+// its names from adapter-core's I18n — no js-controller in a unit test.
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+    translate: vi.fn((key: string) => key),
+  },
+}));
+
 import { CloudControlRejected } from "./govee-cloud-client";
 import { CommandRouter } from "./command-router";
 import { DeviceRegistry } from "./device-registry";
@@ -160,6 +171,17 @@ describe("CommandRouter", () => {
       await router.sendCommand(makeDevice(), "colorTemperature", 4000);
       expect(lan.calls[0].method).toBe("setColorTemperature");
       expect(lan.calls[0].args).toEqual(["192.168.1.42", 4000]);
+    });
+
+    it("reports the clamped LAN colour temperature as the value that went out (N19)", async () => {
+      // H1630/H1771 declare 1000–10000 K; the LAN packet carries 2000–9000.
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      expect(await router.sendCommand(makeDevice(), "colorTemperature", 1500)).toBe(2000);
+      expect(await router.sendCommand(makeDevice(), "colorTemperature", 9800)).toBe(9000);
+      expect(await router.sendCommand(makeDevice(), "colorTemperature", 4000)).toBe(4000);
+      expect(await router.sendCommand(makeDevice(), "brightness", 55)).toBe(55);
     });
 
     it("routes gradientToggle to LAN setGradient", async () => {
@@ -457,6 +479,27 @@ describe("CommandRouter", () => {
       const router = new CommandRouter(mockLog, noopTimers, registry);
       expect(router.toCloudValue(makeDevice(), "power", true)).toBe(1);
       expect(router.toCloudValue(makeDevice(), "power", false)).toBe(0);
+    });
+
+    it("scene sends the presetScene option value Govee declared, not the dropdown's text key (M16)", () => {
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      const dev = makeDevice({
+        capabilities: [
+          {
+            type: "devices.capabilities.mode",
+            instance: "presetScene",
+            parameters: {
+              dataType: "ENUM",
+              options: [
+                { name: "Sunrise", value: 1 },
+                { name: "Candle", value: 2 },
+              ],
+            },
+          },
+        ] as GoveeDevice["capabilities"],
+      });
+      expect(router.toCloudValue(dev, "scene", "2")).toBe(2);
+      expect(router.toCloudValue(dev, "scene", "7")).toBe("7"); // undeclared — unchanged
     });
 
     it("converts colorRgb hex to packed int", () => {

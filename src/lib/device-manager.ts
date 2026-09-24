@@ -1995,7 +1995,7 @@ export class DeviceManager {
    * @param command Command type
    * @param value Command value
    */
-  async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
+  async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<unknown> {
     return this.commandRouter.sendCommand(device, command, value);
   }
 

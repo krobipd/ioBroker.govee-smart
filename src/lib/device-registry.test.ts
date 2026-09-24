@@ -285,6 +285,52 @@ describe("DeviceRegistry", () => {
   });
 });
 
+describe("devices.json — platformTempUnit (2.40.0, audit M18)", () => {
+  // govee2mqtt src/service/quirks.rs, `with_platform_temperature_sensor_units(Fahrenheit)`,
+  // read 2026-09-24 — exactly these 15 models, no more.
+  const GOVEE2MQTT_FAHRENHEIT = [
+    "H5051",
+    "H5100",
+    "H5103",
+    "H5179",
+    "H7130",
+    "H7131",
+    "H7132",
+    "H7133",
+    "H7134",
+    "H7135",
+    "H713A",
+    "H713B",
+    "H7170",
+    "H7171",
+    "H7173",
+  ];
+
+  it("carries the quirk on exactly govee2mqtt's list", () => {
+    const file = path.resolve(__dirname, "..", "..", "devices.json");
+    const real = JSON.parse(fs.readFileSync(file, "utf-8")) as {
+      devices: Record<string, { quirks?: { platformTempUnit?: unknown } }>;
+    };
+    const carrying = Object.entries(real.devices)
+      .filter(([, e]) => e.quirks?.platformTempUnit !== undefined)
+      .map(([sku]) => sku)
+      .sort();
+    expect(carrying).toEqual([...GOVEE2MQTT_FAHRENHEIT].sort());
+    for (const sku of carrying) {
+      expect(real.devices[sku].quirks?.platformTempUnit).toBe("F");
+    }
+  });
+
+  it("the verified H5179 applies it by default, a seed model only with the experimental toggle", () => {
+    const file = path.resolve(__dirname, "..", "..", "devices.json");
+    const dormant = new DeviceRegistry({ filePath: file });
+    const active = new DeviceRegistry({ filePath: file, experimental: true });
+    expect(dormant.getQuirks("H5179")?.platformTempUnit).toBe("F");
+    expect(dormant.getQuirks("H7131")).toBeUndefined();
+    expect(active.getQuirks("H7131")?.platformTempUnit).toBe("F");
+  });
+});
+
 describe("isSeedAndDormant — the experimental-toggle nudge", () => {
   it("is true only for a seed entry while the experimental toggle is OFF", () => {
     const reg = new DeviceRegistry({ data: SAMPLE });

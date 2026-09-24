@@ -1,6 +1,17 @@
 import { vi } from "vitest";
+
+// The event tests run a message through to the capability mapper, which reads
+// its datapoint names from adapter-core's I18n — no js-controller in a unit test.
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: vi.fn((key: string) => ({ en: key })),
+    translate: vi.fn((key: string) => key),
+  },
+}));
+
 import { GoveeOpenapiMqttClient } from "./govee-openapi-mqtt-client";
-import type { TimerAdapter } from "./types";
+import { LAN_STATE_IDS, planCloudCapabilityWrites } from "./capability-mapper";
+import type { CloudStateCapability, TimerAdapter } from "./types";
 
 /**
  * Lifecycle tests for the OpenAPI-MQTT client (constructor + disconnect) plus
@@ -295,6 +306,63 @@ describe("GoveeOpenapiMqttClient", () => {
       feed(msg);
       expect(events).toEqual([{ sku: "H5179", device: "AA:BB", capabilities: msg.capabilities }]);
       expect(raws).toEqual([JSON.stringify(msg)]);
+    });
+
+    // Govee's own examples, verbatim (developer.govee.com/reference/subscribe-device-event,
+    // read 2026-09-24): `state` is an ARRAY of {name, value, message?}. Until 2.40.0
+    // it went through unchanged and no event ever reached a datapoint (audit H2).
+    const H7172_LACK_WATER = {
+      sku: "H7172",
+      device: "41:DA:D4:AD:FC:46:00:64",
+      deviceName: "H7172",
+      capabilities: [
+        {
+          type: "devices.capabilities.event",
+          instance: "lackWaterEvent",
+          state: [{ name: "lack", value: 1, message: "Lack of Water" }],
+        },
+      ],
+    };
+    const h5127 = (name: string, value: number): unknown => ({
+      sku: "H5127",
+      device: "06:30:60:74:F4:45:B9:DA",
+      deviceName: "Presence Sensor",
+      capabilities: [{ type: "devices.capabilities.event", instance: "bodyAppearedEvent", state: [{ name, value }] }],
+    });
+    const writesOf = (event: unknown): unknown =>
+      planCloudCapabilityWrites((event as { capabilities: CloudStateCapability[] }).capabilities, false, LAN_STATE_IDS);
+
+    it("normalises Govee's event array to state.value — H7172 water alarm reaches lack_water_event", () => {
+      const { events, feed } = makeClient();
+      feed(H7172_LACK_WATER);
+      expect(events).toHaveLength(1);
+      expect((events[0] as { capabilities: CloudStateCapability[] }).capabilities[0].state).toEqual({ value: 1 });
+      expect(writesOf(events[0])).toEqual([{ stateId: "lack_water_event", value: true, channel: "events" }]);
+    });
+
+    it("H5127 presence 1 = someone there, 2 = absence (homebridge-govee reads it the same way)", () => {
+      const { events, feed } = makeClient();
+      feed(h5127("Presence", 1));
+      feed(h5127("Absence", 2));
+      expect(writesOf(events[0])).toEqual([{ stateId: "body_appeared_event", value: true, channel: "events" }]);
+      expect(writesOf(events[1])).toEqual([{ stateId: "body_appeared_event", value: false, channel: "events" }]);
+    });
+
+    it("an event value it does not declare writes nothing — never guessed into false", () => {
+      const { events, feed } = makeClient();
+      feed({
+        ...H7172_LACK_WATER,
+        capabilities: [{ ...H7172_LACK_WATER.capabilities[0], state: [{ name: "x", value: 0 }] }],
+      });
+      feed(h5127("Unknown", 3));
+      expect(writesOf(events[0])).toEqual([]);
+      expect(writesOf(events[1])).toEqual([]);
+    });
+
+    it("an event array without any value becomes an empty value, not a crash", () => {
+      const { events, feed } = makeClient();
+      feed({ ...H7172_LACK_WATER, capabilities: [{ ...H7172_LACK_WATER.capabilities[0], state: [{ name: "lack" }] }] });
+      expect(writesOf(events[0])).toEqual([]);
     });
 
     it("drops messages without device info, without/empty/all-malformed capabilities", () => {

@@ -13,11 +13,12 @@ import * as path from "node:path";
  * allowed — SKU-specific notes go into the per-release issue tracker or
  * the Wiki Devices page, not into the schema.
  *
- * Four pattern families cover all observed Govee quirks:
+ * Pattern families of the observed Govee quirks:
  *  1. Range-Override: API reports a wrong numeric range (colorTempRange)
  *  2. Boolean-Flag: per-SKU behaviour toggle (brokenPlatformApi)
  *  3. Map-Override: per-operation routing/behaviour map (transportOverrides)
- *  4. Number-Override: API reports a wrong scalar (segmentCount)
+ *  4. Number-Override: API reports a wrong scalar (segmentCount, statusCmdVersion)
+ *  5. Unit-Override: API reports a value in another unit (platformTempUnit)
  */
 export interface DeviceQuirks {
   /** Override color-temperature range (Govee API often claims a flat 2000-9000K, real range is narrower). */
@@ -54,6 +55,16 @@ export interface DeviceQuirks {
    * entry like every quirk until the experimental toggle is on.
    */
   statusCmdVersion?: 1 | 2;
+  /**
+   * The unit the OpenAPI `/device/state` reports `sensorTemperature` in. Govee
+   * sends whatever unit the app is set to for these models (homebridge-govee
+   * `response-parser.js`: "in whatever unit the Govee app is set to"); `"F"`
+   * converts it to °C before it reaches the °C datapoint. The list follows
+   * govee2mqtt `src/service/quirks.rs` (`with_platform_temperature_sensor_units`,
+   * 15 models, read 2026-09-24). Only the `/device/state` reading — the account
+   * list's `tem` is hundredths of °C whatever the app shows (#18).
+   */
+  platformTempUnit?: "F";
 }
 
 /**

@@ -47,6 +47,7 @@ const KNOWN_QUIRK_FIELDS = new Set([
   "transportOverrides",
   "segmentCount",
   "statusCmdVersion",
+  "platformTempUnit",
 ]);
 
 /**
@@ -178,6 +179,9 @@ function validate(devicesJsonPath: string): Issue[] {
         }
         if (q.statusCmdVersion !== undefined && q.statusCmdVersion !== 1 && q.statusCmdVersion !== 2) {
           issues.push({ sku, msg: `'statusCmdVersion' must be 1 or 2 (got ${JSON.stringify(q.statusCmdVersion)})` });
+        }
+        if (q.platformTempUnit !== undefined && q.platformTempUnit !== "F") {
+          issues.push({ sku, msg: `'platformTempUnit' must be "F" (got ${JSON.stringify(q.platformTempUnit)})` });
         }
         if (q.transportOverrides !== undefined) {
           const t = q.transportOverrides;

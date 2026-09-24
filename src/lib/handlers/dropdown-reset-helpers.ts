@@ -23,6 +23,7 @@ export const STATE_TO_COMMAND: Readonly<Record<string, string>> = {
   "control.work_mode": "workMode",
   "control.mode_value": "workMode",
   "control.target_temperature": "targetTemperature",
+  "control.auto_stop": "targetTemperature",
   "scenes.light_scene": "lightScene",
   "scenes.diy_scene": "diyScene",
   "scenes.scene_speed": "sceneSpeed",

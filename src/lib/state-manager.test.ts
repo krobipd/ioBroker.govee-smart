@@ -15,7 +15,7 @@ import { CLOUD_ONLINE_EVIDENCE_TTL_MS } from "./timing-constants";
 /** Catalog without entries — the state-manager tests do not exercise quirks. */
 const registry = new DeviceRegistry({ data: { devices: {} } });
 import type { GoveeDevice } from "./types";
-import { LAN_STATE_IDS, type StateDefinition } from "./capability-mapper";
+import { LAN_STATE_IDS, mapCapabilities, type StateDefinition } from "./capability-mapper";
 
 /**
  * Test helper — runs the full state-creation sequence (info + LAN + Cloud)
@@ -537,6 +537,89 @@ describe("StateManager", () => {
       expect(deleted).toContain(`${prefix}.sensor.online`);
       expect(deleted).not.toContain(`${prefix}.sensor.temperature`);
       expect(deleted).not.toContain(`${prefix}.sensor`);
+    });
+  });
+
+  describe("a setpoint and a reading sharing an id (audit C12)", () => {
+    it("each value lands in its own channel, whatever the channel map holds", async () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const prefix = "devices.h7141_0a0b";
+      // Both defs built — the map keeps ONE channel per id, the last one.
+      await sm.createCloudStates(
+        createTestDevice({ sku: "H7141", deviceId: "AABBCCDDEEFF0A0B" }),
+        [
+          { id: "humidity", name: "Target", type: "number", role: "level.humidity", write: true, channel: "control" },
+          { id: "humidity", name: "Reading", type: "number", role: "value.humidity", write: false, channel: "sensor" },
+        ] as StateDefinition[],
+        0,
+      );
+      expect(sm.resolveStatePath(prefix, "humidity", "control")).toBe(`${prefix}.control.humidity`);
+      expect(sm.resolveStatePath(prefix, "humidity", "sensor")).toBe(`${prefix}.sensor.humidity`);
+    });
+
+    it("a setpoint value is no synthetic reading — it creates no sensor.humidity next to it", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const prefix = "devices.h7141_0c0d";
+      // Only the setpoint exists (range/humidity) — no reading was ever declared.
+      await sm.createCloudStates(
+        createTestDevice({ sku: "H7141", deviceId: "AABBCCDDEEFF0C0D" }),
+        [
+          { id: "humidity", name: "Target", type: "number", role: "level.humidity", write: true, channel: "control" },
+        ] as StateDefinition[],
+        0,
+      );
+      await sm.ensureSyntheticStateObject(prefix, "humidity", "control");
+      expect(objects.has(`${prefix}.sensor.humidity`)).toBe(false);
+      expect(sm.resolveStatePath(prefix, "humidity")).toBe(`${prefix}.control.humidity`);
+    });
+  });
+
+  describe("migration of the LAN colour-temperature limits (2.40.0, M7)", () => {
+    it("an existing 2000/9000 object takes the declared 2200/6500 on the next LAN build", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice({
+        sku: "H6076",
+        deviceId: "AABBCCDDEEFF6076",
+        lanIp: "192.168.1.60",
+        // issue-44-h6076-diag.json.txt
+        capabilities: [
+          {
+            type: "devices.capabilities.color_setting",
+            instance: "colorTemperatureK",
+            parameters: { dataType: "INTEGER", range: { min: 2200, max: 6500, precision: 1 } },
+          },
+        ] as GoveeDevice["capabilities"],
+      });
+      const ctId = `${sm.devicePrefix(dev)}.control.color_temperature`;
+      objects.set(ctId, { type: "state", common: { min: 2000, max: 9000, def: 2000 }, native: {} });
+      await sm.createLanStates(dev);
+      const common = (objects.get(ctId) as { common: { min: number; max: number } }).common;
+      expect({ min: common.min, max: common.max }).toEqual({ min: 2200, max: 6500 });
+    });
+  });
+
+  describe("migration of renamed Cloud-owned datapoints (2.40.0)", () => {
+    it("the old CO2 ids leave on the next Cloud rebuild, sensor.co2 stays (C14/N20)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const prefix = "devices.h5140_0a0b";
+      objects.set(`${prefix}.sensor`, { type: "channel" });
+      objects.set(`${prefix}.sensor.carbon_dioxide_concentration`, { type: "state" }); // up to 2.39.x
+      objects.set(`${prefix}.sensor.co2concentration`, { type: "state" }); // up to 2.39.x
+      objects.set(`${prefix}.sensor.co2`, { type: "state" });
+      const defs = mapCapabilities(
+        [{ type: "devices.capabilities.property", instance: "carbonDioxideConcentration" }],
+        adapter.log as never,
+      );
+      expect(defs.map(d => d.id)).toEqual(["co2"]);
+      await sm.cleanupCloudOwnedStates(prefix, defs);
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).toContain(`${prefix}.sensor.carbon_dioxide_concentration`);
+      expect(deleted).toContain(`${prefix}.sensor.co2concentration`);
+      expect(deleted).not.toContain(`${prefix}.sensor.co2`);
     });
   });
 
@@ -1705,6 +1788,13 @@ describe("StateManager", () => {
       expect(sm.resolveStatePath("devices.hxxxx_yy", "ice_full_event")).toBe("devices.hxxxx_yy.events.ice_full_event");
       expect(sm.resolveStatePath("devices.hxxxx_yy", "body_appeared")).toBe("devices.hxxxx_yy.events.body_appeared");
       expect(sm.resolveStatePath("devices.hxxxx_yy", "dirt_detected")).toBe("devices.hxxxx_yy.events.dirt_detected");
+      // The ids Govee's real instance names produce (bodyAppearedEvent, dirtDetectedEvent).
+      expect(sm.resolveStatePath("devices.hxxxx_yy", "body_appeared_event")).toBe(
+        "devices.hxxxx_yy.events.body_appeared_event",
+      );
+      expect(sm.resolveStatePath("devices.hxxxx_yy", "dirt_detected_event")).toBe(
+        "devices.hxxxx_yy.events.dirt_detected_event",
+      );
     });
   });
 

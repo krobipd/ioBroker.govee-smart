@@ -2881,12 +2881,15 @@ describe("DeviceManager — loadFromCache merge", () => {
         type: "devices.capabilities.property",
         instance: "sensorTemperature",
         state: { value: 23.7 },
+        ts: 1776704461000, // the reading's own measurement time (D9)
       });
       expect(caps[2]).toEqual({
         type: "devices.capabilities.property",
         instance: "sensorHumidity",
         state: { value: 42.9 },
+        ts: 1776704461000,
       });
+      // settings.battery has no measurement time of its own.
       expect(caps[3]).toEqual({
         type: "devices.capabilities.property",
         instance: "battery",
@@ -3315,7 +3318,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       dm2.handleOpenApiEvent({
         sku: "H5179",
         device: "AABBCCDDEEFF0002",
-        capabilities: [{ type: "devices.capabilities.event", instance: "lackWaterEvent", state: { value: true } }],
+        capabilities: [{ type: "devices.capabilities.event", instance: "lackWaterEvent", state: { value: 1 } }],
       });
       expect(seen).toHaveLength(1);
       expect((seen[0] as Array<{ instance: string }>)[0].instance).toBe("lackWaterEvent");
@@ -3530,7 +3533,7 @@ describe("DeviceManager — loadFromCache merge", () => {
         device: "AABBCCDDEEFF0083",
         capabilities: [
           { type: "devices.capabilities.online", instance: "online", state: { value: true } },
-          { type: "devices.capabilities.event", instance: "lackWaterEvent", state: { value: true } },
+          { type: "devices.capabilities.event", instance: "lackWaterEvent", state: { value: 1 } },
         ],
       });
 

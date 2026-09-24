@@ -9,6 +9,7 @@ import {
   type TimerAdapter,
 } from "./types";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import { declaredOptionValue } from "./capability-mapper";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 
 /**
@@ -22,7 +23,7 @@ export type HeldIntent =
   | { kind: "capability"; capabilityType: string; capabilityInstance: string; value: unknown };
 import { CloudControlRejected, type GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
-import { applySceneSpeed } from "./govee-lan-client";
+import { applySceneSpeed, lanColorTemperatureK } from "./govee-lan-client";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { resolveSegmentCount, SEGMENT_HARD_MAX } from "./device-manager/lookups";
@@ -337,13 +338,16 @@ export class CommandRouter {
    * @param device Target device
    * @param command Command type
    * @param value Command value
+   * @returns The value that went out — the written one, except where the
+   *   transport carries less (LAN colour temperature, N19); the caller acks it
    */
-  async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<void> {
+  async sendCommand(device: GoveeDevice, command: string, value: unknown): Promise<unknown> {
     const decision = this.resolveTransport(device, command);
     const transport = this.decisionToChannelMarker(decision);
     try {
-      await this.dispatchCommand(device, command, value, decision);
-      this.onCommandResult?.(device.deviceId, { stateId: command, value, transport, ok: true });
+      const sent = await this.dispatchCommand(device, command, value, decision);
+      this.onCommandResult?.(device.deviceId, { stateId: command, value: sent, transport, ok: true });
+      return sent;
     } catch (e) {
       // Report the failure, then rethrow — the caller owns the "Command failed"
       // warn and the ack decision; this only makes the outcome visible in the
@@ -370,13 +374,14 @@ export class CommandRouter {
    * @param command Command type
    * @param value Command value
    * @param decision Routing decision from resolveTransport
+   * @returns The value that went out (see {@link sendCommand})
    */
   private async dispatchCommand(
     device: GoveeDevice,
     command: string,
     value: unknown,
     decision: TransportDecision,
-  ): Promise<void> {
+  ): Promise<unknown> {
     // Diag-log: one line, marker derived from the actual decision (not the
     // configured channel). JSON.stringify keeps `[object Object]` out of
     // the trace for object-valued commands like segmentBatch.
@@ -394,24 +399,26 @@ export class CommandRouter {
     // sendSegmentBatchParsed.
     if (command.startsWith("segmentColor:")) {
       await this.dispatchSegmentColor(device, command, value, decision);
-      return;
+      return value;
     }
     if (command === "segmentBatch") {
       await this.dispatchSegmentBatch(device, value, decision);
-      return;
+      return value;
     }
     if (command.startsWith("segmentBrightness:")) {
       await this.dispatchSegmentBrightness(device, command, value, decision);
-      return;
+      return value;
     }
 
     // Generic dispatch
     if (decision.kind === "lan") {
       await this.sendLanCommand(device, command, value);
-      return;
+      // The LAN packet carries 2000–9000 K whatever the device declares (N19).
+      return command === "colorTemperature" && typeof value === "number" ? lanColorTemperatureK(value) : value;
     }
     // decision.kind === "cloud"
     await this.sendCloudCommand(device, command, value);
+    return value;
   }
 
   /**
@@ -808,7 +815,8 @@ export class CommandRouter {
       case "colorTemperature":
         return value;
       case "scene":
-        return value;
+        // The dropdown key is text; Govee declared a number (M16).
+        return declaredOptionValue(device.capabilities, "devices.capabilities.mode", "presetScene", value);
       case "gradientToggle":
         // Govee toggle-cap expects 0/1, not boolean.
         return value ? 1 : 0;

@@ -431,7 +431,7 @@ export class GoveeLanClient {
    * @param kelvin Color temperature in Kelvin
    */
   setColorTemperature(ip: string, kelvin: number): void {
-    const clamped = Number.isFinite(kelvin) ? Math.max(2000, Math.min(9000, Math.round(kelvin))) : 2000;
+    const clamped = lanColorTemperatureK(kelvin);
     this.sendCommand(ip, "colorwc", {
       color: { r: 0, g: 0, b: 0 },
       colorTemInKelvin: clamped,
@@ -1083,4 +1083,16 @@ export function applySceneSpeed(scenceParam: string, speedLevel: number, speedCo
   }
 
   return Buffer.from(bytes).toString("base64");
+}
+
+/**
+ * The colour temperature the LAN protocol actually carries: Govee's published
+ * LAN range 2000–9000 K, rounded. A device may declare a wider range
+ * (H1630/H1771: 1000–10000) — what goes out over LAN is still this, and the
+ * router confirms THIS value, not the written one (audit N19).
+ *
+ * @param kelvin Requested colour temperature
+ */
+export function lanColorTemperatureK(kelvin: number): number {
+  return Number.isFinite(kelvin) ? Math.max(2000, Math.min(9000, Math.round(kelvin))) : 2000;
 }

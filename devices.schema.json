@@ -99,6 +99,10 @@
           "enum": [1, 2],
           "description": "cmdVersion of the status request published over the account broker (default 2). Only H6121 is known to need 1 (homebridge-govee device-capabilities.js). A device sent the wrong version stays silent."
         },
+        "platformTempUnit": {
+          "enum": ["F"],
+          "description": "Unit of the OpenAPI /device/state sensorTemperature — 'F' converts it to °C. Models per govee2mqtt quirks.rs (with_platform_temperature_sensor_units). The account list's reading is unaffected (hundredths of °C)."
+        },
         "brokenPlatformApi": {
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."

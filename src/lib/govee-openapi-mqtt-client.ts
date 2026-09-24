@@ -184,7 +184,13 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
 
   /**
    * Parse incoming MQTT event message.
-   * Expected format: { sku, device, capabilities: [{ type, instance, state: { value } }] }
+   *
+   * Govee's format (developer.govee.com/reference/subscribe-device-event):
+   * `{ sku, device, deviceName, capabilities: [{ type, instance, state: [{ name, value, message? }] }] }`
+   * — `state` is an ARRAY here, unlike `/device/state`'s `state: { value }`.
+   * It is normalised to `state: { value }` at this boundary, so every consumer
+   * reads the one shape; until 2.40.0 it went through unchanged, `state.value`
+   * was undefined and no event ever reached a datapoint (audit H2).
    *
    * @param payload Raw MQTT message buffer
    */
@@ -238,10 +244,28 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         return;
       }
 
-      const event: OpenApiMqttEvent = { sku, device, capabilities: caps };
+      const event: OpenApiMqttEvent = { sku, device, capabilities: caps.map(normaliseEventState) };
       this.onEvent?.(event);
     } catch {
       this.log.debug(`Cloud-events: failed to parse message: ${payload.toString().slice(0, 200)}`);
     }
   }
+}
+
+/**
+ * `state: [{ name, value }]` (the event form) → `state: { value }` (the form
+ * every other Cloud path delivers). The first entry that carries a value wins —
+ * Govee's examples carry exactly one. Any other shape passes unchanged.
+ *
+ * @param cap One capability of an event message
+ */
+function normaliseEventState(cap: CloudStateCapability): CloudStateCapability {
+  const state: unknown = (cap as { state?: unknown }).state;
+  if (!Array.isArray(state)) {
+    return cap;
+  }
+  const entry = state.find(
+    (e: unknown): e is { value: unknown } => e !== null && typeof e === "object" && "value" in e,
+  );
+  return { ...cap, state: { value: entry?.value } };
 }

@@ -177,9 +177,23 @@ export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
     descKey: "descBodyDetected",
     channel: "events",
   },
+  body_appeared_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.body_appeared_event.role,
+    nameKey: "bodyDetected",
+    descKey: "descBodyDetected",
+    channel: "events",
+  },
   dirt_detected: {
     type: "boolean",
     role: EVENT_STATE_ROLES.dirt_detected.role,
+    nameKey: "dirtDetected",
+    descKey: "descDirtDetected",
+    channel: "events",
+  },
+  dirt_detected_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.dirt_detected_event.role,
     nameKey: "dirtDetected",
     descKey: "descDirtDetected",
     channel: "events",
@@ -647,10 +661,13 @@ export class StateManager {
    *
    * @param prefix Device object ID prefix
    * @param stateId State ID suffix
+   * @param channel The value's own channel, where it knows one — wins over the
+   *   map, which holds ONE channel per id (a setpoint and a reading sharing an
+   *   id would otherwise share a path, audit C12)
    */
-  resolveStatePath(prefix: string, stateId: string): string {
-    const channel = this.stateChannelMap.get(`${prefix}.${stateId}`) ?? inferChannelFromStateId(stateId);
-    return `${prefix}.${channel}.${stateId}`;
+  resolveStatePath(prefix: string, stateId: string, channel?: string): string {
+    const resolved = channel ?? this.stateChannelMap.get(`${prefix}.${stateId}`) ?? inferChannelFromStateId(stateId);
+    return `${prefix}.${resolved}.${stateId}`;
   }
 
   /**
@@ -666,10 +683,16 @@ export class StateManager {
    *
    * @param prefix Device prefix (e.g. "devices.h5179_aabb")
    * @param stateId State ID without channel (e.g. "battery")
+   * @param valueChannel The value's own channel — a value of another channel
+   *   than the synthetic one (the `range/humidity` setpoint next to the
+   *   `humidity` reading) is no synthetic datapoint and is left alone (C12)
    */
-  async ensureSyntheticStateObject(prefix: string, stateId: string): Promise<void> {
+  async ensureSyntheticStateObject(prefix: string, stateId: string, valueChannel?: string): Promise<void> {
     const meta = SYNTHETIC_STATE_META[stateId.toLowerCase()];
     if (!meta) {
+      return;
+    }
+    if (valueChannel !== undefined && valueChannel !== meta.channel) {
       return;
     }
     const channel = inferChannelFromStateId(stateId);

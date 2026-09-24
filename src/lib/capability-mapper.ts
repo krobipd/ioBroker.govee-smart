@@ -377,8 +377,10 @@ function mapRange(cap: CloudCapability): StateDefinition[] {
       type: "number",
       role: isBrightness ? "level.brightness" : "level",
       write: true,
-      min: range?.min ?? 0,
-      max: range?.max ?? 100,
+      // Only the limits Govee reported — an invented 0–100 on a range it did not
+      // describe clamps a legitimate value in every UI (audit C-O1).
+      min: range?.min,
+      max: range?.max,
       unit: normalizeUnit(cap.parameters?.unit),
       def: range?.min ?? 0,
       capabilityType: cap.type,
@@ -417,8 +419,10 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
         type: "number",
         role: "level.color.temperature",
         write: true,
-        min: range?.min ?? 2000,
-        max: range?.max ?? 9000,
+        // Only the limits Govee reported (audit C-O1); the catalog quirk can
+        // still set them (applyQuirksToStates).
+        min: range?.min,
+        max: range?.max,
         unit: "K",
         def: range?.min ?? 2000,
         capabilityType: cap.type,
@@ -497,6 +501,57 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
 }
 
 /**
+ * Resolve a written value against an option list: key first, then label.
+ *
+ * @param options Option list to search
+ * @param raw     Written datapoint value
+ */
+export function pickOption(
+  options: readonly CapabilityOption[],
+  raw: ioBroker.StateValue,
+): CapabilityOption | undefined {
+  if (raw === null || raw === undefined) {
+    return undefined;
+  }
+  const s = String(raw).trim();
+  if (!s) {
+    return undefined;
+  }
+  return (
+    options.find(o => o && o.value !== undefined && o.value !== null && safeStringify(o.value) === s) ??
+    options.find(o => o && typeof o.name === "string" && o.name.toLowerCase() === s.toLowerCase())
+  );
+}
+
+/**
+ * The value Govee declared for a written dropdown key. A `mode` dropdown is
+ * keyed by the option value as TEXT (`states: {"3": "Rhythm"}`, `type: mixed`),
+ * so the write arrives as `"3"` — Govee's options and examples are integers
+ * (H7131 `nightlightScene`, issue47 fixture). Until 2.40.0 the text went out
+ * unchanged (audit M16). An ENUM capability hands back its option's own value;
+ * anything else (no declared options, no match) passes unchanged.
+ *
+ * @param declared The device's declared capabilities
+ * @param type     Capability type
+ * @param instance Capability instance
+ * @param raw      Written datapoint value
+ */
+export function declaredOptionValue(
+  declared: readonly CloudCapability[],
+  type: string,
+  instance: string,
+  raw: unknown,
+): unknown {
+  const cap = declared.find(c => c && c.type === type && c.instance === instance);
+  const options = cap?.parameters?.dataType === "ENUM" ? cap.parameters.options : undefined;
+  if (!Array.isArray(options) || options.length === 0) {
+    return raw;
+  }
+  const opt = pickOption(options, raw as ioBroker.StateValue);
+  return opt ? opt.value : raw;
+}
+
+/**
  * Canonical (role, unit) for the numeric Govee sensor kinds — the single
  * source of truth shared between {@link mapProperty} (Cloud property caps) and
  * state-manager's synthetic-state table, so a reading gets the same role + unit
@@ -523,8 +578,44 @@ export const EVENT_STATE_ROLES = {
   ice_full: { role: "indicator.maintenance" },
   ice_full_event: { role: "indicator.maintenance" },
   body_appeared: { role: "sensor.motion" },
+  body_appeared_event: { role: "sensor.motion" },
   dirt_detected: { role: "indicator.maintenance" },
+  dirt_detected_event: { role: "indicator.maintenance" },
 } as const;
+
+/**
+ * What an event's value means. Govee's messages carry `state[0].value`
+ * (developer.govee.com/reference/subscribe-device-event): H7172/H7151
+ * `lackWaterEvent` 1 = the alarm, H5127 `bodyAppearedEvent` 1 = presence and
+ * 2 = absence (homebridge-govee `openapi.js`: `!(Number(value) - 1)`). An event
+ * without a declared all-clear only ever sets `true`; its datapoint holds the
+ * last reported event until another report says otherwise (audit N42).
+ */
+const EVENT_VALUES: Record<string, { on: number; off?: number }> = {
+  bodyAppearedEvent: { on: 1, off: 2 },
+};
+
+/**
+ * The datapoint value of one event report, or null for a value the event does
+ * not declare (never guessed into `true`/`false`).
+ *
+ * @param instance Govee event instance, e.g. `bodyAppearedEvent`
+ * @param raw The reported value
+ */
+function eventStateValue(instance: string, raw: unknown): boolean | null {
+  const meaning = EVENT_VALUES[instance] ?? { on: 1 };
+  const n = typeof raw === "boolean" ? (raw ? 1 : 0) : coerceNum(raw);
+  if (n === meaning.on) {
+    return true;
+  }
+  if (meaning.off !== undefined && n === meaning.off) {
+    return false;
+  }
+  return null;
+}
+
+/** Sanitised instance ids that all mean the CO2 reading. */
+const CO2_IDS = new Set(["carbon_dioxide", "carbondioxide", "carbon_dioxide_concentration", "co2concentration"]);
 
 /**
  * The one state id for a sensor reading or an event, whichever path delivers
@@ -542,7 +633,10 @@ export const EVENT_STATE_ROLES = {
  */
 export function canonicalSyntheticId(instance: string): string {
   const id = sanitizeId(instance).replace(/^sensor_/, "");
-  if (id === "carbon_dioxide" || id === "carbondioxide") {
+  // `carbonDioxideConcentration` is Govee's documented CO2 instance, and
+  // `co2Concentration` the short form — both ended as their own datapoint
+  // next to an unused `sensor.co2` until 2.40.0 (audit C14/N20).
+  if (CO2_IDS.has(id)) {
     return "co2";
   }
   return id;
@@ -687,25 +781,7 @@ export function resolveWorkModeStruct(
   const modeOptions = fields.find(f => f && f.fieldName === "workMode")?.options ?? [];
   const levelOptions = fields.find(f => f && f.fieldName === "modeValue")?.options ?? [];
 
-  /**
-   * Resolve a written value against an option list: key first, then label.
-   *
-   * @param options Option list to search
-   * @param raw     Written datapoint value
-   */
-  const pick = (options: readonly CapabilityOption[], raw: ioBroker.StateValue): CapabilityOption | undefined => {
-    if (raw === null || raw === undefined) {
-      return undefined;
-    }
-    const s = String(raw).trim();
-    if (!s) {
-      return undefined;
-    }
-    return (
-      options.find(o => o && o.value !== undefined && o.value !== null && safeStringify(o.value) === s) ??
-      options.find(o => o && typeof o.name === "string" && o.name.toLowerCase() === s.toLowerCase())
-    );
-  };
+  const pick = pickOption;
 
   const groups = levelOptions.filter(o => o && Array.isArray(o.options) && o.options.length > 0);
   const flatLevels = levelOptions.filter(
@@ -854,6 +930,48 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
 }
 
 /**
+ * The `autoStop` field of a heater's temperature setting (H7131, issue #4
+ * fixture: ENUM `Auto Stop` = 1 / `Maintain` = 0, `defaultValue` 0,
+ * `required: false`): stop heating at the target, or keep it. Its own
+ * dropdown, sent inside the same STRUCT as the temperature (audit C-O2).
+ * Nothing for a capability that does not declare the field.
+ *
+ * @param cap Cloud temperature_setting capability
+ */
+function mapAutoStop(cap: CloudCapability): StateDefinition[] {
+  const field = cap.parameters?.fields?.find(f => f && f.fieldName === "autoStop");
+  const options = field?.dataType === "ENUM" && Array.isArray(field.options) ? field.options : [];
+  const states: Record<string, string> = {};
+  for (const opt of options) {
+    if (opt && typeof opt.name === "string" && opt.value !== undefined && opt.value !== null) {
+      states[safeStringify(opt.value)] = opt.name;
+    }
+  }
+  if (Object.keys(states).length === 0) {
+    return [];
+  }
+  const declaredDefault = field?.defaultValue;
+  const def =
+    declaredDefault !== undefined && declaredDefault !== null && safeStringify(declaredDefault) in states
+      ? safeStringify(declaredDefault)
+      : Object.keys(states)[0];
+  return [
+    {
+      id: "auto_stop",
+      name: tName("autoStop"),
+      desc: tDesc("descAutoStop"),
+      type: "mixed",
+      role: "state",
+      write: true,
+      states,
+      def,
+      capabilityType: cap.type,
+      capabilityInstance: cap.instance,
+    },
+  ];
+}
+
+/**
  * Map temperature_setting capability — Heater target-temp slider.
  * Honours the unit reported by the API (°F or °C); falls back to °F
  * because that's the more common Govee Heater default.
@@ -888,6 +1006,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
           capabilityType: cap.type,
           capabilityInstance: cap.instance,
         },
+        ...mapAutoStop(cap),
       ];
     }
   }
@@ -1095,8 +1214,12 @@ export function applyQuirksToStates(
   registry: DeviceRegistry,
 ): StateDefinition[] {
   for (const state of states) {
-    if (state.id === "color_temperature" && state.min != null && state.max != null) {
-      const corrected = registry.applyColorTempQuirk(sku, state.min, state.max);
+    if (state.id === "color_temperature") {
+      const quirk = registry.getQuirks(sku)?.colorTempRange;
+      if (!quirk) {
+        continue;
+      }
+      const corrected = registry.applyColorTempQuirk(sku, state.min ?? quirk.min, state.max ?? quirk.max);
       if (corrected.min !== state.min || corrected.max !== state.max) {
         log.debug(
           `Quirk applied for ${sku}: color_temperature range ${state.min}-${state.max}K → ${corrected.min}-${corrected.max}K`,
@@ -1207,6 +1330,26 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
   reverseAirflowToggle: "capReverseAirflowToggle",
   pillarLightToggle: "capPillarLightToggle",
   baseLightToggle: "capBaseLightToggle",
+  // Documented instances of the air conditioner, ice maker, dual smart plug,
+  // two-sided lamp and HDMI sync box (audit C13) — until 2.40.0 they reached
+  // the tree with Govee's own wording in all eleven languages.
+  swingLeafToggle: "capSwingLeafToggle",
+  precoolToggle: "capPrecoolToggle",
+  iceMakingToggle: "capIceMakingToggle",
+  socketToggle1: "capSocketToggle1",
+  socketToggle2: "capSocketToggle2",
+  leftLightToggle: "capLeftLightToggle",
+  rightLightToggle: "capRightLightToggle",
+  hdmiSource: "capHdmiSource",
+  // The CO2 reading carries the synthetic path's name whatever Govee calls it.
+  carbonDioxideConcentration: "co2",
+  co2Concentration: "co2",
+  // Events: the same name the synthetic path (SYNTHETIC_STATE_META) gives the
+  // same datapoint — two paths create it, one label (audit N17).
+  lackWaterEvent: "lackOfWater",
+  iceFullEvent: "iceBucketFull",
+  bodyAppearedEvent: "bodyDetected",
+  dirtDetectedEvent: "dirtDetected",
 };
 
 /**
@@ -1296,6 +1439,14 @@ export interface CloudStateValue {
   stateId: string;
   /** Converted value ready for ioBroker setState */
   value: ioBroker.StateValue;
+  /**
+   * The channel the value belongs to, where the id alone is ambiguous — a
+   * setpoint (`control`) and a reading (`sensor`) can share an id (audit C12).
+   * Absent: the channel map of the state manager decides.
+   */
+  channel?: string;
+  /** When the device measured it (ms epoch), where the source says so (D9). */
+  ts?: number;
 }
 
 /**
@@ -1327,7 +1478,9 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       if (n === null) {
         return null;
       }
-      return { stateId: sanitizeId(cap.instance), value: n };
+      // The channel travels with the value: `range/humidity` (setpoint) and
+      // `property/sensorHumidity` (reading) share the id `humidity` (audit C12).
+      return { stateId: sanitizeId(cap.instance), value: n, channel: "control" };
     }
 
     case "color_setting":
@@ -1405,11 +1558,13 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       return null;
     }
 
-    case "event":
-      return {
-        stateId: canonicalSyntheticId(cap.instance),
-        value: coerceBool(raw),
-      };
+    case "event": {
+      const value = eventStateValue(cap.instance, raw);
+      if (value === null) {
+        return null;
+      }
+      return { stateId: canonicalSyntheticId(cap.instance), value, channel: "events" };
+    }
 
     case "music_setting":
       // Extract mode value from STRUCT state
@@ -1428,12 +1583,32 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       if (n === null) {
         return null;
       }
-      return { stateId: canonicalSyntheticId(cap.instance), value: n };
+      return { stateId: canonicalSyntheticId(cap.instance), value: n, channel: "sensor" };
     }
 
     default:
       return null;
   }
+}
+
+/**
+ * `/device/state` readings of a model whose platform API reports temperature
+ * in °F (catalog quirk `platformTempUnit`, audit M18) → °C, one decimal. Only
+ * `property/sensorTemperature`; everything else passes unchanged.
+ *
+ * @param caps One `/device/state` answer
+ */
+export function platformReadingsToCelsius(caps: CloudStateCapability[]): CloudStateCapability[] {
+  return caps.map(cap => {
+    if (cap?.type !== "devices.capabilities.property" || cap.instance !== "sensorTemperature") {
+      return cap;
+    }
+    const f = coerceNum(cap.state?.value);
+    if (f === null) {
+      return cap;
+    }
+    return { ...cap, state: { value: Math.round((((f - 32) * 5) / 9) * 10) / 10 } };
+  });
 }
 
 /**
@@ -1469,11 +1644,13 @@ export function planCloudCapabilityWrites(
   // (work_mode → mode + level), and the LAN-shadow rule below has to be
   // applied per RESULT, not per capability. Keeping it a single loop also
   // keeps that rule at one nesting level.
-  for (const mapped of caps.flatMap(cap => mapCloudStateValues(cap, declared))) {
-    if (hasLanIp && lanStateIds.has(mapped.stateId)) {
-      continue;
+  for (const cap of caps) {
+    for (const mapped of mapCloudStateValues(cap, declared)) {
+      if (hasLanIp && lanStateIds.has(mapped.stateId)) {
+        continue;
+      }
+      writes.push(typeof cap?.ts === "number" ? { ...mapped, ts: cap.ts } : mapped);
     }
-    writes.push(mapped);
   }
   return writes;
 }
@@ -1495,6 +1672,13 @@ export function mapCloudStateValues(
   const primary = mapCloudStateValue(cap);
   if (!primary) {
     return [];
+  }
+  if (primary.stateId === "target_temperature") {
+    // The heater's STRUCT answer carries `autoStop` next to the temperature (C-O2).
+    const struct = cap.state?.value;
+    const autoStop =
+      typeof struct === "object" && struct !== null ? coerceNum((struct as Record<string, unknown>).autoStop) : null;
+    return autoStop === null ? [primary] : [primary, { stateId: "auto_stop", value: safeStringify(autoStop) }];
   }
   if (primary.stateId !== "work_mode") {
     return [primary];
@@ -1552,6 +1736,27 @@ const SCENE_DROPDOWN_RULES: ReadonlyArray<{
 ];
 
 /**
+ * The colour-temperature range a device's Cloud capability declares, or null.
+ *
+ * @param device The device
+ */
+export function declaredColorTempRange(device: GoveeDevice): { min: number; max: number } | null {
+  const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+  const cap = caps.find(
+    c =>
+      c &&
+      c.type === "devices.capabilities.color_setting" &&
+      typeof c.instance === "string" &&
+      c.instance.includes("colorTem"),
+  );
+  const range = cap?.parameters?.range;
+  if (!range || typeof range.min !== "number" || typeof range.max !== "number" || range.min >= range.max) {
+    return null;
+  }
+  return { min: range.min, max: range.max };
+}
+
+/**
  * Build LAN-owned state definitions for a device. Returns the four
  * lan-default states (power/brightness/colorRgb/colorTemperature) with quirks
  * applied, or [] for devices without a LAN address (sensors, appliances,
@@ -1573,6 +1778,18 @@ export function buildLanStateDefs(
     return [];
   }
   const stateDefs = getDefaultLanStates();
+  // The device's own declared colour-temperature range, where the Cloud list
+  // gave one (H6076: 2200–6500, issue #44) — the LAN default 2000–9000 is Govee's generic
+  // LAN range, not this lamp's (audit M7/N19). The catalog quirk still wins.
+  const declared = declaredColorTempRange(device);
+  if (declared) {
+    const ct = stateDefs.find(d => d.id === "color_temperature");
+    if (ct) {
+      ct.min = declared.min;
+      ct.max = declared.max;
+      ct.def = declared.min;
+    }
+  }
   applyQuirksToStates(device.sku, stateDefs, log, registry);
   return stateDefs;
 }

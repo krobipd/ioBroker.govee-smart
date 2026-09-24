@@ -11,6 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import {
+  handleGenericCapabilityCommand,
   findDeviceForState,
   handleManualSegmentsChange,
   onStateChange,
@@ -83,7 +84,10 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
           return Promise.reject(err);
         }
         commands.push({ device: device.deviceId, command, value });
-        return Promise.resolve();
+        // The router's own rule for the LAN colour temperature (2000–9000 K).
+        return Promise.resolve(
+          command === "colorTemperature" && typeof value === "number" ? Math.max(2000, Math.min(9000, value)) : value,
+        );
       },
       sendCapabilityCommand: (device: GoveeDevice, type: string, instance: string, value: unknown) => {
         // Honours setSendFailure like sendCommand does: since the 2026-09-12
@@ -376,28 +380,34 @@ describe("sendTargetTemperatureCommand", () => {
   it("sends a struct with the unit the device's own field declares", async () => {
     const dev = heaterDevice("Celsius");
     const rig = makeRig([dev]);
-    expect(await sendTargetTemperatureCommand(rig.adapter, dev, 22)).toBe(true);
+    expect(await sendTargetTemperatureCommand(rig.adapter, dev, PREFIX, "control.target_temperature", 22)).toEqual({
+      ack: 22,
+    });
     expect(rig.capCommands[0].value).toEqual({ temperature: 22, unit: "Celsius" });
   });
 
   it("omits unit when the device declares no unit field — never invents one", async () => {
     const dev = heaterDevice();
     const rig = makeRig([dev]);
-    await sendTargetTemperatureCommand(rig.adapter, dev, 22);
+    await sendTargetTemperatureCommand(rig.adapter, dev, PREFIX, "control.target_temperature", 22);
     expect(rig.capCommands[0].value).toEqual({ temperature: 22 });
   });
 
-  it("clamps into the range the device declares", async () => {
+  it("clamps into the range the device declares — and acks the clamped value (N45)", async () => {
     const dev = heaterDevice("Celsius");
     const rig = makeRig([dev]);
-    await sendTargetTemperatureCommand(rig.adapter, dev, 99);
+    expect(await sendTargetTemperatureCommand(rig.adapter, dev, PREFIX, "control.target_temperature", 99)).toEqual({
+      ack: 30,
+    });
     expect(rig.capCommands[0].value).toEqual({ temperature: 30, unit: "Celsius" });
   });
 
   it("reports false for a non-numeric write", async () => {
     const dev = heaterDevice("Celsius");
     const rig = makeRig([dev]);
-    expect(await sendTargetTemperatureCommand(rig.adapter, dev, "warm")).toBe(false);
+    expect(
+      await sendTargetTemperatureCommand(rig.adapter, dev, PREFIX, "control.target_temperature", "warm"),
+    ).toBeNull();
     expect(rig.capCommands).toEqual([]);
   });
 
@@ -938,5 +948,162 @@ describe("onStateChange — the diagnostics button is gone", () => {
     // Nothing at all happens: no report, and no ack that would make the write
     // look accepted. Re-adding the branch would show up here as a lastExport ack.
     expect(rig.acks).toEqual([]);
+  });
+});
+
+describe("a mode dropdown sends the value Govee declared, not the text key (audit M16)", () => {
+  // issue47-fixtures/list-devices-issue4-H7131-H7121.json — H7131 `nightlightScene`
+  // declares integer option values; the dropdown keys them as text ("3").
+  const nightlight = {
+    type: "devices.capabilities.mode",
+    instance: "nightlightScene",
+    parameters: {
+      dataType: "ENUM",
+      options: [
+        { name: "Flame", value: 1 },
+        { name: "Rainbow", value: 2 },
+        { name: "Rhythm", value: 3 },
+        { name: "Easy", value: 4 },
+        { name: "Sleep", value: 5 },
+      ],
+    },
+  } as GoveeDevice["capabilities"][number];
+
+  it('"3" goes out as 3 and the datapoint keeps its key', async () => {
+    const dev = { ...heaterDevice(), capabilities: [nightlight] };
+    const rig = makeRig([dev]);
+    rig.objects.set(id("control.nightlight_scene"), {
+      native: { capabilityType: nightlight.type, capabilityInstance: nightlight.instance },
+    });
+    await handleGenericCapabilityCommand(
+      rig.adapter,
+      dev,
+      id("control.nightlight_scene"),
+      "control.nightlight_scene",
+      "3",
+    );
+    expect(rig.capCommands).toEqual([
+      { device: dev.deviceId, type: nightlight.type, instance: "nightlightScene", value: 3 },
+    ]);
+    expect(rig.acks).toContainEqual({ id: id("control.nightlight_scene"), val: "3" });
+  });
+
+  it("a written option label resolves too; an undeclared key passes unchanged", async () => {
+    const dev = { ...heaterDevice(), capabilities: [nightlight] };
+    const rig = makeRig([dev]);
+    rig.objects.set(id("control.nightlight_scene"), {
+      native: { capabilityType: nightlight.type, capabilityInstance: nightlight.instance },
+    });
+    await handleGenericCapabilityCommand(
+      rig.adapter,
+      dev,
+      id("control.nightlight_scene"),
+      "control.nightlight_scene",
+      "Sleep",
+    );
+    await handleGenericCapabilityCommand(
+      rig.adapter,
+      dev,
+      id("control.nightlight_scene"),
+      "control.nightlight_scene",
+      "9",
+    );
+    expect(rig.capCommands.map(c => c.value)).toEqual([5, "9"]);
+  });
+});
+
+describe("the datapoint confirms what went out, not what was written (audit N19)", () => {
+  it("a colour temperature the LAN clamps is acked with the clamped value", async () => {
+    const dev = createTestDevice({ lanIp: "192.168.1.42" });
+    const rig = makeRig([dev]);
+    await onStateChange(rig.adapter, `govee-smart.0.${PREFIX}.control.color_temperature`, {
+      val: 1500,
+      ack: false,
+    } as ioBroker.State);
+    expect(rig.acks).toContainEqual({ id: `govee-smart.0.${PREFIX}.control.color_temperature`, val: 2000 });
+  });
+});
+
+describe("the heater's auto stop travels in the temperature STRUCT (audit C-O2, N45)", () => {
+  // issue47-fixtures/list-devices-issue4-H7131-H7121.json — H7131, fields verbatim.
+  function h7131(): GoveeDevice {
+    const base = createTestDevice({
+      type: "devices.types.heater",
+      lanIp: undefined,
+      lastLanReplyAt: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const cap = {
+      type: GOVEE_CAP_TYPE.TEMPERATURE_SETTING,
+      instance: "targetTemperature",
+      parameters: {
+        dataType: "STRUCT",
+        fields: [
+          {
+            fieldName: "autoStop",
+            defaultValue: 0,
+            dataType: "ENUM",
+            options: [
+              { name: "Auto Stop", value: 1 },
+              { name: "Maintain", value: 0 },
+            ],
+            required: false,
+          },
+          { fieldName: "temperature", dataType: "INTEGER", range: { min: 5, max: 30, precision: 1 }, required: true },
+          {
+            fieldName: "unit",
+            defaultValue: "Celsius",
+            dataType: "ENUM",
+            options: [
+              { name: "Celsius", value: "Celsius" },
+              { name: "Fahrenheit", value: "Fahrenheit" },
+            ],
+            required: true,
+          },
+        ],
+      },
+    } as GoveeDevice["capabilities"][number];
+    return { ...base, capabilities: [cap] };
+  }
+
+  it("a temperature write carries the auto stop the dropdown holds", async () => {
+    const dev = h7131();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.auto_stop"), "1");
+    await write(rig, id("control.target_temperature"), 22);
+    expect(rig.capCommands[0].value).toEqual({ temperature: 22, unit: "Celsius", autoStop: 1 });
+  });
+
+  it("an auto-stop write goes out with the current target temperature and acks its key", async () => {
+    const dev = h7131();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.target_temperature"), 20);
+    await write(rig, id("control.auto_stop"), "0");
+    expect(rig.capCommands[0].value).toEqual({ temperature: 20, unit: "Celsius", autoStop: 0 });
+    expect(rig.acks).toEqual([{ id: id("control.auto_stop"), val: "0" }]);
+  });
+
+  it("an auto-stop write without a known target temperature sends nothing and acks nothing", async () => {
+    const dev = h7131();
+    const rig = makeRig([dev]);
+    await write(rig, id("control.auto_stop"), "1");
+    expect(rig.capCommands).toEqual([]);
+    expect(rig.acks).toEqual([]);
+  });
+
+  it("an undeclared auto-stop key is refused", async () => {
+    const dev = h7131();
+    const rig = makeRig([dev]);
+    rig.states.set(id("control.target_temperature"), 20);
+    await write(rig, id("control.auto_stop"), "7");
+    expect(rig.capCommands).toEqual([]);
+  });
+
+  it("a temperature above the declared range is acked with what went out (N45)", async () => {
+    const dev = h7131();
+    const rig = makeRig([dev]);
+    await write(rig, id("control.target_temperature"), 99);
+    expect(rig.capCommands[0].value).toMatchObject({ temperature: 30 });
+    expect(rig.acks).toEqual([{ id: id("control.target_temperature"), val: 30 }]);
   });
 });

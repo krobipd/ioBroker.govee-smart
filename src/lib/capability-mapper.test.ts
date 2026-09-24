@@ -2032,8 +2032,9 @@ describe("CapabilityMapper", () => {
         expect(() => mapCapabilities(caps)).not.toThrow();
         const result = mapCapabilities(caps);
         expect(result).toHaveLength(1);
-        expect(result[0].min).toBe(0);
-        expect(result[0].max).toBe(100);
+        // No reported range, no invented one (audit C-O1).
+        expect(result[0].min).toBeUndefined();
+        expect(result[0].max).toBeUndefined();
       });
 
       it("mapColorSetting colorTem should not throw when parameters is missing", () => {
@@ -2043,8 +2044,9 @@ describe("CapabilityMapper", () => {
         expect(() => mapCapabilities(caps)).not.toThrow();
         const result = mapCapabilities(caps);
         expect(result).toHaveLength(1);
-        expect(result[0].min).toBe(2000);
-        expect(result[0].max).toBe(9000);
+        // No reported range, no invented one (audit C-O1).
+        expect(result[0].min).toBeUndefined();
+        expect(result[0].max).toBeUndefined();
       });
 
       it("mapMode should return empty when parameters is missing", () => {
@@ -2296,7 +2298,7 @@ describe("CapabilityMapper", () => {
       const result = planCloudCapabilityWrites(caps, false, lanStateIds);
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({ stateId: "power", value: true });
-      expect(result[1]).toEqual({ stateId: "brightness", value: 50 });
+      expect(result[1]).toEqual({ stateId: "brightness", value: 50, channel: "control" });
     });
 
     it("skips LAN-shadowed states when the device has a LAN IP", () => {
@@ -2306,7 +2308,7 @@ describe("CapabilityMapper", () => {
       ];
       const result = planCloudCapabilityWrites(caps, true, lanStateIds);
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({ stateId: "battery", value: 75 });
+      expect(result[0]).toEqual({ stateId: "battery", value: 75, channel: "sensor" });
     });
 
     it("includes every state when the device has no LAN IP (sensors / appliances)", () => {
@@ -2327,6 +2329,19 @@ describe("CapabilityMapper", () => {
       const result = planCloudCapabilityWrites(caps, false, lanStateIds);
       expect(result).toHaveLength(1);
       expect(result[0].stateId).toBe("power");
+    });
+
+    it("a setpoint and a reading sharing an id keep their own channels (audit C12)", () => {
+      // An appliance declaring range/humidity (target) and property/sensorHumidity
+      // (reading) — both map to the id `humidity`.
+      const caps: CloudStateCapability[] = [
+        { type: "devices.capabilities.range", instance: "humidity", state: { value: 55 } },
+        { type: "devices.capabilities.property", instance: "sensorHumidity", state: { value: 48 } },
+      ];
+      expect(planCloudCapabilityWrites(caps, false, lanStateIds)).toEqual([
+        { stateId: "humidity", value: 55, channel: "control" },
+        { stateId: "humidity", value: 48, channel: "sensor" },
+      ]);
     });
 
     it("handles non-array input defensively", () => {
@@ -2585,7 +2600,9 @@ describe("Invariant (M12-B): every value-side stateId has an owning state object
       { type: "devices.capabilities.property", instance: "sensorTemperature", parameters: { dataType: "INTEGER" } },
       { type: "devices.capabilities.property", instance: "sensorHumidity", parameters: { dataType: "INTEGER" } },
       { type: "devices.capabilities.event", instance: "lackWaterEvent", parameters: { dataType: "ENUM" } },
-      { type: "devices.capabilities.event", instance: "bodyAppeared", parameters: { dataType: "ENUM" } },
+      // Govee's real instance names (developer.govee.com/reference/subscribe-device-event).
+      { type: "devices.capabilities.event", instance: "bodyAppearedEvent", parameters: { dataType: "ENUM" } },
+      { type: "devices.capabilities.event", instance: "dirtDetectedEvent", parameters: { dataType: "ENUM" } },
       {
         type: "devices.capabilities.temperature_setting",
         instance: "targetTemperature",
@@ -2631,11 +2648,36 @@ describe("canonicalSyntheticId — one id per reading, whichever path delivers i
   it("names the CO2 reading co2 whatever Govee calls it", () => {
     expect(canonicalSyntheticId("carbonDioxide")).toBe("co2");
     expect(canonicalSyntheticId("co2")).toBe("co2");
+    // Govee's documented instance and its short form (audit C14/N20).
+    expect(canonicalSyntheticId("carbonDioxideConcentration")).toBe("co2");
+    expect(canonicalSyntheticId("co2Concentration")).toBe("co2");
   });
 
   it("keeps events in snake_case", () => {
     expect(canonicalSyntheticId("lackWaterEvent")).toBe("lack_water_event");
-    expect(canonicalSyntheticId("bodyAppeared")).toBe("body_appeared");
+    expect(canonicalSyntheticId("bodyAppearedEvent")).toBe("body_appeared_event");
+  });
+
+  it("the real event ids carry their role and name on BOTH paths (audit N16/N17)", () => {
+    // bodyAppearedEvent / dirtDetectedEvent were missing from the shared tables:
+    // the capability path fell back to indicator.alarm and a vendor-text name,
+    // and the synthetic path had no object meta and no cleanup protection.
+    for (const [instance, role, nameKey] of [
+      ["bodyAppearedEvent", "sensor.motion", "bodyDetected"],
+      ["dirtDetectedEvent", "indicator.maintenance", "dirtDetected"],
+      ["lackWaterEvent", "indicator.maintenance", "lackOfWater"],
+      ["iceFullEvent", "indicator.maintenance", "iceBucketFull"],
+    ] as const) {
+      const [def] = mapCapabilities([
+        { type: "devices.capabilities.event", instance, parameters: { dataType: "ENUM" } },
+      ]);
+      const meta = SYNTHETIC_STATE_META[def.id];
+      expect(meta, `${instance} → ${def.id} has synthetic meta`).toBeDefined();
+      expect(def.role).toBe(role);
+      expect(meta.role).toBe(role);
+      expect(def.name).toEqual({ en: nameKey, de: `${nameKey}_de` });
+      expect(meta.nameKey).toBe(nameKey);
+    }
   });
 
   it("Cloud state-def and Cloud value write agree on the id, so the value lands on the declared object", () => {
@@ -2700,5 +2742,161 @@ describe("capability names", () => {
     const def = defs.find(d => d.id === "some_future_thing");
     expect(typeof def?.name).not.toBe("string");
     expect(def?.name).toMatchObject({ en: "Some Future Thing", de: "Some Future Thing" });
+  });
+});
+
+describe("documented capability instances carry a translated name (audit C13)", () => {
+  it("air conditioner, ice maker, dual plug, two-sided lamp and sync box instances are not left in vendor text", () => {
+    const toggles: Array<[string, string]> = [
+      ["swingLeafToggle", "capSwingLeafToggle"],
+      ["precoolToggle", "capPrecoolToggle"],
+      ["iceMakingToggle", "capIceMakingToggle"],
+      ["socketToggle1", "capSocketToggle1"],
+      ["socketToggle2", "capSocketToggle2"],
+      ["leftLightToggle", "capLeftLightToggle"],
+      ["rightLightToggle", "capRightLightToggle"],
+    ];
+    for (const [instance, key] of toggles) {
+      const [def] = mapCapabilities([
+        { type: "devices.capabilities.toggle", instance, parameters: { dataType: "ENUM" } },
+      ]);
+      expect(def.name, instance).toEqual({ en: key, de: `${key}_de` });
+    }
+    const [hdmi] = mapCapabilities([
+      {
+        type: "devices.capabilities.mode",
+        instance: "hdmiSource",
+        parameters: {
+          dataType: "ENUM",
+          options: [
+            { name: "HDMI 1", value: 1 },
+            { name: "HDMI 2", value: 2 },
+          ],
+        },
+      },
+    ]);
+    expect(hdmi.name).toEqual({ en: "capHdmiSource", de: "capHdmiSource_de" });
+  });
+});
+
+describe("LAN colour-temperature limits follow the device's declared range (audit M7/N19, C-O1)", () => {
+  // issue-44-h6076-diag.json.txt: the H6076's Cloud capability declares 2200–6500 K.
+  const h6076ColorTem = {
+    type: "devices.capabilities.color_setting",
+    instance: "colorTemperatureK",
+    parameters: { dataType: "INTEGER", range: { min: 2200, max: 6500, precision: 1 } },
+  } as CloudCapability;
+
+  it("a LAN light with the declared block gets 2200–6500, not the generic 2000–9000", () => {
+    const ct = buildLanStateDefs(
+      createTestDevice({ sku: "H6076", lanIp: "192.168.1.60", capabilities: [h6076ColorTem] }),
+    ).find(d => d.id === "color_temperature");
+    expect({ min: ct?.min, max: ct?.max, def: ct?.def }).toEqual({ min: 2200, max: 6500, def: 2200 });
+  });
+
+  it("without a declared block the LAN default stays (a pure-LAN install has no Cloud list)", () => {
+    const ct = buildLanStateDefs(createTestDevice({ sku: "H6076", lanIp: "192.168.1.60", capabilities: [] })).find(
+      d => d.id === "color_temperature",
+    );
+    expect({ min: ct?.min, max: ct?.max }).toEqual({ min: 2000, max: 9000 });
+  });
+
+  it("the catalog quirk still wins over the declared range", () => {
+    const quirked = new DeviceRegistry({
+      data: {
+        devices: {
+          H6076: { name: "x", type: "light", status: "verified", quirks: { colorTempRange: { min: 2700, max: 6500 } } },
+        },
+      },
+    });
+    const ct = buildLanStateDefsRaw(
+      createTestDevice({ sku: "H6076", lanIp: "192.168.1.60", capabilities: [h6076ColorTem] }),
+      mockLog,
+      quirked,
+    ).find(d => d.id === "color_temperature");
+    expect({ min: ct?.min, max: ct?.max }).toEqual({ min: 2700, max: 6500 });
+  });
+
+  it("a Cloud colour-temperature capability without a range still takes the quirk (C-O1)", () => {
+    const quirked = new DeviceRegistry({
+      data: {
+        devices: {
+          H6076: { name: "x", type: "light", status: "verified", quirks: { colorTempRange: { min: 2700, max: 6500 } } },
+        },
+      },
+    });
+    const defs = applyQuirksToStatesRaw(
+      "H6076",
+      mapCapabilities([{ type: "devices.capabilities.color_setting", instance: "colorTemperatureK" }]),
+      mockLog,
+      quirked,
+    );
+    expect({ min: defs[0].min, max: defs[0].max }).toEqual({ min: 2700, max: 6500 });
+  });
+});
+
+describe("the heater's auto stop is its own dropdown (audit C-O2)", () => {
+  // issue47-fixtures/list-devices-issue4-H7131-H7121.json — H7131.
+  const h7131Temp = {
+    type: "devices.capabilities.temperature_setting",
+    instance: "targetTemperature",
+    parameters: {
+      dataType: "STRUCT",
+      fields: [
+        {
+          fieldName: "autoStop",
+          defaultValue: 0,
+          dataType: "ENUM",
+          options: [
+            { name: "Auto Stop", value: 1 },
+            { name: "Maintain", value: 0 },
+          ],
+          required: false,
+        },
+        { fieldName: "temperature", dataType: "INTEGER", range: { min: 5, max: 30, precision: 1 }, required: true },
+      ],
+    },
+  } as CloudCapability;
+
+  it("declares control.auto_stop with Govee's options and default", () => {
+    const def = mapCapabilities([h7131Temp]).find(d => d.id === "auto_stop");
+    expect(def).toMatchObject({
+      type: "mixed",
+      role: "state",
+      write: true,
+      states: { 1: "Auto Stop", 0: "Maintain" },
+      def: "0",
+      name: { en: "autoStop", de: "autoStop_de" },
+    });
+  });
+
+  it("the default follows Govee's declared defaultValue, not the first option", () => {
+    const autoStop = { ...h7131Temp.parameters!.fields![0], defaultValue: 1 };
+    const variant = {
+      ...h7131Temp,
+      parameters: { dataType: "STRUCT", fields: [autoStop, h7131Temp.parameters!.fields![1]] },
+    } as CloudCapability;
+    expect(mapCapabilities([variant]).find(d => d.id === "auto_stop")?.def).toBe("1");
+  });
+
+  it("a temperature setting without the field gets no auto-stop datapoint", () => {
+    const plain = {
+      ...h7131Temp,
+      parameters: { dataType: "STRUCT", fields: [h7131Temp.parameters!.fields![1]] },
+    } as CloudCapability;
+    expect(mapCapabilities([plain]).map(d => d.id)).toEqual(["target_temperature"]);
+  });
+
+  it("the state answer's STRUCT fills both datapoints", () => {
+    expect(
+      mapCloudStateValues({
+        type: "devices.capabilities.temperature_setting",
+        instance: "targetTemperature",
+        state: { value: { temperature: 20, autoStop: 1 } },
+      }),
+    ).toEqual([
+      { stateId: "target_temperature", value: 20 },
+      { stateId: "auto_stop", value: "1" },
+    ]);
   });
 });

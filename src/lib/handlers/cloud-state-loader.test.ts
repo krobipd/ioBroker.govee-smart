@@ -12,6 +12,8 @@ vi.mock("@iobroker/adapter-core", () => ({
 import { applyCloudCapabilities, loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
 import type { CloudStateCapability, GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../test-helpers";
+import { DeviceRegistry } from "../device-registry";
+import { buildCapabilitiesFromAppEntry } from "../device-manager/mapping";
 
 interface TestRig {
   adapter: CloudStateLoaderAdapter;
@@ -23,7 +25,7 @@ interface TestRig {
   setDeviceState(fn: (sku: string, deviceId: string) => Promise<CloudStateCapability[]>): void;
 }
 
-function makeRig(devices: GoveeDevice[]): TestRig {
+function makeRig(devices: GoveeDevice[], deviceRegistry = new DeviceRegistry({ data: { devices: {} } })): TestRig {
   const writes: Array<{ id: string; val: unknown }> = [];
   const ensured: string[] = [];
   const removed: Array<{ prefix: string; stateId: string }> = [];
@@ -37,6 +39,7 @@ function makeRig(devices: GoveeDevice[]): TestRig {
     // null = direct execution; the budgeting itself is covered by the
     // rate-limited dispatch test below.
     rateLimiter: null,
+    deviceRegistry,
     cloudClient: { getDeviceState: (sku: string, id: string) => getDeviceState(sku, id) } as never,
     deviceManager: {
       getDevices: () => devices,
@@ -368,5 +371,128 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     const rig = makeRig([appliance]);
     await applyCloudCapabilities(rig.adapter, appliance, [powerCap]);
     expect(rig.removed).toHaveLength(0);
+  });
+});
+
+describe("a model whose platform API reports °F (catalog quirk platformTempUnit, audit M18)", () => {
+  // Govee's own example answer carries `sensorTemperature: 79.52` (get-devices-status,
+  // H5140); homebridge-govee: "in whatever unit the Govee app is set to". The model
+  // list is govee2mqtt's (quirks.rs, with_platform_temperature_sensor_units).
+  const heater = (): GoveeDevice =>
+    createTestDevice({
+      sku: "H7131",
+      deviceId: "AA:BB:CC:DD:EE:FF:71:31",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+      capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature", parameters: {} }] as never,
+    });
+  const catalog = (experimental: boolean): DeviceRegistry =>
+    new DeviceRegistry({
+      data: {
+        devices: { H7131: { name: "Heater", type: "heater", status: "seed", quirks: { platformTempUnit: "F" } } },
+      },
+      experimental,
+    });
+  const reading: CloudStateCapability = {
+    type: "devices.capabilities.property",
+    instance: "sensorTemperature",
+    state: { value: 79.52 },
+  };
+
+  it("converts the /device/state reading to °C with one decimal — only the temperature", async () => {
+    const rig = makeRig([heater()], catalog(true));
+    rig.setDeviceState(() =>
+      Promise.resolve([
+        reading,
+        { type: "devices.capabilities.property", instance: "sensorHumidity", state: { value: 40 } },
+      ]),
+    );
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.find(w => w.id.endsWith(".temperature"))?.val).toBe(26.4);
+    expect(rig.writes.find(w => w.id.endsWith(".humidity"))?.val).toBe(40);
+  });
+
+  it("an empty reading stays empty — nothing is converted into a number", async () => {
+    const rig = makeRig([heater()], catalog(true));
+    rig.setDeviceState(() => Promise.resolve([{ ...reading, state: { value: "" } }]));
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.find(w => w.id.endsWith(".temperature"))).toBeUndefined();
+  });
+
+  it("a seed entry stays dormant without the experimental switch — the reading passes unchanged", async () => {
+    const rig = makeRig([heater()], catalog(false));
+    rig.setDeviceState(() => Promise.resolve([reading]));
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.find(w => w.id.endsWith(".temperature"))?.val).toBe(79.52);
+  });
+
+  it("the account-list path is never converted — its reading is hundredths of °C whatever the app shows (#18)", async () => {
+    const rig = makeRig([heater()], catalog(true));
+    await applyCloudCapabilities(rig.adapter, heater(), [{ ...reading, state: { value: 21.5 } }]);
+    expect(rig.writes.find(w => w.id.endsWith(".temperature"))?.val).toBe(21.5);
+  });
+});
+
+describe("an account-list reading carries its own measurement time (audit D9)", () => {
+  // Issue #18 (v2.15.0 export, 2026-06-08): the H5074's list entry reported
+  // tem 2120 / hum 4860 with lastTime 1770838320000 — four months old, written
+  // as if measured right now.
+  const h5074 = (): GoveeDevice =>
+    createTestDevice({
+      sku: "H5074",
+      deviceId: "AA:BB:CC:DD:EE:FF:17:E5",
+      type: "devices.types.thermometer",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+      capabilities: [],
+    });
+  const entry = {
+    sku: "H5074",
+    device: "AA:BB:CC:DD:EE:FF:17:E5",
+    deviceName: "Thermo-Hygrometer",
+    lastData: { online: false, tem: 2120, hum: 4860, lastTime: 1770838320000 },
+  };
+
+  function tsRig(): { rig: TestRig; stamps: Array<{ id: string; ts?: number }> } {
+    const rig = makeRig([h5074()]);
+    const stamps: Array<{ id: string; ts?: number }> = [];
+    const plain = rig.adapter.setState.bind(rig.adapter);
+    (rig.adapter as { setState: unknown }).setState = (id: string, state: ioBroker.SettableState) => {
+      stamps.push({ id, ts: state.ts });
+      return plain(id, state);
+    };
+    return { rig, stamps };
+  }
+
+  it("writes temperature and humidity with ts = lastTime", async () => {
+    const { rig, stamps } = tsRig();
+    const caps = buildCapabilitiesFromAppEntry(entry, 1780950000000);
+    await applyCloudCapabilities(rig.adapter, h5074(), caps);
+    expect(stamps.filter(s => /\.(temperature|humidity)$/.test(s.id)).map(s => s.ts)).toEqual([
+      1770838320000, 1770838320000,
+    ]);
+  });
+
+  it("the same measurement polled again is not written again; a newer one is, even with the same value", async () => {
+    const { rig, stamps } = tsRig();
+    const dev = h5074();
+    await applyCloudCapabilities(rig.adapter, dev, buildCapabilitiesFromAppEntry(entry, 1780950000000));
+    const first = stamps.length;
+    await applyCloudCapabilities(rig.adapter, dev, buildCapabilitiesFromAppEntry(entry, 1780950120000));
+    expect(stamps.length).toBe(first);
+    const newer = { ...entry, lastData: { ...entry.lastData, lastTime: 1780950100000 } };
+    await applyCloudCapabilities(rig.adapter, dev, buildCapabilitiesFromAppEntry(newer, 1780950120000));
+    expect(
+      stamps
+        .slice(first)
+        .filter(s => s.id.endsWith(".temperature"))
+        .map(s => s.ts),
+    ).toEqual([1780950100000]);
+  });
+
+  it("a measurement time in the future is no measurement time — written without one", () => {
+    const future = { ...entry, lastData: { ...entry.lastData, lastTime: 1780950000000 + 3_600_000 } };
+    const caps = buildCapabilitiesFromAppEntry(future, 1780950000000);
+    expect(caps.filter(c => c.ts !== undefined)).toEqual([]);
   });
 });

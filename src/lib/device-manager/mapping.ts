@@ -117,30 +117,48 @@ export function buildCapabilitiesFromAppEntry(
       state: { value: online },
     });
   }
+  // The measurement time rides along, so the datapoint's `ts` says how old the
+  // reading is (D9). A time in the future (clock skew beyond a few minutes) is
+  // no measurement time and is left out.
+  const measuredAt =
+    typeof last.lastTime === "number" &&
+    Number.isFinite(last.lastTime) &&
+    last.lastTime > 0 &&
+    last.lastTime <= now + 5 * 60_000
+      ? last.lastTime
+      : undefined;
+  const at = (cap: CloudStateCapability): CloudStateCapability =>
+    measuredAt === undefined ? cap : { ...cap, ts: measuredAt };
   if (typeof last.tem === "number" && Number.isFinite(last.tem)) {
-    caps.push({
-      type: GOVEE_CAP_TYPE.PROPERTY,
-      instance: "sensorTemperature",
-      state: { value: last.tem / 100 },
-    });
+    caps.push(
+      at({
+        type: GOVEE_CAP_TYPE.PROPERTY,
+        instance: "sensorTemperature",
+        state: { value: last.tem / 100 },
+      }),
+    );
   }
   // Skip the "no humidity sensor" sentinel (hum:0 on a device without a
   // declared humidity capability) so temp-only sensors don't grow a phantom
   // `humidity=0` datapoint. A real, non-zero reading is always kept,
   // and a real hygrometer (capability present) keeps humidity even at 0 %.
   if (typeof last.hum === "number" && Number.isFinite(last.hum) && (last.hum !== 0 || hasHumidityCapability)) {
-    caps.push({
-      type: GOVEE_CAP_TYPE.PROPERTY,
-      instance: "sensorHumidity",
-      state: { value: last.hum / 100 },
-    });
+    caps.push(
+      at({
+        type: GOVEE_CAP_TYPE.PROPERTY,
+        instance: "sensorHumidity",
+        state: { value: last.hum / 100 },
+      }),
+    );
   }
   if (typeof last.battery === "number" && Number.isFinite(last.battery)) {
-    caps.push({
-      type: GOVEE_CAP_TYPE.PROPERTY,
-      instance: "battery",
-      state: { value: last.battery },
-    });
+    caps.push(
+      at({
+        type: GOVEE_CAP_TYPE.PROPERTY,
+        instance: "battery",
+        state: { value: last.battery },
+      }),
+    );
   } else if (entry.settings && typeof entry.settings.battery === "number" && Number.isFinite(entry.settings.battery)) {
     caps.push({
       type: GOVEE_CAP_TYPE.PROPERTY,
