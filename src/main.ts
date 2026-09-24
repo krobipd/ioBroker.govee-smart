@@ -214,6 +214,8 @@ export class GoveeAdapter extends utils.Adapter {
   private readyLogged = false;
   /** Cloud was connected at least once — for the "restored" log after a down. */
   private cloudWasConnected = false;
+  /** What `info.cloudConnected` / `groups.info.online` carry now — see `cloudRetryHandler.setCloudConnected`. */
+  private cloudConnectedShown = false;
   /**
    * js-controller and admin versions, read once at start. The diagnostics
    * report states them, and a bug report without them costs one round-trip
@@ -360,6 +362,11 @@ export class GoveeAdapter extends utils.Adapter {
       "cloudWasConnected",
       () => this.cloudWasConnected,
       v => (this.cloudWasConnected = v),
+    );
+    readWrite(
+      "cloudConnectedShown",
+      () => this.cloudConnectedShown,
+      v => (this.cloudConnectedShown = v),
     );
     readWrite(
       "cloudInitTimer",
@@ -997,7 +1004,10 @@ export class GoveeAdapter extends utils.Adapter {
           },
           // Forward every fresh bearer token — fires on initial login and on
           // each reconnect-login, so the API client never runs with a stale one.
-          token => apiClient.setBearerToken(token),
+          token => {
+            apiClient.setBearerToken(token);
+            this.deviceManager?.onBearerToken();
+          },
         );
       }
 
@@ -1073,6 +1083,9 @@ export class GoveeAdapter extends utils.Adapter {
         this.cloudClient.setResponseHook((deviceId, endpoint, body, rateLimit) => {
           this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body, undefined, rateLimit);
         });
+        // Every accepted call shows the Cloud reachable, a 401/403 shows it lost —
+        // the rule itself lives in cloudRetryHandler.setCloudConnected.
+        this.cloudClient.setContactHook(outcome => cloudRetryHandler.onCloudContact(this.handlerHost, outcome));
         this.deviceManager.setCloudClient(this.cloudClient);
 
         this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
@@ -1123,15 +1136,9 @@ export class GoveeAdapter extends utils.Adapter {
           // No cache — first start, fetch from Cloud with 60s hard-timeout.
           // If Cloud hangs/fails, we don't want to block adapter startup indefinitely.
           const result = await cloudRetryHandler.cloudInitWithTimeout(this.handlerHost);
-          this.cloudWasConnected = result.ok;
-          cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(result.ok);
-          this.setState("info.cloudConnected", {
-            val: result.ok,
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-          this.stateManager?.updateGroupsOnline(result.ok).catch(logRejected(this.log, "write groups.info.online"));
-
           if (result.ok) {
+            cloudRetryHandler.setCloudConnected(this.handlerHost, true);
+            cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
             cloudStateReadable = true;
           } else {
             cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
@@ -1141,13 +1148,12 @@ export class GoveeAdapter extends utils.Adapter {
           // info — keep this one on debug so a cache-only start isn't announced
           // twice (C9).
           this.log.debug(`Using cached device data — no Cloud calls needed`);
+          // The cache stands in for the device list, so the retry loop has
+          // nothing to fetch and a Cloud-only light counts as reachable. The
+          // two datapoints wait for the first call Govee actually accepts
+          // (contact hook): a cache start has not talked to the Cloud yet.
           this.cloudWasConnected = true;
           cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
-          this.setState("info.cloudConnected", {
-            val: true,
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-          this.stateManager?.updateGroupsOnline(true).catch(logRejected(this.log, "write groups.info.online"));
           cloudStateReadable = true;
         }
         // Load group membership from undocumented API (needs bearer token + device map)
@@ -1183,25 +1189,37 @@ export class GoveeAdapter extends utils.Adapter {
         await cloudStateLoader.loadCloudStates(this.handlerHost);
       }
 
-      // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went
-      // through a Cloud-phase) on prior versions had scenes/music/snapshots
-      // states briefly created then orphaned. Wipe those leftovers now.
-      // Idempotent — second run does nothing, the LAN_STATE_IDS skip in
-      // cleanupCloudOwnedStates protects power/brightness/color_rgb/color_temperature.
       if (this.stateManager && this.deviceManager) {
-        for (const device of this.deviceManager.getDevices()) {
-          if (device.lanIp && device.capabilities.length === 0) {
-            const prefix = this.stateManager.devicePrefix(device);
-            const deleted = await this.stateManager.cleanupCloudOwnedStates(prefix, []).catch(e => {
-              this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
-              return 0;
-            });
-            // Only announce when something was actually removed: pure-LAN
-            // devices (no API key) match this condition on EVERY start, and
-            // an info-level "Migrated" line for a no-op was permanent log
-            // noise for exactly the credential-less target group (M7).
-            if (deleted > 0) {
-              this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
+        // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went
+        // through a Cloud-phase) on prior versions had scenes/music/snapshots
+        // states briefly created then orphaned. Wipe those leftovers now.
+        // Idempotent — second run does nothing, the LAN_STATE_IDS skip in
+        // cleanupCloudOwnedStates protects power/brightness/color_rgb/color_temperature.
+        //
+        // ONLY for the purpose it names: an installation without an API key.
+        // With one, "no capabilities yet" means the Cloud data has not arrived
+        // (a failed Cloud start, a light from the scan) — deleting then took
+        // the light's Cloud datapoints with their values, rooms and history
+        // (M8, „Löschen braucht Wissen, nicht Abwesenheit“). And inside the
+        // device's build chain, so a build running at the same moment cannot
+        // create what this pass deletes, or the other way round (N27).
+        if (!this.config.apiKey && !this.cloudClient) {
+          const sm = this.stateManager;
+          for (const device of this.deviceManager.getDevices()) {
+            if (device.lanIp && device.capabilities.length === 0) {
+              await sm.runDeviceBuild(device, async () => {
+                const deleted = await sm.cleanupCloudOwnedStates(sm.devicePrefix(device), []).catch(e => {
+                  this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+                  return 0;
+                });
+                // Only announce when something was actually removed: pure-LAN
+                // devices (no API key) match this condition on EVERY start, and
+                // an info-level "Migrated" line for a no-op was permanent log
+                // noise for exactly the credential-less target group (M7).
+                if (deleted > 0) {
+                  this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
+                }
+              });
             }
           }
         }
@@ -1223,6 +1241,9 @@ export class GoveeAdapter extends utils.Adapter {
       // pushes held during the start (the device's own, newer word) and let
       // later ones through immediately.
       this.deviceManager?.releaseHeldPushes();
+      // What waited for an account token (group members, libraries) runs from
+      // now on with each token — and right away when one came during the start.
+      this.deviceManager?.enableBearerFollowUps();
 
       // Subscribe to all writable device and group states, plus the adapter-level
       // manual-sync button. The button lives under `info`, which the two wildcard
@@ -1546,16 +1567,26 @@ export class GoveeAdapter extends utils.Adapter {
     if (!this.deviceManager) {
       return;
     }
+    if (!this.cloudClient) {
+      // The account device list is a Cloud call — without an API key there is
+      // nothing to fetch, and a "failed" warning plus a retry loop that can
+      // never succeed would tell the user something false.
+      this.log.info("Manual device sync needs the Cloud API key (adapter settings) — nothing to sync");
+      return;
+    }
     const result = await this.deviceManager.loadFromCloud();
     if (!result.ok) {
       // Same single mechanism as the init/retry path: auth-failed reaches the
-      // ActionableProblems registry, transient failures arm the retry loop.
+      // ActionableProblems registry, every other failure arms the retry loop —
+      // also on a running adapter whose loop counted the list as loaded.
       // Plus one non-deduplicated line — the user explicitly pressed the
       // button and must see why nothing happened (M4).
       this.log.warn(`Manual device sync failed (${result.reason}) — see earlier log for details`);
       cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
       return;
     }
+    // A group added in the app since the start gets its members now (M9).
+    await this.deviceManager.loadGroupMembers();
     await this.reapStaleDevices();
   }
 

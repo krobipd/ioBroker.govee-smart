@@ -26,6 +26,7 @@ interface Rig {
   logs: Record<string, string[]>;
   saveToCacheCalls: number[];
   cleanupCalls: GoveeDevice[][];
+  cleanupProtected: Array<Set<string> | undefined>;
   prunedWith: Array<Set<string>>;
 }
 
@@ -43,11 +44,14 @@ function makeRig(opts: {
   needsAppApi?: boolean;
   channelStatus?: ChannelStatusSnapshot;
   populationKnown?: boolean;
+  listedPrefixes?: Set<string>;
+  gapReload?: boolean;
 }): Rig {
   const stateWrites: Array<{ id: string; val: unknown }> = [];
   const logs: Record<string, string[]> = { debug: [], info: [], warn: [], error: [] };
   const saveToCacheCalls: number[] = [];
   const cleanupCalls: GoveeDevice[][] = [];
+  const cleanupProtected: Array<Set<string> | undefined> = [];
   const prunedWith: Array<Set<string>> = [];
   const devices = opts.devices ?? [];
 
@@ -64,6 +68,8 @@ function makeRig(opts: {
     deviceManager: {
       getDevices: () => devices,
       hasKnownPopulation: () => opts.populationKnown ?? true,
+      accountListedPrefixes: () => opts.listedPrefixes ?? new Set<string>(),
+      reloadForAccountGap: () => opts.gapReload ?? false,
       hasDeviceNeedingAppApi: () => opts.needsAppApi ?? false,
       saveDevicesToCache: () => saveToCacheCalls.push(1),
       getDiagnostics: () => ({
@@ -83,8 +89,9 @@ function makeRig(opts: {
         : ({ connected: opts.openapiConnected } as never),
     lanClient: opts.lanClient === false ? null : ({} as never),
     stateManager: {
-      cleanupDevices: (current: GoveeDevice[]) => {
+      cleanupDevices: (current: GoveeDevice[], listed?: Set<string>) => {
         cleanupCalls.push(current);
+        cleanupProtected.push(listed);
         return Promise.resolve([]);
       },
     } as never,
@@ -100,7 +107,7 @@ function makeRig(opts: {
       return Promise.resolve(undefined);
     },
   };
-  return { adapter, stateWrites, logs, saveToCacheCalls, cleanupCalls, prunedWith };
+  return { adapter, stateWrites, logs, saveToCacheCalls, cleanupCalls, cleanupProtected, prunedWith };
 }
 
 describe("updateConnectionState", () => {
@@ -242,6 +249,20 @@ describe("reapStaleDevices", () => {
     expect(rig.prunedWith[0].has("AA:01")).toBe(true);
     expect(rig.adapter.diagnosticsLastRun.has(sessionKey(live.sku, live.deviceId))).toBe(true);
     expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(false);
+  });
+
+  it("hands the prefixes an account list names to the cleanup — they are kept (H6)", async () => {
+    const listed = new Set(["devices.h600d_0009"]);
+    const rig = makeRig({ devices: [], listedPrefixes: listed });
+    await reapStaleDevices(rig.adapter);
+    expect(rig.cleanupProtected).toEqual([listed]);
+  });
+
+  it("waits while the Cloud list is re-read for an account gap — no cleanup this pass (H6)", async () => {
+    const rig = makeRig({ devices: [], gapReload: true });
+    await reapStaleDevices(rig.adapter);
+    expect(rig.cleanupCalls).toEqual([]);
+    expect(rig.prunedWith).toEqual([]);
   });
 
   it("deletes nothing while no account list has answered (cloud down)", async () => {

@@ -1481,10 +1481,15 @@ export class StateManager {
    * and prevent unbounded map growth across the adapter's lifetime.
    *
    * @param currentDevices Current device list
+   * @param listedPrefixes Tree prefixes an account list names — kept even when
+   *   the device map lacks them (H6: a device the account lists exists)
    * @returns Prefixes of removed devices (e.g. "devices.h61be_1d6f")
    */
-  async cleanupDevices(currentDevices: GoveeDevice[]): Promise<string[]> {
+  async cleanupDevices(currentDevices: GoveeDevice[], listedPrefixes?: Set<string>): Promise<string[]> {
     const currentPrefixes = new Set(currentDevices.map(d => this.devicePrefix(d)));
+    for (const prefix of listedPrefixes ?? []) {
+      currentPrefixes.add(prefix);
+    }
     const removed: string[] = [];
 
     // Cleanup both devices/ and groups/ folders

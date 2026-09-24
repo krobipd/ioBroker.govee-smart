@@ -132,6 +132,49 @@ describe("GoveeCloudClient", () => {
     });
   });
 
+  describe("setContactHook", () => {
+    it("reports an accepted call as ok and a 401/403 as auth-failed", async () => {
+      const answers: unknown[] = [
+        { data: [] },
+        new HttpError("Access denied", 401, {}),
+        new HttpError("Forbidden", 403, {}),
+      ];
+      const fake = makeFakeHttps((_c, idx) => answers[idx]);
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      const seen: string[] = [];
+      client.setContactHook(o => seen.push(o));
+      await client.getDevices();
+      await expect(client.getDevices()).rejects.toBeInstanceOf(HttpError);
+      await expect(client.getDevices()).rejects.toBeInstanceOf(HttpError);
+      expect(seen).toEqual(["ok", "auth-failed", "auth-failed"]);
+    });
+
+    it("stays silent on a 429, a 5xx and a network error — they say nothing about the key", async () => {
+      const answers: unknown[] = [
+        new HttpError("Too many requests", 429, { "retry-after": "60" }),
+        new HttpError("Bad gateway", 502, {}),
+        Object.assign(new Error("ECONNRESET"), { code: "ECONNRESET" }),
+      ];
+      const fake = makeFakeHttps((_c, idx) => answers[idx]);
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      const seen: string[] = [];
+      client.setContactHook(o => seen.push(o));
+      for (let i = 0; i < answers.length; i++) {
+        await expect(client.getDevices()).rejects.toBeDefined();
+      }
+      expect(seen).toEqual([]);
+    });
+
+    it("a throwing hook never fails the request", async () => {
+      const fake = makeFakeHttps(() => ({ data: [] }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      client.setContactHook(() => {
+        throw new Error("hook broke");
+      });
+      await expect(client.getDevices()).resolves.toEqual([]);
+    });
+  });
+
   describe("setResponseHook", () => {
     it("fires for every device list response with the whole list under the account pseudo-id, and null clears it", async () => {
       const fake = makeFakeHttps(() => ({ data: [{ sku: "H6160", device: "AABBCC", deviceName: "Test" }] }));
@@ -286,6 +329,25 @@ describe("GoveeCloudClient", () => {
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       const devices = await client.getDevices();
       expect(devices).toEqual([]);
+    });
+
+    it("a rejection inside the envelope throws with Govee's reason — never an empty account (A11)", async () => {
+      // The list names its reason `message` (CloudDeviceListResponse), the other envelopes `msg`.
+      const fake = makeFakeHttps(() => ({ code: 401, message: "Unauthorized", data: [] }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDevices()).rejects.toThrow("Device list rejected: code=401 — Unauthorized");
+    });
+
+    it("an envelope reason under `msg` is read too", async () => {
+      const fake = makeFakeHttps(() => ({ code: 500, msg: "system busy" }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDevices()).rejects.toThrow("code=500 — system busy");
+    });
+
+    it("a code-200 envelope with an empty list stays an empty list", async () => {
+      const fake = makeFakeHttps(() => ({ code: 200, message: "success", data: [] }));
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      await expect(client.getDevices()).resolves.toEqual([]);
     });
 
     it("should send GET to /router/api/v1/user/devices with API key header", async () => {

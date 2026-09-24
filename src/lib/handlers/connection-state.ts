@@ -151,8 +151,13 @@ export async function reapStaleDevices(adapter: ConnectionStateAdapter): Promise
     adapter.log.debug("Device cleanup skipped: no account list answered this session — absence proves nothing");
     return;
   }
+  // A list names a device the map lacks: fetch the Cloud list first — the
+  // light's tree comes back with it, and this pass would judge a gap.
+  if (adapter.deviceManager.reloadForAccountGap()) {
+    return;
+  }
   const currentDevices = adapter.deviceManager.getDevices();
-  await adapter.stateManager.cleanupDevices(currentDevices);
+  await adapter.stateManager.cleanupDevices(currentDevices, adapter.deviceManager.accountListedPrefixes());
 
   const liveDeviceIds = new Set(currentDevices.map(d => d.deviceId));
   adapter.deviceManager.getDiagnostics().pruneOrphans(liveDeviceIds);

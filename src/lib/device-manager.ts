@@ -26,6 +26,7 @@ import {
 import * as cacheHelpers from "./device-manager/cache";
 import * as cloudMergeHelpers from "./device-manager/cloud-merge";
 import * as libraryLoader from "./device-manager/library-loader";
+import { treeKey } from "./device-key";
 import {
   ABSENT_SOURCE,
   reconcileAccountMembership,
@@ -109,6 +110,13 @@ export class DeviceManager {
    * for every install whose start-up exceeded the minute window (issue #46).
    */
   private readonly pendingSceneLoads = new Set<Promise<void>>();
+  /**
+   * Lights whose account-token libraries were left unasked for want of a
+   * bearer (M3) — loaded once a token is there, see {@link onBearerToken}.
+   */
+  private readonly librariesAwaitingBearer = new Set<string>();
+  /** Set once the state tree exists — the bearer follow-ups wait for it. */
+  private bearerFollowUpsEnabled = false;
   /** Reads main's `unloading` flag — one truth, not a second marker. */
   private readonly isUnloading: () => boolean;
   /**
@@ -150,6 +158,13 @@ export class DeviceManager {
    * either source refreshes (end of loadFromCloud / pollAppApi).
    */
   private lastCloudList: ReconcileSource | null = null;
+  /**
+   * An empty Cloud device list was already retried once this session — see
+   * {@link loadFromCloud}. Reset by the next non-empty list.
+   */
+  private emptyCloudListRetried = false;
+  /** {@link reloadForAccountGap} ran this session. */
+  private accountGapReloadStarted = false;
   private lastAppList: ReconcileSource | null = null;
   private lastGroupList: ReconcileSource | null = null;
   /**
@@ -568,11 +583,13 @@ export class DeviceManager {
    * @param track Optional outcome tracker for one job
    * @param track.cancelled Set when a call never ran, so the caller can tell
    *   "checked, empty" from "not checked this round"
+   * @param track.skipped Set when an account-token endpoint was not asked for
+   *   want of a token — the libraries are then not checked either (M3)
    * @param shared The run's memo for SKU-level fetches (one fetch per SKU and
    *   run, shared by every light of that SKU); absent for a manual refresh
    */
   private libraryHost(
-    track?: { cancelled: boolean },
+    track?: { cancelled: boolean; skipped?: boolean },
     shared?: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
   ): libraryLoader.LibraryLoaderHost {
     return {
@@ -584,6 +601,11 @@ export class DeviceManager {
       noteCancelled: () => {
         if (track) {
           track.cancelled = true;
+        }
+      },
+      noteSkipped: () => {
+        if (track) {
+          track.skipped = true;
         }
       },
       runLimited: async (fn: () => Promise<void>, lane: CallLane): Promise<void> => {
@@ -623,6 +645,11 @@ export class DeviceManager {
     const job: Promise<void> = this.loadSceneDataFor(device, cd, shared)
       .catch((e: unknown) => {
         this.log.debug(`Scene load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+        // The light is saved anyway, unconfirmed — its capability entry has to
+        // survive, and the next start asks again (H6: a light missing from the
+        // cache is a light the next cache start does not know).
+        device.scenesChecked = false;
+        this.persistDeviceToCache(device);
       })
       .finally(() => {
         this.pendingSceneLoads.delete(job);
@@ -635,17 +662,26 @@ export class DeviceManager {
     cd: CloudDevice,
     shared: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
   ): Promise<void> {
-    const track = { cancelled: false };
+    const track = { cancelled: false, skipped: false };
     const host = this.libraryHost(track, shared);
     const scenesChanged = await libraryLoader.loadDeviceScenes(host, device, cd);
     const librariesChanged = await libraryLoader.loadDeviceLibraries(host, device, cd.sku);
     if (this.isUnloading()) {
+      // No stamp and no rebuild into a closing database — but the light is
+      // saved, unconfirmed: the cache is a file, and a light missing from it
+      // is one the next cache start does not know (H6).
+      device.scenesChecked = false;
+      this.persistDeviceToCache(device);
       return;
     }
-    if (!track.cancelled) {
+    if (!track.cancelled && !track.skipped) {
       // The libraries were confirmed this round (filled or empty) — an empty
-      // answer is remembered until LIBRARY_RECHECK_MS has passed.
+      // answer is remembered until LIBRARY_RECHECK_MS has passed. An endpoint
+      // left unasked for want of an account token is no answer (M3).
       device.librariesCheckedAt = Date.now();
+    }
+    if (track.skipped) {
+      this.awaitBearerForLibraries(device);
     }
     // Checked = the cloud answered this round, even with an empty list (empty
     // is legitimate and must not refetch forever). A cancelled call is NOT
@@ -663,6 +699,88 @@ export class DeviceManager {
     // segment count that waited for them is judged now.
     this.reviewDeferredSegmentShrink(device);
     if (scenesChanged || librariesChanged) {
+      this.onCloudDataReady?.(device, this.getDevices());
+    }
+  }
+
+  /**
+   * Remember a light whose account-token libraries were not asked. A token
+   * that arrived while its job ran is used right away — otherwise the job
+   * would wait for a token that is already there.
+   *
+   * @param device The light
+   */
+  private awaitBearerForLibraries(device: GoveeDevice): void {
+    this.librariesAwaitingBearer.add(this.deviceKey(device.sku, device.deviceId));
+    if (this.bearerFollowUpsEnabled && this.apiClient?.hasBearerToken()) {
+      this.onBearerToken();
+    }
+  }
+
+  /**
+   * The state tree exists — from now on a bearer token runs its follow-ups,
+   * and one that came earlier runs them right away.
+   */
+  enableBearerFollowUps(): void {
+    this.bearerFollowUpsEnabled = true;
+    this.onBearerToken();
+  }
+
+  /**
+   * A bearer token is there (MQTT login, reuse or refresh): run what waited
+   * for one (M9, M3) — the group members, when an app group is known and no
+   * group list answered yet (never asked, or failed on an older token), and the account-token libraries of every
+   * light that was loaded without a token. Before the state tree exists the
+   * start-up path does both itself.
+   */
+  onBearerToken(): void {
+    if (!this.bearerFollowUpsEnabled || !this.apiClient?.hasBearerToken() || this.isUnloading()) {
+      return;
+    }
+    if (!this.lastGroupList?.ok && [...this.devices.values()].some(d => d.sku === "BaseGroup")) {
+      this.loadGroupMembers().catch((e: unknown) => {
+        this.log.debug(`Group members after the first token failed: ${errMessage(e)}`);
+      });
+    }
+    for (const key of [...this.librariesAwaitingBearer]) {
+      this.librariesAwaitingBearer.delete(key);
+      const device = this.devices.get(key);
+      if (!device) {
+        continue;
+      }
+      const job: Promise<void> = this.loadLibrariesWithBearer(device)
+        .catch((e: unknown) => {
+          this.log.debug(`Library load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+        })
+        .finally(() => {
+          this.pendingSceneLoads.delete(job);
+        });
+      this.pendingSceneLoads.add(job);
+    }
+  }
+
+  /**
+   * The libraries of one light, now with a token — same follow-up as a scene
+   * job: stamp, scenes from the library, cache, rebuild on a change.
+   *
+   * @param device The light
+   */
+  private async loadLibrariesWithBearer(device: GoveeDevice): Promise<void> {
+    const track = { cancelled: false, skipped: false };
+    const changed = await libraryLoader.loadDeviceLibraries(this.libraryHost(track), device, device.sku);
+    if (this.isUnloading()) {
+      return;
+    }
+    if (!track.cancelled && !track.skipped) {
+      device.librariesCheckedAt = Date.now();
+    }
+    if (track.skipped) {
+      this.librariesAwaitingBearer.add(this.deviceKey(device.sku, device.deviceId));
+    }
+    cacheHelpers.populateScenesFromLibrary(this, device);
+    this.persistDeviceToCache(device);
+    this.reviewDeferredSegmentShrink(device);
+    if (changed) {
       this.onCloudDataReady?.(device, this.getDevices());
     }
   }
@@ -711,6 +829,71 @@ export class DeviceManager {
   /** Get all known devices */
   getDevices(): GoveeDevice[] {
     return Array.from(this.devices.values());
+  }
+
+  /**
+   * One account list as a reconcile source: map keys for the reconciler,
+   * tree prefixes for the cleanup's protection.
+   *
+   * @param ok Whether the list answered plausibly (non-empty)
+   * @param listed The devices it named
+   */
+  private listSource(ok: boolean, listed: Array<{ sku: string; deviceId: string }>): ReconcileSource {
+    return {
+      ok,
+      keys: new Set(listed.map(l => this.deviceKey(l.sku, l.deviceId))),
+      trees: new Set(listed.map(l => `${l.sku === "BaseGroup" ? "groups" : "devices"}.${treeKey(l.sku, l.deviceId)}`)),
+    };
+  }
+
+  /**
+   * Tree prefixes an account list answered this session names — the object
+   * cleanup keeps them whatever the device map holds (H6: „Löschen braucht
+   * Wissen, nicht Abwesenheit“ — a device the list names is known to exist).
+   */
+  accountListedPrefixes(): Set<string> {
+    const listed = new Set<string>();
+    for (const source of [this.lastCloudList, this.lastAppList, this.lastGroupList]) {
+      if (source?.ok) {
+        for (const tree of source.trees ?? []) {
+          listed.add(tree);
+        }
+      }
+    }
+    return listed;
+  }
+
+  /**
+   * An account list names a device the map lacks while no Cloud list was read
+   * this session (a cache start that lost a light, H6): read the Cloud list
+   * once, so the light comes back. Returns true when that reload started —
+   * the caller's cleanup pass waits for it. Once per session.
+   */
+  reloadForAccountGap(): boolean {
+    if (this.accountGapReloadStarted || !this.cloudClient || this.lastCloudList !== null) {
+      return false;
+    }
+    const gap = [this.lastAppList, this.lastGroupList].some(
+      source => source?.ok && [...source.keys].some(key => !this.devices.has(key)),
+    );
+    if (!gap) {
+      return false;
+    }
+    this.accountGapReloadStarted = true;
+    this.log.debug("An account list names devices the cache did not hold — reading the Cloud device list once");
+    this.loadFromCloud()
+      .then(result => {
+        if (!result.ok) {
+          this.log.debug(`Cloud device list for the account gap failed (${result.reason})`);
+        }
+      })
+      .catch((e: unknown) => this.log.debug(`Cloud device list for the account gap failed: ${errMessage(e)}`));
+    return true;
+  }
+
+  /** Anything besides the Cloud list says the account has devices. */
+  private hasOtherDeviceEvidence(): boolean {
+    return this.devices.size > 0 || (this.lastAppList?.keys.size ?? 0) > 0;
   }
 
   /**
@@ -943,6 +1126,20 @@ export class DeviceManager {
     try {
       const rawCloudDevices = await this.cloudClient.getDevices();
 
+      // An empty list is a valid account (only Bluetooth devices, only
+      // groups) — unless something else says devices exist: a cache entry, a
+      // LAN-found light, a non-empty App-API list. Govee answers an empty list
+      // on hiccups too, so that case gets ONE retry before it counts.
+      if (!Array.isArray(rawCloudDevices) || rawCloudDevices.length === 0) {
+        if (!this.emptyCloudListRetried && this.hasOtherDeviceEvidence()) {
+          this.emptyCloudListRetried = true;
+          this.log.debug("Cloud: device list came back empty although devices are known — retrying once");
+          return { ok: false, reason: "transient" };
+        }
+      } else {
+        this.emptyCloudListRetried = false;
+      }
+
       // Hard-filter: Govee's Device-List API returns historical/stale entries
       // (deleted devices that are no longer in the app) without capabilities.
       const cloudDevices = filterCloudDevicesWithCapabilities(rawCloudDevices);
@@ -991,10 +1188,10 @@ export class DeviceManager {
       // and run the central reconciler. `ok` requires a plausible non-empty
       // response — a transient empty body (Govee returns HTTP 200 empty on
       // hiccups) must never drive an irreversible removal.
-      this.lastCloudList = {
-        ok: cloudDevices.length > 0,
-        keys: new Set(cloudDevices.map(cd => this.deviceKey(cd.sku, cd.device))),
-      };
+      this.lastCloudList = this.listSource(
+        cloudDevices.length > 0,
+        cloudDevices.map(cd => ({ sku: cd.sku, deviceId: cd.device })),
+      );
       this.runAccountReconcile("cloud");
 
       // Step 3: Prune stale cache entries (only after successful Cloud-load
@@ -1132,7 +1329,7 @@ export class DeviceManager {
       capabilities: Array.isArray(target.capabilities) ? target.capabilities : [],
     };
     let changed = false;
-    const track = { cancelled: false };
+    const track = { cancelled: false, skipped: false };
     const host = this.libraryHost(track);
     if (await libraryLoader.loadDeviceScenes(host, target, cd)) {
       changed = true;
@@ -1140,8 +1337,11 @@ export class DeviceManager {
     if (await libraryLoader.loadDeviceLibraries(host, target, cd.sku, /* force */ true)) {
       changed = true;
     }
-    if (!track.cancelled) {
+    if (!track.cancelled && !track.skipped) {
       target.librariesCheckedAt = Date.now();
+    }
+    if (track.skipped) {
+      this.awaitBearerForLibraries(target);
     }
     if (changed) {
       this.saveDevicesToCache();
@@ -1184,10 +1384,10 @@ export class DeviceManager {
       // Snapshot the group list as the third reconcile source. Non-empty guard
       // (like the device sources): an empty response is treated as not-ok, so a
       // transient empty never evicts a still-existing group.
-      this.lastGroupList = {
-        ok: apiGroups.length > 0,
-        keys: new Set(apiGroups.map(g => this.deviceKey("BaseGroup", String(g.groupId)))),
-      };
+      this.lastGroupList = this.listSource(
+        apiGroups.length > 0,
+        apiGroups.map(g => ({ sku: "BaseGroup", deviceId: String(g.groupId) })),
+      );
       // v2.9.1 — record per-group response in apiHistory of each BaseGroup
       // device. The fetch is account-wide so we tag every group's deviceId.
       for (const group of this.devices.values()) {
@@ -1965,10 +2165,10 @@ export class DeviceManager {
     // Snapshot the App-API list as the second account-membership source. This
     // endpoint (empty-body POST) returns the COMPLETE Govee-Home account list,
     // so it is authoritative for sensors (which never appear in /user/devices).
-    this.lastAppList = {
-      ok: entries.length > 0,
-      keys: new Set(entries.map(e => this.deviceKey(e.sku, e.device))),
-    };
+    this.lastAppList = this.listSource(
+      entries.length > 0,
+      entries.map(e => ({ sku: e.sku, deviceId: e.device })),
+    );
     // Apply each entry in a plain loop — the per-entry work only touches its own
     // device and the downstream onCloudCapabilities callback is fire-and-forget
     // (it enqueues its own setState work), so there is nothing to parallelise.

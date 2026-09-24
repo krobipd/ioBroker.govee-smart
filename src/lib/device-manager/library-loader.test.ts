@@ -177,6 +177,69 @@ describe("library-loader — loadDeviceLibraries", () => {
   });
 });
 
+describe("library-loader — without an account token the token endpoints are not asked (M3, 2.40.0)", () => {
+  function tokenless(): { api: unknown; asked: string[] } {
+    const asked: string[] = [];
+    const api = {
+      hasBearerToken: () => false,
+      fetchSceneLibrary: () => {
+        asked.push("scene");
+        return Promise.resolve([]);
+      },
+      fetchMusicLibrary: () => {
+        asked.push("music");
+        return Promise.resolve([]);
+      },
+      fetchDiyLibrary: () => {
+        asked.push("diy");
+        return Promise.resolve([]);
+      },
+      fetchSkuFeatures: () => {
+        asked.push("features");
+        return Promise.resolve(null);
+      },
+      fetchSnapshots: () => {
+        asked.push("snapshots");
+        return Promise.resolve([]);
+      },
+    };
+    return { api, asked };
+  }
+
+  it("asks only the public scene library and reports every other endpoint as skipped", async () => {
+    const { api, asked } = tokenless();
+    let skipped = 0;
+    const host = { ...makeHost(setupMockCloud([]), api), noteSkipped: () => skipped++ };
+    const device = createTestDevice({ snapshots: [{ name: "Snap1", value: 1 }] });
+    await loadDeviceLibraries(host, device, device.sku);
+    expect(asked).toEqual(["scene"]);
+    // music, DIY, SKU features, snapshot packets
+    expect(skipped).toBe(4);
+  });
+
+  it("an unasked endpoint lands in no diagnostics history — it never answered", async () => {
+    const { api } = tokenless();
+    const host = makeHost(setupMockCloud([]), api);
+    const device = createTestDevice();
+    await loadDeviceLibraries(host, device, device.sku);
+    const hist = (await host.diagnostics.generate(device, "x")).apiHistory as Record<string, unknown>;
+    expect(hist["/light-effect-libraries-music?sku=H6160"]).toBeUndefined();
+    expect(hist["/diy-effect-libraries?sku=H6160"]).toBeUndefined();
+    expect(hist["/sku-features?sku=H6160"]).toBeUndefined();
+  });
+
+  it("with a token nothing is skipped", async () => {
+    const { api, asked } = tokenless();
+    (api as { hasBearerToken: () => boolean }).hasBearerToken = () => true;
+    let skipped = 0;
+    const host = { ...makeHost(setupMockCloud([]), api), noteSkipped: () => skipped++ };
+    const device = createTestDevice({ snapshots: [{ name: "Snap1", value: 1 }] });
+    await loadDeviceLibraries(host, device, device.sku);
+    expect(asked).toEqual(["scene", "music", "diy", "features", "snapshots"]);
+    expect(skipped).toBe(0);
+  });
+});
+
 describe("library-loader — one library fetch per SKU and run, an empty answer remembered with an expiry (issue #46, 2026-09-22)", () => {
   // Eight bulbs of one SKU fetched the same three libraries eight times per
   // start, and an empty answer (music/DIY library `[]`, sku-features `null`)

@@ -3,6 +3,8 @@ import {
   cloudInitWithTimeout,
   ensureCloudRetry,
   handleCloudFailure,
+  onCloudContact,
+  setCloudConnected,
   type CloudRetryHandlerAdapter,
 } from "./cloud-retry-handler";
 import type { CloudLoadResult } from "../types";
@@ -17,6 +19,7 @@ interface TestRig {
   stateWrites: Array<{ id: string; val: unknown }>;
   groupsOnline: boolean[];
   loadCloudStatesCalls: number[];
+  groupMemberLoads: number[];
   setLoad(fn: () => Promise<CloudLoadResult>): void;
 }
 
@@ -28,11 +31,18 @@ function makeRig(): TestRig {
   const stateWrites: Array<{ id: string; val: unknown }> = [];
   const groupsOnline: boolean[] = [];
   const loadCloudStatesCalls: number[] = [];
+  const groupMemberLoads: number[] = [];
   let load: () => Promise<CloudLoadResult> = () => Promise.resolve({ ok: true });
 
   const adapter: CloudRetryHandlerAdapter = {
     log: mockLog,
-    deviceManager: { loadFromCloud: () => load() } as never,
+    deviceManager: {
+      loadFromCloud: () => load(),
+      loadGroupMembers: () => {
+        groupMemberLoads.push(1);
+        return Promise.resolve(false);
+      },
+    } as never,
     cloudClient: null,
     stateManager: {
       updateGroupsOnline: (v: boolean) => {
@@ -43,6 +53,7 @@ function makeRig(): TestRig {
     cloudInitTimer: undefined,
     cloudRetry: undefined,
     cloudWasConnected: false,
+    cloudConnectedShown: false,
     setState: (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
       return Promise.resolve();
@@ -72,6 +83,7 @@ function makeRig(): TestRig {
     stateWrites,
     groupsOnline,
     loadCloudStatesCalls,
+    groupMemberLoads,
     setLoad: fn => {
       load = fn;
     },
@@ -126,9 +138,9 @@ describe("ensureCloudRetry", () => {
   it("seeds the loop with the adapter's connected flag — a cache-hit start must not arm retries", () => {
     const rig = makeRig();
     rig.adapter.cloudWasConnected = true;
-    ensureCloudRetry(rig.adapter);
+    const loop = ensureCloudRetry(rig.adapter);
     // Connected loop ignores transient results — observable: no retry timer armed.
-    handleCloudFailure(rig.adapter, { ok: false, reason: "transient" });
+    loop.handleResult({ ok: false, reason: "transient" });
     expect(rig.timers).toHaveLength(0);
   });
 });
@@ -140,6 +152,25 @@ describe("handleCloudFailure", () => {
     expect(rig.reports).toHaveLength(1);
     expect(rig.reports[0].key).toBe("cloud-auth");
     expect(rig.timers).toHaveLength(0);
+  });
+
+  it("a failed load of a running adapter (manual sync) arms a retry although the loop counted as connected", () => {
+    const rig = makeRig();
+    rig.adapter.cloudWasConnected = true;
+    ensureCloudRetry(rig.adapter).setConnected(true);
+    handleCloudFailure(rig.adapter, { ok: false, reason: "rate-limited", retryAfterMs: 120_000 });
+    expect(rig.timers).toHaveLength(1);
+    expect(rig.timers[0].ms).toBe(120_000);
+  });
+
+  it("a failed load shows the Cloud unreachable — both datapoints and the reachability flag", () => {
+    const rig = makeRig();
+    rig.adapter.cloudWasConnected = true;
+    rig.adapter.cloudConnectedShown = true;
+    handleCloudFailure(rig.adapter, { ok: false, reason: "transient" });
+    expect(rig.adapter.cloudWasConnected).toBe(false);
+    expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: false }]);
+    expect(rig.groupsOnline).toEqual([false]);
   });
 
   it("transient failures do NOT reach the actionable registry (self-healing stays out)", () => {
@@ -160,5 +191,81 @@ describe("buildCloudRetryHost — onCloudRestored", () => {
     expect(rig.stateWrites).toContainEqual({ id: "info.cloudConnected", val: true });
     expect(rig.groupsOnline).toEqual([true]);
     expect(rig.loadCloudStatesCalls).toHaveLength(1);
+    // The failed start-up list never reached its group-member step (M9).
+    expect(rig.groupMemberLoads).toHaveLength(1);
+  });
+});
+
+describe("setCloudConnected", () => {
+  it("writes both datapoints on a change only — the per-call hook must not write on every answer", () => {
+    const rig = makeRig();
+    setCloudConnected(rig.adapter, true);
+    setCloudConnected(rig.adapter, true);
+    expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: true }]);
+    expect(rig.groupsOnline).toEqual([true]);
+    setCloudConnected(rig.adapter, false);
+    expect(rig.stateWrites.map(w => w.val)).toEqual([true, false]);
+    expect(rig.groupsOnline).toEqual([true, false]);
+  });
+
+  it("an unchanged value still updates the reachability flag", () => {
+    const rig = makeRig();
+    rig.adapter.cloudWasConnected = true;
+    setCloudConnected(rig.adapter, false);
+    expect(rig.adapter.cloudWasConnected).toBe(false);
+    expect(rig.stateWrites).toEqual([]);
+  });
+});
+
+describe("onCloudContact", () => {
+  it("an accepted call after a cache start shows the Cloud reachable and resolves the key problem", () => {
+    const rig = makeRig();
+    rig.adapter.cloudWasConnected = true; // cache start: assumed, not shown
+    onCloudContact(rig.adapter, "ok");
+    expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: true }]);
+    expect(rig.groupsOnline).toEqual([true]);
+    expect(rig.resolves.some(r => r.key === "cloud-auth")).toBe(true);
+  });
+
+  it("an accepted call does not cancel a pending list retry", () => {
+    const rig = makeRig();
+    handleCloudFailure(rig.adapter, { ok: false, reason: "transient" });
+    expect(rig.timers).toHaveLength(1);
+    onCloudContact(rig.adapter, "ok");
+    expect(rig.cleared).toHaveLength(0);
+    expect(rig.adapter.cloudConnectedShown).toBe(true);
+  });
+
+  it("a 401 on a state query of a reachable Cloud reports the key once, repeats stay silent", () => {
+    const rig = makeRig();
+    setCloudConnected(rig.adapter, true);
+    onCloudContact(rig.adapter, "auth-failed");
+    onCloudContact(rig.adapter, "auth-failed");
+    expect(rig.reports.map(r => r.key)).toEqual(["cloud-auth"]);
+    expect(rig.adapter.cloudConnectedShown).toBe(false);
+    expect(rig.adapter.cloudWasConnected).toBe(false);
+  });
+
+  it("a 401 after a cache start (Cloud assumed, never shown) is reported too", () => {
+    const rig = makeRig();
+    rig.adapter.cloudWasConnected = true;
+    onCloudContact(rig.adapter, "auth-failed");
+    expect(rig.reports.map(r => r.key)).toEqual(["cloud-auth"]);
+  });
+
+  it("the 401 of a failing initial list load stays with that load's own result", () => {
+    const rig = makeRig();
+    onCloudContact(rig.adapter, "auth-failed");
+    expect(rig.reports).toHaveLength(0);
+  });
+
+  it("an accepted call after an auth stop lets a later failed list query arm a retry again", () => {
+    const rig = makeRig();
+    handleCloudFailure(rig.adapter, { ok: false, reason: "auth-failed", message: "HTTP 401" });
+    handleCloudFailure(rig.adapter, { ok: false, reason: "transient" });
+    expect(rig.timers).toHaveLength(0); // auth stop holds
+    onCloudContact(rig.adapter, "ok");
+    handleCloudFailure(rig.adapter, { ok: false, reason: "transient" });
+    expect(rig.timers).toHaveLength(1);
   });
 });

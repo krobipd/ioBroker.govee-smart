@@ -95,6 +95,7 @@ export function readRateLimitHeaders(
 }
 import {
   classifyError,
+  errMessage,
   type CapabilityOption,
   type CloudDevice,
   type CloudDeviceListResponse,
@@ -106,6 +107,9 @@ import {
 } from "./types";
 
 const BASE_URL = "https://openapi.api.govee.com";
+
+/** What one Cloud answer says about the API key — see `GoveeCloudClient.setContactHook`. */
+export type CloudContact = "ok" | "auth-failed";
 
 /**
  * Monotonic counter for `requestId` so two calls in the same millisecond
@@ -156,9 +160,14 @@ function mapSceneOptions(opts: CapabilityOption[] | undefined): CloudScene[] {
  * @param resp The parsed answer (null/undefined pass — the callers handle them)
  * @param what Start of the error message, naming the call and the device
  */
-function throwIfRejected(resp: { code?: unknown; msg?: unknown } | null | undefined, what: string): void {
+function throwIfRejected(
+  resp: { code?: unknown; msg?: unknown; message?: unknown } | null | undefined,
+  what: string,
+): void {
   if (resp && typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
-    const msg = typeof resp.msg === "string" && resp.msg ? ` — ${resp.msg}` : "";
+    // The device list names its reason `message`, the state/scene envelopes `msg`.
+    const reason = [resp.msg, resp.message].find(r => typeof r === "string" && r);
+    const msg = typeof reason === "string" ? ` — ${reason}` : "";
     throw new Error(`${what}: code=${resp.code}${msg}`);
   }
 }
@@ -191,6 +200,14 @@ export class GoveeCloudClient {
    * the request path.
    */
   private lastErrorCategory: ErrorCategory | null = null;
+
+  /**
+   * Hook called after every Cloud answer that says something about the API
+   * key: `ok` for any accepted call, `auth-failed` for a 401/403. Other
+   * failures (429, 5xx, network) stay silent — one failed state query says
+   * nothing about the Cloud connection as a whole.
+   */
+  private onContact: ((outcome: CloudContact) => void) | null = null;
 
   /**
    * @param apiKey Govee API key
@@ -240,6 +257,16 @@ export class GoveeCloudClient {
   }
 
   /**
+   * Register the hook that learns whether Govee accepted the API key — see
+   * {@link onContact}. A throwing hook never fails the request.
+   *
+   * @param cb Callback receiving `ok` or `auth-failed`
+   */
+  setContactHook(cb: ((outcome: CloudContact) => void) | null): void {
+    this.onContact = cb;
+  }
+
+  /**
    * The newest set of rate-limit headers Govee sent, or null before the first
    * answer that carried any. The diagnostics report shows it; that is the
    * measurement the daily numbers of the budget wait for (see CLOUD_LIMITS).
@@ -251,6 +278,9 @@ export class GoveeCloudClient {
   /** Fetch all devices with their capabilities */
   async getDevices(): Promise<CloudDevice[]> {
     const resp = await this.request<CloudDeviceListResponse>("GET", "/router/api/v1/user/devices");
+    // A rejection inside the envelope (HTTP 200, `code` ≠ 200) is a failed
+    // list, never an empty account — it throws so the retry loop takes it.
+    throwIfRejected(resp, "Device list rejected");
     // Defensive — API can drift. Guard for non-array to protect downstream iteration.
     const devices = Array.isArray(resp?.data) ? resp.data : [];
     // v2.9.1 — fire onResponse per-device so every device sees the canonical
@@ -505,6 +535,7 @@ export class GoveeCloudClient {
       // Reset the failure category on success — getFailureReason() then returns
       // null until the next error.
       this.lastErrorCategory = null;
+      this.reportContact("ok");
       return result.value;
     } catch (err) {
       // Classify 429 explicitly by status code — classifyError only looks at
@@ -534,10 +565,24 @@ export class GoveeCloudClient {
       // that classifyError only looks at the message — that stopped being true.
       if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
         this.lastErrorCategory = "AUTH";
+        this.reportContact("auth-failed");
         throw err;
       }
       this.lastErrorCategory = classifyError(err);
       throw err;
+    }
+  }
+
+  /**
+   * Tell the contact hook — a throwing hook is logged, never rethrown.
+   *
+   * @param outcome What the answer said about the API key
+   */
+  private reportContact(outcome: CloudContact): void {
+    try {
+      this.onContact?.(outcome);
+    } catch (e) {
+      this.log.debug(`Cloud contact hook failed: ${errMessage(e)}`);
     }
   }
 }

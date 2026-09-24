@@ -654,6 +654,50 @@ describe("DeviceManager", () => {
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "transient" });
     });
 
+    it("an empty list next to a known device is retried ONCE, then accepted (2.40.0)", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const known = createTestDevice({ sku: "H61BE", deviceId: "DEADBEEF03" });
+      (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "DEADBEEF03"), known);
+      dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
+      expect(await dm2.loadFromCloud()).toEqual({ ok: false, reason: "transient" });
+      expect(await dm2.loadFromCloud()).toEqual({ ok: true });
+    });
+
+    it("an empty list with a non-empty App-API list counts as evidence too", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      (dm2 as any).lastAppList = { ok: true, keys: new Set(["h5179:aabb"]) };
+      dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
+      expect(await dm2.loadFromCloud()).toEqual({ ok: false, reason: "transient" });
+    });
+
+    it("an empty list of an account nothing else knows is a valid account — ok at once", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
+      expect(await dm2.loadFromCloud()).toEqual({ ok: true });
+    });
+
+    it("a non-empty list re-arms the one retry for a later empty list", async () => {
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const known = createTestDevice({ sku: "H61BE", deviceId: "DEADBEEF04" });
+      (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "DEADBEEF04"), known);
+      const lists: unknown[][] = [
+        [],
+        [
+          {
+            sku: "H61BE",
+            device: "DEADBEEF04",
+            type: "devices.types.light",
+            capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+          },
+        ],
+        [],
+      ];
+      dm2.setCloudClient({ getDevices: () => Promise.resolve(lists.shift()) } as any);
+      expect(await dm2.loadFromCloud()).toEqual({ ok: false, reason: "transient" });
+      expect(await dm2.loadFromCloud()).toEqual({ ok: true });
+      expect(await dm2.loadFromCloud()).toEqual({ ok: false, reason: "transient" });
+    });
+
     it("loadGroupMembers returns false without an api client / without a bearer token (L29)", async () => {
       const noClient = new DeviceManager(mockLog, mockTimers, registry);
       expect(await noClient.loadGroupMembers()).toBe(false);
@@ -4923,7 +4967,10 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     }
   });
 
-  it("neither persists nor rebuilds when the adapter is unloading by the time the queued call ran", async () => {
+  it("unloading by the time the queued call ran: no rebuild, but the light is saved unconfirmed (H6)", async () => {
+    // The cache is a file, not the closing database. A light missing from it
+    // made the next cache start believe the account had no light — no cloud
+    // list, and the cleanup removed the trees of the cloud-only lights.
     let unloading = false;
     const { dm, saved, cloudReady, settle } = build({ isUnloading: () => unloading });
     await dm.loadFromCloud();
@@ -4933,8 +4980,20 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     unloading = true;
     await settle();
 
-    expect(saved.filter(s => s.deviceId === "BULB000000000002").length).toBe(savesBefore);
+    const after = saved.filter(s => s.deviceId === "BULB000000000002");
+    expect(after.length).toBe(savesBefore + 1);
+    expect(after[after.length - 1].scenesChecked).toBe(false);
     expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
+  });
+
+  it("a scene job that throws still saves its light, unconfirmed (H6)", async () => {
+    const { dm, saved, settle } = build();
+    (dm as any).loadSceneDataFor = () => Promise.reject(new Error("boom"));
+    await dm.loadFromCloud();
+    await settle();
+    const bulb = saved.filter(s => s.deviceId === "BULB000000000002");
+    expect(bulb.length).toBeGreaterThan(0);
+    expect(bulb[bulb.length - 1].scenesChecked).toBe(false);
   });
 });
 
@@ -5324,5 +5383,226 @@ describe("requestStaleStatuses — the status request over the account broker (i
       expect(d.iotTopic).toBe("GD/0123456789abcdef0123456789abcdef");
       expect(goveeDeviceToCached(d)).not.toHaveProperty("iotTopic");
     });
+  });
+});
+
+describe("what waits for an account token — libraries and group members (M3/M9, 2.40.0)", () => {
+  // Without a token the account endpoints (music/DIY libraries, SKU features,
+  // snapshot packets) were "asked" anyway, answered [] by the client itself,
+  // and the empty result was stamped for LIBRARY_RECHECK_MS — a week without
+  // the libraries on every start whose MQTT login came after the cloud list.
+  function bench(): {
+    dm: DeviceManager;
+    bearer: { on: boolean };
+    musicCalls: () => number;
+    groupCalls: () => number;
+  } {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const bearer = { on: false };
+    let music = 0;
+    let groups = 0;
+    dm.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([
+          {
+            sku: "H600D",
+            device: "BULB000000000009",
+            deviceName: "Bulb",
+            type: "devices.types.light",
+            capabilities: lightCapabilities(),
+          },
+        ]),
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => Promise.resolve([]),
+    } as any);
+    dm.setApiClient({
+      hasBearerToken: () => bearer.on,
+      fetchSceneLibrary: () => Promise.resolve([]),
+      fetchMusicLibrary: () => {
+        music++;
+        return Promise.resolve([{ name: "Energic", musicCode: 1 }]);
+      },
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => Promise.resolve([]),
+      fetchGroupMembers: () => {
+        groups++;
+        return Promise.resolve([{ groupId: 1234567, name: "Living room", devices: [] }]);
+      },
+    } as any);
+    return { dm, bearer, musicCalls: () => music, groupCalls: () => groups };
+  }
+
+  it("a light loaded without a token is not stamped as checked", async () => {
+    const { dm, musicCalls } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    const [bulb] = dm.getDevices();
+    expect(musicCalls()).toBe(0);
+    expect(bulb.librariesCheckedAt).toBeUndefined();
+    expect(bulb.scenesChecked).toBe(true); // the scenes came from the API key
+  });
+
+  it("the first token after the tree exists loads the libraries and stamps them", async () => {
+    const { dm, bearer, musicCalls } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    dm.enableBearerFollowUps(); // no token yet — nothing to do
+    expect(musicCalls()).toBe(0);
+    bearer.on = true;
+    dm.onBearerToken();
+    await dm.whenSceneLoadsSettled();
+    const [bulb] = dm.getDevices();
+    expect(musicCalls()).toBe(1);
+    expect(bulb.musicLibrary.map(m => m.name)).toEqual(["Energic"]);
+    expect(typeof bulb.librariesCheckedAt).toBe("number");
+    // A later token (refresh) has nothing left to load.
+    dm.onBearerToken();
+    await dm.whenSceneLoadsSettled();
+    expect(musicCalls()).toBe(1);
+  });
+
+  it("a token before the tree exists waits — enabling the follow-ups runs them", async () => {
+    const { dm, bearer, musicCalls } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    bearer.on = true;
+    dm.onBearerToken();
+    await dm.whenSceneLoadsSettled();
+    expect(musicCalls()).toBe(0);
+    dm.enableBearerFollowUps();
+    await dm.whenSceneLoadsSettled();
+    expect(musicCalls()).toBe(1);
+  });
+
+  it("a token that arrives while the light's job runs is used when the job ends", async () => {
+    const { dm, bearer, musicCalls } = bench();
+    dm.enableBearerFollowUps();
+    // The MQTT login answers between the job's token check (start of the
+    // libraries) and its end — during the public scene-library call.
+    (dm as any).apiClient.fetchSceneLibrary = () => {
+      bearer.on = true;
+      return Promise.resolve([]);
+    };
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    expect(musicCalls()).toBe(1);
+  });
+
+  it("a known app group whose members were never resolved gets them with the token — once", async () => {
+    const { dm, bearer, groupCalls } = bench();
+    (dm as any).devices.set(
+      (dm as any).deviceKey("BaseGroup", "1234567"),
+      createTestDevice({ sku: "BaseGroup", deviceId: "1234567", name: "Living room" }),
+    );
+    bearer.on = true;
+    dm.enableBearerFollowUps();
+    await new Promise(r => setTimeout(r, 0));
+    expect(groupCalls()).toBe(1);
+    dm.onBearerToken(); // the group list answered — a refreshed token asks nothing
+    await new Promise(r => setTimeout(r, 0));
+    expect(groupCalls()).toBe(1);
+  });
+
+  it("no app group — the token asks for no group members", async () => {
+    const { dm, bearer, groupCalls } = bench();
+    bearer.on = true;
+    dm.enableBearerFollowUps();
+    await new Promise(r => setTimeout(r, 0));
+    expect(groupCalls()).toBe(0);
+  });
+});
+
+describe("a cache start that lost a light — the account lists protect its tree (H6, 2.40.0)", () => {
+  it("names the tree prefix of every device an ok list carries, groups under groups.", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    (dm as any).lastAppList = (dm as any).listSource(true, [
+      { sku: "H5179", deviceId: "AA:BB:CC:DD:EE:FF:11:22" },
+      { sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" },
+    ]);
+    (dm as any).lastGroupList = (dm as any).listSource(true, [{ sku: "BaseGroup", deviceId: "1234567" }]);
+    expect([...dm.accountListedPrefixes()].sort()).toEqual([
+      "devices.h5179_1122",
+      "devices.h600d_0009",
+      "groups.basegroup_4567",
+    ]);
+  });
+
+  it("a list that did not answer plausibly protects nothing", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    (dm as any).lastAppList = (dm as any).listSource(false, [{ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }]);
+    expect(dm.accountListedPrefixes().size).toBe(0);
+  });
+
+  function gapBench(): { dm: DeviceManager; listCalls: () => number } {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    let calls = 0;
+    dm.setCloudClient({
+      getDevices: () => {
+        calls++;
+        return Promise.resolve([
+          {
+            sku: "H600D",
+            device: "AA:BB:CC:DD:EE:FF:00:09",
+            deviceName: "Bulb",
+            type: "devices.types.light",
+            capabilities: lightCapabilities(),
+          },
+        ]);
+      },
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => Promise.resolve([]),
+    } as any);
+    (dm as any).lastAppList = (dm as any).listSource(true, [{ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }]);
+    return { dm, listCalls: () => calls };
+  }
+
+  it("reads the Cloud list once when a list names a device the map lacks — the light comes back", async () => {
+    const { dm, listCalls } = gapBench();
+    expect(dm.reloadForAccountGap()).toBe(true);
+    await new Promise(r => setTimeout(r, 0));
+    await dm.whenSceneLoadsSettled();
+    expect(listCalls()).toBe(1);
+    expect(dm.getDevices().map(d => d.sku)).toEqual(["H600D"]);
+    // Once per session.
+    expect(dm.reloadForAccountGap()).toBe(false);
+    expect(listCalls()).toBe(1);
+  });
+
+  it("a failed gap reload is not repeated on the next cleanup pass — once per session", async () => {
+    const { dm, listCalls } = gapBench();
+    (dm as any).cloudClient.getDevices = () => {
+      (dm as any).gapCalls = ((dm as any).gapCalls ?? 0) + 1;
+      return Promise.reject(new Error("network down"));
+    };
+    expect(dm.reloadForAccountGap()).toBe(true);
+    await new Promise(r => setTimeout(r, 0));
+    // The list failed, so no Cloud list is known — the guard alone stops a second call.
+    expect(dm.reloadForAccountGap()).toBe(false);
+    expect((dm as any).gapCalls).toBe(1);
+    expect(listCalls()).toBe(0);
+  });
+
+  it("no reload once a Cloud list was read this session — its gaps are devices the Cloud does not list", () => {
+    const { dm, listCalls } = gapBench();
+    (dm as any).lastCloudList = (dm as any).listSource(true, []);
+    expect(dm.reloadForAccountGap()).toBe(false);
+    expect(listCalls()).toBe(0);
+  });
+
+  it("no reload without a Cloud client (no API key)", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    (dm as any).lastAppList = (dm as any).listSource(true, [{ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }]);
+    expect(dm.reloadForAccountGap()).toBe(false);
+  });
+
+  it("no reload when the map holds every listed device", () => {
+    const { dm, listCalls } = gapBench();
+    (dm as any).devices.set(
+      (dm as any).deviceKey("H600D", "AA:BB:CC:DD:EE:FF:00:09"),
+      createTestDevice({ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }),
+    );
+    expect(dm.reloadForAccountGap()).toBe(false);
+    expect(listCalls()).toBe(0);
   });
 });

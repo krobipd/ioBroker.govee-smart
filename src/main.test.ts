@@ -371,6 +371,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     getDevices: vi.fn(() => Promise.resolve([])),
     getDeviceState: vi.fn(() => Promise.resolve([])),
     setResponseHook: vi.fn(),
+    setContactHook: vi.fn(),
     getFailureReason: vi.fn(() => null),
     getLastRateLimit: vi.fn(() => null),
   };
@@ -1380,6 +1381,38 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     i.log.warn.mockClear();
     await i.syncDevicesManually();
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Manual device sync failed"));
+    // A running adapter whose loop counted the list as loaded arms a retry again.
+    expect(i.setTimeout.mock.calls.some(c => c[1] === 300_000)).toBe(true);
+  });
+
+  it("a successful manual sync resolves the group members again — a group added in the app (M9)", async () => {
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.api.hasBearerToken.mockReturnValue(true);
+    f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H61BE",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Strip",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    f.api.fetchGroupMembers.mockClear();
+    await i.syncDevicesManually();
+    expect(f.api.fetchGroupMembers).toHaveBeenCalledTimes(1);
+  });
+
+  it("the manual-sync button without an API key says what it needs and arms no retry", async () => {
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    i.log.warn.mockClear();
+    const timersBefore = i.setTimeout.mock.calls.length;
+    await i.syncDevicesManually();
+    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("needs the Cloud API key"));
+    expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("Manual device sync failed"));
+    expect(i.setTimeout.mock.calls.slice(timersBefore).some(c => c[1] === 300_000)).toBe(false);
+    expect(f.cloud.getDevices).not.toHaveBeenCalled();
   });
 
   it("the handler view maps state suffixes to commands (plain + dynamic segment indices)", async () => {
@@ -1503,7 +1536,7 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
         lastSeenOnNetwork: Date.now(),
       }),
     );
-    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const ctx = setup();
     const i = internalOf(ctx.adapter);
     // The cached lanIp is deliberately NOT trusted on load — feed a discovery
     // frame from start() so the device really is LAN-bound when the migration
@@ -1522,10 +1555,63 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
     const removedLines = i.log.info.mock.calls.filter(c => String(c[0]).includes("legacy cloud-owned state"));
     expect(removedLines).toHaveLength(0);
   });
+
+  function seedLanLightWithLeftovers(ctx: ReturnType<typeof setup>): void {
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h6172_ee11.json"),
+      JSON.stringify({
+        sku: "H6172",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Strip",
+        type: "devices.types.light",
+        capabilities: [],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const i = internalOf(ctx.adapter);
+    i.objects.set("devices.h6172_ee11.scenes.light_scene", { type: "state", common: {}, native: {} });
+    ctx.f.lan.start.mockImplementation((...args: unknown[]) => {
+      ctx.f.lan.startArgs = args;
+      (args[0] as (d: { ip: string; device: string; sku: string }) => void)({
+        ip: "10.0.0.5",
+        device: "AA:BB:CC:DD:EE:11",
+        sku: "H6172",
+      });
+    });
+  }
+
+  it("without an API key the pure-LAN leftovers go — the purpose the migration names", async () => {
+    const ctx = setup();
+    seedLanLightWithLeftovers(ctx);
+    const i = internalOf(ctx.adapter);
+    await i.onReady();
+    expect(i.objects.has("devices.h6172_ee11.scenes.light_scene")).toBe(false);
+  });
+
+  it("with an API key a light without capabilities yet keeps its Cloud datapoints (M8)", async () => {
+    // A failed Cloud start leaves a LAN light without capabilities — the
+    // migration took its scenes with their values, rooms and history.
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    ctx.f.cloud.getDevices.mockRejectedValue(new Error("network down"));
+    seedLanLightWithLeftovers(ctx);
+    const i = internalOf(ctx.adapter);
+    await i.onReady();
+    expect(i.objects.has("devices.h6172_ee11.scenes.light_scene")).toBe(true);
+  });
 });
 
 describe("GoveeAdapter — cache vs cloud start", () => {
-  it("a cache hit skips the cloud device fetch and marks cloud connected", async () => {
+  it("a cache hit skips the cloud device fetch; the Cloud datapoints wait for the first accepted call", async () => {
     // Pre-seed a cache file so DeviceManager.loadFromCache() finds a device.
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
@@ -1554,8 +1640,14 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     // No lights in the cache → no cloud refetch needed.
     expect(f.cloud.getDevices).not.toHaveBeenCalled();
     expect(i.cloudWasConnected).toBe(true);
-    expect(i.states.get("info.cloudConnected")).toEqual({ val: true, ack: true });
+    // The cache is not a Cloud contact — nothing talked to Govee yet.
+    expect(i.states.get("info.cloudConnected")).toEqual({ val: false, ack: true });
     expect(i.cloudInitDone).toBe(true);
+    // The first call Govee accepts turns both datapoints on.
+    const contact = f.cloud.setContactHook.mock.calls[0][0] as (o: string) => void;
+    contact("ok");
+    expect(i.states.get("info.cloudConnected")).toEqual({ val: true, ack: true });
+    expect(i.states.get("groups.info.online")).toEqual({ val: true, ack: true });
   });
 
   it("reads device states even when the cache alone was enough, but never for a light (issue #47)", async () => {
@@ -1845,6 +1937,18 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(ctx.adapter);
     ctx.f.cloud.getDeviceState.mockResolvedValue([]);
+    // The account list names the purifier — an empty list next to a known
+    // device is retried once instead of read (2.40.0), and that is not what
+    // this test is about.
+    ctx.f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H7127",
+        device: "AA:BB:CC:DD:EE:11",
+        deviceName: "Purifier",
+        type: "devices.types.air_purifier",
+        capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+      },
+    ]);
     // The UDP scan answers the moment it is started — i.e. after the cache
     // decided there is no light, and before the cached branch runs its loop.
     ctx.f.lan.start.mockImplementation((onDevice: (d: unknown) => void) => {
@@ -2131,6 +2235,25 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(f.api.setBearerToken).toHaveBeenCalledWith("fresh-bearer");
   });
 
+  it("the first token after the start resolves the members of a known app group (M9)", async () => {
+    const { adapter, f } = await fullSetup();
+    const i = internalOf(adapter);
+    (i.deviceManager as any).devices.set("basegroup:1234567", {
+      sku: "BaseGroup",
+      deviceId: "1234567",
+      name: "Living room",
+      type: "devices.types.light",
+      capabilities: [],
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    f.api.fetchGroupMembers.mockClear();
+    f.api.hasBearerToken.mockReturnValue(true);
+    const onToken = f.mqtt.connect.mock.calls[0][2] as (t: string) => void;
+    onToken("fresh-bearer");
+    await new Promise(r => setTimeout(r, 0));
+    expect(f.api.fetchGroupMembers).toHaveBeenCalledTimes(1);
+  });
+
   it("the report's control paths come from the SAME router a real write uses", async () => {
     // The routing must not drift from the behaviour it describes: if the report
     // computed it separately, a quirk override would show in one and not the
@@ -2298,6 +2421,69 @@ describe("GoveeAdapter — callback wiring", () => {
     (timer![0] as () => void)();
     await settle(5);
     expect(cleanup).toHaveBeenCalledTimes(1);
+  });
+
+  it("a cache start that lost a light keeps the light's tree and gets the light back (H6)", async () => {
+    // Measured mechanism (audit 2026-09-24, H6): a light is cached only once
+    // its scenes are checked, so a restart inside its scene job left a cache
+    // with the sensor alone. That start read no Cloud list, the account list
+    // answered, and the cleanup compared against the MAP — the light's tree
+    // went, with its values, rooms and history.
+    const dataDir = currentDataDir();
+    fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(dataDir, "cache", "h5179_ee11.json"),
+      JSON.stringify({
+        sku: "H5179",
+        deviceId: "AA:BB:CC:DD:EE:11",
+        name: "Thermo",
+        type: "devices.types.thermometer",
+        capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature" }],
+        scenes: [],
+        diyScenes: [],
+        snapshots: [],
+        sceneLibrary: [],
+        musicLibrary: [],
+        diyLibrary: [],
+        skuFeatures: null,
+        cachedAt: Date.now(),
+        lastSeenOnNetwork: Date.now(),
+      }),
+    );
+    const { adapter, f } = await setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
+    const i = internalOf(adapter);
+    expect(f.cloud.getDevices).not.toHaveBeenCalled(); // the cache alone was enough
+    // The lost light's tree from the last session.
+    i.objects.set("devices.h600d_ee7e", { type: "device", common: { name: "Bulb" }, native: {} });
+    i.objects.set("devices.h600d_ee7e.control.power", { type: "state", common: {}, native: {} });
+    f.api.hasBearerToken.mockReturnValue(true);
+    f.api.fetchDeviceList.mockResolvedValue([
+      { sku: "H5179", device: "AA:BB:CC:DD:EE:11", deviceName: "Thermo", lastData: { online: true }, settings: {} },
+      { sku: "H600D", device: "AA:BB:CC:DD:EE:7E", deviceName: "Bulb", lastData: { online: true }, settings: {} },
+    ] as never);
+    f.cloud.getDevices.mockResolvedValue([
+      {
+        sku: "H600D",
+        device: "AA:BB:CC:DD:EE:7E",
+        deviceName: "Bulb",
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+      },
+    ]);
+    const pollCall = i.setInterval.mock.calls.find(c => c[1] === 2 * 60 * 1000);
+    (pollCall![0] as () => void)();
+    await settle(6);
+    const timer = i.setTimeout.mock.calls.find(c => c[1] === STALE_DEVICE_CLEANUP_DELAY_MS);
+    (timer![0] as () => void)();
+    await settle(10);
+
+    expect(i.objects.has("devices.h600d_ee7e")).toBe(true);
+    expect(f.cloud.getDevices).toHaveBeenCalledTimes(1);
+    expect(i.deviceManager!.getDevices().some(d => d.sku === "H600D")).toBe(true);
   });
 
   it("the cleanup timer deletes NOTHING while the device population is unknown", async () => {

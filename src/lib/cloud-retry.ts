@@ -42,6 +42,8 @@ export class CloudRetryLoop {
   private retryTimer: unknown = undefined;
   private connected = false;
   private stopped = false;
+  /** Set by {@link dispose} only — an auth stop can be lifted, an unload never. */
+  private disposed = false;
 
   /** @param host Host interface wired up to the adapter. */
   constructor(private readonly host: CloudRetryHost) {}
@@ -70,10 +72,23 @@ export class CloudRetryLoop {
    * torn-down adapter. Clearing the timer alone never stopped that path.
    */
   public dispose(): void {
+    this.disposed = true;
     this.stopped = true;
     if (this.retryTimer !== undefined) {
       this.host.clearTimeout(this.retryTimer);
       this.retryTimer = undefined;
+    }
+  }
+
+  /**
+   * A Cloud call went through with the API key — lift the stop an earlier
+   * `auth-failed` set, so a later failed list query arms a retry again. A key
+   * Govee rejected once mid-session and accepted afterwards would otherwise
+   * leave the loop dead until the next restart. Never lifts {@link dispose}.
+   */
+  public noteKeyAccepted(): void {
+    if (!this.disposed) {
+      this.stopped = false;
     }
   }
 

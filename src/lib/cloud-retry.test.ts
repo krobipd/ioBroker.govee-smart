@@ -335,6 +335,22 @@ describe("CloudRetryLoop", () => {
     });
   });
 
+  describe("noteKeyAccepted", () => {
+    it("lifts the auth stop — a later transient failure arms a retry again", () => {
+      loop.handleResult({ ok: false, reason: "auth-failed", message: "x" });
+      loop.noteKeyAccepted();
+      loop.handleResult({ ok: false, reason: "transient" });
+      expect(host.timers).toHaveLength(1);
+    });
+
+    it("never lifts dispose — an unloaded adapter arms nothing", () => {
+      loop.dispose();
+      loop.noteKeyAccepted();
+      loop.handleResult({ ok: false, reason: "transient" });
+      expect(host.timers).toHaveLength(0);
+    });
+  });
+
   describe("dispose", () => {
     it("should clear the pending retry timer", () => {
       loop.handleResult({ ok: false, reason: "transient" });

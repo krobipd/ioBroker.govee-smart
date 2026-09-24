@@ -2067,6 +2067,22 @@ describe("StateManager", () => {
       expect(objects.has("devices.h6160_1111.info.name")).toBe(true);
     });
 
+    it("keeps a tree an account list names although the device map lacks it (H6)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const sensor = createTestDevice({ sku: "H5179", deviceId: "AABB1111" });
+      const lostLight = createTestDevice({ sku: "H6161", deviceId: "AABB2222" });
+      await createAllStatesForTest(sm, sensor, []);
+      await createAllStatesForTest(sm, lostLight, []);
+
+      // The map holds only the sensor (a cache start that lost the light); the
+      // account list names both.
+      await sm.cleanupDevices([sensor], new Set(["devices.h5179_1111", "devices.h6161_2222"]));
+
+      expect(calls.filter(c => c.method === "delObjectAsync")).toEqual([]);
+      expect(objects.has("devices.h6161_2222.info.name")).toBe(true);
+    });
+
     it("should not remove devices that still exist", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

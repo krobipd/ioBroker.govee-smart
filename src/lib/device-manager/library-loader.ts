@@ -53,6 +53,13 @@ export interface LibraryLoaderHost {
    * a device that merely shared the outcome needs this hook.
    */
   noteCancelled?(): void;
+  /**
+   * Tells the host that an account-token endpoint was not asked because no
+   * bearer token was there yet — the libraries are then NOT checked, and the
+   * first token loads them (M3). Without it an unasked endpoint counted as
+   * "empty" for a week.
+   */
+  noteSkipped?(): void;
 }
 
 /** What a (possibly shared) fetch came back with. `ran: false` = the limiter never ran it. */
@@ -273,6 +280,7 @@ export async function loadDeviceScenes(
  * @param cfg.failLabel Library label passed to the undocumented-API failure log
  * @param cfg.fetch Closure that performs the actual API fetch
  * @param cfg.assign Closure that stores the fetched array on the device
+ * @param cfg.needsBearer The endpoint runs on the account token — without one it is not asked (M3)
  */
 async function loadLibrary<T>(
   host: LibraryLoaderHost,
@@ -289,9 +297,15 @@ async function loadLibrary<T>(
     failLabel: string;
     fetch: () => Promise<T[]>;
     assign: (lib: T[]) => void;
+    /** The endpoint runs on the account token — without one it is not asked. */
+    needsBearer: boolean;
   },
 ): Promise<boolean> {
   if (!cfg.force && (cfg.current.length > 0 || cfg.recentlyChecked)) {
+    return false;
+  }
+  if (cfg.needsBearer && !hasBearer) {
+    host.noteSkipped?.();
     return false;
   }
   const outcome = await sharedFetch(host, cfg.ep, cfg.fetch);
@@ -364,6 +378,7 @@ export async function loadDeviceLibraries(
       assign: lib => {
         device.sceneLibrary = lib;
       },
+      needsBearer: false,
     })
   ) {
     changed = true;
@@ -382,6 +397,7 @@ export async function loadDeviceLibraries(
       assign: lib => {
         device.musicLibrary = lib;
       },
+      needsBearer: true,
     })
   ) {
     changed = true;
@@ -400,12 +416,15 @@ export async function loadDeviceLibraries(
       assign: lib => {
         device.diyLibrary = lib;
       },
+      needsBearer: true,
     })
   ) {
     changed = true;
   }
 
-  if (force || (!device.skuFeatures && !recentlyChecked)) {
+  if ((force || (!device.skuFeatures && !recentlyChecked)) && !hasBearer) {
+    host.noteSkipped?.();
+  } else if (force || (!device.skuFeatures && !recentlyChecked)) {
     const ep = `/sku-features?sku=${sku}`;
     const outcome = await sharedFetch(host, ep, () => apiClient.fetchSkuFeatures(sku));
     if (!outcome.ran) {
@@ -431,7 +450,9 @@ export async function loadDeviceLibraries(
   // user re-creates a snapshot in the Govee app and re-imports it. Without
   // the force-branch the gate was sticky — cached snapshot packets stayed
   // until the cache file was manually deleted (Issue #13 v2.8.2, tukey42).
-  if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0) {
+  if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0 && !hasBearer) {
+    host.noteSkipped?.();
+  } else if ((force || !device.snapshotBleCmds) && device.snapshots.length > 0) {
     await host.runLimited(async () => {
       const ep = `/bff-app/v1/devices/snapshots?sku=${sku}`;
       try {
