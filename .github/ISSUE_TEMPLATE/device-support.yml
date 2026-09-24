@@ -35,9 +35,9 @@ body:
 
         Concrete, brief, honest. What works? What doesn't? Any errors in the adapter log?
       placeholder: |
-        - Power on/off: funktioniert
-        - Mode wechseln: funktioniert
-        - Temperatur setzen: kein Effekt am Gerät
+        - Power on/off: works / funktioniert
+        - Change mode / Modus wechseln: works / funktioniert
+        - Set temperature / Temperatur setzen: no effect on the device / kein Effekt am Gerät
     validations:
       required: true
 
@@ -46,9 +46,9 @@ body:
     attributes:
       label: Diagnose-Export / Diagnostics export
       description: |
-        Knopf `diag.export` am Gerät drücken, dann `diag.result` kopieren — darin stecken auch die letzten Protokollzeilen. Der Export ist lang: **am besten als Datei `diagnose.json` hier hineinziehen.**
+        In der Instanz-Konfiguration: Reiter **Experte** → **Diagnose** → Gerät wählen → **Bericht erstellen und herunterladen**, dann die heruntergeladene Datei hier hineinziehen. Der Bericht enthält auch die letzten Protokollzeilen und ist anonymisiert.
 
-        Press `diag.export` on the device, then copy `diag.result` — it also contains the most recent log lines. The export is long: **best dragged in as a file `diagnose.json`.**
+        In the instance settings: tab **Expert** → **Diagnostics** → pick the device → **Create report and download**, then drag the downloaded file in here. The report also contains the most recent log lines and is anonymised.
     validations:
       required: true
 
@@ -56,7 +56,8 @@ body:
     id: adapter-version
     attributes:
       label: govee-smart Version
-      placeholder: "2.28.0"
+      description: Reiter Instanzen / Instances tab
+      placeholder: "x.y.z"
     validations:
       required: true
 

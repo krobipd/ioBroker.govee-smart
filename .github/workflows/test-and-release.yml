@@ -254,12 +254,12 @@ jobs:
     steps:
       - uses: ioBroker/testing-action-deploy@v1
         with:
-          # Node 24 (statt 22) — Workaround für Issue
-          # ioBroker/testing-action-deploy#19: `npm install -g npm@latest`
-          # scheitert auf Node 22 mit MODULE_NOT_FOUND (promise-retry).
-          # Maintainer-Empfehlung von mcm1957. Engines-Constraint des
-          # Adapters bleibt davon unberührt — das ist nur die CI-Runtime
-          # für `npm publish`.
+          # Always the highest EVEN major of the test matrix, floored at
+          # max(minimumNodeVersionDeploy, engines.node) — the consistency audit aligns
+          # this line in release mode; never edit it by hand. Odd majors never become
+          # LTS (nodejs/Release/schedule.json), and the publish step is exactly where two
+          # npm regressions hit (promise-retry on 22, sigstore on 24) with no gate to
+          # catch them: the repochecker reports nothing above its deploy floor.
           node-version: "26.x"
           build: true
           github-token: ${{ secrets.GITHUB_TOKEN }}
