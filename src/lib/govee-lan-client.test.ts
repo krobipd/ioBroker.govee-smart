@@ -581,6 +581,18 @@ describe("GoveeLanClient — handleMessage (LAN reply parsing)", () => {
     expect(statuses[0].status).toEqual({ onOff: 0, brightness: 0, color: { r: 0, g: 0, b: 0 }, colorTemInKelvin: 0 });
   });
 
+  it("a devStatus without a data object is no report — never 'off, brightness 0'", () => {
+    // Handed on as `{}` (2.40.0 development), such a packet read as a light that
+    // had switched itself off.
+    const { statuses, discovered, feed } = makeClient();
+    feed({ msg: { cmd: "devStatus", data: null } }, "10.0.0.1");
+    feed({ msg: { cmd: "devStatus", data: [1, 80] } }, "10.0.0.1");
+    feed({ msg: { cmd: "devStatus" } }, "10.0.0.1");
+    feed({ msg: { cmd: "scan", data: "AA:BB" } }, "10.0.0.1");
+    expect(statuses).toEqual([]);
+    expect(discovered).toEqual([]);
+  });
+
   it("drops oversize messages (>8192 bytes) without parsing", () => {
     const { discovered, statuses, feed } = makeClient();
     feed({ msg: { cmd: "scan", data: { ip: "1", device: "x", sku: "y", pad: "A".repeat(9000) } } });

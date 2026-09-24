@@ -495,7 +495,7 @@ export class CommandRouter {
       return;
     }
     if (decision.kind === "cloud") {
-      await this.sendSegmentBatchParsed(device, typeof value === "string" ? value : "", parsed);
+      await this.sendSegmentBatchParsed(device, parsed);
     }
   }
 
@@ -609,28 +609,25 @@ export class CommandRouter {
    * Send a batch segment command with pre-parsed data.
    *
    * @param device Target device
-   * @param commandStr Original command string (for error messages)
-   * @param parsed Pre-parsed batch data (null = invalid command)
+   * @param parsed Pre-parsed batch data — the dispatcher refuses an unparsable command before
+   * @param parsed.segments Segment indices to address
+   * @param parsed.color Packed RGB colour, when the batch sets one
+   * @param parsed.brightness Brightness 0–100, when the batch sets one
    */
   private async sendSegmentBatchParsed(
     device: GoveeDevice,
-    commandStr: string,
     parsed: {
       segments: number[];
       color?: number;
       brightness?: number;
-    } | null,
+    },
   ): Promise<void> {
     // Principle 5 — every refusal throws, so the caller never acks what did
-    // not go out (audit C9; these three returned silently until 2.40.0).
+    // not go out (audit C9; these returned silently until 2.40.0).
     if (!this.cloudClient) {
       throw new Error(
         `No Cloud connection for ${deviceLabel(device)} segment command (no API key, or adapter stopping)`,
       );
-    }
-
-    if (!parsed) {
-      throw new Error(`Invalid segment command "${commandStr}" for ${deviceLabel(device)}`);
     }
 
     const cap = this.findCapabilityForCommand(device, "segmentColor:0");

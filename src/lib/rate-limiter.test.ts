@@ -1,6 +1,6 @@
-import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, type CallLane } from "./rate-limiter";
+import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, applianceBudget, type CallLane } from "./rate-limiter";
 import { CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
-import type { TimerAdapter } from "./types";
+import type { GoveeDevice, TimerAdapter } from "./types";
 
 const mockLog: ioBroker.Logger = {
   debug: () => {},
@@ -419,6 +419,15 @@ describe("RateLimiter — queue cap (v2.16.1)", () => {
 });
 
 describe("per-device daily budget", () => {
+  it("an app group has no allowance of its own, whatever type Govee lists it with — its members pay", () => {
+    const group = { sku: "BaseGroup", deviceId: "9900001", type: "" } as GoveeDevice;
+    expect(applianceBudget(group)).toBeUndefined();
+    expect(applianceBudget({ ...group, sku: "H7160", deviceId: "AA:BB" })).toEqual({
+      key: "H7160:AA:BB",
+      perDay: expect.any(Number),
+    });
+  });
+
   // Govee's limits are not one budget: the account gets 10,000 calls a day, but
   // an APPLIANCE gets 100 for itself — and appliance control has no local path,
   // so every write is a cloud call. The global counters cannot express that.

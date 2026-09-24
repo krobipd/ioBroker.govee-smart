@@ -1978,6 +1978,17 @@ describe("DeviceManager", () => {
   });
 
   describe("parseMqttSegmentData", () => {
+    it("reads at most 512 entries of op.command — a packet behind them is not looked at (SEC-GC1)", () => {
+      const packet = buildAaA5Packet(1, [
+        [100, 255, 0, 0],
+        [50, 0, 255, 0],
+        [75, 0, 0, 255],
+        [1, 128, 128, 128],
+      ]);
+      expect(parseMqttSegmentData([...Array<string>(511).fill(""), packet]).segments).toHaveLength(4);
+      expect(parseMqttSegmentData([...Array<string>(512).fill(""), packet]).segments).toHaveLength(0);
+    });
+
     it("rejects a packet whose XOR checksum does not match (spoofed / corrupt)", () => {
       const good = buildAaA5Packet(1, [
         [100, 255, 0, 0],
@@ -4594,6 +4605,16 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
     expect(reads).toEqual([]);
   });
 
+  it("never reads the state of an app group — Govee answers 400 for a group id", async () => {
+    const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
+    dev.sku = "BaseGroup";
+    dev.deviceId = "9900001";
+    const { client, reads } = recordingCloud();
+    dm2.setCloudClient(client as never);
+    expect(await dm2.refreshExpiringReachability()).toBe(0);
+    expect(reads).toEqual([]);
+  });
+
   it("skips a device that is not in the account at all", async () => {
     const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
     dev.channels.cloud = false;
@@ -5602,6 +5623,45 @@ describe("what waits for an account token — libraries and group members (M3/M9
     dm.onBearerToken(); // the group list answered — a refreshed token asks nothing
     await new Promise(r => setTimeout(r, 0));
     expect(groupCalls()).toBe(1);
+  });
+
+  it("the refresh button without a token leaves the light waiting — the first token loads its libraries", async () => {
+    const { dm, bearer, musicCalls } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    dm.enableBearerFollowUps();
+    (dm as any).librariesAwaitingBearer.clear(); // only the button's own job may put it back
+    await dm.refreshSceneDataForDevice("BULB000000000009");
+    expect(musicCalls()).toBe(0);
+    bearer.on = true;
+    dm.onBearerToken();
+    await dm.whenSceneLoadsSettled();
+    expect(musicCalls()).toBe(1);
+  });
+
+  it("the group list is attributed to app groups only — members, report entries and failures", async () => {
+    const { dm, bearer } = bench();
+    await dm.loadFromCloud();
+    await dm.whenSceneLoadsSettled();
+    const group = createTestDevice({ sku: "BaseGroup", deviceId: "1234567", name: "Living room" });
+    (dm as any).devices.set((dm as any).deviceKey("BaseGroup", "1234567"), group);
+    const [bulb] = dm.getDevices().filter(d => d.sku === "H600D");
+    (dm as any).apiClient.fetchGroupMembers = () =>
+      Promise.resolve([
+        { groupId: 1234567, name: "Living room", devices: [{ sku: "H600D", deviceId: "BULB000000000009" }] },
+      ]);
+    bearer.on = true;
+    const diag = dm.getDiagnostics();
+    const success = vi.spyOn(diag, "recordApiSuccess");
+    const failure = vi.spyOn(diag, "recordApiFailure");
+    await dm.loadGroupMembers();
+    expect(group.groupMembers).toEqual([{ sku: "H600D", deviceId: "BULB000000000009" }]);
+    expect(bulb.groupMembers).toBeUndefined();
+    expect(success.mock.calls.map(c => c[0])).toEqual(["1234567"]);
+
+    (dm as any).apiClient.fetchGroupMembers = () => Promise.reject(new Error("socket hang up"));
+    await dm.loadGroupMembers();
+    expect(failure.mock.calls.map(c => c[0])).toEqual(["1234567"]);
   });
 
   it("no app group — the token asks for no group members", async () => {

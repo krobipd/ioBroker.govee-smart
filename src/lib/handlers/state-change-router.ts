@@ -6,7 +6,6 @@ import {
   resolveWorkModeStruct,
 } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
-import { SEGMENT_HARD_MAX } from "../device-manager/lookups";
 import { GOVEE_CAP_TYPE, isAppGroup } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";
@@ -346,10 +345,10 @@ export async function handleManualSegmentsChange(
   }
 
   // Bounded by the physical length the tree is built from — the learned value
-  // alone is unset on a strip nothing has measured yet (then the protocol limit).
+  // alone is unset on a strip nothing has measured yet. Then the bound is -1,
+  // which parseSegmentList reads as "no length known": the protocol limit.
   const physical = adapter.deviceManager?.physicalSegmentCount(device) ?? 0;
-  const maxIndex = physical > 0 ? physical - 1 : SEGMENT_HARD_MAX;
-  const parsed = parseSegmentList(listVal, maxIndex);
+  const parsed = parseSegmentList(listVal, physical - 1);
   if (parsed.error) {
     adapter.log.warn(`${deviceLabel(device)}: manual_list invalid (${parsed.error}) — disabling manual mode`);
     await adapter.applyManualSegments(device, false);

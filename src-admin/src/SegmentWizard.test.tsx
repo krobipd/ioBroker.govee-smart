@@ -164,6 +164,27 @@ describe("SegmentWizard", () => {
     await waitFor(() => expect(mockApi.abort).toHaveBeenCalledTimes(1));
   });
 
+  it("the measurement a re-measure started is open too — leaving the card aborts it", async () => {
+    mockApi.start.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 0, confirmed: [] },
+      active: true,
+    });
+    mockApi.yes.mockResolvedValue({
+      snapshot: { phase: "measuring", total: 55, currentIndex: 1, confirmed: [0] },
+    });
+    const view = renderWizard();
+    fireEvent.click(await screen.findByTestId("wiz-start"));
+    fireEvent.click(await screen.findByTestId("wiz-lit"));
+    await waitFor(() => expect(mockApi.yes).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByTestId("wiz-finish"));
+    fireEvent.click(await screen.findByTestId("wiz-remeasure"));
+    await waitFor(() => expect(mockApi.start).toHaveBeenCalledTimes(2));
+    await screen.findByTestId("wiz-lit");
+    expect(mockApi.abort).toHaveBeenCalledTimes(1); // the old session
+    view.unmount();
+    await waitFor(() => expect(mockApi.abort).toHaveBeenCalledTimes(2));
+  });
+
   it("a card unmounted without a session aborts nothing", async () => {
     const view = renderWizard();
     await screen.findByTestId("wiz-start");

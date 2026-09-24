@@ -728,6 +728,13 @@ describe("handleManualSegmentsChange", () => {
     expect(rig.warns.some(w => w.includes("manual_list invalid"))).toBe(true);
   });
 
+  it("a strip nothing has measured yet takes a list up to the protocol limit", async () => {
+    const rig = makeRig([device]);
+    const dev = createTestDevice({ segmentCount: undefined, manualMode: true });
+    await handleManualSegmentsChange(rig.adapter, dev, "segments.manual_list", "0-2,5");
+    expect(rig.manualApplied).toEqual([{ mode: true, indices: [0, 1, 2, 5] }]);
+  });
+
   it("toggle off → contiguous strip restored", async () => {
     const rig = makeRig([device]);
     const dev = createTestDevice({ segmentCount: 15, manualMode: true, manualSegments: [0, 1] });
@@ -1098,6 +1105,10 @@ describe("the heater's auto stop travels in the temperature STRUCT (audit C-O2, 
     rig.states.set(id("control.target_temperature"), 20);
     await write(rig, id("control.auto_stop"), "7");
     expect(rig.capCommands).toEqual([]);
+    expect(rig.acks).toEqual([]);
+    // Refused with its own reason — not a crash on the missing send result.
+    expect(rig.warns.filter(w => w.includes("no auto-stop option"))).toHaveLength(1);
+    expect(rig.warns.some(w => w.includes("Command failed"))).toBe(false);
   });
 
   it("a temperature above the declared range is acked with what went out (N45)", async () => {

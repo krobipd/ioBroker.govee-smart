@@ -1697,6 +1697,18 @@ describe("StateManager", () => {
       expect(sm.resolveStatePath("devices.h6160_0011", "tier")).toBe("devices.h6160_0011.diag.tier");
     });
 
+    it("diag.tier is written for a device and never for an app group — a group has no diag channel", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.updateDeviceTier(createTestDevice({ sku: "BaseGroup", deviceId: "9900001" }), "unknown");
+      expect(calls.filter(c => c.method === "setState")).toEqual([]);
+      const light = createTestDevice();
+      await sm.updateDeviceTier(light, "verified");
+      expect(calls.filter(c => c.method === "setState").map(c => c.args)).toEqual([
+        [`${sm.devicePrefix(light)}.diag.tier`, { val: "verified", ack: true }],
+      ]);
+    });
+
     it("should route unknown states to control channel", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

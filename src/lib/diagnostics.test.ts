@@ -495,6 +495,31 @@ describe("DiagnosticsCollector", () => {
       registry = emptyRegistry();
     });
 
+    it("names where the segment count came from — quirk, learned, capability, nothing", async () => {
+      const segmentCap = {
+        type: "devices.capabilities.segment_color_setting",
+        instance: "segmentedColorRgb",
+        parameters: { fields: [{ fieldName: "segment", elementRange: { min: 0, max: 14 } }] },
+      } as unknown as GoveeDevice["capabilities"][number];
+      const quirked = new DeviceRegistry({
+        data: {
+          devices: { H6141: { name: "LED Strip", type: "light", status: "seed", quirks: { segmentCount: 10 } } },
+        } as never,
+        experimental: true,
+      });
+      const source = async (c: DiagnosticsCollector, d: GoveeDevice): Promise<unknown> =>
+        ((await c.generate(d, "2.40.0")).device as Record<string, unknown>).segmentCountSource;
+      expect(await source(new DiagnosticsCollector(quirked), makeDevice({ sku: "H6141", segmentCount: 20 }))).toBe(
+        "quirk (hard override for this SKU)",
+      );
+      const plain = new DiagnosticsCollector(emptyRegistry());
+      expect(await source(plain, makeDevice({ segmentCount: 20 }))).toBe(
+        "learned at runtime (cache, MQTT push or wizard)",
+      );
+      expect(await source(plain, makeDevice({ capabilities: [segmentCap] }))).toBe("smallest cloud segment capability");
+      expect(await source(plain, makeDevice())).toBe("unknown (no segment source)");
+    });
+
     it("contains all v1.x top-level fields plus the v2 ring buffers", async () => {
       const c = new DiagnosticsCollector(registry);
       const result = await c.generate(makeDevice(), "2.0.0");

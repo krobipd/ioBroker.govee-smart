@@ -728,7 +728,13 @@ export class GoveeLanClient {
       }
       cmd = data.msg.cmd;
       const rawPayload = data.msg.data;
-      payload = rawPayload && typeof rawPayload === "object" && !Array.isArray(rawPayload) ? rawPayload : {};
+      if (!rawPayload || typeof rawPayload !== "object" || Array.isArray(rawPayload)) {
+        // No data object is no report — handed on as `{}`, a devStatus without
+        // data read as "off, brightness 0" and switched the light off in the tree.
+        this.log.debug(`LAN: ${cmd} from ${sourceIp} carries no data object — ignored`);
+        return;
+      }
+      payload = rawPayload;
     } catch {
       this.log.debug(`LAN: Failed to parse message: ${msg.toString().slice(0, 200)}`);
       return;

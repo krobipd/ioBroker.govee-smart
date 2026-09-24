@@ -374,9 +374,11 @@ export class RateLimiter {
     priority = 0,
     budget?: DeviceBudget,
   ): Promise<boolean> {
-    if ((budget && this.deviceBudgetSpent(budget)) || this.dayBudgetSpent()) {
+    if (budget && this.deviceBudgetSpent(budget)) {
       return false;
     }
+    // A spent day needs no check of its own: canMakeCall refuses it first, and
+    // enqueue then turns the call away without queueing it.
     if (this.canMakeCall(lane)) {
       this.spend(lane, budget);
       await execute();
@@ -506,9 +508,7 @@ export class RateLimiter {
     if (budget && this.deviceBudgetSpent(budget)) {
       throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
     }
-    if (this.dayBudgetSpent()) {
-      throw new Error(DAY_BUDGET_SPENT);
-    }
+    // A spent day: canMakeCall refuses, and enqueue rejects with DAY_BUDGET_SPENT.
     if (this.canMakeCall(lane)) {
       this.spend(lane, budget);
       await execute();
