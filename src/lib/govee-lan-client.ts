@@ -145,7 +145,7 @@ export class GoveeLanClient {
    * @param bindAddr The pinned interface IP, if any
    */
   private reportSocketError(kind: string, err: Error, bindAddr: string | undefined): void {
-    const msg = `LAN ${kind} socket error: ${err.message}`;
+    const msg = `LAN ${kind} socket error: ${errMessage(err)}`;
     if (this.socketErrorWarned) {
       this.log.debug(msg);
     } else {
@@ -154,7 +154,7 @@ export class GoveeLanClient {
     }
     if (bindAddr) {
       this.onInterfaceError?.(
-        `LAN ${kind} socket failed on the selected network interface ${bindAddr} (${err.message}) — check the Network Interface setting; the selected IP may no longer exist`,
+        `LAN ${kind} socket failed on the selected network interface ${bindAddr} (${errMessage(err)}) — check the Network Interface setting; the selected IP may no longer exist`,
       );
     }
   }

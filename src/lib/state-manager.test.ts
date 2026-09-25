@@ -173,7 +173,7 @@ function createMockAdapter(): {
           if (objType && objType !== viewType) {
             continue;
           }
-          rows.push({ id: `govee-smart.0.${key}`, value: obj });
+          rows.push({ id: `govee-smart.0.${key}`, value: structuredClone(obj) });
         }
       }
       return Promise.resolve({ rows });

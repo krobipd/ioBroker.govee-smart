@@ -114,6 +114,8 @@ export class GoveeAdapter extends utils.Adapter {
    * keys in every installation, and next to a drop it would have written them back on every start.
    * `scanTargets` (2.40.0 only): extra scan addresses beside the network interface selector —
    * the selected interface alone decides where discovery searches since 2.41.0.
+   * `encryptedNative` / `protectedNative` inside `common` (declared there since 2.1.0): the manifest
+   * carries both at its root, and js-controller never removes a key from the instance's `common`.
    */
   private static readonly NATIVE_KEY_MIGRATIONS: NativeKeyMigration[] = [
     { from: "networkInterface", to: "bind", coerce: v => (typeof v === "string" && v.trim()) || "0.0.0.0" },
@@ -126,6 +128,8 @@ export class GoveeAdapter extends utils.Adapter {
     { drop: "mqttAccountTopic" },
     { drop: "mqttTokenExpiresAt" },
     { drop: "scanTargets" },
+    { commonDrop: "encryptedNative" },
+    { commonDrop: "protectedNative" },
   ];
   // ── Test seams ────────────────────────────────────────────────────────────
   // Network-facing collaborators are built through overridable factory fields
@@ -779,7 +783,7 @@ export class GoveeAdapter extends utils.Adapter {
       };
 
       // Sync per-segment states from MQTT BLE status push (AA A5 packets).
-      // Gleicher Cap-Filter wie bei batch — defensive vor stale Pakete.
+      // Same cap filter as the batch path — guards against stale packets.
       this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
         const prefix = this.stateManager!.devicePrefix(device);
         const cap = physicalSegmentCap(device, this.deviceRegistry);
@@ -1258,7 +1262,7 @@ export class GoveeAdapter extends utils.Adapter {
         // With one, "no capabilities yet" means the Cloud data has not arrived
         // (a failed Cloud start, a light from the scan) — deleting then took
         // the light's Cloud datapoints with their values, rooms and history
-        // (M8, „Löschen braucht Wissen, nicht Abwesenheit“). And inside the
+        // (M8, "deletion needs knowledge, not absence"). And inside the
         // device's build chain, so a build running at the same moment cannot
         // create what this pass deletes, or the other way round (N27).
         if (!this.config.apiKey && !this.cloudClient) {

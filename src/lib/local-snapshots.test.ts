@@ -42,7 +42,7 @@ function createMockAdapter(namespace = "govee-smart.0"): {
         const rows: Array<{ id: string; value: StoredObject }> = [];
         for (const [id, obj] of objects) {
           if (id.startsWith(prefix) && obj.type === type) {
-            rows.push({ id: `${namespace}.${id}`, value: obj });
+            rows.push({ id: `${namespace}.${id}`, value: structuredClone(obj) });
           }
         }
         return Promise.resolve({ rows });

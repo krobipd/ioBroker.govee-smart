@@ -1409,11 +1409,8 @@ export class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online: boolean): Promise<void> {
-    await this.adapter.extendObject("groups", {
-      type: "folder",
-      common: { name: tName("groups") },
-      native: {},
-    });
+    // A manifest object: the manifest owns its shape, the refresh carries only the name.
+    await this.adapter.extendObject("groups", { common: { name: tName("groups") } });
     await this.adapter.extendObject("groups.info", {
       type: "channel",
       common: { name: tName("groupsStatus") },

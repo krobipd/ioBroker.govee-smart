@@ -145,7 +145,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
             return;
           }
         }
-        this.log.debug(`Cloud-events error: ${err.message}`);
+        this.log.debug(`Cloud-events error: ${errMessage(err)}`);
         // Some error types (TLS handshake fail, unsolicited disconnect) keep
         // the client object alive without firing `close`. Force a close so
         // the close-handler scheduleReconnect runs — without this the

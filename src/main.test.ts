@@ -142,7 +142,7 @@ vi.mock("@iobroker/adapter-core", () => {
       const rows: Array<{ id: string; value: unknown }> = [];
       for (const [k, v] of this.objects) {
         if (k.startsWith(prefix) && (v as { type?: string }).type === type) {
-          rows.push({ id: `${this.namespace}.${k}`, value: v });
+          rows.push({ id: `${this.namespace}.${k}`, value: structuredClone(v) });
         }
       }
       return Promise.resolve({ rows });

@@ -7,7 +7,7 @@
     "start": "vite --port 4173",
     "lint": "eslint -c eslint.config.mjs",
     "build": "tsc && vite build",
-    "test": "vitest run"
+    "test": "node node_modules/vitest/vitest.mjs run"
   },
   "devDependencies": {
     "@iobroker/build-tools": "^2.0.15",
@@ -23,19 +23,21 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.4",
-    "jsdom": "^26.1.0",
+    "jsdom": "~26.1.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "~6.0.3",
     "vite": "^8.1.5",
     "vite-plugin-commonjs": "^0.10.4",
-    "vitest": "^4.1.10"
+    "vitest": "~4.1.10"
   },
   "overrides": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0"
+    "@types/react-dom": "^19.2.0",
+    "adm-zip": "^0.6.0",
+    "undici": "^7.29.0"
   },
   "browserslist": {
     "production": [
