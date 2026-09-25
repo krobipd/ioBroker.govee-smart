@@ -8,8 +8,10 @@ import {
   buildSegmentColorPacket,
   buildSegmentBrightnessPacket,
   applySceneSpeed,
+  interfaceBroadcasts,
 } from "./govee-lan-client";
 import type { LanDevice, LanStatus, TimerAdapter } from "./types";
+import type * as NodeOs from "node:os";
 
 // dgram is mocked so the interface-pinning behaviour in start() (setMulticastInterface
 // on the scan socket + bind on the command socket) is unit-testable. The rest of the
@@ -75,6 +77,28 @@ const dgramMock = vi.hoisted(() => {
   return { sockets, make };
 });
 vi.mock("node:dgram", () => ({ createSocket: (opts: unknown) => dgramMock.make(opts) }));
+
+// The host's network cards as os.networkInterfaces() reports them — the scan's
+// broadcast targets come from here. One /24 card unless a test sets its own.
+const osMock = vi.hoisted(() => {
+  const nic = (address: string, netmask: string, internal = false): Record<string, unknown> => ({
+    address,
+    netmask,
+    family: "IPv4",
+    mac: "00:00:00:00:00:00",
+    internal,
+    cidr: null,
+  });
+  const standard = (): Record<string, Array<Record<string, unknown>>> => ({
+    lo0: [nic("127.0.0.1", "255.0.0.0", true)],
+    en0: [nic("192.168.1.5", "255.255.255.0")],
+  });
+  return { nic, standard, interfaces: standard() };
+});
+vi.mock("node:os", async orig => ({
+  ...(await orig<typeof NodeOs>()),
+  networkInterfaces: () => osMock.interfaces,
+}));
 
 const lanLog = {
   silly: () => {},
@@ -1008,12 +1032,12 @@ describe("GoveeLanClient — discovery loop + socket wiring", () => {
     expect(intervals, "the periodic scan must be armed").toHaveLength(1);
     intervals[0]();
     intervals[0]();
-    // Each tick: the multicast group and the limited broadcast (A-O1).
+    // Each tick: the multicast group and the broadcast of the host's one card.
     expect(scanSock.sends).toHaveLength(before + 4);
     const tick = scanSock.sends.slice(-2);
     expect(tick.map(t => [t.address, t.port])).toEqual([
       ["239.255.255.250", 4001],
-      ["255.255.255.255", 4001],
+      ["192.168.1.255", 4001],
     ]);
     expect(JSON.parse(tick[0].buf.toString())).toEqual({ msg: { cmd: "scan", data: { account_topic: "reserve" } } });
     client.stop();
@@ -1145,13 +1169,20 @@ describe("GoveeLanClient — audit 2026-09-24 (A5, N1, M2, A9, A-O1)", () => {
     client.stop();
   });
 
-  it("the scan also asks every device address seen and the configured targets; bad targets are ignored (A-O1)", () => {
+  it("the scan also asks every device address seen, and nothing outside the selected interface", () => {
     const intervals: Array<() => void> = [];
     const timers = { ...lanTimers, setInterval: (cb: () => void) => (intervals.push(cb), intervals.length) } as never;
-    const infos: string[] = [];
-    const client = new GoveeLanClient({ ...lanLog, info: (m: string) => infos.push(m) }, timers);
-    client.setScanTargets(["10.0.5.20", " ", "not-an-ip", "300.1.1.1"]);
-    start(client);
+    osMock.interfaces = {
+      en0: [osMock.nic("192.168.1.5", "255.255.255.0")],
+      en1: [osMock.nic("10.20.0.3", "255.255.0.0")],
+    };
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "192.168.1.5",
+    );
     const reply = Buffer.from(JSON.stringify({ msg: { cmd: "scan", data: { device: "AA:BB:CC:DD", sku: "H6076" } } }));
     for (const h of listen().handlers.message ?? []) {
       h(reply, { address: "192.168.1.79" });
@@ -1162,8 +1193,57 @@ describe("GoveeLanClient — audit 2026-09-24 (A5, N1, M2, A9, A-O1)", () => {
       scan()
         .sends.slice(before)
         .map(t => t.address),
-    ).toEqual(["239.255.255.250", "255.255.255.255", "192.168.1.79", "10.0.5.20"]);
-    expect(infos.some(i => i.includes("not-an-ip") && i.includes("300.1.1.1"))).toBe(true);
+    ).toEqual(["239.255.255.250", "192.168.1.255", "192.168.1.79"]);
     client.stop();
+    osMock.interfaces = osMock.standard();
+  });
+
+  it("all interfaces broadcast into every card's own network, never the limited broadcast", () => {
+    osMock.interfaces = {
+      lo0: [osMock.nic("127.0.0.1", "255.0.0.0", true)],
+      en0: [osMock.nic("192.168.1.5", "255.255.255.0")],
+      en1: [osMock.nic("10.20.0.3", "255.255.0.0")],
+    };
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    start(client);
+    const addresses = scan().sends.map(t => t.address);
+    expect(addresses).toEqual(["239.255.255.250", "192.168.1.255", "10.20.255.255"]);
+    expect(addresses).not.toContain("255.255.255.255");
+    client.stop();
+    osMock.interfaces = osMock.standard();
+  });
+});
+
+describe("interfaceBroadcasts — the scan's broadcast targets come from the selected interface", () => {
+  const nic = osMock.nic as (a: string, m: string, i?: boolean) => never;
+
+  it("a selected address yields only its own network's broadcast", () => {
+    const ifaces = { en0: [nic("192.168.1.5", "255.255.255.0")], en1: [nic("10.20.0.3", "255.255.0.0")] };
+    expect(interfaceBroadcasts("10.20.0.3", ifaces)).toEqual(["10.20.255.255"]);
+  });
+
+  it("a /23 gets its real broadcast, not the /24 one", () => {
+    expect(interfaceBroadcasts("192.168.2.10", { en0: [nic("192.168.2.10", "255.255.254.0")] })).toEqual([
+      "192.168.3.255",
+    ]);
+  });
+
+  it("all interfaces: every non-internal IPv4 card, each network once", () => {
+    const ifaces = {
+      lo0: [nic("127.0.0.1", "255.0.0.0", true)],
+      en0: [nic("192.168.1.5", "255.255.255.0"), nic("192.168.1.6", "255.255.255.0")],
+      en1: [nic("10.20.0.3", "255.255.0.0")],
+      en2: [{ ...(nic("fe80::1", "ffff:ffff:ffff:ffff::") as object), family: "IPv6" } as never],
+    };
+    expect(interfaceBroadcasts(undefined, ifaces)).toEqual(["192.168.1.255", "10.20.255.255"]);
+  });
+
+  it("a selected address the host no longer has yields none", () => {
+    expect(interfaceBroadcasts("192.168.9.9", { en0: [nic("192.168.1.5", "255.255.255.0")] })).toEqual([]);
+  });
+
+  it("a /31 or /32 has no broadcast", () => {
+    const ifaces = { tun0: [nic("10.8.0.2", "255.255.255.255")], p2p: [nic("10.9.0.0", "255.255.255.254")] };
+    expect(interfaceBroadcasts(undefined, ifaces)).toEqual([]);
   });
 });

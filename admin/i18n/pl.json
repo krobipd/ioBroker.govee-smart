@@ -74,8 +74,6 @@
   "musicSensitivity": "Czułość muzyki",
   "bindLabel": "Interfejs sieciowy",
   "bindTooltip": "Wybierz interfejs sieciowy do wykrywania i sterowania LAN. Pozostaw domyślny (0.0.0.0 = wszystkie), chyba że ten host ma wiele interfejsów.",
-  "scanTargetsLabel": "Dodatkowe adresy wyszukiwania",
-  "scanTargetsTooltip": "Adresy IPv4 lamp Govee, o które wyszukiwanie ma dodatkowo pytać bezpośrednio, rozdzielone przecinkami — dla lamp w innej podsieci lub za routerem blokującym multicast i broadcast. Zwykle zostaw puste.",
   "online": "Online",
   "power": "Zasilanie",
   "refreshCloud": "Odśwież dane Cloud",

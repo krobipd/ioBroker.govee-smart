@@ -74,8 +74,6 @@
   "musicSensitivity": "Sensibilidad musical",
   "bindLabel": "Interfaz de red",
   "bindTooltip": "Selecciona la interfaz de red para el descubrimiento y control LAN. Mantén el valor predeterminado (0.0.0.0 = todas) salvo que este host tenga varias interfaces.",
-  "scanTargetsLabel": "Direcciones de búsqueda adicionales",
-  "scanTargetsTooltip": "Direcciones IPv4 de luces Govee que la búsqueda debe consultar también directamente, separadas por comas — para luces en otra subred o detrás de un router que bloquea multicast y broadcast. Normalmente déjelo vacío.",
   "online": "Conectado",
   "power": "Encendido",
   "refreshCloud": "Actualizar datos Cloud",

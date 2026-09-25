@@ -486,7 +486,6 @@
     "goveePassword": "",
     "port": 4002,
     "bind": "0.0.0.0",
-    "scanTargets": "",
     "experimentalQuirks": false,
     "mqttVerificationCode": ""
   },

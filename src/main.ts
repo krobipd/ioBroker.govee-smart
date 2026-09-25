@@ -111,6 +111,8 @@ export class GoveeAdapter extends utils.Adapter {
    * Dropped (nothing reads them any more): `pollInterval` (until 0.9.6) and the plaintext MQTT
    * session of 2.1.0–2.1.2, which a cleanup of its own blanked until 2.40.0 — blanking left the
    * keys in every installation, and next to a drop it would have written them back on every start.
+   * `scanTargets` (2.40.0 only): extra scan addresses beside the network interface selector —
+   * the selected interface alone decides where discovery searches since 2.41.0.
    */
   private static readonly NATIVE_KEY_MIGRATIONS: NativeKeyMigration[] = [
     { from: "networkInterface", to: "bind", coerce: v => (typeof v === "string" && v.trim()) || "0.0.0.0" },
@@ -122,6 +124,7 @@ export class GoveeAdapter extends utils.Adapter {
     { drop: "mqttAccountId" },
     { drop: "mqttAccountTopic" },
     { drop: "mqttTokenExpiresAt" },
+    { drop: "scanTargets" },
   ];
   // ── Test seams ────────────────────────────────────────────────────────────
   // Network-facing collaborators are built through overridable factory fields
@@ -845,7 +848,6 @@ export class GoveeAdapter extends utils.Adapter {
           action: `${message}. Stop the other process (or the second instance) and restart this one.`,
         });
       };
-      this.lanClient.setScanTargets((config.scanTargets ?? "").split(/[\s,;]+/));
 
       // v2.9.1 — wire LAN-traffic into the diag-collector. Resolves
       // destination-IP → device on every send/status/scan so the diag

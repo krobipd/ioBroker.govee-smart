@@ -1,4 +1,5 @@
 import * as dgram from "node:dgram";
+import * as os from "node:os";
 import { clampByte, errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import {
@@ -10,10 +11,6 @@ import {
 const MULTICAST_ADDR = "239.255.255.250";
 const SCAN_PORT = 4001;
 const LISTEN_PORT = 4002;
-/** Limited broadcast — reaches devices that ignore the multicast scan (govee2mqtt `lan_api.rs`, homebridge `lan.js`). */
-const BROADCAST_ADDR = "255.255.255.255";
-/** A plain dotted IPv4 address — the only form a scan target may take. */
-const IPV4 = /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/;
 const COMMAND_PORT = 4003;
 /** Cap on distinct LAN device identities we track/create — bounds a spoofed-discovery flood (SEC-H2). */
 const MAX_DISTINCT_LAN_DEVICES = 512;
@@ -95,8 +92,6 @@ export class GoveeLanClient {
   public onListenPortBusy: ((message: string) => void) | null = null;
   /** The listen socket is bound — the LAN channel can hear replies (audit N1). */
   private listening = false;
-  /** Extra unicast scan targets from the settings (audit A-O1). */
-  private scanTargets: string[] = [];
   /** warn-once guard for non-EADDRINUSE socket errors. */
   private socketErrorWarned = false;
   private onSend: LanSendCallback | null = null;
@@ -666,26 +661,12 @@ export class GoveeLanClient {
   }
 
   /**
-   * Extra addresses the scan asks directly — for devices in another subnet or
-   * behind a router that drops multicast and broadcast. Entries that are no
-   * plain IPv4 address are ignored (one info line).
-   *
-   * @param targets IPv4 addresses from the settings
-   */
-  setScanTargets(targets: readonly string[]): void {
-    const valid = targets.map(t => t.trim()).filter(t => t !== "");
-    const bad = valid.filter(t => !IPV4.test(t));
-    if (bad.length > 0) {
-      this.log.info(`LAN: ignoring scan target(s) that are no IPv4 address: ${bad.join(", ")}`);
-    }
-    this.scanTargets = valid.filter(t => IPV4.test(t));
-  }
-
-  /**
-   * Send the scan — to the multicast group, the limited broadcast, every
-   * address a device answered from, and the configured targets (audit A-O1).
-   * Multicast alone missed devices whose network drops it; govee2mqtt and
-   * homebridge-govee scan all of these.
+   * Send the scan — to the multicast group, the broadcast address of the
+   * selected network interface (every interface's for "all interfaces"), and
+   * every address a device answered from. Multicast alone missed devices whose
+   * network drops it (govee2mqtt `lan_api.rs`, homebridge-govee `lan.js`). The
+   * selected interface decides where the adapter searches: no fixed limited
+   * broadcast, no extra addresses beside it (2.41.0).
    */
   private sendScan(): void {
     const scanMsg: LanMessage = {
@@ -693,7 +674,8 @@ export class GoveeLanClient {
     };
     const buf = Buffer.from(JSON.stringify(scanMsg));
     const known = [...this.seenDeviceIps].map(key => key.slice(key.lastIndexOf(":") + 1));
-    const targets = new Set<string>([MULTICAST_ADDR, BROADCAST_ADDR, ...known, ...this.scanTargets]);
+    const broadcasts = interfaceBroadcasts(this.multicastBind, os.networkInterfaces());
+    const targets = new Set<string>([MULTICAST_ADDR, ...broadcasts, ...known]);
     for (const target of targets) {
       this.scanSocket?.send(buf, 0, buf.length, SCAN_PORT, target, err => {
         if (err) {
@@ -864,6 +846,41 @@ export class GoveeLanClient {
  *
  * @param v Input value
  */
+/**
+ * The directed broadcast address of each IPv4 network the scan may use:
+ * only the network of the selected address, or every non-internal IPv4
+ * network for "all interfaces". Computed from address and netmask, so a /23
+ * gets its real broadcast. A selected address the host no longer has yields
+ * none — the bind error already reports that. A /31 or /32 has no broadcast.
+ *
+ * @param bind The selected interface address, undefined for all interfaces
+ * @param interfaces What `os.networkInterfaces()` returns
+ */
+export function interfaceBroadcasts(
+  bind: string | undefined,
+  interfaces: NodeJS.Dict<os.NetworkInterfaceInfo[]>,
+): string[] {
+  const toInt = (ip: string): number => ip.split(".").reduce((acc, part) => (acc << 8) + Number(part), 0) >>> 0;
+  const out = new Set<string>();
+  for (const entries of Object.values(interfaces)) {
+    for (const entry of entries ?? []) {
+      if (entry.family !== "IPv4" || entry.internal) {
+        continue;
+      }
+      if (bind !== undefined && entry.address !== bind) {
+        continue;
+      }
+      const mask = toInt(entry.netmask);
+      if (mask >= 0xfffffffe) {
+        continue;
+      }
+      const broadcast = (toInt(entry.address) | ~mask) >>> 0;
+      out.add([24, 16, 8, 0].map(shift => (broadcast >>> shift) & 0xff).join("."));
+    }
+  }
+  return [...out];
+}
+
 function clampByte0_100(v: number): number {
   if (typeof v !== "number" || !Number.isFinite(v)) {
     return 0;

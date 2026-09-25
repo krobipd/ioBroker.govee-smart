@@ -74,8 +74,6 @@
   "musicSensitivity": "Music Sensitivity",
   "bindLabel": "Network Interface",
   "bindTooltip": "Select the network interface for LAN discovery and control. Keep the default (0.0.0.0 = all interfaces) unless this host has multiple network interfaces.",
-  "scanTargetsLabel": "Additional scan addresses",
-  "scanTargetsTooltip": "IPv4 addresses of Govee lights the discovery should also ask directly, separated by commas — for lights in another subnet or behind a router that blocks multicast and broadcast. Leave empty normally.",
   "online": "Online",
   "power": "Power",
   "refreshCloud": "Refresh Cloud Data",

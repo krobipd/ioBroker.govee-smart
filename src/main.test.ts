@@ -213,7 +213,6 @@ interface Fakes {
     setStatusRecordHook: ReturnType<typeof vi.fn>;
     setScanRecordHook: ReturnType<typeof vi.fn>;
     getDiagSnapshot: ReturnType<typeof vi.fn>;
-    setScanTargets: ReturnType<typeof vi.fn>;
     isListening: ReturnType<typeof vi.fn>;
     onInterfaceError: ((m: string) => void) | null;
     onListenPortBusy: ((m: string) => void) | null;
@@ -347,7 +346,6 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     setStatusRecordHook: vi.fn(),
     setScanRecordHook: vi.fn(),
     getDiagSnapshot: vi.fn(() => ({ seenDeviceIps: [], lastCommandSentMs: {} })),
-    setScanTargets: vi.fn(),
     isListening: vi.fn(() => true),
     onInterfaceError: null,
     onListenPortBusy: null,
@@ -1188,6 +1186,24 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(f.lan.start).not.toHaveBeenCalled();
   });
 
+  it("the extra scan addresses of 2.40.0 are dropped once — the network interface alone decides where discovery searches", async () => {
+    const { adapter, f } = await setupReady();
+    const i = internalOf(adapter);
+    i.getForeignObjectAsync.mockResolvedValueOnce({ common: {} });
+    i.getForeignObjectAsync.mockResolvedValueOnce({
+      native: { bind: "0.0.0.0", port: 4002, scanTargets: "10.0.5.20" },
+    });
+    i.extendForeignObjectAsync.mockClear();
+    f.lan.start.mockClear();
+
+    await i.onReady();
+
+    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(`system.adapter.${i.namespace}`, {
+      native: { scanTargets: null },
+    });
+    expect(f.lan.start).not.toHaveBeenCalled();
+  });
+
   it("an instance without the old key — or with the null the delete left behind — starts without a write", async () => {
     for (const native of [
       { bind: "0.0.0.0", port: 4002 },
@@ -1359,11 +1375,6 @@ describe("GoveeAdapter — LAN discovery wiring", () => {
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("LAN port 4002 is taken by another process"));
     f.lan.onListenReady!();
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("LAN listening on port 4002"));
-  });
-
-  it("hands the configured extra scan targets to the LAN client, split on space, comma and semicolon (audit A-O1)", async () => {
-    const { f } = await setupReady({ scanTargets: "10.0.0.7, 10.0.0.8;10.0.0.9  10.0.0.10" });
-    expect(f.lan.setScanTargets).toHaveBeenCalledWith(["10.0.0.7", "10.0.0.8", "10.0.0.9", "10.0.0.10"]);
   });
 
   it("the LAN-scan settle timer enables the account reconcile only afterwards", async () => {
