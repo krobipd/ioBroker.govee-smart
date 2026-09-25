@@ -145,6 +145,17 @@ export const CLOUD_ONLINE_EVIDENCE_TTL_MS = 30 * 60 * 1000;
 export const CLOUD_REACHABILITY_REFRESH_MS = 20 * 60 * 1000;
 
 /**
+ * How far apart two Cloud calls that could not reach Govee must lie before the
+ * Cloud counts as down (60 s, 2.41.0, issue #51).
+ *
+ * Chosen, not measured: Govee's servers drop single calls often, and several
+ * calls in the same second (a group switched, the start-up reads) are one
+ * hiccup, not an outage. Two failures a minute apart with no accepted answer in
+ * between are an outage the user should see in `info.cloudConnected`.
+ */
+export const CLOUD_UNREACHABLE_CONFIRM_MS = 60 * 1000;
+
+/**
  * How long "this device answered on the local interface" stays true.
  *
  * A device that has answered locally is decided by the LAN reply and nothing

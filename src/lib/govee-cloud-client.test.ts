@@ -149,11 +149,35 @@ describe("GoveeCloudClient", () => {
       expect(seen).toEqual(["ok", "auth-failed", "auth-failed"]);
     });
 
-    it("stays silent on a 429, a 5xx and a network error — they say nothing about the key", async () => {
+    it("reports a call that never reached Govee as unreachable, with its error text (issue #51)", async () => {
+      const answers: unknown[] = [
+        Object.assign(new Error("connect ECONNREFUSED 1.2.3.4:443"), { code: "ECONNREFUSED" }),
+        Object.assign(new Error("getaddrinfo ENOTFOUND openapi.api.govee.com"), { code: "ENOTFOUND" }),
+        Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
+        new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/device/control"),
+        new HttpError("HTTP 500", 500, {}),
+        new HttpError("Bad gateway", 502, {}),
+        new HttpError("HTTP 503", 503, {}),
+        Object.assign(new Error("certificate has expired"), { code: "CERT_HAS_EXPIRED" }),
+      ];
+      const fake = makeFakeHttps((_c, idx) => answers[idx]);
+      const client = new GoveeCloudClient("k", mockLog, fake.fn);
+      const seen: Array<[string, string | undefined]> = [];
+      client.setContactHook((o, r) => seen.push([o, r]));
+      for (let i = 0; i < answers.length; i++) {
+        await expect(client.getDevices()).rejects.toBeDefined();
+      }
+      expect(seen.map(([o]) => o)).toEqual(Array(answers.length).fill("unreachable"));
+      expect(seen[1][1]).toContain("ENOTFOUND");
+      expect(seen[6][1]).toContain("503");
+    });
+
+    it("stays silent where Govee answered or the adapter aborted — 429, 400, 404, Aborted", async () => {
       const answers: unknown[] = [
         new HttpError("Too many requests", 429, { "retry-after": "60" }),
-        new HttpError("Bad gateway", 502, {}),
-        Object.assign(new Error("ECONNRESET"), { code: "ECONNRESET" }),
+        new HttpError("HTTP 400", 400, {}),
+        new HttpError("HTTP 404", 404, {}),
+        new Error("Aborted"),
       ];
       const fake = makeFakeHttps((_c, idx) => answers[idx]);
       const client = new GoveeCloudClient("k", mockLog, fake.fn);

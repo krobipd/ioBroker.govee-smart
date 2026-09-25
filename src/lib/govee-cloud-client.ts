@@ -108,8 +108,42 @@ import {
 
 const BASE_URL = "https://openapi.api.govee.com";
 
-/** What one Cloud answer says about the API key — see `GoveeCloudClient.setContactHook`. */
-export type CloudContact = "ok" | "auth-failed";
+/**
+ * What one Cloud call says — see `GoveeCloudClient.setContactHook`: `ok` (Govee
+ * accepted it), `auth-failed` (401/403, the API key), `unreachable` (Govee did
+ * not answer, or answered 5xx — issue #51).
+ */
+export type CloudContact = "ok" | "auth-failed" | "unreachable";
+
+/** TLS failures — no connection to Govee ever came about (wrong clock, intercepting proxy). */
+const TLS_ERROR_CODES = new Set([
+  "CERT_HAS_EXPIRED",
+  "CERT_NOT_YET_VALID",
+  "DEPTH_ZERO_SELF_SIGNED_CERT",
+  "SELF_SIGNED_CERT_IN_CHAIN",
+  "UNABLE_TO_GET_ISSUER_CERT_LOCALLY",
+  "UNABLE_TO_VERIFY_LEAF_SIGNATURE",
+  "ERR_TLS_CERT_ALTNAME_INVALID",
+]);
+
+/**
+ * A failed call that never reached a working Govee server: no answer (network,
+ * DNS, refused, reset, timeout, TLS) or a 5xx. An answer Govee gave — 429,
+ * 401/403, any other 4xx — is not an outage, nor is the adapter's own abort.
+ *
+ * @param err The error of the failed call
+ * @param category What `classifyError` made of it
+ */
+function isUnreachable(err: unknown, category: ErrorCategory): boolean {
+  if (category === "NETWORK" || category === "TIMEOUT") {
+    return true;
+  }
+  if (err instanceof HttpError) {
+    return err.statusCode >= 500;
+  }
+  const code = (err as { code?: unknown } | null)?.code;
+  return typeof code === "string" && TLS_ERROR_CODES.has(code);
+}
 
 /**
  * Monotonic counter for `requestId` so two calls in the same millisecond
@@ -202,12 +236,13 @@ export class GoveeCloudClient {
   private lastErrorCategory: ErrorCategory | null = null;
 
   /**
-   * Hook called after every Cloud answer that says something about the API
-   * key: `ok` for any accepted call, `auth-failed` for a 401/403. Other
-   * failures (429, 5xx, network) stay silent — one failed state query says
-   * nothing about the Cloud connection as a whole.
+   * Hook called after every Cloud call that says something about the
+   * connection: `ok` for any accepted call, `auth-failed` for a 401/403,
+   * `unreachable` for no answer or a 5xx ({@link isUnreachable}). A 429 or
+   * another 4xx stays silent — Govee answered. One `unreachable` alone decides
+   * nothing; the handler waits for a second one a minute later.
    */
-  private onContact: ((outcome: CloudContact) => void) | null = null;
+  private onContact: ((outcome: CloudContact, reason?: string) => void) | null = null;
 
   /**
    * @param apiKey Govee API key
@@ -257,12 +292,12 @@ export class GoveeCloudClient {
   }
 
   /**
-   * Register the hook that learns whether Govee accepted the API key — see
+   * Register the hook that learns what each Cloud call said — see
    * {@link onContact}. A throwing hook never fails the request.
    *
-   * @param cb Callback receiving `ok` or `auth-failed`
+   * @param cb Callback receiving `ok`, `auth-failed` or `unreachable` (with the error text)
    */
-  setContactHook(cb: ((outcome: CloudContact) => void) | null): void {
+  setContactHook(cb: ((outcome: CloudContact, reason?: string) => void) | null): void {
     this.onContact = cb;
   }
 
@@ -569,6 +604,9 @@ export class GoveeCloudClient {
         throw err;
       }
       this.lastErrorCategory = classifyError(err);
+      if (isUnreachable(err, this.lastErrorCategory)) {
+        this.reportContact("unreachable", errMessage(err));
+      }
       throw err;
     }
   }
@@ -576,11 +614,12 @@ export class GoveeCloudClient {
   /**
    * Tell the contact hook — a throwing hook is logged, never rethrown.
    *
-   * @param outcome What the answer said about the API key
+   * @param outcome What the call said
+   * @param reason The error text of an `unreachable` call
    */
-  private reportContact(outcome: CloudContact): void {
+  private reportContact(outcome: CloudContact, reason?: string): void {
     try {
-      this.onContact?.(outcome);
+      this.onContact?.(outcome, reason);
     } catch (e) {
       this.log.debug(`Cloud contact hook failed: ${errMessage(e)}`);
     }

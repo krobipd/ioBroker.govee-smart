@@ -10,6 +10,7 @@ import type { ChannelStatusSnapshot } from "../log-prefix";
 import { deviceLabel, errMessage, logRejected } from "../types";
 import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
 import { resolveDeviceReachability } from "../device-manager/lookups";
+import { cloudReachable } from "../cloud-outage";
 
 /**
  * Adapter surface required by the connection-state helpers — covers the
@@ -23,6 +24,8 @@ export interface ConnectionStateAdapter {
   readonly deviceManager: DeviceManager | null;
   readonly cloudClient: GoveeCloudClient | null;
   readonly cloudWasConnected: boolean;
+  /** Whether real calls say the Cloud is down (issue #51) — read through `cloudReachable`. */
+  readonly cloudOutage: { readonly confirmed: boolean };
   readonly diagnosticsLastRun: Map<string, number>;
   readonly mqttClient: GoveeMqttClient | null;
   readonly openapiMqttClient: GoveeOpenapiMqttClient | null;
@@ -65,7 +68,7 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const anyOnline = devices.some(
     d =>
       resolveDeviceReachability(d).online ||
-      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && adapter.cloudWasConnected),
+      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && cloudReachable(adapter)),
   );
   // A LAN client whose listen socket is not bound (port taken) hears nothing (audit N1).
   const lanRunning = adapter.lanClient?.isListening() ?? false;
@@ -86,7 +89,7 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
       cs.lan = hasDevices ? "on" : "off";
     }
     if (cs.cloud !== "n/a") {
-      cs.cloud = adapter.cloudWasConnected ? "on" : "off";
+      cs.cloud = cloudReachable(adapter) ? "on" : "off";
     }
     if (cs.mqtt !== "n/a") {
       cs.mqtt = adapter.mqttClient?.connected ? "on" : "off";
@@ -229,7 +232,7 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   const lanOk = lights.length === 0 || anyLightOnLan;
   const parts: string[] = [lanOk ? "LAN ✓" : "LAN ✗"];
   if (adapter.cloudClient) {
-    parts.push(adapter.cloudWasConnected ? "Cloud REST ✓" : "Cloud REST ✗");
+    parts.push(cloudReachable(adapter) ? "Cloud REST ✓" : "Cloud REST ✗");
   }
   if (adapter.mqttClient) {
     parts.push(adapter.mqttClient.connected ? "Lights Push ✓" : "Lights Push ✗");
@@ -239,7 +242,7 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   }
   adapter.log.info(`Govee adapter ready — ${parts.join("  ")}`);
 
-  if (adapter.cloudClient && !adapter.cloudWasConnected) {
+  if (adapter.cloudClient && !cloudReachable(adapter)) {
     const reason = adapter.cloudClient.getFailureReason();
     adapter.log.warn(reason ? `Cloud REST: ${reason}` : `Cloud REST: not connected — see earlier errors`);
   }

@@ -1,4 +1,5 @@
 import { CloudRetryLoop, type CloudRetryHost } from "../cloud-retry";
+import { cloudReachable, type CloudOutage } from "../cloud-outage";
 import type { DeviceManager } from "../device-manager";
 import type { CloudContact, GoveeCloudClient } from "../govee-cloud-client";
 import type { StateManager } from "../state-manager";
@@ -24,6 +25,8 @@ export interface CloudRetryHandlerAdapter {
    * hook does not turn every Cloud answer into two state writes.
    */
   cloudConnectedShown: boolean;
+  /** Whether real calls say the Cloud is down (issue #51) — see {@link cloudReachable}. */
+  readonly cloudOutage: CloudOutage;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
@@ -97,8 +100,9 @@ export function ensureCloudRetry(adapter: CloudRetryHandlerAdapter): CloudRetryL
 
 /**
  * The one place that decides the Cloud reachability the user sees:
- * `cloudWasConnected` (device reachability, summary line) plus the two
- * datapoints `info.cloudConnected` and `groups.info.online`. The datapoints
+ * `cloudWasConnected` (key accepted / list loaded) plus the two datapoints
+ * `info.cloudConnected` and `groups.info.online`, which show
+ * {@link cloudReachable} — that also counts a confirmed outage. The datapoints
  * are written only when their value changes.
  *
  * @param adapter Handler host
@@ -106,14 +110,25 @@ export function ensureCloudRetry(adapter: CloudRetryHandlerAdapter): CloudRetryL
  */
 export function setCloudConnected(adapter: CloudRetryHandlerAdapter, ok: boolean): void {
   adapter.cloudWasConnected = ok;
-  if (adapter.cloudConnectedShown === ok) {
+  showCloudReachability(adapter);
+}
+
+/**
+ * Write `info.cloudConnected` + `groups.info.online` when {@link cloudReachable}
+ * changed — only then, so the per-call contact hook costs no state write.
+ *
+ * @param adapter Handler host
+ */
+function showCloudReachability(adapter: CloudRetryHandlerAdapter): void {
+  const shown = cloudReachable(adapter);
+  if (adapter.cloudConnectedShown === shown) {
     return;
   }
-  adapter.cloudConnectedShown = ok;
+  adapter.cloudConnectedShown = shown;
   adapter
-    .setState("info.cloudConnected", { val: ok, ack: true })
+    .setState("info.cloudConnected", { val: shown, ack: true })
     .catch(logRejected(adapter.log, "write info.cloudConnected"));
-  adapter.stateManager?.updateGroupsOnline(ok).catch(logRejected(adapter.log, "write groups.info.online"));
+  adapter.stateManager?.updateGroupsOnline(shown).catch(logRejected(adapter.log, "write groups.info.online"));
 }
 
 /**
@@ -126,11 +141,33 @@ export function setCloudConnected(adapter: CloudRetryHandlerAdapter, ok: boolean
  * and the 401 of a failing initial list load, which reports itself — stay
  * silent.
  *
+ * A call that could not reach Govee (`unreachable`) only feeds the outage
+ * tracker: the second one a minute after the first, with no accepted answer in
+ * between, shows the Cloud as down (issue #51). It never reaches the auth path,
+ * never touches the retry loop and triggers no call of its own — the lessons of
+ * 2.32.1 (a Cloud outage deleted a device tree) and #39 (retries into a 24 h
+ * account block).
+ *
  * @param adapter Handler host
- * @param outcome What the answer said about the key
+ * @param outcome What the call said
+ * @param reason The error text of an `unreachable` call
  */
-export function onCloudContact(adapter: CloudRetryHandlerAdapter, outcome: CloudContact): void {
+export function onCloudContact(adapter: CloudRetryHandlerAdapter, outcome: CloudContact, reason?: string): void {
+  if (outcome === "unreachable") {
+    const now = Date.now();
+    if (adapter.cloudOutage.noteUnreachable(now, reason ?? "no answer")) {
+      const since = new Date(adapter.cloudOutage.since ?? now).toTimeString().slice(0, 8);
+      adapter.log.warn(
+        `Govee Cloud not reachable since ${since} (${adapter.cloudOutage.reason}) — commands over the Cloud fail until it answers again, LAN keeps working`,
+      );
+      showCloudReachability(adapter);
+    }
+    return;
+  }
   if (outcome === "ok") {
+    if (adapter.cloudOutage.noteAnswer()) {
+      adapter.log.info("Govee Cloud reachable again");
+    }
     adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
     adapter.cloudRetry?.noteKeyAccepted();
     setCloudConnected(adapter, true);

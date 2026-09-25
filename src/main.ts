@@ -16,6 +16,7 @@ import { installLogPrefix, type ChannelStatusSnapshot } from "./lib/log-prefix";
 import { SnapshotHandler } from "./lib/snapshot-handler";
 import { GroupFanoutHandler } from "./lib/group-fanout";
 import { MessageRouter, type MessageRouterHost } from "./lib/message-router";
+import { CloudOutage } from "./lib/cloud-outage";
 import type { CloudRetryLoop } from "./lib/cloud-retry";
 import * as cloudCreds from "./lib/handlers/cloud-creds-handler";
 import * as cloudRetryHandler from "./lib/handlers/cloud-retry-handler";
@@ -232,6 +233,8 @@ export class GoveeAdapter extends utils.Adapter {
   private cloudWasConnected = false;
   /** What `info.cloudConnected` / `groups.info.online` carry now — see `cloudRetryHandler.setCloudConnected`. */
   private cloudConnectedShown = false;
+  /** Whether real Cloud calls say Govee is down (issue #51) — `cloudRetryHandler.onCloudContact`. */
+  private readonly cloudOutage = new CloudOutage();
   /**
    * js-controller and admin versions, read once at start. The diagnostics
    * report states them, and a bug report without them costs one round-trip
@@ -357,6 +360,7 @@ export class GoveeAdapter extends utils.Adapter {
     read("diagnosticsLastRun", () => this.diagnosticsLastRun);
     read("stateCreationQueue", () => this.stateCreationQueue);
     read("channelStatus", () => this.channelStatus);
+    read("cloudOutage", () => this.cloudOutage);
     // Boot flags (read-only for the handlers)
     read("lanScanDone", () => this.lanScanDone);
     read("statesReady", () => this.statesReady);
@@ -1122,9 +1126,12 @@ export class GoveeAdapter extends utils.Adapter {
         this.cloudClient.setResponseHook((deviceId, endpoint, body, rateLimit) => {
           this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body, undefined, rateLimit);
         });
-        // Every accepted call shows the Cloud reachable, a 401/403 shows it lost —
-        // the rule itself lives in cloudRetryHandler.setCloudConnected.
-        this.cloudClient.setContactHook(outcome => cloudRetryHandler.onCloudContact(this.handlerHost, outcome));
+        // Every accepted call shows the Cloud reachable, a 401/403 shows it lost, and a
+        // call that could not reach Govee feeds the outage tracker (issue #51) — the
+        // rules live in cloudRetryHandler.onCloudContact / setCloudConnected.
+        this.cloudClient.setContactHook((outcome, reason) =>
+          cloudRetryHandler.onCloudContact(this.handlerHost, outcome, reason),
+        );
         this.deviceManager.setCloudClient(this.cloudClient);
 
         this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);

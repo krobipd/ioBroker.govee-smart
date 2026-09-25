@@ -37,6 +37,8 @@ function makeRig(opts: {
   lanListening?: boolean;
   cloudClient?: boolean;
   cloudWasConnected?: boolean;
+  /** Real calls confirmed a Cloud outage (issue #51). */
+  cloudOutage?: boolean;
   mqttConnected?: boolean | null; // null = no mqtt client
   openapiConnected?: boolean | null;
   lanScanDone?: boolean;
@@ -80,6 +82,7 @@ function makeRig(opts: {
     } as never,
     cloudClient: opts.cloudClient ? ({ getFailureReason: () => "API key rejected" } as never) : null,
     cloudWasConnected: opts.cloudWasConnected ?? false,
+    cloudOutage: { confirmed: opts.cloudOutage ?? false },
     diagnosticsLastRun: new Map<string, number>(),
     mqttClient:
       opts.mqttConnected === null || opts.mqttConnected === undefined
@@ -130,6 +133,17 @@ describe("updateConnectionState", () => {
     const rig = makeRig({ devices: [cloudOnly], cloudWasConnected: true });
     updateConnectionState(rig.adapter);
     expect(rig.stateWrites).toEqual([{ id: "info.connection", val: true }]);
+  });
+
+  it("a confirmed Cloud outage no longer keeps a light without LAN green (issue #51)", () => {
+    const cloudOnly = createTestDevice({
+      lanIp: undefined,
+      state: { online: false },
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const rig = makeRig({ devices: [cloudOnly], cloudWasConnected: true, cloudOutage: true });
+    updateConnectionState(rig.adapter);
+    expect(rig.stateWrites).toEqual([{ id: "info.connection", val: false }]);
   });
 
   it("without devices the LAN stack decides (bind error → false)", () => {

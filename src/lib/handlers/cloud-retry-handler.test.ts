@@ -9,6 +9,7 @@ import {
 } from "./cloud-retry-handler";
 import type { CloudLoadResult } from "../types";
 import { mockLog } from "../test-helpers";
+import { CloudOutage } from "../cloud-outage";
 
 interface TestRig {
   adapter: CloudRetryHandlerAdapter;
@@ -23,7 +24,7 @@ interface TestRig {
   setLoad(fn: () => Promise<CloudLoadResult>): void;
 }
 
-function makeRig(): TestRig {
+function makeRig(log: ioBroker.Logger = mockLog): TestRig {
   const timers: Array<{ cb: () => void; ms: number }> = [];
   const cleared: number[] = [];
   const reports: Array<{ key: string; title: string }> = [];
@@ -35,7 +36,7 @@ function makeRig(): TestRig {
   let load: () => Promise<CloudLoadResult> = () => Promise.resolve({ ok: true });
 
   const adapter: CloudRetryHandlerAdapter = {
-    log: mockLog,
+    log,
     deviceManager: {
       loadFromCloud: () => load(),
       loadGroupMembers: () => {
@@ -54,6 +55,7 @@ function makeRig(): TestRig {
     cloudRetry: undefined,
     cloudWasConnected: false,
     cloudConnectedShown: false,
+    cloudOutage: new CloudOutage(),
     setState: (id, state) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
       return Promise.resolve();
@@ -214,6 +216,109 @@ describe("setCloudConnected", () => {
     setCloudConnected(rig.adapter, false);
     expect(rig.adapter.cloudWasConnected).toBe(false);
     expect(rig.stateWrites).toEqual([]);
+  });
+});
+
+describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => {
+  const warns: string[] = [];
+  const infos: string[] = [];
+  const reachableRig = (): TestRig => {
+    warns.length = 0;
+    infos.length = 0;
+    const rig = makeRig({
+      ...mockLog,
+      warn: (m: string) => warns.push(m),
+      info: (m: string) => infos.push(m),
+    });
+    setCloudConnected(rig.adapter, true);
+    rig.stateWrites.length = 0;
+    rig.groupsOnline.length = 0;
+    return rig;
+  };
+  afterEach(() => vi.useRealTimers());
+
+  it("one failed call shows nothing — Govee drops single calls", () => {
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "Timeout after 15000ms");
+    expect(rig.adapter.cloudConnectedShown).toBe(true);
+    expect(rig.stateWrites).toEqual([]);
+    expect(warns).toEqual([]);
+  });
+
+  it("several failures in the same moment (a group switched) are one hiccup, not an outage", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    for (let n = 0; n < 5; n++) {
+      onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    }
+    vi.advanceTimersByTime(59_999);
+    onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    expect(rig.adapter.cloudConnectedShown).toBe(true);
+    expect(rig.stateWrites).toEqual([]);
+  });
+
+  it("a second failure a minute later shows the Cloud down, with ONE warning naming time and reason", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "getaddrinfo ENOTFOUND openapi.api.govee.com");
+    vi.advanceTimersByTime(60_000);
+    onCloudContact(rig.adapter, "unreachable", "Timeout after 15000ms");
+    vi.advanceTimersByTime(60_000);
+    onCloudContact(rig.adapter, "unreachable", "Timeout after 15000ms");
+    expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: false }]);
+    expect(rig.groupsOnline).toEqual([false]);
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("Govee Cloud not reachable since");
+    expect(warns[0]).toContain("ENOTFOUND");
+  });
+
+  it("an accepted answer in between starts the count again", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "HTTP 502");
+    vi.advanceTimersByTime(30_000);
+    onCloudContact(rig.adapter, "ok");
+    vi.advanceTimersByTime(30_000);
+    onCloudContact(rig.adapter, "unreachable", "HTTP 502");
+    expect(rig.adapter.cloudConnectedShown).toBe(true);
+    expect(warns).toEqual([]);
+  });
+
+  it("the next accepted answer shows the Cloud again, with ONE info line", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    vi.advanceTimersByTime(60_000);
+    onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    onCloudContact(rig.adapter, "ok");
+    onCloudContact(rig.adapter, "ok");
+    expect(rig.stateWrites).toEqual([
+      { id: "info.cloudConnected", val: false },
+      { id: "info.cloudConnected", val: true },
+    ]);
+    expect(infos.filter(i => i === "Govee Cloud reachable again")).toHaveLength(1);
+  });
+
+  it("an outage never reports the API key, never arms the list retry, keeps the key flag", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "HTTP 500");
+    vi.advanceTimersByTime(60_000);
+    onCloudContact(rig.adapter, "unreachable", "HTTP 500");
+    expect(rig.reports).toEqual([]);
+    expect(rig.timers).toEqual([]);
+    expect(rig.adapter.cloudRetry).toBeUndefined();
+    expect(rig.adapter.cloudWasConnected).toBe(true);
+  });
+
+  it("a 401 during an outage is still the key problem", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    vi.advanceTimersByTime(60_000);
+    onCloudContact(rig.adapter, "unreachable", "HTTP 503");
+    onCloudContact(rig.adapter, "auth-failed");
+    expect(rig.reports.map(r => r.key)).toEqual(["cloud-auth"]);
   });
 });
 
