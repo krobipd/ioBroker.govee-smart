@@ -185,6 +185,13 @@ describe("updateConnectionState", () => {
     expect(cs.cloud).toBe("n/a"); // configured-ness is decided once in onReady
     expect(cs.openapi).toBe("n/a");
   });
+
+  it("the log-prefix Cloud channel follows a confirmed outage, not only the key (issue #51)", () => {
+    const cs: ChannelStatusSnapshot = { lan: "off", cloud: "on", mqtt: "n/a", openapi: "n/a" };
+    const rig = makeRig({ devices: [], cloudWasConnected: true, cloudOutage: true, channelStatus: cs });
+    updateConnectionState(rig.adapter);
+    expect(cs.cloud).toBe("off");
+  });
 });
 
 describe("checkAllReady", () => {
@@ -255,6 +262,19 @@ describe("logDeviceSummary", () => {
     const ready = rig.logs.info.find(m => m.includes("ready"))!;
     expect(ready).toContain("Cloud REST ✗");
     expect(rig.logs.warn.some(m => m.includes("API key rejected"))).toBe(true);
+  });
+
+  it("a confirmed Cloud outage shows Cloud REST ✗ with its reason, although the key was accepted (issue #51)", () => {
+    const rig = makeRig({
+      devices: [createTestDevice()],
+      cloudClient: true,
+      cloudWasConnected: true,
+      cloudOutage: true,
+    });
+    logDeviceSummary(rig.adapter);
+    const ready = rig.logs.info.find(m => m.includes("ready"))!;
+    expect(ready).toContain("Cloud REST ✗");
+    expect(rig.logs.warn.some(m => m.startsWith("Cloud REST:"))).toBe(true);
   });
 });
 
