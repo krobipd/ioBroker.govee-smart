@@ -95,12 +95,12 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 2.40.0 (2026-09-25)
 
 - New: Optional additional scan addresses — lights in another subnet or behind a router that blocks multicast are found by asking them directly
 - New: Heaters with an auto-stop setting get `control.auto_stop` — stop heating at the target temperature or keep it
-- New: Models that report the cloud temperature in °F (govee2mqtt's list of 15) are converted to °C — the H5179 by default, the others with the experimental switch
-- Fixed: Cloud events (lack of water, presence, ice bucket full) now reach their datapoints — until now none did
+- New: Models that report the cloud temperature in °F are converted to °C — the H5179 by default, 14 further models with the experimental switch
+- Fixed: Cloud events such as lack of water, presence or a full ice bucket now reach their datapoints — until now none did
 - Fixed: The segment count of strips that report in groups of three is measured correctly — H61A8 and H7020 no longer grow phantom or lose real segments
 - Fixed: A strip nothing had measured yet accepts segment commands, uses its scenes over LAN and works in the wizard and in snapshots
 - Fixed: A device the account still lists is no longer deleted when the cached device list misses it
@@ -112,6 +112,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: A command that could not be sent is no longer confirmed, and a day whose cloud budget is spent refuses commands instead of queueing them until midnight
 - Fixed: With the account connected, lights are still asked for their status once a minute and after every LAN command, so a lost command is corrected
 - Fixed: Port 4002 taken by another program is now reported instead of silently losing the lights' replies, and `info.connection` turns false when the last device goes quiet
+- Improved: Leftovers of very old versions, including emptied login fields, no longer linger in the instance settings — expect one extra restart right after the update
 - Fixed: Stopping the adapter during its start no longer leaves parts of it running, and a message sent during the start is answered
 - Fixed: The segment wizard is cancelled when you leave the card, and the connection card shows Govee's reason instead of a raw text key
 - Fixed: The diagnostics report hides Govee account topics and the device's LAN address in number form, and a device name only replaces whole words
@@ -142,10 +143,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 2.38.3 (2026-09-17) — stable
 
 - Changed: Internal cleanup. No user-facing changes.
-
-### 2.38.2 (2026-09-17)
-
-- Changed: Internal refactoring. No user-facing changes.
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
