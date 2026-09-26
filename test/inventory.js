@@ -584,6 +584,16 @@ tests.integration(ADAPTER_DIR, {
         let cloud;
         let lan;
         const previous = JSON.parse(fs.readFileSync(previousFile, "utf8"));
+        // A tree of the 2.x id rule (`<sku>_<last 4>`, no idScheme mark) with a room, a function, two
+        // aliases and a recording on it — what the one-time id move of 3.0.0 must carry, proven against
+        // the real controller (its recursive delete takes the ids out of every enum). A previous release
+        // without such a tree has nothing left to move.
+        const legacyPower = Object.keys(previous).find(
+          id =>
+            /\.devices\.[^.]+_[^.]+\.control\.power$/.test(id) &&
+            !previous[id.replace(/\.control\.power$/, "")]?.native?.idScheme,
+        );
+        const legacyDevice = legacyPower?.replace(/\.control\.power$/, "");
         before(async function () {
           this.timeout(180000);
           harness = getHarness();
@@ -593,6 +603,34 @@ tests.integration(ADAPTER_DIR, {
           // so the seed survives and the adapter starts on top of the OLD objects.
           for (const [id, obj] of Object.entries(previous)) {
             await harness.objects.setObjectAsync(id, obj);
+          }
+          if (legacyPower) {
+            const power = previous[legacyPower];
+            await harness.objects.setObjectAsync(legacyPower, {
+              ...power,
+              common: { ...power.common, custom: { "history.0": { enabled: true } } },
+            });
+            await harness.objects.setObjectAsync("enum.rooms.inventory_upgrade", {
+              type: "enum",
+              common: { name: "Upgrade room", members: [legacyDevice, legacyPower] },
+              native: {},
+            });
+            await harness.objects.setObjectAsync("enum.functions.inventory_upgrade", {
+              type: "enum",
+              common: { name: "Upgrade function", members: [legacyPower] },
+              native: {},
+            });
+            const alias = { type: "boolean", role: "switch", read: true, write: true };
+            await harness.objects.setObjectAsync("alias.0.inventory_upgrade.plain", {
+              type: "state",
+              common: { name: "Plain", ...alias, alias: { id: legacyPower } },
+              native: {},
+            });
+            await harness.objects.setObjectAsync("alias.0.inventory_upgrade.pair", {
+              type: "state",
+              common: { name: "Pair", ...alias, alias: { id: { read: legacyPower, write: legacyPower } } },
+              native: {},
+            });
           }
           // The "fresh" DB is restored from the harness's backup, and that backup
           // carries the instance object of whatever version first set it up — with
@@ -635,6 +673,34 @@ tests.integration(ADAPTER_DIR, {
             }
           }
           assert.deepStrictEqual(stale, [], `objects an update did not reach:\n${stale.join("\n")}`);
+        });
+
+        it("a 2.x tree takes its rooms, functions, aliases and recordings along", async function () {
+          if (!legacyPower) {
+            this.skip();
+          }
+          this.timeout(30000);
+          const live = await dumpObjects(harness);
+          const deviceId = previous[legacyDevice].native.deviceId;
+          const movedDevice = Object.keys(live).find(
+            id => /\.devices\.[^.]+$/.test(id) && live[id].type === "device" && live[id].native?.deviceId === deviceId,
+          );
+          assert.ok(movedDevice && movedDevice !== legacyDevice, `${legacyDevice} did not move`);
+          const movedPower = `${movedDevice}.control.power`;
+          const members = async id => (await harness.objects.getObjectAsync(id))?.common?.members ?? [];
+          assert.deepStrictEqual(
+            [...(await members("enum.rooms.inventory_upgrade"))].sort(),
+            [movedDevice, movedPower].sort(),
+          );
+          assert.deepStrictEqual(await members("enum.functions.inventory_upgrade"), [movedPower]);
+          const target = async id => (await harness.objects.getObjectAsync(id))?.common?.alias?.id;
+          assert.strictEqual(await target("alias.0.inventory_upgrade.plain"), movedPower);
+          assert.deepStrictEqual(await target("alias.0.inventory_upgrade.pair"), {
+            read: movedPower,
+            write: movedPower,
+          });
+          const recording = (await harness.objects.getObjectAsync(movedPower))?.common?.custom?.["history.0"];
+          assert.deepStrictEqual(recording, { enabled: true, aliasId: legacyPower });
         });
 
         it("objects the release removed are gone (no leftovers)", async function () {

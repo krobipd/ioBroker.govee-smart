@@ -101,7 +101,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Changed: the move carries values, recording settings, rooms, functions and aliases along, and recorded history continues in its old series
 - Fixed: two devices of one model whose IDs end alike now get a tree each and each receives its own commands — until now they shared one
 - New: the H1741 battery table lamp reports its charge level in `sensor.battery`; Govee reports a fully charged battery as about 80 percent
-- Fixed: fans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 stops writing a level it has no datapoint for
+- Fixed: fans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 no longer puts a warning in the log at every refresh
 
 ### 2.41.0 (2026-09-26)
 
