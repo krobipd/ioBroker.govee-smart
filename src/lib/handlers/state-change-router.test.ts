@@ -25,6 +25,7 @@ import type { GoveeDevice } from "../types";
 import { CloudControlRejected } from "../govee-cloud-client";
 import { createTestDevice, mockLog } from "../test-helpers";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
+import { DeviceIdRegistry } from "../device-id";
 import { GroupFanoutHandler } from "../group-fanout";
 
 const NS = "govee-smart.0";
@@ -425,6 +426,19 @@ describe("findDeviceForState", () => {
   it("resolves a state path to its owning device via prefix match", () => {
     const rig = makeRig([device]);
     expect(findDeviceForState(rig.adapter, `${PREFIX}.control.power`)).toBe(device);
+  });
+
+  it("sends a command to the device that owns the tree when two devices of one SKU end alike (3.0.0)", () => {
+    // Until 2.41.0 both shared `devices.h61be_525f` and the first one listed got every command.
+    const ids = new DeviceIdRegistry();
+    const first = createTestDevice({ sku: "H61BE", deviceId: "AB:CD:EF:12:34:56:52:5F" });
+    const second = createTestDevice({ sku: "H61BE", deviceId: "11:22:33:44:55:66:52:5F" });
+    const rig = makeRig([first, second]);
+    (rig.adapter as { stateManager: unknown }).stateManager = {
+      devicePrefix: (d: GoveeDevice) => ids.prefixFor(d.sku, d.deviceId),
+    };
+    expect(findDeviceForState(rig.adapter, "devices.h61be-525f.control.power")).toBe(first);
+    expect(findDeviceForState(rig.adapter, "devices.h61be-112233445566525f.control.power")).toBe(second);
   });
 
   it("returns undefined for foreign paths and while managers are missing", () => {

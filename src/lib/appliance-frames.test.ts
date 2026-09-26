@@ -187,3 +187,56 @@ describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", (
     expect(decodeApplianceFrames(purifier(), undefined)).toEqual([]);
   });
 });
+
+/**
+ * The H1741's status packet frames, verbatim from the issue #50 reports — only the `aa 42` frame differs.
+ *
+ * @param level the base64 `aa 42` frame of the report
+ */
+function h1741Push(level: string): string[] {
+  return [
+    "qgUVAAqMAAAAAAAAAAAAAAAAADw=",
+    "qqUBZP+NC2T/jQtk/40LZP+NCw4=",
+    "qqUCZP+NC2T/jQtk/40LZP+NCw0=",
+    "qhEAHg8PAP8yAAAAAAAAAAAAAGg=",
+    "qhL/ZAAAgAoA/65UAAAAAAAAAKw=",
+    "qiP/AAAAgAAAAIAAAACAAAAAgHY=",
+    "qkECAAAAAAAAAAAAAAAAAAAAAOk=",
+    level,
+    "qvEAAAAAAAAAAAAAAAAAAAAAAFs=",
+  ];
+}
+
+describe("decodeApplianceFrames — H1741 battery (issue #50)", () => {
+  const lamp = (): GoveeDevice => createTestDevice({ sku: "H1741", type: "devices.types.light" });
+  const battery = (value: number): unknown[] => [
+    { type: "devices.capabilities.property", instance: "battery", state: { value } },
+  ];
+
+  it("reads the level against the app's battery icon: two of three bars, full, one bar", () => {
+    // 2026-09-23 05:13 — the app showed two of three bars.
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="))).toEqual(battery(48));
+    // 2026-09-25 13:14 — right after a full charge.
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkJQAAAAAAAAAAAAAAAAAAAAALg="))).toEqual(battery(80));
+    // 2026-09-26 11:24 — one bar, shortly before the battery saver.
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkIgAAAAAAAAAAAAAAAAAAAAAMg="))).toEqual(battery(32));
+  });
+
+  it("masks bit 7 — seen only before the lamp was unplugged, its meaning is not measured", () => {
+    // 2026-09-25 13:12 — 0xd4.
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkLUAAAAAAAAAAAAAAAAAAAAADw="))).toEqual(battery(84));
+  });
+
+  it("drops a level above 100 and a frame with a wrong checksum", () => {
+    // 0x65 = 101, checksum fixed up.
+    const over = Buffer.from("aa4265000000000000000000000000000000008d", "hex").toString("base64");
+    expect(decodeApplianceFrames(lamp(), h1741Push(over))).toEqual([]);
+    const broken = Buffer.from("aa423000000000000000000000000000000000d9", "hex").toString("base64");
+    expect(decodeApplianceFrames(lamp(), h1741Push(broken))).toEqual([]);
+  });
+
+  it("reads nothing from another device's `aa 42` — mains devices send it too", () => {
+    const h1310 = createTestDevice({ sku: "H1310", type: "devices.types.fan" });
+    expect(decodeApplianceFrames(h1310, h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="))).toEqual([]);
+  });
+});

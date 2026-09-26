@@ -2734,6 +2734,31 @@
           "instance": "sensorHumidity"
         }
       ]
+    },
+    {
+      "sku": "H5080",
+      "device": "CC:DD:EE:FF:00:11:00:0D",
+      "deviceName": "Socket Balcony 2",
+      "type": "devices.types.socket",
+      "capabilities": [
+        {
+          "type": "devices.capabilities.on_off",
+          "instance": "powerSwitch",
+          "parameters": {
+            "dataType": "ENUM",
+            "options": [
+              {
+                "name": "on",
+                "value": 1
+              },
+              {
+                "name": "off",
+                "value": 0
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

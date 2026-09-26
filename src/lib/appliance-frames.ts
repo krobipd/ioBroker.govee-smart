@@ -94,9 +94,31 @@ const purifierH7127: FrameDecoder = (frames, device) => {
   return out;
 };
 
+/**
+ * H1741 battery table lamp (issue #50). Measured frame:
+ *   aa 42 <b>                       battery level in % (bits 0–6)
+ * Four reports against the app's own battery icon: 0x30 = two of three bars (2026-09-23), 0x50 right
+ * after a full charge, 0x20 one bar shortly before the battery saver (2026-09-25/26). Govee reports a
+ * full battery as 80–84, not 100 — the value is shown as it comes. Bit 7 was set only in the minutes
+ * before the lamp was unplugged (0xd4); that it means "charging" is not measured, so it is masked and
+ * not decoded. `aa 42` exists on mains devices too (H1310 `aa4200`, H70B1 `aa4202`) — hence per SKU.
+ *
+ * @param frames The checksum-valid frames of one status packet
+ * @returns the battery reading, or nothing
+ */
+const lampH1741: FrameDecoder = frames => {
+  const frame = frames.find(f => f.fn === 0x42);
+  if (!frame) {
+    return [];
+  }
+  const level = frame.sub & 0x7f;
+  return level <= 100 ? [{ type: GOVEE_CAP_TYPE.PROPERTY, instance: "battery", state: { value: level } }] : [];
+};
+
 /** One decoder per measured device family. A SKU not listed here gets nothing from its push. */
 const DECODERS: Readonly<Record<string, FrameDecoder>> = {
   H7127: purifierH7127,
+  H1741: lampH1741,
 };
 
 /**

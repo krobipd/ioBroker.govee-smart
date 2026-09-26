@@ -102,8 +102,8 @@ function deviceObject(sku: string, deviceId: string, name: string): StoredObject
  * @param objects The rig's object map
  */
 function seedDevices(objects: Map<string, StoredObject>): void {
-  objects.set("devices.h6160_0011", deviceObject("H6160", "AABBCCDDEEFF0011", "Strip"));
-  objects.set("devices.h6160_2222", deviceObject("H6160", "AABBCCDDEEFF2222", "Bulb"));
+  objects.set("devices.h6160-0011", deviceObject("H6160", "AABBCCDDEEFF0011", "Strip"));
+  objects.set("devices.h6160-2222", deviceObject("H6160", "AABBCCDDEEFF2222", "Bulb"));
 }
 
 /**
@@ -265,7 +265,7 @@ describe("LocalSnapshotStore", () => {
     // simply has no snapshots until the next save.
     const mock = createMockAdapter();
     seedDevices(mock.objects);
-    mock.objects.get("devices.h6160_0011")!.native!.localSnapshots = "NOT JSON!";
+    mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = "NOT JSON!";
     const corruptStore = new LocalSnapshotStore(mock.adapter, mockLog);
     await corruptStore.init();
     expect(corruptStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
@@ -274,7 +274,7 @@ describe("LocalSnapshotStore", () => {
   it("should return empty array when snapshots field is not an array", async () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
-    mock.objects.get("devices.h6160_0011")!.native!.localSnapshots = JSON.stringify({ snapshots: "hello" });
+    mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = JSON.stringify({ snapshots: "hello" });
     const driftStore = new LocalSnapshotStore(mock.adapter, mockLog);
     await driftStore.init();
     expect(driftStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
@@ -283,7 +283,7 @@ describe("LocalSnapshotStore", () => {
   it("should return empty array when the field holds something that is not text", async () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
-    mock.objects.get("devices.h6160_0011")!.native!.localSnapshots = { snapshots: [] };
+    mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = { snapshots: [] };
     const driftStore = new LocalSnapshotStore(mock.adapter, mockLog);
     await driftStore.init();
     expect(driftStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
@@ -393,10 +393,10 @@ describe("LocalSnapshotStore", () => {
       savedAt: 1000,
     };
     await store.saveSnapshot("H6160", "AABBCCDDEEFF0011", snap);
-    expect(storedList(objects, "devices.h6160_0011")).toEqual([snap]);
+    expect(storedList(objects, "devices.h6160-0011")).toEqual([snap]);
     await store.deleteSnapshot("H6160", "AABBCCDDEEFF0011", "Single");
     // `extendObject` cannot remove a key — the empty list is written as "".
-    expect(objects.get("devices.h6160_0011")!.native!.localSnapshots).toBe("");
+    expect(objects.get("devices.h6160-0011")!.native!.localSnapshots).toBe("");
   });
 
   it("writes nothing but native.localSnapshots — name, icon and identity stay", async () => {
@@ -415,10 +415,10 @@ describe("LocalSnapshotStore", () => {
       savedAt: 5,
     });
     expect(mock.extendCalls).toHaveLength(1);
-    expect(mock.extendCalls[0].id).toBe("devices.h6160_0011");
+    expect(mock.extendCalls[0].id).toBe("devices.h6160-0011");
     expect(Object.keys(mock.extendCalls[0].obj)).toEqual(["native"]);
     expect(Object.keys(mock.extendCalls[0].obj.native)).toEqual(["localSnapshots"]);
-    const obj = mock.objects.get("devices.h6160_0011")!;
+    const obj = mock.objects.get("devices.h6160-0011")!;
     expect(obj.common).toEqual({ name: "Strip", icon: "data:…" });
     expect(obj.native!.sku).toBe("H6160");
     expect(obj.native!.deviceId).toBe("AABBCCDDEEFF0011");
@@ -428,7 +428,7 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
     const snap = { name: "Kept", power: false, brightness: 0, colorRgb: "#000000", colorTemperature: 0, savedAt: 1 };
-    mock.objects.get("devices.h6160_2222")!.native!.localSnapshots = JSON.stringify({ snapshots: [snap] });
+    mock.objects.get("devices.h6160-2222")!.native!.localSnapshots = JSON.stringify({ snapshots: [snap] });
     const s = new LocalSnapshotStore(mock.adapter, mockLog);
     await s.init();
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF2222")).toEqual([snap]);
@@ -451,9 +451,9 @@ describe("LocalSnapshotStore", () => {
       colorTemperature: 0,
       savedAt: 1,
     });
-    expect(mock.objects.has("devices.h7000_9999")).toBe(false);
+    expect(mock.objects.has("devices.h7000-9999")).toBe(false);
     expect(warns).toHaveLength(1);
-    expect(warns[0]).toContain("devices.h7000_9999 does not exist");
+    expect(warns[0]).toContain("devices.h7000-9999 does not exist");
   });
 
   it("stays closed when the device objects cannot be read", async () => {
@@ -492,8 +492,8 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, info: (m: string) => infos.push(m) });
     await s.init();
 
-    expect(storedList(mock.objects, "devices.h6160_0011")).toEqual([snapA]);
-    expect(storedList(mock.objects, "devices.h6160_2222")).toEqual([snapB]);
+    expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
+    expect(storedList(mock.objects, "devices.h6160-2222")).toEqual([snapB]);
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([snapA]);
     expect(mock.files.size).toBe(0);
     expect(mock.objects.has("snapshots")).toBe(false);
@@ -508,7 +508,7 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     mock.files.set("govee-smart.0.snapshots/h7000_9999.json", JSON.stringify({ snapshots: [snapA] }));
     const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, info: (m: string) => infos.push(m) });
     await s.init();
-    expect(mock.objects.has("devices.h7000_9999")).toBe(false);
+    expect(mock.objects.has("devices.h7000-9999")).toBe(false);
     expect(mock.files.size).toBe(0);
     expect(mock.objects.has("snapshots")).toBe(false);
     expect(infos.some(m => m.includes("h7000_9999.json") && m.includes("no longer in the account"))).toBe(true);
@@ -555,7 +555,7 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
       seedDevices(mock.objects);
       const s = new LocalSnapshotStore(mock.adapter, mockLog);
       await s.init(dataDir);
-      expect(storedList(mock.objects, "devices.h6160_0011")).toEqual([snapA]);
+      expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
       expect(fs.existsSync(path.join(dataDir, "snapshots"))).toBe(false);
     } finally {
       fs.rmSync(dataDir, { recursive: true, force: true });

@@ -95,6 +95,48 @@
         "zh-cn": "内部重构。无用户可见的更改。"
       }
     },
+    "messages": [
+      {
+        "condition": {
+          "operand": "and",
+          "rules": [
+            "oldVersion<3.0.0",
+            "newVersion>=3.0.0"
+          ]
+        },
+        "title": {
+          "en": "Every device gets a new object ID once",
+          "de": "Jedes Gerät bekommt einmalig eine neue Objekt-ID",
+          "ru": "Каждое устройство однократно получает новый ID объекта",
+          "pt": "Cada dispositivo recebe uma vez um novo ID de objeto",
+          "nl": "Elk apparaat krijgt eenmalig een nieuwe object-ID",
+          "fr": "Chaque appareil reçoit une fois un nouvel ID d'objet",
+          "it": "Ogni dispositivo riceve una sola volta un nuovo ID oggetto",
+          "es": "Cada dispositivo recibe una única vez un nuevo ID de objeto",
+          "pl": "Każde urządzenie jednorazowo otrzymuje nowy identyfikator obiektu",
+          "uk": "Кожен пристрій одноразово отримує новий ID об'єкта",
+          "zh-cn": "每个设备将一次性获得新的对象 ID"
+        },
+        "text": {
+          "en": "A device's object ID is now its model and the last four characters of its Govee device ID, joined by a hyphen, for example govee-smart.0.devices.h61be-525f (before: h61be_525f). Two devices of the same model whose IDs end alike therefore get a tree each; the second one carries its whole device ID. The move happens automatically at the first start. Values, recording settings, rooms, functions and aliases move along, and recorded history continues in its old series. Scripts, visualizations and settings of other adapters that use the old IDs must be updated. Going back to a 2.x version can delete the moved object trees.",
+          "de": "Die Objekt-ID eines Geräts ist jetzt sein Modell und die letzten vier Zeichen seiner Govee-Geräte-ID, mit Bindestrich verbunden, zum Beispiel govee-smart.0.devices.h61be-525f (bisher: h61be_525f). Zwei Geräte desselben Modells, deren IDs gleich enden, bekommen damit je einen eigenen Baum; das zweite trägt seine ganze Geräte-ID. Der Umzug geschieht automatisch beim ersten Start. Werte, Aufzeichnungs-Einstellungen, Räume, Funktionen und Aliase ziehen mit, aufgezeichnete Verläufe laufen in ihrer bisherigen Reihe weiter. Skripte, Visualisierungen und Einstellungen anderer Adapter, die die alten IDs verwenden, müssen angepasst werden. Eine Rückkehr zu einer 2.x-Version kann die umgezogenen Objektbäume löschen.",
+          "ru": "ID объекта устройства теперь состоит из его модели и последних четырёх символов ID устройства Govee через дефис, например govee-smart.0.devices.h61be-525f (раньше: h61be_525f). Поэтому два устройства одной модели с одинаковым окончанием ID получают каждое своё дерево; второе носит свой полный ID устройства. Перенос выполняется автоматически при первом запуске. Значения, настройки записи, комнаты, функции и алиасы переносятся, записанная история продолжается в прежнем ряду. Скрипты, визуализации и настройки других адаптеров со старыми ID нужно обновить. Возврат к версии 2.x может удалить перенесённые деревья объектов.",
+          "pt": "O ID de objeto de um dispositivo é agora o seu modelo e os últimos quatro caracteres do seu ID de dispositivo Govee, unidos por hífen, por exemplo govee-smart.0.devices.h61be-525f (antes: h61be_525f). Assim, dois dispositivos do mesmo modelo cujos IDs terminam igual recebem cada um a sua árvore; o segundo leva o seu ID de dispositivo completo. A mudança é automática no primeiro arranque. Valores, definições de gravação, divisões, funções e aliases acompanham a mudança, e o histórico gravado continua na sua série anterior. Scripts, visualizações e definições de outros adaptadores que usam os IDs antigos têm de ser atualizados. Voltar a uma versão 2.x pode apagar as árvores de objetos mudadas.",
+          "nl": "De object-ID van een apparaat is nu het model plus de laatste vier tekens van de Govee-apparaat-ID, verbonden met een koppelteken, bijvoorbeeld govee-smart.0.devices.h61be-525f (voorheen: h61be_525f). Twee apparaten van hetzelfde model waarvan de ID's gelijk eindigen, krijgen daardoor elk een eigen boom; het tweede draagt zijn volledige apparaat-ID. De verhuizing gaat automatisch bij de eerste start. Waarden, opname-instellingen, ruimtes, functies en aliassen verhuizen mee, en de opgenomen geschiedenis loopt door in de oude reeks. Scripts, visualisaties en instellingen van andere adapters die de oude ID's gebruiken, moeten worden aangepast. Terug naar een 2.x-versie kan de verhuisde objectbomen verwijderen.",
+          "fr": "L'ID d'objet d'un appareil est désormais son modèle suivi des quatre derniers caractères de son ID d'appareil Govee, reliés par un tiret, par exemple govee-smart.0.devices.h61be-525f (avant : h61be_525f). Deux appareils du même modèle dont les ID se terminent pareil reçoivent ainsi chacun leur arborescence ; le second porte son ID d'appareil complet. Le déplacement est automatique au premier démarrage. Les valeurs, les réglages d'enregistrement, les pièces, les fonctions et les alias suivent, et l'historique enregistré se poursuit dans sa série d'origine. Les scripts, les visualisations et les réglages d'autres adaptateurs qui utilisent les anciens ID doivent être adaptés. Revenir à une version 2.x peut supprimer les arborescences déplacées.",
+          "it": "L'ID oggetto di un dispositivo è ora il suo modello più gli ultimi quattro caratteri del suo ID dispositivo Govee, uniti da un trattino, per esempio govee-smart.0.devices.h61be-525f (prima: h61be_525f). Due dispositivi dello stesso modello con ID dalla stessa fine ricevono quindi ciascuno il proprio albero; il secondo porta il suo ID dispositivo completo. Lo spostamento è automatico al primo avvio. Valori, impostazioni di registrazione, stanze, funzioni e alias seguono lo spostamento, e la cronologia registrata continua nella sua serie precedente. Script, visualizzazioni e impostazioni di altri adattatori che usano i vecchi ID vanno aggiornati. Tornare a una versione 2.x può cancellare gli alberi di oggetti spostati.",
+          "es": "El ID de objeto de un dispositivo es ahora su modelo y los últimos cuatro caracteres de su ID de dispositivo Govee, unidos por un guion, por ejemplo govee-smart.0.devices.h61be-525f (antes: h61be_525f). Así, dos dispositivos del mismo modelo cuyos ID terminan igual reciben cada uno su árbol; el segundo lleva su ID de dispositivo completo. El traslado es automático en el primer arranque. Valores, ajustes de grabación, habitaciones, funciones y alias se trasladan, y el historial grabado continúa en su serie anterior. Los scripts, las visualizaciones y los ajustes de otros adaptadores que usan los ID antiguos deben actualizarse. Volver a una versión 2.x puede borrar los árboles de objetos trasladados.",
+          "pl": "Identyfikator obiektu urządzenia to teraz jego model i cztery ostatnie znaki identyfikatora urządzenia Govee, połączone łącznikiem, na przykład govee-smart.0.devices.h61be-525f (wcześniej: h61be_525f). Dzięki temu dwa urządzenia tego samego modelu, których identyfikatory kończą się tak samo, dostają każde swoje drzewo; drugie nosi swój pełny identyfikator urządzenia. Przeniesienie odbywa się automatycznie przy pierwszym starcie. Wartości, ustawienia rejestrowania, pomieszczenia, funkcje i aliasy przenoszą się razem, a zapisana historia jest kontynuowana w dotychczasowej serii. Skrypty, wizualizacje i ustawienia innych adapterów używające starych identyfikatorów trzeba zaktualizować. Powrót do wersji 2.x może usunąć przeniesione drzewa obiektów.",
+          "uk": "ID об'єкта пристрою тепер складається з його моделі та останніх чотирьох символів ID пристрою Govee через дефіс, наприклад govee-smart.0.devices.h61be-525f (раніше: h61be_525f). Тож два пристрої однієї моделі з однаковим закінченням ID отримують кожен своє дерево; другий носить свій повний ID пристрою. Перенесення відбувається автоматично під час першого запуску. Значення, налаштування запису, кімнати, функції та аліаси переносяться, а записана історія продовжується в попередньому ряді. Скрипти, візуалізації та налаштування інших адаптерів зі старими ID потрібно оновити. Повернення до версії 2.x може видалити перенесені дерева об'єктів.",
+          "zh-cn": "设备的对象 ID 现在由型号加 Govee 设备 ID 的最后四个字符组成，以连字符连接，例如 govee-smart.0.devices.h61be-525f（此前：h61be_525f）。因此，同一型号且 ID 结尾相同的两台设备会各自获得对象树；第二台使用其完整的设备 ID。迁移在首次启动时自动进行。数值、记录设置、房间、功能和别名随之迁移，已记录的历史继续沿用原有序列。使用旧 ID 的脚本、可视化和其他适配器的设置需要调整。回退到 2.x 版本可能会删除已迁移的对象树。"
+        },
+        "level": "warn",
+        "buttons": [
+          "agree",
+          "cancel"
+        ]
+      }
+    ],
     "plugins": {
       "sentry": {
         "dsn": "https://66f27ceff38c1ce1e6cdcc3095ba06d3@o4511524771266560.ingest.de.sentry.io/4511524773560400"

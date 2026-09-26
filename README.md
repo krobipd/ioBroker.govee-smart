@@ -95,6 +95,14 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Changed: every device gets a new object ID once — model and last four characters with a hyphen, e.g. `devices.h61be-525f`; scripts and visualizations need the new IDs
+- Changed: the move carries values, recording settings, rooms, functions and aliases along, and recorded history continues in its old series
+- Fixed: two devices of one model whose IDs end alike now get a tree each and each receives its own commands — until now they shared one
+- New: the H1741 battery table lamp reports its charge level in `sensor.battery`; Govee reports a fully charged battery as about 80 percent
+- Fixed: fans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 stops writing a level it has no datapoint for
+
 ### 2.41.0 (2026-09-26)
 
 - Changed: Discovery follows the selected network interface only — the additional scan addresses setting is gone, and the broadcast goes to the network of the chosen card

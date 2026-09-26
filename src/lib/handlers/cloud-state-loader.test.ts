@@ -290,6 +290,21 @@ describe("applyCloudCapabilities (App-API / OpenAPI-MQTT pipe)", () => {
     expect((sensor.state as Record<string, unknown>).battery).toBe(75);
   });
 
+  it("gives a LAN light its battery from its own push — the LAN guard covers only the light values (issue #50)", async () => {
+    const lamp = createTestDevice({
+      sku: "H1741",
+      deviceId: "AA:08",
+      type: "devices.types.light",
+      lanIp: "192.168.1.50",
+    });
+    const rig = makeRig([lamp]);
+    await applyCloudCapabilities(rig.adapter, lamp, [
+      { type: "devices.capabilities.property", instance: "battery", state: { value: 32 } },
+    ]);
+    expect(rig.ensured).toEqual(["battery"]);
+    expect(rig.writes.find(w => w.id.endsWith(".sensor.battery"))).toMatchObject({ val: 32 });
+  });
+
   // Audit 2026-09-12 (F6): this path runs on every App-API poll (every 2 min)
   // and every cloud event, and it re-sent the same reading each time — 720
   // writes a day per value, each bumping `ts`, firing every subscription and

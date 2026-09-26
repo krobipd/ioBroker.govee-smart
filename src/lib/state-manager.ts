@@ -13,7 +13,10 @@ import { GOVEE_DEVICE_TYPE, isAppGroup, PSEUDO_GROUP_SKUS } from "./govee-consta
 import type { I18nKey } from "./i18n";
 import { tDesc, tName, tNameWith } from "./i18n";
 import { errMessage, type DeviceState, type GoveeDevice } from "./types";
-import { mapKey, treeKey } from "./device-key";
+import { DeviceIdRegistry, ID_SCHEME } from "./device-id";
+import { migrateDeviceIds, type IdMigrationDeps } from "./device-id-migration";
+import { enumMembersUnder } from "./device-move";
+import { moveWithEnums } from "./enum-carry";
 
 /**
  * High sort-end marker for getObjectView key ranges (`startkey: prefix,
@@ -215,8 +218,11 @@ function inferChannelFromStateId(stateId: string): string {
 /** Manages ioBroker state creation and updates for Govee devices */
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
-  /** Maps deviceKey (sku_deviceId) → current object prefix */
-  private readonly prefixMap = new Map<string, string>();
+  /**
+   * Which tree belongs to which device — the one place that names a device's tree (3.0.0). Filled by
+   * {@link migrateDeviceIds} at start; a device seen for the first time is given its id on the first ask.
+   */
+  readonly deviceIds = new DeviceIdRegistry();
   /** Maps "prefix.stateId" → channel name (populated during createDeviceStates) */
   private readonly stateChannelMap = new Map<string, string>();
   /**
@@ -791,21 +797,10 @@ export class StateManager {
    * @param device Govee device
    */
   async createInfoStates(device: GoveeDevice): Promise<void> {
-    const key = this.deviceKey(device);
-    const newPrefix = this.devicePrefix(device);
-    const oldPrefix = this.prefixMap.get(key);
-
-    // Migrate if prefix changed (e.g., old naming scheme)
-    if (oldPrefix && oldPrefix !== newPrefix) {
-      this.adapter.log.debug(`Migrating device ${device.sku}: ${oldPrefix} → ${newPrefix}`);
-      await this.adapter.delObjectAsync(oldPrefix, { recursive: true });
-      // Drop every in-memory trace of the old prefix (channel map, ensured
-      // cache, marker cache) so nothing shadows the lookups after the rename.
-      this.forgetPrefix(oldPrefix);
-    }
-    this.prefixMap.set(key, newPrefix);
-
-    const prefix = newPrefix;
+    // The id is decided once (DeviceIdRegistry) and never changes within a run; a tree of an older
+    // rule moved at start (migrateDeviceIds). Until 2.41.0 a changed prefix deleted the old tree
+    // here — recursively, without its values, recordings, rooms or aliases.
+    const prefix = this.devicePrefix(device);
     const isGroup = isAppGroup(device);
 
     // Device object with online status indicator + type-aware icon.
@@ -837,6 +832,8 @@ export class StateManager {
         native: {
           sku: device.sku,
           deviceId: device.deviceId,
+          // The mark of the id rule — the only proof that this tree needs no move.
+          idScheme: ID_SCHEME,
         },
       });
       this.deviceObjectSignature.set(prefix, signature);
@@ -960,7 +957,7 @@ export class StateManager {
       await this.syncInfoOnline(device);
     } else {
       // Group members: comma-separated device prefix IDs
-      const memberIds = (device.groupMembers ?? []).map(m => treeKey(m.sku, m.deviceId)).join(", ");
+      const memberIds = (device.groupMembers ?? []).map(m => this.deviceIds.idFor(m.sku, m.deviceId)).join(", ");
       await this.ensureState(
         `${prefix}.info.members`,
         tName("members"),
@@ -1487,7 +1484,7 @@ export class StateManager {
     // as unreachable that the tree showed as reachable, and the other way round.
     const unreachable = memberDevices
       .filter(m => !resolveDeviceReachability(m).online)
-      .map(m => treeKey(m.sku, m.deviceId));
+      .map(m => this.deviceIds.idFor(m.sku, m.deviceId));
 
     await this.ensureGroupMembersUnreachableState(prefix);
     // setStateChangedAsync: reachability is re-evaluated on every online
@@ -1694,15 +1691,72 @@ export class StateManager {
   }
 
   /**
-   * Get device object ID prefix — stable SKU + short device ID.
-   * Groups (BaseGroup) go under groups/, devices under devices/.
-   * Human-readable name is in common.name, not in the object ID.
+   * The tree of a device — `devices.<sku>-<last 4>`, groups (BaseGroup) under `groups.`, decided once
+   * per device and kept ({@link DeviceIdRegistry}). The human-readable name is `common.name`, never
+   * part of the id.
    *
    * @param device Govee device
    */
   devicePrefix(device: GoveeDevice): string {
-    const folder = isAppGroup(device) ? "groups" : "devices";
-    return `${folder}.${treeKey(device.sku, device.deviceId)}`;
+    return this.deviceIds.prefixFor(device.sku, device.deviceId);
+  }
+
+  /**
+   * Move every tree of an older id rule to its id under the current one and record every tree —
+   * once per start, before anything else touches the trees (`migrateDeviceIds`). Values, recordings
+   * (as `aliasId`), aliases and rooms/functions move along.
+   *
+   * @returns how many trees moved
+   */
+  async migrateDeviceIds(): Promise<number> {
+    const adapter = this.adapter;
+    const ns = adapter.namespace;
+    const deps: IdMigrationDeps = {
+      namespace: ns,
+      // Every object kind of the instance: a pattern read without a type returns states only.
+      objects: async () => (await adapter.getAdapterObjectsAsync()) ?? {},
+      states: async pattern => (await adapter.getForeignStatesAsync(pattern)) ?? {},
+      setObject: (id, obj) => adapter.setForeignObject(id, obj),
+      extendObject: (id, patch) => adapter.extendForeignObjectAsync(id, patch),
+      setState: (id, state) => adapter.setForeignStateAsync(id, state),
+      aliases: async () => (await adapter.getForeignObjectsAsync("alias.*", "state")) ?? {},
+      deleteTreeCarryingEnums: (root, carry) => this.deleteTreeCarryingEnums(root, carry),
+      log: adapter.log,
+    };
+    return migrateDeviceIds(deps, this.deviceIds);
+  }
+
+  /**
+   * Delete a whole tree and carry the room and function entries of its objects to the ids that take
+   * their place — through the fleet helper, in its order: the entries are read first, the tree is
+   * deleted, the new ids are written last. The delete removes the old ids from every enum, written
+   * back from the adapter's enum cache, and would take away an id written before it.
+   *
+   * @param root the namespace-relative root that goes away
+   * @param carry old full id → the full ids that take its place
+   * @returns how many room/function entries now list one of the new ids
+   */
+  private async deleteTreeCarryingEnums(root: string, carry: ReadonlyMap<string, readonly string[]>): Promise<number> {
+    const adapter = this.adapter;
+    const members = enumMembersUnder(
+      await adapter.getForeignObjectsAsync("enum.*", "enum"),
+      `${adapter.namespace}.${root}`,
+    );
+    const carried = new Set<string>();
+    // One carry per moved member and new id, nested so that every one reads before the single delete runs.
+    let remove = async (): Promise<unknown> => adapter.delObjectAsync(root, { recursive: true });
+    for (const oldId of members) {
+      for (const newId of carry.get(oldId) ?? []) {
+        const inner = remove;
+        remove = async () => {
+          for (const enumId of await moveWithEnums(adapter, oldId, newId, inner, errMessage)) {
+            carried.add(`${enumId}|${newId}`);
+          }
+        };
+      }
+    }
+    await remove();
+    return carried.size;
   }
 
   /**
@@ -1717,11 +1771,8 @@ export class StateManager {
     // A removed or re-prefixed device must get its device object written in
     // full again — a surviving signature would skip the write that rebuilds it.
     this.deviceObjectSignature.delete(prefix);
-    for (const key of this.prefixMap.keys()) {
-      if (this.prefixMap.get(key) === prefix) {
-        this.prefixMap.delete(key);
-      }
-    }
+    // The tree is gone — its id is free for the next device that needs one.
+    this.deviceIds.release(prefix);
     const stalePrefix = `${prefix}.`;
     for (const key of this.stateChannelMap.keys()) {
       if (key.startsWith(stalePrefix)) {
@@ -1739,15 +1790,6 @@ export class StateManager {
         this.ensuredStates.delete(id);
       }
     }
-  }
-
-  /**
-   * Unique key for internal tracking (not used as object ID).
-   *
-   * @param device Govee device
-   */
-  private deviceKey(device: GoveeDevice): string {
-    return mapKey(device.sku, device.deviceId);
   }
 
   /**

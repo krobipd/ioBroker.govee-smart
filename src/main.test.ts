@@ -70,6 +70,8 @@ vi.mock("@iobroker/adapter-core", () => {
     public states = new Map<string, { val: unknown; ack: boolean }>();
     /** meta.user file store used by LocalSnapshotStore. */
     public files = new Map<string, string>();
+    /** Rooms and functions by full id — what the id move carries along. */
+    public enums = new Map<string, Record<string, unknown>>();
     public on = vi.fn();
     public subscribeStatesAsync = vi.fn(async () => {});
     public sendTo = vi.fn();
@@ -147,8 +149,62 @@ vi.mock("@iobroker/adapter-core", () => {
       }
       return Promise.resolve({ rows });
     });
-    public getForeignObjectAsync = vi.fn(() => Promise.resolve({ native: {} }));
-    public extendForeignObjectAsync = vi.fn(async () => {});
+    public getForeignObjectAsync = vi.fn((id: string) =>
+      Promise.resolve(id.startsWith("enum.") ? structuredClone(this.enums.get(id) ?? null) : { native: {} }),
+    );
+    /**
+     * Own objects of one kind for `<namespace>.*` — like js-controller, a read without a type returns
+     * states only (`type || "state"`); the enums come from their own map, no aliases exist here.
+     */
+    public getForeignObjectsAsync = vi.fn((pattern: string, type?: string) => {
+      const out: Record<string, unknown> = {};
+      if (pattern === "enum.*" && type === "enum") {
+        return Promise.resolve(structuredClone(Object.fromEntries(this.enums)));
+      }
+      if (pattern === `${this.namespace}.*`) {
+        for (const [k, v] of this.objects) {
+          if ((v as { type?: string }).type === (type ?? "state")) {
+            out[`${this.namespace}.${k}`] = structuredClone(v);
+          }
+        }
+      }
+      return Promise.resolve(out);
+    });
+    /** Every own object by full id — folders, devices, channels and states, as js-controller reads them. */
+    public getAdapterObjectsAsync = vi.fn(() => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of this.objects) {
+        if (["folder", "device", "channel", "state"].includes((v as { type?: string }).type ?? "")) {
+          out[`${this.namespace}.${k}`] = structuredClone(v);
+        }
+      }
+      return Promise.resolve(out);
+    });
+    public getForeignStatesAsync = vi.fn((pattern: string) => {
+      const prefix = pattern.replace(/\*$/, "").replace(`${this.namespace}.`, "");
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of this.states) {
+        if (k.startsWith(prefix)) {
+          out[`${this.namespace}.${k}`] = structuredClone(v);
+        }
+      }
+      return Promise.resolve(out);
+    });
+    public setForeignObject = vi.fn((id: string, obj: Record<string, unknown>) => {
+      if (id.startsWith(`${this.namespace}.`)) {
+        this.objects.set(id.slice(this.namespace.length + 1), structuredClone(obj));
+      } else if (id.startsWith("enum.")) {
+        this.enums.set(id, structuredClone(obj));
+      }
+      return Promise.resolve();
+    });
+    /** Merges into own objects like `extendObject`; the instance object stays a recorded call only. */
+    public extendForeignObjectAsync = vi.fn(async (id: string, obj: Record<string, unknown>) => {
+      if (id.startsWith(`${this.namespace}.`)) {
+        await this.extendObject(id, obj);
+      }
+    });
+    public setForeignStateAsync = vi.fn((id: string, state: unknown) => this.setState(id, state));
     public readDirAsync = vi.fn(() => Promise.resolve([] as { file: string; isDir: boolean }[]));
     public readFileAsync = vi.fn((_meta: string, name: string) => {
       const f = this.files.get(name);
@@ -238,6 +294,7 @@ function internalOf(adapter: GoveeAdapter): {
   objects: Map<string, Record<string, unknown>>;
   states: Map<string, { val: unknown; ack: boolean }>;
   files: Map<string, string>;
+  enums: Map<string, Record<string, unknown>>;
   config: Record<string, unknown>;
   log: Record<"silly" | "debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
   namespace: string;
@@ -571,7 +628,12 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     const { adapter } = setup();
     const i = internalOf(adapter);
     i.objects.set("snapshots", { type: "meta", common: { type: "meta.user" } });
-    i.objects.set("devices.h61be_ee11", { type: "device", common: { name: "Strip" }, native: { sku: "H61BE" } });
+    // A 2.x tree: the device object under the old id (`<sku>_<last 4>`), the file under the same key.
+    i.objects.set("devices.h61be_ee11", {
+      type: "device",
+      common: { name: "Strip" },
+      native: { sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:11" },
+    });
     const snap = { name: "Evening", power: true, brightness: 40, colorRgb: "#ff8800", colorTemperature: 0, savedAt: 7 };
     i.files.set("h61be_ee11.json", JSON.stringify({ snapshots: [snap] }));
     i.readDirAsync.mockImplementation((meta: string) =>
@@ -580,13 +642,79 @@ describe("GoveeAdapter onReady — channel wiring", () => {
       ),
     );
     await i.onReady();
-    const device = i.objects.get("devices.h61be_ee11") as { native: Record<string, unknown> };
+    // The tree moved to its 3.x id first, the file followed it there.
+    expect(i.objects.has("devices.h61be_ee11")).toBe(false);
+    const device = i.objects.get("devices.h61be-ee11") as { native: Record<string, unknown> };
     expect(JSON.parse(device.native.localSnapshots as string)).toEqual({ snapshots: [snap] });
     expect(device.native.sku).toBe("H61BE");
     expect(i.files.size).toBe(0);
     expect(i.objects.has("snapshots")).toBe(false);
     // And the moved values are what the dropdown will list.
     expect(i.localSnapshots!.getSnapshots("H61BE", "AA:BB:CC:DD:EE:11")).toEqual([snap]);
+  });
+
+  it("a 2.x tree takes its rooms and functions along — a room deleted meanwhile is not written back", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    i.objects.set("devices.h61be_ee11", {
+      type: "device",
+      common: { name: "Strip" },
+      native: { sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:11" },
+    });
+    i.objects.set("devices.h61be_ee11.control", { type: "channel", common: { name: "Control" }, native: {} });
+    i.objects.set("devices.h61be_ee11.control.power", { type: "state", common: { name: "Power" }, native: {} });
+    const old = "govee-smart.0.devices.h61be_ee11";
+    i.enums.set("enum.rooms.living", {
+      type: "enum",
+      common: { name: "Living", members: [old, `${old}.control.power`, "hm-rpc.0.X.1.STATE"] },
+    });
+    // Listed when the move reads the rooms, gone by the time it writes them.
+    i.enums.set("enum.functions.light", { type: "enum", common: { name: "Light", members: [old] } });
+    i.getForeignObjectAsync.mockImplementation((id: string) =>
+      Promise.resolve(
+        !id.startsWith("enum.")
+          ? { native: {} }
+          : id === "enum.functions.light"
+            ? null
+            : structuredClone(i.enums.get(id) ?? null),
+      ),
+    );
+    await i.onReady();
+    const moved = "govee-smart.0.devices.h61be-ee11";
+    expect((i.enums.get("enum.rooms.living")?.common as { members: string[] }).members.sort()).toEqual(
+      ["hm-rpc.0.X.1.STATE", moved, `${moved}.control.power`].sort(),
+    );
+    expect((i.enums.get("enum.functions.light")?.common as { members: string[] }).members).toEqual([old]);
+    // A room that is gone is nothing to report.
+    expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("could not be carried"));
+    expect(i.objects.has("devices.h61be_ee11")).toBe(false);
+  });
+
+  it("the cleanup protects a listed device's tree under the id the state tree gave it", async () => {
+    const { adapter } = setup();
+    const i = internalOf(adapter);
+    // Two devices of one model ending alike: the short id already belongs to the second one.
+    i.objects.set("devices.h61be-ee11", {
+      type: "device",
+      common: { name: "B" },
+      native: { sku: "H61BE", deviceId: "11:22:33:44:EE:11", idScheme: 3 },
+    });
+    i.objects.set("devices.h61be-aabbccddee11", {
+      type: "device",
+      common: { name: "A" },
+      native: { sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:11", idScheme: 3 },
+    });
+    await i.onReady();
+    const listSource = (
+      i.deviceManager as unknown as {
+        listSource(ok: boolean, listed: Array<{ sku: string; deviceId: string }>): { trees: Set<string> };
+      }
+    ).listSource.bind(i.deviceManager);
+    const { trees } = listSource(true, [
+      { sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:11" },
+      { sku: "H61BE", deviceId: "11:22:33:44:EE:11" },
+    ]);
+    expect([...trees].sort()).toEqual(["devices.h61be-aabbccddee11", "devices.h61be-ee11"]);
   });
 
   it("a fresh install has no report store — the cleanup touches nothing", async () => {
@@ -774,12 +902,12 @@ describe("GoveeAdapter onReady — timers", () => {
     const device = makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: Date.now() });
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
     await (i.stateManager as unknown as { createInfoStates(d: GoveeDevice): Promise<void> }).createInfoStates(device);
-    i.states.set("devices.h6172_ee11.info.online", { val: false, ack: true });
+    i.states.set("devices.h6172-ee11.info.online", { val: false, ack: true });
 
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
     (syncCall![0] as () => void)();
     await settle(5);
-    expect(i.states.get("devices.h6172_ee11.info.online")?.val).toBe(true);
+    expect(i.states.get("devices.h6172-ee11.info.online")?.val).toBe(true);
   });
 
   it("the 20 s round re-evaluates info.connection — the last device aging out turns it false (B7)", async () => {
@@ -819,13 +947,13 @@ describe("GoveeAdapter onReady — timers", () => {
     devices.set("H6172_aabbccddee11", member);
     devices.set("BaseGroup_g1", group);
     // A stale value from before the restart — nobody has re-checked it since.
-    i.states.set("groups.basegroup_g1.info.membersUnreachable", { val: "", ack: true });
+    i.states.set("groups.basegroup-g1.info.membersUnreachable", { val: "", ack: true });
 
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
     (syncCall![0] as () => void)();
     await settle(5);
 
-    expect(i.states.get("groups.basegroup_g1.info.membersUnreachable")?.val).toBe("h6172_ee11");
+    expect(i.states.get("groups.basegroup-g1.info.membersUnreachable")?.val).toBe("h6172-ee11");
   });
 
   it("a first round before the device list arrived does not burn the priming", async () => {
@@ -855,10 +983,10 @@ describe("GoveeAdapter onReady — timers", () => {
         groupMembers: [{ sku: "H6172", deviceId: "AA:BB:CC:DD:EE:11" }],
       }),
     );
-    i.states.set("groups.basegroup_g1.info.membersUnreachable", { val: "", ack: true });
+    i.states.set("groups.basegroup-g1.info.membersUnreachable", { val: "", ack: true });
     (syncCall![0] as () => void)();
     await settle(5);
-    expect(i.states.get("groups.basegroup_g1.info.membersUnreachable")?.val).toBe("h6172_ee11");
+    expect(i.states.get("groups.basegroup-g1.info.membersUnreachable")?.val).toBe("h6172-ee11");
     expect(i.groupReachabilityPrimed).toBe(true);
   });
 
@@ -967,7 +1095,7 @@ describe("GoveeAdapter onReady — timers", () => {
     await vi.waitFor(() => expect(f.cloud.getDeviceState).toHaveBeenCalled());
     // A colour datapoint of the old camelCase name, once the tree is built —
     // the B2 migration after the read would delete it.
-    i.objects.set("devices.h7127_ee11.control.colorRgb", {
+    i.objects.set("devices.h7127-ee11.control.colorRgb", {
       type: "state",
       common: { name: "colorRgb", type: "string", role: "level.color.rgb", read: true, write: true },
       native: {},
@@ -975,7 +1103,7 @@ describe("GoveeAdapter onReady — timers", () => {
     i.onUnload(() => undefined);
     release([]);
     await ready;
-    expect(i.objects.has("devices.h7127_ee11.control.colorRgb")).toBe(true);
+    expect(i.objects.has("devices.h7127-ee11.control.colorRgb")).toBe(true);
   });
 
   it("a stop during the start-up migrations leaves the tree not ready and unsubscribed (B6)", async () => {
@@ -1843,7 +1971,7 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
       }),
     );
     const i = internalOf(ctx.adapter);
-    i.objects.set("devices.h6172_ee11.scenes.light_scene", { type: "state", common: {}, native: {} });
+    i.objects.set("devices.h6172-ee11.scenes.light_scene", { type: "state", common: {}, native: {} });
     ctx.f.lan.start.mockImplementation((...args: unknown[]) => {
       ctx.f.lan.startArgs = args;
       (args[0] as (d: { ip: string; device: string; sku: string }) => void)({
@@ -1859,7 +1987,7 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
     seedLanLightWithLeftovers(ctx);
     const i = internalOf(ctx.adapter);
     await i.onReady();
-    expect(i.objects.has("devices.h6172_ee11.scenes.light_scene")).toBe(false);
+    expect(i.objects.has("devices.h6172-ee11.scenes.light_scene")).toBe(false);
   });
 
   it("with an API key a light without capabilities yet keeps its Cloud datapoints (M8)", async () => {
@@ -1870,7 +1998,7 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
     seedLanLightWithLeftovers(ctx);
     const i = internalOf(ctx.adapter);
     await i.onReady();
-    expect(i.objects.has("devices.h6172_ee11.scenes.light_scene")).toBe(true);
+    expect(i.objects.has("devices.h6172-ee11.scenes.light_scene")).toBe(true);
   });
 });
 
@@ -1959,7 +2087,7 @@ describe("GoveeAdapter — cache vs cloud start", () => {
 
     expect(ctx.f.cloud.getDevices).not.toHaveBeenCalled();
     expect(ctx.f.cloud.getDeviceState).toHaveBeenCalledWith("H7127", "AA:BB:CC:DD:EE:11");
-    expect(i.states.get("devices.h7127_ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
+    expect(i.states.get("devices.h7127-ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
     expect(i.cloudInitDone).toBe(true);
   });
 
@@ -2025,7 +2153,7 @@ describe("GoveeAdapter — cache vs cloud start", () => {
       if (sku !== "H7127") {
         return Promise.resolve([]);
       }
-      objectExistedAtRead.push(i.objects.has("devices.h7127_ee11.sensor.filter_life_time"));
+      objectExistedAtRead.push(i.objects.has("devices.h7127-ee11.sensor.filter_life_time"));
       return Promise.resolve([
         { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 73 } },
       ]);
@@ -2035,8 +2163,8 @@ describe("GoveeAdapter — cache vs cloud start", () => {
 
     expect(ctx.f.cloud.getDevices).toHaveBeenCalled();
     expect(objectExistedAtRead, "the state read happens after the tree exists").toEqual([true]);
-    expect(i.states.get("devices.h7127_ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
-    expect(i.states.has("devices.h7127_ee11.control.filter_life_time"), "no stray write in the wrong channel").toBe(
+    expect(i.states.get("devices.h7127-ee11.sensor.filter_life_time")).toEqual({ val: 73, ack: true });
+    expect(i.states.has("devices.h7127-ee11.control.filter_life_time"), "no stray write in the wrong channel").toBe(
       false,
     );
   });
@@ -2091,14 +2219,14 @@ describe("GoveeAdapter — cache vs cloud start", () => {
 
     expect(ctx.f.cloud.getDeviceState).toHaveBeenCalledWith("H7127", "AA:BB:CC:DD:EE:11");
     expect(
-      i.states.get("devices.h7127_ee11.sensor.filter_life_time"),
+      i.states.get("devices.h7127-ee11.sensor.filter_life_time"),
       "the held push is written after the seed",
     ).toEqual({
       val: 73,
       ack: true,
     });
     expect(
-      i.states.has("devices.h7127_ee11.control.filter_life_time"),
+      i.states.has("devices.h7127-ee11.control.filter_life_time"),
       "nothing was written into the wrong channel",
     ).toBe(false);
   });
@@ -2167,8 +2295,8 @@ describe("GoveeAdapter — cache vs cloud start", () => {
       "H6172",
       "AA:BB:CC:DD:EE:22",
     );
-    expect(i.states.get("devices.h6172_ee22.control.power")?.val, "power stays the LAN's word").not.toBe(true);
-    expect(i.states.get("devices.h6172_ee22.control.brightness")?.val, "brightness stays the LAN's word").not.toBe(42);
+    expect(i.states.get("devices.h6172-ee22.control.power")?.val, "power stays the LAN's word").not.toBe(true);
+    expect(i.states.get("devices.h6172-ee22.control.brightness")?.val, "brightness stays the LAN's word").not.toBe(42);
   });
 
   it("skips a LAN-discovered light on the cached path — LAN owns those values", async () => {
@@ -2281,7 +2409,7 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     (syncCall![0] as () => void)();
     await settle();
 
-    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: true, ack: true });
+    expect(i.states.get("devices.h6172-ee11.info.online")).toEqual({ val: true, ack: true });
   });
 
   it("an unplugged light with no local API stays unreachable — no evidence, no green", async () => {
@@ -2329,7 +2457,7 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     (syncCall![0] as () => void)();
     await settle();
 
-    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: false, ack: true });
+    expect(i.states.get("devices.h6172-ee11.info.online")).toEqual({ val: false, ack: true });
   });
 
   it("an explicit offline from Govee wins over everything else", async () => {
@@ -2378,7 +2506,7 @@ describe("GoveeAdapter — cache vs cloud start", () => {
     (syncCall![0] as () => void)();
     await settle();
 
-    expect(i.states.get("devices.h6172_ee11.info.online")).toEqual({ val: false, ack: true });
+    expect(i.states.get("devices.h6172-ee11.info.online")).toEqual({ val: false, ack: true });
     // …and the device carries Govee's word, so nothing derives around it later.
     expect(i.deviceManager!.getDevices()[0].state.cloudReportedOnline).toBe(false);
   });
@@ -2722,8 +2850,8 @@ describe("GoveeAdapter — callback wiring", () => {
     const i = internalOf(adapter);
     expect(f.cloud.getDevices).not.toHaveBeenCalled(); // the cache alone was enough
     // The lost light's tree from the last session.
-    i.objects.set("devices.h600d_ee7e", { type: "device", common: { name: "Bulb" }, native: {} });
-    i.objects.set("devices.h600d_ee7e.control.power", { type: "state", common: {}, native: {} });
+    i.objects.set("devices.h600d-ee7e", { type: "device", common: { name: "Bulb" }, native: {} });
+    i.objects.set("devices.h600d-ee7e.control.power", { type: "state", common: {}, native: {} });
     f.api.hasBearerToken.mockReturnValue(true);
     f.api.fetchDeviceList.mockResolvedValue([
       { sku: "H5179", device: "AA:BB:CC:DD:EE:11", deviceName: "Thermo", lastData: { online: true }, settings: {} },
@@ -2745,7 +2873,7 @@ describe("GoveeAdapter — callback wiring", () => {
     (timer![0] as () => void)();
     await settle(10);
 
-    expect(i.objects.has("devices.h600d_ee7e")).toBe(true);
+    expect(i.objects.has("devices.h600d-ee7e")).toBe(true);
     expect(f.cloud.getDevices).toHaveBeenCalledTimes(1);
     expect(i.deviceManager!.getDevices().some(d => d.sku === "H600D")).toBe(true);
   });
@@ -2986,7 +3114,7 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     await settle(6);
 
     const dropdown = (id: string): Record<string, string> | undefined =>
-      (i.objects.get(`devices.h600d_${id}.scenes.light_scene`) as { common?: { states?: Record<string, string> } })
+      (i.objects.get(`devices.h600d-${id}.scenes.light_scene`) as { common?: { states?: Record<string, string> } })
         ?.common?.states;
     expect(dropdown("ee01")).toEqual({ 0: "---" }); // still waiting — nothing invented
     expect(dropdown("ee02")).toEqual({ 0: "---" });
@@ -3004,7 +3132,9 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     // save() is asynchronous (temp file + flush + rename) — wait for the disk.
     const inFlight = (i.skuCache as { inFlight: Map<string, Promise<void>> }).inFlight;
     await Promise.allSettled([...inFlight.values()]);
-    const cached = JSON.parse(fsReal.readFileSync(pathReal.join(dataDir, "cache", "h600d_ee02.json"), "utf8")) as {
+    const cached = JSON.parse(
+      fsReal.readFileSync(pathReal.join(dataDir, "cache", "h600d_aabbccddee02.json"), "utf8"),
+    ) as {
       scenes: unknown[];
       scenesChecked?: boolean;
     };
@@ -3020,7 +3150,7 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     await i2.onReady();
     await settle();
     const dropdown2 = (
-      i2.objects.get("devices.h600d_ee02.scenes.light_scene") as {
+      i2.objects.get("devices.h600d-ee02.scenes.light_scene") as {
         common?: { states?: Record<string, string> };
       }
     )?.common?.states;

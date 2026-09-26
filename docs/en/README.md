@@ -36,8 +36,18 @@ seconds per command and is rate-limited by Govee.
 3. If Govee asks for a verification code (it does that for a new client), the card asks you for it.
    Nothing else is needed; the adapter remembers the login across restarts so no further codes are
    sent.
-4. Devices appear under `devices.<model>_<id>`. Groups you created in the Govee app appear under
-   `groups.`.
+4. Devices appear under `devices.<model>-<id>` — the model and the last four characters of the
+   device's own ID, for example `devices.h61be-525f`. Should two devices of one model end in the same
+   four characters, the second one gets its whole ID. Groups you created in the Govee app appear
+   under `groups.`.
+
+## Updating from 2.x
+
+Version 3.0.0 gives every device a new object ID once: `devices.h61be_525f` becomes
+`devices.h61be-525f`, with a hyphen like the other device adapters of this developer. The move
+happens by itself at the first start: values, recording settings, rooms, functions and aliases move
+along, and recorded history continues in its old series. Scripts and visualizations that use the old
+IDs must be updated.
 
 ## Reporting a problem
 

@@ -152,7 +152,7 @@ hast du echte Daten — und unser Adapter wird mit jedem Bericht besser.
 2. Häkchen setzen: **„Experimentelle Geräte-Unterstützung aktivieren"**
 3. Speichern → Adapter startet neu
 4. Nach 1-2 Minuten: dein Gerät erscheint im Object-Browser unter
-   \`govee-smart.0.devices.<sku>_<id>\`
+   \`govee-smart.0.devices.<sku>-<id>\`
 5. Probier die Funktionen durch (Power, Helligkeit, Farbe, Modes — was
    dein Gerät eben kann)
 
@@ -230,7 +230,7 @@ real data — and the adapter improves with every report.
 2. Tick **"Enable experimental device support"**
 3. Save → adapter restarts
 4. After 1–2 minutes: your device appears in the object browser under
-   \`govee-smart.0.devices.<sku>_<id>\`
+   \`govee-smart.0.devices.<sku>-<id>\`
 5. Try the functions (power, brightness, color, modes — whatever your
    device supports)
 

@@ -178,6 +178,46 @@ describe("SkuCache", () => {
     expect(cache.loadAll()).toEqual([]);
   });
 
+  it("keeps two devices of one SKU whose ids end alike in two files (3.0.0)", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    await cache.save({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "First" });
+    await cache.save({ ...createTestData("H61BE", "11:22:33:44:55:66:52:5F"), name: "Second" });
+    expect(fs.readdirSync(path.join(dir, "cache")).sort()).toEqual([
+      "h61be_112233445566525f.json",
+      "h61be_abcdef123456525f.json",
+    ]);
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")?.name).toBe("First");
+    expect(cache.loadOne("H61BE", "11:22:33:44:55:66:52:5F")?.name).toBe("Second");
+  });
+
+  it("reads a 2.x file under its old name and replaces it at the next save", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const legacy = path.join(dir, "cache", "h61be_525f.json");
+    fs.writeFileSync(legacy, JSON.stringify({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "Old" }));
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")?.name).toBe("Old");
+    await cache.save({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "New" });
+    expect(fs.existsSync(legacy)).toBe(false);
+    expect(cache.loadAll().map(e => e.name)).toEqual(["New"]);
+  });
+
+  it("does not hand one device the 2.x file of another that shared its old name", () => {
+    const cache = new SkuCache(dir, mockLog);
+    fs.writeFileSync(
+      path.join(dir, "cache", "h61be_525f.json"),
+      JSON.stringify({ ...createTestData("H61BE", "11:22:33:44:55:66:52:5F"), name: "Other" }),
+    );
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")).toBeNull();
+    expect(cache.loadOne("H61BE", "11:22:33:44:55:66:52:5F")?.name).toBe("Other");
+  });
+
+  it("evicts a device's 2.x file together with its current one", () => {
+    const cache = new SkuCache(dir, mockLog);
+    const legacy = path.join(dir, "cache", "h61be_525f.json");
+    fs.writeFileSync(legacy, JSON.stringify(createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F")));
+    cache.evictDevice("H61BE", "AB:CD:EF:12:34:56:52:5F");
+    expect(fs.existsSync(legacy)).toBe(false);
+  });
+
   it("normalises the device id for the file name — colon and colon-less spellings hit the same file", async () => {
     const cache = new SkuCache(dir, mockLog);
     await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));

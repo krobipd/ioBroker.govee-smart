@@ -253,6 +253,71 @@ describe("mapCloudStateValues", () => {
     ]);
   });
 
+  it("writes the level as a number where the device declares a bare range (H7130, H7102 — built as a number)", () => {
+    const rangeCap: CloudCapability = {
+      type: "devices.capabilities.work_mode",
+      instance: "workMode",
+      parameters: {
+        dataType: "STRUCT",
+        fields: [
+          { fieldName: "workMode", dataType: "ENUM", options: [{ name: "gearMode", value: 1 }] },
+          { fieldName: "modeValue", dataType: "INTEGER", range: { min: 0, max: 3, precision: 1 } },
+        ],
+      },
+    };
+    expect(mapCapabilities([rangeCap]).find(d => d.id === "mode_value")?.type).toBe("number");
+    expect(
+      mapCloudStateValues(
+        {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { value: { workMode: 1, modeValue: 2 } },
+        },
+        [rangeCap],
+      ),
+    ).toEqual([
+      { stateId: "work_mode", value: "1" },
+      { stateId: "mode_value", value: 2 },
+    ]);
+  });
+
+  it("writes no level where the builder created none (H7121: every mode carries only a default)", () => {
+    const h7121Cap: CloudCapability = {
+      type: "devices.capabilities.work_mode",
+      instance: "workMode",
+      parameters: {
+        dataType: "STRUCT",
+        fields: [
+          {
+            fieldName: "workMode",
+            dataType: "ENUM",
+            options: [
+              { name: "High", value: 3 },
+              { name: "Low", value: 1 },
+            ],
+          },
+          {
+            fieldName: "modeValue",
+            dataType: "ENUM",
+            options: [
+              { defaultValue: 0, name: "High" },
+              { defaultValue: 0, name: "Low" },
+            ],
+          },
+        ],
+      },
+    };
+    expect(mapCapabilities([h7121Cap]).map(d => d.id)).not.toContain("mode_value");
+    const answer: CloudStateCapability = {
+      type: "devices.capabilities.work_mode",
+      instance: "workMode",
+      state: { value: { workMode: 3, modeValue: 0 } },
+    };
+    expect(mapCloudStateValues(answer, [h7121Cap])).toEqual([{ stateId: "work_mode", value: "3" }]);
+    // A device list without the work-mode capability built no level either.
+    expect(mapCloudStateValues(answer, [])).toEqual([{ stateId: "work_mode", value: "3" }]);
+  });
+
   it("passes a non-work_mode capability straight through as one result", () => {
     expect(
       mapCloudStateValues({

@@ -99,6 +99,18 @@ function okPayload(payload) {
 }
 
 /**
+ * A temperature inside the range the capability declares for it — a kettle starts at 40 °C, and a
+ * reading below that is refused by js-controller with a warning.
+ *
+ * @param {{ parameters?: { fields?: Array<{ fieldName?: string, range?: { min: number, max: number } }> } }} cap the declared capability
+ * @param {number} preferred the reading wanted
+ */
+function withinDeclared(cap, preferred) {
+  const range = cap.parameters?.fields?.find(f => f && f.fieldName === "temperature")?.range;
+  return range ? Math.min(range.max, Math.max(range.min, preferred)) : preferred;
+}
+
+/**
  * The device state read. Returns the reachability Govee reports plus a reading
  * per capability kind, so the synthetic sensor/appliance datapoints are created
  * the same way a real account creates them.
@@ -128,7 +140,7 @@ function stateFor(device) {
                     : c.instance === "filterLifeTime"
                       ? 76
                       : c.instance === "targetTemperature"
-                        ? { temperature: 22 }
+                        ? { temperature: withinDeclared(c, 22) }
                         : c.instance === "workMode"
                           ? { workMode: 1, modeValue: 1 }
                           : 50;
@@ -481,14 +493,21 @@ async function resetInstanceNative(harness) {
 }
 
 /**
- * The tree key the adapter builds for a device: lower-case SKU plus the last
- * four hex pairs of the Govee device id, colons dropped.
+ * Whether a device object below `devices.` names this fixture device in its `native` — by what the
+ * device IS, not by a copy of the id rule: since 3.0.0 an id depends on which ids are taken (two
+ * devices of one SKU ending alike), so a rule copied here would drift from the adapter.
  *
+ * @param {Record<string, any>} objects Dumped objects
  * @param {{sku: string, device: string}} entry Fixture device
  */
-function treeKeyFor(entry) {
-  const tail = entry.device.replace(/:/g, "").slice(-4).toLowerCase();
-  return `${entry.sku.toLowerCase()}_${tail}`;
+function hasTree(objects, entry) {
+  return Object.entries(objects).some(
+    ([id, obj]) =>
+      id.startsWith(`${NS}devices.`) &&
+      obj.type === "device" &&
+      obj.native?.sku === entry.sku &&
+      obj.native?.deviceId === entry.device,
+  );
 }
 
 async function dumpObjects(harness) {
@@ -551,8 +570,8 @@ tests.integration(ADAPTER_DIR, {
           // only becomes a tree once its members are resolved — which needs
           // account credentials this fixture deliberately does not carry.
           .filter(d => d.sku !== "SameModeGroup" && d.sku !== "BaseGroup")
-          .map(d => treeKeyFor(d))
-          .filter(prefix => !objects[`${NS}devices.${prefix}`]);
+          .filter(d => !hasTree(objects, d))
+          .map(d => `${d.sku} ${d.device}`);
         assert.deepStrictEqual(missing, [], `fixture devices missing from the object tree: ${missing.join(", ")}`);
         fs.writeFileSync(INVENTORY, `${JSON.stringify(objects, null, 2)}\n`);
       });

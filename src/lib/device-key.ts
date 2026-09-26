@@ -24,11 +24,11 @@ export function mapKey(sku: string, deviceId: string): string {
 }
 
 /**
- * State-tree / on-disk key — `${skuLower}_<last4>`, sanitized for use as an
- * ioBroker object id. Used for the device-object prefix (below the
- * `devices.`/`groups.` folder), the SKU-cache filename and the local-snapshot
- * filename, plus the comma-separated group-member lists. Stable across
- * restarts — the short, sanitized form is what users already have on disk.
+ * The key of the 2.x rule — `${skuLower}_<last4>`, sanitized. Up to 2.41.0 it was the device's
+ * object id below `devices.`/`groups.`, the SKU-cache filename and the local-snapshot key, derived
+ * anew everywhere and never checked for a second device with the same four characters. Since 3.0.0
+ * the object id comes from `DeviceIdRegistry` (`device-id.ts`); this form only still finds what 2.x
+ * left behind — a cache file of the old name, a snapshot file of a store older than 2.37.0.
  *
  * @param sku Govee SKU
  * @param deviceId Raw device id
@@ -36,6 +36,18 @@ export function mapKey(sku: string, deviceId: string): string {
 export function treeKey(sku: string, deviceId: string): string {
   const shortId = normalizeDeviceId(deviceId).slice(-4);
   return sanitizeId(`${sku}_${shortId}`);
+}
+
+/**
+ * On-disk key of a device's SKU-cache file — `${skuLower}_<full normalized id>`, sanitized. The full
+ * id, not the object id: two devices of one SKU whose ids end in the same four characters had one
+ * shared file under the 2.x name ({@link treeKey}), and the last save won (3.0.0).
+ *
+ * @param sku Govee SKU
+ * @param deviceId Raw device id
+ */
+export function cacheKey(sku: string, deviceId: string): string {
+  return sanitizeId(`${sku}_${normalizeDeviceId(deviceId)}`);
 }
 
 /**

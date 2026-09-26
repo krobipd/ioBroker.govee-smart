@@ -5720,10 +5720,20 @@ describe("a cache start that lost a light — the account lists protect its tree
     ]);
     (dm as any).lastGroupList = (dm as any).listSource(true, [{ sku: "BaseGroup", deviceId: "1234567" }]);
     expect([...dm.accountListedPrefixes()].sort()).toEqual([
-      "devices.h5179_1122",
-      "devices.h600d_0009",
-      "groups.basegroup_4567",
+      "devices.h5179-1122",
+      "devices.h600d-0009",
+      "groups.basegroup-4567",
     ]);
+  });
+
+  it("names the tree the adapter's registry gave the device, not one derived again (3.0.0)", () => {
+    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    // The registry kept a long id for this device — the protection must name exactly that tree.
+    dm.setTreeResolver((sku, deviceId) =>
+      deviceId === "11:22:33:44:55:66:52:5F" ? "devices.h61be-112233445566525f" : `devices.${sku.toLowerCase()}-x`,
+    );
+    (dm as any).lastAppList = (dm as any).listSource(true, [{ sku: "H61BE", deviceId: "11:22:33:44:55:66:52:5F" }]);
+    expect([...dm.accountListedPrefixes()]).toEqual(["devices.h61be-112233445566525f"]);
   });
 
   it("a list that did not answer plausibly protects nothing", () => {

@@ -37,8 +37,18 @@ dauert aber einige Sekunden je Befehl und ist von Govee mengenmäßig begrenzt.
 3. Verlangt Govee einen Bestätigungscode (das tut es bei einem neuen Client), fragt die Karte
    danach. Mehr ist nicht nötig: der Adapter merkt sich die Anmeldung über Neustarts hinweg, es
    werden also keine weiteren Codes verschickt.
-4. Geräte erscheinen unter `devices.<modell>_<kennung>`. In der Govee-App angelegte Gruppen
-   erscheinen unter `groups.`.
+4. Geräte erscheinen unter `devices.<modell>-<kennung>` — das Modell und die letzten vier Zeichen
+   der eigenen Kennung des Geräts, zum Beispiel `devices.h61be-525f`. Enden zwei Geräte eines Modells
+   auf dieselben vier Zeichen, bekommt das zweite seine ganze Kennung. In der Govee-App angelegte
+   Gruppen erscheinen unter `groups.`.
+
+## Umstieg von 2.x
+
+Version 3.0.0 gibt jedem Gerät einmal eine neue Objekt-ID: aus `devices.h61be_525f` wird
+`devices.h61be-525f`, mit Bindestrich wie bei den anderen Geräte-Adaptern dieses Entwicklers. Der
+Umzug passiert beim ersten Start von selbst: Werte, Aufzeichnungs-Einstellungen, Räume, Funktionen
+und Aliase ziehen mit, aufgezeichnete Verläufe laufen in ihrer bisherigen Reihe weiter. Skripte und
+Visualisierungen mit den alten IDs müssen angepasst werden.
 
 ## Ein Problem melden
 

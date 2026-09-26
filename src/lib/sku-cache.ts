@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { deviceLabel, errMessage, type CloudCapability, type CloudScene, type SnapshotPackets } from "./types";
-import { treeKey } from "./device-key";
+import { cacheKey, treeKey } from "./device-key";
 import { writeFileAtomic } from "./atomic-file";
 
 /** Data persisted per device in the SKU cache */
@@ -181,6 +181,29 @@ export class SkuCache {
     if (this.inFlight.get(file) === current) {
       this.inFlight.delete(file);
     }
+    this.removeLegacyFile(data.sku, data.deviceId);
+  }
+
+  /**
+   * Drop the 2.x file of a device once its file of the current name is written — `loadAll` reads by
+   * content and would otherwise return the device twice. The 2.x name could be shared by two devices
+   * of one SKU; the other one then loads its libraries anew, once.
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier
+   */
+  private removeLegacyFile(sku: string, deviceId: string): void {
+    const legacy = this.legacyCacheFile(sku, deviceId);
+    if (legacy === this.cacheFile(sku, deviceId) || !fs.existsSync(this.cacheFile(sku, deviceId))) {
+      return;
+    }
+    try {
+      if (fs.existsSync(legacy)) {
+        fs.unlinkSync(legacy);
+      }
+    } catch (e) {
+      this.log.debug(`Cache: could not remove the old file of ${sku}: ${errMessage(e)}`);
+    }
   }
 
   /**
@@ -195,13 +218,16 @@ export class SkuCache {
     if (!this.dataAvailable) {
       return null;
     }
-    const file = this.cacheFile(sku, deviceId);
+    // A device whose cache was last written by 2.x still has the file under the old name.
+    const file = [this.cacheFile(sku, deviceId), this.legacyCacheFile(sku, deviceId)].find(f => fs.existsSync(f));
     try {
-      if (!fs.existsSync(file)) {
+      if (!file) {
         return null;
       }
       const raw = fs.readFileSync(file, "utf-8");
-      return JSON.parse(raw) as CachedDeviceData;
+      const data = JSON.parse(raw) as CachedDeviceData;
+      // The 2.x name could be shared by two devices of one SKU — only this device's data counts.
+      return cacheKey(data.sku, data.deviceId) === cacheKey(sku, deviceId) ? data : null;
     } catch (e) {
       this.log.debug(`Cache loadOne failed for ${sku}: ${errMessage(e)}`);
       return null;
@@ -222,7 +248,10 @@ export class SkuCache {
         this.log.debug(`Cache load: miss — directory does not exist yet (${this.cacheDir})`);
         return results;
       }
-      for (const file of fs.readdirSync(this.cacheDir)) {
+      // Sorted: the order devices come back in is the order a cache start assigns their object ids in
+      // (DeviceIdRegistry) — with two devices of one SKU ending alike, which one keeps the short id must
+      // not depend on the file system's listing order.
+      for (const file of fs.readdirSync(this.cacheDir).sort()) {
         if (!file.endsWith(".json")) {
           skippedFiles++;
           continue;
@@ -315,6 +344,10 @@ export class SkuCache {
     const file = this.cacheFile(sku, deviceId);
     this.lastWritten.delete(file);
     try {
+      const legacy = this.legacyCacheFile(sku, deviceId);
+      if (legacy !== file && fs.existsSync(legacy)) {
+        fs.unlinkSync(legacy);
+      }
       if (fs.existsSync(file)) {
         fs.unlinkSync(file);
         this.log.debug(`Cache: evicted ${label ?? sku} ${deviceId} (removed from Govee account)`);
@@ -366,6 +399,16 @@ export class SkuCache {
    * @param deviceId Device identifier
    */
   private cacheFile(sku: string, deviceId: string): string {
+    return path.join(this.cacheDir, `${cacheKey(sku, deviceId)}.json`);
+  }
+
+  /**
+   * The file name of 2.x — `<sku>_<last 4>.json` ({@link treeKey}).
+   *
+   * @param sku Product model
+   * @param deviceId Device identifier
+   */
+  private legacyCacheFile(sku: string, deviceId: string): string {
     return path.join(this.cacheDir, `${treeKey(sku, deviceId)}.json`);
   }
 }

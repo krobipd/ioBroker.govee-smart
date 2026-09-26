@@ -615,6 +615,17 @@ export class GoveeAdapter extends utils.Adapter {
       });
 
       this.stateManager = new StateManager(this, this.deviceRegistry);
+      // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
+      // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
+      // generic device; intake skips them now, but a tree already created that
+      // way never re-enters the device map and so is never reaped. Drop any
+      // leftover on upgraded installs — before the id move, which leaves them alone.
+      await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
+      // Every tree of an older id rule moves once to `<sku>-<last 4>` (3.0.0), and every tree is
+      // recorded — before anything else reads, writes or deletes a device tree.
+      await this.stateManager
+        .migrateDeviceIds()
+        .catch(e => this.log.warn(`Device id migration failed: ${errMessage(e)}`));
       // Nothing has been asked yet, so nothing may still claim to be reachable from
       // the previous run — least of all after a crash, where no shutdown code ran at
       // all and the old values would stand until the 20-second sync catches up.
@@ -624,12 +635,6 @@ export class GoveeAdapter extends utils.Adapter {
       // session's numbers standing until the first 20 s round (F8).
       await this.stateManager.ensureDeviceRollupStates().catch(() => undefined);
       await this.stateManager.markAllOffline().catch(() => undefined);
-      // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
-      // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
-      // generic device; intake skips them now, but a tree already created that
-      // way never re-enters the device map and so is never reaped. Drop any
-      // leftover on upgraded installs.
-      await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
       // General groups online state (reflects Cloud connection)
       await this.stateManager.createGroupsOnlineState(false);
       // The unloading reader: a scene job that finishes after onUnload began
@@ -641,12 +646,17 @@ export class GoveeAdapter extends utils.Adapter {
       // The store carries the snapshot files of earlier versions (root meta
       // object 2.11.0–2.36.0, instance data dir before 2.11) into the device
       // objects once and removes the root folder — see LocalSnapshotStore.
-      this.localSnapshots = new LocalSnapshotStore(this, this.log);
+      const deviceIds = this.stateManager.deviceIds;
+      this.localSnapshots = new LocalSnapshotStore(this, this.log, {
+        idOf: (sku, deviceId) => deviceIds.idFor(sku, deviceId),
+      });
       await this.localSnapshots.init(dataDir);
       this.snapshotHandler = new SnapshotHandler(snapshotHandlerGlue.buildSnapshotHost(this.handlerHost));
       this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
       this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
       this.deviceManager.setSkuCache(this.skuCache);
+      // The cleanup's protection of listed devices names their trees from the same registry.
+      this.deviceManager.setTreeResolver((sku, deviceId) => this.stateManager!.deviceIds.prefixFor(sku, deviceId));
 
       // v2.9.1 — wire diag providers so generate() can render persisted-cache,
       // local-snapshots and adapter-runtime state. Providers are pulled at

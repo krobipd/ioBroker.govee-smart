@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { errMessage } from "./types";
+import { DeviceIdRegistry } from "./device-id";
 import { treeKey } from "./device-key";
 
 /** Per-segment state in a local snapshot */
@@ -100,13 +101,19 @@ export class LocalSnapshotStore {
   /** False until init() succeeds — guards save/load while the objects are unreachable */
   private dataAvailable = false;
 
+  /** Where a device's tree lives — see the constructor. */
+  private readonly ids: SnapshotTreeIds;
+
   /**
    * @param adapter ioBroker adapter (object view + extendObject; file methods only for the carry-over)
    * @param log ioBroker logger
+   * @param ids the adapter's registry of device ids (main.ts hands in the state manager's); without
+   *   one, a registry of its own keeps the rule
    */
-  constructor(adapter: LocalSnapshotStoreAdapter, log: ioBroker.Logger) {
+  constructor(adapter: LocalSnapshotStoreAdapter, log: ioBroker.Logger, ids?: SnapshotTreeIds) {
     this.adapter = adapter;
     this.log = log;
+    this.ids = ids ?? ownTreeIds();
   }
 
   /**
@@ -366,7 +373,8 @@ export class LocalSnapshotStore {
     if (snapshots.length === 0) {
       return false;
     }
-    if (await this.writeToDevice(key, snapshots)) {
+    // The file carries the 2.x key (`<sku>_<last 4>`); the device lives under its 3.x id now.
+    if (await this.writeToDevice((await this.legacyKeys()).get(key) ?? key, snapshots)) {
       return true;
     }
     this.log.info(`Local snapshot file ${file} belongs to a device that is no longer in the account — dropped`);
@@ -380,8 +388,52 @@ export class LocalSnapshotStore {
    * @param deviceId Device identifier
    */
   private deviceKey(sku: string, deviceId: string): string {
-    return treeKey(sku, deviceId);
+    return this.ids.idOf(sku, deviceId);
   }
+
+  /**
+   * The 2.x key of every device tree (`<sku>_<last 4>`, what the old stores named their files by) →
+   * the id the tree has now — read from the device objects' `native.sku`/`native.deviceId`. Read once,
+   * on the first carried-over file.
+   *
+   * @returns legacy key → current id below `devices.`
+   */
+  private async legacyKeys(): Promise<Map<string, string>> {
+    if (!this.legacyKeyMap) {
+      const map = new Map<string, string>();
+      const prefix = `${this.adapter.namespace}.devices.`;
+      const view = await this.adapter
+        .getObjectViewAsync("system", "device", { startkey: prefix, endkey: `${prefix}${SORT_KEY_END}` })
+        .catch(() => null);
+      for (const row of view?.rows ?? []) {
+        const native = row.value?.native;
+        if (typeof native?.sku === "string" && typeof native?.deviceId === "string") {
+          map.set(treeKey(native.sku, native.deviceId), row.id.slice(prefix.length));
+        }
+      }
+      this.legacyKeyMap = map;
+    }
+    return this.legacyKeyMap;
+  }
+
+  /** See {@link legacyKeys}. */
+  private legacyKeyMap: Map<string, string> | null = null;
+}
+
+/** What the store needs to know about device ids. */
+export interface SnapshotTreeIds {
+  /** The id of a device's tree below `devices.` (`h61be-525f`). */
+  idOf(sku: string, deviceId: string): string;
+}
+
+/**
+ * A registry of the store's own, for a store built without the adapter's.
+ *
+ * @returns the id lookups
+ */
+function ownTreeIds(): SnapshotTreeIds {
+  const own = new DeviceIdRegistry();
+  return { idOf: (sku, deviceId) => own.idFor(sku, deviceId) };
 }
 
 /**

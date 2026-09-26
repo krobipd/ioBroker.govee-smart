@@ -4,6 +4,7 @@ import {
   deviceLabel,
   errMessage,
   rgbToHex,
+  type CapabilityField,
   type CapabilityOption,
   type NamedCapabilityOption,
   type CloudCapability,
@@ -1724,13 +1725,35 @@ export function mapCloudStateValues(
     return [primary];
   }
   // The state response carries no `parameters` (measured). Whether the level
-  // datapoint is a dropdown or a number is decided by the DECLARED capability,
-  // which lives on the device. With none in hand, assume the common case.
-  const levelOptions = declared
-    ?.find(c => c.type === cap.type && c.instance === cap.instance)
-    ?.parameters?.fields?.find(f => f && f.fieldName === "modeValue")?.options;
-  const asNumber = levelOptions !== undefined && classifyModeLevels(levelOptions).kind === "number";
-  return [primary, { stateId: "mode_value", value: asNumber ? level : safeStringify(level) }];
+  // datapoint is a dropdown, a number or absent is decided by the DECLARED
+  // capability, which lives on the device — the same decision the builder
+  // made. With none in hand, assume the common case.
+  const kind = declared
+    ? modeLevelKind(
+        declared
+          .find(c => c.type === cap.type && c.instance === cap.instance)
+          ?.parameters?.fields?.find(f => f && f.fieldName === "modeValue"),
+      )
+    : "dropdown";
+  if (kind === "none") {
+    return [primary];
+  }
+  return [primary, { stateId: "mode_value", value: kind === "number" ? level : safeStringify(level) }];
+}
+
+/**
+ * The shape the `mode_value` datapoint was built with (`mapWorkMode`): a dropdown or a number from
+ * the level options, a number from a bare range, and no datapoint at all where every mode carries
+ * only a default (H7121 — the level IS the mode) or no level is declared.
+ *
+ * @param field the declared `modeValue` field of the work-mode capability
+ * @returns the datapoint's shape, or `none` when the builder created none
+ */
+function modeLevelKind(field: CapabilityField | undefined): "dropdown" | "number" | "none" {
+  if (field?.options && field.options.length > 0) {
+    return classifyModeLevels(field.options).kind;
+  }
+  return field?.range ? "number" : "none";
 }
 
 /**

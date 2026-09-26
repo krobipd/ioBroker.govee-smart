@@ -246,11 +246,11 @@ describe("StateManager", () => {
     it("clears the namespace-less ensureState cache so a re-pair recreates info states (M4)", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      (sm as any).ensuredStates.add("devices.h6160_0011.info.name");
-      (sm as any).ensuredStates.add("devices.h6160_0011.control.power");
-      (sm as any).ensuredStates.add("devices.other_9999.info.name"); // unrelated → survives
-      (sm as any).forgetPrefix("devices.h6160_0011");
-      expect(Array.from((sm as any).ensuredStates as Set<string>)).toEqual(["devices.other_9999.info.name"]);
+      (sm as any).ensuredStates.add("devices.h6160-0011.info.name");
+      (sm as any).ensuredStates.add("devices.h6160-0011.control.power");
+      (sm as any).ensuredStates.add("devices.other-9999.info.name"); // unrelated → survives
+      (sm as any).forgetPrefix("devices.h6160-0011");
+      expect(Array.from((sm as any).ensuredStates as Set<string>)).toEqual(["devices.other-9999.info.name"]);
     });
   });
 
@@ -259,44 +259,44 @@ describe("StateManager", () => {
       // info.online is what colours a device in the object tree. Left on its last
       // value it keeps every Govee device green while the instance is switched off.
       const { adapter, states, objects } = createMockAdapter();
-      objects.set("devices.h6160_0011.info.online", { type: "state" });
-      objects.set("devices.h6160_0022.info.online", { type: "state" });
+      objects.set("devices.h6160-0011.info.online", { type: "state" });
+      objects.set("devices.h6160-0022.info.online", { type: "state" });
       objects.set("groups.info.online", { type: "state" });
-      objects.set("devices.h6160_0011.control.power", { type: "state" });
-      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      states.set("devices.h6160_0022.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      objects.set("devices.h6160-0011.control.power", { type: "state" });
+      states.set("devices.h6160-0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      states.set("devices.h6160-0022.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       states.set("groups.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
-      states.set("devices.h6160_0011.control.power", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      states.set("devices.h6160-0011.control.power", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
 
       const sm = new StateManager(adapter as never, registry);
       const touched = await sm.markAllOffline();
 
       expect(touched.sort()).toEqual([
-        "devices.h6160_0011.info.online",
-        "devices.h6160_0022.info.online",
+        "devices.h6160-0011.info.online",
+        "devices.h6160-0022.info.online",
         "groups.info.online",
       ]);
-      expect(states.get("devices.h6160_0011.info.online")?.val).toBe(false);
+      expect(states.get("devices.h6160-0011.info.online")?.val).toBe(false);
       expect(states.get("groups.info.online")?.val).toBe(false);
       // Everything else is left alone — this is not a blanket reset.
-      expect(states.get("devices.h6160_0011.control.power")?.val).toBe(true);
+      expect(states.get("devices.h6160-0011.control.power")?.val).toBe(true);
     });
 
     it("works off the object database, so it also runs before any device is known", async () => {
       // At startup the device map is empty and at shutdown it may already be gone.
       const { adapter, objects, states } = createMockAdapter();
-      objects.set("devices.h6160_0011.info.online", { type: "state" });
-      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      objects.set("devices.h6160-0011.info.online", { type: "state" });
+      states.set("devices.h6160-0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       const sm = new StateManager(adapter as never, registry);
-      expect(await sm.markAllOffline()).toEqual(["devices.h6160_0011.info.online"]);
+      expect(await sm.markAllOffline()).toEqual(["devices.h6160-0011.info.online"]);
     });
 
     it("at shutdown it scans nothing — the marker list is served from the cache the run maintained", async () => {
       // The host allows one second before it kills the process; two full-tree
       // scans plus sequential writes were spending it on things already known.
       const { adapter, objects, states, calls } = createMockAdapter();
-      objects.set("devices.h6160_0099.info.online", { type: "state" });
-      states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      objects.set("devices.h6160-0099.info.online", { type: "state" });
+      states.set("devices.h6160-0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline(); // startup: cold cache → one scan
       await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() })); // a device created during the run
@@ -305,9 +305,9 @@ describe("StateManager", () => {
 
       const touched = await sm.markAllOffline(); // shutdown
 
-      expect(touched.sort()).toEqual(["devices.h6160_0011.info.online", "devices.h6160_0099.info.online"]);
+      expect(touched.sort()).toEqual(["devices.h6160-0011.info.online", "devices.h6160-0099.info.online"]);
       expect(calls.filter(c => c.method === "getObjectViewAsync")).toHaveLength(0);
-      expect(states.get("devices.h6160_0011.info.online")?.val).toBe(false);
+      expect(states.get("devices.h6160-0011.info.online")?.val).toBe(false);
       expect(states.get("info.devicesOnline")?.val).toBe(0);
       expect(states.get("info.devicesAllOnline")?.val).toBe(false);
     });
@@ -350,8 +350,8 @@ describe("StateManager", () => {
 
     it("a marker nobody resolved this run counts as offline (a device still waiting to be reaped)", async () => {
       const { adapter, objects, states } = createMockAdapter();
-      objects.set("devices.h6160_0099.info.online", { type: "state" });
-      states.set("devices.h6160_0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      objects.set("devices.h6160-0099.info.online", { type: "state" });
+      states.set("devices.h6160-0099.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       const sm = new StateManager(adapter as never, registry);
       await sm.markAllOffline(); // startup stamp — the leftover is found in the DB and set false
       await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
@@ -368,8 +368,8 @@ describe("StateManager", () => {
     it("markAllOffline zeroes the rollup but keeps the device count", async () => {
       // How many devices exist did not change just because nobody is reading them.
       const { adapter, objects, states } = createMockAdapter();
-      objects.set("devices.h6160_0011.info.online", { type: "state" });
-      states.set("devices.h6160_0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
+      objects.set("devices.h6160-0011.info.online", { type: "state" });
+      states.set("devices.h6160-0011.info.online", { val: true, ack: true, ts: 0, lc: 0, from: "", q: 0 } as never);
       const sm = new StateManager(adapter as never, registry);
       await sm.writeDeviceRollup();
       expect(states.get("info.devicesTotal")?.val).toBe(1);
@@ -437,8 +437,8 @@ describe("StateManager", () => {
         sm.createCloudStates(device, [def("nightlight_toggle"), def("oscillation_toggle")], 0),
       );
       await Promise.all([older, newer]);
-      expect(objects.has("devices.h7131_0012.control.oscillation_toggle"), "the newer build's datapoint").toBe(true);
-      expect(objects.has("devices.h7131_0012.control.nightlight_toggle")).toBe(true);
+      expect(objects.has("devices.h7131-0012.control.oscillation_toggle"), "the newer build's datapoint").toBe(true);
+      expect(objects.has("devices.h7131-0012.control.nightlight_toggle")).toBe(true);
     });
 
     it("the second build starts only after the first one has finished", async () => {
@@ -508,7 +508,7 @@ describe("StateManager", () => {
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const prefix = "devices.h6160_0011";
+      const prefix = "devices.h6160-0011";
       objects.set(`${prefix}.control`, { type: "channel" });
       objects.set(`${prefix}.control.colorRgb`, { type: "state" }); // LAN — skipped by cloud cleanup
       objects.set(`${prefix}.control.power`, { type: "state" }); // LAN — skipped
@@ -528,7 +528,7 @@ describe("StateManager", () => {
       // install permanently unremovable. Reachability belongs in `info.online`.
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const prefix = "devices.h5179_3c1b";
+      const prefix = "devices.h5179-3c1b";
       objects.set(`${prefix}.sensor`, { type: "channel" });
       objects.set(`${prefix}.sensor.online`, { type: "state" }); // leftover, no longer synthetic
       objects.set(`${prefix}.sensor.temperature`, { type: "state" }); // real reading — foreign-owned
@@ -544,7 +544,7 @@ describe("StateManager", () => {
     it("each value lands in its own channel, whatever the channel map holds", async () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const prefix = "devices.h7141_0a0b";
+      const prefix = "devices.h7141-0a0b";
       // Both defs built — the map keeps ONE channel per id, the last one.
       await sm.createCloudStates(
         createTestDevice({ sku: "H7141", deviceId: "AABBCCDDEEFF0A0B" }),
@@ -561,7 +561,7 @@ describe("StateManager", () => {
     it("a setpoint value is no synthetic reading — it creates no sensor.humidity next to it", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const prefix = "devices.h7141_0c0d";
+      const prefix = "devices.h7141-0c0d";
       // Only the setpoint exists (range/humidity) — no reading was ever declared.
       await sm.createCloudStates(
         createTestDevice({ sku: "H7141", deviceId: "AABBCCDDEEFF0C0D" }),
@@ -605,7 +605,7 @@ describe("StateManager", () => {
     it("the old CO2 ids leave on the next Cloud rebuild, sensor.co2 stays (C14/N20)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const prefix = "devices.h5140_0a0b";
+      const prefix = "devices.h5140-0a0b";
       objects.set(`${prefix}.sensor`, { type: "channel" });
       objects.set(`${prefix}.sensor.carbon_dioxide_concentration`, { type: "state" }); // up to 2.39.x
       objects.set(`${prefix}.sensor.co2concentration`, { type: "state" }); // up to 2.39.x
@@ -632,14 +632,14 @@ describe("StateManager", () => {
       objects.set("devices.samemodegroup_9100.control", { type: "channel" });
       objects.set("devices.samemodegroup_9100.control.power", { type: "state" });
       // A real device that must survive.
-      objects.set("devices.h6160_0011", { type: "device" });
-      objects.set("devices.h6160_0011.control.power", { type: "state" });
+      objects.set("devices.h6160-0011", { type: "device" });
+      objects.set("devices.h6160-0011.control.power", { type: "state" });
 
       const removed = await sm.cleanupPseudoGroupOrphansOnce();
 
       const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
       expect(deleted).toContain("devices.samemodegroup_9100");
-      expect(deleted).not.toContain("devices.h6160_0011");
+      expect(deleted).not.toContain("devices.h6160-0011");
       expect(removed).toEqual(["devices.samemodegroup_9100"]);
     });
 
@@ -648,16 +648,16 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       objects.set("devices.dreamviewscenic_9200", { type: "device" });
       objects.set("devices.dreamviewscenic_9200.control.power", { type: "state" });
-      objects.set("devices.h6160_0011", { type: "device" });
+      objects.set("devices.h6160-0011", { type: "device" });
       const removed = await sm.cleanupPseudoGroupOrphansOnce();
       expect(removed).toEqual(["devices.dreamviewscenic_9200"]);
-      expect(calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0])).not.toContain("devices.h6160_0011");
+      expect(calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0])).not.toContain("devices.h6160-0011");
     });
 
     it("is a no-op on a clean install (no samemodegroup objects)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      objects.set("devices.h6160_0011", { type: "device" });
+      objects.set("devices.h6160-0011", { type: "device" });
 
       const removed = await sm.cleanupPseudoGroupOrphansOnce();
 
@@ -726,15 +726,15 @@ describe("StateManager", () => {
     it("deletes an existing phantom humidity object exactly once (#31)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      const path = "devices.h5109_1a.sensor.humidity"; // inferChannelFromStateId → "sensor"
+      const path = "devices.h5109-1a.sensor.humidity"; // inferChannelFromStateId → "sensor"
       objects.set(path, { type: "state", common: {}, native: {} });
 
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109-1a", "humidity");
       expect(objects.has(path)).toBe(false); // datapoint actually disappears
       expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
 
       // Once-guard: a repeat call skips even the existence-check (no per-poll round-trip)
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109-1a", "humidity");
       expect(calls.filter(c => c.method === "getObjectAsync" && c.args[0] === path)).toHaveLength(1);
       expect(calls.filter(c => c.method === "delObjectAsync" && c.args[0] === path)).toHaveLength(1);
     });
@@ -742,7 +742,7 @@ describe("StateManager", () => {
     it("is a silent no-op when the state never existed (fresh install)", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.removeSyntheticStateOnce("devices.h5109_1a", "humidity");
+      await sm.removeSyntheticStateOnce("devices.h5109-1a", "humidity");
       expect(calls.some(c => c.method === "delObjectAsync")).toBe(false);
     });
   });
@@ -784,28 +784,64 @@ describe("StateManager", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "H61BE", deviceId: "AA:BB:CC:DD:EE:FF:1D:6F" });
-      expect(sm.devicePrefix(dev)).toBe("devices.h61be_1d6f");
+      expect(sm.devicePrefix(dev)).toBe("devices.h61be-1d6f");
     });
 
     it("should put BaseGroup under groups/ folder", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
-      expect(sm.devicePrefix(dev)).toBe("groups.basegroup_1280");
+      expect(sm.devicePrefix(dev)).toBe("groups.basegroup-1280");
     });
 
     it("should sanitize special characters in SKU", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "H6-XY.Z", deviceId: "ABCD" });
-      expect(sm.devicePrefix(dev)).toBe("devices.h6-xy_z_abcd");
+      expect(sm.devicePrefix(dev)).toBe("devices.h6-xy-z-abcd");
     });
 
     it("should handle device ID with colons", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
-      expect(sm.devicePrefix(dev)).toBe("devices.h6160_525f");
+      expect(sm.devicePrefix(dev)).toBe("devices.h6160-525f");
+    });
+
+    it("gives two devices of one SKU whose ids end alike two trees (3.0.0)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const first = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F", name: "First" });
+      const second = createTestDevice({ deviceId: "11:22:33:44:55:66:52:5F", name: "Second" });
+      await sm.createInfoStates(first);
+      await sm.createInfoStates(second);
+      expect(sm.devicePrefix(first)).toBe("devices.h6160-525f");
+      expect(sm.devicePrefix(second)).toBe("devices.h6160-112233445566525f");
+      expect((objects.get("devices.h6160-525f") as { common: { name: string } }).common.name).toBe("First");
+      expect((objects.get("devices.h6160-112233445566525f") as { common: { name: string } }).common.name).toBe(
+        "Second",
+      );
+    });
+
+    it("marks every device object with the id rule it was given its id under", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.createInfoStates(createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" }));
+      expect((objects.get("devices.h6160-525f") as { native: Record<string, unknown> }).native).toMatchObject({
+        sku: "H6160",
+        deviceId: "AA:BB:CC:DD:EE:FF:52:5F",
+        idScheme: 3,
+      });
+    });
+
+    it("frees the id of a device whose tree the cleanup removed", async () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const gone = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
+      await sm.createInfoStates(gone);
+      await sm.cleanupDevices([]);
+      const next = createTestDevice({ deviceId: "11:22:33:44:55:66:52:5F" });
+      expect(sm.devicePrefix(next)).toBe("devices.h6160-525f");
     });
   });
 
@@ -819,7 +855,7 @@ describe("StateManager", () => {
       // (pre-v2.8.4 tLabel output) and it carries a stale key "9" that the
       // fresh map no longer contains. extendObject deep-merge would fix "0"
       // and "1" but leave "9" as an object → Admin still crashes (React #31).
-      objects.set("devices.h6160_0011.scenes.light_scene", {
+      objects.set("devices.h6160-0011.scenes.light_scene", {
         type: "state",
         common: {
           name: "Scene",
@@ -850,7 +886,7 @@ describe("StateManager", () => {
         },
       ]);
 
-      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+      const obj = objects.get("devices.h6160-0011.scenes.light_scene") as {
         common: { states: Record<string, unknown> };
       };
       // The postcondition of the repair: the persisted map is EXACTLY the
@@ -865,7 +901,7 @@ describe("StateManager", () => {
       // `state` object also drops its VALUE (`delForeignState`) and every enum
       // membership (`removeIdFromAllEnums`), which a dropdown repair has no
       // business doing. `setObject` stays out too (repochecker S5054).
-      const repairPath = "devices.h6160_0011.scenes.light_scene";
+      const repairPath = "devices.h6160-0011.scenes.light_scene";
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.some(c => c.method === "delStateAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
@@ -884,7 +920,7 @@ describe("StateManager", () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
-      objects.set("devices.h6160_0011.scenes.light_scene", {
+      objects.set("devices.h6160-0011.scenes.light_scene", {
         type: "state",
         common: { name: "Scene", type: "mixed", role: "state", states: null },
         native: {},
@@ -906,7 +942,7 @@ describe("StateManager", () => {
         },
       ]);
 
-      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+      const obj = objects.get("devices.h6160-0011.scenes.light_scene") as {
         common: { states: Record<string, unknown> };
       };
       expect(obj.common.states).toEqual(fresh);
@@ -934,7 +970,7 @@ describe("StateManager", () => {
       ]);
       // Healthy plain-string map → the repair returns early: nothing clears the
       // map, nothing deletes the object, no setObject.
-      const repairPath = "devices.h6160_0011.scenes.light_scene";
+      const repairPath = "devices.h6160-0011.scenes.light_scene";
       expect(calls.filter(c => c.method === "setObject")).toHaveLength(0);
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
       expect(calls.some(c => c.method === "setForeignObject")).toBe(false);
@@ -952,7 +988,7 @@ describe("StateManager", () => {
       const { adapter, objects, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
-      objects.set("devices.h6160_0011.scenes.light_scene", {
+      objects.set("devices.h6160-0011.scenes.light_scene", {
         type: "state",
         common: { name: "Scene", type: "mixed", role: "state", states: { 0: "---", 1: "Aurora", 2: "Sunrise" } },
         native: {},
@@ -974,11 +1010,11 @@ describe("StateManager", () => {
         },
       ]);
 
-      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+      const obj = objects.get("devices.h6160-0011.scenes.light_scene") as {
         common: { states: Record<string, unknown> };
       };
       expect(obj.common.states).toEqual(fresh);
-      const repairPath = "devices.h6160_0011.scenes.light_scene";
+      const repairPath = "devices.h6160-0011.scenes.light_scene";
       const whole = calls.filter(c => c.method === "setForeignObject" && c.args[0] === `govee-smart.0.${repairPath}`);
       expect(whole).toHaveLength(1);
       expect(calls.some(c => c.method === "delObjectAsync" && c.args[0] === repairPath)).toBe(false);
@@ -989,7 +1025,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       const filled = { 0: "---", 1: "Aurora", 2: "Sunrise" };
-      objects.set("devices.h6160_0011.scenes.light_scene", {
+      objects.set("devices.h6160-0011.scenes.light_scene", {
         type: "state",
         common: { name: "Scene", type: "mixed", role: "state", states: { ...filled } },
         native: {},
@@ -1010,7 +1046,7 @@ describe("StateManager", () => {
         },
       ]);
 
-      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as {
+      const obj = objects.get("devices.h6160-0011.scenes.light_scene") as {
         common: { states: Record<string, unknown> };
       };
       expect(obj.common.states).toEqual(filled);
@@ -1027,22 +1063,22 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, []);
 
       // Device object
-      expect(objects.has("devices.h6160_0011")).toBe(true);
+      expect(objects.has("devices.h6160-0011")).toBe(true);
       // Info channel
-      expect(objects.has("devices.h6160_0011.info")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info")).toBe(true);
       // Info states
-      expect(objects.has("devices.h6160_0011.info.name")).toBe(true);
-      expect(objects.has("devices.h6160_0011.info.model")).toBe(true);
-      expect(objects.has("devices.h6160_0011.info.serial")).toBe(true);
-      expect(objects.has("devices.h6160_0011.info.online")).toBe(true);
-      expect(objects.has("devices.h6160_0011.info.ip")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info.name")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info.model")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info.serial")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info.online")).toBe(true);
+      expect(objects.has("devices.h6160-0011.info.ip")).toBe(true);
     });
 
     it("info.name/model/serial carry the catalog roles — also on an existing tree with `text` (B10)", async () => {
       const { adapter, objects } = createMockAdapter();
       // An installation from before 2.40.0: the three datapoints exist with role text.
       for (const id of ["name", "model", "serial"]) {
-        objects.set(`devices.h6160_0011.info.${id}`, {
+        objects.set(`devices.h6160-0011.info.${id}`, {
           type: "state",
           common: { name: id, type: "string", role: "text", read: true, write: false },
           native: {},
@@ -1051,7 +1087,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       await createAllStatesForTest(sm, createTestDevice(), []);
       const role = (id: string): unknown =>
-        (objects.get(`devices.h6160_0011.info.${id}`) as { common: { role: string } }).common.role;
+        (objects.get(`devices.h6160-0011.info.${id}`) as { common: { role: string } }).common.role;
       expect(role("name")).toBe("info.name");
       expect(role("model")).toBe("info.model");
       expect(role("serial")).toBe("info.serial");
@@ -1064,10 +1100,10 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(states.get("devices.h612f_0011.info.name")).toMatchObject({ val: "Living Room" });
-      expect(states.get("devices.h612f_0011.info.model")).toMatchObject({ val: "H612F" });
-      expect(states.get("devices.h612f_0011.info.ip")).toMatchObject({ val: "10.0.0.5" });
-      expect(states.get("devices.h612f_0011.info.online")).toMatchObject({ val: true });
+      expect(states.get("devices.h612f-0011.info.name")).toMatchObject({ val: "Living Room" });
+      expect(states.get("devices.h612f-0011.info.model")).toMatchObject({ val: "H612F" });
+      expect(states.get("devices.h612f-0011.info.ip")).toMatchObject({ val: "10.0.0.5" });
+      expect(states.get("devices.h612f-0011.info.online")).toMatchObject({ val: true });
     });
 
     it("should create control channel and states from definitions", async () => {
@@ -1077,9 +1113,9 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
-      expect(objects.has("devices.h6160_0011.control")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.power")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.brightness")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.power")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.brightness")).toBe(true);
     });
 
     it("should set native capabilityType/Instance on LAN-default control states", async () => {
@@ -1092,7 +1128,7 @@ describe("StateManager", () => {
       // LAN-state-IDs are the LAN phase's territory.
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
-      const powerObj = objects.get("devices.h6160_0011.control.power") as Record<string, unknown>;
+      const powerObj = objects.get("devices.h6160-0011.control.power") as Record<string, unknown>;
       const native = powerObj?.native as Record<string, unknown>;
       expect(native?.capabilityType).toBe("lan");
       expect(native?.capabilityInstance).toBe("powerSwitch");
@@ -1105,14 +1141,14 @@ describe("StateManager", () => {
 
       // First call: should set default
       await createAllStatesForTest(sm, dev, basicControlDefs());
-      expect(states.get("devices.h6160_0011.control.power")).toMatchObject({ val: false });
+      expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: false });
 
       // Simulate user setting the value
-      states.set("devices.h6160_0011.control.power", { val: true, ack: false } as ioBroker.State);
+      states.set("devices.h6160-0011.control.power", { val: true, ack: false } as ioBroker.State);
 
       // Second call: should NOT overwrite existing value
       await createAllStatesForTest(sm, dev, basicControlDefs());
-      expect(states.get("devices.h6160_0011.control.power")).toMatchObject({ val: true });
+      expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
     });
 
     it("should not create control channel for sensor (no lanIp, no caps)", async () => {
@@ -1124,7 +1160,7 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(objects.has("devices.h6160_0011.control")).toBe(false);
+      expect(objects.has("devices.h6160-0011.control")).toBe(false);
     });
 
     it("should include unit, min, max, states in common", async () => {
@@ -1150,7 +1186,7 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, defs);
 
-      const obj = objects.get("devices.h6160_0011.control.brightness") as Record<string, unknown>;
+      const obj = objects.get("devices.h6160-0011.control.brightness") as Record<string, unknown>;
       const common = obj?.common as Record<string, unknown>;
       expect(common?.min).toBe(0);
       expect(common?.max).toBe(100);
@@ -1180,11 +1216,11 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, defs);
 
       // Must be in scenes channel, not control
-      expect(objects.has("devices.h6160_0011.scenes")).toBe(true);
-      expect(objects.has("devices.h6160_0011.scenes.light_scene")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.light_scene")).toBe(false);
+      expect(objects.has("devices.h6160-0011.scenes")).toBe(true);
+      expect(objects.has("devices.h6160-0011.scenes.light_scene")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.light_scene")).toBe(false);
 
-      const obj = objects.get("devices.h6160_0011.scenes.light_scene") as Record<string, unknown>;
+      const obj = objects.get("devices.h6160-0011.scenes.light_scene") as Record<string, unknown>;
       const common = obj?.common as Record<string, unknown>;
       const objStates = common?.states as Record<string, string>;
       expect(objStates?.["1"]).toBe("Sunset");
@@ -1225,10 +1261,10 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, defs);
 
-      expect(objects.has("devices.h6160_0011.music")).toBe(true);
-      expect(objects.has("devices.h6160_0011.music.music_mode")).toBe(true);
-      expect(objects.has("devices.h6160_0011.music.music_sensitivity")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.music_mode")).toBe(false);
+      expect(objects.has("devices.h6160-0011.music")).toBe(true);
+      expect(objects.has("devices.h6160-0011.music.music_mode")).toBe(true);
+      expect(objects.has("devices.h6160-0011.music.music_sensitivity")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.music_mode")).toBe(false);
     });
 
     it("should route snapshot states to snapshots channel", async () => {
@@ -1285,12 +1321,12 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, defs);
 
-      expect(objects.has("devices.h6160_0011.snapshots")).toBe(true);
-      expect(objects.has("devices.h6160_0011.snapshots.snapshot")).toBe(true);
-      expect(objects.has("devices.h6160_0011.snapshots.snapshot_local")).toBe(true);
-      expect(objects.has("devices.h6160_0011.snapshots.snapshot_save")).toBe(true);
-      expect(objects.has("devices.h6160_0011.snapshots.snapshot_delete")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.snapshot")).toBe(false);
+      expect(objects.has("devices.h6160-0011.snapshots")).toBe(true);
+      expect(objects.has("devices.h6160-0011.snapshots.snapshot")).toBe(true);
+      expect(objects.has("devices.h6160-0011.snapshots.snapshot_local")).toBe(true);
+      expect(objects.has("devices.h6160-0011.snapshots.snapshot_save")).toBe(true);
+      expect(objects.has("devices.h6160-0011.snapshots.snapshot_delete")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.snapshot")).toBe(false);
     });
 
     it("should create multiple channels simultaneously", async () => {
@@ -1337,10 +1373,10 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, defs);
 
-      expect(objects.has("devices.h6160_0011.control")).toBe(true);
-      expect(objects.has("devices.h6160_0011.scenes")).toBe(true);
-      expect(objects.has("devices.h6160_0011.music")).toBe(true);
-      expect(objects.has("devices.h6160_0011.snapshots")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control")).toBe(true);
+      expect(objects.has("devices.h6160-0011.scenes")).toBe(true);
+      expect(objects.has("devices.h6160-0011.music")).toBe(true);
+      expect(objects.has("devices.h6160-0011.snapshots")).toBe(true);
     });
 
     it("should set ip to empty string when no LAN IP", async () => {
@@ -1350,7 +1386,7 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(states.get("devices.h6160_0011.info.ip")).toMatchObject({ val: "" });
+      expect(states.get("devices.h6160-0011.info.ip")).toMatchObject({ val: "" });
     });
 
     it("should not create model/serial/ip/online for BaseGroup", async () => {
@@ -1360,11 +1396,11 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(objects.has("groups.basegroup_1280.info.name")).toBe(true);
-      expect(objects.has("groups.basegroup_1280.info.online")).toBe(false);
-      expect(objects.has("groups.basegroup_1280.info.model")).toBe(false);
-      expect(objects.has("groups.basegroup_1280.info.serial")).toBe(false);
-      expect(objects.has("groups.basegroup_1280.info.ip")).toBe(false);
+      expect(objects.has("groups.basegroup-1280.info.name")).toBe(true);
+      expect(objects.has("groups.basegroup-1280.info.online")).toBe(false);
+      expect(objects.has("groups.basegroup-1280.info.model")).toBe(false);
+      expect(objects.has("groups.basegroup-1280.info.serial")).toBe(false);
+      expect(objects.has("groups.basegroup-1280.info.ip")).toBe(false);
     });
   });
 
@@ -1411,10 +1447,10 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(objects.has("groups.basegroup_1311.info.members")).toBe(true);
-      const val = states.get("groups.basegroup_1311.info.members");
+      expect(objects.has("groups.basegroup-1311.info.members")).toBe(true);
+      const val = states.get("groups.basegroup-1311.info.members");
       expect(val).toBeDefined();
-      expect(val!.val).toBe("h61be_525f, h61bc_1a2b");
+      expect(val!.val).toBe("h61be-525f, h61bc-1a2b");
     });
 
     it("creates info.membersUnreachable with the group, before any reachability round", async () => {
@@ -1433,8 +1469,8 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      expect(objects.has("groups.basegroup_1311.info.membersUnreachable")).toBe(true);
-      expect(states.get("groups.basegroup_1311.info.membersUnreachable")).toBeUndefined();
+      expect(objects.has("groups.basegroup-1311.info.membersUnreachable")).toBe(true);
+      expect(states.get("groups.basegroup-1311.info.membersUnreachable")).toBeUndefined();
     });
 
     it("should create empty info.members for BaseGroup without groupMembers", async () => {
@@ -1448,7 +1484,7 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, []);
 
-      const val = states.get("groups.basegroup_1280.info.members");
+      const val = states.get("groups.basegroup-1280.info.members");
       expect(val).toBeDefined();
       expect(val!.val).toBe("");
     });
@@ -1460,20 +1496,20 @@ describe("StateManager", () => {
       // Pre-seed legacy objects to simulate an upgrade scenario — without
       // these, safeDeleteState's existence-probe would correctly skip the
       // delete-calls (no-op when object never existed).
-      objects.set("groups.basegroup_1311.info.diagnostics_export", { type: "state", common: {} });
-      objects.set("groups.basegroup_1311.info.diagnostics_result", { type: "state", common: {} });
-      objects.set("groups.basegroup_1311.info.diagnostics_tier", { type: "state", common: {} });
-      objects.set("groups.basegroup_1311.diag", { type: "channel", common: {} });
+      objects.set("groups.basegroup-1311.info.diagnostics_export", { type: "state", common: {} });
+      objects.set("groups.basegroup-1311.info.diagnostics_result", { type: "state", common: {} });
+      objects.set("groups.basegroup-1311.info.diagnostics_tier", { type: "state", common: {} });
+      objects.set("groups.basegroup-1311.diag", { type: "channel", common: {} });
 
       await createAllStatesForTest(sm, dev, []);
 
       const delCalls = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0] as string);
       // Legacy v2.1.0 layout (info.diagnostics_*) — dropped via safeDeleteState
-      expect(delCalls).toContain("groups.basegroup_1311.info.diagnostics_export");
-      expect(delCalls).toContain("groups.basegroup_1311.info.diagnostics_result");
-      expect(delCalls).toContain("groups.basegroup_1311.info.diagnostics_tier");
+      expect(delCalls).toContain("groups.basegroup-1311.info.diagnostics_export");
+      expect(delCalls).toContain("groups.basegroup-1311.info.diagnostics_result");
+      expect(delCalls).toContain("groups.basegroup-1311.info.diagnostics_tier");
       // v2.1.1 layout — diag channel via direct delObjectAsync (recursive, no probe)
-      expect(delCalls).toContain("groups.basegroup_1311.diag");
+      expect(delCalls).toContain("groups.basegroup-1311.diag");
     });
 
     it("should NOT trigger del-calls on fresh install when legacy objects never existed (no WARN spam)", async () => {
@@ -1486,11 +1522,11 @@ describe("StateManager", () => {
 
       const delCalls = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0] as string);
       // safeDeleteState skips the delete because getObjectAsync returns null
-      expect(delCalls).not.toContain("groups.basegroup_1311.info.diagnostics_export");
-      expect(delCalls).not.toContain("groups.basegroup_1311.info.diagnostics_result");
-      expect(delCalls).not.toContain("groups.basegroup_1311.info.diagnostics_tier");
+      expect(delCalls).not.toContain("groups.basegroup-1311.info.diagnostics_export");
+      expect(delCalls).not.toContain("groups.basegroup-1311.info.diagnostics_result");
+      expect(delCalls).not.toContain("groups.basegroup-1311.info.diagnostics_tier");
       // diag-channel-recursive stays — operates on the known "groups have no diag" convention
-      expect(delCalls).toContain("groups.basegroup_1311.diag");
+      expect(delCalls).toContain("groups.basegroup-1311.diag");
     });
   });
 
@@ -1515,9 +1551,9 @@ describe("StateManager", () => {
 
       await sm.updateGroupMembersUnreachable(group, [m1, m2]);
 
-      expect(objects.has("groups.basegroup_1311.info.membersUnreachable")).toBe(true);
-      const val = states.get("groups.basegroup_1311.info.membersUnreachable");
-      expect(val!.val).toBe("h61be_0011");
+      expect(objects.has("groups.basegroup-1311.info.membersUnreachable")).toBe(true);
+      const val = states.get("groups.basegroup-1311.info.membersUnreachable");
+      expect(val!.val).toBe("h61be-0011");
     });
 
     it("should write empty string when all members are reachable (no delete to avoid race-condition WARN)", async () => {
@@ -1529,15 +1565,15 @@ describe("StateManager", () => {
       await sm.updateGroupMembersUnreachable(group, [m1]);
 
       // State + object keep existing, the content is set to an empty string
-      expect(objects.has("groups.basegroup_1311.info.membersUnreachable")).toBe(true);
-      const val = states.get("groups.basegroup_1311.info.membersUnreachable");
+      expect(objects.has("groups.basegroup-1311.info.membersUnreachable")).toBe(true);
+      const val = states.get("groups.basegroup-1311.info.membersUnreachable");
       expect(val!.val).toBe("");
       // Critical: no delObject/delState at all — otherwise the "has no existing object" WARN
       // appears every 2 min when parallel updateGroupReachability calls produce a race condition
       const delObj = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0] as string);
       const delSt = calls.filter(c => c.method === "delStateAsync").map(c => c.args[0] as string);
-      expect(delObj).not.toContain("groups.basegroup_1311.info.membersUnreachable");
-      expect(delSt).not.toContain("groups.basegroup_1311.info.membersUnreachable");
+      expect(delObj).not.toContain("groups.basegroup-1311.info.membersUnreachable");
+      expect(delSt).not.toContain("groups.basegroup-1311.info.membersUnreachable");
     });
 
     it("should not call delObjectAsync ever (race-condition prevention)", async () => {
@@ -1545,13 +1581,13 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
       // Pre-seed: state existed (from previous unreachable-cycle on disk)
-      objects.set("groups.basegroup_1311.info.membersUnreachable", { type: "state", common: {} });
+      objects.set("groups.basegroup-1311.info.membersUnreachable", { type: "state", common: {} });
       const m1 = createTestDevice({ state: { online: true } });
 
       await sm.updateGroupMembersUnreachable(group, [m1]);
 
       const delCalls = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0] as string);
-      expect(delCalls).not.toContain("groups.basegroup_1311.info.membersUnreachable");
+      expect(delCalls).not.toContain("groups.basegroup-1311.info.membersUnreachable");
     });
   });
 
@@ -1559,8 +1595,8 @@ describe("StateManager", () => {
     it("should route control states to control channel", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.h6160_0011", "power")).toBe("devices.h6160_0011.control.power");
-      expect(sm.resolveStatePath("devices.h6160_0011", "brightness")).toBe("devices.h6160_0011.control.brightness");
+      expect(sm.resolveStatePath("devices.h6160-0011", "power")).toBe("devices.h6160-0011.control.power");
+      expect(sm.resolveStatePath("devices.h6160-0011", "brightness")).toBe("devices.h6160-0011.control.brightness");
     });
 
     it("should route scene states to scenes channel", async () => {
@@ -1602,9 +1638,9 @@ describe("StateManager", () => {
           channel: "scenes",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "light_scene")).toBe("devices.h6160_0011.scenes.light_scene");
-      expect(sm.resolveStatePath("devices.h6160_0011", "diy_scene")).toBe("devices.h6160_0011.scenes.diy_scene");
-      expect(sm.resolveStatePath("devices.h6160_0011", "scene_speed")).toBe("devices.h6160_0011.scenes.scene_speed");
+      expect(sm.resolveStatePath("devices.h6160-0011", "light_scene")).toBe("devices.h6160-0011.scenes.light_scene");
+      expect(sm.resolveStatePath("devices.h6160-0011", "diy_scene")).toBe("devices.h6160-0011.scenes.diy_scene");
+      expect(sm.resolveStatePath("devices.h6160-0011", "scene_speed")).toBe("devices.h6160-0011.scenes.scene_speed");
     });
 
     it("should route music states to music channel", async () => {
@@ -1624,7 +1660,7 @@ describe("StateManager", () => {
           channel: "music",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "music_mode")).toBe("devices.h6160_0011.music.music_mode");
+      expect(sm.resolveStatePath("devices.h6160-0011", "music_mode")).toBe("devices.h6160-0011.music.music_mode");
     });
 
     it("should route snapshot states to snapshots channel", async () => {
@@ -1655,9 +1691,9 @@ describe("StateManager", () => {
           channel: "snapshots",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "snapshot")).toBe("devices.h6160_0011.snapshots.snapshot");
-      expect(sm.resolveStatePath("devices.h6160_0011", "snapshot_local")).toBe(
-        "devices.h6160_0011.snapshots.snapshot_local",
+      expect(sm.resolveStatePath("devices.h6160-0011", "snapshot")).toBe("devices.h6160-0011.snapshots.snapshot");
+      expect(sm.resolveStatePath("devices.h6160-0011", "snapshot_local")).toBe(
+        "devices.h6160-0011.snapshots.snapshot_local",
       );
     });
 
@@ -1693,8 +1729,8 @@ describe("StateManager", () => {
           channel: "diag",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "lastExport")).toBe("devices.h6160_0011.diag.lastExport");
-      expect(sm.resolveStatePath("devices.h6160_0011", "tier")).toBe("devices.h6160_0011.diag.tier");
+      expect(sm.resolveStatePath("devices.h6160-0011", "lastExport")).toBe("devices.h6160-0011.diag.lastExport");
+      expect(sm.resolveStatePath("devices.h6160-0011", "tier")).toBe("devices.h6160-0011.diag.tier");
     });
 
     it("diag.tier is written for a device and never for an app group — a group has no diag channel", async () => {
@@ -1712,8 +1748,8 @@ describe("StateManager", () => {
     it("should route unknown states to control channel", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.h6160_0011", "gradient_toggle")).toBe(
-        "devices.h6160_0011.control.gradient_toggle",
+      expect(sm.resolveStatePath("devices.h6160-0011", "gradient_toggle")).toBe(
+        "devices.h6160-0011.control.gradient_toggle",
       );
     });
 
@@ -1759,9 +1795,9 @@ describe("StateManager", () => {
           channel: "sensor",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "temperature")).toBe("devices.h6160_0011.sensor.temperature");
-      expect(sm.resolveStatePath("devices.h6160_0011", "humidity")).toBe("devices.h6160_0011.sensor.humidity");
-      expect(sm.resolveStatePath("devices.h6160_0011", "battery")).toBe("devices.h6160_0011.sensor.battery");
+      expect(sm.resolveStatePath("devices.h6160-0011", "temperature")).toBe("devices.h6160-0011.sensor.temperature");
+      expect(sm.resolveStatePath("devices.h6160-0011", "humidity")).toBe("devices.h6160-0011.sensor.humidity");
+      expect(sm.resolveStatePath("devices.h6160-0011", "battery")).toBe("devices.h6160-0011.sensor.battery");
     });
 
     it("should route event states to events channel", async () => {
@@ -1792,8 +1828,8 @@ describe("StateManager", () => {
           channel: "events",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160_0011", "lack_water")).toBe("devices.h6160_0011.events.lack_water");
-      expect(sm.resolveStatePath("devices.h6160_0011", "ice_full")).toBe("devices.h6160_0011.events.ice_full");
+      expect(sm.resolveStatePath("devices.h6160-0011", "lack_water")).toBe("devices.h6160-0011.events.lack_water");
+      expect(sm.resolveStatePath("devices.h6160-0011", "ice_full")).toBe("devices.h6160-0011.events.ice_full");
     });
 
     it("routes the canonical sensor ids to the sensor channel without a prior createDeviceStates run", () => {
@@ -1803,9 +1839,9 @@ describe("StateManager", () => {
       // `battery` (canonicalSyntheticId) — these MUST route to sensor/.
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "temperature")).toBe("devices.h5179_3c1b.sensor.temperature");
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "humidity")).toBe("devices.h5179_3c1b.sensor.humidity");
-      expect(sm.resolveStatePath("devices.h5179_3c1b", "battery")).toBe("devices.h5179_3c1b.sensor.battery");
+      expect(sm.resolveStatePath("devices.h5179-3c1b", "temperature")).toBe("devices.h5179-3c1b.sensor.temperature");
+      expect(sm.resolveStatePath("devices.h5179-3c1b", "humidity")).toBe("devices.h5179-3c1b.sensor.humidity");
+      expect(sm.resolveStatePath("devices.h5179-3c1b", "battery")).toBe("devices.h5179-3c1b.sensor.battery");
     });
 
     it("no longer knows the pre-2.28.0 spellings — they are not synthetic states any more", async () => {
@@ -1816,7 +1852,7 @@ describe("StateManager", () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       for (const legacy of ["sensor_temperature", "sensor_humidity", "lackwater", "carbondioxide"]) {
-        await sm.ensureSyntheticStateObject("devices.h5179_3c1b", legacy);
+        await sm.ensureSyntheticStateObject("devices.h5179-3c1b", legacy);
       }
       expect(calls.filter(c => c.method === "extendObject")).toHaveLength(0);
     });
@@ -1824,18 +1860,18 @@ describe("StateManager", () => {
     it("should route sanitizeId-output event IDs (lack_water_event etc.) to events channel via inferChannelFromStateId", () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "lack_water_event")).toBe(
-        "devices.hxxxx_yy.events.lack_water_event",
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "lack_water_event")).toBe(
+        "devices.hxxxx-yy.events.lack_water_event",
       );
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "ice_full_event")).toBe("devices.hxxxx_yy.events.ice_full_event");
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "body_appeared")).toBe("devices.hxxxx_yy.events.body_appeared");
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "dirt_detected")).toBe("devices.hxxxx_yy.events.dirt_detected");
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "ice_full_event")).toBe("devices.hxxxx-yy.events.ice_full_event");
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "body_appeared")).toBe("devices.hxxxx-yy.events.body_appeared");
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "dirt_detected")).toBe("devices.hxxxx-yy.events.dirt_detected");
       // The ids Govee's real instance names produce (bodyAppearedEvent, dirtDetectedEvent).
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "body_appeared_event")).toBe(
-        "devices.hxxxx_yy.events.body_appeared_event",
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "body_appeared_event")).toBe(
+        "devices.hxxxx-yy.events.body_appeared_event",
       );
-      expect(sm.resolveStatePath("devices.hxxxx_yy", "dirt_detected_event")).toBe(
-        "devices.hxxxx_yy.events.dirt_detected_event",
+      expect(sm.resolveStatePath("devices.hxxxx-yy", "dirt_detected_event")).toBe(
+        "devices.hxxxx-yy.events.dirt_detected_event",
       );
     });
   });
@@ -1844,14 +1880,14 @@ describe("StateManager", () => {
     it("should create state under sensor/ channel for temperature", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "temperature");
       // Check Channel-Object created
-      expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor")).toBe(true);
       // Check State-Object created via extendObject (NOT setObjectNotExists)
-      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor.temperature")).toBe(true);
       // Verify extendObject was used (idempotent + repairs partial-formed)
       const extendCalls = calls.filter(c => c.method === "extendObject");
-      const stateExtend = extendCalls.find(c => c.args[0] === "devices.h5179_3c1b.sensor.temperature");
+      const stateExtend = extendCalls.find(c => c.args[0] === "devices.h5179-3c1b.sensor.temperature");
       expect(stateExtend).toBeDefined();
     });
 
@@ -1860,37 +1896,37 @@ describe("StateManager", () => {
       // objects only have to exist, not be re-written.
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "temperature");
       const first = calls.filter(c => c.method === "extendObject").length;
       expect(first).toBe(2);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity"); // same channel, new state
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "humidity"); // same channel, new state
       const extendIds = calls.filter(c => c.method === "extendObject").map(c => c.args[0]);
       expect(extendIds).toEqual([
-        "devices.h5179_3c1b.sensor",
-        "devices.h5179_3c1b.sensor.temperature",
-        "devices.h5179_3c1b.sensor.humidity",
+        "devices.h5179-3c1b.sensor",
+        "devices.h5179-3c1b.sensor.temperature",
+        "devices.h5179-3c1b.sensor.humidity",
       ]);
     });
 
     it("re-creates a synthetic state after removeSyntheticStateOnce dropped it", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
-      await sm.removeSyntheticStateOnce("devices.h5179_3c1b", "humidity");
-      expect(objects.has("devices.h5179_3c1b.sensor.humidity")).toBe(false);
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "humidity");
+      await sm.removeSyntheticStateOnce("devices.h5179-3c1b", "humidity");
+      expect(objects.has("devices.h5179-3c1b.sensor.humidity")).toBe(false);
       calls.length = 0;
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
-      expect(objects.has("devices.h5179_3c1b.sensor.humidity")).toBe(true);
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "humidity");
+      expect(objects.has("devices.h5179-3c1b.sensor.humidity")).toBe(true);
       expect(calls.filter(c => c.method === "extendObject").map(c => c.args[0])).toEqual([
-        "devices.h5179_3c1b.sensor.humidity",
+        "devices.h5179-3c1b.sensor.humidity",
       ]);
     });
 
     it("should be no-op for unknown stateId (not in SYNTHETIC_STATE_META)", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "unknown_state_xyz");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "unknown_state_xyz");
       const extendCalls = calls.filter(c => c.method === "extendObject");
       expect(extendCalls).toHaveLength(0);
     });
@@ -1899,13 +1935,13 @@ describe("StateManager", () => {
       const { adapter, objects } = createMockAdapter();
       // Pre-set partial-formed object (missing role) — simulating broken
       // state from older adapter version
-      objects.set("devices.h5179_3c1b.sensor.humidity", {
+      objects.set("devices.h5179-3c1b.sensor.humidity", {
         type: "state",
         common: { name: "old", type: "number" },
       });
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "humidity");
-      const final = objects.get("devices.h5179_3c1b.sensor.humidity") as Record<string, unknown>;
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "humidity");
+      const final = objects.get("devices.h5179-3c1b.sensor.humidity") as Record<string, unknown>;
       // extendObject stores latest write — common should now be the full meta
       const common = final?.common as { role?: string };
       expect(common?.role).toBe("value.humidity");
@@ -1922,7 +1958,7 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
       await sm.updateDeviceState(dev, { power: true });
-      expect(states.get("devices.h6160_0011.control.power")).toMatchObject({ val: true });
+      expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
     });
 
     it("should update multiple state fields at once", async () => {
@@ -1933,8 +1969,8 @@ describe("StateManager", () => {
 
       await sm.updateDeviceState(dev, { power: true, brightness: 75 });
 
-      expect(states.get("devices.h6160_0011.control.power")).toMatchObject({ val: true });
-      expect(states.get("devices.h6160_0011.control.brightness")).toMatchObject({ val: 75 });
+      expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
+      expect(states.get("devices.h6160-0011.control.brightness")).toMatchObject({ val: 75 });
     });
 
     it("should update online status for non-Light devices via updateDeviceState", async () => {
@@ -1947,7 +1983,7 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, []);
 
       await sm.updateDeviceState(dev, { online: false });
-      expect(states.get("devices.h5179_0011.info.online")).toMatchObject({ val: false });
+      expect(states.get("devices.h5179-0011.info.online")).toMatchObject({ val: false });
     });
 
     it("should NOT write info.online for Lights via updateDeviceState", async () => {
@@ -1962,7 +1998,7 @@ describe("StateManager", () => {
       // createInfoStates (= true because createTestDevice sets a fresh
       // lastLanReplyAt). Then call updateDeviceState with online=false —
       // it must NOT overwrite info.online for the Light.
-      const before = states.get("devices.h6160_0011.info.online");
+      const before = states.get("devices.h6160-0011.info.online");
       expect(before).toMatchObject({ val: true });
       // Age the LAN evidence so the resolver's answer (offline) differs from the
       // marker (online): a write from this path would now CHANGE the value. With the
@@ -1971,7 +2007,7 @@ describe("StateManager", () => {
 
       await sm.updateDeviceState(dev, { online: false });
 
-      const after = states.get("devices.h6160_0011.info.online");
+      const after = states.get("devices.h6160-0011.info.online");
       expect(after).toEqual(before);
       expect(after).toMatchObject({ val: true });
     });
@@ -1992,7 +2028,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: true });
       });
 
       it("an explicit offline from Govee wins even while the cloud channel is up", async () => {
@@ -2010,7 +2046,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
       });
 
       it("a light nothing ever reported on is NOT reachable", async () => {
@@ -2030,7 +2066,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
       });
 
       it("the same light IS reachable once Govee reports it as online", async () => {
@@ -2047,7 +2083,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: true });
       });
 
       it("the report expires — a light that reported hours ago is NOT still reachable", async () => {
@@ -2070,7 +2106,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
       });
 
       it("a gateway-backed device is capped by its gateway, whatever its own reading says", async () => {
@@ -2092,7 +2128,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
       });
 
       it("a derived reachability never burns a false into the device", async () => {
@@ -2122,7 +2158,7 @@ describe("StateManager", () => {
         });
         await createAllStatesForTest(sm, dev, []);
         await sm.syncInfoOnline(dev);
-        expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+        expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
       });
     });
 
@@ -2194,9 +2230,9 @@ describe("StateManager", () => {
       const delCalls = calls
         .filter(c => c.method === "delObjectAsync" && (c.args[0] as string).includes("h6161"))
         .map(c => c.args[0]);
-      expect(delCalls).toEqual(["devices.h6161_2222"]); // the device root, recursively — once
-      expect([...objects.keys()].filter(k => k.startsWith("devices.h6161_2222"))).toEqual([]);
-      expect(objects.has("devices.h6160_1111.info.name")).toBe(true);
+      expect(delCalls).toEqual(["devices.h6161-2222"]); // the device root, recursively — once
+      expect([...objects.keys()].filter(k => k.startsWith("devices.h6161-2222"))).toEqual([]);
+      expect(objects.has("devices.h6160-1111.info.name")).toBe(true);
     });
 
     it("keeps a tree an account list names although the device map lacks it (H6)", async () => {
@@ -2209,10 +2245,10 @@ describe("StateManager", () => {
 
       // The map holds only the sensor (a cache start that lost the light); the
       // account list names both.
-      await sm.cleanupDevices([sensor], new Set(["devices.h5179_1111", "devices.h6161_2222"]));
+      await sm.cleanupDevices([sensor], new Set(["devices.h5179-1111", "devices.h6161-2222"]));
 
       expect(calls.filter(c => c.method === "delObjectAsync")).toEqual([]);
-      expect(objects.has("devices.h6161_2222.info.name")).toBe(true);
+      expect(objects.has("devices.h6161-2222.info.name")).toBe(true);
     });
 
     it("should not remove devices that still exist", async () => {
@@ -2245,7 +2281,7 @@ describe("StateManager", () => {
       // js-controller 7.2.2 (`_deleteObjects`) deletes the value of every state
       // object it removes and drops its enum memberships — a second pass over
       // the state table would be a second mechanism for the same guarantee.
-      const stalePrefix = "devices.h6161_2222";
+      const stalePrefix = "devices.h6161-2222";
       const objectDeletes = calls.filter(c => c.method === "delObjectAsync" && c.args[0] === stalePrefix);
       expect(objectDeletes).toHaveLength(1);
       expect(objectDeletes[0].args[1]).toEqual({ recursive: true });
@@ -2254,7 +2290,7 @@ describe("StateManager", () => {
       );
       expect(stateDeletes, "no separate value pass before the recursive delete").toHaveLength(0);
       expect([...states.keys()].filter(k => k.startsWith(`${stalePrefix}.`))).toEqual([]);
-      expect([...states.keys()].some(k => k.startsWith("devices.h6160_1111."))).toBe(true);
+      expect([...states.keys()].some(k => k.startsWith("devices.h6160-1111."))).toBe(true);
     });
 
     it("leaves the surviving device's objects and values alone", async () => {
@@ -2266,7 +2302,7 @@ describe("StateManager", () => {
 
       await sm.cleanupDevices([survivor]);
 
-      const survivorPrefix = "devices.h6160_1111";
+      const survivorPrefix = "devices.h6160-1111";
       const survivorDeletes = calls.filter(
         c =>
           (c.method === "delObjectAsync" || c.method === "delStateAsync") &&
@@ -2298,7 +2334,7 @@ describe("StateManager", () => {
         },
       ];
       await createAllStatesForTest(sm, dev, withGradient);
-      expect(objects.has("devices.h6160_0011.control.gradient_toggle")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.gradient_toggle")).toBe(true);
 
       // Recreate with no cloud-cap states — gradient_toggle should be cleaned up
       await createAllStatesForTest(sm, dev, []);
@@ -2316,21 +2352,21 @@ describe("StateManager", () => {
       // a value gap). They are foreign-owned survivors, like the LAN ids.
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "battery");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "battery");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "lack_water");
       calls.length = 0;
 
-      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179_3c1b", []);
+      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179-3c1b", []);
 
       expect(deleted).toBe(0);
       expect(calls.filter(c => c.method === "delObjectAsync")).toHaveLength(0);
-      expect(objects.has("devices.h5179_3c1b.sensor.battery")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.events.lack_water")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor.battery")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor.temperature")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.events.lack_water")).toBe(true);
       // The channel objects survive with their states.
-      expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.events")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.events")).toBe(true);
     });
 
     it("sweeps the pre-2.28.0 sensor/event spellings on the first Cloud-phase rebuild (migration)", async () => {
@@ -2340,24 +2376,24 @@ describe("StateManager", () => {
       // while the canonical objects next to them survive untouched.
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "temperature");
-      await sm.ensureSyntheticStateObject("devices.h5179_3c1b", "lack_water");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "temperature");
+      await sm.ensureSyntheticStateObject("devices.h5179-3c1b", "lack_water");
       for (const legacy of ["sensor.sensor_temperature", "sensor.sensor_humidity", "events.lackwater"]) {
-        objects.set(`devices.h5179_3c1b.${legacy}`, { type: "state", common: {}, native: {} });
+        objects.set(`devices.h5179-3c1b.${legacy}`, { type: "state", common: {}, native: {} });
       }
       calls.length = 0;
 
-      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179_3c1b", []);
+      const deleted = await sm.cleanupCloudOwnedStates("devices.h5179-3c1b", []);
 
       expect(deleted).toBe(3);
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_temperature")).toBe(false);
-      expect(objects.has("devices.h5179_3c1b.sensor.sensor_humidity")).toBe(false);
-      expect(objects.has("devices.h5179_3c1b.events.lackwater")).toBe(false);
-      expect(objects.has("devices.h5179_3c1b.sensor.temperature")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.events.lack_water")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor.sensor_temperature")).toBe(false);
+      expect(objects.has("devices.h5179-3c1b.sensor.sensor_humidity")).toBe(false);
+      expect(objects.has("devices.h5179-3c1b.events.lackwater")).toBe(false);
+      expect(objects.has("devices.h5179-3c1b.sensor.temperature")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.events.lack_water")).toBe(true);
       // Channels keep their surviving canonical states.
-      expect(objects.has("devices.h5179_3c1b.sensor")).toBe(true);
-      expect(objects.has("devices.h5179_3c1b.events")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.sensor")).toBe(true);
+      expect(objects.has("devices.h5179-3c1b.events")).toBe(true);
     });
 
     it("should NEVER remove LAN-owned states (power, brightness, colorRgb, colorTemperature)", async () => {
@@ -2367,11 +2403,11 @@ describe("StateManager", () => {
 
       // Create with LAN-defaults populated (power, brightness, etc.)
       await createAllStatesForTest(sm, dev, basicControlDefs());
-      expect(objects.has("devices.h6160_0011.control.power")).toBe(true);
-      expect(objects.has("devices.h6160_0011.control.brightness")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.power")).toBe(true);
+      expect(objects.has("devices.h6160-0011.control.brightness")).toBe(true);
 
       // Run cleanupCloudOwnedStates with empty cloudDefs — LAN states must survive
-      await sm.cleanupCloudOwnedStates("devices.h6160_0011", []);
+      await sm.cleanupCloudOwnedStates("devices.h6160-0011", []);
 
       // Every LAN-owned id — taken from the real set, not a hand-written list:
       // until 2.28.0 this filter still spelled the colour ids camelCase (pre-B2),
@@ -2384,7 +2420,7 @@ describe("StateManager", () => {
       );
       expect(lanDeletes).toEqual([]);
       for (const id of LAN_STATE_IDS) {
-        expect(objects.has(`devices.h6160_0011.control.${id}`), `control.${id} must survive`).toBe(true);
+        expect(objects.has(`devices.h6160-0011.control.${id}`), `control.${id} must survive`).toBe(true);
       }
     });
 
@@ -2415,9 +2451,9 @@ describe("StateManager", () => {
       const channelDeletes = calls
         .filter(c => c.method === "delObjectAsync" && (c.args[0] as string).endsWith(".scenes"))
         .map(c => c.args[0]);
-      expect(channelDeletes).toEqual(["devices.h6160_0011.scenes"]);
-      expect(objects.has("devices.h6160_0011.scenes")).toBe(false);
-      expect(objects.has("devices.h6160_0011.scenes.light_scene")).toBe(false);
+      expect(channelDeletes).toEqual(["devices.h6160-0011.scenes"]);
+      expect(objects.has("devices.h6160-0011.scenes")).toBe(false);
+      expect(objects.has("devices.h6160-0011.scenes.light_scene")).toBe(false);
     });
 
     it("should migrate states from old control to new channel", async () => {
@@ -2426,7 +2462,7 @@ describe("StateManager", () => {
       const dev = createTestDevice();
 
       // Simulate old layout: light_scene in control channel
-      objects.set("devices.h6160_0011.control.light_scene", { type: "state" });
+      objects.set("devices.h6160-0011.control.light_scene", { type: "state" });
 
       // Create with light_scene in scenes channel
       const defs: StateDefinition[] = [
@@ -2446,12 +2482,12 @@ describe("StateManager", () => {
 
       // Old control.light_scene is deleted exactly once (it's stale in control)
       const delCalls = calls.filter(
-        c => c.method === "delObjectAsync" && (c.args[0] as string) === "devices.h6160_0011.control.light_scene",
+        c => c.method === "delObjectAsync" && (c.args[0] as string) === "devices.h6160-0011.control.light_scene",
       );
       expect(delCalls).toHaveLength(1);
-      expect(objects.has("devices.h6160_0011.control.light_scene")).toBe(false);
+      expect(objects.has("devices.h6160-0011.control.light_scene")).toBe(false);
       // New scenes.light_scene should exist
-      expect(objects.has("devices.h6160_0011.scenes.light_scene")).toBe(true);
+      expect(objects.has("devices.h6160-0011.scenes.light_scene")).toBe(true);
     });
 
     it("should reset dropdown to default when current value is no longer in states map", async () => {
@@ -2477,7 +2513,7 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, defs);
 
       // Simulate user selected scene 2
-      states.set("devices.h6160_0011.scenes.light_scene", { val: "2", ack: true } as ioBroker.State);
+      states.set("devices.h6160-0011.scenes.light_scene", { val: "2", ack: true } as ioBroker.State);
 
       // Re-create with only 1 scene — scene 2 no longer valid
       const newDefs: StateDefinition[] = [
@@ -2497,7 +2533,7 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, newDefs);
 
       // Value should be reset to default "0"
-      const final = states.get("devices.h6160_0011.scenes.light_scene");
+      const final = states.get("devices.h6160-0011.scenes.light_scene");
       expect(final?.val).toBe("0");
     });
 
@@ -2523,12 +2559,12 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, defs);
 
       // Simulate user selected scene 1
-      states.set("devices.h6160_0011.scenes.light_scene", { val: "1", ack: true } as ioBroker.State);
+      states.set("devices.h6160-0011.scenes.light_scene", { val: "1", ack: true } as ioBroker.State);
 
       // Re-create with same scenes — value should remain
       await createAllStatesForTest(sm, dev, defs);
 
-      const final = states.get("devices.h6160_0011.scenes.light_scene");
+      const final = states.get("devices.h6160-0011.scenes.light_scene");
       expect(final?.val).toBe("1");
     });
   });
@@ -2564,13 +2600,13 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(objects.has("devices.h6160_0011.segments")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.0")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.0.color")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.0.brightness")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.9")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.10")).toBe(false); // exactly 10 channels
-      expect(objects.has("devices.h6160_0011.segments.command")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.0")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.0.color")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.0.brightness")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.9")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.10")).toBe(false); // exactly 10 channels
+      expect(objects.has("devices.h6160-0011.segments.command")).toBe(true);
     });
 
     it("should return 0 segments when field has no elementRange", async () => {
@@ -2626,7 +2662,7 @@ describe("StateManager", () => {
 
       // Simulate old segment channels 0-14 existing
       for (let i = 0; i < 15; i++) {
-        objects.set(`devices.h6160_0011.segments.${i}`, { type: "channel" });
+        objects.set(`devices.h6160-0011.segments.${i}`, { type: "channel" });
       }
 
       const segmentDefs: StateDefinition[] = [
@@ -2648,10 +2684,10 @@ describe("StateManager", () => {
         .filter(c => c.method === "delObjectAsync" && /segments\.\d+$/.test(c.args[0] as string))
         .map(c => c.args[0]);
       expect(delCalls.sort()).toEqual(
-        Array.from({ length: 10 }, (_, i) => `devices.h6160_0011.segments.${i + 5}`).sort(),
+        Array.from({ length: 10 }, (_, i) => `devices.h6160-0011.segments.${i + 5}`).sort(),
       );
-      expect(objects.has("devices.h6160_0011.segments.4")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.5")).toBe(false);
+      expect(objects.has("devices.h6160-0011.segments.4")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.5")).toBe(false);
     });
 
     it("should return 0 segments when capability has no fields", async () => {
@@ -2717,9 +2753,9 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      expect(objects.has("devices.h6160_0011.segments.19")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.14")).toBe(true);
-      expect(objects.has("devices.h6160_0011.segments.20")).toBe(false);
+      expect(objects.has("devices.h6160-0011.segments.19")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.14")).toBe(true);
+      expect(objects.has("devices.h6160-0011.segments.20")).toBe(false);
     });
 
     it("should write manual_mode + manual_list initial values from device", async () => {
@@ -2757,8 +2793,8 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      const mode = states.get("devices.h6160_0011.segments.manual_mode");
-      const list = states.get("devices.h6160_0011.segments.manual_list");
+      const mode = states.get("devices.h6160-0011.segments.manual_mode");
+      const list = states.get("devices.h6160-0011.segments.manual_list");
       expect(mode?.val).toBe(true);
       expect(mode?.ack).toBe(true);
       expect(list?.val).toBe("0,1,2,5,6,7");
@@ -2797,8 +2833,8 @@ describe("StateManager", () => {
 
       await createAllStatesForTest(sm, dev, segmentDefs);
 
-      const mode = states.get("devices.h6160_0011.segments.manual_mode");
-      const list = states.get("devices.h6160_0011.segments.manual_list");
+      const mode = states.get("devices.h6160-0011.segments.manual_mode");
+      const list = states.get("devices.h6160-0011.segments.manual_list");
       expect(mode?.val).toBe(false);
       expect(list?.val).toBe("");
     });
@@ -2813,14 +2849,14 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     await createAllStatesForTest(sm, dev, []);
 
     await sm.syncInfoOnline(dev);
-    expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: true });
+    expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: true });
 
     // 91 s without a reply: the device is gone even though the last reply
     // timestamp is still set — a truthy check alone would keep it "online"
     // forever after the very first discovery.
     dev.lastLanReplyAt = Date.now() - 91_000;
     await sm.syncInfoOnline(dev);
-    expect(states.get("devices.h6160_0011.info.online")).toMatchObject({ val: false });
+    expect(states.get("devices.h6160-0011.info.online")).toMatchObject({ val: false });
   });
 
   it("info.online is written only when the value actually changes", async () => {
@@ -2834,7 +2870,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       calls.filter(
         c =>
           c.method === "setStateChangedAsync" &&
-          c.args[0] === "devices.h6160_0011.info.online" &&
+          c.args[0] === "devices.h6160-0011.info.online" &&
           (c.args[2] as { changed: boolean }).changed,
       ).length;
 
@@ -2874,7 +2910,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     const count = effectiveSegmentCount(raised, registry);
     expect(count).toBe(14);
     await sm.createSegmentStates(raised, count);
-    expect(objects.has("devices.h6160_0011.segments.13")).toBe(true);
+    expect(objects.has("devices.h6160-0011.segments.13")).toBe(true);
 
     // A list that only names a few of the existing indices must not shrink the
     // tree — the other segments are still physically there, just not listed.
@@ -2927,8 +2963,8 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       ] as StateDefinition[],
       0,
     );
-    expect((objects.get("devices.h6160_0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
-    expect((objects.get("devices.h6160_0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
+    expect((objects.get("devices.h6160-0011.control.refresh_cloud")?.common as { read: boolean }).read).toBe(false);
+    expect((objects.get("devices.h6160-0011.control.power_state")?.common as { read: boolean }).read).toBe(true);
   });
 
   describe("migrateLegacyDiagnostics", () => {
@@ -2942,13 +2978,13 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       const { adapter, objects, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
-      objects.set("devices.h6160_0011.diag.result", { common: { name: "Diagnostics JSON" } });
-      states.set("devices.h6160_0011.diag.result", { val: "{…}", ack: true } as ioBroker.State);
+      objects.set("devices.h6160-0011.diag.result", { common: { name: "Diagnostics JSON" } });
+      states.set("devices.h6160-0011.diag.result", { val: "{…}", ack: true } as ioBroker.State);
 
       await sm.migrateLegacyDiagnostics(dev);
 
-      expect(objects.has("devices.h6160_0011.diag.result")).toBe(false);
-      expect(states.has("devices.h6160_0011.diag.result")).toBe(false);
+      expect(objects.has("devices.h6160-0011.diag.result")).toBe(false);
+      expect(states.has("devices.h6160-0011.diag.result")).toBe(false);
     });
 
     it("removes the export BUTTON on an upgraded install", async () => {
@@ -2959,13 +2995,13 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       // swept, so the datapoint has to be removed explicitly or it stays forever.
       const { adapter, objects, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      objects.set("devices.h6160_0011.diag.export", { common: { name: "Export Diagnostics" } });
-      states.set("devices.h6160_0011.diag.export", { val: false, ack: true } as ioBroker.State);
+      objects.set("devices.h6160-0011.diag.export", { common: { name: "Export Diagnostics" } });
+      states.set("devices.h6160-0011.diag.export", { val: false, ack: true } as ioBroker.State);
 
       await sm.migrateLegacyDiagnostics(createTestDevice());
 
-      expect(objects.has("devices.h6160_0011.diag.export")).toBe(false);
-      expect(states.has("devices.h6160_0011.diag.export")).toBe(false);
+      expect(objects.has("devices.h6160-0011.diag.export")).toBe(false);
+      expect(states.has("devices.h6160-0011.diag.export")).toBe(false);
     });
 
     it("clears a lastExport still holding a FILE NAME — the type change alone would not", async () => {
@@ -2976,42 +3012,42 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       // that reads "time of the last export".
       const { adapter, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      states.set("devices.h6160_0011.diag.lastExport", {
+      states.set("devices.h6160-0011.diag.lastExport", {
         val: "govee-smart_H6160_0011_v2.30.0_2026-09-03_205830.json",
         ack: true,
       } as ioBroker.State);
 
       await sm.migrateLegacyDiagnostics(createTestDevice());
 
-      expect(states.get("devices.h6160_0011.diag.lastExport")?.val).toBe("");
+      expect(states.get("devices.h6160-0011.diag.lastExport")?.val).toBe("");
     });
 
     it("leaves a timestamp alone — the migration must not undo itself on every start", async () => {
       const { adapter, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      states.set("devices.h6160_0011.diag.lastExport", {
+      states.set("devices.h6160-0011.diag.lastExport", {
         val: "2026-09-03T20:58:30Z",
         ack: true,
       } as ioBroker.State);
 
       await sm.migrateLegacyDiagnostics(createTestDevice());
 
-      expect(states.get("devices.h6160_0011.diag.lastExport")?.val).toBe("2026-09-03T20:58:30Z");
+      expect(states.get("devices.h6160-0011.diag.lastExport")?.val).toBe("2026-09-03T20:58:30Z");
     });
 
     it("is a silent no-op on an install that never had it", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       await expect(sm.migrateLegacyDiagnostics(createTestDevice())).resolves.toBeUndefined();
-      expect(objects.has("devices.h6160_0011.diag.result")).toBe(false);
+      expect(objects.has("devices.h6160-0011.diag.result")).toBe(false);
     });
 
     it("leaves groups alone — they never had diagnostics", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      objects.set("groups.h6160_0011.diag.result", { common: {} });
+      objects.set("groups.h6160-0011.diag.result", { common: {} });
       await sm.migrateLegacyDiagnostics(createTestDevice({ sku: "BaseGroup" }));
-      expect(objects.has("groups.h6160_0011.diag.result")).toBe(true);
+      expect(objects.has("groups.h6160-0011.diag.result")).toBe(true);
     });
   });
 
@@ -3053,7 +3089,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       const writes = (): number =>
-        calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160_0011").length;
+        calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160-0011").length;
 
       await sm.createInfoStates(dev);
       expect(writes()).toBe(1);
@@ -3067,7 +3103,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       // The user renamed the device in the Govee app.
       await sm.createInfoStates({ ...dev, name: "Renamed in the app" });
       expect(writes()).toBe(2);
-      expect((objects.get("devices.h6160_0011") as { common: { name: string } }).common.name).toBe(
+      expect((objects.get("devices.h6160-0011") as { common: { name: string } }).common.name).toBe(
         "Renamed in the app",
       );
     });
@@ -3081,7 +3117,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       await sm.createInfoStates(dev);
       await sm.cleanupDevices([]);
       await sm.createInfoStates(dev);
-      const writes = calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160_0011").length;
+      const writes = calls.filter(c => c.method === "extendObject" && c.args[0] === "devices.h6160-0011").length;
       expect(writes).toBe(2);
     });
 
@@ -3089,7 +3125,7 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       await sm.createSegmentStates(createTestDevice(), 2);
-      const name = (objects.get("devices.h6160_0011.segments.1")?.common as { name: unknown }).name;
+      const name = (objects.get("devices.h6160-0011.segments.1")?.common as { name: unknown }).name;
       expect(typeof name).not.toBe("string");
       expect(name).toMatchObject({ en: expect.any(String) });
     });
