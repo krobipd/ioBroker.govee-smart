@@ -95,7 +95,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 3.0.0 (2026-09-26)
 
 - Changed: every device gets a new object ID once — model and last four characters with a hyphen, e.g. `devices.h61be-525f`; scripts and visualizations need the new IDs
 - Changed: the move carries values, recording settings, rooms, functions and aliases along, and recorded history continues in its old series
@@ -141,17 +141,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Fixed: The diagnostics report no longer contains your Wi-Fi network name, the Govee app's device number or a group's id — they appeared in clear in every exported file
 - Improved: The diagnostics report keeps Govee's complete account-list entry and shows commands waiting for an offline device and when the adapter started
-
-### 2.39.0 (2026-09-22)
-
-- New: A device that has gone quiet is asked for its status over the Govee account connection — a bulb or purifier that works but showed as unreachable now stays reachable
-- Improved: The cloud budget follows Govee's per-device limits — a command for one light no longer waits for another light's calls or for library downloads
-- New: A command Govee refused because the device was offline is delivered once the device reports back (within five minutes), instead of being lost
-- Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
-- Fixed: A scene list that shrank no longer leaves withdrawn scenes in the dropdown
-- Fixed: The diagnostics report no longer lists a reachability refresh for appliances, which never get one
-- New: 28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles, a composter and the gateways that carry battery sensors
-- New: H1771 Table Lamp reported working by a user
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

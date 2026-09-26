@@ -1,5 +1,16 @@
 # Older Changes
 
+## 2.39.0 (2026-09-22)
+
+- New: A device that has gone quiet is asked for its status over the Govee account connection — a bulb or purifier that works but showed as unreachable now stays reachable
+- Improved: The cloud budget follows Govee's per-device limits — a command for one light no longer waits for another light's calls or for library downloads
+- New: A command Govee refused because the device was offline is delivered once the device reports back (within five minutes), instead of being lost
+- Fixed: Scenes and libraries that arrived after a busy start now reach the scene dropdown and the cache — they used to stay at `---` and were fetched again on every start
+- Fixed: A scene list that shrank no longer leaves withdrawn scenes in the dropdown
+- Fixed: The diagnostics report no longer lists a reachability refresh for appliances, which never get one
+- New: 28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles, a composter and the gateways that carry battery sensors
+- New: H1771 Table Lamp reported working by a user
+
 ## 2.38.3 (2026-09-17) — stable
 
 - Changed: Internal cleanup. No user-facing changes.
