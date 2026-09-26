@@ -1,5 +1,9 @@
 # Older Changes
 
+## 2.38.3 (2026-09-17) — stable
+
+- Changed: Internal cleanup. No user-facing changes.
+
 ## 2.38.2 (2026-09-17)
 
 - Changed: Internal refactoring. No user-facing changes.

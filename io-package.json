@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "2.40.0",
+    "version": "2.41.0",
     "news": {
+      "2.41.0": {
+        "en": "Discovery follows the selected network interface only: the additional scan addresses setting is gone, the broadcast goes to the network of the chosen card\ninfo.cloudConnected turns false while the Govee Cloud stays unreachable, and true again with its next answer — until now only a rejected API key cleared it",
+        "de": "Die Suche folgt nur noch der gewählten Netzwerkkarte: die Einstellung „Zusätzliche Suchadressen“ entfällt, der Broadcast geht in das Netz der gewählten Karte\ninfo.cloudConnected wird false, solange die Govee-Cloud nicht erreichbar bleibt, und mit ihrer nächsten Antwort wieder true — bisher nur bei abgelehntem API-Schlüssel",
+        "ru": "Поиск следует только выбранному сетевому интерфейсу: настройка дополнительных адресов поиска удалена, широковещательный запрос идёт в сеть выбранной карты\ninfo.cloudConnected становится false, пока облако Govee недоступно, и снова true с его следующим ответом — раньше только при отклонённом API-ключе",
+        "pt": "A pesquisa segue apenas a interface de rede selecionada: a definição de endereços de pesquisa adicionais desaparece, o broadcast vai para a rede da placa escolhida\ninfo.cloudConnected passa a false enquanto a cloud da Govee continuar inacessível e volta a true com a próxima resposta — até agora só com uma chave API rejeitada",
+        "nl": "Het zoeken volgt alleen nog de gekozen netwerkinterface: de instelling voor extra zoekadressen vervalt, de broadcast gaat naar het netwerk van de gekozen kaart\ninfo.cloudConnected wordt false zolang de Govee-cloud onbereikbaar blijft en weer true bij het volgende antwoord — tot nu toe alleen bij een geweigerde API-sleutel",
+        "fr": "La recherche suit uniquement l'interface réseau choisie : le réglage des adresses de recherche supplémentaires disparaît, le broadcast part vers le réseau de la carte choisie\ninfo.cloudConnected passe à false tant que le cloud Govee reste injoignable et revient à true à sa prochaine réponse — jusqu'ici seulement avec une clé API refusée",
+        "it": "La ricerca segue solo l'interfaccia di rete scelta: l'impostazione degli indirizzi di ricerca aggiuntivi scompare, il broadcast va nella rete della scheda scelta\ninfo.cloudConnected diventa false finché il cloud Govee resta irraggiungibile e torna true alla risposta successiva — finora solo con una chiave API rifiutata",
+        "es": "La búsqueda sigue solo la interfaz de red elegida: desaparece el ajuste de direcciones de búsqueda adicionales y el broadcast va a la red de la tarjeta elegida\ninfo.cloudConnected pasa a false mientras la nube de Govee siga inaccesible y vuelve a true con su siguiente respuesta — hasta ahora solo con una clave API rechazada",
+        "pl": "Wyszukiwanie podąża już tylko za wybranym interfejsem sieciowym: ustawienie dodatkowych adresów wyszukiwania znika, broadcast trafia do sieci wybranej karty\ninfo.cloudConnected zmienia się na false, dopóki chmura Govee jest nieosiągalna, i wraca na true przy jej następnej odpowiedzi — dotąd tylko przy odrzuconym kluczu API",
+        "uk": "Пошук слідує лише вибраному мережевому інтерфейсу: налаштування додаткових адрес пошуку прибрано, широкомовний запит іде в мережу вибраної карти\ninfo.cloudConnected стає false, поки хмара Govee недоступна, і знову true з її наступною відповіддю — досі лише при відхиленому API-ключі",
+        "zh-cn": "发现只跟随所选网络接口：附加扫描地址设置已移除，广播发往所选网卡所在的网络\n当 Govee 云持续无法访问时 info.cloudConnected 变为 false，收到下一次应答后恢复为 true——此前只有 API 密钥被拒绝时才会如此"
+      },
       "2.40.0": {
         "en": "Cloud events reach their datapoints, segment counts are measured right, and a device the account still lists is no longer deleted\nNew: additional scan addresses for lights in another subnet, auto stop for heaters, °F readings converted to °C\nSafer account logins, commands that could not be sent are no longer confirmed, and the diagnostics report hides more",
         "de": "Cloud-Ereignisse erreichen ihre Datenpunkte, Segmentzahlen werden richtig gemessen, und ein Gerät, das das Konto noch führt, wird nicht mehr gelöscht\nNeu: zusätzliche Suchadressen für Lampen in einem anderen Subnetz, Auto-Stopp für Heizgeräte, °F-Werte werden in °C umgerechnet\nSicherere Konto-Anmeldungen, nicht gesendete Befehle werden nicht mehr bestätigt, und der Diagnosebericht verbirgt mehr",
@@ -80,19 +93,6 @@
         "pl": "Wewnętrzny refaktoring. Brak zmian widocznych dla użytkownika.",
         "uk": "Внутрішній рефакторинг. Жодних змін для користувача.",
         "zh-cn": "内部重构。无用户可见的更改。"
-      },
-      "2.38.1": {
-        "en": "Repairing a dropdown is now a single write — until 2.38.0 it was emptied first, so a restart in that moment left the datapoint with nothing to pick from.",
-        "de": "Die Reparatur eines Auswahlfeldes ist jetzt EIN Schreibvorgang — bis 2.38.0 wurde es zuerst geleert, ein Neustart in diesem Moment ließ den Datenpunkt ohne Auswahl zurück.",
-        "ru": "Восстановление поля выбора теперь выполняется одной записью — до 2.38.0 оно сначала очищалось, и перезапуск в этот момент оставлял датапоинт без вариантов.",
-        "pt": "A reparação de um campo de seleção é agora uma única escrita — até 2.38.0 era primeiro esvaziado e um reinício nesse momento deixava o ponto de dados sem escolhas.",
-        "nl": "Het herstellen van een keuzeveld is nu één schrijfactie — tot 2.38.0 werd het eerst geleegd, en een herstart op dat moment liet het datapunt zonder keuzes achter.",
-        "fr": "La réparation d'un champ de sélection est désormais une seule écriture — jusqu'à 2.38.0 il était d'abord vidé, et un redémarrage à cet instant laissait le point de données sans choix.",
-        "it": "La riparazione di un campo di selezione è ora una sola scrittura — fino alla 2.38.0 veniva prima svuotato e un riavvio in quel momento lasciava il punto dati senza scelte.",
-        "es": "La reparación de un campo de selección es ahora una sola escritura — hasta 2.38.0 se vaciaba primero y un reinicio en ese momento dejaba el punto de datos sin opciones.",
-        "pl": "Naprawa pola wyboru to teraz jeden zapis — do wersji 2.38.0 było ono najpierw opróżniane, a restart w tym momencie zostawiał punkt danych bez wyboru.",
-        "uk": "Відновлення поля вибору тепер відбувається одним записом — до 2.38.0 воно спершу очищалося, і перезапуск у цей момент залишав точку даних без варіантів.",
-        "zh-cn": "修复选择字段现在只需一次写入——2.38.0 之前会先清空，此时重启会让数据点没有可选项。"
       }
     },
     "plugins": {
