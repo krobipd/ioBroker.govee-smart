@@ -80,19 +80,6 @@
         "pl": "Wewnętrzne porządki. Brak widocznych zmian.",
         "uk": "Внутрішнє прибирання. Без видимих змін.",
         "zh-cn": "内部清理。无用户可见更改。"
-      },
-      "2.38.2": {
-        "en": "Internal refactoring. No user-facing changes.",
-        "de": "Interne Überarbeitung. Keine für Nutzer sichtbaren Änderungen.",
-        "ru": "Внутренний рефакторинг. Никаких изменений для пользователя.",
-        "pt": "Refatoração interna. Nenhuma alteração visível para o utilizador.",
-        "nl": "Interne refactoring. Geen zichtbare wijzigingen voor gebruikers.",
-        "fr": "Refactorisation interne. Aucun changement visible pour l'utilisateur.",
-        "it": "Refactoring interno. Nessuna modifica visibile all'utente.",
-        "es": "Refactorización interna. Sin cambios visibles para el usuario.",
-        "pl": "Wewnętrzny refaktoring. Brak zmian widocznych dla użytkownika.",
-        "uk": "Внутрішній рефакторинг. Жодних змін для користувача.",
-        "zh-cn": "内部重构。无用户可见的更改。"
       }
     },
     "messages": [
