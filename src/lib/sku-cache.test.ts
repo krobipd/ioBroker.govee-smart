@@ -486,7 +486,11 @@ describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)"
     const cache = new SkuCache(dir, mockLog);
     await cache.save(createTestData("H6100", "LO:00:00:00:00:00:00:01"));
     expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:01")?.name).toBe("Test Light");
-    expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:99")).toBeNull();
+    const debug = vi.fn();
+    const quiet = new SkuCache(dir, { ...mockLog, debug });
+    expect(quiet.loadOne("H6100", "LO:00:00:00:00:00:00:99")).toBeNull();
+    // No file is the ordinary miss of a device seen for the first time — not a failed read.
+    expect(debug).not.toHaveBeenCalledWith(expect.stringContaining("loadOne failed"));
     const file = fs.readdirSync(cacheDir())[0];
     fs.writeFileSync(path.join(cacheDir(), file), "{ not json");
     expect(cache.loadOne("H6100", "LO:00:00:00:00:00:00:01")).toBeNull();
