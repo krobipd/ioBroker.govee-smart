@@ -95,7 +95,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 3.0.1 (2026-09-27)
 
 - Improved: the note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details
 
@@ -140,11 +140,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Fixed: App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report
 - Fixed: A scene request Govee refuses is no longer taken as "no scenes" — the cached scenes and snapshots stay, and the report names the reason once
-
-### 2.39.1 (2026-09-22)
-
-- Fixed: The diagnostics report no longer contains your Wi-Fi network name, the Govee app's device number or a group's id — they appeared in clear in every exported file
-- Improved: The diagnostics report keeps Govee's complete account-list entry and shows commands waiting for an offline device and when the adapter started
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 

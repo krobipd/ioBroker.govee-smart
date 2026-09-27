@@ -1,8 +1,21 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "3.0.0",
+    "version": "3.0.1",
     "news": {
+      "3.0.1": {
+        "en": "The note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details.",
+        "de": "Der Hinweis, den der Admin vor einem Update auf 3.x zeigt, ist jetzt kurz: die Warnung, ein Beispiel alt → neu und ein Link zu den Details.",
+        "ru": "Уведомление, которое Admin показывает перед обновлением до 3.x, теперь короткое: предупреждение, пример старое → новое и ссылка на подробности.",
+        "pt": "A nota que o Admin mostra antes de uma atualização para 3.x agora é curta: o aviso, um exemplo antigo → novo e um link para os detalhes.",
+        "nl": "De melding die de Admin vóór een update naar 3.x toont, is nu kort: de waarschuwing, één voorbeeld oud → nieuw en een link naar de details.",
+        "fr": "La note affichée par l'Admin avant une mise à jour vers 3.x est courte : l'avertissement, un exemple ancien → nouveau et un lien vers les détails.",
+        "it": "La nota che l'Admin mostra prima di un aggiornamento a 3.x ora è breve: l'avviso, un esempio vecchio → nuovo e un link ai dettagli.",
+        "es": "El aviso que muestra el Admin antes de actualizar a 3.x ahora es breve: la advertencia, un ejemplo antiguo → nuevo y un enlace a los detalles.",
+        "pl": "Komunikat, który Admin pokazuje przed aktualizacją do 3.x, jest teraz krótki: ostrzeżenie, przykład stare → nowe i link do szczegółów.",
+        "uk": "Повідомлення, яке Admin показує перед оновленням до 3.x, тепер коротке: попередження, приклад старе → нове та посилання на подробиці.",
+        "zh-cn": "Admin 在升级到 3.x 前显示的提示现在很简短：警告、一个新旧对照示例和详情链接。"
+      },
       "3.0.0": {
         "en": "Every device gets a new object ID once — model and last four characters with a hyphen, e.g. devices.h61be-525f; scripts and visualizations need the new IDs\nThe move carries values, recording settings, rooms, functions and aliases along, and recorded history continues in its old series\nTwo devices of one model whose IDs end alike now get a tree each and each receives its own commands — until now they shared one\nThe H1741 battery table lamp reports its charge level in sensor.battery; Govee reports a fully charged battery as about 80 percent\nFans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 no longer puts a warning in the log at every refresh",
         "de": "Jedes Gerät bekommt einmalig eine neue Objekt-ID — Modell und letzte vier Zeichen mit Bindestrich, z. B. devices.h61be-525f; Skripte und Visualisierungen brauchen die neuen IDs\nDer Umzug nimmt Werte, Aufzeichnungseinstellungen, Räume, Funktionen und Aliase mit, und die aufgezeichnete Historie läuft in ihrer alten Reihe weiter\nZwei Geräte eines Modells, deren IDs gleich enden, bekommen jetzt je einen eigenen Baum und je ihre eigenen Befehle — bisher teilten sie sich einen\nDie Akku-Tischlampe H1741 meldet ihren Ladestand in sensor.battery; Govee meldet einen voll geladenen Akku mit etwa 80 Prozent\nVentilatoren und Heizungen mit Zahlenstufe (H7102, H7130) speichern sie als Zahl, und die H7121 schreibt nicht mehr bei jeder Aktualisierung eine Warnung ins Log",
@@ -80,19 +93,6 @@
         "pl": "Milczące urządzenie jest pytane o stan przez połączenie z kontem Govee i pozostaje osiągalne; polecenie odrzucone offline jest dostarczane, gdy urządzenie wraca\nRozpoznawanych jest kolejnych 28 modeli Govee — termometry do mięsa, czujniki ruchu i nacisku, grzejniki, czajniki oraz bramki czujników bateryjnych",
         "uk": "Пристрій, що замовк, запитується про стан через з'єднання з обліковим записом Govee і лишається доступним; команду, відхилену офлайн, буде доставлено після повернення\nРозпізнається ще 28 моделей Govee — термометри для м'яса, датчики руху й тиску, обігрівачі, чайники та шлюзи для датчиків на батарейках",
         "zh-cn": "沉默的设备会通过 Govee 账户连接被询问状态并保持可达；设备离线时被拒绝的命令会在设备恢复后送达\n新增识别 28 款 Govee 设备——肉类温度计、移动与压力传感器、取暖器、电热水壶，以及电池传感器所依赖的网关"
-      },
-      "2.38.3": {
-        "en": "Internal cleanup. No user-facing changes.",
-        "de": "Interne Bereinigung. Keine sichtbaren Änderungen.",
-        "ru": "Внутренняя оптимизация. Без видимых изменений.",
-        "pt": "Limpeza interna. Sem alterações visíveis.",
-        "nl": "Interne opruiming. Geen zichtbare wijzigingen.",
-        "fr": "Nettoyage interne. Aucun changement visible.",
-        "it": "Pulizia interna. Nessuna modifica visibile.",
-        "es": "Limpieza interna. Sin cambios visibles.",
-        "pl": "Wewnętrzne porządki. Brak widocznych zmian.",
-        "uk": "Внутрішнє прибирання. Без видимих змін.",
-        "zh-cn": "内部清理。无用户可见更改。"
       }
     },
     "messages": [
