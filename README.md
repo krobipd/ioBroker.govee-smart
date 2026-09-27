@@ -95,6 +95,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Improved: the note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details
+
 ### 3.0.0 (2026-09-26)
 
 - Changed: every device gets a new object ID once — model and last four characters with a hyphen, e.g. `devices.h61be-525f`; scripts and visualizations need the new IDs
