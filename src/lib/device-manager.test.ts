@@ -5022,6 +5022,32 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     expect(libraryCalls).toEqual(["H600D", "H600D"]); // a new run, a new fetch — still one for the SKU
   });
 
+  it("a library Govee rejects is not stamped as checked, and a rejected token asks for a fresh one (M6, 3.0.2)", async () => {
+    const { dm, settle } = build();
+    const refresh = vi.fn();
+    dm.setBearerRefresher(refresh);
+    const pleaseLogin = Object.assign(
+      new Error("Govee rejected the music library of H600D: status=401 — please login"),
+      {
+        statusCode: 401,
+      },
+    );
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchSceneLibrary: () => Promise.resolve([]),
+      fetchMusicLibrary: () => Promise.reject(pleaseLogin),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => Promise.resolve([]),
+    } as never);
+    await dm.loadFromCloud();
+    await settle();
+    for (const d of dm.getDevices()) {
+      expect(d.librariesCheckedAt, `${d.deviceId}: a failed answer is no answer`).toBeUndefined();
+    }
+    expect(refresh).toHaveBeenCalled();
+  });
+
   it("a light that only SHARED a dropped library fetch is not stamped as checked — it never made the call itself", async () => {
     // The second light of a SKU makes NO library call of its own: it awaits
     // the run's memo. Its own calls (scenes) go through fine, so the host's

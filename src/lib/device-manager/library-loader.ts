@@ -1,4 +1,4 @@
-import type { GoveeApiClient } from "../govee-api-client";
+import { APP_API_PATHS, type GoveeApiClient } from "../govee-api-client";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import type { DiagnosticsCollector } from "../diagnostics";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
@@ -60,6 +60,14 @@ export interface LibraryLoaderHost {
    * "empty" for a week.
    */
   noteSkipped?(): void;
+  /**
+   * Tells the host that a fetch this device depends on FAILED — an error or a
+   * rejection in the body. The libraries are then not checked (no empty answer
+   * to remember for a week), and a rejected token asks for a fresh one.
+   *
+   * @param error What the fetch threw
+   */
+  noteFailed?(error: unknown): void;
 }
 
 /** What a (possibly shared) fetch came back with. `ran: false` = the limiter never ran it. */
@@ -316,6 +324,7 @@ async function loadLibrary<T>(
   if (outcome.error !== undefined || outcome.data === null) {
     host.diagnostics.recordApiFailure(device.deviceId, cfg.ep, outcome.error, extractHttpStatus(outcome.error));
     logUndocApiFailure(host.log, sku, cfg.failLabel, cfg.ep, hasBearer, outcome.error);
+    host.noteFailed?.(outcome.error);
     return false;
   }
   const lib = outcome.data;
@@ -384,7 +393,7 @@ export async function loadDeviceLibraries(
       force,
       current: device.sceneLibrary,
       recentlyChecked,
-      ep: `/light-effect-libraries?sku=${sku}`,
+      ep: `${APP_API_PATHS.sceneLibrary}?sku=${sku}`,
       label: "Scene library",
       noun: "scene(s)",
       failLabel: "scene library",
@@ -403,7 +412,7 @@ export async function loadDeviceLibraries(
       force,
       current: device.musicLibrary,
       recentlyChecked,
-      ep: `/light-effect-libraries-music?sku=${sku}`,
+      ep: `${APP_API_PATHS.musicLibrary}?sku=${sku}`,
       label: "Music library",
       noun: "mode(s)",
       failLabel: "music library",
@@ -422,7 +431,7 @@ export async function loadDeviceLibraries(
       force,
       current: device.diyLibrary,
       recentlyChecked,
-      ep: `/diy-effect-libraries?sku=${sku}`,
+      ep: `${APP_API_PATHS.diyLibrary}?sku=${sku}`,
       label: "DIY library",
       noun: "effect(s)",
       failLabel: "DIY library",
@@ -439,13 +448,14 @@ export async function loadDeviceLibraries(
   if ((force || (!device.skuFeatures && !recentlyChecked)) && !hasBearer) {
     host.noteSkipped?.();
   } else if (force || (!device.skuFeatures && !recentlyChecked)) {
-    const ep = `/sku-features?sku=${sku}`;
+    const ep = `${APP_API_PATHS.skuFeatures}?sku=${sku}`;
     const outcome = await sharedFetch(host, ep, () => apiClient.fetchSkuFeatures(sku));
     if (!outcome.ran) {
       host.noteCancelled?.();
     } else if (outcome.error !== undefined) {
       host.diagnostics.recordApiFailure(device.deviceId, ep, outcome.error, extractHttpStatus(outcome.error));
       logUndocApiFailure(host.log, sku, "SKU features", ep, hasBearer, outcome.error);
+      host.noteFailed?.(outcome.error);
     } else {
       const features = outcome.data;
       host.diagnostics.recordApiSuccess(device.deviceId, ep, features);
@@ -471,7 +481,7 @@ export async function loadDeviceLibraries(
     host.noteSkipped?.();
   } else if (packetsStale && device.snapshots.length > 0) {
     await host.runLimited(async () => {
-      const ep = `/bff-app/v1/devices/snapshots?sku=${sku}`;
+      const ep = `${APP_API_PATHS.snapshots}?sku=${sku}`;
       try {
         const snaps = await apiClient.fetchSnapshots(sku, device.deviceId);
         // v2.9.1 — record the full bleCmds payload (per-snapshot Base64
@@ -491,6 +501,7 @@ export async function loadDeviceLibraries(
       } catch (e) {
         host.diagnostics.recordApiFailure(device.deviceId, ep, e, extractHttpStatus(e));
         logUndocApiFailure(host.log, sku, "snapshot BLE", ep, hasBearer, e);
+        host.noteFailed?.(e);
       }
     }, APP_API_LANE);
   }

@@ -68,6 +68,28 @@ import {
 } from "./types";
 import { extractHttpStatus, HttpError } from "./http-client";
 
+/** What became of the fetches of one library run — see {@link librariesConfirmed}. */
+interface LibraryTrack {
+  /** A call never ran (the limiter dropped it). */
+  cancelled: boolean;
+  /** An account-token endpoint was not asked for want of a token (M3). */
+  skipped?: boolean;
+  /** A call failed or Govee rejected it in the body. */
+  failed?: boolean;
+}
+
+/**
+ * The libraries were confirmed this run — every endpoint answered (filled or
+ * empty), so an empty answer may be remembered for LIBRARY_RECHECK_MS. A call
+ * that never ran, was not asked or failed is no answer: until 3.0.1 a failed one
+ * was stamped too, and the library was not asked again for a week.
+ *
+ * @param track The run's record
+ */
+function librariesConfirmed(track: LibraryTrack): boolean {
+  return !track.cancelled && !track.skipped && !track.failed;
+}
+
 /**
  * Device manager — maintains unified device list and routes commands
  * through the fastest available channel: LAN → Cloud.
@@ -597,7 +619,7 @@ export class DeviceManager {
    *   run, shared by every light of that SKU); absent for a manual refresh
    */
   private libraryHost(
-    track?: { cancelled: boolean; skipped?: boolean },
+    track?: LibraryTrack,
     shared?: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
   ): libraryLoader.LibraryLoaderHost {
     return {
@@ -614,6 +636,16 @@ export class DeviceManager {
       noteSkipped: () => {
         if (track) {
           track.skipped = true;
+        }
+      },
+      noteFailed: error => {
+        if (track) {
+          track.failed = true;
+        }
+        // A rejected token on a library endpoint asks for a fresh one, like the
+        // App API list does (pollAppApi) — until 3.0.1 only the list did.
+        if (classifyError(error) === "AUTH") {
+          this.bearerRefresher?.();
         }
       },
       runLimited: async (fn: () => Promise<void>, lane: CallLane): Promise<void> => {
@@ -670,7 +702,7 @@ export class DeviceManager {
     cd: CloudDevice,
     shared: Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>,
   ): Promise<void> {
-    const track = { cancelled: false, skipped: false };
+    const track: LibraryTrack = { cancelled: false, skipped: false, failed: false };
     const host = this.libraryHost(track, shared);
     const scenesChanged = await libraryLoader.loadDeviceScenes(host, device, cd);
     const librariesChanged = await libraryLoader.loadDeviceLibraries(host, device, cd.sku);
@@ -682,7 +714,7 @@ export class DeviceManager {
       this.persistDeviceToCache(device);
       return;
     }
-    if (!track.cancelled && !track.skipped) {
+    if (librariesConfirmed(track)) {
       // The libraries were confirmed this round (filled or empty) — an empty
       // answer is remembered until LIBRARY_RECHECK_MS has passed. An endpoint
       // left unasked for want of an account token is no answer (M3).
@@ -774,12 +806,12 @@ export class DeviceManager {
    * @param device The light
    */
   private async loadLibrariesWithBearer(device: GoveeDevice): Promise<void> {
-    const track = { cancelled: false, skipped: false };
+    const track: LibraryTrack = { cancelled: false, skipped: false, failed: false };
     const changed = await libraryLoader.loadDeviceLibraries(this.libraryHost(track), device, device.sku);
     if (this.isUnloading()) {
       return;
     }
-    if (!track.cancelled && !track.skipped) {
+    if (librariesConfirmed(track)) {
       device.librariesCheckedAt = Date.now();
     }
     if (track.skipped) {
@@ -1324,7 +1356,7 @@ export class DeviceManager {
       capabilities: Array.isArray(target.capabilities) ? target.capabilities : [],
     };
     let changed = false;
-    const track = { cancelled: false, skipped: false };
+    const track: LibraryTrack = { cancelled: false, skipped: false, failed: false };
     const host = this.libraryHost(track);
     if (await libraryLoader.loadDeviceScenes(host, target, cd)) {
       changed = true;
@@ -1332,7 +1364,7 @@ export class DeviceManager {
     if (await libraryLoader.loadDeviceLibraries(host, target, cd.sku, /* force */ true)) {
       changed = true;
     }
-    if (!track.cancelled && !track.skipped) {
+    if (librariesConfirmed(track)) {
       target.librariesCheckedAt = Date.now();
     }
     if (track.skipped) {

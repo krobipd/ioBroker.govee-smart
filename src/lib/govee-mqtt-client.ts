@@ -2,7 +2,7 @@ import * as crypto from "node:crypto";
 import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
-import { buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
+import { GOVEE_APP_BASE_URL, buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
 import {
   MQTT_LOGIN_WINDOW_MS,
   MQTT_MAX_AUTH_FAILURES,
@@ -26,8 +26,9 @@ import {
   maskSecret,
 } from "./types";
 
-const LOGIN_URL = "https://app2.govee.com/account/rest/account/v2/login";
-const IOT_KEY_URL = "https://app2.govee.com/app/v1/account/iot/key";
+const LOGIN_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v2/login`;
+const IOT_KEY_URL = `${GOVEE_APP_BASE_URL}/app/v1/account/iot/key`;
+const VERIFICATION_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v1/verification`;
 
 /** Amazon Root CA 1 — required for AWS IoT Core TLS */
 const AMAZON_ROOT_CA1 = `-----BEGIN CERTIFICATE-----
@@ -1253,10 +1254,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       throw new Error(`Verification code request throttled — wait ${throttleRemainingSec}s before retrying.`);
     }
     this.lastVerificationRequestMs = now;
-    const url = "https://app2.govee.com/account/rest/account/v1/verification";
     await this.httpsRequestImpl<unknown>({
       method: "POST",
-      url,
+      url: VERIFICATION_URL,
       headers: buildGoveeAppHeaders(this.clientId, { withTimestamp: true }),
       body: {
         type: 8,

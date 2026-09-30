@@ -1,3 +1,4 @@
+import { APP_API_PATHS } from "../govee-api-client";
 import { describe, expect, it } from "vitest";
 import { DiagnosticsCollector } from "../diagnostics";
 import { DeviceRegistry } from "../device-registry";
@@ -232,9 +233,11 @@ describe("library-loader — without an account token the token endpoints are no
     const device = createTestDevice();
     await loadDeviceLibraries(host, device, device.sku);
     const hist = (await host.diagnostics.generate(device, "x")).apiHistory as Record<string, unknown>;
-    expect(hist["/light-effect-libraries-music?sku=H6160"]).toBeUndefined();
-    expect(hist["/diy-effect-libraries?sku=H6160"]).toBeUndefined();
-    expect(hist["/sku-features?sku=H6160"]).toBeUndefined();
+    expect(hist[`${APP_API_PATHS.musicLibrary}?sku=H6160`]).toBeUndefined();
+    expect(hist[`${APP_API_PATHS.diyLibrary}?sku=H6160`]).toBeUndefined();
+    expect(hist[`${APP_API_PATHS.skuFeatures}?sku=H6160`]).toBeUndefined();
+    // Only the public scene library was asked — the history names exactly that.
+    expect(Object.keys(hist)).toEqual([`${APP_API_PATHS.sceneLibrary}?sku=H6160`]);
   });
 
   it("with a token nothing is skipped", async () => {
@@ -415,7 +418,7 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
 
     const line = debugs.find(m => m.startsWith("Could not load scene library for H6160"));
     expect(line).toBeDefined();
-    expect(line).toContain("endpoint=/light-effect-libraries?sku=H6160");
+    expect(line).toContain(`endpoint=${APP_API_PATHS.sceneLibrary}?sku=H6160`);
     expect(line).toContain("httpStatus=403");
     expect(line).toContain("bearer=yes");
     expect(device.sceneLibrary).toEqual([]); // the old library is not replaced by garbage
@@ -423,7 +426,7 @@ describe("library-loader — undocumented-API failures are diagnosable, not sile
       string,
       Array<{ ok: boolean; statusCode?: number }>
     >;
-    expect(hist["/light-effect-libraries?sku=H6160"][0]).toMatchObject({ ok: false, statusCode: 403 });
+    expect(hist[`${APP_API_PATHS.sceneLibrary}?sku=H6160`][0]).toMatchObject({ ok: false, statusCode: 403 });
   });
 
   it("quotes the body snippet when Govee answered 200 with a non-JSON page", async () => {

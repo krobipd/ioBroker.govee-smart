@@ -422,3 +422,58 @@ describe("GoveeApiClient — fetchGroupMembers", () => {
     ]);
   });
 });
+
+describe("GoveeApiClient — a rejected token in the body is an error at EVERY token endpoint (M6, 3.0.2)", () => {
+  beforeEach(() => mockHttp.mockReset());
+
+  // Govee's own answer when it does not accept the bearer (ptreal-ble-research.md §4.2).
+  const pleaseLogin = { status: 401, message: "please login" };
+  const calls: Array<[string, (c: GoveeApiClient) => Promise<unknown>]> = [
+    ["music library", c => c.fetchMusicLibrary("H61BE")],
+    ["DIY library", c => c.fetchDiyLibrary("H61BE")],
+    ["SKU features", c => c.fetchSkuFeatures("H61BE")],
+    ["snapshots", c => c.fetchSnapshots("H61BE", "AA:BB")],
+    ["group members", c => c.fetchGroupMembers()],
+    ["device list", c => c.fetchDeviceList()],
+  ];
+  it.each(calls)("%s: throws an AUTH HttpError instead of answering empty", async (_what, call) => {
+    const client = new GoveeApiClient(apiLog);
+    client.setBearerToken("tok");
+    mockHttp.mockResolvedValue(httpOk(pleaseLogin));
+    const err = await call(client).catch((e: unknown) => e);
+    expect((err as { statusCode?: number }).statusCode).toBe(401);
+    expect(classifyError(err)).toBe("AUTH");
+    expect(String((err as Error).message)).toContain("please login");
+  });
+
+  it("a status 200 without data stays an empty answer, and data beside a status is data", async () => {
+    const client = new GoveeApiClient(apiLog);
+    client.setBearerToken("tok");
+    mockHttp.mockResolvedValue(httpOk({ status: 200, message: "success" }));
+    expect(await client.fetchMusicLibrary("H61BE")).toEqual([]);
+    mockHttp.mockResolvedValue(httpOk({ status: 400, data: { categories: [] } }));
+    expect(await client.fetchMusicLibrary("H61BE")).toEqual([]);
+  });
+
+  it("a library code or parameter of the wrong type is no code — never reaches Buffer.from (N5)", async () => {
+    const client = new GoveeApiClient(apiLog);
+    client.setBearerToken("tok");
+    mockHttp.mockResolvedValue(
+      httpOk({
+        data: {
+          categories: [
+            {
+              scenes: [
+                { sceneName: "A", sceneCode: "12", lightEffects: [{ sceneCode: "7", scenceParam: 42 }] },
+                { sceneName: "B", sceneCode: 5, lightEffects: [{ scenceParam: { x: 1 } }] },
+              ],
+            },
+          ],
+        },
+      }),
+    );
+    expect(await client.fetchMusicLibrary("H61BE")).toEqual([
+      { name: "B", musicCode: 5, scenceParam: undefined, mode: 1 },
+    ]);
+  });
+});

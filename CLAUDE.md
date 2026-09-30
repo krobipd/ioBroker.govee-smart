@@ -148,6 +148,7 @@ Die interne App-API liefert, was die öffentliche OpenAPI nicht kann: **Sensor-W
 
 - Sensor-Werte (z.B. H5179): OpenAPI v2 `/device/state` liefert die Fähigkeiten mit LEEREN Werten (`sensorTemperature: ""`, #18) plus Govees `online`-Aussage — „liefert `[]`“ war bis 2.34.0 der Hüllen-Fehler des Adapters, nicht Govee. Werte kommen aus App-API `POST /device/rest/devices/v1/list` → `deviceExt.lastDeviceData`. App-API-Poll alle 2 min.
 - Scene Library: `GET /appsku/v1/light-effect-libraries?sku=<SKU>` (public) → `sceneCode` für ptReal BLE-over-LAN.
+- **Eine Token-Ablehnung im Body (`{"status":401,"message":"please login"}`) wirft an JEDEM Token-Endpunkt** (`throwIfBodyRejected`, `govee-api-client.ts`; Pfade EINMAL in `APP_API_PATHS`, auch für die Bericht-Labels): der Lader meldet `noteFailed`, ein gescheiterter Lauf wird nicht gestempelt (`librariesConfirmed`), und ein AUTH-Fehler fordert ein frisches Token an (`bearerRefresher`).
 - Gruppen-Mitglieder: `GET /bff-app/v1/exec-plat/home` (Bearer) — ohne Konto-Login bleibt der Gruppen-Teilbaum ohne Mitglieder. **Aufgelöst beim Start, nach jedem erfolgreichen manuellen Sync, nach einem wiederhergestellten Cloud-Start und mit jedem Token, solange eine App-Gruppe bekannt ist und keine Gruppenliste geantwortet hat (seit 2.40.0, M9)** — bis 2.39.x nur beim Start, wo das Token meist noch fehlte.
 
 ## AWS IoT MQTT (Echtzeit-Status-Push)

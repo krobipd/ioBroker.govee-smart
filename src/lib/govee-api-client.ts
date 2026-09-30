@@ -8,6 +8,81 @@ import {
 } from "./govee-constants";
 
 /**
+ * The App API's paths — ONE list: the client calls them, and the diagnostics
+ * report names them (until 3.0.1 the report's labels named three paths the
+ * client never called).
+ */
+export const APP_API_PATHS = {
+  deviceList: "/device/rest/devices/v1/list",
+  sceneLibrary: "/appsku/v1/light-effect-libraries",
+  musicLibrary: "/appsku/v1/music-effect-libraries",
+  diyLibrary: "/appsku/v1/diy-light-effect-libraries",
+  skuFeatures: "/appsku/v1/sku-supported-feature",
+  snapshots: "/bff-app/v1/devices/snapshots",
+  groupMembers: "/bff-app/v1/exec-plat/home",
+} as const;
+
+/**
+ * Full URL of an App API path.
+ *
+ * @param path One of {@link APP_API_PATHS}
+ * @param query Query parameters, in order
+ */
+function appUrl(path: string, query: Record<string, string> = {}): string {
+  const qs = Object.entries(query)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+  return `${GOVEE_APP_BASE_URL}${path}${qs ? `?${qs}` : ""}`;
+}
+
+/**
+ * Govee answers a request whose bearer it does not accept with HTTP 200 and a
+ * body-level `status` (`{"status":401,"message":"please login"}` — every token
+ * endpoint, ptreal-ble-research.md §4.2). Read as data it became "empty": the
+ * report booked a success, the log said "Govee returned no data for this SKU",
+ * and nobody asked for a fresh token. Thrown as HttpError with that status as
+ * its code, so classifyError reads a 401 as AUTH.
+ *
+ * @param what What was asked, for the message
+ * @param body The parsed body
+ * @param hasPayload The body carries the data the endpoint delivers
+ */
+function throwIfBodyRejected(what: string, body: unknown, hasPayload: boolean): void {
+  const b = body as { status?: unknown; message?: unknown } | null | undefined;
+  if (hasPayload || !b || typeof b !== "object" || typeof b.status !== "number" || b.status === 200) {
+    return;
+  }
+  const message = typeof b.message === "string" && b.message ? ` — ${b.message}` : "";
+  throw new HttpError(`Govee rejected ${what}: status=${b.status}${message}`, b.status, {}, "");
+}
+
+/**
+ * The code of a library entry — the effect's own, else the scene's; only a
+ * positive number counts (the App API is undocumented, a string is no code).
+ *
+ * @param effect The entry's first light effect, if any
+ * @param effect.sceneCode The effect's own code
+ * @param scene The scene entry
+ * @param scene.sceneCode The scene's code
+ */
+function libraryCode(effect: { sceneCode?: unknown } | undefined, scene: { sceneCode?: unknown }): number {
+  const own = effect?.sceneCode;
+  const code = own !== undefined && own !== null ? own : scene.sceneCode;
+  return typeof code === "number" && Number.isFinite(code) && code > 0 ? code : 0;
+}
+
+/**
+ * The BLE parameter of a library effect — a non-empty string or nothing
+ * (it goes into `Buffer.from(…, "base64")`, which throws on anything else).
+ *
+ * @param effect The light effect
+ * @param effect.scenceParam Govee's (sic) parameter field
+ */
+function libraryParam(effect: { scenceParam?: unknown } | undefined): string | undefined {
+  return typeof effect?.scenceParam === "string" && effect.scenceParam ? effect.scenceParam : undefined;
+}
+
+/**
  * Parsed `lastDeviceData` field from the undocumented device-list response.
  * Govee serializes this as a JSON string inside the outer JSON. Temperature
  * and humidity are integer hundredths (`tem: 2370` → 23.70 °C).
@@ -206,10 +281,10 @@ export class GoveeApiClient {
    * @returns Parsed entries; never throws on a single malformed entry.
    */
   async fetchDeviceList(): Promise<AppDeviceEntry[]> {
-    if (!this.requireBearer(`/device/rest/devices/v1/list`)) {
+    if (!this.requireBearer(APP_API_PATHS.deviceList)) {
       return [];
     }
-    this.log.debug(`App API POST /device/rest/devices/v1/list bearer=yes`);
+    this.log.debug(`App API POST ${APP_API_PATHS.deviceList} bearer=yes`);
     const result = await httpsRequest<{
       status?: number;
       message?: string;
@@ -227,29 +302,17 @@ export class GoveeApiClient {
       }>;
     }>({
       method: "POST",
-      url: `${GOVEE_APP_BASE_URL}/device/rest/devices/v1/list`,
+      url: appUrl(APP_API_PATHS.deviceList),
       headers: this.authHeaders(),
       body: {},
     });
-    this.logFallback(`/device/rest/devices/v1/list`, result);
+    this.logFallback(APP_API_PATHS.deviceList, result);
     const resp = result.value;
 
-    // Govee answers HTTP 200 with a body-level `status` when the bearer is not
-    // accepted (`{"status":401,"message":"please login"}`, ptreal-ble-research.md
-    // §4.2). Until 2.35.0 that became an empty list: nothing warned, the sensor
-    // values simply stopped. A failed fetch throws — the caller warns once and
-    // records it in the diagnostics report (device-manager.ts pollAppApi).
-    // Thrown as HttpError with the body-level status as its code, so
-    // classifyError sees a 401 as AUTH (a plain Error read as UNKNOWN) and the
-    // caller can ask for a fresh bearer (audit 2026-09-24 M1).
-    if (typeof resp?.status === "number" && resp.status !== 200 && !Array.isArray(resp.devices)) {
-      throw new HttpError(
-        `Govee rejected the device list: status=${resp.status}${resp.message ? ` — ${resp.message}` : ""}`,
-        resp.status,
-        {},
-        "",
-      );
-    }
+    // Until 2.35.0 a rejected token became an empty list: nothing warned, the
+    // sensor values simply stopped. The caller warns once, records it and asks
+    // for a fresh bearer (device-manager.ts pollAppApi, audit 2026-09-24 M1).
+    throwIfBodyRejected("the device list", resp, Array.isArray(resp?.devices));
 
     const out: AppDeviceEntry[] = [];
     const list = Array.isArray(resp?.devices) ? resp.devices : [];
@@ -320,8 +383,8 @@ export class GoveeApiClient {
       };
     }[]
   > {
-    this.log.debug(`App API GET /light-effect-libraries sku=${sku} bearer=no (public endpoint)`);
-    const url = `https://app2.govee.com/appsku/v1/light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    this.log.debug(`App API GET ${APP_API_PATHS.sceneLibrary} sku=${sku} bearer=no (public endpoint)`);
+    const url = appUrl(APP_API_PATHS.sceneLibrary, { sku });
     const result = await httpsRequest<{
       data?: {
         categories?: Array<{
@@ -349,7 +412,7 @@ export class GoveeApiClient {
         "User-Agent": goveeUserAgent(),
       },
     });
-    this.logFallback(`/light-effect-libraries sku=${sku}`, result);
+    this.logFallback(`${APP_API_PATHS.sceneLibrary} sku=${sku}`, result);
     const resp = result.value;
 
     const scenes: {
@@ -362,7 +425,7 @@ export class GoveeApiClient {
       const effects = Array.isArray(s.lightEffects) ? s.lightEffects : [];
       if (effects.length === 0) {
         // No effects — use scene-level code
-        const code = s.sceneCode ?? 0;
+        const code = libraryCode(undefined, s);
         if (code > 0) {
           scenes.push({ name: s.sceneName, sceneCode: code });
         }
@@ -370,7 +433,7 @@ export class GoveeApiClient {
       }
       const multiVariant = effects.length > 1;
       for (const effect of effects) {
-        const code = effect.sceneCode ?? s.sceneCode ?? 0;
+        const code = libraryCode(effect, s);
         if (code <= 0) {
           continue;
         }
@@ -379,7 +442,7 @@ export class GoveeApiClient {
         scenes.push({
           name,
           sceneCode: code,
-          scenceParam: effect.scenceParam || undefined,
+          scenceParam: libraryParam(effect),
           speedInfo: si?.supSpeed
             ? {
                 supSpeed: true,
@@ -403,11 +466,11 @@ export class GoveeApiClient {
   async fetchMusicLibrary(
     sku: string,
   ): Promise<{ name: string; musicCode: number; scenceParam?: string; mode?: number }[]> {
-    if (!this.requireBearer(`/music-effect-libraries sku=${sku}`)) {
+    if (!this.requireBearer(`${APP_API_PATHS.musicLibrary} sku=${sku}`)) {
       return [];
     }
-    this.log.debug(`App API GET /music-effect-libraries sku=${sku} bearer=yes`);
-    const url = `https://app2.govee.com/appsku/v1/music-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    this.log.debug(`App API GET ${APP_API_PATHS.musicLibrary} sku=${sku} bearer=yes`);
+    const url = appUrl(APP_API_PATHS.musicLibrary, { sku });
     const result = await httpsRequest<{
       data?: {
         categories?: Array<{
@@ -423,8 +486,9 @@ export class GoveeApiClient {
         }>;
       };
     }>({ method: "GET", url, headers: this.authHeaders() });
-    this.logFallback(`/music-effect-libraries sku=${sku}`, result);
+    this.logFallback(`${APP_API_PATHS.musicLibrary} sku=${sku}`, result);
     const resp = result.value;
+    throwIfBodyRejected(`the music library of ${sku}`, resp, !!resp?.data);
 
     const modes: {
       name: string;
@@ -434,14 +498,13 @@ export class GoveeApiClient {
     }[] = [];
     let modeIdx = 0;
     this.walkCategories(resp?.data?.categories, s => {
-      const effects = Array.isArray(s.lightEffects) ? s.lightEffects : [];
-      const effect = effects[0];
-      const code = effect?.sceneCode ?? s.sceneCode ?? 0;
+      const effect = Array.isArray(s.lightEffects) ? s.lightEffects[0] : undefined;
+      const code = libraryCode(effect, s);
       if (code > 0) {
         modes.push({
           name: s.sceneName,
           musicCode: code,
-          scenceParam: effect?.scenceParam || undefined,
+          scenceParam: libraryParam(effect),
           mode: modeIdx,
         });
       }
@@ -457,11 +520,11 @@ export class GoveeApiClient {
    * @param sku Product model (e.g. "H61BE")
    */
   async fetchDiyLibrary(sku: string): Promise<{ name: string; diyCode: number; scenceParam?: string }[]> {
-    if (!this.requireBearer(`/diy-light-effect-libraries sku=${sku}`)) {
+    if (!this.requireBearer(`${APP_API_PATHS.diyLibrary} sku=${sku}`)) {
       return [];
     }
-    this.log.debug(`App API GET /diy-light-effect-libraries sku=${sku} bearer=yes`);
-    const url = `https://app2.govee.com/appsku/v1/diy-light-effect-libraries?sku=${encodeURIComponent(sku)}`;
+    this.log.debug(`App API GET ${APP_API_PATHS.diyLibrary} sku=${sku} bearer=yes`);
+    const url = appUrl(APP_API_PATHS.diyLibrary, { sku });
     const result = await httpsRequest<{
       data?: {
         categories?: Array<{
@@ -476,19 +539,19 @@ export class GoveeApiClient {
         }>;
       };
     }>({ method: "GET", url, headers: this.authHeaders() });
-    this.logFallback(`/diy-light-effect-libraries sku=${sku}`, result);
+    this.logFallback(`${APP_API_PATHS.diyLibrary} sku=${sku}`, result);
     const resp = result.value;
+    throwIfBodyRejected(`the DIY library of ${sku}`, resp, !!resp?.data);
 
     const diys: { name: string; diyCode: number; scenceParam?: string }[] = [];
     this.walkCategories(resp?.data?.categories, s => {
-      const effects = Array.isArray(s.lightEffects) ? s.lightEffects : [];
-      const effect = effects[0];
-      const code = effect?.sceneCode ?? s.sceneCode ?? 0;
+      const effect = Array.isArray(s.lightEffects) ? s.lightEffects[0] : undefined;
+      const code = libraryCode(effect, s);
       if (code > 0) {
         diys.push({
           name: s.sceneName,
           diyCode: code,
-          scenceParam: effect?.scenceParam || undefined,
+          scenceParam: libraryParam(effect),
         });
       }
     });
@@ -502,16 +565,17 @@ export class GoveeApiClient {
    * @param sku Product model (e.g. "H61BE")
    */
   async fetchSkuFeatures(sku: string): Promise<Record<string, unknown> | null> {
-    if (!this.requireBearer(`/sku-supported-feature sku=${sku}`)) {
+    if (!this.requireBearer(`${APP_API_PATHS.skuFeatures} sku=${sku}`)) {
       return null;
     }
-    this.log.debug(`App API GET /sku-supported-feature sku=${sku} bearer=yes`);
-    const url = `https://app2.govee.com/appsku/v1/sku-supported-feature?sku=${encodeURIComponent(sku)}`;
+    this.log.debug(`App API GET ${APP_API_PATHS.skuFeatures} sku=${sku} bearer=yes`);
+    const url = appUrl(APP_API_PATHS.skuFeatures, { sku });
     const result = await httpsRequest<{
       data?: Record<string, unknown>;
     } | null>({ method: "GET", url, headers: this.authHeaders() });
-    this.logFallback(`/sku-supported-feature sku=${sku}`, result);
+    this.logFallback(`${APP_API_PATHS.skuFeatures} sku=${sku}`, result);
     const resp = result.value;
+    throwIfBodyRejected(`the features of ${sku}`, resp, !!resp?.data);
     // Defensive: API can return literal `null` body on edge cases (Govee
     // response wrapped as JSON-null on some unknown SKUs). Without this
     // guard `resp.data` would throw on null-resp.
@@ -529,11 +593,11 @@ export class GoveeApiClient {
    * @param deviceId Device identifier (colon-separated)
    */
   async fetchSnapshots(sku: string, deviceId: string): Promise<{ name: string; bleCmds: string[][] }[]> {
-    if (!this.requireBearer(`/devices/snapshots sku=${sku}`)) {
+    if (!this.requireBearer(`${APP_API_PATHS.snapshots} sku=${sku}`)) {
       return [];
     }
-    this.log.debug(`App API GET /devices/snapshots sku=${sku} device=${deviceId} bearer=yes`);
-    const url = `https://app2.govee.com/bff-app/v1/devices/snapshots?sku=${encodeURIComponent(sku)}&device=${encodeURIComponent(deviceId)}&snapshotId=-1`;
+    this.log.debug(`App API GET ${APP_API_PATHS.snapshots} sku=${sku} device=${deviceId} bearer=yes`);
+    const url = appUrl(APP_API_PATHS.snapshots, { sku, device: deviceId, snapshotId: "-1" });
     const result = await httpsRequest<{
       data?: {
         snapshots?: Array<{
@@ -544,8 +608,9 @@ export class GoveeApiClient {
         }>;
       };
     }>({ method: "GET", url, headers: this.authHeaders() });
-    this.logFallback(`/devices/snapshots sku=${sku}`, result);
+    this.logFallback(`${APP_API_PATHS.snapshots} sku=${sku}`, result);
     const resp = result.value;
+    throwIfBodyRejected(`the snapshots of ${sku}`, resp, !!resp?.data);
 
     const results: { name: string; bleCmds: string[][] }[] = [];
     const snaps = Array.isArray(resp?.data?.snapshots) ? resp.data.snapshots : [];
@@ -586,11 +651,11 @@ export class GoveeApiClient {
       devices: { sku: string; deviceId: string }[];
     }[]
   > {
-    if (!this.requireBearer(`/exec-plat/home`)) {
+    if (!this.requireBearer(APP_API_PATHS.groupMembers)) {
       return [];
     }
-    this.log.debug(`App API GET /exec-plat/home bearer=yes`);
-    const url = "https://app2.govee.com/bff-app/v1/exec-plat/home";
+    this.log.debug(`App API GET ${APP_API_PATHS.groupMembers} bearer=yes`);
+    const url = appUrl(APP_API_PATHS.groupMembers);
     const result = await httpsRequest<{
       data?: {
         components?: Array<{
@@ -605,8 +670,9 @@ export class GoveeApiClient {
         }>;
       };
     }>({ method: "GET", url, headers: this.authHeaders() });
-    this.logFallback(`/exec-plat/home`, result);
+    this.logFallback(APP_API_PATHS.groupMembers, result);
     const resp = result.value;
+    throwIfBodyRejected("the group members", resp, !!resp?.data);
 
     const groups: {
       groupId: number;
