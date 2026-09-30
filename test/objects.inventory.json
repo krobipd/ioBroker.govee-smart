@@ -629,10 +629,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -646,7 +642,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h1310-0013.info.type"
@@ -2048,10 +2064,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -2065,7 +2077,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5042-0004.info.type"
@@ -2428,10 +2460,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -2445,7 +2473,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5080-000d.info.type"
@@ -2808,10 +2856,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -2825,7 +2869,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.info.type"
@@ -3201,10 +3265,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -3218,7 +3278,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5085-000e.info.type"
@@ -3533,10 +3613,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -3550,7 +3626,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5109-0005.info.type"
@@ -3940,10 +4036,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -3957,7 +4049,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5140-0016.info.type"
@@ -4379,10 +4491,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -4396,7 +4504,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5179-0003.info.type"
@@ -5091,10 +5219,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -5108,7 +5232,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h607c-0015.info.type"
@@ -7358,10 +7502,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -7375,7 +7515,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.info.type"
@@ -9067,10 +9227,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -9084,7 +9240,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6199-0002.info.type"
@@ -11604,10 +11780,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -11621,7 +11793,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h61a8-000f.info.type"
@@ -14147,10 +14339,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -14164,7 +14352,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h66a1-0014.info.type"
@@ -16305,10 +16513,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -16322,7 +16526,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7102-0008.info.type"
@@ -16732,10 +16956,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -16749,7 +16969,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7121-0009.info.type"
@@ -16988,7 +17228,7 @@
       "read": true,
       "write": true,
       "states": {
-        "1": "gearMode",
+        "1": "Manual",
         "2": "Custom",
         "3": "Auto"
       },
@@ -17307,10 +17547,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -17324,7 +17560,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7127-0010.info.type"
@@ -17909,10 +18165,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -17926,7 +18178,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7130-0006.info.type"
@@ -17988,8 +18260,8 @@
       "read": true,
       "write": true,
       "states": {
-        "0": "Maintain",
-        "1": "Auto Stop"
+        "0": "Keep temperature",
+        "1": "Stop when reached"
       },
       "def": "0",
       "desc": {
@@ -18288,7 +18560,7 @@
       "read": true,
       "write": true,
       "states": {
-        "1": "gearMode",
+        "1": "Manual",
         "3": "Auto",
         "9": "Fan"
       },
@@ -18607,10 +18879,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -18624,7 +18892,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7131-0012.info.type"
@@ -19128,10 +19416,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -19145,7 +19429,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7141-0007.info.type"
@@ -19638,10 +19942,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -19655,7 +19955,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7143-0011.info.type"
@@ -20049,10 +20369,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -20066,7 +20382,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7161-000c.info.type"
@@ -20550,10 +20886,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -20567,7 +20899,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7171-000a.info.type"
@@ -20991,10 +21343,6 @@
         "uk": "Тип пристрою",
         "zh-cn": "设备类型"
       },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
       "desc": {
         "de": "Kurze Geräteart wie light oder thermometer, damit ein Skript filtern kann, ohne das Modell zu zerlegen.",
         "en": "Short device kind such as light or thermometer, so a script can filter without parsing the model.",
@@ -21008,7 +21356,27 @@
         "uk": "Короткий вид пристрою, наприклад light або thermometer, щоб скрипт фільтрував без розбору моделі.",
         "zh-cn": "简短的设备种类（如 light、thermometer），脚本无需解析型号即可筛选。"
       },
-      "def": ""
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "def": "unknown",
+      "states": {
+        "light": "Light",
+        "thermometer": "Thermometer",
+        "sensor": "Sensor",
+        "heater": "Heater",
+        "humidifier": "Humidifier",
+        "dehumidifier": "Dehumidifier",
+        "fan": "Fan",
+        "air_purifier": "Air purifier",
+        "socket": "Smart plug",
+        "kettle": "Kettle",
+        "ice_maker": "Ice maker",
+        "aroma_diffuser": "Aroma diffuser",
+        "button": "Button",
+        "unknown": "Unknown"
+      }
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7172-000b.info.type"

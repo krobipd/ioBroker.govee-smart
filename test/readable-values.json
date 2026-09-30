@@ -1,0 +1,28 @@
+{
+  "devices.*.scenes.light_scene": {
+    "label-language": "Govee's scene names from the scene endpoint of the device — Govee content in one language, no fixed vocabulary the adapter could translate"
+  },
+  "groups.*.scenes.light_scene": {
+    "label-language": "The scene names the group's members share — Govee content in one language, no fixed vocabulary the adapter could translate"
+  },
+  "devices.*.scenes.diy_scene": {
+    "label-language": "The user's own DIY effect names from the Govee app — the user's text, shown as written"
+  },
+  "devices.*.snapshots.snapshot_cloud": {
+    "label-language": "The user's own snapshot names from the Govee app — the user's text, shown as written"
+  },
+  "devices.*.music.music_mode": {
+    "label-language": "Govee's music effect names (Energic, Rhythm, …) declared by the device — Govee content; a group matches its members by these names"
+  },
+  "groups.*.music.music_mode": {
+    "label-language": "The music effect names every member declares — Govee content; each member resolves the name against its own list"
+  },
+  "devices.*.control.nightlight_scene": {
+    "label-language": "Govee's night-light effect names (Flame, Rainbow, …) declared by the device — Govee content, no fixed vocabulary"
+  },
+  "$sameInEveryLanguage": {
+    "DIY": "Govee's kettle mode for a user-defined programme — German and the Govee app use the same abbreviation",
+    "Thermometer": "Device type label — German writes the same word",
+    "Sensor": "Device type label — German writes the same word"
+  }
+}

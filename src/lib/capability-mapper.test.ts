@@ -18,6 +18,7 @@ import {
   buildLanStateDefs as buildLanStateDefsRaw,
   getDefaultLanStates,
   LAN_STATE_IDS,
+  libraryDecidesPending,
   mapCapabilities as mapCapabilitiesRaw,
   mapCloudStateValue,
   musicModeNameUsesRgb,
@@ -123,9 +124,10 @@ const h7121Cap = workModeCapFixture(
 );
 
 describe("classifyModeLevels + mapWorkMode against the real option shapes", () => {
-  it("H7127 (issue #47): one named group becomes a real dropdown", () => {
+  it("H7127 (issue #47): one named group becomes a real dropdown, labelled in the system language", () => {
     const modeValue = mapCapabilities([h7127Cap]).find(s => s.id === "mode_value");
-    expect(modeValue!.states).toEqual({ 1: "Sleep", 2: "Low", 3: "High" });
+    // The I18n stub hands back the key — a translated label, not Govee's wording.
+    expect(modeValue!.states).toEqual({ 1: "optSleep", 2: "optLow", 3: "optHigh" });
     expect(modeValue!.def).toBe("1");
     expect(modeValue!.type).toBe("mixed");
   });
@@ -215,6 +217,45 @@ describe("resolveWorkModeStruct", () => {
 });
 
 describe("mapCloudStateValues", () => {
+  const fanSpeedMode: CloudCapability = {
+    type: "devices.capabilities.mode",
+    instance: "fanSpeedMode",
+    parameters: {
+      dataType: "ENUM",
+      options: [
+        { name: "Speed 1", value: 1 },
+        { name: "Speed 2", value: 2 },
+      ],
+    },
+  };
+  const answer = (value: unknown): CloudStateCapability => ({
+    type: "devices.capabilities.mode",
+    instance: "fanSpeedMode",
+    state: { value },
+  });
+
+  it("writes a value the device did not declare into no dropdown — no label explains it", () => {
+    expect(mapCloudStateValues(answer(50), [fanSpeedMode])).toEqual([]);
+  });
+
+  it("writes a declared value and the --- entry of the dropdown", () => {
+    expect(mapCloudStateValues(answer(2), [fanSpeedMode])).toEqual([{ stateId: "fan_speed_mode", value: "2" }]);
+    expect(mapCloudStateValues(answer(0), [fanSpeedMode])).toEqual([{ stateId: "fan_speed_mode", value: "0" }]);
+  });
+
+  it("a level of 0 in a mode without levels leaves the level dropdown alone (H7127 in Auto)", () => {
+    expect(
+      mapCloudStateValues(
+        {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          state: { value: { workMode: 3, modeValue: 0 } },
+        },
+        [h7127Cap],
+      ),
+    ).toEqual([{ stateId: "work_mode", value: "3" }]);
+  });
+
   it("keeps the level Govee sent alongside the mode (issue47-fixtures/get_device_state.json)", () => {
     expect(
       mapCloudStateValues(
@@ -882,7 +923,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("work_mode");
       expect(result[0].type).toBe("mixed");
-      expect(result[0].states).toEqual({ 1: "Manual", 2: "Auto", 3: "Sleep" });
+      expect(result[0].states).toEqual({ 1: "optManual", 2: "optAuto", 3: "optSleep" });
       expect(result[0].def).toBe("1");
     });
 
@@ -915,7 +956,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(2);
       const modeValue = result.find(s => s.id === "mode_value");
       expect(modeValue).toBeDefined();
-      expect(modeValue!.states).toEqual({ 1: "Low", 2: "High" });
+      expect(modeValue!.states).toEqual({ 1: "optLow", 2: "optHigh" });
       expect(modeValue!.type).toBe("mixed");
     });
 
@@ -2965,13 +3006,13 @@ describe("the heater's auto stop is its own dropdown (audit C-O2)", () => {
     },
   } as CloudCapability;
 
-  it("declares control.auto_stop with Govee's options and default", () => {
+  it("declares control.auto_stop with Govee's options, labelled in the system language, and default", () => {
     const def = mapCapabilities([h7131Temp]).find(d => d.id === "auto_stop");
     expect(def).toMatchObject({
       type: "mixed",
       role: "state",
       write: true,
-      states: { 1: "Auto Stop", 0: "Maintain" },
+      states: { 1: "optAutoStop", 0: "optMaintain" },
       def: "0",
       name: { en: "autoStop", de: "autoStop_de" },
     });
@@ -3099,5 +3140,45 @@ describe("scene speed slider", () => {
     const def = buildCloudStateDefsRaw(light(), mockLog, emptyRegistry()).find(d => d.id === "scene_speed");
     expect(def).toMatchObject({ min: 0, max: 2, channel: "scenes" });
     expect(def?.desc).toEqual(tDesc("descSceneSpeed"));
+  });
+});
+
+describe("libraryDecidesPending — the scene library decides scene_speed", () => {
+  it("keeps the slider undecided while the library has not been confirmed for a light", () => {
+    expect(libraryDecidesPending(createTestDevice())).toEqual(["scenes.scene_speed"]);
+  });
+
+  it("a failed or skipped library run (no stamp) leaves it undecided — a failure is no knowledge", () => {
+    // scenesChecked says only that the scene job ran; it is set after a failed library call too.
+    expect(libraryDecidesPending(createTestDevice({ scenesChecked: true }))).toEqual(["scenes.scene_speed"]);
+  });
+
+  it("a confirmed run or a loaded library decides it", () => {
+    expect(libraryDecidesPending(createTestDevice({ librariesCheckedAt: 1 }))).toEqual([]);
+    expect(libraryDecidesPending(createTestDevice({ sceneLibrary: [{ name: "Easter", sceneCode: 11217 }] }))).toEqual(
+      [],
+    );
+  });
+
+  it("a device that is no light has no scene library to wait for", () => {
+    expect(libraryDecidesPending(createTestDevice({ type: "devices.types.thermometer" }))).toEqual([]);
+  });
+});
+
+describe("mode dropdown labels — settings in the system language, Govee's content as Govee names it", () => {
+  const mode = (instance: string, names: string[]): CloudCapability => ({
+    type: "devices.capabilities.mode",
+    instance,
+    parameters: { dataType: "ENUM", options: names.map((name, i) => ({ name, value: i + 1 })) },
+  });
+
+  it("a setting (fan speed) is labelled from the adapter's own table", () => {
+    const def = mapCapabilitiesRaw([mode("fanSpeedMode", ["Speed 1", "Sleep"])], mockLog)[0];
+    expect(def.states).toEqual({ 0: "---", 1: "optSpeedN", 2: "optSleep" });
+  });
+
+  it("a scene instance keeps Govee's effect names — content, not settings", () => {
+    const def = mapCapabilitiesRaw([mode("nightlightScene", ["Flame", "Sleep"])], mockLog)[0];
+    expect(def.states).toEqual({ 0: "---", 1: "Flame", 2: "Sleep" });
   });
 });

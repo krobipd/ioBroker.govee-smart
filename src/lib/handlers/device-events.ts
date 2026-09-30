@@ -1,4 +1,4 @@
-import { buildCloudStateDefs } from "../capability-mapper";
+import { buildCloudStateDefs, libraryDecidesPending } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "../govee-constants";
@@ -165,27 +165,36 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   if (isAppGroup(device) && !device.groupMembers?.length) {
     return;
   }
-  const localSnaps = adapter.localSnapshots?.getSnapshots(device.sku, device.deviceId);
-  let memberDevices: GoveeDevice[] | undefined;
-  if (isAppGroup(device) && device.groupMembers) {
-    memberDevices = groupFanoutHandler.resolveGroupMembers(device, allDevices);
-  }
-  const cloudDefs = buildCloudStateDefs(device, adapter.log, adapter.deviceRegistry, localSnaps, memberDevices);
-  const capN = Array.isArray(device.capabilities) ? device.capabilities.length : 0;
-  adapter.log.debug(
-    `buildCloudStateDefs for ${device.sku} ${device.deviceId}: ${capN} cap(s) in → ${cloudDefs.length} state def(s) out`,
-  );
-  // The device manager settles the count (and stores it on the device); the
-  // state manager only builds the tree for that number.
-  const segmentCount = adapter.deviceManager?.syncSegmentCount(device) ?? 0;
   // One build per device at a time (runDeviceBuild): the cache-based build of
   // the start-up and the cloud-list build a moment later must not interleave,
-  // or the older cleanup deletes what the newer build just declared.
+  // or the older cleanup deletes what the newer build just declared. The
+  // definitions are derived INSIDE the build, from the device as it is when the
+  // build runs: derived at the call, a build queued before the scene library
+  // arrived ran after it with the old list and deleted `scenes.scene_speed` —
+  // its value and the user's recording with it (the inventory upgrade suite
+  // showed it, 3.0.2).
   const p = sm
     .runDeviceBuild(device, async () => {
       await sm.createInfoStates(device);
       await sm.createLanStates(device);
-      await sm.createCloudStates(device, cloudDefs, segmentCount);
+      // Derived right before they are written, and together with what the
+      // device does not know yet (`libraryDecidesPending`): the cleanup keeps
+      // exactly what this list could not decide.
+      const localSnaps = adapter.localSnapshots?.getSnapshots(device.sku, device.deviceId);
+      const memberDevices =
+        isAppGroup(device) && device.groupMembers
+          ? groupFanoutHandler.resolveGroupMembers(device, adapter.deviceManager?.getDevices() ?? allDevices)
+          : undefined;
+      const cloudDefs = buildCloudStateDefs(device, adapter.log, adapter.deviceRegistry, localSnaps, memberDevices);
+      const undecided = libraryDecidesPending(device);
+      const capN = Array.isArray(device.capabilities) ? device.capabilities.length : 0;
+      adapter.log.debug(
+        `buildCloudStateDefs for ${device.sku} ${device.deviceId}: ${capN} cap(s) in → ${cloudDefs.length} state def(s) out`,
+      );
+      // The device manager settles the count (and stores it on the device); the
+      // state manager only builds the tree for that number.
+      const segmentCount = adapter.deviceManager?.syncSegmentCount(device) ?? 0;
+      await sm.createCloudStates(device, cloudDefs, segmentCount, undecided);
       await sm.migrateLegacyDiagnostics(device);
       await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
     })

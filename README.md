@@ -106,6 +106,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: when Govee no longer accepts the account session, scene, music and DIY libraries, snapshots and groups ask for a fresh login instead of reading as empty
 - Fixed: a Cloud rate limit or rejected API key is reported once, with the real waiting time — no longer three times or with a wrong retry hint
 - Fixed: moving a 2.x device tree to its new id no longer loses recordings or room assignments when the move fails or is interrupted
+- Fixed: a light whose scene library has not loaded yet keeps its `scenes.scene_speed` datapoint, value and recording — a start without saved data deleted and re-created it
+- Improved: a restart or a refreshed device list rewrites no object that did not change, and status indicators are written only when their value changes
+- Fixed: a mode or level dropdown only takes a value the device declares — a fan speed no longer shows `50`, an air purifier's level no longer `0` in Auto mode
+- Improved: appliance modes and levels (Manual, Low, High, Auto, Keep temperature, Speed 1 …) and `info.type` are labelled in the system language
 
 ### 3.0.1 (2026-09-27)
 

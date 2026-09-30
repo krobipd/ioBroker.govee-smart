@@ -504,7 +504,80 @@ describe("StateManager", () => {
     });
   });
 
+  describe("info.type", () => {
+    it("carries Govee's type without prefix and a value list that explains it", async () => {
+      const { adapter, objects, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.createInfoStates(createTestDevice({ type: "devices.types.heater" }));
+      const common = objects.get("devices.h6160-0011.info.type")?.common as ioBroker.StateCommon;
+      expect(states.get("devices.h6160-0011.info.type")?.val).toBe("heater");
+      expect(common.states).toMatchObject({ heater: "deviceTypeHeater", unknown: "deviceTypeUnknown" });
+    });
+
+    it("a type the adapter does not know is written as unknown — never a value outside the list", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.createInfoStates(createTestDevice({ type: "devices.types.robot_vacuum" }));
+      expect(states.get("devices.h6160-0011.info.type")?.val).toBe("unknown");
+    });
+  });
+
+  describe("writes only what changes (fleet rules, rounds 61/62)", () => {
+    it("a repeated build of the same device writes no object", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      const defs = [
+        { id: "gradient_toggle", name: "Gradient", type: "boolean", role: "switch", write: true, channel: "control" },
+      ] as StateDefinition[];
+      await createAllStatesForTest(sm, dev, defs);
+      const writes = (): number =>
+        calls.filter(c => ["extendObject", "setObject", "setForeignObject"].includes(c.method)).length;
+      const first = writes();
+      expect(first).toBeGreaterThan(0);
+      await createAllStatesForTest(sm, dev, defs);
+      expect(writes()).toBe(first);
+    });
+
+    it("a read-only state compares in memory — the same value a second time reaches no database", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dbCalls = (): string[] =>
+        calls.filter(c => c.method === "setState" || c.method === "setStateChangedAsync").map(c => c.method);
+      await sm.writeReadOnly("info.devicesTotal", 3);
+      expect(dbCalls()).toEqual(["setStateChangedAsync"]); // the first write of a run asks the database once
+      await sm.writeReadOnly("info.devicesTotal", 3);
+      expect(dbCalls()).toEqual(["setStateChangedAsync"]);
+      await sm.writeReadOnly("info.devicesTotal", 4);
+      expect(dbCalls()).toEqual(["setStateChangedAsync", "setState"]);
+    });
+  });
+
   describe("cleanupCloudOwnedStates", () => {
+    it("createCloudStates hands what the definitions could not decide to the cleanup", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice({ sku: "H6199", deviceId: "AABBCCDDEEFF0011" });
+      objects.set("devices.h6199-0011.scenes", { type: "channel" });
+      objects.set("devices.h6199-0011.scenes.scene_speed", { type: "state" });
+      await sm.createCloudStates(dev, [], 0, ["scenes.scene_speed"]);
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).not.toContain("devices.h6199-0011.scenes.scene_speed");
+    });
+
+    it("keeps what the definitions could not decide yet — the scene library has not answered", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const prefix = "devices.h6199-0011";
+      objects.set(`${prefix}.scenes`, { type: "channel" });
+      objects.set(`${prefix}.scenes.scene_speed`, { type: "state" });
+      objects.set(`${prefix}.scenes.stale_dropdown`, { type: "state" });
+      await sm.cleanupCloudOwnedStates(prefix, [], new Set(["scenes.scene_speed"]));
+      const deleted = calls.filter(c => c.method === "delObjectAsync").map(c => c.args[0]);
+      expect(deleted).not.toContain(`${prefix}.scenes.scene_speed`);
+      expect(deleted).toContain(`${prefix}.scenes.stale_dropdown`);
+    });
+
     it("does not delete the control channel object while LAN states survive under it (L9)", async () => {
       const { adapter, calls, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
@@ -1423,7 +1496,7 @@ describe("StateManager", () => {
 
       await sm.createGroupsOnlineState(true);
 
-      expect(objects.has("groups")).toBe(true);
+      // The manifest folder `groups` is refreshed with the other manifest objects (main.ts), not here.
       expect(objects.has("groups.info")).toBe(true);
       expect(objects.has("groups.info.online")).toBe(true);
       expect(states.get("groups.info.online")).toMatchObject({ val: true });
@@ -2192,6 +2265,7 @@ describe("StateManager", () => {
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, basicControlDefs());
 
+      const start = calls.length;
       const before = calls.filter(c => c.method === "setStateChangedAsync").length;
       await sm.updateDeviceState(dev, {
         power: true,
@@ -2200,8 +2274,9 @@ describe("StateManager", () => {
       });
       const after = calls.filter(c => c.method === "setStateChangedAsync").length;
       // Three fields set → three setStateChangedAsync calls, no extra getObjectAsync
+      // (counted from here — the tree build before reads objects to compare them).
       expect(after - before).toBe(3);
-      const getObjectCalls = calls.filter(c => c.method === "getObjectAsync");
+      const getObjectCalls = calls.slice(start).filter(c => c.method === "getObjectAsync");
       expect(getObjectCalls.filter(c => String(c.args[0]).includes(".control."))).toHaveLength(0);
     });
 
@@ -2245,6 +2320,22 @@ describe("StateManager", () => {
       expect(delCalls).toEqual(["devices.h6161-2222"]); // the device root, recursively — once
       expect([...objects.keys()].filter(k => k.startsWith("devices.h6161-2222"))).toEqual([]);
       expect(objects.has("devices.h6160-1111.info.name")).toBe(true);
+    });
+
+    it("a removed device forgets its remembered online value — the rebuilt tree gets it written again", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev1 = createTestDevice({ sku: "H6160", deviceId: "AABB1111" });
+      const dev2 = createTestDevice({ sku: "H6161", deviceId: "AABB2222" });
+      await createAllStatesForTest(sm, dev1, []);
+      await createAllStatesForTest(sm, dev2, []);
+      await sm.syncInfoOnline(dev2);
+      expect(states.get("devices.h6161-2222.info.online")?.val).toBe(true);
+      await sm.cleanupDevices([dev1]);
+      expect(states.has("devices.h6161-2222.info.online")).toBe(false);
+      await createAllStatesForTest(sm, dev2, []);
+      await sm.syncInfoOnline(dev2);
+      expect(states.get("devices.h6161-2222.info.online")?.val).toBe(true);
     });
 
     it("keeps a tree an account list names although the device map lacks it (H6)", async () => {
@@ -2876,24 +2967,31 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
     const sm = new StateManager(adapter as never, registry);
     const dev = createTestDevice({ lanIp: "192.168.1.100", lastLanReplyAt: Date.now() });
     await createAllStatesForTest(sm, dev, []);
-    // setStateChangedAsync is the platform's own "only on change" write — the
-    // mock records whether the value actually changed, and only those count.
+    // A read-only state is compared IN MEMORY (round 62): after the run's first
+    // write every call that reaches the database is a write — setStateChangedAsync
+    // (the first, compared once with the database) only when it changed.
     const countWrites = (): number =>
       calls.filter(
         c =>
-          c.method === "setStateChangedAsync" &&
           c.args[0] === "devices.h6160-0011.info.online" &&
-          (c.args[2] as { changed: boolean }).changed,
+          (c.method === "setState" ||
+            (c.method === "setStateChangedAsync" && (c.args[2] as { changed: boolean }).changed)),
       ).length;
+    const reads = (): number =>
+      calls.filter(c => c.method === "getStateAsync" && c.args[0] === "devices.h6160-0011.info.online").length;
 
     await sm.syncInfoOnline(dev); // settle whatever createInfoStates left behind
     const before = countWrites();
+    const readsBefore = reads();
+    const callsBefore = calls.length;
     await sm.syncInfoOnline(dev);
     await sm.syncInfoOnline(dev);
     await sm.syncInfoOnline(dev);
     // Runs every 20 s per device — a write per pass is pure timestamp spam in
-    // every history/InfluxDB attached to the state.
+    // every history/InfluxDB attached to the state; and nothing is read back.
     expect(countWrites()).toBe(before);
+    expect(reads()).toBe(readsBefore);
+    expect(calls.slice(callsBefore).filter(c => c.method === "setStateChangedAsync")).toHaveLength(0);
 
     dev.lastLanReplyAt = Date.now() - 91_000;
     await sm.syncInfoOnline(dev);

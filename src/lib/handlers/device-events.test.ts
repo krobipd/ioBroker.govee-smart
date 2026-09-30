@@ -22,15 +22,19 @@ interface Rig {
   adapter: Parameters<typeof onDeviceStateUpdate>[0];
   calls: string[];
   cloudDefs: StateDefinition[][];
+  undecided: string[][];
   updates: Array<Partial<DeviceState>>;
   dropdownResets: string[];
   reapCalls: number[];
   queue: Promise<void>[];
 }
 
-function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}): Rig {
+function makeRig(
+  opts: { devices?: GoveeDevice[]; statesReady?: boolean; holdBuilds?: Array<() => Promise<void>> } = {},
+): Rig {
   const calls: string[] = [];
   const cloudDefs: StateDefinition[][] = [];
+  const undecided: string[][] = [];
   const updates: Array<Partial<DeviceState>> = [];
   const dropdownResets: string[] = [];
   const reapCalls: number[] = [];
@@ -47,6 +51,11 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
       // build went through it and runs it.
       runDeviceBuild: (d: GoveeDevice, build: () => Promise<void>) => {
         calls.push(`runDeviceBuild:${d.deviceId}`);
+        if (opts.holdBuilds) {
+          // The real chain runs a build only after the previous one — held here
+          // until the test lets it go.
+          return new Promise<void>(resolve => opts.holdBuilds!.push(() => build().then(resolve)));
+        }
         return build();
       },
       updateDeviceState: (_d: GoveeDevice, s: Partial<DeviceState>) => {
@@ -65,9 +74,10 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
         calls.push("createLanStates");
         return Promise.resolve();
       },
-      createCloudStates: (_d: GoveeDevice, defs: StateDefinition[], segmentCount: number) => {
+      createCloudStates: (_d: GoveeDevice, defs: StateDefinition[], segmentCount: number, pending: string[]) => {
         calls.push(`createCloudStates:${segmentCount}`);
         cloudDefs.push(defs);
+        undecided.push(pending);
         return Promise.resolve();
       },
       migrateLegacyDiagnostics: () => {
@@ -123,7 +133,7 @@ function makeRig(opts: { devices?: GoveeDevice[]; statesReady?: boolean } = {}):
     return Promise.resolve();
   };
 
-  return { adapter, calls, cloudDefs, updates, dropdownResets, reapCalls, queue };
+  return { adapter, calls, cloudDefs, undecided, updates, dropdownResets, reapCalls, queue };
 }
 
 describe("onDeviceStateUpdate", () => {
@@ -307,6 +317,31 @@ describe("onCloudDataReady (phase 2)", () => {
     const localDef = rig.cloudDefs[0].find(d => d.id === "snapshot_local");
     expect(localDef).toBeDefined();
     expect(Object.values(localDef!.states!)).toContain("Snap");
+  });
+
+  it("derives the definitions when the build RUNS — a build queued before the scene library keeps scene_speed", async () => {
+    // Until 3.0.2 the definitions were derived at the call: a build queued
+    // behind another ran after the library had arrived, with the old list, and
+    // its cleanup deleted scenes.scene_speed with the user's recording.
+    const config = JSON.stringify([{ page: 0, defaultIndex: 2, moveIn: [242, 247, 252] }]);
+    const device = createTestDevice({ sku: "H6199" });
+    const held: Array<() => Promise<void>> = [];
+    const rig = makeRig({ devices: [device], statesReady: false, holdBuilds: held });
+    onCloudDataReady(rig.adapter, device, [device]);
+    device.sceneLibrary = [{ name: "Easter", sceneCode: 11217, speedInfo: { supSpeed: true, speedIndex: 0, config } }];
+    device.librariesCheckedAt = 1;
+    await held[0]();
+    expect(rig.cloudDefs[0].map(d => d.id)).toContain("scene_speed");
+    expect(rig.undecided[0]).toEqual([]);
+  });
+
+  it("hands the cleanup what the unconfirmed scene library cannot decide yet", async () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onCloudDataReady(rig.adapter, device, [device]);
+    await Promise.all(rig.queue);
+    expect(rig.cloudDefs[0].map(d => d.id)).not.toContain("scene_speed");
+    expect(rig.undecided[0]).toEqual(["scenes.scene_speed"]);
   });
 
   it("re-reaps stale devices only after the initial tree is ready (no churn during boot)", () => {

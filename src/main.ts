@@ -53,6 +53,7 @@ import {
   STALE_DEVICE_CLEANUP_DELAY_MS,
 } from "./lib/timing-constants";
 import { deriveGoveeClientId, isAppGroup } from "./lib/govee-constants";
+import { patchChangesNothing } from "./lib/object-write";
 
 // Rate-limit defaults moved to lib/timing-constants.ts as CLOUD_FULL_LIMITS so
 // every module that touches Govee budgeting reads the same canonical values.
@@ -617,16 +618,7 @@ export class GoveeAdapter extends utils.Adapter {
       // io-package.json, so js-controller materialises them on install /
       // upgrade. We only initialise the runtime values here.
       await this.setState("info.connection", { val: false, ack: true });
-      await this.setState("info.mqttConnected", { val: false, ack: true });
       await this.setState("info.cloudConnected", { val: false, ack: true });
-      await this.setState("info.openapiMqttConnected", {
-        val: false,
-        ack: true,
-      });
-      // Clear any stale 2FA-pending flag from a previous run — it is set true
-      // again by the login flow if Govee still wants a code, so leaving an old
-      // true here would keep the connection card's code field open forever.
-      await this.setState("info.verificationPending", { val: false, ack: true });
 
       // Device catalog from devices.json in the adapter package root — built
       // before anything that applies quirks. Status filter: verified+reported
@@ -637,6 +629,14 @@ export class GoveeAdapter extends utils.Adapter {
       });
 
       this.stateManager = new StateManager(this, this.deviceRegistry);
+      // The account and event flags go through the state manager's read-only
+      // writer from their first write on: every later callback writes only a
+      // change (a login retry used to rewrite `false` each time). The stale
+      // 2FA-pending flag of a previous run is cleared here — the login flow sets
+      // it again if Govee still wants a code.
+      await this.stateManager.writeReadOnly("info.mqttConnected", false);
+      await this.stateManager.writeReadOnly("info.openapiMqttConnected", false);
+      await this.stateManager.writeReadOnly("info.verificationPending", false);
       // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
       // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
       // generic device; intake skips them now, but a tree already created that
@@ -1010,9 +1010,9 @@ export class GoveeAdapter extends utils.Adapter {
           // connection card can show it live (the notification below is only a
           // nudge for when the user isn't in the settings — the actual flow
           // runs through the card, never a second login path).
-          this.setState("info.verificationPending", { val: true, ack: true }).catch(
-            logRejected(this.log, "best-effort write"),
-          );
+          this.stateManager
+            ?.writeReadOnly("info.verificationPending", true)
+            .catch(logRejected(this.log, "best-effort write"));
           if (reason === "failed") {
             cloudCreds
               .clearVerificationCodeSetting(this.handlerHost)
@@ -1074,10 +1074,9 @@ export class GoveeAdapter extends utils.Adapter {
         await this.mqttClient.connect(
           update => this.deviceManager!.handleMqttStatus(update),
           connected => {
-            this.setState("info.mqttConnected", {
-              val: connected,
-              ack: true,
-            }).catch(logRejected(this.log, "best-effort write"));
+            this.stateManager
+              ?.writeReadOnly("info.mqttConnected", connected)
+              .catch(logRejected(this.log, "best-effort write"));
             if (connected) {
               this.actionableProblems.resolve(
                 "mqtt-verification",
@@ -1085,9 +1084,9 @@ export class GoveeAdapter extends utils.Adapter {
               );
               this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
               this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
-              this.setState("info.verificationPending", { val: false, ack: true }).catch(
-                logRejected(this.log, "best-effort write"),
-              );
+              this.stateManager
+                ?.writeReadOnly("info.verificationPending", false)
+                .catch(logRejected(this.log, "best-effort write"));
               connectionState.checkAllReady(this.handlerHost);
               // A (re)connected broker: ask right away what went quiet while
               // it was down — the topics are known from the last list poll.
@@ -1199,10 +1198,9 @@ export class GoveeAdapter extends utils.Adapter {
         this.openapiMqttClient.connect(
           event => this.deviceManager?.handleOpenApiEvent(event),
           connected => {
-            this.setState("info.openapiMqttConnected", {
-              val: connected,
-              ack: true,
-            }).catch(logRejected(this.log, "best-effort write"));
+            this.stateManager
+              ?.writeReadOnly("info.openapiMqttConnected", connected)
+              .catch(logRejected(this.log, "best-effort write"));
             if (connected) {
               // Cloud-events (Sensor Push) is a Ready precondition — re-check so
               // the adapter logs "ready" as soon as it connects instead of
@@ -1532,31 +1530,69 @@ export class GoveeAdapter extends utils.Adapter {
   private async ensureManifestObjects(): Promise<void> {
     // Written out one call per object on purpose. A loop over a table would be
     // shorter and would hide which objects are actually reached — from a reader
-    // and from the consistency gate, which looks for the literal call. The
+    // and from the consistency gate, which looks for the literal call. Each one
+    // writes only when the text differs (round 61: the first write of an
+    // instanceObjects entry is js-controller's, a second unchanged one ours). The
     // texts come from `admin/i18n`, the same source the release gate writes the
     // manifest from, so the two cannot drift apart.
     const fail = (id: string) => (e: unknown) => this.log.debug(`Could not refresh ${id}: ${errMessage(e)}`);
-    await this.extendObject("info", { common: { name: tName("information") } }).catch(fail("info"));
-    await this.extendObject("devices", { common: { name: tName("devicesFolder") } }).catch(fail("devices"));
-    await this.extendObject("groups", { common: { name: tName("groups") } }).catch(fail("groups"));
-    await this.extendObject("info.connection", {
-      common: { name: tName("infoConnection"), desc: tDesc("infoConnectionDesc") },
-    }).catch(fail("info.connection"));
-    await this.extendObject("info.mqttConnected", {
-      common: { name: tName("infoMqttConnected"), desc: tDesc("infoMqttConnectedDesc") },
-    }).catch(fail("info.mqttConnected"));
-    await this.extendObject("info.cloudConnected", {
-      common: { name: tName("infoCloudConnected"), desc: tDesc("infoCloudConnectedDesc") },
-    }).catch(fail("info.cloudConnected"));
-    await this.extendObject("info.openapiMqttConnected", {
-      common: { name: tName("infoOpenapiMqttConnected"), desc: tDesc("infoOpenapiMqttConnectedDesc") },
-    }).catch(fail("info.openapiMqttConnected"));
-    await this.extendObject("info.verificationPending", {
-      common: { name: tName("infoVerificationPending"), desc: tDesc("infoVerificationPendingDesc") },
-    }).catch(fail("info.verificationPending"));
-    await this.extendObject("info.manualSyncDevices", {
-      common: { name: tName("infoManualSyncDevices"), desc: tDesc("infoManualSyncDevicesDesc") },
-    }).catch(fail("info.manualSyncDevices"));
+    // The comparison stands before the literal call; the call writes the patch it is handed.
+    const refresh = async (
+      id: string,
+      patch: ioBroker.PartialObject,
+      write: (p: ioBroker.PartialObject) => Promise<unknown>,
+    ): Promise<void> => {
+      const existing = await this.getObjectAsync(id).catch(() => null);
+      if (existing && patchChangesNothing(patch, existing)) {
+        return;
+      }
+      await write(patch).catch(fail(id));
+    };
+    await refresh("info", { common: { name: tName("information") } }, p => this.extendObject("info", p));
+    await refresh("devices", { common: { name: tName("devicesFolder") } }, p => this.extendObject("devices", p));
+    await refresh("groups", { common: { name: tName("groups") } }, p => this.extendObject("groups", p));
+    await refresh(
+      "info.connection",
+      {
+        common: { name: tName("infoConnection"), desc: tDesc("infoConnectionDesc") },
+      },
+      p => this.extendObject("info.connection", p),
+    );
+    await refresh(
+      "info.mqttConnected",
+      {
+        common: { name: tName("infoMqttConnected"), desc: tDesc("infoMqttConnectedDesc") },
+      },
+      p => this.extendObject("info.mqttConnected", p),
+    );
+    await refresh(
+      "info.cloudConnected",
+      {
+        common: { name: tName("infoCloudConnected"), desc: tDesc("infoCloudConnectedDesc") },
+      },
+      p => this.extendObject("info.cloudConnected", p),
+    );
+    await refresh(
+      "info.openapiMqttConnected",
+      {
+        common: { name: tName("infoOpenapiMqttConnected"), desc: tDesc("infoOpenapiMqttConnectedDesc") },
+      },
+      p => this.extendObject("info.openapiMqttConnected", p),
+    );
+    await refresh(
+      "info.verificationPending",
+      {
+        common: { name: tName("infoVerificationPending"), desc: tDesc("infoVerificationPendingDesc") },
+      },
+      p => this.extendObject("info.verificationPending", p),
+    );
+    await refresh(
+      "info.manualSyncDevices",
+      {
+        common: { name: tName("infoManualSyncDevices"), desc: tDesc("infoManualSyncDevicesDesc") },
+      },
+      p => this.extendObject("info.manualSyncDevices", p),
+    );
   }
 
   /**

@@ -6,7 +6,9 @@ import {
   SENSOR_ROLE_UNIT,
   type StateDefinition,
 } from "./capability-mapper";
-import { GROUP_ICON, iconForGoveeType, shortenGoveeType } from "./device-icons";
+import { GROUP_ICON, iconForGoveeType } from "./device-icons";
+import { extendIfChanged } from "./object-write";
+import { infoTypeStates, infoTypeValue, UNKNOWN_DEVICE_TYPE } from "./value-labels";
 import { SEGMENT_COUNT_MAX, resolveDeviceReachability } from "./device-manager/lookups";
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE, isAppGroup, PSEUDO_GROUP_SKUS } from "./govee-constants";
@@ -253,6 +255,11 @@ export class StateManager {
    * round has just written exactly these values, so the two can't disagree.
    */
   private readonly resolvedOnline = new Map<string, boolean>();
+  /**
+   * The value each read-only state of this instance carries, as this run wrote or
+   * confirmed it — see {@link writeReadOnly}.
+   */
+  private readonly readOnlyValues = new Map<string, ioBroker.StateValue>();
   /** This instance's device catalog — quirks for the LAN default states. */
   private readonly registry: DeviceRegistry;
   /**
@@ -458,9 +465,7 @@ export class StateManager {
     for (const id of ids) {
       this.resolvedOnline.set(id, false);
     }
-    await Promise.all(
-      ids.map(id => this.adapter.setStateChangedAsync(id, { val: false, ack: true }).catch(() => undefined)),
-    );
+    await Promise.all(ids.map(id => this.writeReadOnly(id, false).catch(() => undefined)));
     await this.clearDeviceRollup();
     return ids;
   }
@@ -551,13 +556,45 @@ export class StateManager {
     const online = deviceIds.filter(id => this.resolvedOnline.get(id) === true).length;
     const total = deviceIds.length;
     await this.ensureDeviceRollupStates();
-    await this.adapter.setStateChangedAsync("info.devicesTotal", { val: total, ack: true });
-    await this.adapter.setStateChangedAsync("info.devicesOnline", { val: online, ack: true });
-    await this.adapter.setStateChangedAsync("info.devicesAllOnline", {
-      val: total > 0 && online === total,
-      ack: true,
-    });
+    await this.writeReadOnly("info.devicesTotal", total);
+    await this.writeReadOnly("info.devicesOnline", online);
+    await this.writeReadOnly("info.devicesAllOnline", total > 0 && online === total);
     return { total, online };
+  }
+
+  /**
+   * Merge into an object only when that changes something (fleet rule, round 61) —
+   * every tree build ran through every object again and rewrote it unchanged.
+   *
+   * @param id Namespace-less object id
+   * @param patch What `extendObject` would merge
+   */
+  private async extendIfChanged(id: string, patch: ioBroker.PartialObject): Promise<void> {
+    await extendIfChanged(this.adapter, id, patch);
+  }
+
+  /**
+   * Write a state only the adapter writes (`common.write: false`) — only when it
+   * differs from what this run already wrote or confirmed, compared IN MEMORY
+   * (fleet rule, round 62): `setStateChangedAsync` reads the state back from the
+   * database on every call, and the 20-second round did that for every marker.
+   * The first write of a run compares once with the database — the value of the
+   * last run lives only there.
+   *
+   * @param id State id (namespace-less)
+   * @param val The value
+   */
+  async writeReadOnly(id: string, val: ioBroker.StateValue): Promise<void> {
+    if (this.readOnlyValues.has(id)) {
+      if (this.readOnlyValues.get(id) === val) {
+        return;
+      }
+      this.readOnlyValues.set(id, val);
+      await this.adapter.setState(id, { val, ack: true });
+      return;
+    }
+    this.readOnlyValues.set(id, val);
+    await this.adapter.setStateChangedAsync(id, { val, ack: true });
   }
 
   /**
@@ -575,12 +612,8 @@ export class StateManager {
     const exists = async (id: string): Promise<boolean> =>
       this.ensuredStates.has(id) || (await this.adapter.getObjectAsync(id).catch(() => null)) != null;
     await Promise.all([
-      exists("info.devicesOnline").then(ok =>
-        ok ? this.adapter.setStateChangedAsync("info.devicesOnline", { val: 0, ack: true }) : undefined,
-      ),
-      exists("info.devicesAllOnline").then(ok =>
-        ok ? this.adapter.setStateChangedAsync("info.devicesAllOnline", { val: false, ack: true }) : undefined,
-      ),
+      exists("info.devicesOnline").then(ok => (ok ? this.writeReadOnly("info.devicesOnline", 0) : undefined)),
+      exists("info.devicesAllOnline").then(ok => (ok ? this.writeReadOnly("info.devicesAllOnline", false) : undefined)),
     ]).catch(() => undefined);
   }
 
@@ -717,7 +750,7 @@ export class StateManager {
       // events/. Without it the channel parent stays missing and Admin shows
       // the state directly under the device root.
       try {
-        await this.adapter.extendObject(channelId, {
+        await this.extendIfChanged(channelId, {
           type: "channel",
           common: { name: channelName(channel) },
           native: {},
@@ -731,7 +764,7 @@ export class StateManager {
       return;
     }
     try {
-      await this.adapter.extendObject(stateFullId, {
+      await this.extendIfChanged(stateFullId, {
         type: "state",
         common: {
           name: tName(meta.nameKey),
@@ -821,7 +854,7 @@ export class StateManager {
     // persisting it would rebuild exactly the defect the preserve removal fixes.
     const signature = JSON.stringify([device.name, icon, onlineId]);
     if (this.deviceObjectSignature.get(prefix) !== signature) {
-      await this.adapter.extendObject(prefix, {
+      await this.extendIfChanged(prefix, {
         type: "device",
         common: {
           name: device.name,
@@ -840,7 +873,7 @@ export class StateManager {
     }
 
     // Info channel — groups only get name (no individual online)
-    await this.adapter.extendObject(`${prefix}.info`, {
+    await this.extendIfChanged(`${prefix}.info`, {
       type: "channel",
       common: { name: tName("deviceInformation") },
       native: {},
@@ -910,19 +943,24 @@ export class StateManager {
           tDesc("descIpAddress"),
         );
       }
-      // Device-type marker — short label like "light", "thermometer",
-      // "heater" (Govee API type without the "devices.types." prefix).
-      // Lets scripts filter `*.info.type === "light"` without parsing.
-      await this.ensureState(
-        `${prefix}.info.type`,
-        tName("deviceType"),
-        "string",
-        "text",
-        false,
-        undefined,
-        "",
-        tDesc("descDeviceType"),
-      );
+      // Device-type marker — "light", "thermometer", "heater" (Govee's type
+      // without the "devices.types." prefix, `unknown` for a type outside the
+      // list), so scripts filter `*.info.type === "light"` without parsing; the
+      // value list labels it in the system language (readable values).
+      await this.extendIfChanged(`${prefix}.info.type`, {
+        type: "state",
+        common: {
+          name: tName("deviceType"),
+          desc: tDesc("descDeviceType"),
+          type: "string",
+          role: "text",
+          read: true,
+          write: false,
+          def: UNKNOWN_DEVICE_TYPE,
+          states: infoTypeStates(),
+        },
+        native: {},
+      });
       await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
         val: device.sku,
         ack: true,
@@ -947,7 +985,7 @@ export class StateManager {
         });
       }
       await this.adapter.setStateChangedAsync(`${prefix}.info.type`, {
-        val: shortenGoveeType(device.type),
+        val: infoTypeValue(device.type),
         ack: true,
       });
       // Initial info.online sync — see syncInfoOnline for the resolver.
@@ -1034,8 +1072,15 @@ export class StateManager {
    * @param device Govee device
    * @param stateDefs Cloud-owned state definitions from buildCloudStateDefs
    * @param segmentCount Settled segment count (DeviceManager.syncSegmentCount) for the segment tree
+   * @param undecided `channel.stateId`s the definitions could not decide yet — derived
+   *   together with them (`libraryDecidesPending`), kept by the cleanup
    */
-  async createCloudStates(device: GoveeDevice, stateDefs: StateDefinition[], segmentCount: number): Promise<void> {
+  async createCloudStates(
+    device: GoveeDevice,
+    stateDefs: StateDefinition[],
+    segmentCount: number,
+    undecided: readonly string[] = [],
+  ): Promise<void> {
     const prefix = this.devicePrefix(device);
 
     // Drop _segment_ marker entries — segments have their own dedicated
@@ -1046,7 +1091,7 @@ export class StateManager {
     // Remove states no longer present in this Cloud-phase build. LAN_STATE_IDS
     // protects the LAN-default ids in the control channel — the LAN phase
     // owns those.
-    await this.cleanupCloudOwnedStates(prefix, nonSegmentDefs);
+    await this.cleanupCloudOwnedStates(prefix, nonSegmentDefs, new Set(undecided));
 
     // Segment channel if device has segment caps
     if (stateDefs.some(d => d.id.startsWith("_segment_"))) {
@@ -1079,7 +1124,7 @@ export class StateManager {
     );
 
     for (const [channel, defs] of channelGroups) {
-      await this.adapter.extendObject(`${prefix}.${channel}`, {
+      await this.extendIfChanged(`${prefix}.${channel}`, {
         type: "channel",
         common: { name: channelName(channel) },
         native: {},
@@ -1116,7 +1161,7 @@ export class StateManager {
           common.desc = def.desc as ioBroker.StringOrTranslated;
         }
 
-        await this.adapter.extendObject(`${prefix}.${channel}.${def.id}`, {
+        await this.extendIfChanged(`${prefix}.${channel}.${def.id}`, {
           type: "state",
           common: common,
           native: {
@@ -1174,7 +1219,7 @@ export class StateManager {
   async createSegmentStates(device: GoveeDevice, segmentCount: number): Promise<void> {
     const prefix = this.devicePrefix(device);
 
-    await this.adapter.extendObject(`${prefix}.segments`, {
+    await this.extendIfChanged(`${prefix}.segments`, {
       type: "channel",
       common: { name: tName("ledSegments") },
       native: {},
@@ -1205,7 +1250,7 @@ export class StateManager {
     });
 
     // Manual-mode toggle and list — user-writable for cut-strip overrides
-    await this.adapter.extendObject(`${prefix}.segments.manual_mode`, {
+    await this.extendIfChanged(`${prefix}.segments.manual_mode`, {
       type: "state",
       common: {
         name: tName("manualSegmentsActive"),
@@ -1218,7 +1263,7 @@ export class StateManager {
       },
       native: {},
     });
-    await this.adapter.extendObject(`${prefix}.segments.manual_list`, {
+    await this.extendIfChanged(`${prefix}.segments.manual_list`, {
       type: "state",
       common: {
         name: tName("manualSegmentList"),
@@ -1250,13 +1295,13 @@ export class StateManager {
     });
 
     for (const i of validIndices) {
-      await this.adapter.extendObject(`${prefix}.segments.${i}`, {
+      await this.extendIfChanged(`${prefix}.segments.${i}`, {
         type: "channel",
         common: { name: tNameWith("segmentChannel", i) },
         native: {},
       });
 
-      await this.adapter.extendObject(`${prefix}.segments.${i}.color`, {
+      await this.extendIfChanged(`${prefix}.segments.${i}.color`, {
         type: "state",
         common: {
           name: tName("color"),
@@ -1269,7 +1314,7 @@ export class StateManager {
         native: {},
       });
 
-      await this.adapter.extendObject(`${prefix}.segments.${i}.brightness`, {
+      await this.extendIfChanged(`${prefix}.segments.${i}.brightness`, {
         type: "state",
         common: {
           name: tName("brightness"),
@@ -1287,7 +1332,7 @@ export class StateManager {
     }
 
     // Comfort command state for batch segment control
-    await this.adapter.extendObject(`${prefix}.segments.command`, {
+    await this.extendIfChanged(`${prefix}.segments.command`, {
       type: "state",
       common: {
         name: tName("batchSegmentCommand"),
@@ -1383,7 +1428,7 @@ export class StateManager {
       // reading the marker back, so a stale entry would mis-count devicesOnline
       // until the next 20 s round.
       this.resolvedOnline.set(onlineId, resolved);
-      set(onlineId, resolved);
+      writes.push(this.writeReadOnly(onlineId, resolved).catch(() => undefined));
     }
     if (state.power !== undefined) {
       set(`${prefix}.control.power`, state.power);
@@ -1406,9 +1451,9 @@ export class StateManager {
    * @param online Initial online value
    */
   async createGroupsOnlineState(online: boolean): Promise<void> {
-    // A manifest object: the manifest owns its shape, the refresh carries only the name.
-    await this.adapter.extendObject("groups", { common: { name: tName("groups") } });
-    await this.adapter.extendObject("groups.info", {
+    // The manifest folder `groups` is refreshed once, with the other manifest
+    // objects (main.ts ensureManifestObjects).
+    await this.extendIfChanged("groups.info", {
       type: "channel",
       common: { name: tName("groupsStatus") },
       native: {},
@@ -1424,10 +1469,7 @@ export class StateManager {
       tDesc("descCloudOnline"),
     );
     this.onlineMarkerCache?.add("groups.info.online");
-    await this.adapter.setState("groups.info.online", {
-      val: online,
-      ack: true,
-    });
+    await this.writeReadOnly("groups.info.online", online);
   }
 
   /**
@@ -1436,7 +1478,7 @@ export class StateManager {
    * @param online Cloud connection status
    */
   async updateGroupsOnline(online: boolean): Promise<void> {
-    await this.adapter.setState("groups.info.online", { val: online, ack: true }).catch(() => undefined);
+    await this.writeReadOnly("groups.info.online", online).catch(() => undefined);
   }
 
   /**
@@ -1610,8 +1652,13 @@ export class StateManager {
    *
    * @param prefix Device prefix
    * @param cloudStateDefs Current Cloud-phase state definitions (non-segment)
+   * @param undecided `channel.stateId`s whose source has not answered yet — kept, never swept
    */
-  async cleanupCloudOwnedStates(prefix: string, cloudStateDefs: StateDefinition[]): Promise<number> {
+  async cleanupCloudOwnedStates(
+    prefix: string,
+    cloudStateDefs: StateDefinition[],
+    undecided: ReadonlySet<string> = new Set(),
+  ): Promise<number> {
     // Build expected state set per channel
     const expectedByChannel = new Map<string, Set<string>>();
     for (const def of cloudStateDefs) {
@@ -1654,6 +1701,8 @@ export class StateManager {
       // Count them as seen-but-not-deleted survivors so the "empty channel"
       // removal below doesn't delete the channel object out from under them.
       const foreignOwned =
+        // Not known yet (a library that has not answered) is not "gone".
+        undecided.has(`${channel}.${stateId}`) ||
         (channel === "control" && LAN_STATE_IDS.has(stateId)) ||
         ((channel === "sensor" || channel === "events") && SYNTHETIC_STATE_META[stateId.toLowerCase()] !== undefined);
       if (foreignOwned) {
@@ -1771,6 +1820,7 @@ export class StateManager {
   private forgetPrefix(prefix: string): void {
     this.onlineMarkerCache?.delete(`${prefix}.info.online`);
     this.resolvedOnline.delete(`${prefix}.info.online`);
+    this.readOnlyValues.delete(`${prefix}.info.online`);
     // A removed or re-prefixed device must get its device object written in
     // full again — a surviving signature would skip the write that rebuilds it.
     this.deviceObjectSignature.delete(prefix);
@@ -1846,7 +1896,7 @@ export class StateManager {
     if (def !== undefined) {
       common.def = def;
     }
-    await this.adapter.extendObject(id, {
+    await this.extendIfChanged(id, {
       type: "state",
       common: common,
       native: {},
@@ -1894,7 +1944,7 @@ export class StateManager {
     const { online: desiredOnline, proven } = resolveDeviceReachability(device);
 
     this.resolvedOnline.set(stateId, desiredOnline);
-    await this.adapter.setStateChangedAsync(stateId, { val: desiredOnline, ack: true }).catch(() => undefined);
+    await this.writeReadOnly(stateId, desiredOnline).catch(() => undefined);
 
     let lightOnlineChanged = false;
     // A derived value may raise the device's own flag but never lower it —

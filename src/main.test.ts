@@ -311,6 +311,7 @@ function internalOf(adapter: GoveeAdapter): {
   enums: Map<string, Record<string, unknown>>;
   config: Record<string, unknown>;
   log: Record<"silly" | "debug" | "info" | "warn" | "error", ReturnType<typeof vi.fn>>;
+  extendObject: ReturnType<typeof vi.fn>;
   namespace: string;
   deviceManager: { getDevices(): GoveeDevice[]; [k: string]: unknown } | null;
   skuCache: unknown;
@@ -613,6 +614,22 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.states.get("info.connection")).toEqual({ val: true, ack: true });
     // A leftover `true` would keep the connection card's code field open forever.
     expect(i.states.get("info.verificationPending")).toEqual({ val: false, ack: true });
+  });
+
+  it("refreshes a manifest object only when its text differs — a second pass writes none (round 61)", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const manifestIds = (
+      JSON.parse(fsReal.readFileSync(pathReal.join(__dirname, "..", "io-package.json"), "utf8")) as {
+        instanceObjects: Array<{ _id: string }>;
+      }
+    ).instanceObjects.map(o => o._id);
+    const manifestWrites = (): string[] =>
+      i.extendObject.mock.calls.map(c => String(c[0])).filter(id => manifestIds.includes(id));
+    expect(manifestWrites().length).toBeGreaterThan(0);
+    i.extendObject.mockClear();
+    await (i as unknown as { ensureManifestObjects(): Promise<void> }).ensureManifestObjects();
+    expect(manifestWrites()).toEqual([]);
   });
 
   it("removes the report store of 2.29.0–2.36.0 — files and the meta object", async () => {
@@ -922,9 +939,13 @@ describe("GoveeAdapter onReady — timers", () => {
     const device = makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: Date.now() });
     (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
     await (i.stateManager as unknown as { createInfoStates(d: GoveeDevice): Promise<void> }).createInfoStates(device);
-    i.states.set("devices.h6172-ee11.info.online", { val: false, ack: true });
-
     const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    // Only the adapter writes the marker: the round turns it with the light's own evidence.
+    device.lastLanReplyAt = Date.now() - 10 * 60_000;
+    (syncCall![0] as () => void)();
+    await settle(5);
+    expect(i.states.get("devices.h6172-ee11.info.online")?.val).toBe(false);
+    device.lastLanReplyAt = Date.now();
     (syncCall![0] as () => void)();
     await settle(5);
     expect(i.states.get("devices.h6172-ee11.info.online")?.val).toBe(true);
@@ -3232,8 +3253,14 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     const dropdown = (id: string): Record<string, string> | undefined =>
       (i.objects.get(`devices.h600d-${id}.scenes.light_scene`) as { common?: { states?: Record<string, string> } })
         ?.common?.states;
-    expect(dropdown("ee01")).toEqual({ 0: "---" }); // still waiting — nothing invented
-    expect(dropdown("ee02")).toEqual({ 0: "---" });
+    // Nothing invented while waiting: a dropdown shows only what Govee already answered — the light
+    // whose call is held shows the placeholder alone (the definitions are derived when the build runs,
+    // so a light whose scene answer is already in may show it).
+    const shown = [dropdown("ee01"), dropdown("ee02")].map(d => Object.values(d ?? {}));
+    expect(shown).toContainEqual(["---"]);
+    for (const labels of shown) {
+      expect(labels.every(l => l === "---" || l === "Sunrise")).toBe(true);
+    }
 
     const dm = i.deviceManager as unknown as {
       whenSceneLoadsSettled: () => Promise<void>;

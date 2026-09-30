@@ -15,6 +15,7 @@ import {
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { resolveLabel, tDesc, tName, type I18nKey } from "./i18n";
+import { optionLabel } from "./value-labels";
 
 /** ioBroker state definition derived from a Govee capability */
 export interface StateDefinition {
@@ -468,12 +469,15 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
   // used the value 0 would take the slot, which is the same property every
   // value-keyed dropdown here has.
   const states: Record<string, string> = { 0: "---" };
+  // A scene instance lists Govee's content (effect names) — kept as Govee names
+  // it; any other instance lists settings (`Speed 1`), labelled in the system language.
+  const content = /scene$/i.test(cap.instance);
   for (const opt of cap.parameters.options) {
     if (!opt || typeof opt.name !== "string") {
       continue;
     }
     const val = safeStringify(opt.value);
-    states[val] = opt.name;
+    states[val] = content ? opt.name : optionLabel(opt.name);
   }
 
   return [
@@ -755,7 +759,7 @@ export function classifyModeLevels(
   if (named && !collision && ranges.length === 0) {
     const states: Record<string, string> = {};
     for (const l of levels) {
-      states[safeStringify(l.value)] = l.name!;
+      states[safeStringify(l.value)] = optionLabel(l.name!);
     }
     return { kind: "dropdown", states };
   }
@@ -858,7 +862,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
     const modeStates: Record<string, string> = {};
     for (const opt of modeField.options) {
       if (opt && typeof opt.name === "string") {
-        modeStates[safeStringify(opt.value)] = opt.name;
+        modeStates[safeStringify(opt.value)] = optionLabel(opt.name);
       }
     }
     states.push({
@@ -945,7 +949,7 @@ function mapAutoStop(cap: CloudCapability): StateDefinition[] {
   const states: Record<string, string> = {};
   for (const opt of options) {
     if (opt && typeof opt.name === "string" && opt.value !== undefined && opt.value !== null) {
-      states[safeStringify(opt.value)] = opt.name;
+      states[safeStringify(opt.value)] = optionLabel(opt.name);
     }
   }
   if (Object.keys(states).length === 0) {
@@ -1695,6 +1699,12 @@ export function planCloudCapabilityWrites(
  * whole struct, and dropping `modeValue` left the level datapoint on its
  * default while the mode updated (issue #47).
  *
+ * A value for a datapoint with a value list is kept only when the list the
+ * builder makes from the DECLARED capability carries it — the same builder,
+ * so the two cannot disagree. Until 3.0.2 any number Govee sent landed in the
+ * dropdown (a fan-speed mode showed `50`, a level in Auto mode `0`), a value no
+ * label explains and no command can send back.
+ *
  * @param cap      One capability from the cloud-state response
  * @param declared The device's declared capabilities, if the caller has them
  */
@@ -1702,6 +1712,30 @@ export function mapCloudStateValues(
   cap: CloudStateCapability,
   declared?: readonly CloudCapability[],
 ): CloudStateValue[] {
+  const values = cloudStateValuesOf(cap, declared);
+  const own = declared?.find(c => c.type === cap.type && c.instance === cap.instance);
+  if (!own) {
+    return values;
+  }
+  const lists = new Map<string, Record<string, string>>();
+  for (const def of mapSingleCapability(own) ?? []) {
+    if (def.states) {
+      lists.set(def.id, def.states);
+    }
+  }
+  return values.filter(v => {
+    const list = lists.get(v.stateId);
+    return list === undefined || safeStringify(v.value) in list;
+  });
+}
+
+/**
+ * {@link mapCloudStateValues} before the value-list check.
+ *
+ * @param cap      One capability from the cloud-state response
+ * @param declared The device's declared capabilities, if the caller has them
+ */
+function cloudStateValuesOf(cap: CloudStateCapability, declared?: readonly CloudCapability[]): CloudStateValue[] {
   const primary = mapCloudStateValue(cap);
   if (!primary) {
     return [];
@@ -2046,7 +2080,8 @@ export function buildCloudStateDefs(
     });
   }
 
-  // Scene speed slider — only if any scene supports speed adjustment.
+  // Scene speed slider — only if any scene supports speed adjustment
+  // (the scene library decides; see {@link libraryDecidesPending}).
   // Stays inline: depends on a computed maxSpeedLevel that doesn't fit the
   // dropdown-rule shape.
   const maxSpeedLevel = device.sceneLibrary.reduce((max, entry) => {
@@ -2186,6 +2221,26 @@ function memberHasControlState(member: GoveeDevice, stateId: string): boolean {
   }
   const caps = Array.isArray(member.capabilities) ? member.capabilities : [];
   return caps.some(c => capMatchesControl(c, kind));
+}
+
+/**
+ * The datapoints the scene LIBRARY decides — `scenes.scene_speed` — while that
+ * library has not been confirmed for this light: no library entry and no
+ * confirmed run (`librariesCheckedAt` is stamped only when every library
+ * endpoint answered — a failed, skipped or dropped call is no answer). Absence
+ * then proves nothing, so the cloud-owned cleanup keeps them (deletion needs
+ * knowledge, not absence). Until 3.0.1 a start without the cache deleted the
+ * slider before the library arrived and created it anew — its value and the
+ * user's recording were gone.
+ *
+ * @param device The device being built
+ * @returns full-local ids below the device (`scenes.scene_speed`), empty once the library is known
+ */
+export function libraryDecidesPending(device: GoveeDevice): string[] {
+  const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
+  return isLight && device.sceneLibrary.length === 0 && device.librariesCheckedAt === undefined
+    ? ["scenes.scene_speed"]
+    : [];
 }
 
 /**

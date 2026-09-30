@@ -55,3 +55,7 @@ build/
 
 # Session memory of the note-taking hook — never repository content
 .remember/
+
+# Value dumps of the inventory run — generated, never committed (template: CLAUDE_TEMPLATES.md, Objekt-Inventar)
+test/states.inventory.json
+test/objects.inventory.de.json

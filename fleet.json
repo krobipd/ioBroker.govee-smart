@@ -31,5 +31,9 @@
       "role": "primary",
       "fixed": 4002
     }
-  ]
+  ],
+  "ciExtraJobs": {
+    "_comment": "Extra CI jobs beyond the fleet's core jobs — each costs runtime in every run, so each carries its reason.",
+    "validate-devices": "devices.json is the device catalog the adapter ships: its schema, statuses and quirk fields are validated on every push (npm run validate-devices), a broken entry would break every installation's quirk loading"
+  }
 }
