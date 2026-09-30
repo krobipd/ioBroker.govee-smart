@@ -1889,6 +1889,36 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(0);
     });
 
+    it("offers only the colour temperatures every member takes — the intersection of their own ranges (M5, 3.0.2)", () => {
+      const ctCap = (min: number, max: number): GoveeDevice["capabilities"][number] =>
+        ({
+          type: "devices.capabilities.color_setting",
+          instance: "colorTemperatureK",
+          parameters: { dataType: "INTEGER", range: { min, max, precision: 1 } },
+        }) as never;
+      const group = createGroup();
+      // H6076 declares 2200–6500 (issue #44); the second light has no declared range (LAN default 2000–9000).
+      const m1 = createMember({ sku: "H6076", lanIp: "192.168.1.1", capabilities: [ctCap(2200, 6500)] });
+      const m2 = createMember({ sku: "H61BC", lanIp: "192.168.1.2" });
+      const ct = buildAllStateDefsForTest(group, undefined, [m1, m2]).find(d => d.id === "color_temperature");
+      expect(ct).toMatchObject({ min: 2200, max: 6500, def: 2200 });
+    });
+
+    it("offers no colour temperature when the members' ranges do not overlap", () => {
+      const ctCap = (min: number, max: number): GoveeDevice["capabilities"][number] =>
+        ({
+          type: "devices.capabilities.color_setting",
+          instance: "colorTemperatureK",
+          parameters: { dataType: "INTEGER", range: { min, max, precision: 1 } },
+        }) as never;
+      const group = createGroup();
+      const m1 = createMember({ sku: "H6076", lanIp: "192.168.1.1", capabilities: [ctCap(2200, 3000)] });
+      const m2 = createMember({ sku: "H61BC", lanIp: "192.168.1.2", capabilities: [ctCap(4000, 6500)] });
+      const ids = buildAllStateDefsForTest(group, undefined, [m1, m2]).map(d => d.id);
+      expect(ids).toContain("power");
+      expect(ids).not.toContain("color_temperature");
+    });
+
     it("should return control states from LAN member intersection", () => {
       const group = createGroup();
       const m1 = createMember({ sku: "H61BE", lanIp: "192.168.1.1" });

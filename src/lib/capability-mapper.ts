@@ -1832,10 +1832,27 @@ export function buildLanStateDefs(
   if (!device.lanIp) {
     return [];
   }
-  const stateDefs = getDefaultLanStates();
-  // The device's own declared colour-temperature range, where the Cloud list
-  // gave one (H6076: 2200–6500, issue #44) — the LAN default 2000–9000 is Govee's generic
-  // LAN range, not this lamp's (audit M7/N19). The catalog quirk still wins.
+  return applyOwnColorTempRange(getDefaultLanStates(), device, log, registry);
+}
+
+/**
+ * Give the colour-temperature definition in `stateDefs` the range of THIS
+ * device: the one its Cloud capability declares (H6076: 2200–6500, issue #44 —
+ * the LAN default 2000–9000 is Govee's generic LAN range, not this lamp's;
+ * audit M7/N19), then the catalog quirk, which still wins. The one rule for a
+ * light's own datapoint and for a group's intersection.
+ *
+ * @param stateDefs Definitions (changed in place, returned)
+ * @param device The device whose range applies
+ * @param log Adapter logger — forwarded to applyQuirksToStates
+ * @param registry This instance's device catalog
+ */
+function applyOwnColorTempRange(
+  stateDefs: StateDefinition[],
+  device: GoveeDevice,
+  log: ioBroker.Logger,
+  registry: DeviceRegistry,
+): StateDefinition[] {
   const declared = declaredColorTempRange(device);
   if (declared) {
     const ct = stateDefs.find(d => d.id === "color_temperature");
@@ -1847,6 +1864,33 @@ export function buildLanStateDefs(
   }
   applyQuirksToStates(device.sku, stateDefs, log, registry);
   return stateDefs;
+}
+
+/**
+ * The colour-temperature range every member can take — the largest minimum and
+ * the smallest maximum of the members' own ranges, or null when they do not
+ * overlap. A group offering more sent values outside a member's range to it
+ * (Cloud members get no LAN clamp).
+ *
+ * @param members The controllable members
+ * @param log Adapter logger
+ * @param registry This instance's device catalog
+ */
+function sharedColorTempRange(
+  members: GoveeDevice[],
+  log: ioBroker.Logger,
+  registry: DeviceRegistry,
+): { min: number; max: number } | null {
+  let min = -Infinity;
+  let max = Infinity;
+  for (const member of members) {
+    const ct = applyOwnColorTempRange(getDefaultLanStates(), member, log, registry).find(
+      d => d.id === "color_temperature",
+    );
+    min = Math.max(min, ct?.min ?? -Infinity);
+    max = Math.min(max, ct?.max ?? Infinity);
+  }
+  return Number.isFinite(min) && Number.isFinite(max) && min <= max ? { min, max } : null;
 }
 
 /**
@@ -1936,7 +1980,7 @@ export function buildCloudStateDefs(
   memberDevices?: GoveeDevice[],
 ): StateDefinition[] {
   if (isAppGroup(device)) {
-    return buildGroupStateDefs(memberDevices || []);
+    return buildGroupStateDefs(memberDevices || [], log, registry);
   }
 
   // Per-SKU quirk: brokenPlatformApi → don't trust the platform-cap tree.
@@ -2150,8 +2194,14 @@ function memberHasControlState(member: GoveeDevice, stateId: string): boolean {
  * No snapshots, no segments, no diag channel (a group's report is built but not stamped).
  *
  * @param members Resolved member devices
+ * @param log Adapter logger
+ * @param registry This instance's device catalog (the members' quirks)
  */
-function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
+function buildGroupStateDefs(
+  members: GoveeDevice[],
+  log: ioBroker.Logger,
+  registry: DeviceRegistry,
+): StateDefinition[] {
   const controllable = members.filter(m => m.lanIp || m.channels.cloud);
   if (controllable.length === 0) {
     return [];
@@ -2161,9 +2211,19 @@ function buildGroupStateDefs(members: GoveeDevice[]): StateDefinition[] {
 
   // Control states: intersection of member capabilities
   for (const ld of getDefaultLanStates()) {
-    if (controllable.every(m => memberHasControlState(m, ld.id))) {
-      stateDefs.push(ld);
+    if (!controllable.every(m => memberHasControlState(m, ld.id))) {
+      continue;
     }
+    if (ld.id === "color_temperature") {
+      const shared = sharedColorTempRange(controllable, log, registry);
+      if (!shared) {
+        continue; // no temperature every member can take
+      }
+      ld.min = shared.min;
+      ld.max = shared.max;
+      ld.def = shared.min;
+    }
+    stateDefs.push(ld);
   }
 
   // Scenes: intersection of member scene names
