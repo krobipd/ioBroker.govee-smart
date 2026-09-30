@@ -25,6 +25,7 @@ import {
   STATUS_REQUEST_INTERVAL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   LAN_CAPABLE_MEMORY_MS,
+  LAN_STATUS_REFRESH_MS,
 } from "./timing-constants";
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
@@ -426,6 +427,39 @@ describe("DeviceManager", () => {
       });
 
       expect(updateCalled).toBe(false);
+    });
+  });
+
+  describe("LAN lookup and status requests", () => {
+    const discover = (): void =>
+      dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
+
+    it("finds the device by its LAN address — and nothing for another address", () => {
+      discover();
+      expect(dm.deviceByLanIp("192.168.1.100")?.sku).toBe("H6160");
+      expect(dm.deviceByLanIp("192.168.1.101")).toBeUndefined();
+    });
+
+    it("without the account broker every scan reply asks", () => {
+      discover();
+      expect(dm.claimLanStatusRequest("192.168.1.100", false, 1_000_000)).toBe(true);
+      expect(dm.claimLanStatusRequest("192.168.1.100", false, 1_000_001)).toBe(true);
+    });
+
+    it("with the broker a light is asked once per refresh window, and the request is stamped", () => {
+      discover();
+      const t0 = 1_000_000;
+      expect(dm.claimLanStatusRequest("192.168.1.100", true, t0)).toBe(true);
+      expect(dm.deviceByLanIp("192.168.1.100")?.lastLanStatusAskedAt).toBe(t0);
+      expect(dm.claimLanStatusRequest("192.168.1.100", true, t0 + LAN_STATUS_REFRESH_MS - 1)).toBe(false);
+      expect(dm.claimLanStatusRequest("192.168.1.100", true, t0 + LAN_STATUS_REFRESH_MS)).toBe(true);
+    });
+
+    it("a fresh devStatus answer counts as a read — no request until it ages", () => {
+      discover();
+      const light = dm.deviceByLanIp("192.168.1.100")!;
+      light.lastLanStatusAt = 5_000_000;
+      expect(dm.claimLanStatusRequest("192.168.1.100", true, 5_000_000 + 10)).toBe(false);
     });
   });
 

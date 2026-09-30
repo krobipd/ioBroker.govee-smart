@@ -40,6 +40,7 @@ import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, ty
 import {
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
+  LAN_STATUS_REFRESH_MS,
   MAX_RATE_LIMIT_RETRY_MS,
   TRANSIENT_RETRY_MS,
   PENDING_INTENT_TTL_MS,
@@ -1943,6 +1944,47 @@ export class DeviceManager {
   }
 
   /**
+   * The device that answers on this LAN address — the one lookup every LAN
+   * path uses (scan, status reply, diagnostics hooks).
+   *
+   * @param ip The LAN address
+   */
+  deviceByLanIp(ip: string): GoveeDevice | undefined {
+    for (const dev of this.devices.values()) {
+      if (dev.lanIp === ip) {
+        return dev;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether the light behind a scan reply is asked for its status now, and the
+   * request stamped. Without the account broker every scan asks. With it, a light
+   * is still asked once its last LAN answer is older than a minute (audit B5): the
+   * account push comes only on a change or every 1–11 min, and only a read
+   * corrects a datapoint after a lost UDP command — at most one request per light
+   * and minute. The discovery reply stamps lastLanReplyAt itself, so the age of
+   * the VALUES is the last devStatus answer — or the last request, so a light that
+   * never answers is not asked on every scan.
+   *
+   * @param ip The address that answered the scan
+   * @param brokerConnected The account broker is connected
+   * @param now Current time (ms)
+   */
+  claimLanStatusRequest(ip: string, brokerConnected: boolean, now: number): boolean {
+    const light = this.deviceByLanIp(ip);
+    const lastRead = Math.max(light?.lastLanStatusAt ?? 0, light?.lastLanStatusAskedAt ?? 0);
+    if (!brokerConnected || now - lastRead >= LAN_STATUS_REFRESH_MS) {
+      if (light) {
+        light.lastLanStatusAskedAt = now;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * Handle LAN status response.
    *
    * @param ip Source IP address
@@ -1964,14 +2006,7 @@ export class DeviceManager {
       colorTemInKelvin: number;
     },
   ): void {
-    // Find device by LAN IP
-    let device: GoveeDevice | undefined;
-    for (const dev of this.devices.values()) {
-      if (dev.lanIp === ip) {
-        device = dev;
-        break;
-      }
-    }
+    const device = this.deviceByLanIp(ip);
     if (!device) {
       return;
     }

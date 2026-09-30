@@ -47,7 +47,6 @@ import {
   type CloudLimits,
   LAN_SCAN_INITIAL_WAIT_MS,
   LAN_SCAN_INTERVAL_MS,
-  LAN_STATUS_REFRESH_MS,
   ONLINE_SYNC_INTERVAL_MS,
   READY_SAFETY_TIMEOUT_MS,
   STALE_DEVICE_CLEANUP_DELAY_MS,
@@ -997,14 +996,14 @@ export class GoveeAdapter extends utils.Adapter {
     // JSON carries the verbatim UDP bytes per device. Closes Class E
     // of the v2.9.1 audit (LAN UDP completely silent in diag before).
     this.lanClient.setSendHook((ip, cmd, payload, bytes, error) => {
-      const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
+      const dev = this.deviceManager?.deviceByLanIp(ip);
       if (!dev) {
         return;
       }
       this.deviceManager!.getDiagnostics().addLanSend(dev.deviceId, ip, cmd, payload, bytes, error);
     });
     this.lanClient.setStatusRecordHook((ip, status) => {
-      const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
+      const dev = this.deviceManager?.deviceByLanIp(ip);
       if (!dev) {
         return;
       }
@@ -1019,21 +1018,7 @@ export class GoveeAdapter extends utils.Adapter {
     this.lanClient.start(
       lanDevice => {
         this.deviceManager!.handleLanDiscovery(lanDevice);
-        // Without the account broker every scan asks. With it, a light is
-        // still asked once its last LAN answer is older than a minute (audit
-        // B5): the account push comes only on a change or every 1–11 min, and
-        // only a read corrects a datapoint after a lost UDP command — at most
-        // one request per light and minute.
-        // The discovery reply stamps lastLanReplyAt itself, so the age of
-        // the VALUES is the last devStatus answer — or the last request, so
-        // a light that never answers is not asked on every scan.
-        const light = this.deviceManager!.getDevices().find(d => d.lanIp === lanDevice.ip);
-        const now = Date.now();
-        const lastRead = Math.max(light?.lastLanStatusAt ?? 0, light?.lastLanStatusAskedAt ?? 0);
-        if (!this.mqttClient?.connected || now - lastRead >= LAN_STATUS_REFRESH_MS) {
-          if (light) {
-            light.lastLanStatusAskedAt = now;
-          }
+        if (this.deviceManager!.claimLanStatusRequest(lanDevice.ip, this.mqttClient?.connected === true, Date.now())) {
           this.lanClient!.requestStatus(lanDevice.ip);
         }
       },
