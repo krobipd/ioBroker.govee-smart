@@ -36,7 +36,6 @@ import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
 import { deviceLabel, errMessage, logRejected, type GoveeDevice } from "./lib/types";
-import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import {
@@ -77,7 +76,8 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   snapshotHandlerGlue.SnapshotHandlerGlueAdapter &
   stateChangeRouter.StateChangeRouterAdapter &
   wizardHandler.WizardHandlerAdapter &
-  diagnosticsHandler.DiagnosticsHandlerAdapter;
+  diagnosticsHandler.DiagnosticsHandlerAdapter &
+  diagnosticsHandler.DiagnosticsProvidersHost;
 
 /** What the start phases of onReady hand each other. */
 interface StartContext {
@@ -255,7 +255,7 @@ export class GoveeAdapter extends utils.Adapter {
    * every time. Read once rather than per export: they cannot change while the
    * process runs — a controller or admin update restarts every instance.
    */
-  private hostVersions: { jsController?: string; admin?: string } = {};
+  private hostVersions: diagnosticsHandler.HostVersions = {};
   /** When this run's onReady began — the zero point of every timeline in a diagnostics report. */
   private startedAt = Date.now();
   /** Daily interval for the app-version-drift check against the app store. */
@@ -363,6 +363,9 @@ export class GoveeAdapter extends utils.Adapter {
     method("getStateAsync", (id: string) => this.getStateAsync(id));
     method("getObjectAsync", (id: string) => this.getObjectAsync(id));
     method("getForeignObjectAsync", (id: string) => this.getForeignObjectAsync(id));
+    method("getObjectViewAsync", (design: "system", search: "state", params: { startkey: string; endkey: string }) =>
+      this.getObjectViewAsync(design, search, params),
+    );
     method("extendForeignObjectAsync", (id: string, obj: { native?: Record<string, unknown> }) =>
       this.extendForeignObjectAsync(id, obj),
     );
@@ -383,6 +386,7 @@ export class GoveeAdapter extends utils.Adapter {
     read("cloudClient", () => this.cloudClient);
     read("rateLimiter", () => this.rateLimiter);
     read("localSnapshots", () => this.localSnapshots);
+    read("skuCache", () => this.skuCache);
     read("snapshotHandler", () => this.snapshotHandler);
     read("groupFanout", () => this.groupFanout);
     read("actionableProblems", () => this.actionableProblems);
@@ -390,6 +394,11 @@ export class GoveeAdapter extends utils.Adapter {
     read("stateCreationQueue", () => this.stateCreationQueue);
     read("channelStatus", () => this.channelStatus);
     read("cloudOutage", () => this.cloudOutage);
+    // What the diagnostics report says about the installation
+    read("hostName", () => this.host);
+    read("hostVersions", () => this.hostVersions);
+    read("startedAt", () => this.startedAt);
+    read("compactMode", () => this.common?.compact === true);
     // Boot flags (read-only for the handlers)
     read("lanScanDone", () => this.lanScanDone);
     read("statesReady", () => this.statesReady);
@@ -553,7 +562,7 @@ export class GoveeAdapter extends utils.Adapter {
     // Read once — a controller or admin update restarts every instance, so
     // these cannot go stale while this process lives. Failure is silent: a
     // report without them is worse, but not a reason to refuse starting.
-    await this.readHostVersions();
+    this.hostVersions = await diagnosticsHandlerImpl.readHostVersions(this.handlerHost);
     // Deliver the manifest's texts to an EXISTING tree too — js-controller
     // only creates instanceObjects that are missing.
     await this.ensureManifestObjects();
@@ -757,77 +766,7 @@ export class GoveeAdapter extends utils.Adapter {
     // The cleanup's protection of listed devices names their trees from the same registry.
     this.deviceManager!.setTreeResolver((sku, deviceId) => this.stateManager!.deviceIds.prefixFor(sku, deviceId));
 
-    // v2.9.1 — wire diag providers so generate() can render persisted-cache,
-    // local-snapshots and adapter-runtime state. Providers are pulled at
-    // export time, so a wizard that's running THEN gets captured even
-    // though the collector itself doesn't track it live.
-    const diag = this.deviceManager!.getDiagnostics();
-    diag.setCacheSnapshotProvider((sku, deviceId) => this.skuCache?.loadOne(sku, deviceId) ?? null);
-    diag.setLocalSnapshotsProvider((sku, deviceId) => this.localSnapshots?.getSnapshots(sku, deviceId) ?? []);
-    diag.setRuntimeStateProvider(() => {
-      const errorCats = this.deviceManager?.getErrorCategorySnapshot();
-      return {
-        deviceManagerLastErrorCategory: errorCats?.deviceManager ?? null,
-        appApiLastErrorCategory: errorCats?.appApi ?? null,
-        groupMembersLastErrorCategory: errorCats?.groupMembers ?? null,
-        cloudFailureReason: this.cloudClient?.getFailureReason() ?? null,
-        mqttFailureReason: this.mqttClient?.getFailureReason() ?? null,
-        rateLimiter: this.rateLimiter?.getUsageSnapshot() ?? null,
-        cloudRateLimit: this.cloudClient?.getLastRateLimit() ?? null,
-        wizardSession: this.segmentWizard?.getSessionSnapshot() ?? null,
-        lanSeenDeviceIps: this.lanClient?.getDiagSnapshot().seenDeviceIps ?? [],
-      };
-    });
-    // Device names have no detectable shape, so the pseudonymiser can only
-    // replace the ones it is told about.
-    diag.setDeviceNamesProvider(() => this.deviceManager?.getDevices().map(d => d.name) ?? []);
-    // A group's id is digits only — no pattern finds it, so it goes by lookup too.
-    diag.setDeviceIdsProvider(() => this.deviceManager?.getDevices().map(d => d.deviceId) ?? []);
-    // Which ioBroker this runs on, and how the installation as a whole is
-    // doing. Every field here used to be a follow-up question on a report —
-    // and the issue forms dropped their Node field because it belongs in here.
-    diag.setEnvironmentProvider(() => {
-      const devices = this.deviceManager?.getDevices() ?? [];
-      return {
-        node: process.version,
-        jsController: this.hostVersions.jsController,
-        admin: this.hostVersions.admin,
-        platform: `${process.platform} ${process.arch}`,
-        compactMode: this.common?.compact === true,
-        credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
-        deviceCount: devices.length,
-        reachableCount: devices.filter(d => resolveDeviceReachability(d).online).length,
-        channels: { ...this.channelStatus },
-        startedAt: new Date(this.startedAt).toISOString(),
-      };
-    });
-    // The datapoints as they really exist — the answer to "this datapoint is
-    // missing / has the wrong type / the wrong role", which the in-memory view
-    // cannot give. Scoped to ONE device prefix, never a full-instance scan.
-    diag.setObjectTreeProvider(prefix => this.readObjectTree(prefix));
-
-    // How each writable datapoint is actually driven. The report carried the
-    // capability list and the object tree — the two ends — but never the
-    // routing between them, so "this control does nothing on my model" could
-    // not be answered from a report. Asks the SAME function a real write asks,
-    // so the answer cannot drift from the behaviour it describes; pure
-    // decision-making, no I/O.
-    diag.setControlPathProvider((device, stateIds) => {
-      const router = this.deviceManager;
-      if (!router) {
-        return [];
-      }
-      const out: diagnostics.ControlPathEntry[] = [];
-      for (const stateId of stateIds) {
-        const command = dropdownReset.stateToCommand(stateId);
-        if (!command) {
-          continue;
-        }
-        const decision = router.resolveTransport(device, command);
-        out.push({ stateId, command, transport: decision.kind, reason: decision.reason });
-      }
-      return out;
-    });
+    diagnosticsHandlerImpl.wireDiagnosticsProviders(this.handlerHost);
 
     // API client for undocumented scene/music/DIY libraries (always available)
     const apiClient = this.makeApiClient(this.log);
@@ -1656,57 +1595,6 @@ export class GoveeAdapter extends utils.Adapter {
       },
       p => this.extendObject("info.manualSyncDevices", p),
     );
-  }
-
-  /**
-   * js-controller and admin versions for the diagnostics report.
-   */
-  private async readHostVersions(): Promise<void> {
-    const host = await this.getForeignObjectAsync(`system.host.${this.host}`).catch(() => null);
-    const admin = await this.getForeignObjectAsync("system.adapter.admin").catch(() => null);
-    this.hostVersions = {
-      jsController: (host?.common as { installedVersion?: string } | undefined)?.installedVersion,
-      admin: (admin?.common as { version?: string } | undefined)?.version,
-    };
-  }
-
-  /**
-   * The datapoints below ONE device prefix, with type, role, unit and current
-   * value — the view the user actually sees in the object tree.
-   *
-   * Deliberately scoped to a single prefix: a full-instance scan is exactly
-   * what 2.27.1 removed from the periodic round, and this runs behind a button
-   * a user can press repeatedly. One export therefore reads one device's
-   * subtree, never the whole instance.
-   *
-   * @param prefix Device prefix, e.g. `devices.h61be_1d6f`
-   * @returns One entry per datapoint, or an empty list if the tree cannot be read
-   */
-  private async readObjectTree(prefix: string): Promise<diagnostics.ObjectTreeEntry[]> {
-    const start = `${this.namespace}.${prefix}.`;
-    const view = await this.getObjectViewAsync("system", "state", {
-      startkey: start,
-      endkey: `${start}\u9999`,
-    }).catch(() => null);
-    if (!view?.rows) {
-      return [];
-    }
-    const entries: diagnostics.ObjectTreeEntry[] = [];
-    for (const row of view.rows) {
-      const localId = row.id.replace(`${this.namespace}.`, "");
-      const common = row.value?.common as ioBroker.StateCommon | undefined;
-      const state = await this.getStateAsync(localId).catch(() => null);
-      entries.push({
-        id: localId.replace(`${prefix}.`, ""),
-        type: common?.type,
-        role: common?.role,
-        unit: common?.unit,
-        write: common?.write,
-        val: state?.val,
-        ack: state?.ack,
-      });
-    }
-    return entries;
   }
 
   /**

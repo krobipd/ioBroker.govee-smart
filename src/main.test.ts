@@ -3162,6 +3162,8 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     const dm = i.deviceManager as unknown as DeviceManager & { devices: Map<string, GoveeDevice> };
     dm.devices.set("BaseGroup_98765432", { ...device, sku: "BaseGroup", deviceId: "98765432" });
     dm.getDiagnostics().addLog(device.deviceId, "info", "member of group 98765432");
+    // An instance in compact mode says so in its report.
+    (adapter as unknown as { common: { compact?: boolean } }).common = { compact: true };
     const host = i.buildMessageRouterHost();
     const result = await (
       host.buildDiagnosticsReport as (key: string) => Promise<{ fileName: string; content: string }>
@@ -3174,6 +3176,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // The zero point of this run — onReady's start, not the epoch or the process.
     expect(Date.parse(startedAt)).toBeGreaterThanOrEqual(before - 1000);
     expect(Date.parse(startedAt)).toBeLessThanOrEqual(Date.now());
+    expect(JSON.parse(result.content).environment.compactMode).toBe(true);
   });
 });
 
