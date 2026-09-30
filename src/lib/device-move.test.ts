@@ -47,8 +47,10 @@ function database(objects: Record<string, unknown>, states: Record<string, unkno
     },
     extendObject: (id, patch) => {
       const prev = db.objects.get(id) ?? ({} as ioBroker.Object);
+      // Merges like js-controller's extendObject — common and native both.
       db.objects.set(id, {
         ...prev,
+        common: { ...(prev.common ?? {}), ...((patch.common as Record<string, unknown>) ?? {}) },
         native: { ...(prev.native ?? {}), ...((patch.native as Record<string, unknown>) ?? {}) },
       } as ioBroker.Object);
       db.written.push(id);
@@ -278,6 +280,22 @@ describe("copyDeviceTree", () => {
     const report = await copyDeviceTree(deps, "devices.h61be_525f", "devices.h61be-525f");
     expect(report.datapoints).toBe(2);
     expect(db.objects.get(NEW)?.native).toMatchObject({ idScheme: 3 });
+  });
+
+  it("an empty recording setting on the kept datapoint is no recording — the leftover's is handed over", async () => {
+    const kept = {
+      [NEW]: {
+        type: "device",
+        common: { name: "Kept" },
+        native: { sku: "H61BE", deviceId: "AB:CD:EF:12:34:56:52:5F", idScheme: 3 },
+      },
+      [`${NEW}.status.operationState`]: { type: "state", common: { name: "Kept state", custom: {} }, native: {} },
+    };
+    const { db, deps } = database({ ...eNumberTree(), ...kept }, {});
+    await copyDeviceTree(deps, "devices.h61be_525f", "devices.h61be-525f", true);
+    const custom = (db.objects.get(`${NEW}.status.operationState`)?.common as { custom?: Record<string, unknown> })
+      .custom;
+    expect(Object.keys(custom ?? {})).toContain("influxdb.0");
   });
 
   it("fills a kept tree from a leftover: only what is missing, values only where there are none", async () => {

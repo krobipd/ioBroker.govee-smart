@@ -1364,6 +1364,7 @@ describe("GoveeAdapter onReady — timers", () => {
     });
     i.extendForeignObjectAsync.mockClear();
     i.setInterval.mockClear();
+    i.log.error.mockClear();
 
     await i.onReady();
 
@@ -1371,6 +1372,8 @@ describe("GoveeAdapter onReady — timers", () => {
       common: { supportedMessages: null },
     });
     expect(i.setInterval).not.toHaveBeenCalled();
+    // The start ENDS here — no phase runs into the missing runtime and logs a failure.
+    expect(i.log.error).not.toHaveBeenCalled();
   });
 
   it("an instance already carrying { stopInstance: false } is corrected too", async () => {
@@ -2895,6 +2898,10 @@ describe("GoveeAdapter — callback wiring", () => {
     const report = await diag.generate(device, "x");
     expect((report.apiHistory as Record<string, unknown[]>)["/router/x"]).toHaveLength(1);
     expect(report.lastMqttPackets).toEqual([expect.objectContaining({ topic: "openapi-events" })]);
+    // An event that names no device belongs to none — it is not filed under an empty id.
+    const spy = vi.spyOn(diag as unknown as { addMqttPacket: (...a: unknown[]) => void }, "addMqttPacket");
+    onRaw(JSON.stringify({ sku: "H6172", capabilities: [] }));
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("Cloud-events connection state is mirrored to info.openapiMqttConnected and events reach the device manager", async () => {

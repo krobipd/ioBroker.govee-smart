@@ -1090,13 +1090,10 @@ export class GoveeAdapter extends utils.Adapter {
       // Account-level bucket would have meant a new diag struct; per-device
       // keeps shape consistent with all other capture paths.
       rawJson => {
-        if (!this.deviceManager) {
-          return;
-        }
         try {
           const parsed = JSON.parse(rawJson) as { sku?: unknown; device?: unknown };
           if (typeof parsed?.device === "string" && parsed.device) {
-            this.deviceManager.getDiagnostics().addMqttPacket(parsed.device, "openapi-events", { rawJson });
+            this.deviceManager?.getDiagnostics().addMqttPacket(parsed.device, "openapi-events", { rawJson });
           }
         } catch {
           /* malformed — already debug-logged in the client */
