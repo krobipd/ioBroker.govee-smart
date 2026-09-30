@@ -239,6 +239,7 @@ import { CLOUD_LIMITS, LAN_STATUS_REFRESH_MS, STALE_DEVICE_CLEANUP_DELAY_MS } fr
 import { CloudControlRejected } from "./lib/govee-cloud-client";
 import * as connectionState from "./lib/handlers/connection-state";
 import { StateManager } from "./lib/state-manager";
+import * as cloudCredsModule from "./lib/handlers/cloud-creds-handler";
 import type { DeviceManager } from "./lib/device-manager";
 import type { GoveeDevice } from "./lib/types";
 import { httpsRequest } from "./lib/http-client";
@@ -931,6 +932,29 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.states.get("info.connection")?.val).toBe(false);
   });
 
+  it("a throw inside the 20 s round stays in the round — no unhandled rejection that would end the process (M3, 3.0.2)", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const debugs: string[] = [];
+    (adapter as unknown as { log: ioBroker.Logger }).log.debug = (m: string) => void debugs.push(m);
+    const spy = vi.spyOn(connectionState, "updateConnectionState").mockImplementation(() => {
+      throw new Error("boom");
+    });
+    const rejections: unknown[] = [];
+    const onRejection = (r: unknown): void => void rejections.push(r);
+    process.on("unhandledRejection", onRejection);
+    try {
+      const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+      (syncCall![0] as () => void)();
+      await settle(5);
+      expect(rejections).toEqual([]);
+      expect(debugs.some(d => d.includes("Online sync round failed: boom"))).toBe(true);
+    } finally {
+      process.off("unhandledRejection", onRejection);
+      spy.mockRestore();
+    }
+  });
+
   it("the first online-sync round rebuilds the group rollup even when nothing changed", async () => {
     // The rollup used to ride purely on CHANGES. After a restart on a stable
     // installation nothing ever changes, so info.membersUnreachable kept
@@ -1011,6 +1035,65 @@ describe("GoveeAdapter onReady — timers", () => {
       (adapter as unknown as { subscribeStatesAsync: ReturnType<typeof vi.fn> }).subscribeStatesAsync,
     ).not.toHaveBeenCalled();
     expect(i.statesReady).toBe(false);
+  });
+
+  it("a stop during the id move ends the start — no LAN socket, no login, no Cloud (M1, 3.0.2)", async () => {
+    const { adapter, f } = setup({ apiKey: "key", goveeEmail: "a@b.c", goveePassword: "pw" });
+    const i = internalOf(adapter);
+    let release!: () => void;
+    const spy = vi
+      .spyOn(StateManager.prototype, "migrateDeviceIds")
+      .mockImplementation(() => new Promise<number>(r => (release = () => r(0))));
+    try {
+      const ready = i.onReady();
+      await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+      i.onUnload(() => undefined);
+      release();
+      await ready;
+      expect(f.lan.start).not.toHaveBeenCalled();
+      expect(f.mqtt.connect).not.toHaveBeenCalled();
+      expect(f.openapi.connect).not.toHaveBeenCalled();
+      expect(i.statesReady).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("an id move that cannot read the object tree stops the start with one error line (M8, 3.0.2)", async () => {
+    const { adapter, f } = setup({ apiKey: "key" });
+    const i = internalOf(adapter);
+    const errors: string[] = [];
+    (adapter as unknown as { log: ioBroker.Logger }).log.error = (m: string) => void errors.push(m);
+    const spy = vi.spyOn(StateManager.prototype, "migrateDeviceIds").mockRejectedValue(new Error("db down"));
+    try {
+      await i.onReady();
+      expect(errors.some(e => e.includes("Device id migration failed — the adapter does not start: db down"))).toBe(
+        true,
+      );
+      expect(f.lan.start).not.toHaveBeenCalled();
+      expect(i.statesReady).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("a stop while the saved account session loads starts no login (M1, 3.0.2)", async () => {
+    const { adapter, f } = setup({ goveeEmail: "a@b.c", goveePassword: "pw" });
+    const i = internalOf(adapter);
+    let release!: () => void;
+    const spy = vi
+      .spyOn(cloudCredsModule, "loadPersistedCreds")
+      .mockImplementation(() => new Promise(r => (release = () => r(null))));
+    try {
+      const ready = i.onReady();
+      await vi.waitFor(() => expect(spy).toHaveBeenCalled());
+      i.onUnload(() => undefined);
+      release();
+      await ready;
+      expect(f.mqtt.connect).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("a stop during the Cloud start ends the start before the tree counts as ready (B6)", async () => {

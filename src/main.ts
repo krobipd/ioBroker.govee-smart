@@ -645,9 +645,17 @@ export class GoveeAdapter extends utils.Adapter {
       await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
       // Every tree of an older id rule moves once to `<sku>-<last 4>` (3.0.0), and every tree is
       // recorded — before anything else reads, writes or deletes a device tree.
-      await this.stateManager
-        .migrateDeviceIds()
-        .catch(e => this.log.warn(`Device id migration failed: ${errMessage(e)}`));
+      // A move that cannot even read the object tree leaves the id map empty — every
+      // device would get an id by arrival order, and two devices ending in the same four
+      // characters could swap trees. Nothing starts on a guess: the start stops here.
+      try {
+        await this.stateManager.migrateDeviceIds();
+      } catch (e) {
+        this.log.error(
+          `Device id migration failed — the adapter does not start: ${errMessage(e)}; restart the instance`,
+        );
+        return;
+      }
       // Nothing has been asked yet, so nothing may still claim to be reachable from
       // the previous run — least of all after a crash, where no shutdown code ran at
       // all and the old values would stand until the 20-second sync catches up.
@@ -673,6 +681,11 @@ export class GoveeAdapter extends utils.Adapter {
         idOf: (sku, deviceId) => deviceIds.idFor(sku, deviceId),
       });
       await this.localSnapshots.init(dataDir);
+      // The last wait before the first start (the LAN socket below) — a stop during
+      // any wait so far, the id move included, ends the start here.
+      if (this.unloading) {
+        return; // nothing may start behind onUnload (audit B6)
+      }
       this.snapshotHandler = new SnapshotHandler(snapshotHandlerGlue.buildSnapshotHost(this.handlerHost));
       this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
       this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
@@ -1046,6 +1059,9 @@ export class GoveeAdapter extends utils.Adapter {
         // The plaintext native fields of 2.1.0–2.1.2 are dropped by
         // NATIVE_KEY_MIGRATIONS at the very start of onReady.
         const cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir, accountEmail);
+        if (this.unloading) {
+          return; // stopped during the wait — no login may start behind onUnload (audit B6)
+        }
         if (cachedCreds) {
           this.mqttClient.setPersistedCredentials(cachedCreds);
         }
@@ -1369,43 +1385,7 @@ export class GoveeAdapter extends utils.Adapter {
       // value is unchanged). When a Light flips online/offline, also refreshes
       // group-reachability since the original onDeviceUpdate path no longer
       // sees those transitions for Lights.
-      this.onlineSyncTimer = this.setInterval(() => {
-        if (this.unloading || !this.stateManager || !this.deviceManager) {
-          return;
-        }
-        void (async (): Promise<void> => {
-          let anyLightChanged = false;
-          for (const device of this.deviceManager!.getDevices()) {
-            const changed = await this.stateManager!.syncInfoOnline(device).catch(() => false);
-            if (changed) {
-              anyLightChanged = true;
-            }
-          }
-          // The first round after a start always re-evaluates the groups: their
-          // members' reachability was just read fresh, and without this the
-          // rollup would keep a value nobody has checked since the last restart.
-          if (anyLightChanged || !this.groupReachabilityPrimed) {
-            // Only a round that really wrote a group counts as primed — at the
-            // first tick the cloud device list may still be loading, and a flag
-            // spent on an empty round would put us back to change-only.
-            if (groupFanoutHandler.updateGroupReachability(this.handlerHost) > 0) {
-              this.groupReachabilityPrimed = true;
-            }
-          }
-          // The rollup rides on the same round: it is derived from exactly the
-          // markers that were just re-evaluated, so it can never drift away from
-          // what the individual devices say.
-          await this.stateManager!.writeDeviceRollup().catch(e => {
-            this.log.debug(`Device rollup failed: ${errMessage(e)}`);
-          });
-          // info.connection rides on the same round: the evidence of the last
-          // device ages out here, and no other event would notice (audit B7 —
-          // it stayed green until the next channel change).
-          if (!this.unloading) {
-            connectionState.updateConnectionState(this.handlerHost);
-          }
-        })();
-      }, ONLINE_SYNC_INTERVAL_MS);
+      this.onlineSyncTimer = this.setInterval(() => void this.runOnlineSyncRound(), ONLINE_SYNC_INTERVAL_MS);
 
       // Keep the impersonated Govee-app version current — daily refresh (the
       // initial fetch is fired early in onReady, above).
@@ -1434,6 +1414,54 @@ export class GoveeAdapter extends utils.Adapter {
       if (error instanceof Error && error.stack) {
         this.log.debug(error.stack);
       }
+    }
+  }
+
+  /**
+   * One round of the 20-second re-evaluation: every device's `info.online`,
+   * the groups' reachability, the rollup and `info.connection`.
+   */
+  private async runOnlineSyncRound(): Promise<void> {
+    // The body is one try: the group and connection updates are synchronous,
+    // and a throw there would be an unhandled rejection of the timer's promise
+    // — which ends the process, every 20 s again (fleet rule: top-level
+    // try/catch in the async body).
+    try {
+      if (this.unloading || !this.stateManager || !this.deviceManager) {
+        return;
+      }
+      let anyLightChanged = false;
+      for (const device of this.deviceManager.getDevices()) {
+        const changed = await this.stateManager.syncInfoOnline(device).catch(() => false);
+        if (changed) {
+          anyLightChanged = true;
+        }
+      }
+      // The first round after a start always re-evaluates the groups: their
+      // members' reachability was just read fresh, and without this the
+      // rollup would keep a value nobody has checked since the last restart.
+      if (anyLightChanged || !this.groupReachabilityPrimed) {
+        // Only a round that really wrote a group counts as primed — at the
+        // first tick the cloud device list may still be loading, and a flag
+        // spent on an empty round would put us back to change-only.
+        if (groupFanoutHandler.updateGroupReachability(this.handlerHost) > 0) {
+          this.groupReachabilityPrimed = true;
+        }
+      }
+      // The rollup rides on the same round: it is derived from exactly the
+      // markers that were just re-evaluated, so it can never drift away from
+      // what the individual devices say.
+      await this.stateManager.writeDeviceRollup().catch(e => {
+        this.log.debug(`Device rollup failed: ${errMessage(e)}`);
+      });
+      // info.connection rides on the same round: the evidence of the last
+      // device ages out here, and no other event would notice (audit B7 —
+      // it stayed green until the next channel change).
+      if (!this.unloading) {
+        connectionState.updateConnectionState(this.handlerHost);
+      }
+    } catch (e) {
+      this.log.debug(`Online sync round failed: ${errMessage(e)}`);
     }
   }
 

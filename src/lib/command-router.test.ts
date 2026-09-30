@@ -421,6 +421,18 @@ describe("CommandRouter", () => {
       expect(lan.calls).toHaveLength(0); // nothing sent
     });
 
+    it("the LAN path confirms the segments once, after the batch went out (M2, 3.0.2)", async () => {
+      const lan = makeLanStub();
+      const router = new CommandRouter(mockLog, noopTimers, registry);
+      router.setLanClient(lan.client);
+      const order: string[] = [];
+      router.onSegmentBatchUpdate = () => void order.push(`echo after ${lan.calls.length} send(s)`);
+      await router.sendCommand(makeDevice({ segmentCount: 8 }), "segmentBatch", "0-2:#ff0000:50");
+      expect(lan.calls.some(c => c.method === "setSegmentColor")).toBe(true);
+      expect(order).toEqual([`echo after ${lan.calls.length} send(s)`]);
+      expect(lan.calls.length).toBeGreaterThan(0);
+    });
+
     it("emits onSegmentBatchUpdate exactly once on the Cloud path (I2)", async () => {
       const cloud = makeCloudStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
@@ -929,10 +941,15 @@ describe("CommandRouter", () => {
       router.setCloudClient(cloud.client);
       router.setRateLimiter(makeRateLimiter());
       const device = makeDevice({ capabilities: [], segmentCount: 15 });
+      const echoes: unknown[] = [];
+      router.onSegmentBatchUpdate = (_d, batch) => void echoes.push(batch);
       await expect(router.sendCommand(device, "segmentBatch", "0-2:#ff0000")).rejects.toThrow(
         "declares no segment capability",
       );
       expect(cloud.calls).toEqual([]);
+      // Principle 5: the segment datapoints are not confirmed either (M2, 3.0.2 —
+      // the echo fired before the send until then).
+      expect(echoes).toEqual([]);
     });
 
     it("segmentBatch=cloud → Cloud via sendSegmentBatchParsed (not sendCloudCommand)", async () => {

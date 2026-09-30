@@ -480,7 +480,10 @@ export class CommandRouter {
           : "invalid segment batch",
       );
     }
-    this.onSegmentBatchUpdate?.(device, parsed);
+    // The segment datapoints are confirmed only once the batch went out
+    // (principle 5): the Cloud path can still refuse after parsing — no
+    // capability, the limiter, Govee — and an echo before it acked colours the
+    // strip never got.
     if (decision.kind === "lan" && device.lanIp && this.lanClient) {
       await this.forceColorMode(device);
       if (parsed.color !== undefined) {
@@ -492,10 +495,12 @@ export class CommandRouter {
       if (parsed.brightness !== undefined) {
         this.lanClient.setSegmentBrightness(device.lanIp, parsed.brightness, parsed.segments);
       }
+      this.onSegmentBatchUpdate?.(device, parsed);
       return;
     }
     if (decision.kind === "cloud") {
       await this.sendSegmentBatchParsed(device, parsed);
+      this.onSegmentBatchUpdate?.(device, parsed);
     }
   }
 
@@ -661,9 +666,7 @@ export class CommandRouter {
       await this.sendBudgeted(execute, device);
     }
     // NOTE: no onSegmentBatchUpdate here — dispatchSegmentBatch (the only caller)
-    // already emits it once for both the LAN and Cloud paths, before dispatch.
-    // Emitting again here double-fired it on the Cloud path (idempotent, but
-    // redundant) (I2).
+    // emits it once for both the LAN and Cloud paths, after the send (I2).
   }
 
   /**
