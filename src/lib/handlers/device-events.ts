@@ -332,3 +332,29 @@ export function onMqttSegmentEcho(
     segments.map(seg => ({ index: seg.index, color: rgbToHex(seg.r, seg.g, seg.b), brightness: seg.brightness })),
   );
 }
+
+/**
+ * Central entry point for manual-segment updates (the wizard and the
+ * state-change router both end here). Sets the device flags, rebuilds the
+ * segment tree (which writes manual_mode + manual_list with ack=true), and
+ * persists to cache.
+ *
+ * @param adapter Adapter surface
+ * @param device Target device
+ * @param mode    Whether manual mode should be active
+ * @param indices Physical indices when mode=true, ignored otherwise
+ */
+export async function applyManualSegments(
+  adapter: DeviceEventsAdapter,
+  device: GoveeDevice,
+  mode: boolean,
+  indices?: number[],
+): Promise<void> {
+  if (!adapter.stateManager || !adapter.deviceManager) {
+    return;
+  }
+  device.manualMode = mode;
+  device.manualSegments = mode && Array.isArray(indices) && indices.length > 0 ? indices.slice() : undefined;
+  await adapter.stateManager.createSegmentStates(device, adapter.deviceManager.syncSegmentCount(device));
+  adapter.deviceManager.persistDeviceToCache(device);
+}

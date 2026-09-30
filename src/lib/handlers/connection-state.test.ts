@@ -2,6 +2,11 @@ import { vi } from "vitest";
 
 // refreshLiveAppVersion calls the module-level httpsRequest (no DI) — mock it.
 vi.mock("../http-client", () => ({ httpsRequest: vi.fn() }));
+// The 20 s round reaches group-fanout-handler → capability-mapper → i18n → adapter-core, whose
+// import-time controller lookup process.exits outside a js-controller.
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: { getTranslatedObject: vi.fn((key: string) => ({ en: key })), translate: vi.fn((key: string) => key) },
+}));
 
 import {
   checkAllReady,

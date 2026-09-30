@@ -356,7 +356,7 @@ function internalOf(adapter: GoveeAdapter): {
   onStateChange: (id: string, s: unknown) => Promise<void>;
   onMessage: (obj: unknown) => void;
   syncDevicesManually: () => Promise<void>;
-  applyManualSegments: (d: GoveeDevice, mode: boolean, idx?: number[]) => Promise<void>;
+  handlerHost: { applyManualSegments: (d: GoveeDevice, mode: boolean, idx?: number[]) => Promise<void> };
   buildMessageRouterHost: () => Record<string, unknown>;
 } {
   return adapter as unknown as ReturnType<typeof internalOf>;
@@ -970,12 +970,30 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.states.get("info.connection")?.val).toBe(false);
   });
 
+  it("a 20 s round that fires after the stop touches no device (the database is closing)", async () => {
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const device = makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: Date.now() });
+    (i.deviceManager as unknown as { devices: Map<string, GoveeDevice> }).devices.set("H6172_aabbccddee11", device);
+    const syncCall = i.setInterval.mock.calls.find(c => c[1] === 20_000);
+    i.onUnload(() => undefined);
+    const spy = vi.spyOn(StateManager.prototype, "syncInfoOnline");
+    try {
+      (syncCall![0] as () => void)();
+      await settle(5);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it("a throw inside the 20 s round stays in the round — no unhandled rejection that would end the process (M3, 3.0.2)", async () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const debugs: string[] = [];
     (adapter as unknown as { log: ioBroker.Logger }).log.debug = (m: string) => void debugs.push(m);
-    const spy = vi.spyOn(connectionState, "updateConnectionState").mockImplementation(() => {
+    // A synchronous throw inside the round (the rollup write throws before its own .catch).
+    const spy = vi.spyOn(StateManager.prototype, "writeDeviceRollup").mockImplementation(() => {
       throw new Error("boom");
     });
     const rejections: unknown[] = [];
@@ -1868,7 +1886,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const device = makeDevice({ segmentCount: 6 });
-    await i.applyManualSegments(device, true, [0, 1, 4]);
+    await i.handlerHost.applyManualSegments(device, true, [0, 1, 4]);
     expect(device.manualMode).toBe(true);
     expect(device.manualSegments).toEqual([0, 1, 4]);
     const prefix = i.stateManager!.devicePrefix(device);
@@ -1883,7 +1901,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const device = makeDevice({ segmentCount: 3, manualMode: true, manualSegments: [0, 2] });
-    await i.applyManualSegments(device, false);
+    await i.handlerHost.applyManualSegments(device, false);
     expect(device.manualMode).toBe(false);
     expect(device.manualSegments).toBeUndefined();
     const prefix = i.stateManager!.devicePrefix(device);

@@ -81,7 +81,8 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   diagnosticsHandler.DiagnosticsHandlerAdapter &
   diagnosticsHandler.DiagnosticsProvidersHost &
   legacyCleanup.LegacyCleanupAdapter &
-  accountHandler.AccountHandlerAdapter;
+  accountHandler.AccountHandlerAdapter &
+  connectionState.OnlineSyncAdapter;
 
 /** What the start phases of onReady hand each other. */
 interface StartContext {
@@ -442,6 +443,11 @@ export class GoveeAdapter extends utils.Adapter {
       v => (this.cloudRetry = v),
     );
     readWrite(
+      "groupReachabilityPrimed",
+      () => this.groupReachabilityPrimed,
+      v => (this.groupReachabilityPrimed = v),
+    );
+    readWrite(
       "segmentWizard",
       () => this.segmentWizard,
       v => (this.segmentWizard = v),
@@ -449,7 +455,7 @@ export class GoveeAdapter extends utils.Adapter {
     // Adapter-owned operations the handlers call back into
     method("loadCloudStates", (only?: GoveeDevice) => this.loadCloudStates(only));
     method("applyManualSegments", (device: GoveeDevice, mode: boolean, indices?: number[]) =>
-      this.applyManualSegments(device, mode, indices),
+      deviceEvents.applyManualSegments(host, device, mode, indices),
     );
     method("syncDevicesManually", () => this.syncDevicesManually());
     method("reapStaleDevices", () => this.reapStaleDevices());
@@ -1280,7 +1286,10 @@ export class GoveeAdapter extends utils.Adapter {
     // value is unchanged). When a Light flips online/offline, also refreshes
     // group-reachability since the original onDeviceUpdate path no longer
     // sees those transitions for Lights.
-    this.onlineSyncTimer = this.setInterval(() => void this.runOnlineSyncRound(), ONLINE_SYNC_INTERVAL_MS);
+    this.onlineSyncTimer = this.setInterval(
+      () => void connectionState.runOnlineSyncRound(this.handlerHost),
+      ONLINE_SYNC_INTERVAL_MS,
+    );
 
     // Keep the impersonated Govee-app version current — daily refresh (the
     // initial fetch is fired early in onReady, above).
@@ -1303,54 +1312,6 @@ export class GoveeAdapter extends utils.Adapter {
       }
     }, READY_SAFETY_TIMEOUT_MS);
     return true;
-  }
-
-  /**
-   * One round of the 20-second re-evaluation: every device's `info.online`,
-   * the groups' reachability, the rollup and `info.connection`.
-   */
-  private async runOnlineSyncRound(): Promise<void> {
-    // The body is one try: the group and connection updates are synchronous,
-    // and a throw there would be an unhandled rejection of the timer's promise
-    // — which ends the process, every 20 s again (fleet rule: top-level
-    // try/catch in the async body).
-    try {
-      if (this.unloading || !this.stateManager || !this.deviceManager) {
-        return;
-      }
-      let anyLightChanged = false;
-      for (const device of this.deviceManager.getDevices()) {
-        const changed = await this.stateManager.syncInfoOnline(device).catch(() => false);
-        if (changed) {
-          anyLightChanged = true;
-        }
-      }
-      // The first round after a start always re-evaluates the groups: their
-      // members' reachability was just read fresh, and without this the
-      // rollup would keep a value nobody has checked since the last restart.
-      if (anyLightChanged || !this.groupReachabilityPrimed) {
-        // Only a round that really wrote a group counts as primed — at the
-        // first tick the cloud device list may still be loading, and a flag
-        // spent on an empty round would put us back to change-only.
-        if (groupFanoutHandler.updateGroupReachability(this.handlerHost) > 0) {
-          this.groupReachabilityPrimed = true;
-        }
-      }
-      // The rollup rides on the same round: it is derived from exactly the
-      // markers that were just re-evaluated, so it can never drift away from
-      // what the individual devices say.
-      await this.stateManager.writeDeviceRollup().catch(e => {
-        this.log.debug(`Device rollup failed: ${errMessage(e)}`);
-      });
-      // info.connection rides on the same round: the evidence of the last
-      // device ages out here, and no other event would notice (audit B7 —
-      // it stayed green until the next channel change).
-      if (!this.unloading) {
-        connectionState.updateConnectionState(this.handlerHost);
-      }
-    } catch (e) {
-      this.log.debug(`Online sync round failed: ${errMessage(e)}`);
-    }
   }
 
   private async onStateChange(id: string, state: ioBroker.State | null | undefined): Promise<void> {
@@ -1583,26 +1544,6 @@ export class GoveeAdapter extends utils.Adapter {
    */
   private loadCloudStates(only?: GoveeDevice): Promise<void> {
     return cloudStateLoader.loadCloudStates(this.handlerHost, only);
-  }
-
-  /**
-   * Central entry point for manual-segment updates (the wizard and the
-   * state-change router both end here). Sets the device flags, rebuilds the
-   * segment tree (which writes manual_mode + manual_list with ack=true), and
-   * persists to cache.
-   *
-   * @param device Target device
-   * @param mode    Whether manual mode should be active
-   * @param indices Physical indices when mode=true, ignored otherwise
-   */
-  private async applyManualSegments(device: GoveeDevice, mode: boolean, indices?: number[]): Promise<void> {
-    if (!this.stateManager || !this.deviceManager) {
-      return;
-    }
-    device.manualMode = mode;
-    device.manualSegments = mode && Array.isArray(indices) && indices.length > 0 ? indices.slice() : undefined;
-    await this.stateManager.createSegmentStates(device, this.deviceManager.syncSegmentCount(device));
-    this.deviceManager.persistDeviceToCache(device);
   }
 
   // ───────── Segment-Detection-Wizard ─────────
