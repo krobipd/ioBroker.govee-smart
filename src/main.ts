@@ -39,6 +39,7 @@ import { deviceLabel, errMessage, logRejected, type GoveeDevice } from "./lib/ty
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
+import * as accountHandler from "./lib/handlers/account-handler";
 import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
@@ -79,7 +80,8 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   wizardHandler.WizardHandlerAdapter &
   diagnosticsHandler.DiagnosticsHandlerAdapter &
   diagnosticsHandler.DiagnosticsProvidersHost &
-  legacyCleanup.LegacyCleanupAdapter;
+  legacyCleanup.LegacyCleanupAdapter &
+  accountHandler.AccountHandlerAdapter;
 
 /** What the start phases of onReady hand each other. */
 interface StartContext {
@@ -915,74 +917,8 @@ export class GoveeAdapter extends utils.Adapter {
     // A 401 from the App API asks the account client for a fresh bearer.
     this.deviceManager!.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
 
-    // Forward every parsed MQTT message into the diagnostics ring buffer
-    // so the report contains the recent packets per device. v2.9.1: the
-    // hook gets both BLE-hex (op.command) and the raw JSON envelope so
-    // state-only pushes are also captured.
-    this.mqttClient.setPacketHook((deviceId, topic, payload) => {
-      this.deviceManager?.getDiagnostics().addMqttPacket(deviceId, topic, payload);
-    });
-
-    // Login + IoT-key outcome into the report. Credentials never travel —
-    // only which call, whether Govee accepted it, its status and its own
-    // message. Two filed issues were exactly this case and the report could
-    // not tell them apart from "no account entered".
-    this.mqttClient.setOnAccountCall((endpoint, ok, statusCode, message) => {
-      this.deviceManager?.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
-    });
-
-    // 2FA: forward optional code from settings into the next login attempt;
-    // clear the field automatically once Govee has accepted it.
-    this.mqttClient.setVerificationCode(config.mqttVerificationCode ?? "");
-    this.mqttClient.setOnVerificationConsumed(() => {
-      cloudCreds.clearVerificationCodeSetting(this.handlerHost).catch(e => {
-        this.log.warn(`Could not clear mqttVerificationCode: ${errMessage(e)}`);
-      });
-    });
-    this.mqttClient.setOnVerificationFailed(reason => {
-      // On 'failed' (455 / 454+code-was-sent) blank the code so the user
-      // doesn't keep retrying with a stale value. On 'pending' (454 + no
-      // code) we leave the field as-is — the user is about to fill it.
-      // Surface the "code needed" state on info.verificationPending so the
-      // connection card can show it live (the notification below is only a
-      // nudge for when the user isn't in the settings — the actual flow
-      // runs through the card, never a second login path).
-      this.stateManager
-        ?.writeReadOnly("info.verificationPending", true)
-        .catch(logRejected(this.log, "best-effort write"));
-      if (reason === "failed") {
-        cloudCreds
-          .clearVerificationCodeSetting(this.handlerHost)
-          .catch(logRejected(this.log, "clear the verification code setting"));
-        this.actionableProblems.report({
-          key: "mqtt-verification",
-          title: "Govee rejected the verification code for real-time status",
-          action:
-            "open the adapter settings — the connection card requests a fresh code; enter the one Govee e-mails you",
-        });
-      } else {
-        this.actionableProblems.report({
-          key: "mqtt-verification",
-          title: "Govee requires a verification code to enable real-time status (lights/sensors stay readable)",
-          action: "open the adapter settings — the connection card requests a code and takes the one Govee e-mails you",
-        });
-      }
-    });
-    this.mqttClient.setOnAuthFailed(() => {
-      this.actionableProblems.report({
-        key: "mqtt-auth",
-        title: "Govee rejected the account login for real-time status",
-        action: "check the Govee email and password in the adapter settings (connection card)",
-      });
-    });
-    this.mqttClient.setOnLoginBlocked(() => {
-      this.actionableProblems.report({
-        key: "mqtt-login-blocked",
-        title: "Govee stopped accepting the account login for real-time status",
-        action:
-          "Govee rejected repeated login attempts (the account may be temporarily locked). Automatic retries are stopped — check your Govee account, then restart the adapter",
-      });
-    });
+    // Diagnostics hooks, the verification code and the problems the user has to act on.
+    accountHandler.wireAccountClient(this.handlerHost, this.mqttClient, config.mqttVerificationCode ?? "");
 
     // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
     // a FILE in the instance data directory — not a state and not a meta
@@ -1021,27 +957,7 @@ export class GoveeAdapter extends utils.Adapter {
 
     await this.mqttClient!.connect(
       update => this.deviceManager!.handleMqttStatus(update),
-      connected => {
-        this.stateManager
-          ?.writeReadOnly("info.mqttConnected", connected)
-          .catch(logRejected(this.log, "best-effort write"));
-        if (connected) {
-          this.actionableProblems.resolve(
-            "mqtt-verification",
-            "Govee real-time status connected — verification accepted",
-          );
-          this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
-          this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
-          this.stateManager
-            ?.writeReadOnly("info.verificationPending", false)
-            .catch(logRejected(this.log, "best-effort write"));
-          connectionState.checkAllReady(this.handlerHost);
-          // A (re)connected broker: ask right away what went quiet while
-          // it was down — the topics are known from the last list poll.
-          this.deviceManager?.requestStaleStatuses();
-        }
-        connectionState.updateConnectionState(this.handlerHost);
-      },
+      connected => accountHandler.onAccountConnection(this.handlerHost, connected),
       // Forward every fresh bearer token — fires on initial login and on
       // each reconnect-login, so the API client never runs with a stale one.
       token => {
