@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "Máquina de hielo",
   "deviceTypeAromaDiffuser": "Difusor de aromas",
   "deviceTypeButton": "Botón",
-  "deviceTypeUnknown": "Desconocido"
+  "deviceTypeUnknown": "Desconocido",
+  "optHeat": "Calefacción"
 }

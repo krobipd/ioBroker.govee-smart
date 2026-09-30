@@ -126,8 +126,13 @@ function coerceNum(v: unknown): number | null {
  *
  * @param capabilities Device capabilities from Cloud API
  * @param log Adapter logger — per-cap skip-decisions land on debug.
+ * @param deviceType Govee's type of the device — a label can depend on it (a heater's gearMode)
  */
-export function mapCapabilities(capabilities: CloudCapability[], log: ioBroker.Logger): StateDefinition[] {
+export function mapCapabilities(
+  capabilities: CloudCapability[],
+  log: ioBroker.Logger,
+  deviceType?: string,
+): StateDefinition[] {
   const states: StateDefinition[] = [];
 
   if (!Array.isArray(capabilities)) {
@@ -137,7 +142,7 @@ export function mapCapabilities(capabilities: CloudCapability[], log: ioBroker.L
   let mapped = 0;
   let skipped = 0;
   for (const cap of capabilities) {
-    const result = mapSingleCapability(cap);
+    const result = mapSingleCapability(cap, deviceType);
     if (result) {
       states.push(...result);
       mapped++;
@@ -256,8 +261,9 @@ export function getDefaultLanStates(): StateDefinition[] {
  * Map a single capability to state definition(s)
  *
  * @param cap Cloud capability to map
+ * @param deviceType Govee's type of the device, where a label depends on it
  */
-function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
+function mapSingleCapability(cap: CloudCapability, deviceType?: string): StateDefinition[] | null {
   if (!cap || typeof cap.type !== "string" || typeof cap.instance !== "string") {
     return null;
   }
@@ -346,7 +352,7 @@ function mapSingleCapability(cap: CloudCapability): StateDefinition[] | null {
       ];
 
     case "work_mode":
-      return mapWorkMode(cap);
+      return mapWorkMode(cap, deviceType);
 
     case "temperature_setting":
       return mapTemperatureSetting(cap);
@@ -837,8 +843,9 @@ export function resolveWorkModeStruct(
  *     "manual" mode); only created if the API actually exposes one
  *
  * @param cap Cloud work_mode capability
+ * @param deviceType Govee's type of the device — a heater's gearMode is its heating mode
  */
-function mapWorkMode(cap: CloudCapability): StateDefinition[] {
+function mapWorkMode(cap: CloudCapability, deviceType?: string): StateDefinition[] {
   const fields = cap.parameters?.fields;
   if (!fields || fields.length === 0) {
     return [
@@ -862,7 +869,7 @@ function mapWorkMode(cap: CloudCapability): StateDefinition[] {
     const modeStates: Record<string, string> = {};
     for (const opt of modeField.options) {
       if (opt && typeof opt.name === "string") {
-        modeStates[safeStringify(opt.value)] = optionLabel(opt.name);
+        modeStates[safeStringify(opt.value)] = optionLabel(opt.name, deviceType);
       }
     }
     states.push({
@@ -2044,6 +2051,7 @@ export function buildCloudStateDefs(
     : mapCapabilities(
         device.capabilities.filter(c => !ignored.has(c.instance)),
         log,
+        device.type,
       ).filter(d => noLanPhase || !LAN_STATE_IDS.has(d.id));
 
   if (skipCapabilities) {

@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "Ice maker",
   "deviceTypeAromaDiffuser": "Aroma diffuser",
   "deviceTypeButton": "Button",
-  "deviceTypeUnknown": "Unknown"
+  "deviceTypeUnknown": "Unknown",
+  "optHeat": "Heat"
 }

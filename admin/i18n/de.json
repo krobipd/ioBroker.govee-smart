@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "Eiswürfelbereiter",
   "deviceTypeAromaDiffuser": "Aromadiffusor",
   "deviceTypeButton": "Taster",
-  "deviceTypeUnknown": "Unbekannt"
+  "deviceTypeUnknown": "Unbekannt",
+  "optHeat": "Heizen"
 }

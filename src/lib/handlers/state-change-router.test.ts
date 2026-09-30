@@ -472,6 +472,23 @@ describe("resolveDropdownInput (number-OR-name dual input, Pattern 45)", () => {
     expect(await resolveDropdownInput(rig.adapter, id("control.mode_value"), "low")).toEqual({ val: "2", ok: true });
   });
 
+  it("Govee's own word reaches the entry the system language labels — scripts written against 3.0.x", async () => {
+    // The I18n stub resolves a label to its key: the dropdown shows the translation of Auto/gearMode.
+    const rig = makeRig([device]);
+    withCommon(rig, id("control.work_mode"), { type: "mixed", states: { 1: "optManual", 3: "optAuto", 9: "optFan" } });
+    expect(await resolveDropdownInput(rig.adapter, id("control.work_mode"), "Auto")).toEqual({ val: "3", ok: true });
+    expect(await resolveDropdownInput(rig.adapter, id("control.work_mode"), "gearMode")).toEqual({
+      val: "1",
+      ok: true,
+    });
+    // A heater labels its gearMode as the heating mode — Govee's word still reaches it.
+    withCommon(rig, id("control.work_mode"), { type: "mixed", states: { 1: "optHeat", 3: "optAuto" } });
+    expect(await resolveDropdownInput(rig.adapter, id("control.work_mode"), "gearMode")).toEqual({
+      val: "1",
+      ok: true,
+    });
+  });
+
   it("still rejects an unknown value on a real dropdown", async () => {
     const rig = makeRig([device]);
     withCommon(rig, id("control.mode_value"), { type: "mixed", states: { 0: "---", 1: "Sleep" } });

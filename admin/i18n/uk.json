@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "Льодогенератор",
   "deviceTypeAromaDiffuser": "Аромадифузор",
   "deviceTypeButton": "Кнопка",
-  "deviceTypeUnknown": "Невідомо"
+  "deviceTypeUnknown": "Невідомо",
+  "optHeat": "Нагрівання"
 }

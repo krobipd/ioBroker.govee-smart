@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "IJsblokjesmachine",
   "deviceTypeAromaDiffuser": "Aromaverspreider",
   "deviceTypeButton": "Knop",
-  "deviceTypeUnknown": "Onbekend"
+  "deviceTypeUnknown": "Onbekend",
+  "optHeat": "Verwarmen"
 }

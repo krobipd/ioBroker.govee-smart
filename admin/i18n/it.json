@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "Macchina del ghiaccio",
   "deviceTypeAromaDiffuser": "Diffusore di aromi",
   "deviceTypeButton": "Pulsante",
-  "deviceTypeUnknown": "Sconosciuto"
+  "deviceTypeUnknown": "Sconosciuto",
+  "optHeat": "Riscaldamento"
 }

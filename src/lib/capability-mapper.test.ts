@@ -3177,6 +3177,48 @@ describe("mode dropdown labels — settings in the system language, Govee's cont
     expect(def.states).toEqual({ 0: "---", 1: "optSpeedN", 2: "optSleep" });
   });
 
+  it("a heater's work mode gearMode is labelled as heating (govee2mqtt work_mode.rs: H7131/H7173 → Heat)", () => {
+    const cap: CloudCapability = {
+      type: "devices.capabilities.work_mode",
+      instance: "workMode",
+      parameters: {
+        dataType: "STRUCT",
+        fields: [
+          {
+            fieldName: "workMode",
+            dataType: "ENUM",
+            options: [
+              { name: "gearMode", value: 1 },
+              { name: "Fan", value: 9 },
+            ],
+          },
+        ],
+      },
+    };
+    expect(mapCapabilitiesRaw([cap], mockLog, "devices.types.heater")[0].states).toEqual({ 1: "optHeat", 9: "optFan" });
+    expect(mapCapabilitiesRaw([cap], mockLog, "devices.types.fan")[0].states).toEqual({ 1: "optManual", 9: "optFan" });
+  });
+
+  it("the device build hands the heater's type to the builder", () => {
+    const heater = createTestDevice({
+      sku: "H7131",
+      type: "devices.types.heater",
+      lanIp: undefined,
+      capabilities: [
+        {
+          type: "devices.capabilities.work_mode",
+          instance: "workMode",
+          parameters: {
+            dataType: "STRUCT",
+            fields: [{ fieldName: "workMode", dataType: "ENUM", options: [{ name: "gearMode", value: 1 }] }],
+          },
+        },
+      ],
+    });
+    const def = buildCloudStateDefsRaw(heater, mockLog, emptyRegistry()).find(d => d.id === "work_mode");
+    expect(def?.states).toEqual({ 1: "optHeat" });
+  });
+
   it("a scene instance keeps Govee's effect names — content, not settings", () => {
     const def = mapCapabilitiesRaw([mode("nightlightScene", ["Flame", "Sleep"])], mockLog)[0];
     expect(def.states).toEqual({ 0: "---", 1: "Flame", 2: "Sleep" });

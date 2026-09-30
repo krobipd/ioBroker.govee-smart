@@ -217,5 +217,6 @@
   "deviceTypeIceMaker": "制冰机",
   "deviceTypeAromaDiffuser": "香薰机",
   "deviceTypeButton": "按钮",
-  "deviceTypeUnknown": "未知"
+  "deviceTypeUnknown": "未知",
+  "optHeat": "加热"
 }

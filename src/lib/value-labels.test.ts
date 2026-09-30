@@ -11,7 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { infoTypeStates, infoTypeValue, optionLabel, UNKNOWN_DEVICE_TYPE } from "./value-labels";
+import { infoTypeStates, infoTypeValue, optionLabel, optionLabelsFor, UNKNOWN_DEVICE_TYPE } from "./value-labels";
 
 describe("optionLabel — Govee's setting words in the system language", () => {
   it("translates a known word, whatever its case and padding", () => {
@@ -21,6 +21,17 @@ describe("optionLabel — Govee's setting words in the system language", () => {
 
   it("gearMode is the manual level mode", () => {
     expect(optionLabel("gearMode")).toBe("optManual");
+  });
+
+  it("a heater's gearMode is its heating mode — elsewhere it is the manual level mode", () => {
+    expect(optionLabel("gearMode", "devices.types.heater")).toBe("optHeat");
+    expect(optionLabel("gearMode", "devices.types.air_purifier")).toBe("optManual");
+    expect(optionLabel("Auto", "devices.types.heater")).toBe("optAuto");
+  });
+
+  it("every label a Govee word can carry — for input written with Govee's name", () => {
+    expect(optionLabelsFor("gearMode")).toEqual(["optManual", "optHeat"]);
+    expect(optionLabelsFor("Tea")).toEqual(["optTea"]);
   });
 
   it("a numbered fan speed keeps its number", () => {

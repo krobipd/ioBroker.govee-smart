@@ -35,18 +35,34 @@ const SPEED_LEVEL = /^speed\s+(\d+)$/i;
 
 /**
  * The label of one option Govee declares for a setting: the translation where the word is known, Govee's own
- * text otherwise — a new word shows as Govee wrote it, never as nothing.
+ * text otherwise — a new word shows as Govee wrote it, never as nothing. On a heater `gearMode` is the heating
+ * mode with its levels (govee2mqtt `work_mode.rs` relabels it "Heat" for H7131/H7173), next to Auto and Fan.
  *
  * @param name The option name Govee declares
+ * @param deviceType Govee's type of the device (`devices.types.heater`), where the word depends on it
  */
-export function optionLabel(name: string): string {
+export function optionLabel(name: string, deviceType?: string): string {
   const word = name.trim();
-  const key = OPTION_WORDS[word.toLowerCase()];
+  const lower = word.toLowerCase();
+  if (lower === "gearmode" && deviceType === GOVEE_DEVICE_TYPE.HEATER) {
+    return resolveLabel("optHeat");
+  }
+  const key = OPTION_WORDS[lower];
   if (key) {
     return resolveLabel(key);
   }
   const speed = SPEED_LEVEL.exec(word);
   return speed ? resolveLabel("optSpeedN", Number(speed[1])) : name;
+}
+
+/**
+ * Every label a Govee option word can carry — a script that writes Govee's name (`Auto`, `gearMode`) into a
+ * dropdown still reaches the entry, whatever the system language shows.
+ *
+ * @param input What was written
+ */
+export function optionLabelsFor(input: string): string[] {
+  return [...new Set([optionLabel(input), optionLabel(input, GOVEE_DEVICE_TYPE.HEATER)])];
 }
 
 /** The `info.type` value of a device whose Govee type the adapter does not know. */

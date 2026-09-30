@@ -12,6 +12,7 @@ import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
 import { deviceLabel, errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
+import { optionLabelsFor } from "../value-labels";
 import * as dropdownReset from "./dropdown-reset-helpers";
 
 /**
@@ -102,7 +103,16 @@ export async function resolveDropdownInput(
   if (!states || typeof states !== "object") {
     return { val: raw, ok: true };
   }
-  const resolved = resolveStatesValue(raw, states as Record<string, string>);
+  const map = states as Record<string, string>;
+  // Govee's own word (`Auto`, `gearMode`) reaches the entry the system language
+  // labels (`Automatik`, `Manuell`) — scripts written against 3.0.x keep working.
+  const resolved =
+    resolveStatesValue(raw, map) ??
+    (typeof raw === "string"
+      ? optionLabelsFor(raw)
+          .map(label => resolveStatesValue(label, map))
+          .find(r => r !== null)
+      : null);
   if (resolved) {
     return { val: resolved.key, ok: true };
   }

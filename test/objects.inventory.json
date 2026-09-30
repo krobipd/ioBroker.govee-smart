@@ -18560,7 +18560,7 @@
       "read": true,
       "write": true,
       "states": {
-        "1": "Manual",
+        "1": "Heat",
         "3": "Auto",
         "9": "Fan"
       },
