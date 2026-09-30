@@ -653,6 +653,29 @@ describe("DeviceManager", () => {
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
     });
 
+    it("a 429 warns ONCE and names the Retry-After wait, not the transient 5 minutes (M7, 3.0.2)", async () => {
+      const warns: string[] = [];
+      const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
+      const dm2 = new DeviceManager(log, mockTimers, registry);
+      dm2.setCloudClient({
+        getDevices: () => Promise.reject(new HttpError("Rate limited", 429, { "retry-after": "120" })),
+      } as any);
+      await dm2.loadFromCloud();
+      await dm2.loadFromCloud();
+      expect(warns).toHaveLength(1);
+      expect(warns[0]).toContain("retrying in 120 s");
+      expect(warns[0]).not.toContain("5 min");
+    });
+
+    it("a rejected key is no warning here — the registry names it once with what to do (M7, 3.0.2)", async () => {
+      const warns: string[] = [];
+      const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
+      const dm2 = new DeviceManager(log, mockTimers, registry);
+      dm2.setCloudClient({ getDevices: () => Promise.reject(new HttpError("Access denied", 403, {})) } as any);
+      expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
+      expect(warns).toEqual([]);
+    });
+
     it("loadFromCloud classifies a generic network error as transient (L29)", async () => {
       const dm2 = new DeviceManager(mockLog, mockTimers, registry);
       dm2.setCloudClient({ getDevices: () => Promise.reject(new Error("network boom")) } as any);

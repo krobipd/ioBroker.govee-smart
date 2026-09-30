@@ -74,6 +74,11 @@ class TestHost implements CloudRetryHost {
     const w = [...this.logs].reverse().find(l => l.level === "warn");
     return w?.msg;
   }
+
+  public lastDebug(): string | undefined {
+    const d = [...this.logs].reverse().find(l => l.level === "debug");
+    return d?.msg;
+  }
 }
 
 function queueResults(host: TestHost, ...rs: CloudLoadResult[]): void {
@@ -97,7 +102,9 @@ describe("CloudRetryLoop", () => {
         message: "HTTP 403",
       });
       expect(host.timers).toHaveLength(0);
-      expect(host.lastWarn()).toContain("authentication failed");
+      // Told once by the actionable-problems registry, never by the loop (M7, 3.0.2).
+      expect(host.lastWarn()).toBeUndefined();
+      expect(host.lastDebug()).toContain("key rejected");
       // Stopped-for-good is observable behaviour: a later transient result
       // must not schedule a retry either.
       loop.handleResult({ ok: false, reason: "transient" });
@@ -140,14 +147,17 @@ describe("CloudRetryLoop", () => {
       });
       expect(host.timers).toHaveLength(1);
       expect(host.timers[0].ms).toBe(30_000);
-      expect(host.lastWarn()).toContain("30s");
+      // The list failure warned once, naming the wait — the loop's line is debug (M7, 3.0.2).
+      expect(host.lastWarn()).toBeUndefined();
+      expect(host.lastDebug()).toContain("30s");
     });
 
     it("floors a zero / malformed Retry-After so it can't tight-loop (L5)", () => {
       loop.handleResult({ ok: false, reason: "rate-limited", retryAfterMs: 0 });
       expect(host.timers).toHaveLength(1);
       expect(host.timers[0].ms).toBe(5_000); // floored to MIN_RATE_LIMIT_RETRY_MS, not 0
-      expect(host.lastWarn()).toContain("5s");
+      expect(host.lastWarn()).toBeUndefined();
+      expect(host.lastDebug()).toContain("5s");
     });
 
     it("caps a huge Retry-After at one hour — a timer above 2^31−1 ms throws in js-controller (audit 2026-09-24 A12)", () => {

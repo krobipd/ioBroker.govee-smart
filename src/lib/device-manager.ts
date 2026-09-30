@@ -41,6 +41,7 @@ import {
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   MAX_RATE_LIMIT_RETRY_MS,
+  TRANSIENT_RETRY_MS,
   PENDING_INTENT_TTL_MS,
   STATUS_REQUEST_INTERVAL_MS,
   clampTimerMs,
@@ -88,6 +89,31 @@ interface LibraryTrack {
  */
 function librariesConfirmed(track: LibraryTrack): boolean {
   return !track.cancelled && !track.skipped && !track.failed;
+}
+
+/**
+ * What a failed Cloud device list means for the retry loop: a 429 waits for
+ * Govee's Retry-After (60 s when absent, at most an hour — a timer throws above
+ * 2^31−1 ms), a rejected key stops (classifyError reads 401/403 from the
+ * status field), everything else is retried later.
+ *
+ * @param err What the list call threw
+ */
+function cloudListFailure(err: unknown): Exclude<CloudLoadResult, { ok: true }> {
+  if (err instanceof HttpError && err.statusCode === 429) {
+    const retryAfterRaw = err.headers["retry-after"];
+    const retryAfterSec =
+      typeof retryAfterRaw === "string" && /^\d+$/.test(retryAfterRaw) ? parseInt(retryAfterRaw, 10) : 60;
+    return {
+      ok: false,
+      reason: "rate-limited",
+      retryAfterMs: clampTimerMs(retryAfterSec * 1000, 60_000, MAX_RATE_LIMIT_RETRY_MS),
+    };
+  }
+  if (classifyError(err) === "AUTH") {
+    return { ok: false, reason: "auth-failed", message: errMessage(err) };
+  }
+  return { ok: false, reason: "transient" };
 }
 
 /**
@@ -1248,44 +1274,26 @@ export class DeviceManager {
       this.cloudListDedup.lastCategory = null;
       return { ok: true };
     } catch (err) {
-      logChannelFail(this.log, {
-        channel: "Cloud REST",
-        err,
-        context: "loading device list",
-        retryHint: "retrying every 5 min",
-        dedup: this.cloudListDedup,
-      });
-
-      // Govee 429: respect Retry-After header (default 60s if missing)
-      if (err instanceof HttpError && err.statusCode === 429) {
-        const retryAfterRaw = err.headers["retry-after"];
-        const retryAfterSec =
-          typeof retryAfterRaw === "string" && /^\d+$/.test(retryAfterRaw) ? parseInt(retryAfterRaw, 10) : 60;
-        return {
-          ok: false,
-          reason: "rate-limited",
-          // Bounded: a timer throws above 2^31−1 ms, and no pause needs more than an hour.
-          retryAfterMs: clampTimerMs(retryAfterSec * 1000, 60_000, MAX_RATE_LIMIT_RETRY_MS),
-        };
+      const result = cloudListFailure(err);
+      if (result.reason === "auth-failed") {
+        // Surfaced once, with what to do, by the actionable-problems registry
+        // (cloud-retry-handler) — until 3.0.1 the same 401 made three warnings.
+        this.log.debug(`Cloud REST: device list rejected — ${errMessage(err)}`);
+      } else {
+        logChannelFail(this.log, {
+          channel: "Cloud REST",
+          err,
+          context: "loading device list",
+          // The hint names the wait that really follows — a 429 waits for
+          // Govee's Retry-After, not the transient 5 minutes.
+          retryHint:
+            result.reason === "rate-limited"
+              ? `retrying in ${Math.round(result.retryAfterMs / 1000)} s`
+              : `retrying every ${TRANSIENT_RETRY_MS / 60_000} min`,
+          dedup: this.cloudListDedup,
+        });
       }
-
-      // Auth failure: API key wrong or revoked — NO retry. Classify 401/403 by
-      // status code too, not just classifyError's message match, so a body
-      // without "auth"/"unauthorized" (e.g. "Access denied") doesn't fall
-      // through to a "transient" retry loop on a permanently-bad key (same class
-      // as the L26 cloud-client fix).
-      const category = classifyError(err);
-      const authByStatus = err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403);
-      if (authByStatus || category === "AUTH") {
-        return {
-          ok: false,
-          reason: "auth-failed",
-          message: errMessage(err),
-        };
-      }
-
-      // Network/timeout/unknown: transient, just retry later
-      return { ok: false, reason: "transient" };
+      return result;
     }
   }
 

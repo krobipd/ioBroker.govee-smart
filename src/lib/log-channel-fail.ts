@@ -66,7 +66,9 @@ export function logChannelFail(log: ioBroker.Logger, opts: LogChannelFailOptions
 
 /**
  * Pure formatter — exported for tests. Translates an ErrorCategory into a
- * user-facing line. No I/O, no side-effects.
+ * user-facing line. No I/O, no side-effects. A rejected key never comes here —
+ * the actionable-problems registry names it once with what to do — and the
+ * verification categories belong to the account login, not to a channel call.
  *
  * @param channel channel name
  * @param category classified error category
@@ -96,21 +98,12 @@ export function formatChannelFail(
       const codePart = code ? ` (${code})` : "";
       return `${channel}: network error${codePart}${contextSuffix}${retrySuffix}`;
     }
-    case "AUTH": {
-      const status = err instanceof HttpError ? err.statusCode : null;
-      const statusPart = status ? ` (HTTP ${status})` : "";
-      return `${channel}: authentication failed${statusPart} — check adapter config, no auto-retry`;
-    }
     case "RATE_LIMIT": {
       const status = err instanceof HttpError ? err.statusCode : null;
       const statusPart = status ? ` (HTTP ${status})` : "";
       const hint = retryHint ?? "retrying after Retry-After window";
       return `${channel}: rate-limited by Govee${statusPart} — ${hint}`;
     }
-    case "VERIFICATION_PENDING":
-      return `${channel}: verification code required — open adapter Settings and request a code`;
-    case "VERIFICATION_FAILED":
-      return `${channel}: verification code rejected — request a fresh code in Settings`;
     case "UNKNOWN":
     default: {
       const msg = errMessage(err);

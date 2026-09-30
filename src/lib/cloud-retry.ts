@@ -111,9 +111,9 @@ export class CloudRetryLoop {
           this.host.clearTimeout(this.retryTimer);
           this.retryTimer = undefined;
         }
-        this.host.log.warn(
-          `Govee Cloud: authentication failed — check API-Key in adapter settings. Not retrying automatically.`,
-        );
+        // The user is told once, with what to do, by the actionable-problems
+        // registry — this is the loop's own trail.
+        this.host.log.debug("Govee Cloud: key rejected — not retrying automatically");
         return;
       case "rate-limited": {
         // Floor the server's Retry-After so a 0 / malformed value can't turn
@@ -123,7 +123,9 @@ export class CloudRetryLoop {
           MIN_RATE_LIMIT_RETRY_MS,
           MAX_RATE_LIMIT_RETRY_MS,
         );
-        this.host.log.warn(`Govee Cloud: rate-limited — pausing for ${Math.round(pauseMs / 1000)}s before retry`);
+        // The list failure already warned once, naming this wait; every
+        // later cycle of the same 429 is a repeat (log dedup rule).
+        this.host.log.debug(`Govee Cloud: rate-limited — pausing for ${Math.round(pauseMs / 1000)}s before retry`);
         this.schedule(pauseMs);
         return;
       }

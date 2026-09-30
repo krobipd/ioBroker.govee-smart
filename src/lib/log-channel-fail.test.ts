@@ -37,12 +37,6 @@ describe("formatChannelFail (pure formatter)", () => {
     expect(out).toBe("Cloud REST: network error (ENOTFOUND) (loading device list) — retrying every 5 min");
   });
 
-  it("AUTH: includes HTTP status when err is HttpError + no auto-retry hint", () => {
-    const err = new HttpError("Unauthorized", 401, {}, "");
-    const out = formatChannelFail("Cloud REST", "AUTH", err);
-    expect(out).toBe("Cloud REST: authentication failed (HTTP 401) — check adapter config, no auto-retry");
-  });
-
   it("RATE_LIMIT: includes HTTP 429 + retry-after hint", () => {
     const err = new HttpError("Too Many Requests", 429, {}, "");
     const out = formatChannelFail("Cloud REST", "RATE_LIMIT", err, "retrying in 60 s");
@@ -55,11 +49,6 @@ describe("formatChannelFail (pure formatter)", () => {
     expect(out).toBe(
       "Cloud REST: request failed (loading device list) — Govee returned weird payload — retrying every 5 min",
     );
-  });
-
-  it("VERIFICATION_PENDING: directs user to Settings, no retry hint inserted", () => {
-    const out = formatChannelFail("Cloud REST", "VERIFICATION_PENDING", new Error("status 454"));
-    expect(out).toBe("Cloud REST: verification code required — open adapter Settings and request a code");
   });
 });
 
@@ -109,11 +98,12 @@ describe("logChannelFail (dedup wrapper)", () => {
       err: Object.assign(new Error("Timeout x"), { code: "ETIMEDOUT" }),
       dedup,
     });
-    const authErr = new HttpError("Unauthorized", 401, {}, "");
-    logChannelFail(log, { channel: "Cloud REST", err: authErr, dedup });
+    // The channel's real second category: Govee's rate limit.
+    const limited = new HttpError("Too Many Requests", 429, {}, "");
+    logChannelFail(log, { channel: "Cloud REST", err: limited, dedup });
 
     const warns = entries.filter(e => e.level === "warn");
     expect(warns).toHaveLength(2);
-    expect(warns[1].msg).toContain("authentication failed (HTTP 401)");
+    expect(warns[1].msg).toContain("rate-limited by Govee (HTTP 429)");
   });
 });

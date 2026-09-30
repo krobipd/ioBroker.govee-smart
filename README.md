@@ -104,6 +104,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a light found on the network before the saved data loads keeps its scene speed and remembered libraries after a restart
 - Fixed: a group offers only the colour temperatures every member supports, so no member is sent a value outside its range
 - Fixed: when Govee no longer accepts the account session, scene, music and DIY libraries, snapshots and groups ask for a fresh login instead of reading as empty
+- Fixed: a Cloud rate limit or rejected API key is reported once, with the real waiting time — no longer three times or with a wrong retry hint
 
 ### 3.0.1 (2026-09-27)
 

@@ -573,38 +573,24 @@ export class GoveeCloudClient {
       this.reportContact("ok");
       return result.value;
     } catch (err) {
-      // Classify 429 explicitly by status code — classifyError only looks at
-      // err.message, and HttpError("Too many requests", 429, …) has no "429"
-      // or "Rate limit" marker in the text. Without this branch 429 lands as
-      // UNKNOWN and getFailureReason() returns the wrong ready hint.
       if (err instanceof HttpError) {
         // A rejection carries headers too — a 429 is the one answer whose
         // rate-limit headers matter most.
         this.noteRateLimit(path, err.headers);
       }
+      // A 429 is re-thrown with the wait in its text — the warn line names it.
       if (err instanceof HttpError && err.statusCode === 429) {
         this.lastErrorCategory = "RATE_LIMIT";
         const retryAfter = String(err.headers["retry-after"] ?? "unknown");
         throw new HttpError(`Rate limited — retry after ${retryAfter}s`, 429, err.headers);
       }
-      // Classify 401/403 explicitly by status code (L26) — a 401/403 whose body
-      // doesn't contain "auth"/"unauthorized" (e.g. "Access denied") must still
-      // produce the actionable "API key rejected — check Govee API key" instead
-      // of "Cloud request failed".
-      //
-      // classifyError() reads `err.statusCode` itself since the text-marker
-      // hardening, so this branch is redundant TODAY — kept as defence in depth
-      // for the one thing it owns: this class's own error category, independent
-      // of how the shared classifier evolves. Measured 2026-09-03: removing it
-      // changes no test (equivalent mutant G90). Do not re-add the old claim
-      // that classifyError only looks at the message — that stopped being true.
-      if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
-        this.lastErrorCategory = "AUTH";
-        this.reportContact("auth-failed");
-        throw err;
-      }
+      // classifyError reads the status field (401/403 → AUTH, whatever the
+      // body says, L26). A rejected key tells the contact hook; a call that
+      // never reached a working Govee server feeds the outage tracker (#51).
       this.lastErrorCategory = classifyError(err);
-      if (isUnreachable(err, this.lastErrorCategory)) {
+      if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
+        this.reportContact("auth-failed");
+      } else if (isUnreachable(err, this.lastErrorCategory)) {
         this.reportContact("unreachable", errMessage(err));
       }
       throw err;
