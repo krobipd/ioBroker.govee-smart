@@ -99,6 +99,28 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   wizardHandler.WizardHandlerAdapter &
   diagnosticsHandler.DiagnosticsHandlerAdapter;
 
+/** What the start phases of onReady hand each other. */
+interface StartContext {
+  /** The instance configuration. */
+  config: ioBroker.AdapterConfig;
+  /** The account e-mail, trimmed — what the login sends. */
+  accountEmail: string;
+  /** E-mail and password are both set. */
+  hasAccountCreds: boolean;
+  /** The instance data directory. */
+  dataDir: string;
+  /** The App-API client (set by wireRuntime). */
+  apiClient?: GoveeApiClient;
+  /** The saved account credentials (set by openAccount). */
+  cachedCreds?: Awaited<ReturnType<typeof cloudCreds.loadPersistedCreds>>;
+  /** The device list came from the cache. */
+  cachedOk: boolean;
+  /** The Cloud start without a cache (set by startCloud). */
+  cloudInit?: Awaited<ReturnType<typeof cloudRetryHandler.cloudInitWithTimeout>>;
+  /** The state read of the start may run: the cloud client exists and the account answered (cache or live list). */
+  cloudStateReadable: boolean;
+}
+
 /**
  * Exported so the orchestration unit tests can drive the lifecycle handlers
  * directly (fleet harness, see `reference_orchestration_test_harness`). The
@@ -495,916 +517,31 @@ export class GoveeAdapter extends utils.Adapter {
   private async onReady(): Promise<void> {
     this.startedAt = Date.now();
     try {
-      // First of all: without this the whole shutdown path stays dead on an updated
-      // install, and the correction restarts us — so nothing else may start up here.
-      if (await this.clearStopInstanceFlag()) {
+      const start = await this.prepareInstance();
+      if (!start) {
         return;
       }
-      // Same class of correction, same consequence: a settings key renamed by an
-      // earlier release is carried over once, the write restarts the instance.
-      if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errMessage)) {
-        return;
-      }
-      await I18n.init(path.join(this.adapterDir, "admin"), this);
-      // Read once — a controller or admin update restarts every instance, so
-      // these cannot go stale while this process lives. Failure is silent: a
-      // report without them is worse, but not a reason to refuse starting.
-      await this.readHostVersions();
-      // Deliver the manifest's texts to an EXISTING tree too — js-controller
-      // only creates instanceObjects that are missing.
-      await this.ensureManifestObjects();
-      const config = this.config;
-
-      // Fetch the live Govee-app version early (fire-and-forget) so the first
-      // login / requests already use a current version — the undocumented
-      // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
-      // this resolves; a daily timer keeps it fresh.
-      void connectionState
-        .refreshLiveAppVersion(this.handlerHost)
-        .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
-
-      // One-shot cleanup: the global info.refresh_cloud_data button was removed
-      // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
-      // info.manualSyncDevices (BUG-1). Drop the dead orphan.
-      await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
-
-      // One-shot cleanup: 2.29.0–2.36.0 kept a copy of every diagnostics report
-      // as a file under a `diagnostics` meta object at the root of the instance
-      // — a folder next to the devices that nobody asked for. Since 2.37.0 the
-      // report travels only in the answer to the Expert card. Drop the copies
-      // and the folder; a fresh install has neither and this is silent.
-      await this.removeLegacyReportStore();
-
-      // One-shot cleanup: the manual-sync button was spelled info.manual_sync_devices
-      // from v2.17.0 to v2.27.1 — the only snake_case id in the otherwise camelCase
-      // info channel. It was never subscribed either, so no script can depend on the
-      // old spelling; the instanceObjects entry now declares info.manualSyncDevices.
-      await this.delObjectAsync("info.manual_sync_devices").catch(() => undefined);
-
-      // One-shot cleanup: info.legacyMqttCleaned was a migration marker from an
-      // early v2 release. No code has written or read it for many versions —
-      // it survived only because nothing removes what the adapter no longer
-      // knows about. Found in the live tree on 2026-09-03, not by any gate.
-      await this.delObjectAsync("info.legacyMqttCleaned").catch(() => undefined);
-
-      // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
-      // Govee-app version now self-heals in the background, so there is nothing
-      // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
-      await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
-
-      // One-shot cleanup: info.wizardStatus was removed in v2.21.0 — the segment
-      // wizard is now a React admin component that owns its own status, so the
-      // UI-only mirror state is gone. Drop the dead orphan on upgraded installs.
-      await this.delObjectAsync("info.wizardStatus").catch(() => undefined);
-
-      // One-shot migration + cleanup: the <namespace>.credentials meta object
-      // (v2.18.0–v2.18.2) is replaced by an encrypted file in the instance data
-      // directory — the credentials are a re-derivable cache (the account
-      // settings ARE in every backup), and the visible object node disappears.
-      await cloudCreds.migrateCredentialsMetaOnce(this.handlerHost, utils.getAbsoluteInstanceDataDir(this));
-
-      // v2.11.0 credential-encryption migration check: if encryptedNative was
-      // added retroactively, js-controller still decrypts existing plaintext
-      // values via the legacy XOR fallback — the adapter sees garbage that
-      // bears no resemblance to the original. Detect: Govee API keys are
-      // strict UUIDv4 (8-4-4-4-12 hex). Non-empty + non-UUID = needs re-entry.
-      if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
-        // The same symptom has two very different causes — lead with the
-        // common one (typo/whitespace on a fresh install) instead of
-        // frightening every new user with 'encryption migration corrupted'
-        // and demanding a password re-entry the key alone doesn't need (M10).
-        this.log.error(
-          "The Govee API key does not look like a valid key (expected UUID format like 12345678-1234-1234-1234-123456789abc) — check for typos or copied whitespace in the adapter settings. " +
-            "If this appeared right after upgrading a very old install (v2.11.0 encryption migration), re-enter the API key, Govee password and verification code once.",
-        );
-      }
-
-      // Account credentials gate — trimmed so a stray space in a field can't
-      // trip the truthy check into a login with junk data (issue #39). Drives
-      // the status prefix, the startup log and the MQTT init below alike.
-      // The trimmed e-mail is also what the login SENDS: the admin card's
-      // "Connect" test trims it too, so a pasted trailing space must not make
-      // the test succeed and the real start-up login fail on the same value.
-      // The password stays untouched — surrounding spaces can be part of it.
-      const accountEmail = (config.goveeEmail ?? "").trim();
-      const hasAccountCreds = !!(accountEmail && config.goveePassword?.trim());
-
-      // Channel-status prefix for every log line — must run BEFORE sub-libraries
-      // are constructed so they pick up the wrapped adapter.log automatically.
-      // Initial snapshot reflects which credentials the user provided; status
-      // flips to "on" / "off" as connections come up or fail.
-      this.channelStatus = {
-        lan: "off", // LAN listener always exists; flips to "on" after first discovery
-        cloud: config.apiKey ? "off" : "n/a",
-        mqtt: hasAccountCreds ? "off" : "n/a",
-        openapi: config.apiKey ? "off" : "n/a",
-      };
-      installLogPrefix(this.log, () => this.channelStatus);
-
-      // One registry for problems that need the USER to act (verification,
-      // rejected credentials). Surfaces each once — a clear warn + a persistent
-      // ioBroker notification — and a positive resolution line when it clears.
-      // Transient failures never reach here. Spam-free by construction.
-      this.actionableProblems = new ActionableProblems({
-        logWarn: m => this.log.warn(m),
-        logInfo: m => this.log.info(m),
-        notify: m =>
-          this.registerNotification("govee-smart", "userActionRequired", m).catch(e =>
-            this.log.debug(`Could not raise notification: ${errMessage(e)}`),
-          ),
-      });
-
-      // info channel + states are declared as instanceObjects in
-      // io-package.json, so js-controller materialises them on install /
-      // upgrade. We only initialise the runtime values here.
-      await this.setState("info.connection", { val: false, ack: true });
-      await this.setState("info.cloudConnected", { val: false, ack: true });
-
-      // Device catalog from devices.json in the adapter package root — built
-      // before anything that applies quirks. Status filter: verified+reported
-      // active by default; seed-status entries need the experimentalQuirks toggle.
-      this.deviceRegistry = new DeviceRegistry({
-        experimental: config.experimentalQuirks === true,
-        log: this.log,
-      });
-
-      this.stateManager = new StateManager(this, this.deviceRegistry);
-      // The account and event flags go through the state manager's read-only
-      // writer from their first write on: every later callback writes only a
-      // change (a login retry used to rewrite `false` each time). The stale
-      // 2FA-pending flag of a previous run is cleared here — the login flow sets
-      // it again if Govee still wants a code.
-      await this.stateManager.writeReadOnly("info.mqttConnected", false);
-      await this.stateManager.writeReadOnly("info.openapiMqttConnected", false);
-      await this.stateManager.writeReadOnly("info.verificationPending", false);
-      // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
-      // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
-      // generic device; intake skips them now, but a tree already created that
-      // way never re-enters the device map and so is never reaped. Drop any
-      // leftover on upgraded installs — before the id move, which leaves them alone.
-      await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
-      // Every tree of an older id rule moves once to `<sku>-<last 4>` (3.0.0), and every tree is
-      // recorded — before anything else reads, writes or deletes a device tree.
-      // A move that cannot even read the object tree leaves the id map empty — every
-      // device would get an id by arrival order, and two devices ending in the same four
-      // characters could swap trees. Nothing starts on a guess: the start stops here.
-      try {
-        await this.stateManager.migrateDeviceIds();
-      } catch (e) {
-        this.log.error(
-          `Device id migration failed — the adapter does not start: ${errMessage(e)}; restart the instance`,
-        );
-        return;
-      }
-      // Nothing has been asked yet, so nothing may still claim to be reachable from
-      // the previous run — least of all after a crash, where no shutdown code ran at
-      // all and the old values would stand until the 20-second sync catches up.
-      // Before markAllOffline: its clearDeviceRollup only touches datapoints
-      // that already exist, so creating them first makes a restart say
-      // "0 online, not all online" right away instead of leaving the last
-      // session's numbers standing until the first 20 s round (F8).
-      await this.stateManager.ensureDeviceRollupStates().catch(() => undefined);
-      await this.stateManager.markAllOffline().catch(() => undefined);
-      // General groups online state (reflects Cloud connection)
-      await this.stateManager.createGroupsOnlineState(false);
-      // The unloading reader: a scene job that finishes after onUnload began
-      // must not persist or rebuild into a closing database (2026-09-22).
-      this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry, () => this.unloading);
-      const dataDir = utils.getAbsoluteInstanceDataDir(this);
-
-      this.skuCache = new SkuCache(dataDir, this.log);
-      // The store carries the snapshot files of earlier versions (root meta
-      // object 2.11.0–2.36.0, instance data dir before 2.11) into the device
-      // objects once and removes the root folder — see LocalSnapshotStore.
-      const deviceIds = this.stateManager.deviceIds;
-      this.localSnapshots = new LocalSnapshotStore(this, this.log, {
-        idOf: (sku, deviceId) => deviceIds.idFor(sku, deviceId),
-      });
-      await this.localSnapshots.init(dataDir);
-      // The last wait before the first start (the LAN socket below) — a stop during
-      // any wait so far, the id move included, ends the start here.
-      if (this.unloading) {
-        return; // nothing may start behind onUnload (audit B6)
-      }
-      this.snapshotHandler = new SnapshotHandler(snapshotHandlerGlue.buildSnapshotHost(this.handlerHost));
-      this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
-      this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
-      this.deviceManager.setSkuCache(this.skuCache);
-      // The cleanup's protection of listed devices names their trees from the same registry.
-      this.deviceManager.setTreeResolver((sku, deviceId) => this.stateManager!.deviceIds.prefixFor(sku, deviceId));
-
-      // v2.9.1 — wire diag providers so generate() can render persisted-cache,
-      // local-snapshots and adapter-runtime state. Providers are pulled at
-      // export time, so a wizard that's running THEN gets captured even
-      // though the collector itself doesn't track it live.
-      const diag = this.deviceManager.getDiagnostics();
-      diag.setCacheSnapshotProvider((sku, deviceId) => this.skuCache?.loadOne(sku, deviceId) ?? null);
-      diag.setLocalSnapshotsProvider((sku, deviceId) => this.localSnapshots?.getSnapshots(sku, deviceId) ?? []);
-      diag.setRuntimeStateProvider(() => {
-        const errorCats = this.deviceManager?.getErrorCategorySnapshot();
-        return {
-          deviceManagerLastErrorCategory: errorCats?.deviceManager ?? null,
-          appApiLastErrorCategory: errorCats?.appApi ?? null,
-          groupMembersLastErrorCategory: errorCats?.groupMembers ?? null,
-          cloudFailureReason: this.cloudClient?.getFailureReason() ?? null,
-          mqttFailureReason: this.mqttClient?.getFailureReason() ?? null,
-          rateLimiter: this.rateLimiter?.getUsageSnapshot() ?? null,
-          cloudRateLimit: this.cloudClient?.getLastRateLimit() ?? null,
-          wizardSession: this.segmentWizard?.getSessionSnapshot() ?? null,
-          lanSeenDeviceIps: this.lanClient?.getDiagSnapshot().seenDeviceIps ?? [],
-        };
-      });
-      // Device names have no detectable shape, so the pseudonymiser can only
-      // replace the ones it is told about.
-      diag.setDeviceNamesProvider(() => this.deviceManager?.getDevices().map(d => d.name) ?? []);
-      // A group's id is digits only — no pattern finds it, so it goes by lookup too.
-      diag.setDeviceIdsProvider(() => this.deviceManager?.getDevices().map(d => d.deviceId) ?? []);
-      // Which ioBroker this runs on, and how the installation as a whole is
-      // doing. Every field here used to be a follow-up question on a report —
-      // and the issue forms dropped their Node field because it belongs in here.
-      diag.setEnvironmentProvider(() => {
-        const devices = this.deviceManager?.getDevices() ?? [];
-        return {
-          node: process.version,
-          jsController: this.hostVersions.jsController,
-          admin: this.hostVersions.admin,
-          platform: `${process.platform} ${process.arch}`,
-          compactMode: this.common?.compact === true,
-          credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
-          deviceCount: devices.length,
-          reachableCount: devices.filter(d => resolveDeviceReachability(d).online).length,
-          channels: { ...this.channelStatus },
-          startedAt: new Date(this.startedAt).toISOString(),
-        };
-      });
-      // The datapoints as they really exist — the answer to "this datapoint is
-      // missing / has the wrong type / the wrong role", which the in-memory view
-      // cannot give. Scoped to ONE device prefix, never a full-instance scan.
-      diag.setObjectTreeProvider(prefix => this.readObjectTree(prefix));
-
-      // How each writable datapoint is actually driven. The report carried the
-      // capability list and the object tree — the two ends — but never the
-      // routing between them, so "this control does nothing on my model" could
-      // not be answered from a report. Asks the SAME function a real write asks,
-      // so the answer cannot drift from the behaviour it describes; pure
-      // decision-making, no I/O.
-      diag.setControlPathProvider((device, stateIds) => {
-        const router = this.deviceManager;
-        if (!router) {
-          return [];
-        }
-        const out: diagnostics.ControlPathEntry[] = [];
-        for (const stateId of stateIds) {
-          const command = dropdownReset.stateToCommand(stateId);
-          if (!command) {
-            continue;
-          }
-          const decision = router.resolveTransport(device, command);
-          out.push({ stateId, command, transport: decision.kind, reason: decision.reason });
-        }
-        return out;
-      });
-
-      // API client for undocumented scene/music/DIY libraries (always available)
-      const apiClient = this.makeApiClient(this.log);
-      apiClient.setEmail(accountEmail);
-      this.deviceManager.setApiClient(apiClient);
-
-      this.deviceManager.setCallbacks({
-        onUpdate: (device, state, changes) =>
-          deviceEvents.onDeviceStateUpdate(this.handlerHost, device, state, changes),
-        onLanDeviceReady: (device, allDevices) => deviceEvents.onLanDeviceReady(this.handlerHost, device, allDevices),
-        onCloudDataReady: (device, allDevices) => deviceEvents.onCloudDataReady(this.handlerHost, device, allDevices),
-        onGroupMembersReady: (group, allDevices) =>
-          deviceEvents.onGroupMembersReady(this.handlerHost, group, allDevices),
-      });
-
-      // After an account-reconcile eviction, clean up the now-orphan objects +
-      // diagnostics buffers. A poll-driven eviction never fires onCloudDataReady,
-      // so reapStaleDevices must be triggered explicitly here.
-      this.deviceManager.onDevicesRemoved = () => {
-        void this.reapStaleDevices().catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
-      };
-
-      // Update info.ip when LAN IP changes
-      this.deviceManager.onLanIpChanged = (device, ip) => {
-        // A gateway-connected sensor has info.gateway, not info.ip — writing here
-        // would create an orphan state value. It is never LAN-discovered anyway,
-        // but guard defensively.
-        if (device.gateway) {
+      // One phase after the other, and the stop check between them: a phase ends at a wait, and nothing
+      // may start behind onUnload (audit B6) — the id move, the saved account, the login, the Cloud start,
+      // the group members, the queued builds and the state read each end one.
+      const phases: Array<() => boolean | Promise<boolean>> = [
+        () => this.buildRuntime(start),
+        () => this.wireRuntime(start),
+        () => this.startLan(start),
+        () => this.openAccount(start),
+        () => this.connectAccount(start),
+        () => this.startCloud(start),
+        () => this.settleCloudStart(start),
+        () => this.drainStateCreation(start),
+        () => this.readStartState(start),
+        () => this.runStartMigrations(),
+        () => this.finishStart(),
+      ];
+      for (const phase of phases) {
+        if (!(await phase()) || this.unloading) {
           return;
         }
-        const prefix = this.stateManager!.devicePrefix(device);
-        this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(logRejected(this.log, "best-effort write"));
-      };
-
-      // Sync individual segment states after batch command.
-      // Important: the wizard sends `segmentBatch` with indices 0..SEGMENT_HARD_MAX
-      // so the device reveals its real strip length itself. But we may only
-      // write that ECHO into states that actually exist — otherwise js-controller
-      // produces the "has no existing object" WARN for every index above the cap
-      // (e.g. segments.51..55 on a 19-segment strip).
-      this.deviceManager.onSegmentBatchUpdate = (device, batch) => {
-        const prefix = this.stateManager!.devicePrefix(device);
-        const cap = physicalSegmentCap(device, this.deviceRegistry);
-        for (const idx of batch.segments) {
-          if (cap === 0 || idx >= cap) {
-            continue;
-          }
-          if (batch.color !== undefined) {
-            const hex = rgbIntToHex(batch.color);
-            this.setState(`${prefix}.segments.${idx}.color`, {
-              val: hex,
-              ack: true,
-            }).catch(logRejected(this.log, "best-effort write"));
-          }
-          if (batch.brightness !== undefined) {
-            this.setState(`${prefix}.segments.${idx}.brightness`, {
-              val: batch.brightness,
-              ack: true,
-            }).catch(logRejected(this.log, "best-effort write"));
-          }
-        }
-      };
-
-      // Sync per-segment states from MQTT BLE status push (AA A5 packets).
-      // Same cap filter as the batch path — guards against stale packets.
-      this.deviceManager.onMqttSegmentUpdate = (device, segments) => {
-        const prefix = this.stateManager!.devicePrefix(device);
-        const cap = physicalSegmentCap(device, this.deviceRegistry);
-        for (const seg of segments) {
-          if (cap === 0 || seg.index >= cap) {
-            continue;
-          }
-          this.setState(`${prefix}.segments.${seg.index}.color`, {
-            val: rgbToHex(seg.r, seg.g, seg.b),
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-          this.setState(`${prefix}.segments.${seg.index}.brightness`, {
-            val: seg.brightness,
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-        }
-      };
-
-      // When MQTT reveals the device's real segment count differs from what
-      // Cloud advertised, rebuild the state tree so the datapoints match
-      // (extra indices added, excess ones pruned).
-      this.deviceManager.onSegmentCountChanged = device => {
-        if (!this.stateManager || !this.deviceManager) {
-          return;
-        }
-        this.stateManager.createSegmentStates(device, this.deviceManager.syncSegmentCount(device)).catch(e => {
-          this.log.warn(
-            `Failed to rebuild segment tree for ${deviceLabel(device)} after count change: ${errMessage(e)}`,
-          );
-        });
-      };
-
-      // Log startup with configured channels
-      const startChannels: string[] = ["LAN"];
-      if (config.apiKey) {
-        startChannels.push("Cloud");
       }
-      if (hasAccountCreds) {
-        startChannels.push("MQTT");
-      }
-      this.log.info(
-        `Starting (${startChannels.join(", ")}) — please wait, a "ready" message will follow when all channels are up`,
-      );
-
-      // --- LAN (always active) ---
-      this.lanClient = this.makeLanClient(this.log, this);
-      this.deviceManager.setLanClient(this.lanClient);
-
-      // A socket error on a PINNED interface is user-fixable config (the
-      // selected IP is gone after a DHCP/network change) — surface it once
-      // via the actionable-problems registry instead of a debug line that
-      // left the LAN channel silently dead (M11).
-      this.lanClient.onInterfaceError = message => {
-        this.actionableProblems.report({
-          key: "lan-interface",
-          title: "LAN unavailable on the selected network interface",
-          action: message,
-        });
-      };
-      this.lanClient.onListenReady = () => {
-        this.actionableProblems.resolve("lan-interface", "LAN listening on the selected network interface");
-        this.actionableProblems.resolve("lan-port", `LAN listening on port 4002`);
-      };
-      // Port 4002 taken by another process: the LAN channel is down as a whole
-      // (the listen socket no longer shares the port, audit A5).
-      this.lanClient.onListenPortBusy = message => {
-        this.actionableProblems.report({
-          key: "lan-port",
-          title: "LAN port 4002 is taken by another process",
-          action: `${message}. Stop the other process (or the second instance) and restart this one.`,
-        });
-      };
-
-      // v2.9.1 — wire LAN-traffic into the diag-collector. Resolves
-      // destination-IP → device on every send/status/scan so the diag
-      // JSON carries the verbatim UDP bytes per device. Closes Class E
-      // of the v2.9.1 audit (LAN UDP completely silent in diag before).
-      this.lanClient.setSendHook((ip, cmd, payload, bytes, error) => {
-        const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
-        if (!dev) {
-          return;
-        }
-        this.deviceManager!.getDiagnostics().addLanSend(dev.deviceId, ip, cmd, payload, bytes, error);
-      });
-      this.lanClient.setStatusRecordHook((ip, status) => {
-        const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
-        if (!dev) {
-          return;
-        }
-        this.deviceManager!.getDiagnostics().recordApiSuccess(dev.deviceId, "lan://devStatus", status);
-      });
-      this.lanClient.setScanRecordHook(lanDevice => {
-        this.deviceManager
-          ?.getDiagnostics()
-          .addLog(lanDevice.device, "debug", `LAN scan reply: ip=${lanDevice.ip} sku=${lanDevice.sku}`);
-      });
-
-      this.lanClient.start(
-        lanDevice => {
-          this.deviceManager!.handleLanDiscovery(lanDevice);
-          // Without the account broker every scan asks. With it, a light is
-          // still asked once its last LAN answer is older than a minute (audit
-          // B5): the account push comes only on a change or every 1–11 min, and
-          // only a read corrects a datapoint after a lost UDP command — at most
-          // one request per light and minute.
-          // The discovery reply stamps lastLanReplyAt itself, so the age of
-          // the VALUES is the last devStatus answer — or the last request, so
-          // a light that never answers is not asked on every scan.
-          const light = this.deviceManager!.getDevices().find(d => d.lanIp === lanDevice.ip);
-          const now = Date.now();
-          const lastRead = Math.max(light?.lastLanStatusAt ?? 0, light?.lastLanStatusAskedAt ?? 0);
-          if (!this.mqttClient?.connected || now - lastRead >= LAN_STATUS_REFRESH_MS) {
-            if (light) {
-              light.lastLanStatusAskedAt = now;
-            }
-            this.lanClient!.requestStatus(lanDevice.ip);
-          }
-        },
-        (sourceIp, status) => {
-          this.deviceManager!.handleLanStatus(sourceIp, status);
-        },
-        LAN_SCAN_INTERVAL_MS,
-        config.bind || "",
-      );
-
-      // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)
-      this.lanScanTimer = this.setTimeout(() => {
-        this.lanScanDone = true;
-        // Enable the account-reconcile only now — before this a cache-restored
-        // LAN device hasn't had channels.lan set and would count a false miss.
-        if (this.deviceManager) {
-          this.deviceManager.accountReconcileEnabled = true;
-        }
-        connectionState.checkAllReady(this.handlerHost);
-      }, LAN_SCAN_INITIAL_WAIT_MS);
-
-      // --- MQTT (if account credentials provided) ---
-      // Initialize MQTT before Cloud so scene library can load on first cycle
-      if (hasAccountCreds) {
-        this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
-        this.mqttClient.useLoginWindow(this.loginWindowFor(accountEmail));
-        // The status request over the account broker — the DeviceManager
-        // decides WHOM to ask, the client only publishes.
-        this.deviceManager.setStatusRequester((device, cmdVersion) =>
-          device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false,
-        );
-        // A 401 from the App API asks the account client for a fresh bearer.
-        this.deviceManager.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
-
-        // Forward every parsed MQTT message into the diagnostics ring buffer
-        // so the report contains the recent packets per device. v2.9.1: the
-        // hook gets both BLE-hex (op.command) and the raw JSON envelope so
-        // state-only pushes are also captured.
-        this.mqttClient.setPacketHook((deviceId, topic, payload) => {
-          this.deviceManager?.getDiagnostics().addMqttPacket(deviceId, topic, payload);
-        });
-
-        // Login + IoT-key outcome into the report. Credentials never travel —
-        // only which call, whether Govee accepted it, its status and its own
-        // message. Two filed issues were exactly this case and the report could
-        // not tell them apart from "no account entered".
-        this.mqttClient.setOnAccountCall((endpoint, ok, statusCode, message) => {
-          this.deviceManager?.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
-        });
-
-        // 2FA: forward optional code from settings into the next login attempt;
-        // clear the field automatically once Govee has accepted it.
-        this.mqttClient.setVerificationCode(config.mqttVerificationCode ?? "");
-        this.mqttClient.setOnVerificationConsumed(() => {
-          cloudCreds.clearVerificationCodeSetting(this.handlerHost).catch(e => {
-            this.log.warn(`Could not clear mqttVerificationCode: ${errMessage(e)}`);
-          });
-        });
-        this.mqttClient.setOnVerificationFailed(reason => {
-          // On 'failed' (455 / 454+code-was-sent) blank the code so the user
-          // doesn't keep retrying with a stale value. On 'pending' (454 + no
-          // code) we leave the field as-is — the user is about to fill it.
-          // Surface the "code needed" state on info.verificationPending so the
-          // connection card can show it live (the notification below is only a
-          // nudge for when the user isn't in the settings — the actual flow
-          // runs through the card, never a second login path).
-          this.stateManager
-            ?.writeReadOnly("info.verificationPending", true)
-            .catch(logRejected(this.log, "best-effort write"));
-          if (reason === "failed") {
-            cloudCreds
-              .clearVerificationCodeSetting(this.handlerHost)
-              .catch(logRejected(this.log, "clear the verification code setting"));
-            this.actionableProblems.report({
-              key: "mqtt-verification",
-              title: "Govee rejected the verification code for real-time status",
-              action:
-                "open the adapter settings — the connection card requests a fresh code; enter the one Govee e-mails you",
-            });
-          } else {
-            this.actionableProblems.report({
-              key: "mqtt-verification",
-              title: "Govee requires a verification code to enable real-time status (lights/sensors stay readable)",
-              action:
-                "open the adapter settings — the connection card requests a code and takes the one Govee e-mails you",
-            });
-          }
-        });
-        this.mqttClient.setOnAuthFailed(() => {
-          this.actionableProblems.report({
-            key: "mqtt-auth",
-            title: "Govee rejected the account login for real-time status",
-            action: "check the Govee email and password in the adapter settings (connection card)",
-          });
-        });
-        this.mqttClient.setOnLoginBlocked(() => {
-          this.actionableProblems.report({
-            key: "mqtt-login-blocked",
-            title: "Govee stopped accepting the account login for real-time status",
-            action:
-              "Govee rejected repeated login attempts (the account may be temporarily locked). Automatic retries are stopped — check your Govee account, then restart the adapter",
-          });
-        });
-
-        // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
-        // a FILE in the instance data directory — not a state and not a meta
-        // object (so the credentials are neither a visible datapoint nor a
-        // visible object-tree node) and not adapter native (a native write
-        // would trigger a js-controller restart, looping endlessly on every
-        // login). loadPersistedCreds migrates an older info.mqttCredentials
-        // state into the file on first run; the v2.18.x meta object is
-        // migrated + dropped earlier in onReady (migrateCredentialsMetaOnce).
-        // The plaintext native fields of 2.1.0–2.1.2 are dropped by
-        // NATIVE_KEY_MIGRATIONS at the very start of onReady.
-        const cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir, accountEmail);
-        if (this.unloading) {
-          return; // stopped during the wait — no login may start behind onUnload (audit B6)
-        }
-        if (cachedCreds) {
-          this.mqttClient.setPersistedCredentials(cachedCreds);
-        }
-        this.mqttClient.setOnCredentialsRefresh(creds => {
-          cloudCreds.persistCreds(this.handlerHost, dataDir, creds, accountEmail).catch(e => {
-            this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
-          });
-        });
-
-        await this.mqttClient.connect(
-          update => this.deviceManager!.handleMqttStatus(update),
-          connected => {
-            this.stateManager
-              ?.writeReadOnly("info.mqttConnected", connected)
-              .catch(logRejected(this.log, "best-effort write"));
-            if (connected) {
-              this.actionableProblems.resolve(
-                "mqtt-verification",
-                "Govee real-time status connected — verification accepted",
-              );
-              this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
-              this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
-              this.stateManager
-                ?.writeReadOnly("info.verificationPending", false)
-                .catch(logRejected(this.log, "best-effort write"));
-              connectionState.checkAllReady(this.handlerHost);
-              // A (re)connected broker: ask right away what went quiet while
-              // it was down — the topics are known from the last list poll.
-              this.deviceManager?.requestStaleStatuses();
-            }
-            connectionState.updateConnectionState(this.handlerHost);
-          },
-          // Forward every fresh bearer token — fires on initial login and on
-          // each reconnect-login, so the API client never runs with a stale one.
-          token => {
-            apiClient.setBearerToken(token);
-            this.deviceManager?.onBearerToken();
-          },
-        );
-        if (this.unloading) {
-          return; // stopped during the wait — nothing may start behind onUnload (audit B6)
-        }
-      }
-
-      // --- Device data: Cache first, Cloud only on cache miss ---
-      const cachedOk = this.deviceManager.loadFromCache();
-      // Whether the state read below may run: the cloud client exists and the
-      // account answered (from the cache or from a live list).
-      let cloudStateReadable = false;
-
-      // Bridge synthetic capabilities (App-API, OpenAPI-MQTT events) into the
-      // same setState pipeline as polled Cloud state. Keeps mapCloudStateValue
-      // as the single source of truth for value coercion + state-id resolution.
-      // Outside the API-key branch: the App-API runs on the ACCOUNT token, so
-      // an installation with account credentials and no API key needs this too
-      // — without it its poll would fetch values that reach no datapoint
-      // (audit 2026-09-12, F5).
-      this.deviceManager.setOnCloudCapabilities((device, caps) => {
-        cloudStateLoader
-          .applyCloudCapabilities(this.handlerHost, device, caps)
-          .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
-      });
-
-      // App-API poll — every 2 minutes, pulls state for sensors like H5179
-      // whose OpenAPI /device/state answer carries the capability with an
-      // empty value (""). Bearer token comes from the AWS-IoT MQTT login, so
-      // a no-op until that succeeds.
-      //
-      // The same tick also renews reachability proofs that nothing else
-      // renews. It runs HERE and not inside pollAppApi on purpose: that
-      // method returns immediately without a bearer token, and an
-      // installation with only an API key is exactly the case this covers.
-      //
-      // Both credential tiers, not just the API key: the poll needs the
-      // ACCOUNT token and the refresh needs the cloud client, and each of the
-      // two returns 0 on its own when its source is missing. Gated on the
-      // account as well since 2026-09-12 (F5) — before that, an account-only
-      // installation never polled, so `appApiInitialPollDone` stayed false and
-      // "ready" came from the 60 s safety timer alone. A LAN-only installation
-      // has neither and gets no timer at all.
-      if (config.apiKey || hasAccountCreds) {
-        const triggerAppApiPoll = (): void => {
-          this.deviceManager
-            ?.refreshExpiringReachability()
-            .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
-          this.deviceManager
-            ?.pollAppApi()
-            .then(() => {
-              // H2 — mark initial-poll-done and re-check Ready so the adapter
-              // can log "ready" as soon as sensor values are in.
-              if (!this.appApiInitialPollDone) {
-                this.appApiInitialPollDone = true;
-                connectionState.checkAllReady(this.handlerHost);
-              }
-              // The list just handed every device its broker topic — ask the
-              // ones whose own voice has gone quiet (issue #47, 2.39.0). After
-              // the poll, not before: on the first tick the topics are new.
-              this.deviceManager?.requestStaleStatuses();
-            })
-            .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
-        };
-        this.appApiPollTimer = this.setInterval(triggerAppApiPoll, APP_API_POLL_INTERVAL_MS);
-        // Initial poll: gives MQTT time for the bearer login. Without this
-        // immediate poll, sensors like the H5179 stay offline for the first
-        // 2 minutes after start (the online signal only comes via App-API).
-        // Kept in a member variable so onUnload can clear the timer.
-        this.appApiInitialTimer = this.setTimeout(triggerAppApiPoll, APP_API_INITIAL_DELAY_MS);
-      }
-
-      if (config.apiKey) {
-        this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
-        // Capture the most recent Cloud response per (deviceId, endpoint) for
-        // diagnostics — bounded by the DiagnosticsCollector's response slot cap.
-        this.cloudClient.setResponseHook((deviceId, endpoint, body, rateLimit) => {
-          this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body, undefined, rateLimit);
-        });
-        // Every accepted call shows the Cloud reachable, a 401/403 shows it lost, and a
-        // call that could not reach Govee feeds the outage tracker (issue #51) — the
-        // rules live in cloudRetryHandler.onCloudContact / setCloudConnected.
-        this.cloudClient.setContactHook((outcome, reason) =>
-          cloudRetryHandler.onCloudContact(this.handlerHost, outcome, reason),
-        );
-        this.deviceManager.setCloudClient(this.cloudClient);
-
-        this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
-        this.rateLimiter.start();
-        this.deviceManager.setRateLimiter(this.rateLimiter);
-
-        // OpenAPI-MQTT — push channel for appliance/sensor events
-        // (lackWater, iceFull, bodyAppeared etc.). API key is enough; no
-        // separate credentials required. Connection runs in parallel to
-        // the AWS-IoT MQTT used for status push of regular devices.
-        this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
-        this.openapiMqttClient.connect(
-          event => this.deviceManager?.handleOpenApiEvent(event),
-          connected => {
-            this.stateManager
-              ?.writeReadOnly("info.openapiMqttConnected", connected)
-              .catch(logRejected(this.log, "best-effort write"));
-            if (connected) {
-              // Cloud-events (Sensor Push) is a Ready precondition — re-check so
-              // the adapter logs "ready" as soon as it connects instead of
-              // waiting on the 60 s safety timer (L10). Mirrors the AWS-IoT
-              // onConnection callback above.
-              connectionState.checkAllReady(this.handlerHost);
-            }
-          },
-          // v2.9.1 — raw payload hook. Cloud-events MQTT topic is account-wide
-          // (`GA/<apiKey>`), payload carries `sku`/`device`. Parse here so the
-          // raw envelope lands per-device in the diag (same model as AWS-IoT).
-          // Account-level bucket would have meant a new diag struct; per-device
-          // keeps shape consistent with all other capture paths.
-          rawJson => {
-            if (!this.deviceManager) {
-              return;
-            }
-            try {
-              const parsed = JSON.parse(rawJson) as { sku?: unknown; device?: unknown };
-              if (typeof parsed?.device === "string" && parsed.device) {
-                this.deviceManager.getDiagnostics().addMqttPacket(parsed.device, "openapi-events", { rawJson });
-              }
-            } catch {
-              /* malformed — already debug-logged in the client */
-            }
-          },
-        );
-
-        if (!cachedOk) {
-          // No cache — first start, fetch from Cloud with 60s hard-timeout.
-          // If Cloud hangs/fails, we don't want to block adapter startup indefinitely.
-          const result = await cloudRetryHandler.cloudInitWithTimeout(this.handlerHost);
-          if (this.unloading) {
-            return; // stopped during the wait — nothing may start behind onUnload (audit B6)
-          }
-          if (result.ok) {
-            cloudRetryHandler.setCloudConnected(this.handlerHost, true);
-            cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
-            cloudStateReadable = true;
-          } else {
-            cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
-          }
-        } else {
-          // device-manager already logged "Loaded N device(s) from cache" at
-          // info — keep this one on debug so a cache-only start isn't announced
-          // twice (C9).
-          this.log.debug(`Using cached device data — no Cloud calls needed`);
-          // The cache stands in for the device list, so the retry loop has
-          // nothing to fetch and a Cloud-only light counts as reachable. The
-          // two datapoints wait for the first call Govee actually accepts
-          // (contact hook): a cache start has not talked to the Cloud yet.
-          this.cloudWasConnected = true;
-          cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
-          cloudStateReadable = true;
-        }
-        // Load group membership from undocumented API (needs bearer token + device map)
-        await this.deviceManager.loadGroupMembers();
-        if (this.unloading) {
-          return; // stopped during the wait — nothing may start behind onUnload (audit B6)
-        }
-
-        this.cloudInitDone = true;
-      }
-
-      // Wait for all state creation from cache/cloud load to complete.
-      // Drain-loop: a callback that fires during the await (e.g. a late LAN
-      // discovery) can push fresh promises into the queue — we need to await
-      // those too before flipping statesReady, otherwise the initial state
-      // tree would be incomplete on very fast startups.
-      while (this.stateCreationQueue.length > 0) {
-        const pending = this.stateCreationQueue;
-        this.stateCreationQueue = [];
-        await Promise.all(pending);
-      }
-      if (this.unloading) {
-        return; // stopped during the wait — nothing may start behind onUnload (audit B6)
-      }
-
-      // The device STATE is read here, after the drain, for every cloud device
-      // at once. The cache covers the device LIST, never the state, and the two
-      // start paths used to differ: the no-light path read nothing at all until
-      // 2.34.0, the path with a light read before the drain and relied on the
-      // phase callbacks having finished during loadFromCloud's own awaits
-      // (measured: they had — the read must not depend on it). Before the
-      // drain the channel map would be empty and `resolveStatePath` would fall
-      // back to "control" for a sensor id. By now the UDP scan has answered, so
-      // a light with a local API carries its address and the loader's LAN guard
-      // keeps its power/brightness/colour untouched; a failed cloud init
-      // reaches this via the retry loop instead (`onCloudRestored` →
-      // loadCloudStates).
-      if (cloudStateReadable) {
-        await cloudStateLoader.loadCloudStates(this.handlerHost);
-      }
-      if (this.unloading) {
-        return; // stopped during the wait — nothing may start behind onUnload (audit B6)
-      }
-
-      if (this.stateManager && this.deviceManager) {
-        // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went
-        // through a Cloud-phase) on prior versions had scenes/music/snapshots
-        // states briefly created then orphaned. Wipe those leftovers now.
-        // Idempotent — second run does nothing, the LAN_STATE_IDS skip in
-        // cleanupCloudOwnedStates protects power/brightness/color_rgb/color_temperature.
-        //
-        // ONLY for the purpose it names: an installation without an API key.
-        // With one, "no capabilities yet" means the Cloud data has not arrived
-        // (a failed Cloud start, a light from the scan) — deleting then took
-        // the light's Cloud datapoints with their values, rooms and history
-        // (M8, "deletion needs knowledge, not absence"). And inside the
-        // device's build chain, so a build running at the same moment cannot
-        // create what this pass deletes, or the other way round (N27).
-        if (!this.config.apiKey && !this.cloudClient) {
-          const sm = this.stateManager;
-          for (const device of this.deviceManager.getDevices()) {
-            if (device.lanIp && device.capabilities.length === 0) {
-              await sm.runDeviceBuild(device, async () => {
-                const deleted = await sm.cleanupCloudOwnedStates(sm.devicePrefix(device), []).catch(e => {
-                  this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
-                  return 0;
-                });
-                // Only announce when something was actually removed: pure-LAN
-                // devices (no API key) match this condition on EVERY start, and
-                // an info-level "Migrated" line for a no-op was permanent log
-                // noise for exactly the credential-less target group (M7).
-                if (deleted > 0) {
-                  this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
-                }
-              });
-            }
-          }
-        }
-
-        // B2 one-shot migration: the control colour states were renamed from
-        // camelCase (control.colorRgb / control.colorTemperature) to snake_case
-        // (control.color_rgb / control.color_temperature). Delete the old
-        // objects on upgraded installs so they don't linger as dead duplicates.
-        // Idempotent + existence-checked; covers devices AND groups.
-        for (const device of this.deviceManager.getDevices()) {
-          await this.stateManager.migrateLegacyColorStateIds(device).catch(e => {
-            this.log.debug(`B2 colour-state migration failed for ${deviceLabel(device)}: ${errMessage(e)}`);
-          });
-        }
-      }
-
-      if (this.unloading) {
-        return;
-      }
-      this.statesReady = true;
-      // The tree exists and the start-up seed is read: apply the appliance
-      // pushes held during the start (the device's own, newer word) and let
-      // later ones through immediately.
-      this.deviceManager?.releaseHeldPushes();
-      // What waited for an account token (group members, libraries) runs from
-      // now on with each token — and right away when one came during the start.
-      this.deviceManager?.enableBearerFollowUps();
-
-      // Subscribe to all writable device and group states, plus the adapter-level
-      // manual-sync button. The button lives under `info`, which the two wildcard
-      // patterns do not cover — without its own subscription the state change never
-      // reaches onStateChange and the button is dead (v2.17.0–v2.27.1).
-      await this.subscribeStatesAsync("devices.*");
-      await this.subscribeStatesAsync("groups.*");
-      await this.subscribeStatesAsync("info.manualSyncDevices");
-
-      // Cleanup stale devices after initial discovery (30s delay for LAN scan).
-      // Reaps devices from every adapter-level map that was keyed on them so the
-      // process doesn't leak memory across Cloud-side device turnover.
-      // The timer fires no matter what any channel achieved — the reaper itself
-      // refuses to act until an account list has answered (hasKnownPopulation),
-      // because absence proves nothing while the population is unknown.
-      this.cleanupTimer = this.setTimeout(() => {
-        connectionState
-          .reapStaleDevices(this.handlerHost)
-          .catch(e => this.log.debug(`Device cleanup failed: ${errMessage(e)}`));
-      }, STALE_DEVICE_CLEANUP_DELAY_MS);
-
-      // info.online sync — re-evaluates per-device online truth every 20 s.
-      // For Lights this drives the offline-transition (lastLanReplyAt TTL).
-      // For all devices it suppresses ts-rewrite-spam (no setState when
-      // value is unchanged). When a Light flips online/offline, also refreshes
-      // group-reachability since the original onDeviceUpdate path no longer
-      // sees those transitions for Lights.
-      this.onlineSyncTimer = this.setInterval(() => void this.runOnlineSyncRound(), ONLINE_SYNC_INTERVAL_MS);
-
-      // Keep the impersonated Govee-app version current — daily refresh (the
-      // initial fetch is fired early in onReady, above).
-      this.appVersionCheckTimer = this.setInterval(() => {
-        connectionState
-          .refreshLiveAppVersion(this.handlerHost)
-          .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
-      }, APP_VERSION_CHECK_INTERVAL_MS);
-
-      connectionState.updateConnectionState(this.handlerHost);
-
-      // Check if all channels are ready — may already be true if MQTT connected fast
-      connectionState.checkAllReady(this.handlerHost);
-      // Safety timeout: log ready anyway even if a channel takes too long.
-      // READY_SAFETY_TIMEOUT_MS covers a normal MQTT connect + 1 reconnect.
-      this.readyTimer = this.setTimeout(() => {
-        if (!this.readyLogged) {
-          this.readyLogged = true;
-          connectionState.logDeviceSummary(this.handlerHost);
-        }
-      }, READY_SAFETY_TIMEOUT_MS);
     } catch (error) {
       // One clear line for the user; the stack stays on debug (fleet rule —
       // Node-internal frames in an error line are noise, not diagnosis).
@@ -1413,6 +550,1008 @@ export class GoveeAdapter extends utils.Adapter {
         this.log.debug(error.stack);
       }
     }
+  }
+
+  /**
+   * Before anything starts: the corrections that restart the instance, the texts, the one-shot cleanups and
+   * the credential gate.
+   *
+   * @returns the start context, or null when a correction restarts the instance
+   */
+  private async prepareInstance(): Promise<StartContext | null> {
+    // First of all: without this the whole shutdown path stays dead on an updated
+    // install, and the correction restarts us — so nothing else may start up here.
+    if (await this.clearStopInstanceFlag()) {
+      return null;
+    }
+    // Same class of correction, same consequence: a settings key renamed by an
+    // earlier release is carried over once, the write restarts the instance.
+    if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errMessage)) {
+      return null;
+    }
+    await I18n.init(path.join(this.adapterDir, "admin"), this);
+    // Read once — a controller or admin update restarts every instance, so
+    // these cannot go stale while this process lives. Failure is silent: a
+    // report without them is worse, but not a reason to refuse starting.
+    await this.readHostVersions();
+    // Deliver the manifest's texts to an EXISTING tree too — js-controller
+    // only creates instanceObjects that are missing.
+    await this.ensureManifestObjects();
+    const config = this.config;
+
+    // Fetch the live Govee-app version early (fire-and-forget) so the first
+    // login / requests already use a current version — the undocumented
+    // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
+    // this resolves; a daily timer keeps it fresh.
+    void connectionState
+      .refreshLiveAppVersion(this.handlerHost)
+      .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
+
+    // One-shot cleanup: the global info.refresh_cloud_data button was removed
+    // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
+    // info.manualSyncDevices (BUG-1). Drop the dead orphan.
+    await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
+
+    // One-shot cleanup: 2.29.0–2.36.0 kept a copy of every diagnostics report
+    // as a file under a `diagnostics` meta object at the root of the instance
+    // — a folder next to the devices that nobody asked for. Since 2.37.0 the
+    // report travels only in the answer to the Expert card. Drop the copies
+    // and the folder; a fresh install has neither and this is silent.
+    await this.removeLegacyReportStore();
+
+    // One-shot cleanup: the manual-sync button was spelled info.manual_sync_devices
+    // from v2.17.0 to v2.27.1 — the only snake_case id in the otherwise camelCase
+    // info channel. It was never subscribed either, so no script can depend on the
+    // old spelling; the instanceObjects entry now declares info.manualSyncDevices.
+    await this.delObjectAsync("info.manual_sync_devices").catch(() => undefined);
+
+    // One-shot cleanup: info.legacyMqttCleaned was a migration marker from an
+    // early v2 release. No code has written or read it for many versions —
+    // it survived only because nothing removes what the adapter no longer
+    // knows about. Found in the live tree on 2026-09-03, not by any gate.
+    await this.delObjectAsync("info.legacyMqttCleaned").catch(() => undefined);
+
+    // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
+    // Govee-app version now self-heals in the background, so there is nothing
+    // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
+    await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
+
+    // One-shot cleanup: info.wizardStatus was removed in v2.21.0 — the segment
+    // wizard is now a React admin component that owns its own status, so the
+    // UI-only mirror state is gone. Drop the dead orphan on upgraded installs.
+    await this.delObjectAsync("info.wizardStatus").catch(() => undefined);
+
+    // One-shot migration + cleanup: the <namespace>.credentials meta object
+    // (v2.18.0–v2.18.2) is replaced by an encrypted file in the instance data
+    // directory — the credentials are a re-derivable cache (the account
+    // settings ARE in every backup), and the visible object node disappears.
+    await cloudCreds.migrateCredentialsMetaOnce(this.handlerHost, utils.getAbsoluteInstanceDataDir(this));
+
+    // v2.11.0 credential-encryption migration check: if encryptedNative was
+    // added retroactively, js-controller still decrypts existing plaintext
+    // values via the legacy XOR fallback — the adapter sees garbage that
+    // bears no resemblance to the original. Detect: Govee API keys are
+    // strict UUIDv4 (8-4-4-4-12 hex). Non-empty + non-UUID = needs re-entry.
+    if (config.apiKey && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(config.apiKey)) {
+      // The same symptom has two very different causes — lead with the
+      // common one (typo/whitespace on a fresh install) instead of
+      // frightening every new user with 'encryption migration corrupted'
+      // and demanding a password re-entry the key alone doesn't need (M10).
+      this.log.error(
+        "The Govee API key does not look like a valid key (expected UUID format like 12345678-1234-1234-1234-123456789abc) — check for typos or copied whitespace in the adapter settings. " +
+          "If this appeared right after upgrading a very old install (v2.11.0 encryption migration), re-enter the API key, Govee password and verification code once.",
+      );
+    }
+
+    // Account credentials gate — trimmed so a stray space in a field can't
+    // trip the truthy check into a login with junk data (issue #39). Drives
+    // the status prefix, the startup log and the MQTT init below alike.
+    // The trimmed e-mail is also what the login SENDS: the admin card's
+    // "Connect" test trims it too, so a pasted trailing space must not make
+    // the test succeed and the real start-up login fail on the same value.
+    // The password stays untouched — surrounding spaces can be part of it.
+    const accountEmail = (config.goveeEmail ?? "").trim();
+    const hasAccountCreds = !!(accountEmail && config.goveePassword?.trim());
+    return {
+      config,
+      accountEmail,
+      hasAccountCreds,
+      dataDir: utils.getAbsoluteInstanceDataDir(this),
+      cachedOk: false,
+      cloudStateReadable: false,
+    };
+  }
+
+  /**
+   * The runtime: log prefix, catalog, state manager, the id move, caches.
+   *
+   * @param start The start context
+   * @returns false when the id move could not read the tree
+   */
+  private async buildRuntime(start: StartContext): Promise<boolean> {
+    const { config, hasAccountCreds } = start;
+    // Channel-status prefix for every log line — must run BEFORE sub-libraries
+    // are constructed so they pick up the wrapped adapter.log automatically.
+    // Initial snapshot reflects which credentials the user provided; status
+    // flips to "on" / "off" as connections come up or fail.
+    this.channelStatus = {
+      lan: "off", // LAN listener always exists; flips to "on" after first discovery
+      cloud: config.apiKey ? "off" : "n/a",
+      mqtt: hasAccountCreds ? "off" : "n/a",
+      openapi: config.apiKey ? "off" : "n/a",
+    };
+    installLogPrefix(this.log, () => this.channelStatus);
+
+    // One registry for problems that need the USER to act (verification,
+    // rejected credentials). Surfaces each once — a clear warn + a persistent
+    // ioBroker notification — and a positive resolution line when it clears.
+    // Transient failures never reach here. Spam-free by construction.
+    this.actionableProblems = new ActionableProblems({
+      logWarn: m => this.log.warn(m),
+      logInfo: m => this.log.info(m),
+      notify: m =>
+        this.registerNotification("govee-smart", "userActionRequired", m).catch(e =>
+          this.log.debug(`Could not raise notification: ${errMessage(e)}`),
+        ),
+    });
+
+    // info channel + states are declared as instanceObjects in
+    // io-package.json, so js-controller materialises them on install /
+    // upgrade. We only initialise the runtime values here.
+    await this.setState("info.connection", { val: false, ack: true });
+    await this.setState("info.cloudConnected", { val: false, ack: true });
+
+    // Device catalog from devices.json in the adapter package root — built
+    // before anything that applies quirks. Status filter: verified+reported
+    // active by default; seed-status entries need the experimentalQuirks toggle.
+    this.deviceRegistry = new DeviceRegistry({
+      experimental: config.experimentalQuirks === true,
+      log: this.log,
+    });
+
+    this.stateManager = new StateManager(this, this.deviceRegistry);
+    // The account and event flags go through the state manager's read-only
+    // writer from their first write on: every later callback writes only a
+    // change (a login retry used to rewrite `false` each time). The stale
+    // 2FA-pending flag of a previous run is cleared here — the login flow sets
+    // it again if Govee still wants a code.
+    await this.stateManager.writeReadOnly("info.mqttConnected", false);
+    await this.stateManager.writeReadOnly("info.openapiMqttConnected", false);
+    await this.stateManager.writeReadOnly("info.verificationPending", false);
+    // One-shot orphan cleanup: earlier builds merged a Govee app pseudo-device
+    // (SameModeGroup up to v2.21.0, DreamViewScenic up to v2.39.x) into a
+    // generic device; intake skips them now, but a tree already created that
+    // way never re-enters the device map and so is never reaped. Drop any
+    // leftover on upgraded installs — before the id move, which leaves them alone.
+    await this.stateManager.cleanupPseudoGroupOrphansOnce().catch(() => undefined);
+    // Every tree of an older id rule moves once to `<sku>-<last 4>` (3.0.0), and every tree is
+    // recorded — before anything else reads, writes or deletes a device tree.
+    // A move that cannot even read the object tree leaves the id map empty — every
+    // device would get an id by arrival order, and two devices ending in the same four
+    // characters could swap trees. Nothing starts on a guess: the start stops here.
+    try {
+      await this.stateManager.migrateDeviceIds();
+    } catch (e) {
+      this.log.error(`Device id migration failed — the adapter does not start: ${errMessage(e)}; restart the instance`);
+      return false;
+    }
+    // Nothing has been asked yet, so nothing may still claim to be reachable from
+    // the previous run — least of all after a crash, where no shutdown code ran at
+    // all and the old values would stand until the 20-second sync catches up.
+    // Before markAllOffline: its clearDeviceRollup only touches datapoints
+    // that already exist, so creating them first makes a restart say
+    // "0 online, not all online" right away instead of leaving the last
+    // session's numbers standing until the first 20 s round (F8).
+    await this.stateManager.ensureDeviceRollupStates().catch(() => undefined);
+    await this.stateManager.markAllOffline().catch(() => undefined);
+    // General groups online state (reflects Cloud connection)
+    await this.stateManager.createGroupsOnlineState(false);
+    // The unloading reader: a scene job that finishes after onUnload began
+    // must not persist or rebuild into a closing database (2026-09-22).
+    this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry, () => this.unloading);
+    const { dataDir } = start;
+
+    this.skuCache = new SkuCache(dataDir, this.log);
+    // The store carries the snapshot files of earlier versions (root meta
+    // object 2.11.0–2.36.0, instance data dir before 2.11) into the device
+    // objects once and removes the root folder — see LocalSnapshotStore.
+    const deviceIds = this.stateManager.deviceIds;
+    this.localSnapshots = new LocalSnapshotStore(this, this.log, {
+      idOf: (sku, deviceId) => deviceIds.idFor(sku, deviceId),
+    });
+    await this.localSnapshots.init(dataDir);
+    return true;
+  }
+
+  /**
+   * Handlers, diagnostics providers and device-manager callbacks — nothing starts yet.
+   *
+   * @param start The start context
+   */
+  private wireRuntime(start: StartContext): boolean {
+    const { config, accountEmail, hasAccountCreds } = start;
+    this.snapshotHandler = new SnapshotHandler(snapshotHandlerGlue.buildSnapshotHost(this.handlerHost));
+    this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
+    this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
+    this.deviceManager!.setSkuCache(this.skuCache!);
+    // The cleanup's protection of listed devices names their trees from the same registry.
+    this.deviceManager!.setTreeResolver((sku, deviceId) => this.stateManager!.deviceIds.prefixFor(sku, deviceId));
+
+    // v2.9.1 — wire diag providers so generate() can render persisted-cache,
+    // local-snapshots and adapter-runtime state. Providers are pulled at
+    // export time, so a wizard that's running THEN gets captured even
+    // though the collector itself doesn't track it live.
+    const diag = this.deviceManager!.getDiagnostics();
+    diag.setCacheSnapshotProvider((sku, deviceId) => this.skuCache?.loadOne(sku, deviceId) ?? null);
+    diag.setLocalSnapshotsProvider((sku, deviceId) => this.localSnapshots?.getSnapshots(sku, deviceId) ?? []);
+    diag.setRuntimeStateProvider(() => {
+      const errorCats = this.deviceManager?.getErrorCategorySnapshot();
+      return {
+        deviceManagerLastErrorCategory: errorCats?.deviceManager ?? null,
+        appApiLastErrorCategory: errorCats?.appApi ?? null,
+        groupMembersLastErrorCategory: errorCats?.groupMembers ?? null,
+        cloudFailureReason: this.cloudClient?.getFailureReason() ?? null,
+        mqttFailureReason: this.mqttClient?.getFailureReason() ?? null,
+        rateLimiter: this.rateLimiter?.getUsageSnapshot() ?? null,
+        cloudRateLimit: this.cloudClient?.getLastRateLimit() ?? null,
+        wizardSession: this.segmentWizard?.getSessionSnapshot() ?? null,
+        lanSeenDeviceIps: this.lanClient?.getDiagSnapshot().seenDeviceIps ?? [],
+      };
+    });
+    // Device names have no detectable shape, so the pseudonymiser can only
+    // replace the ones it is told about.
+    diag.setDeviceNamesProvider(() => this.deviceManager?.getDevices().map(d => d.name) ?? []);
+    // A group's id is digits only — no pattern finds it, so it goes by lookup too.
+    diag.setDeviceIdsProvider(() => this.deviceManager?.getDevices().map(d => d.deviceId) ?? []);
+    // Which ioBroker this runs on, and how the installation as a whole is
+    // doing. Every field here used to be a follow-up question on a report —
+    // and the issue forms dropped their Node field because it belongs in here.
+    diag.setEnvironmentProvider(() => {
+      const devices = this.deviceManager?.getDevices() ?? [];
+      return {
+        node: process.version,
+        jsController: this.hostVersions.jsController,
+        admin: this.hostVersions.admin,
+        platform: `${process.platform} ${process.arch}`,
+        compactMode: this.common?.compact === true,
+        credentialTier: this.mqttClient ? "account" : this.cloudClient ? "apiKey" : "lan",
+        deviceCount: devices.length,
+        reachableCount: devices.filter(d => resolveDeviceReachability(d).online).length,
+        channels: { ...this.channelStatus },
+        startedAt: new Date(this.startedAt).toISOString(),
+      };
+    });
+    // The datapoints as they really exist — the answer to "this datapoint is
+    // missing / has the wrong type / the wrong role", which the in-memory view
+    // cannot give. Scoped to ONE device prefix, never a full-instance scan.
+    diag.setObjectTreeProvider(prefix => this.readObjectTree(prefix));
+
+    // How each writable datapoint is actually driven. The report carried the
+    // capability list and the object tree — the two ends — but never the
+    // routing between them, so "this control does nothing on my model" could
+    // not be answered from a report. Asks the SAME function a real write asks,
+    // so the answer cannot drift from the behaviour it describes; pure
+    // decision-making, no I/O.
+    diag.setControlPathProvider((device, stateIds) => {
+      const router = this.deviceManager;
+      if (!router) {
+        return [];
+      }
+      const out: diagnostics.ControlPathEntry[] = [];
+      for (const stateId of stateIds) {
+        const command = dropdownReset.stateToCommand(stateId);
+        if (!command) {
+          continue;
+        }
+        const decision = router.resolveTransport(device, command);
+        out.push({ stateId, command, transport: decision.kind, reason: decision.reason });
+      }
+      return out;
+    });
+
+    // API client for undocumented scene/music/DIY libraries (always available)
+    const apiClient = this.makeApiClient(this.log);
+    apiClient.setEmail(accountEmail);
+    this.deviceManager!.setApiClient(apiClient);
+    start.apiClient = apiClient;
+
+    this.deviceManager!.setCallbacks({
+      onUpdate: (device, state, changes) => deviceEvents.onDeviceStateUpdate(this.handlerHost, device, state, changes),
+      onLanDeviceReady: (device, allDevices) => deviceEvents.onLanDeviceReady(this.handlerHost, device, allDevices),
+      onCloudDataReady: (device, allDevices) => deviceEvents.onCloudDataReady(this.handlerHost, device, allDevices),
+      onGroupMembersReady: (group, allDevices) => deviceEvents.onGroupMembersReady(this.handlerHost, group, allDevices),
+    });
+
+    // After an account-reconcile eviction, clean up the now-orphan objects +
+    // diagnostics buffers. A poll-driven eviction never fires onCloudDataReady,
+    // so reapStaleDevices must be triggered explicitly here.
+    this.deviceManager!.onDevicesRemoved = () => {
+      void this.reapStaleDevices().catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
+    };
+
+    // Update info.ip when LAN IP changes
+    this.deviceManager!.onLanIpChanged = (device, ip) => {
+      // A gateway-connected sensor has info.gateway, not info.ip — writing here
+      // would create an orphan state value. It is never LAN-discovered anyway,
+      // but guard defensively.
+      if (device.gateway) {
+        return;
+      }
+      const prefix = this.stateManager!.devicePrefix(device);
+      this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(logRejected(this.log, "best-effort write"));
+    };
+
+    // Sync individual segment states after batch command.
+    // Important: the wizard sends `segmentBatch` with indices 0..SEGMENT_HARD_MAX
+    // so the device reveals its real strip length itself. But we may only
+    // write that ECHO into states that actually exist — otherwise js-controller
+    // produces the "has no existing object" WARN for every index above the cap
+    // (e.g. segments.51..55 on a 19-segment strip).
+    this.deviceManager!.onSegmentBatchUpdate = (device, batch) => {
+      const prefix = this.stateManager!.devicePrefix(device);
+      const cap = physicalSegmentCap(device, this.deviceRegistry);
+      for (const idx of batch.segments) {
+        if (cap === 0 || idx >= cap) {
+          continue;
+        }
+        if (batch.color !== undefined) {
+          const hex = rgbIntToHex(batch.color);
+          this.setState(`${prefix}.segments.${idx}.color`, {
+            val: hex,
+            ack: true,
+          }).catch(logRejected(this.log, "best-effort write"));
+        }
+        if (batch.brightness !== undefined) {
+          this.setState(`${prefix}.segments.${idx}.brightness`, {
+            val: batch.brightness,
+            ack: true,
+          }).catch(logRejected(this.log, "best-effort write"));
+        }
+      }
+    };
+
+    // Sync per-segment states from MQTT BLE status push (AA A5 packets).
+    // Same cap filter as the batch path — guards against stale packets.
+    this.deviceManager!.onMqttSegmentUpdate = (device, segments) => {
+      const prefix = this.stateManager!.devicePrefix(device);
+      const cap = physicalSegmentCap(device, this.deviceRegistry);
+      for (const seg of segments) {
+        if (cap === 0 || seg.index >= cap) {
+          continue;
+        }
+        this.setState(`${prefix}.segments.${seg.index}.color`, {
+          val: rgbToHex(seg.r, seg.g, seg.b),
+          ack: true,
+        }).catch(logRejected(this.log, "best-effort write"));
+        this.setState(`${prefix}.segments.${seg.index}.brightness`, {
+          val: seg.brightness,
+          ack: true,
+        }).catch(logRejected(this.log, "best-effort write"));
+      }
+    };
+
+    // When MQTT reveals the device's real segment count differs from what
+    // Cloud advertised, rebuild the state tree so the datapoints match
+    // (extra indices added, excess ones pruned).
+    this.deviceManager!.onSegmentCountChanged = device => {
+      if (!this.stateManager || !this.deviceManager) {
+        return;
+      }
+      this.stateManager.createSegmentStates(device, this.deviceManager.syncSegmentCount(device)).catch(e => {
+        this.log.warn(`Failed to rebuild segment tree for ${deviceLabel(device)} after count change: ${errMessage(e)}`);
+      });
+    };
+
+    // Log startup with configured channels
+    const startChannels: string[] = ["LAN"];
+    if (config.apiKey) {
+      startChannels.push("Cloud");
+    }
+    if (hasAccountCreds) {
+      startChannels.push("MQTT");
+    }
+    this.log.info(
+      `Starting (${startChannels.join(", ")}) — please wait, a "ready" message will follow when all channels are up`,
+    );
+    return true;
+  }
+
+  /**
+   * The LAN listener and the first scan window.
+   *
+   * @param start The start context
+   */
+  private startLan(start: StartContext): boolean {
+    const { config } = start;
+    // --- LAN (always active) ---
+    this.lanClient = this.makeLanClient(this.log, this);
+    this.deviceManager!.setLanClient(this.lanClient);
+
+    // A socket error on a PINNED interface is user-fixable config (the
+    // selected IP is gone after a DHCP/network change) — surface it once
+    // via the actionable-problems registry instead of a debug line that
+    // left the LAN channel silently dead (M11).
+    this.lanClient.onInterfaceError = message => {
+      this.actionableProblems.report({
+        key: "lan-interface",
+        title: "LAN unavailable on the selected network interface",
+        action: message,
+      });
+    };
+    this.lanClient.onListenReady = () => {
+      this.actionableProblems.resolve("lan-interface", "LAN listening on the selected network interface");
+      this.actionableProblems.resolve("lan-port", `LAN listening on port 4002`);
+    };
+    // Port 4002 taken by another process: the LAN channel is down as a whole
+    // (the listen socket no longer shares the port, audit A5).
+    this.lanClient.onListenPortBusy = message => {
+      this.actionableProblems.report({
+        key: "lan-port",
+        title: "LAN port 4002 is taken by another process",
+        action: `${message}. Stop the other process (or the second instance) and restart this one.`,
+      });
+    };
+
+    // v2.9.1 — wire LAN-traffic into the diag-collector. Resolves
+    // destination-IP → device on every send/status/scan so the diag
+    // JSON carries the verbatim UDP bytes per device. Closes Class E
+    // of the v2.9.1 audit (LAN UDP completely silent in diag before).
+    this.lanClient.setSendHook((ip, cmd, payload, bytes, error) => {
+      const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
+      if (!dev) {
+        return;
+      }
+      this.deviceManager!.getDiagnostics().addLanSend(dev.deviceId, ip, cmd, payload, bytes, error);
+    });
+    this.lanClient.setStatusRecordHook((ip, status) => {
+      const dev = this.deviceManager?.getDevices().find(d => d.lanIp === ip);
+      if (!dev) {
+        return;
+      }
+      this.deviceManager!.getDiagnostics().recordApiSuccess(dev.deviceId, "lan://devStatus", status);
+    });
+    this.lanClient.setScanRecordHook(lanDevice => {
+      this.deviceManager
+        ?.getDiagnostics()
+        .addLog(lanDevice.device, "debug", `LAN scan reply: ip=${lanDevice.ip} sku=${lanDevice.sku}`);
+    });
+
+    this.lanClient.start(
+      lanDevice => {
+        this.deviceManager!.handleLanDiscovery(lanDevice);
+        // Without the account broker every scan asks. With it, a light is
+        // still asked once its last LAN answer is older than a minute (audit
+        // B5): the account push comes only on a change or every 1–11 min, and
+        // only a read corrects a datapoint after a lost UDP command — at most
+        // one request per light and minute.
+        // The discovery reply stamps lastLanReplyAt itself, so the age of
+        // the VALUES is the last devStatus answer — or the last request, so
+        // a light that never answers is not asked on every scan.
+        const light = this.deviceManager!.getDevices().find(d => d.lanIp === lanDevice.ip);
+        const now = Date.now();
+        const lastRead = Math.max(light?.lastLanStatusAt ?? 0, light?.lastLanStatusAskedAt ?? 0);
+        if (!this.mqttClient?.connected || now - lastRead >= LAN_STATUS_REFRESH_MS) {
+          if (light) {
+            light.lastLanStatusAskedAt = now;
+          }
+          this.lanClient!.requestStatus(lanDevice.ip);
+        }
+      },
+      (sourceIp, status) => {
+        this.deviceManager!.handleLanStatus(sourceIp, status);
+      },
+      LAN_SCAN_INTERVAL_MS,
+      config.bind || "",
+    );
+
+    // Wait for first LAN scan responses (UDP multicast, devices respond within 1-2s)
+    this.lanScanTimer = this.setTimeout(() => {
+      this.lanScanDone = true;
+      // Enable the account-reconcile only now — before this a cache-restored
+      // LAN device hasn't had channels.lan set and would count a false miss.
+      if (this.deviceManager) {
+        this.deviceManager.accountReconcileEnabled = true;
+      }
+      connectionState.checkAllReady(this.handlerHost);
+    }, LAN_SCAN_INITIAL_WAIT_MS);
+    return true;
+  }
+
+  /**
+   * The account client and its saved credentials — before the Cloud, so the scene library can load on the
+   * first cycle.
+   *
+   * @param start The start context
+   */
+  private async openAccount(start: StartContext): Promise<boolean> {
+    const { config, accountEmail, hasAccountCreds, dataDir } = start;
+    // --- MQTT (if account credentials provided) ---
+    // Initialize MQTT before Cloud so scene library can load on first cycle
+    if (!hasAccountCreds) {
+      return true;
+    }
+    this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+    this.mqttClient.useLoginWindow(this.loginWindowFor(accountEmail));
+    // The status request over the account broker — the DeviceManager
+    // decides WHOM to ask, the client only publishes.
+    this.deviceManager!.setStatusRequester((device, cmdVersion) =>
+      device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false,
+    );
+    // A 401 from the App API asks the account client for a fresh bearer.
+    this.deviceManager!.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
+
+    // Forward every parsed MQTT message into the diagnostics ring buffer
+    // so the report contains the recent packets per device. v2.9.1: the
+    // hook gets both BLE-hex (op.command) and the raw JSON envelope so
+    // state-only pushes are also captured.
+    this.mqttClient.setPacketHook((deviceId, topic, payload) => {
+      this.deviceManager?.getDiagnostics().addMqttPacket(deviceId, topic, payload);
+    });
+
+    // Login + IoT-key outcome into the report. Credentials never travel —
+    // only which call, whether Govee accepted it, its status and its own
+    // message. Two filed issues were exactly this case and the report could
+    // not tell them apart from "no account entered".
+    this.mqttClient.setOnAccountCall((endpoint, ok, statusCode, message) => {
+      this.deviceManager?.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
+    });
+
+    // 2FA: forward optional code from settings into the next login attempt;
+    // clear the field automatically once Govee has accepted it.
+    this.mqttClient.setVerificationCode(config.mqttVerificationCode ?? "");
+    this.mqttClient.setOnVerificationConsumed(() => {
+      cloudCreds.clearVerificationCodeSetting(this.handlerHost).catch(e => {
+        this.log.warn(`Could not clear mqttVerificationCode: ${errMessage(e)}`);
+      });
+    });
+    this.mqttClient.setOnVerificationFailed(reason => {
+      // On 'failed' (455 / 454+code-was-sent) blank the code so the user
+      // doesn't keep retrying with a stale value. On 'pending' (454 + no
+      // code) we leave the field as-is — the user is about to fill it.
+      // Surface the "code needed" state on info.verificationPending so the
+      // connection card can show it live (the notification below is only a
+      // nudge for when the user isn't in the settings — the actual flow
+      // runs through the card, never a second login path).
+      this.stateManager
+        ?.writeReadOnly("info.verificationPending", true)
+        .catch(logRejected(this.log, "best-effort write"));
+      if (reason === "failed") {
+        cloudCreds
+          .clearVerificationCodeSetting(this.handlerHost)
+          .catch(logRejected(this.log, "clear the verification code setting"));
+        this.actionableProblems.report({
+          key: "mqtt-verification",
+          title: "Govee rejected the verification code for real-time status",
+          action:
+            "open the adapter settings — the connection card requests a fresh code; enter the one Govee e-mails you",
+        });
+      } else {
+        this.actionableProblems.report({
+          key: "mqtt-verification",
+          title: "Govee requires a verification code to enable real-time status (lights/sensors stay readable)",
+          action: "open the adapter settings — the connection card requests a code and takes the one Govee e-mails you",
+        });
+      }
+    });
+    this.mqttClient.setOnAuthFailed(() => {
+      this.actionableProblems.report({
+        key: "mqtt-auth",
+        title: "Govee rejected the account login for real-time status",
+        action: "check the Govee email and password in the adapter settings (connection card)",
+      });
+    });
+    this.mqttClient.setOnLoginBlocked(() => {
+      this.actionableProblems.report({
+        key: "mqtt-login-blocked",
+        title: "Govee stopped accepting the account login for real-time status",
+        action:
+          "Govee rejected repeated login attempts (the account may be temporarily locked). Automatic retries are stopped — check your Govee account, then restart the adapter",
+      });
+    });
+
+    // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
+    // a FILE in the instance data directory — not a state and not a meta
+    // object (so the credentials are neither a visible datapoint nor a
+    // visible object-tree node) and not adapter native (a native write
+    // would trigger a js-controller restart, looping endlessly on every
+    // login). loadPersistedCreds migrates an older info.mqttCredentials
+    // state into the file on first run; the v2.18.x meta object is
+    // migrated + dropped earlier in onReady (migrateCredentialsMetaOnce).
+    // The plaintext native fields of 2.1.0–2.1.2 are dropped by
+    // NATIVE_KEY_MIGRATIONS at the very start of onReady.
+    start.cachedCreds = await cloudCreds.loadPersistedCreds(this.handlerHost, dataDir, accountEmail);
+    return true;
+  }
+
+  /**
+   * The account login.
+   *
+   * @param start The start context
+   */
+  private async connectAccount(start: StartContext): Promise<boolean> {
+    const { accountEmail, hasAccountCreds, dataDir } = start;
+    const apiClient = start.apiClient!;
+    if (!hasAccountCreds) {
+      return true;
+    }
+    const cachedCreds = start.cachedCreds;
+    if (cachedCreds) {
+      this.mqttClient!.setPersistedCredentials(cachedCreds);
+    }
+    this.mqttClient!.setOnCredentialsRefresh(creds => {
+      cloudCreds.persistCreds(this.handlerHost, dataDir, creds, accountEmail).catch(e => {
+        this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
+      });
+    });
+
+    await this.mqttClient!.connect(
+      update => this.deviceManager!.handleMqttStatus(update),
+      connected => {
+        this.stateManager
+          ?.writeReadOnly("info.mqttConnected", connected)
+          .catch(logRejected(this.log, "best-effort write"));
+        if (connected) {
+          this.actionableProblems.resolve(
+            "mqtt-verification",
+            "Govee real-time status connected — verification accepted",
+          );
+          this.actionableProblems.resolve("mqtt-auth", "Govee account login accepted");
+          this.actionableProblems.resolve("mqtt-login-blocked", "Govee account login accepted");
+          this.stateManager
+            ?.writeReadOnly("info.verificationPending", false)
+            .catch(logRejected(this.log, "best-effort write"));
+          connectionState.checkAllReady(this.handlerHost);
+          // A (re)connected broker: ask right away what went quiet while
+          // it was down — the topics are known from the last list poll.
+          this.deviceManager?.requestStaleStatuses();
+        }
+        connectionState.updateConnectionState(this.handlerHost);
+      },
+      // Forward every fresh bearer token — fires on initial login and on
+      // each reconnect-login, so the API client never runs with a stale one.
+      token => {
+        apiClient.setBearerToken(token);
+        this.deviceManager?.onBearerToken();
+      },
+    );
+    return true;
+  }
+
+  /**
+   * Device data (cache first), the App-API tick, the Cloud client, limiter and event broker, and the Cloud
+   * start without a cache.
+   *
+   * @param start The start context
+   */
+  private async startCloud(start: StartContext): Promise<boolean> {
+    const { config, hasAccountCreds } = start;
+    // --- Device data: Cache first, Cloud only on cache miss ---
+    start.cachedOk = this.deviceManager!.loadFromCache();
+
+    // Bridge synthetic capabilities (App-API, OpenAPI-MQTT events) into the
+    // same setState pipeline as polled Cloud state. Keeps mapCloudStateValue
+    // as the single source of truth for value coercion + state-id resolution.
+    // Outside the API-key branch: the App-API runs on the ACCOUNT token, so
+    // an installation with account credentials and no API key needs this too
+    // — without it its poll would fetch values that reach no datapoint
+    // (audit 2026-09-12, F5).
+    this.deviceManager!.setOnCloudCapabilities((device, caps) => {
+      cloudStateLoader
+        .applyCloudCapabilities(this.handlerHost, device, caps)
+        .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
+    });
+
+    // App-API poll — every 2 minutes, pulls state for sensors like H5179
+    // whose OpenAPI /device/state answer carries the capability with an
+    // empty value (""). Bearer token comes from the AWS-IoT MQTT login, so
+    // a no-op until that succeeds.
+    //
+    // The same tick also renews reachability proofs that nothing else
+    // renews. It runs HERE and not inside pollAppApi on purpose: that
+    // method returns immediately without a bearer token, and an
+    // installation with only an API key is exactly the case this covers.
+    //
+    // Both credential tiers, not just the API key: the poll needs the
+    // ACCOUNT token and the refresh needs the cloud client, and each of the
+    // two returns 0 on its own when its source is missing. Gated on the
+    // account as well since 2026-09-12 (F5) — before that, an account-only
+    // installation never polled, so `appApiInitialPollDone` stayed false and
+    // "ready" came from the 60 s safety timer alone. A LAN-only installation
+    // has neither and gets no timer at all.
+    if (config.apiKey || hasAccountCreds) {
+      const triggerAppApiPoll = (): void => {
+        this.deviceManager
+          ?.refreshExpiringReachability()
+          .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
+        this.deviceManager
+          ?.pollAppApi()
+          .then(() => {
+            // H2 — mark initial-poll-done and re-check Ready so the adapter
+            // can log "ready" as soon as sensor values are in.
+            if (!this.appApiInitialPollDone) {
+              this.appApiInitialPollDone = true;
+              connectionState.checkAllReady(this.handlerHost);
+            }
+            // The list just handed every device its broker topic — ask the
+            // ones whose own voice has gone quiet (issue #47, 2.39.0). After
+            // the poll, not before: on the first tick the topics are new.
+            this.deviceManager?.requestStaleStatuses();
+          })
+          .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
+      };
+      this.appApiPollTimer = this.setInterval(triggerAppApiPoll, APP_API_POLL_INTERVAL_MS);
+      // Initial poll: gives MQTT time for the bearer login. Without this
+      // immediate poll, sensors like the H5179 stay offline for the first
+      // 2 minutes after start (the online signal only comes via App-API).
+      // Kept in a member variable so onUnload can clear the timer.
+      this.appApiInitialTimer = this.setTimeout(triggerAppApiPoll, APP_API_INITIAL_DELAY_MS);
+    }
+
+    if (!config.apiKey) {
+      return true;
+    }
+    this.cloudClient = this.makeCloudClient(config.apiKey, this.log);
+    // Capture the most recent Cloud response per (deviceId, endpoint) for
+    // diagnostics — bounded by the DiagnosticsCollector's response slot cap.
+    this.cloudClient.setResponseHook((deviceId, endpoint, body, rateLimit) => {
+      this.deviceManager?.getDiagnostics().recordApiSuccess(deviceId, endpoint, body, undefined, rateLimit);
+    });
+    // Every accepted call shows the Cloud reachable, a 401/403 shows it lost, and a
+    // call that could not reach Govee feeds the outage tracker (issue #51) — the
+    // rules live in cloudRetryHandler.onCloudContact / setCloudConnected.
+    this.cloudClient.setContactHook((outcome, reason) =>
+      cloudRetryHandler.onCloudContact(this.handlerHost, outcome, reason),
+    );
+    this.deviceManager!.setCloudClient(this.cloudClient);
+
+    this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
+    this.rateLimiter.start();
+    this.deviceManager!.setRateLimiter(this.rateLimiter);
+
+    // OpenAPI-MQTT — push channel for appliance/sensor events
+    // (lackWater, iceFull, bodyAppeared etc.). API key is enough; no
+    // separate credentials required. Connection runs in parallel to
+    // the AWS-IoT MQTT used for status push of regular devices.
+    this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
+    this.openapiMqttClient.connect(
+      event => this.deviceManager?.handleOpenApiEvent(event),
+      connected => {
+        this.stateManager
+          ?.writeReadOnly("info.openapiMqttConnected", connected)
+          .catch(logRejected(this.log, "best-effort write"));
+        if (connected) {
+          // Cloud-events (Sensor Push) is a Ready precondition — re-check so
+          // the adapter logs "ready" as soon as it connects instead of
+          // waiting on the 60 s safety timer (L10). Mirrors the AWS-IoT
+          // onConnection callback above.
+          connectionState.checkAllReady(this.handlerHost);
+        }
+      },
+      // v2.9.1 — raw payload hook. Cloud-events MQTT topic is account-wide
+      // (`GA/<apiKey>`), payload carries `sku`/`device`. Parse here so the
+      // raw envelope lands per-device in the diag (same model as AWS-IoT).
+      // Account-level bucket would have meant a new diag struct; per-device
+      // keeps shape consistent with all other capture paths.
+      rawJson => {
+        if (!this.deviceManager) {
+          return;
+        }
+        try {
+          const parsed = JSON.parse(rawJson) as { sku?: unknown; device?: unknown };
+          if (typeof parsed?.device === "string" && parsed.device) {
+            this.deviceManager.getDiagnostics().addMqttPacket(parsed.device, "openapi-events", { rawJson });
+          }
+        } catch {
+          /* malformed — already debug-logged in the client */
+        }
+      },
+    );
+
+    if (!start.cachedOk) {
+      // No cache — first start, fetch from Cloud with 60s hard-timeout.
+      // If Cloud hangs/fails, we don't want to block adapter startup indefinitely.
+      start.cloudInit = await cloudRetryHandler.cloudInitWithTimeout(this.handlerHost);
+    }
+    return true;
+  }
+
+  /**
+   * What the Cloud start decided, and the group members.
+   *
+   * @param start The start context
+   */
+  private async settleCloudStart(start: StartContext): Promise<boolean> {
+    if (!start.config.apiKey) {
+      return true;
+    }
+    const result = start.cloudInit;
+    if (result) {
+      if (result.ok) {
+        cloudRetryHandler.setCloudConnected(this.handlerHost, true);
+        cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
+        start.cloudStateReadable = true;
+      } else {
+        cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
+      }
+    } else {
+      // device-manager already logged "Loaded N device(s) from cache" at
+      // info — keep this one on debug so a cache-only start isn't announced
+      // twice (C9).
+      this.log.debug(`Using cached device data — no Cloud calls needed`);
+      // The cache stands in for the device list, so the retry loop has
+      // nothing to fetch and a Cloud-only light counts as reachable. The
+      // two datapoints wait for the first call Govee actually accepts
+      // (contact hook): a cache start has not talked to the Cloud yet.
+      this.cloudWasConnected = true;
+      cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
+      start.cloudStateReadable = true;
+    }
+    // Load group membership from undocumented API (needs bearer token + device map)
+    await this.deviceManager!.loadGroupMembers();
+    return true;
+  }
+
+  /**
+   * Every tree build the start queued.
+   *
+   * @param start The start context
+   */
+  private async drainStateCreation(start: StartContext): Promise<boolean> {
+    if (start.config.apiKey) {
+      this.cloudInitDone = true;
+    }
+    // Wait for all state creation from cache/cloud load to complete.
+    // Drain-loop: a callback that fires during the await (e.g. a late LAN
+    // discovery) can push fresh promises into the queue — we need to await
+    // those too before flipping statesReady, otherwise the initial state
+    // tree would be incomplete on very fast startups.
+    while (this.stateCreationQueue.length > 0) {
+      const pending = this.stateCreationQueue;
+      this.stateCreationQueue = [];
+      await Promise.all(pending);
+    }
+    return true;
+  }
+
+  /**
+   * The device state read of the start.
+   *
+   * @param start The start context
+   */
+  private async readStartState(start: StartContext): Promise<boolean> {
+    // The device STATE is read here, after the drain, for every cloud device
+    // at once. The cache covers the device LIST, never the state, and the two
+    // start paths used to differ: the no-light path read nothing at all until
+    // 2.34.0, the path with a light read before the drain and relied on the
+    // phase callbacks having finished during loadFromCloud's own awaits
+    // (measured: they had — the read must not depend on it). Before the
+    // drain the channel map would be empty and `resolveStatePath` would fall
+    // back to "control" for a sensor id. By now the UDP scan has answered, so
+    // a light with a local API carries its address and the loader's LAN guard
+    // keeps its power/brightness/colour untouched; a failed cloud init
+    // reaches this via the retry loop instead (`onCloudRestored` →
+    // loadCloudStates).
+    if (start.cloudStateReadable) {
+      await cloudStateLoader.loadCloudStates(this.handlerHost);
+    }
+    return true;
+  }
+
+  /**
+   * The migrations that need the finished tree.
+   */
+  private async runStartMigrations(): Promise<boolean> {
+    if (this.stateManager && this.deviceManager) {
+      // v2.8.0 one-shot migration: pure-LAN devices (no API key, never went
+      // through a Cloud-phase) on prior versions had scenes/music/snapshots
+      // states briefly created then orphaned. Wipe those leftovers now.
+      // Idempotent — second run does nothing, the LAN_STATE_IDS skip in
+      // cleanupCloudOwnedStates protects power/brightness/color_rgb/color_temperature.
+      //
+      // ONLY for the purpose it names: an installation without an API key.
+      // With one, "no capabilities yet" means the Cloud data has not arrived
+      // (a failed Cloud start, a light from the scan) — deleting then took
+      // the light's Cloud datapoints with their values, rooms and history
+      // (M8, "deletion needs knowledge, not absence"). And inside the
+      // device's build chain, so a build running at the same moment cannot
+      // create what this pass deletes, or the other way round (N27).
+      if (!this.config.apiKey && !this.cloudClient) {
+        const sm = this.stateManager;
+        for (const device of this.deviceManager.getDevices()) {
+          if (device.lanIp && device.capabilities.length === 0) {
+            await sm.runDeviceBuild(device, async () => {
+              const deleted = await sm.cleanupCloudOwnedStates(sm.devicePrefix(device), []).catch(e => {
+                this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+                return 0;
+              });
+              // Only announce when something was actually removed: pure-LAN
+              // devices (no API key) match this condition on EVERY start, and
+              // an info-level "Migrated" line for a no-op was permanent log
+              // noise for exactly the credential-less target group (M7).
+              if (deleted > 0) {
+                this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
+              }
+            });
+          }
+        }
+      }
+
+      // B2 one-shot migration: the control colour states were renamed from
+      // camelCase (control.colorRgb / control.colorTemperature) to snake_case
+      // (control.color_rgb / control.color_temperature). Delete the old
+      // objects on upgraded installs so they don't linger as dead duplicates.
+      // Idempotent + existence-checked; covers devices AND groups.
+      for (const device of this.deviceManager.getDevices()) {
+        await this.stateManager.migrateLegacyColorStateIds(device).catch(e => {
+          this.log.debug(`B2 colour-state migration failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+        });
+      }
+    }
+    return true;
+  }
+
+  /**
+   * The tree is ready: held pushes, subscriptions, timers, the ready line.
+   */
+  private async finishStart(): Promise<boolean> {
+    this.statesReady = true;
+    // The tree exists and the start-up seed is read: apply the appliance
+    // pushes held during the start (the device's own, newer word) and let
+    // later ones through immediately.
+    this.deviceManager?.releaseHeldPushes();
+    // What waited for an account token (group members, libraries) runs from
+    // now on with each token — and right away when one came during the start.
+    this.deviceManager?.enableBearerFollowUps();
+
+    // Subscribe to all writable device and group states, plus the adapter-level
+    // manual-sync button. The button lives under `info`, which the two wildcard
+    // patterns do not cover — without its own subscription the state change never
+    // reaches onStateChange and the button is dead (v2.17.0–v2.27.1).
+    await this.subscribeStatesAsync("devices.*");
+    await this.subscribeStatesAsync("groups.*");
+    await this.subscribeStatesAsync("info.manualSyncDevices");
+
+    // Cleanup stale devices after initial discovery (30s delay for LAN scan).
+    // Reaps devices from every adapter-level map that was keyed on them so the
+    // process doesn't leak memory across Cloud-side device turnover.
+    // The timer fires no matter what any channel achieved — the reaper itself
+    // refuses to act until an account list has answered (hasKnownPopulation),
+    // because absence proves nothing while the population is unknown.
+    this.cleanupTimer = this.setTimeout(() => {
+      connectionState
+        .reapStaleDevices(this.handlerHost)
+        .catch(e => this.log.debug(`Device cleanup failed: ${errMessage(e)}`));
+    }, STALE_DEVICE_CLEANUP_DELAY_MS);
+
+    // info.online sync — re-evaluates per-device online truth every 20 s.
+    // For Lights this drives the offline-transition (lastLanReplyAt TTL).
+    // For all devices it suppresses ts-rewrite-spam (no setState when
+    // value is unchanged). When a Light flips online/offline, also refreshes
+    // group-reachability since the original onDeviceUpdate path no longer
+    // sees those transitions for Lights.
+    this.onlineSyncTimer = this.setInterval(() => void this.runOnlineSyncRound(), ONLINE_SYNC_INTERVAL_MS);
+
+    // Keep the impersonated Govee-app version current — daily refresh (the
+    // initial fetch is fired early in onReady, above).
+    this.appVersionCheckTimer = this.setInterval(() => {
+      connectionState
+        .refreshLiveAppVersion(this.handlerHost)
+        .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
+    }, APP_VERSION_CHECK_INTERVAL_MS);
+
+    connectionState.updateConnectionState(this.handlerHost);
+
+    // Check if all channels are ready — may already be true if MQTT connected fast
+    connectionState.checkAllReady(this.handlerHost);
+    // Safety timeout: log ready anyway even if a channel takes too long.
+    // READY_SAFETY_TIMEOUT_MS covers a normal MQTT connect + 1 reconnect.
+    this.readyTimer = this.setTimeout(() => {
+      if (!this.readyLogged) {
+        this.readyLogged = true;
+        connectionState.logDeviceSummary(this.handlerHost);
+      }
+    }, READY_SAFETY_TIMEOUT_MS);
+    return true;
   }
 
   /**

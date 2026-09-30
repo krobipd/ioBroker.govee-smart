@@ -1098,16 +1098,17 @@ describe("GoveeAdapter onReady — timers", () => {
   });
 
   it("an id move that cannot read the object tree stops the start with one error line (M8, 3.0.2)", async () => {
-    const { adapter, f } = setup({ apiKey: "key" });
+    const { adapter, f } = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     const errors: string[] = [];
     (adapter as unknown as { log: ioBroker.Logger }).log.error = (m: string) => void errors.push(m);
     const spy = vi.spyOn(StateManager.prototype, "migrateDeviceIds").mockRejectedValue(new Error("db down"));
     try {
       await i.onReady();
-      expect(errors.some(e => e.includes("Device id migration failed — the adapter does not start: db down"))).toBe(
-        true,
-      );
+      // ONE error line: the start ends here, no later phase runs into the missing runtime.
+      expect(errors).toEqual([
+        expect.stringContaining("Device id migration failed — the adapter does not start: db down"),
+      ]);
       expect(f.lan.start).not.toHaveBeenCalled();
       expect(i.statesReady).toBe(false);
     } finally {
