@@ -38,6 +38,7 @@ import { StateManager } from "./lib/state-manager";
 import { deviceLabel, errMessage, logRejected, type GoveeDevice } from "./lib/types";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
+import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
 import {
   APP_API_INITIAL_DELAY_MS,
   APP_API_POLL_INTERVAL_MS,
@@ -77,7 +78,8 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   stateChangeRouter.StateChangeRouterAdapter &
   wizardHandler.WizardHandlerAdapter &
   diagnosticsHandler.DiagnosticsHandlerAdapter &
-  diagnosticsHandler.DiagnosticsProvidersHost;
+  diagnosticsHandler.DiagnosticsProvidersHost &
+  legacyCleanup.LegacyCleanupAdapter;
 
 /** What the start phases of onReady hand each other. */
 interface StartContext {
@@ -371,6 +373,7 @@ export class GoveeAdapter extends utils.Adapter {
     );
     method("readFileAsync", (meta: string, name: string) => this.readFileAsync(meta, name));
     method("delFileAsync", (meta: string, name: string) => this.delFileAsync(meta, name));
+    method("readDirAsync", (meta: string, path: string) => this.readDirAsync(meta, path));
     method("delObjectAsync", (id: string) => this.delObjectAsync(id));
     method("encrypt", (value: string) => this.encrypt(value));
     method("decrypt", (value: string) => this.decrypt(value));
@@ -576,39 +579,8 @@ export class GoveeAdapter extends utils.Adapter {
       .refreshLiveAppVersion(this.handlerHost)
       .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
 
-    // One-shot cleanup: the global info.refresh_cloud_data button was removed
-    // in v2.7.0 but its object lingers on upgraded installs; it is replaced by
-    // info.manualSyncDevices (BUG-1). Drop the dead orphan.
-    await this.delObjectAsync("info.refresh_cloud_data").catch(() => undefined);
-
-    // One-shot cleanup: 2.29.0–2.36.0 kept a copy of every diagnostics report
-    // as a file under a `diagnostics` meta object at the root of the instance
-    // — a folder next to the devices that nobody asked for. Since 2.37.0 the
-    // report travels only in the answer to the Expert card. Drop the copies
-    // and the folder; a fresh install has neither and this is silent.
-    await this.removeLegacyReportStore();
-
-    // One-shot cleanup: the manual-sync button was spelled info.manual_sync_devices
-    // from v2.17.0 to v2.27.1 — the only snake_case id in the otherwise camelCase
-    // info channel. It was never subscribed either, so no script can depend on the
-    // old spelling; the instanceObjects entry now declares info.manualSyncDevices.
-    await this.delObjectAsync("info.manual_sync_devices").catch(() => undefined);
-
-    // One-shot cleanup: info.legacyMqttCleaned was a migration marker from an
-    // early v2 release. No code has written or read it for many versions —
-    // it survived only because nothing removes what the adapter no longer
-    // knows about. Found in the live tree on 2026-09-03, not by any gate.
-    await this.delObjectAsync("info.legacyMqttCleaned").catch(() => undefined);
-
-    // One-shot cleanup: info.appVersionDrift was removed in v2.18.0 — the
-    // Govee-app version now self-heals in the background, so there is nothing
-    // to surface. Drop the dead orphan on upgraded installs (e.g. from 2.17.0).
-    await this.delObjectAsync("info.appVersionDrift").catch(() => undefined);
-
-    // One-shot cleanup: info.wizardStatus was removed in v2.21.0 — the segment
-    // wizard is now a React admin component that owns its own status, so the
-    // UI-only mirror state is gone. Drop the dead orphan on upgraded installs.
-    await this.delObjectAsync("info.wizardStatus").catch(() => undefined);
+    // One-shot cleanups: objects earlier versions left behind that nothing reads any more.
+    await legacyCleanup.removeLegacyObjects(this.handlerHost);
 
     // One-shot migration + cleanup: the <namespace>.credentials meta object
     // (v2.18.0–v2.18.2) is replaced by an encrypted file in the instance data
@@ -1485,35 +1457,6 @@ export class GoveeAdapter extends utils.Adapter {
       this.messageRouter.onMessage(obj);
     } catch (e) {
       this.log.warn(`onMessage crashed: ${errMessage(e)}`);
-    }
-  }
-
-  /**
-   * Delete the `<namespace>.diagnostics` meta object and every report file it
-   * holds (2.29.0–2.36.0 stored up to three reports per device there). The
-   * object is an `instanceObjects` entry of those versions, so js-controller
-   * recreated it on every update — only the adapter can take it away. Runs
-   * once per start; without the object it does nothing.
-   */
-  private async removeLegacyReportStore(): Promise<void> {
-    const meta = `${this.namespace}.diagnostics`;
-    const store = await this.getObjectAsync("diagnostics").catch(() => null);
-    if (!store) {
-      return;
-    }
-    // readDirAsync throws while the meta object holds nothing — treat it as empty.
-    const entries = await this.readDirAsync(meta, "").catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isDir) {
-        await this.delFileAsync(meta, entry.file).catch(() => undefined);
-      }
-    }
-    await this.delObjectAsync("diagnostics").catch(() => undefined);
-    const removed = entries.filter(e => !e.isDir).length;
-    if (removed > 0) {
-      this.log.info(`Removed ${removed} stored diagnostics report(s) and their folder — reports are download-only now`);
-    } else {
-      this.log.debug("Removed the empty diagnostics report store — reports are download-only now");
     }
   }
 
