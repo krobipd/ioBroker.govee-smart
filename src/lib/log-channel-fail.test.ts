@@ -21,7 +21,10 @@ function makeLog(): { log: ioBroker.Logger; entries: CapturedLog[] } {
 
 describe("formatChannelFail (pure formatter)", () => {
   it("TIMEOUT: uses the enriched http-client message verbatim plus retryHint", () => {
-    const err = new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/user/devices");
+    const err = Object.assign(
+      new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/user/devices"),
+      { code: "ETIMEDOUT" },
+    );
     const out = formatChannelFail("Cloud REST", "TIMEOUT", err, "retrying every 5 min");
     expect(out).toBe(
       "Cloud REST: Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/user/devices — retrying every 5 min",
@@ -64,7 +67,7 @@ describe("logChannelFail (dedup wrapper)", () => {
   it("first failure in a category goes to warn, stack goes to debug", () => {
     const { log, entries } = makeLog();
     const dedup: ChannelDedupState = { lastCategory: null };
-    const err = new Error("Timeout after 15000ms for POST host/path");
+    const err = Object.assign(new Error("Timeout after 15000ms for POST host/path"), { code: "ETIMEDOUT" });
     logChannelFail(log, { channel: "Cloud REST", err, retryHint: "retrying every 5 min", dedup });
 
     const warns = entries.filter(e => e.level === "warn");
@@ -79,8 +82,16 @@ describe("logChannelFail (dedup wrapper)", () => {
   it("second failure in same category goes to debug only", () => {
     const { log, entries } = makeLog();
     const dedup: ChannelDedupState = { lastCategory: null };
-    logChannelFail(log, { channel: "Cloud REST", err: new Error("Timeout x"), dedup });
-    logChannelFail(log, { channel: "Cloud REST", err: new Error("Timeout y"), dedup });
+    logChannelFail(log, {
+      channel: "Cloud REST",
+      err: Object.assign(new Error("Timeout x"), { code: "ETIMEDOUT" }),
+      dedup,
+    });
+    logChannelFail(log, {
+      channel: "Cloud REST",
+      err: Object.assign(new Error("Timeout y"), { code: "ETIMEDOUT" }),
+      dedup,
+    });
 
     const warns = entries.filter(e => e.level === "warn");
     expect(warns).toHaveLength(1);
@@ -93,7 +104,11 @@ describe("logChannelFail (dedup wrapper)", () => {
   it("different category after first → warn again", () => {
     const { log, entries } = makeLog();
     const dedup: ChannelDedupState = { lastCategory: null };
-    logChannelFail(log, { channel: "Cloud REST", err: new Error("Timeout x"), dedup });
+    logChannelFail(log, {
+      channel: "Cloud REST",
+      err: Object.assign(new Error("Timeout x"), { code: "ETIMEDOUT" }),
+      dedup,
+    });
     const authErr = new HttpError("Unauthorized", 401, {}, "");
     logChannelFail(log, { channel: "Cloud REST", err: authErr, dedup });
 

@@ -213,7 +213,12 @@ export function httpsRequest<T>(
     req.on("timeout", () => {
       const ms = reqOptions.timeout ?? 15_000;
       const method = options.method ?? "GET";
-      req.destroy(new Error(`Timeout after ${ms}ms for ${method} ${reqOptions.hostname}${reqOptions.path}`));
+      // The code is what classifyError reads — the text is for the reader only.
+      req.destroy(
+        Object.assign(new Error(`Timeout after ${ms}ms for ${method} ${reqOptions.hostname}${reqOptions.path}`), {
+          code: "ETIMEDOUT",
+        }),
+      );
     });
 
     // M3 — AbortSignal support. Whoever makes the request can abort it

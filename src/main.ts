@@ -8,7 +8,7 @@ import { effectiveSegmentCount, resolveSegmentCount, resolveDeviceReachability }
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
-import { GoveeMqttClient } from "./lib/govee-mqtt-client";
+import { GoveeMqttClient, LoginWindow } from "./lib/govee-mqtt-client";
 import { GoveeOpenapiMqttClient } from "./lib/govee-openapi-mqtt-client";
 import { LocalSnapshotStore } from "./lib/local-snapshots";
 import { migrateNativeKeys, type NativeKeyMigration } from "./lib/native-key-migration";
@@ -52,7 +52,7 @@ import {
   READY_SAFETY_TIMEOUT_MS,
   STALE_DEVICE_CLEANUP_DELAY_MS,
 } from "./lib/timing-constants";
-import { isAppGroup } from "./lib/govee-constants";
+import { deriveGoveeClientId, isAppGroup } from "./lib/govee-constants";
 
 // Rate-limit defaults moved to lib/timing-constants.ts as CLOUD_FULL_LIMITS so
 // every module that touches Govee budgeting reads the same canonical values.
@@ -199,6 +199,13 @@ export class GoveeAdapter extends utils.Adapter {
   private stateManager: StateManager | null = null;
   private lanClient: GoveeLanClient | null = null;
   private mqttClient: GoveeMqttClient | null = null;
+  /**
+   * One login window per Govee account (keyed by its derived client id): the
+   * live client and every "Test login" probe count into the same one, so a
+   * user testing repeatedly cannot log in more often than the adapter itself
+   * (the probe used to be a fresh client with an empty window each click).
+   */
+  private readonly loginWindows = new Map<string, LoginWindow>();
   private openapiMqttClient: GoveeOpenapiMqttClient | null = null;
   /** Registry surfacing user-actionable problems (verification, credentials). */
   private actionableProblems!: ActionableProblems;
@@ -308,6 +315,21 @@ export class GoveeAdapter extends utils.Adapter {
     // govee-smart and suppress Node's default crash-exit. The structural
     // protection is the boundary try/catch in every async entry point
     // (onReady/onStateChange/onMessage) plus `.catch()` on all callbacks.
+  }
+
+  /**
+   * The login window of a Govee account — created on first use.
+   *
+   * @param email Account e-mail (trimmed like the login does)
+   */
+  private loginWindowFor(email: string): LoginWindow {
+    const key = deriveGoveeClientId(email.trim());
+    let window = this.loginWindows.get(key);
+    if (!window) {
+      window = new LoginWindow();
+      this.loginWindows.set(key, window);
+    }
+    return window;
   }
 
   /**
@@ -934,6 +956,7 @@ export class GoveeAdapter extends utils.Adapter {
       // Initialize MQTT before Cloud so scene library can load on first cycle
       if (hasAccountCreds) {
         this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+        this.mqttClient.useLoginWindow(this.loginWindowFor(accountEmail));
         // The status request over the account broker — the DeviceManager
         // decides WHOM to ask, the client only publishes.
         this.deviceManager.setStatusRequester((device, cmdVersion) =>
@@ -1724,10 +1747,11 @@ export class GoveeAdapter extends utils.Adapter {
       },
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
       createMqttProbeClient: (email: string, password: string) => {
-        const probe = new GoveeMqttClient(email, password, this.log, this);
+        const probe = this.makeMqttClient(email, password, this.log, this);
         // One-shot probe: a failed login must not arm the reconnect backoff —
         // it could fire a second login against Govee inside the probe window.
         probe.enableProbeMode();
+        probe.useLoginWindow(this.loginWindowFor(email));
         return probe;
       },
       getDeviceList: () => {

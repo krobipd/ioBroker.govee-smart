@@ -1,5 +1,5 @@
 import { MessageRouter, type MessageRouterHost } from "./message-router";
-import type { GoveeMqttClient } from "./govee-mqtt-client";
+import { classifyLoginResponse, type GoveeMqttClient } from "./govee-mqtt-client";
 
 // MessageRouter routes mqttAuth result strings through adapter-core I18n; resolve
 // them against the real en.json with positional %s substitution (mirrors
@@ -41,7 +41,7 @@ interface FakeProbeOpts {
    * only readable via getLastError() (H2). A fake that throws from connect()
    * would test dead code.
    */
-  lastError?: { category: string; message: string };
+  lastError?: { category: string; message: string; reason?: string };
   /** When set, lastError surfaces only on the SECOND getLastError() read — models a broker-stage failure that lands during the edge-wait. */
   lateError?: boolean;
   /** Throw this from probe.requestVerificationCode. */
@@ -247,7 +247,8 @@ describe("MessageRouter", () => {
 
     it("returns email-not-registered on matching error", async () => {
       const probe = makeProbe({
-        lastError: { category: "AUTH", message: "Login failed: email not registered (status 451)" },
+        // The verdict the real client records for Govee's 451 answer.
+        lastError: classifyLoginResponse({ status: 451, message: "email not registered" }, false),
       });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
@@ -271,14 +272,42 @@ describe("MessageRouter", () => {
 
     it("returns account-locked hint", async () => {
       const probe = makeProbe({
-        lastError: { category: "UNKNOWN", message: "Account temporarily locked by Govee: abnormal login (status 400)" },
+        lastError: classifyLoginResponse({ status: 400, message: "abnormal login" }, false),
       });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
+      const r = responses[0].data as { result: string; status: string };
+      // The status names the case — the generic fallback text would quote Govee's sentence too.
+      expect(r.status).toBe("accountLocked");
       expect(r.result).toContain("temporarily locked");
+    });
+
+    it("an account whose login window is full answers with the adapter's own pause and the time — nothing was sent", async () => {
+      const probe = makeProbe({
+        lastError: { category: "RATE_LIMIT", message: "22:15:00", reason: "loginWindowFull" },
+      });
+      const { host, responses } = makeHost({ probe });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const r = responses[0].data as { result: string; status: string };
+      expect(r.status).toBe("throttled");
+      expect(r.result).toContain("22:15:00");
+      expect(r.result).toContain("Three Govee logins");
+    });
+
+    it("a sentence that only LOOKS like a sub-case is not read as one", async () => {
+      const probe = makeProbe({
+        lastError: { category: "AUTH", message: "Login failed: email not registered (status 401)" },
+      });
+      const { host, responses } = makeHost({ probe });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const r = responses[0].data as { status: string };
+      expect(r.status).toBe("passwordRejected");
     });
 
     it("H2 regression: wrong password reports 'rejected' immediately — NOT 'login ok, MQTT not up' after the timeout", async () => {

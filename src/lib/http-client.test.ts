@@ -1,3 +1,4 @@
+import { classifyError } from "./types";
 import * as http from "node:http";
 import { extractHttpStatus, formatFallback, HttpError, httpsRequest, interpretOkBody } from "./http-client";
 import type { HttpResult } from "./http-client";
@@ -397,6 +398,18 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
         timeout: 50,
       }),
     ).rejects.toThrow(/^Timeout after 50ms for GET 127\.0\.0\.1\/slow-endpoint$/);
+  });
+
+  it("the timeout carries the code ETIMEDOUT — classifyError reads the code, never the sentence", async () => {
+    stub.queue.push({ statusCode: 200, body: "{}", delayMs: 400 });
+    const err: unknown = await httpRequestPlain({
+      method: "GET",
+      url: `http://127.0.0.1:${stub.port}/slow-endpoint`,
+      headers: {},
+      timeout: 50,
+    }).catch((e: unknown) => e);
+    expect((err as { code?: unknown }).code).toBe("ETIMEDOUT");
+    expect(classifyError(err)).toBe("TIMEOUT");
   });
 
   it("rejects on AbortSignal aborted before request", async () => {

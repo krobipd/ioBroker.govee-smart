@@ -95,6 +95,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: a rejected background token refresh of the Govee account now counts toward the login protection and asks to check email/password instead of retrying silently
+- Fixed: "Test login" in the connection card counts toward the account's login limit (3 per hour) and says when the next test is possible
+
 ### 3.0.1 (2026-09-27)
 
 - Improved: the note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details

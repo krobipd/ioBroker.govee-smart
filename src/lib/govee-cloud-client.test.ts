@@ -154,7 +154,9 @@ describe("GoveeCloudClient", () => {
         Object.assign(new Error("connect ECONNREFUSED 1.2.3.4:443"), { code: "ECONNREFUSED" }),
         Object.assign(new Error("getaddrinfo ENOTFOUND openapi.api.govee.com"), { code: "ENOTFOUND" }),
         Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" }),
-        new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/device/control"),
+        Object.assign(new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/device/control"), {
+          code: "ETIMEDOUT",
+        }),
         new HttpError("HTTP 500", 500, {}),
         new HttpError("Bad gateway", 502, {}),
         new HttpError("HTTP 503", 503, {}),

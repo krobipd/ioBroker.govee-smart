@@ -680,6 +680,17 @@ export type ErrorCategory =
   | "VERIFICATION_FAILED"
   | "UNKNOWN";
 
+/** Every {@link ErrorCategory} — the check for a category carried as a field. */
+const ERROR_CATEGORIES = [
+  "NETWORK",
+  "TIMEOUT",
+  "AUTH",
+  "RATE_LIMIT",
+  "VERIFICATION_PENDING",
+  "VERIFICATION_FAILED",
+  "UNKNOWN",
+] as const satisfies readonly ErrorCategory[];
+
 /**
  * Classify an error into a category for dedup logging.
  * Only the category is used as key — not context or full message.
@@ -687,6 +698,13 @@ export type ErrorCategory =
  * @param err Error to classify
  */
 export function classifyError(err: unknown): ErrorCategory {
+  // A rejection that was classified where Govee's numeric answer was still at
+  // hand (the account login) carries its category — nothing is read back out
+  // of a sentence built from it.
+  const carried: unknown = (err as { category?: unknown } | null)?.category;
+  if (typeof carried === "string" && (ERROR_CATEGORIES as readonly string[]).includes(carried)) {
+    return carried as ErrorCategory;
+  }
   if (err instanceof Error) {
     const code = (err as NodeJS.ErrnoException).code;
     if (
@@ -732,32 +750,17 @@ export function classifyError(err: unknown): ErrorCategory {
   ) {
     return "NETWORK";
   }
-  if (msg.includes("Timeout")) {
-    return "TIMEOUT";
-  }
   // Text markers are matched as WORDS, never as bare substrings: an "Invalid
   // JSON" error quotes the first 100 characters of a foreign body, and a Govee
   // maintenance page containing "author" or "401" in that snippet used to be
   // classified AUTH — which stops the Cloud retry loop for good and tells the
-  // user to check a perfectly valid API key.
+  // user to check a perfectly valid API key. The account login and the HTTP
+  // timeout carry their category / code as fields (checked above), so no
+  // sentence of ours is parsed back here.
   if (/\b(rate limit(ed)?|too many requests)\b/i.test(msg)) {
     return "RATE_LIMIT";
   }
-  // 2FA-pending classification must come before AUTH — Govee returns 454 with
-  // a leading "454" or "Verification" marker that would otherwise fall into AUTH
-  // and trip the auth-failure backoff. Two distinct categories so the adapter
-  // can pause reconnect on PENDING (waiting for user-entered code) but reset
-  // on FAILED (code was sent but rejected, user retries via Settings button).
-  if (msg.includes("Verification required") || (msg.includes("status 454") && !msg.includes("invalid"))) {
-    return "VERIFICATION_PENDING";
-  }
-  if (msg.includes("Verification code invalid") || msg.includes("status 455")) {
-    return "VERIFICATION_FAILED";
-  }
-  if (
-    msg.includes("Login failed") ||
-    /\b(unauthori[sz]ed|not authori[sz]ed|forbidden|authentication failed|bad username or password)\b/i.test(msg)
-  ) {
+  if (/\b(unauthori[sz]ed|not authori[sz]ed|forbidden|authentication failed|bad username or password)\b/i.test(msg)) {
     return "AUTH";
   }
   return "UNKNOWN";

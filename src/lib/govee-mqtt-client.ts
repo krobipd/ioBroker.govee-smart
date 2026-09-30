@@ -12,7 +12,7 @@ import {
   clampTimerMs,
   tokenTtlSeconds,
 } from "./timing-constants";
-import { ReconnectingMqttClient } from "./reconnecting-mqtt-client";
+import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient, type MqttConnectFn } from "./reconnecting-mqtt-client";
 import {
   classifyError,
   logDedup,
@@ -51,11 +51,114 @@ o/ufQJVtMVT8QtPHRh8jrdkPSHCa2XV4cdFyQzR1bldZwgJcJmApzyMZFo6IQ6XU
 rqXRfboQnoZsG4q5WTP468SQvvG5
 -----END CERTIFICATE-----`;
 
+/** Why Govee turned a login down — the verdict of {@link classifyLoginResponse}. */
+export interface LoginVerdict {
+  /** Category the reconnect loop, the cap and the log dedup act on. */
+  category: ErrorCategory;
+  /**
+   * A sub-case the connection card names on its own; `loginWindowFull` is the
+   * adapter's own pause (the window was full, nothing was sent).
+   */
+  reason?: "emailNotRegistered" | "accountLocked" | "loginWindowFull";
+  /** Sentence for the log and the card. */
+  message: string;
+}
+
 /**
- * Signature for the `mqtt.connect` factory — tests can inject a FakeMqttClient
- * without starting the real network lib. Default = `mqtt.connect`.
+ * Read a login answer that carries no client (Govee answers HTTP 200 and puts
+ * the verdict into `status`/`message`). The ONE place that turns Govee's
+ * numeric answer into a category — the connect path and the silent bearer
+ * refresh both ask here, and the category travels as a field
+ * ({@link LoginRejectedError}), never re-read from the sentence.
+ *
+ * 454/455 come before everything else: 454 is Govee's "new client, verify
+ * once", not a credential error, and must not trip the reject cap.
+ *
+ * @param resp The login answer without `client`
+ * @param codeWasSent A verification code went along with this login
  */
-export type MqttConnectFn = (url: string, opts: mqtt.IClientOptions) => mqtt.MqttClient;
+export function classifyLoginResponse(resp: GoveeLoginResponse, codeWasSent: boolean): LoginVerdict {
+  const status = typeof resp.status === "number" ? resp.status : 0;
+  const apiMsg = typeof resp.message === "string" && resp.message ? resp.message : "unknown error";
+  const tag = `(status ${status || "?"})`;
+  if (status === 455 || (status === 454 && codeWasSent)) {
+    return { category: "VERIFICATION_FAILED", message: `Verification code invalid or expired ${tag}` };
+  }
+  if (status === 454) {
+    return {
+      category: "VERIFICATION_PENDING",
+      message: `Verification required by Govee — request a code via Adapter settings ${tag}`,
+    };
+  }
+  if (status === 429 || /too many|rate.?limit|frequent|throttl/i.test(apiMsg)) {
+    return { category: "RATE_LIMIT", message: `Rate limited by Govee: ${apiMsg} ${tag}` };
+  }
+  if (status === 451 || /not.*registered/i.test(apiMsg)) {
+    return { category: "AUTH", reason: "emailNotRegistered", message: `Login failed: email not registered ${tag}` };
+  }
+  if (status === 401 || /password|credential|unauthorized/i.test(apiMsg)) {
+    return { category: "AUTH", message: `Login failed: ${apiMsg} ${tag}` };
+  }
+  // Temporarily locked — not a credential error; it counts on the cap like any
+  // other rejection, and the card names it.
+  if (/abnormal|blocked|suspended|disabled/i.test(apiMsg)) {
+    return {
+      category: "UNKNOWN",
+      reason: "accountLocked",
+      message: `Account temporarily locked by Govee: ${apiMsg} ${tag}`,
+    };
+  }
+  return { category: "UNKNOWN", message: `Govee login rejected: ${apiMsg} ${tag}` };
+}
+
+/** A login Govee answered and turned down — its verdict travels as fields. */
+export class LoginRejectedError extends Error {
+  /** Read first by classifyError. */
+  readonly category: ErrorCategory;
+  /** Sub-case for the connection card. */
+  readonly reason: LoginVerdict["reason"];
+
+  /** @param verdict The verdict of {@link classifyLoginResponse} */
+  constructor(verdict: LoginVerdict) {
+    super(verdict.message);
+    this.name = "LoginRejectedError";
+    this.category = verdict.category;
+    this.reason = verdict.reason;
+  }
+}
+
+/**
+ * The account's login window — every login that reached Govee inside the last
+ * {@link MQTT_LOGIN_WINDOW_MS}, successful or not (govee2mqtt #702: ~6
+ * successful logins an hour led to a 24 h lock). ONE per account: the live
+ * client and the admin "Test login" probe count into the same window, so a
+ * user testing repeatedly cannot log in more often than the adapter itself.
+ */
+export class LoginWindow {
+  private times: number[] = [];
+
+  /**
+   * Milliseconds until the next login is allowed — 0 while the window has room.
+   *
+   * @param now Current time in ms
+   */
+  waitMs(now: number): number {
+    this.times = this.times.filter(t => now - t < MQTT_LOGIN_WINDOW_MS);
+    if (this.times.length < MQTT_MAX_LOGINS_PER_WINDOW) {
+      return 0;
+    }
+    return this.times[0] + MQTT_LOGIN_WINDOW_MS - now;
+  }
+
+  /**
+   * Count a login Govee answered.
+   *
+   * @param now Current time in ms
+   */
+  note(now: number): void {
+    this.times.push(now);
+  }
+}
 
 /** Callback for MQTT status updates */
 export type MqttStatusCallback = (update: MqttStatusUpdate) => void;
@@ -156,8 +259,10 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * against Govee marking the account as suspicious from rapid-fire user clicks.
    */
   private lastVerificationRequestMs = 0;
-  /** Times of the account logins inside the last {@link MQTT_LOGIN_WINDOW_MS} — successful or not. */
-  private loginTimes: number[] = [];
+  /** The account's login window — shared with the admin probe via {@link useLoginWindow}. */
+  private loginWindow = new LoginWindow();
+  /** Sub-case of the last rejected login, for the connection card. */
+  private lastErrorReason: LoginVerdict["reason"] = undefined;
   /** Logins are paused until this time (ms) once the window is full; 0 = not paused. */
   private loginPausedUntil = 0;
   /** Broker host of the current bundle — for the log line, fresh login and reuse alike. */
@@ -355,11 +460,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * admin "test login" button MUST read the outcome from here instead of a
    * try/catch around connect().
    */
-  getLastError(): { category: ErrorCategory; message: string } | null {
+  getLastError(): { category: ErrorCategory; message: string; reason?: LoginVerdict["reason"] } | null {
     if (this.connected || !this.lastErrorCategory) {
       return null;
     }
-    return { category: this.lastErrorCategory, message: this.lastErrorMessage ?? "" };
+    return { category: this.lastErrorCategory, message: this.lastErrorMessage ?? "", reason: this.lastErrorReason };
   }
 
   /**
@@ -370,6 +475,16 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   enableProbeMode(): void {
     this.probeMode = true;
+  }
+
+  /**
+   * Count logins into the account's shared window instead of a private one —
+   * the live client and every admin probe of the same account use one.
+   *
+   * @param window The account's login window
+   */
+  useLoginWindow(window: LoginWindow): void {
+    this.loginWindow = window;
   }
 
   /**
@@ -434,37 +549,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       // reached the account and must not use up the window.
       this.noteLogin(Date.now());
       if (!loginResp.client) {
-        const apiStatus = loginResp.status ?? 0;
-        const apiMsg = loginResp.message ?? "unknown error";
-        const statusStr = `(status ${apiStatus || "?"})`;
         // Dump the full response body (capped) so a bug report with
         // debug log shows exactly what Govee returned — useful when
         // they change error semantics or add new status codes.
         this.log.debug(`MQTT login error response body: ${JSON.stringify(loginResp).slice(0, 300)}`);
-        // Classify the Govee response to avoid misleading error messages.
-        // 454/455 (2FA) MUST come before generic AUTH so the user gets the
-        // correct "request a code" hint instead of "check email/password".
-        if (apiStatus === 455 || (apiStatus === 454 && codeWasSent)) {
-          throw new Error(`Verification code invalid or expired ${statusStr}`);
-        }
-        if (apiStatus === 454) {
-          throw new Error(`Verification required by Govee — request a code via Adapter settings ${statusStr}`);
-        }
-        if (apiStatus === 429 || /too many|rate.?limit|frequent|throttl/i.test(apiMsg)) {
-          throw new Error(`Rate limited by Govee: ${apiMsg} ${statusStr}`);
-        }
-        if (apiStatus === 451 || /not.*registered/i.test(apiMsg)) {
-          throw new Error(`Login failed: email not registered ${statusStr}`);
-        }
-        if (apiStatus === 401 || /password|credential|unauthorized/i.test(apiMsg)) {
-          throw new Error(`Login failed: ${apiMsg} ${statusStr}`);
-        }
-        // Account temporarily locked — NOT a credential error, keep reconnecting
-        if (/abnormal|blocked|suspended|disabled/i.test(apiMsg)) {
-          throw new Error(`Account temporarily locked by Govee: ${apiMsg} ${statusStr}`);
-        }
-        // Other account issues, maintenance, etc.
-        throw new Error(`Govee login rejected: ${apiMsg} ${statusStr}`);
+        throw new LoginRejectedError(classifyLoginResponse(loginResp, codeWasSent));
       }
       // Login OK — if a verification code was used, signal the adapter to
       // clear the settings field AND clear the in-memory copy so a
@@ -534,105 +623,100 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       this.scheduleProactiveRefresh(expiresAt);
 
       // Step 4: Connect MQTT with mutual TLS
-      const clientId = `AP/${this.accountId}/${this.sessionUuid}`;
-      this.releaseClient();
       this.brokerEndpoint = endpoint;
-      this.clientAuthRejected = false;
-      this.client = this.mqttConnectImpl(`mqtts://${endpoint}:8883`, {
-        clientId,
-        key,
-        cert,
-        ca,
-        protocolVersion: 4,
-        keepalive: 60,
-        reconnectPeriod: 0, // We handle reconnect ourselves
-        rejectUnauthorized: true,
-      });
-
-      this.attachClientHandlers();
+      this.openAccountBroker(endpoint, this.accountId, { key, cert, ca });
     } catch (err) {
-      const category = classifyError(err);
-      this.lastErrorMessage = errMessage(err);
-      const msg = `MQTT connection failed: ${errMessage(err)}`;
-
       // State sync: a connect() throw = not connected, regardless of error type
       this.onConnection?.(false);
-
-      // Govee verification 454: pause reconnect until the user submits a
-      // code via Settings (which triggers an adapter restart). Don't
-      // increment auth-failure counter — this is not a credential error.
-      //
-      // Wording: Govee returns 454 the first time a particular client-id
-      // tries to log in, regardless of whether the user enabled 2FA on
-      // their account. It's a "new client, please verify once" handshake
-      // — not "you have 2FA enabled". Earlier wording was scaring users
-      // whose accounts are 2FA-free. The actual message says: this is a
-      // one-time setup per client.
-      //
-      // Dedup: only warn on the FIRST occurrence of this category (per
-      // adapter lifetime). Subsequent reconnect attempts that hit the
-      // same 454 are demoted to debug.
-      // Verification/auth are actionable and surfaced once, user-facing, via the
-      // actionable-problems registry (main.ts onVerificationFailed/onAuthFailed
-      // callbacks below). Keep only a debug trail here so the user doesn't see
-      // the same problem twice — once as this warn and once as the registry
-      // warn + notification (C8).
-      if (category === "VERIFICATION_PENDING") {
-        this.lastErrorCategory = category;
-        this.log.debug("MQTT verification pending (Govee returned 454)");
-        if (this.onVerificationFailed) {
-          this.onVerificationFailed("pending");
-        }
-        return;
+      if (!this.recordFailure(err, "MQTT connection failed")) {
+        this.scheduleReconnect();
       }
-      if (category === "VERIFICATION_FAILED") {
-        this.lastErrorCategory = category;
-        this.log.debug("MQTT verification code rejected (Govee returned 455)");
-        if (this.onVerificationFailed) {
-          this.onVerificationFailed("failed");
-        }
-        return;
-      }
-
-      // Login-storm guard (issue #39): cap the login attempts that actually
-      // REACH Govee. Bad credentials, rate-limit, account-locked and any other
-      // non-success RESPONSE all count. Only NETWORK/TIMEOUT — where the POST
-      // never reached Govee and so can't count against the account — keep
-      // retrying freely. The counter is reset EXCLUSIVELY on a successful
-      // subscribe (attachClientHandlers), never here, so an alternating
-      // reject / network-blip pattern still climbs to the cap.
-      const reachedGovee = category !== "NETWORK" && category !== "TIMEOUT";
-      if (reachedGovee) {
-        this.authFailCount++;
-        if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
-          // Stop for good, then surface the right actionable problem once via
-          // the registry (main.ts) — debug-only here (C8). Plain bad creds →
-          // "check email/password"; everything else (rate-limit / locked /
-          // repeated unexpected) → "retries stopped, check the account".
-          this.lastErrorCategory = category;
-          if (category === "AUTH") {
-            this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts — check email/password`);
-            this.onAuthFailed?.();
-          } else {
-            this.log.debug(
-              `MQTT login stopped after ${this.authFailCount} Govee-reaching rejections (${category}) — account may be locked`,
-            );
-            this.onLoginBlocked?.();
-          }
-          return;
-        }
-      }
-
-      // Error dedup — warn on first/new category, debug on repeat
-      if (category !== this.lastErrorCategory) {
-        this.lastErrorCategory = category;
-        this.log.warn(msg);
-      } else {
-        this.log.debug(msg);
-      }
-
-      this.scheduleReconnect();
     }
+  }
+
+  /**
+   * The one bookkeeping for a failed login or connect — the connect path and
+   * the silent bearer refresh both end here, so a rejection counts the same
+   * whichever of them met it (until 3.0.1 the refresh counted nothing: after a
+   * password change it logged in and was turned down three times an hour for
+   * as long as the certificate lasted, and nobody was told).
+   *
+   * Verification (454/455) pauses the retries until the user enters a code
+   * (the settings save restarts the adapter) and never counts — 454 is Govee's
+   * "new client, verify once". Every other rejection that REACHED Govee counts
+   * on the #39 cap; only NETWORK/TIMEOUT, where the request never reached the
+   * account, retry freely. The counter is reset EXCLUSIVELY on a successful
+   * subscribe (attachClientHandlers), so an alternating reject / network-blip
+   * pattern still climbs to the cap. Verification and a reached cap are
+   * surfaced once through the actionable-problems registry (main.ts) — only a
+   * debug trail here, so the user does not see the same problem twice (C8).
+   *
+   * @param err The failure
+   * @param context Log prefix naming the path that met it
+   * @returns true when retrying must stop (verification pending or cap reached)
+   */
+  private recordFailure(err: unknown, context: string): boolean {
+    const category = classifyError(err);
+    this.lastErrorMessage = errMessage(err);
+    this.lastErrorReason = err instanceof LoginRejectedError ? err.reason : undefined;
+    if (category === "VERIFICATION_PENDING" || category === "VERIFICATION_FAILED") {
+      this.lastErrorCategory = category;
+      this.log.debug(`${context}: ${this.lastErrorMessage}`);
+      this.onVerificationFailed?.(category === "VERIFICATION_PENDING" ? "pending" : "failed");
+      return true;
+    }
+    if (category !== "NETWORK" && category !== "TIMEOUT") {
+      this.authFailCount++;
+      if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
+        this.lastErrorCategory = category;
+        if (category === "AUTH") {
+          this.log.debug(`MQTT login rejected after ${this.authFailCount} attempts — check email/password`);
+          this.onAuthFailed?.();
+        } else {
+          this.log.debug(
+            `MQTT login stopped after ${this.authFailCount} Govee-reaching rejections (${category}) — account may be locked`,
+          );
+          this.onLoginBlocked?.();
+        }
+        return true;
+      }
+    }
+    // Error dedup — warn on first/new category, debug on repeat
+    const msg = `${context}: ${this.lastErrorMessage}`;
+    if (category !== this.lastErrorCategory) {
+      this.lastErrorCategory = category;
+      this.log.warn(msg);
+    } else {
+      this.log.debug(msg);
+    }
+    return false;
+  }
+
+  /**
+   * Open the account broker with a client certificate — fresh login and cached
+   * bundle alike.
+   *
+   * @param endpoint Broker host from the IoT key
+   * @param accountId Account id (part of the client id)
+   * @param certs Key, certificate and CA from the P12
+   * @param certs.key Private key (PEM)
+   * @param certs.cert Client certificate (PEM)
+   * @param certs.ca CA certificate (PEM)
+   */
+  private openAccountBroker(
+    endpoint: string,
+    accountId: string,
+    certs: { key: string; cert: string; ca: string },
+  ): void {
+    this.clientAuthRejected = false;
+    this.openBroker(this.mqttConnectImpl, `mqtts://${endpoint}:8883`, {
+      clientId: `AP/${accountId}/${this.sessionUuid}`,
+      ...certs,
+      protocolVersion: 4,
+      keepalive: 60,
+      rejectUnauthorized: true,
+    });
+    this.attachClientHandlers();
   }
 
   /** Stop reconnecting after repeated auth failures (check email/password) — or always in probe mode. */
@@ -670,7 +754,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     // needs a compromised/rogue broker, but dropping a multi-MB payload before
     // JSON.parse + downstream expansion is cheap defence-in-depth (real
     // status/op messages are a few KB; complements the SEC-GC1 segment cap).
-    if (payload.length > 64 * 1024) {
+    if (payload.length > MQTT_MAX_MESSAGE_BYTES) {
       this.log.debug(`Dropping oversized MQTT message (${payload.length} bytes) from topic ${topic}`);
       return;
     }
@@ -780,23 +864,10 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this.accountId = creds.accountId;
     this.accountTopic = creds.accountTopic;
     this.emitToken(this._bearerToken);
-    const clientId = `AP/${creds.accountId}/${this.sessionUuid}`;
     this.log.debug("MQTT: trying cached credentials (no fresh login)");
     this.persistedAttemptInFlight = true;
-    this.releaseClient();
     this.brokerEndpoint = creds.iotEndpoint;
-    this.clientAuthRejected = false;
-    this.client = this.mqttConnectImpl(`mqtts://${creds.iotEndpoint}:8883`, {
-      clientId,
-      key: extracted.key,
-      cert: extracted.cert,
-      ca: extracted.ca,
-      protocolVersion: 4,
-      keepalive: 60,
-      reconnectPeriod: 0,
-      rejectUnauthorized: true,
-    });
-    this.attachClientHandlers();
+    this.openAccountBroker(creds.iotEndpoint, creds.accountId, extracted);
     this.scheduleProactiveRefresh(creds.tokenExpiresAt);
     return true;
   }
@@ -972,14 +1043,21 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     this.refreshInFlight = true;
     this.log.debug("Proactive MQTT bearer refresh triggered");
     try {
+      const codeWasSent = (this.verificationCode ?? "").trim().length > 0;
       const loginResp = await this.login();
       this.noteLogin(Date.now());
       if (!loginResp.client) {
-        // Login was rejected (454 / 455 / locked / rate-limited). Keep the
-        // current MQTT connection alive and try again later.
-        const status = loginResp.status ?? 0;
-        this.log.debug(`Silent bearer refresh declined by Govee (status ${status}) — current session kept`);
-        this.armRefresh(MQTT_REFRESH_RETRY_MS);
+        // Rejected — counted exactly like a rejected connect-login (the live
+        // session itself keeps running on its certificate). Verification or a
+        // reached cap stop the refresh; anything else is tried again later.
+        if (
+          !this.recordFailure(
+            new LoginRejectedError(classifyLoginResponse(loginResp, codeWasSent)),
+            "MQTT bearer refresh rejected",
+          )
+        ) {
+          this.armRefresh(MQTT_REFRESH_RETRY_MS);
+        }
         return;
       }
       this._bearerToken = loginResp.client.token;
@@ -1061,11 +1139,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param now Current time in ms
    */
   private loginWaitMs(now: number): number {
-    this.loginTimes = this.loginTimes.filter(t => now - t < MQTT_LOGIN_WINDOW_MS);
-    if (this.loginTimes.length < MQTT_MAX_LOGINS_PER_WINDOW) {
-      return 0;
-    }
-    return this.loginTimes[0] + MQTT_LOGIN_WINDOW_MS - now;
+    return this.loginWindow.waitMs(now);
   }
 
   /**
@@ -1074,16 +1148,24 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param now Current time in ms
    */
   private noteLogin(now: number): void {
-    this.loginTimes.push(now);
+    this.loginWindow.note(now);
   }
 
   /**
    * The login window is full: no login now, one retry when it has room again.
+   * A probe does not wait — it reports the pause as its result.
    *
    * @param waitMs Time until the window has room
    */
   private pauseLogins(waitMs: number): void {
     const until = Date.now() + waitMs;
+    if (this.probeMode) {
+      this.lastErrorCategory = "RATE_LIMIT";
+      this.lastErrorReason = "loginWindowFull";
+      this.lastErrorMessage = new Date(until).toLocaleTimeString();
+      this.onConnection?.(false);
+      return;
+    }
     if (this.loginPausedUntil <= Date.now()) {
       this.log.warn(
         `MQTT: ${MQTT_MAX_LOGINS_PER_WINDOW} Govee logins within an hour — pausing logins until ${new Date(until).toLocaleTimeString()} to protect the account from a lock`,

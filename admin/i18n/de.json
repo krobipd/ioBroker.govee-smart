@@ -63,6 +63,7 @@
   "mqttAuthLoginFailed": "Login fehlgeschlagen: %s",
   "mqttAuthLoginNoMqtt": "Login angenommen, MQTT-Verbindung steht aber noch nicht — Adapter neu starten.",
   "mqttAuthLoginOk": "Login erfolgreich — Echtzeit-Status-Updates aktiv.",
+  "mqttAuthLoginWindowFull": "Drei Govee-Anmeldungen in der letzten Stunde — zum Schutz des Kontos ist die nächste Anmeldung um %s möglich.",
   "mqttAuthNeedCredentials": "E-Mail + Passwort in den Adapter-Einstellungen nötig.",
   "mqttAuthPasswordRejected": "Passwort wurde von Govee abgelehnt.",
   "mqttAuthRateLimited": "Govee meldet Rate-Limit — bitte später erneut versuchen.",

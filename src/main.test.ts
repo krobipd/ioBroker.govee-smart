@@ -421,6 +421,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
       setOnAuthFailed: vi.fn(),
       setOnLoginBlocked: vi.fn(),
       setPersistedCredentials: vi.fn(),
+      useLoginWindow: vi.fn(),
+      enableProbeMode: vi.fn(),
       setOnCredentialsRefresh: vi.fn(),
       getFailureReason: vi.fn(() => null),
       requestStatus: vi.fn(() => true),
@@ -2539,6 +2541,20 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(fn, "callback must have been registered").toHaveBeenCalled();
     return fn.mock.calls[0][0] as T;
   };
+
+  it("the admin login test counts into the live client's login window — never a fresh one per click (H2, 3.0.2)", async () => {
+    const { adapter, f } = await fullSetup();
+    const live = f.mqtt.useLoginWindow.mock.calls[0]?.[0];
+    expect(live, "the live client must get the account's window").toBeDefined();
+    const host = internalOf(adapter).buildMessageRouterHost();
+    const probe = host.createMqttProbeClient as (email: string, password: string) => unknown;
+    probe("a@b.c", "pw");
+    expect(f.mqtt.enableProbeMode).toHaveBeenCalled();
+    expect(f.mqtt.useLoginWindow.mock.calls.at(-1)?.[0]).toBe(live);
+    // another account has its own window
+    probe("other@b.c", "pw");
+    expect(f.mqtt.useLoginWindow.mock.calls.at(-1)?.[0]).not.toBe(live);
+  });
 
   it("MQTT verification: 'pending' opens the code field + nudges, 'consumed' clears the saved code", async () => {
     const { adapter, f } = await fullSetup();

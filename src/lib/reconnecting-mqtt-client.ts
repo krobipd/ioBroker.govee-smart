@@ -1,5 +1,14 @@
-import type { MqttClient } from "mqtt";
+import type { IClientOptions, MqttClient } from "mqtt";
 import { type ErrorCategory, type TimerAdapter } from "./types";
+
+/**
+ * Signature of the `mqtt.connect` factory — tests inject a fake client without
+ * starting the network library.
+ */
+export type MqttConnectFn = (url: string, opts: IClientOptions) => MqttClient;
+
+/** Upper bound of one broker message — real status/event messages are a few KB. */
+export const MQTT_MAX_MESSAGE_BYTES = 64 * 1024;
 
 /** Exponential-backoff parameters (all milliseconds). */
 export interface BackoffOpts {
@@ -116,6 +125,21 @@ export abstract class ReconnectingMqttClient {
     }
     this.disposeExtras();
     this.releaseClient();
+  }
+
+  /**
+   * Open a broker connection in place of the current one. The ONE way a client
+   * is created: the previous socket is ended first, and mqtt.js never
+   * reconnects on its own (`reconnectPeriod: 0`) — the backoff above does, and
+   * two reconnect loops side by side would each log in.
+   *
+   * @param connectFn The mqtt.connect factory
+   * @param url Broker URL
+   * @param opts Connection options (without `reconnectPeriod`)
+   */
+  protected openBroker(connectFn: MqttConnectFn, url: string, opts: Omit<IClientOptions, "reconnectPeriod">): void {
+    this.releaseClient();
+    this.client = connectFn(url, { ...opts, reconnectPeriod: 0 });
   }
 
   /**

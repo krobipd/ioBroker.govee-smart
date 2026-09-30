@@ -235,7 +235,22 @@ describe("Types utilities", () => {
 
     it("should classify timeout errors as TIMEOUT", () => {
       expect(classifyError(new Error("Request timed out"))).toBe("TIMEOUT");
-      expect(classifyError(new Error("Timeout waiting for response"))).toBe("TIMEOUT");
+      // The http-client timeout carries its code — the shape it really throws.
+      expect(
+        classifyError(Object.assign(new Error("Timeout after 15000ms for GET host/path"), { code: "ETIMEDOUT" })),
+      ).toBe("TIMEOUT");
+    });
+
+    it("reads a bare 'Timeout' in a text as nothing — no sentence is parsed back", () => {
+      expect(classifyError(new Error("Timeout waiting for response"))).toBe("UNKNOWN");
+    });
+
+    it("a carried category field wins over every text marker", () => {
+      expect(
+        classifyError(Object.assign(new Error("forbidden rate limit"), { category: "VERIFICATION_PENDING" })),
+      ).toBe("VERIFICATION_PENDING");
+      // an unknown value in the field is no category
+      expect(classifyError(Object.assign(new Error("HTTP 403 Forbidden"), { category: "BOGUS" }))).toBe("AUTH");
     });
 
     it("should classify 401/403 as AUTH", () => {
@@ -243,8 +258,9 @@ describe("Types utilities", () => {
       expect(classifyError(new Error("HTTP 403 Forbidden"))).toBe("AUTH");
     });
 
-    it("should classify Login failed as AUTH", () => {
-      expect(classifyError(new Error("Login failed: invalid credentials"))).toBe("AUTH");
+    it("reads a login sentence as nothing — the login verdict travels as a field", () => {
+      expect(classifyError(new Error("Login failed: invalid credentials"))).toBe("UNKNOWN");
+      expect(classifyError(new Error("Verification required by Govee (status 454)"))).toBe("UNKNOWN");
     });
 
     it("should classify 429 as RATE_LIMIT", () => {

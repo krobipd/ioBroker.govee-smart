@@ -63,6 +63,7 @@
   "mqttAuthLoginFailed": "Accesso non riuscito: %s",
   "mqttAuthLoginNoMqtt": "Accesso accettato, ma la connessione MQTT non è ancora attiva: riavvia l'adattatore.",
   "mqttAuthLoginOk": "Accesso riuscito: aggiornamenti di stato in tempo reale attivi.",
+  "mqttAuthLoginWindowFull": "Tre accessi a Govee nell'ultima ora — per proteggere l'account, il prossimo accesso è possibile alle %s.",
   "mqttAuthNeedCredentials": "Email + password richiesti nelle impostazioni dell'adattatore.",
   "mqttAuthPasswordRejected": "Govee ha rifiutato la password.",
   "mqttAuthRateLimited": "Govee segnala un limite di velocità: riprova più tardi.",

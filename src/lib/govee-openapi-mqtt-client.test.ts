@@ -24,6 +24,7 @@ import type { CloudStateCapability, TimerAdapter } from "./types";
 const mqttMock = vi.hoisted(() => {
   interface FakeClient {
     connected: boolean;
+    opts: Record<string, unknown>;
     ended: boolean | null;
     on(ev: string, cb: (...args: unknown[]) => void): FakeClient;
     emit(ev: string, ...args: unknown[]): void;
@@ -34,10 +35,11 @@ const mqttMock = vi.hoisted(() => {
   const clients: FakeClient[] = [];
   let subscribeBehavior: (cb: (e: Error | null) => void) => void = cb => cb(null);
   return {
-    connect: (): FakeClient => {
+    connect: (opts: Record<string, unknown> = {}): FakeClient => {
       const handlers: Record<string, ((...args: unknown[]) => void) | undefined> = {};
       const c: FakeClient = {
         connected: false,
+        opts,
         ended: null,
         on(ev, cb) {
           handlers[ev] = cb;
@@ -73,7 +75,9 @@ const mqttMock = vi.hoisted(() => {
   };
 });
 
-vi.mock("mqtt", () => ({ connect: () => mqttMock.connect() }));
+vi.mock("mqtt", () => ({
+  connect: (_url: string, opts: Record<string, unknown>) => mqttMock.connect(opts),
+}));
 
 const mockLog: ioBroker.Logger = {
   debug: () => {},
@@ -285,6 +289,26 @@ describe("GoveeOpenapiMqttClient", () => {
     });
   });
 
+  describe("openBroker — the one way a broker connection is made (3.0.2)", () => {
+    beforeEach(() => mqttMock.reset());
+
+    it("a new connect ends the previous socket first and never lets mqtt.js reconnect on its own", () => {
+      const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers);
+      client.connect(
+        () => {},
+        () => {},
+      );
+      client.connect(
+        () => {},
+        () => {},
+      );
+      expect(mqttMock.clients).toHaveLength(2);
+      expect(mqttMock.clients[0].ended).toBe(true);
+      expect(mqttMock.clients[1].opts.reconnectPeriod).toBe(0);
+      client.disconnect();
+    });
+  });
+
   describe("handleMessage (event parsing)", () => {
     function makeClient(): { events: unknown[]; raws: string[]; feed: (obj: unknown) => void } {
       const client = new GoveeOpenapiMqttClient("key", mockLog, mockTimers);
@@ -295,6 +319,26 @@ describe("GoveeOpenapiMqttClient", () => {
       const feed = (obj: unknown): void => (client as any).handleMessage(Buffer.from(JSON.stringify(obj)));
       return { events, raws, feed };
     }
+
+    it("a consumer that throws is a handler failure, not a parse error", () => {
+      const debugs: string[] = [];
+      const log = { ...mockLog, debug: (m: string) => debugs.push(m) } as ioBroker.Logger;
+      const client = new GoveeOpenapiMqttClient("key", log, mockTimers);
+      (client as any).onEvent = () => {
+        throw new Error("boom");
+      };
+      (client as any).handleMessage(
+        Buffer.from(
+          JSON.stringify({
+            sku: "H5179",
+            device: "AA",
+            capabilities: [{ type: "t", instance: "i", state: { value: 1 } }],
+          }),
+        ),
+      );
+      expect(debugs.some(d => d.includes("event handler failed: boom"))).toBe(true);
+      expect(debugs.some(d => d.includes("failed to parse"))).toBe(false);
+    });
 
     it("emits an event with the valid capabilities and forwards raw JSON", () => {
       const { events, raws, feed } = makeClient();

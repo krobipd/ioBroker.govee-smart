@@ -1,5 +1,5 @@
 import { errMessage, type ErrorCategory } from "./types";
-import type { GoveeMqttClient } from "./govee-mqtt-client";
+import type { GoveeMqttClient, LoginVerdict } from "./govee-mqtt-client";
 import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import { resolveLabel } from "./i18n";
 
@@ -103,30 +103,41 @@ export class MessageRouter {
   private lastTestRequestMs = 0;
 
   /**
-   * Map a probe failure (category + raw client message) onto the localized
-   * admin result label AND a machine-readable status. Category first; the raw
-   * message only disambiguates sub-cases inside a category (451 "email not
-   * registered" is AUTH like a wrong password) and the not-classifiable Govee
-   * account states.
+   * Map a probe failure onto the localized admin result label AND a
+   * machine-readable status. Category first; the verdict's `reason` names the
+   * sub-cases inside a category (451 "email not registered" is AUTH like a
+   * wrong password; a temporarily locked account; the adapter's own pause).
    *
    * @param failure          Last error from the probe client
    * @param failure.category Classified error category
-   * @param failure.message  Raw client error message
+   * @param failure.message  Client error message (for the generic fallback text)
+   * @param failure.reason   Sub-case of the login verdict
    */
-  private resultForProbeFailure(failure: { category: ErrorCategory; message: string }): AuthResponse {
+  private resultForProbeFailure(failure: {
+    category: ErrorCategory;
+    message: string;
+    reason?: LoginVerdict["reason"];
+  }): AuthResponse {
+    // The sub-cases come as a field from the login verdict — never read back
+    // out of the sentence.
+    if (failure.reason === "loginWindowFull") {
+      // The adapter's own pause: the account's login window is full, no login
+      // was sent. The message carries the time the window has room again.
+      return { result: resolveLabel("mqttAuthLoginWindowFull", failure.message), status: "throttled" };
+    }
     switch (failure.category) {
       case "VERIFICATION_PENDING":
         return { result: resolveLabel("mqttAuthVerifyRequired"), status: "verifyRequired" };
       case "VERIFICATION_FAILED":
         return { result: resolveLabel("mqttAuthCodeInvalid"), status: "codeInvalid" };
       case "AUTH":
-        return /email not registered/i.test(failure.message)
+        return failure.reason === "emailNotRegistered"
           ? { result: resolveLabel("mqttAuthEmailNotRegistered"), status: "emailNotRegistered" }
           : { result: resolveLabel("mqttAuthPasswordRejected"), status: "passwordRejected" };
       case "RATE_LIMIT":
         return { result: resolveLabel("mqttAuthRateLimited"), status: "rateLimited" };
       default:
-        return /account temporarily locked/i.test(failure.message)
+        return failure.reason === "accountLocked"
           ? { result: resolveLabel("mqttAuthAccountLocked"), status: "accountLocked" }
           : { result: resolveLabel("mqttAuthLoginFailed", failure.message), status: "loginFailed" };
     }

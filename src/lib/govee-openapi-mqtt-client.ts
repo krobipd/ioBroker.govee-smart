@@ -1,7 +1,7 @@
 import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import { OPENAPI_MQTT_MAX_AUTH_FAILURES } from "./timing-constants";
-import { ReconnectingMqttClient } from "./reconnecting-mqtt-client";
+import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient } from "./reconnecting-mqtt-client";
 import {
   classifyError,
   type OpenApiMqttEvent,
@@ -90,19 +90,18 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
     this.onRaw = onRaw ?? null;
 
     try {
-      this.client = mqtt.connect(BROKER_URL, {
+      const clientId = `iob_govee_smart_${this.sessionUuid}`;
+      this.openBroker(mqtt.connect, BROKER_URL, {
         username: this.apiKey,
         password: this.apiKey,
-        clientId: `iob_govee_smart_${this.sessionUuid}`,
+        clientId,
         protocolVersion: 4,
         keepalive: 60,
-        reconnectPeriod: 0,
         rejectUnauthorized: true,
       });
-
-      const clientId = `iob_govee_smart_${this.sessionUuid}`;
+      const client = this.client!;
       this.log.debug(`Cloud-events connecting: broker=${BROKER_URL} clientId=${clientId} authMode=apiKey`);
-      this.client.on("connect", () => {
+      client.on("connect", () => {
         // CONNACK only — do NOT reset the backoff/fail counters or clear the
         // error category yet. A persistent post-CONNACK subscribe failure must
         // let the backoff climb toward its cap instead of a tight ~5-10s
@@ -130,11 +129,11 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         );
       });
 
-      this.client.on("message", (_topic, payload) => {
+      client.on("message", (_topic, payload) => {
         this.handleMessage(payload);
       });
 
-      this.client.on("error", err => {
+      client.on("error", err => {
         const category = classifyError(err);
         if (category === "AUTH") {
           this.connectFailCount++;
@@ -159,7 +158,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         }
       });
 
-      this.client.on("close", () => {
+      client.on("close", () => {
         this.onConnection?.(false);
         if (!this.lastErrorCategory) {
           this.lastErrorCategory = "NETWORK";
@@ -200,10 +199,11 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
     // compromised broker, but dropping a multi-MB payload before it reaches
     // onRaw + JSON.parse + downstream cap-expansion is cheap defence-in-depth
     // (real Cloud-events messages are a few KB).
-    if (payload.length > 64 * 1024) {
+    if (payload.length > MQTT_MAX_MESSAGE_BYTES) {
       this.log.debug(`Cloud-events: dropping oversized MQTT message (${payload.length} bytes)`);
       return;
     }
+    let event: OpenApiMqttEvent;
     try {
       const rawStr = payload.toString();
 
@@ -244,10 +244,17 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         return;
       }
 
-      const event: OpenApiMqttEvent = { sku, device, capabilities: caps.map(normaliseEventState) };
-      this.onEvent?.(event);
+      event = { sku, device, capabilities: caps.map(normaliseEventState) };
     } catch {
       this.log.debug(`Cloud-events: failed to parse message: ${payload.toString().slice(0, 200)}`);
+      return;
+    }
+    // Hand-over outside the parse `try` (as in the account client): an
+    // exception downstream is a handler failure, not a parse error.
+    try {
+      this.onEvent?.(event);
+    } catch (e) {
+      this.log.debug(`Cloud-events: event handler failed: ${errMessage(e)}`);
     }
   }
 }

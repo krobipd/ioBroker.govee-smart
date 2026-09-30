@@ -63,6 +63,7 @@
   "mqttAuthLoginFailed": "Inloggen mislukt: %s",
   "mqttAuthLoginNoMqtt": "Inloggen geaccepteerd, maar de MQTT-verbinding is nog niet actief. Start de adapter opnieuw op.",
   "mqttAuthLoginOk": "Inloggen succesvol – realtime statusupdates actief.",
+  "mqttAuthLoginWindowFull": "Drie Govee-aanmeldingen in het afgelopen uur — ter bescherming van het account is de volgende aanmelding mogelijk om %s.",
   "mqttAuthNeedCredentials": "E-mailadres + wachtwoord vereist in de adapterinstellingen.",
   "mqttAuthPasswordRejected": "Govee heeft het wachtwoord afgewezen.",
   "mqttAuthRateLimited": "Govee rapporteert een tarieflimiet. Probeer het later opnieuw.",

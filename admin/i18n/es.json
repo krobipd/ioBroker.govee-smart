@@ -63,6 +63,7 @@
   "mqttAuthLoginFailed": "Error al iniciar sesión: %s",
   "mqttAuthLoginNoMqtt": "Se aceptó el inicio de sesión, pero la conexión MQTT aún no está activa; reinicie el adaptador.",
   "mqttAuthLoginOk": "Inicio de sesión exitoso: actualizaciones de estado activas en tiempo real.",
+  "mqttAuthLoginWindowFull": "Tres inicios de sesión en Govee en la última hora — para proteger la cuenta, el próximo inicio de sesión es posible a las %s.",
   "mqttAuthNeedCredentials": "Se requiere correo electrónico + contraseña en la configuración del adaptador.",
   "mqttAuthPasswordRejected": "Govee rechazó la contraseña.",
   "mqttAuthRateLimited": "Govee informa un límite de tarifa; inténtelo de nuevo más tarde.",

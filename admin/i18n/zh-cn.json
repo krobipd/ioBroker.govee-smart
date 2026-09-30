@@ -63,6 +63,7 @@
   "mqttAuthLoginFailed": "登录失败：%s",
   "mqttAuthLoginNoMqtt": "登录已接受，但 MQTT 连接尚未建立 - 重新启动适配器。",
   "mqttAuthLoginOk": "登录成功 — 实时状态更新已激活。",
+  "mqttAuthLoginWindowFull": "过去一小时内已登录 Govee 三次 — 为保护账户，下次登录可在 %s 进行。",
   "mqttAuthNeedCredentials": "适配器设置中需要电子邮件+密码。",
   "mqttAuthPasswordRejected": "Govee 拒绝了密码。",
   "mqttAuthRateLimited": "Govee 报告速率限制 - 请稍后重试。",

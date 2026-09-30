@@ -1,4 +1,4 @@
-import { GoveeMqttClient } from "./govee-mqtt-client";
+import { GoveeMqttClient, LoginWindow, classifyLoginResponse } from "./govee-mqtt-client";
 import { type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
 import { mockLog, mockTimers } from "./test-helpers";
 import type { TimerAdapter } from "./types";
@@ -1165,6 +1165,7 @@ describe("GoveeMqttClient", () => {
       tokenCycle: unknown = 3600,
       accountId = "acc",
       declineLaterLogins = false,
+      declineBody: Record<string, unknown> = { status: 400, message: "declined" },
     ): {
       client: GoveeMqttClient;
       fake: FakeHttpsRequest;
@@ -1179,7 +1180,7 @@ describe("GoveeMqttClient", () => {
       let loginCount = 0;
       const fake = makeFakeHttps(opts =>
         opts.url.includes("/login") && declineLaterLogins && ++loginCount > 1
-          ? { status: 400, message: "declined" }
+          ? declineBody
           : opts.url.includes("/login")
             ? {
                 client: {
@@ -1395,6 +1396,55 @@ describe("GoveeMqttClient", () => {
       await new Promise(r => setTimeout(r, 10));
       const retry = h.scheduled.slice(before).find(s => s.ms === 5 * 60 * 1000);
       expect(retry, "a declined refresh must arm a retry").toBeDefined();
+      h.client.disconnect();
+    });
+
+    it("every rejected silent refresh counts on the #39 cap — the third stops it and tells the user (3.0.2)", async () => {
+      const warns: string[] = [];
+      const log = { ...mockLog, warn: (m: string) => warns.push(m) } as ioBroker.Logger;
+      const h = liveClient(log, 3600, "acc", true, { status: 401, message: "wrong password" });
+      // An open window: this test is about the reject cap, not the login window.
+      h.client.useLoginWindow({ waitMs: () => 0, note: () => {} } as unknown as LoginWindow);
+      let authFailed = 0;
+      h.client.setOnAuthFailed(() => authFailed++);
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect"); // subscribed → cap counter at 0
+      h.fakeMqtt.connected = true;
+      const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
+      for (let i = 0; i < 3; i++) {
+        h.client.requestBearerRefresh();
+        await new Promise(r => setTimeout(r, 10));
+      }
+      expect(logins()).toBe(4);
+      expect(authFailed).toBe(1);
+      // ONE warning for the rejection, the repeats go to debug.
+      expect(warns.filter(w => w.includes("MQTT bearer refresh rejected: Login failed: wrong password"))).toHaveLength(
+        1,
+      );
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(logins(), "after the cap no refresh reaches Govee's login").toBe(4);
+      h.client.disconnect();
+    });
+
+    it("a refresh Govee answers with 454 asks for the code and does not try again by itself", async () => {
+      const h = liveClient(mockLog, 3600, "acc", true, { status: 454, message: "" });
+      const reasons: string[] = [];
+      h.client.setOnVerificationFailed(r => reasons.push(r));
+      await h.client.connect(
+        () => {},
+        () => {},
+      );
+      h.emit("connect");
+      h.fakeMqtt.connected = true;
+      const before = h.scheduled.length;
+      h.client.requestBearerRefresh();
+      await new Promise(r => setTimeout(r, 10));
+      expect(reasons).toEqual(["pending"]);
+      expect(h.scheduled.slice(before).some(t => t.ms === 5 * 60 * 1000)).toBe(false);
       h.client.disconnect();
     });
 
@@ -1618,5 +1668,66 @@ describe("GoveeMqttClient", () => {
       await new Promise(r => setTimeout(r, 10));
       expect(logins()).toBe(1);
     });
+  });
+});
+
+describe("classifyLoginResponse — Govee's numeric answer, read in ONE place", () => {
+  it.each([
+    [{ status: 455, message: "" }, false, "VERIFICATION_FAILED", undefined],
+    [{ status: 454, message: "" }, true, "VERIFICATION_FAILED", undefined],
+    [{ status: 454, message: "" }, false, "VERIFICATION_PENDING", undefined],
+    [{ status: 429, message: "" }, false, "RATE_LIMIT", undefined],
+    [{ status: 400, message: "Too frequent requests" }, false, "RATE_LIMIT", undefined],
+    [{ status: 451, message: "" }, false, "AUTH", "emailNotRegistered"],
+    [{ status: 400, message: "Email is not registered" }, false, "AUTH", "emailNotRegistered"],
+    [{ status: 401, message: "" }, false, "AUTH", undefined],
+    [{ status: 400, message: "wrong password" }, false, "AUTH", undefined],
+    [{ status: 400, message: "account abnormal" }, false, "UNKNOWN", "accountLocked"],
+    [{ status: 500, message: "maintenance" }, false, "UNKNOWN", undefined],
+    [{ status: "x", message: 42 }, false, "UNKNOWN", undefined],
+  ])("%j (code sent: %s) → %s / %s", (resp, codeWasSent, category, reason) => {
+    const v = classifyLoginResponse(resp as never, codeWasSent);
+    expect(v.category).toBe(category);
+    expect(v.reason).toBe(reason);
+  });
+
+  it("a Govee message that reads like a sub-case never changes the category of a numeric answer", () => {
+    // 454 wins over a text that looks like a rate limit
+    expect(classifyLoginResponse({ status: 454, message: "too many requests" }, false).category).toBe(
+      "VERIFICATION_PENDING",
+    );
+  });
+});
+
+describe("LoginWindow — one per account, shared by the live client and the probe (3.0.2)", () => {
+  it("a probe on a full window sends no login and reports the adapter's own pause with the time", async () => {
+    const window = new LoginWindow();
+    const now = Date.now();
+    window.note(now);
+    window.note(now);
+    window.note(now);
+    const fake = makeFakeHttps(() => ({ client: { accountId: "a", topic: "GA/a", token: "t" } }));
+    const probe = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+    probe.enableProbeMode();
+    probe.useLoginWindow(window);
+    await probe.connect(
+      () => {},
+      () => {},
+    );
+    expect(fake.calls).toHaveLength(0);
+    const err = probe.getLastError();
+    expect(err?.category).toBe("RATE_LIMIT");
+    expect(err?.reason).toBe("loginWindowFull");
+    expect(err?.message).toMatch(/\d/);
+    probe.disconnect();
+  });
+
+  it("a window counts logins for an hour and then has room again", () => {
+    const window = new LoginWindow();
+    window.note(0);
+    window.note(1000);
+    window.note(2000);
+    expect(window.waitMs(3000)).toBe(60 * 60 * 1000 - 3000);
+    expect(window.waitMs(60 * 60 * 1000)).toBe(0);
   });
 });
