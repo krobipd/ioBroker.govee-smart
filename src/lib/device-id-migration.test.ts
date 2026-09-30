@@ -12,12 +12,16 @@ class Db {
   readonly states = new Map<string, ioBroker.State>();
   readonly enums = new Map<string, { common: { members: string[] } }>();
   readonly logs: string[] = [];
+  /** Every id the migration deleted, in order. */
+  readonly deleted: string[] = [];
   failMoveOf: string | undefined;
 
   deps(): IdMigrationDeps {
     return {
       namespace: NS,
       objects: () => Promise.resolve(structuredClone(Object.fromEntries(this.objects))),
+      deviceObjects: () =>
+        Promise.resolve(structuredClone(Object.fromEntries([...this.objects].filter(([, o]) => o.type === "device")))),
       states: pattern => {
         const prefix = pattern.replace(/\*$/, "");
         return Promise.resolve(
@@ -50,14 +54,13 @@ class Db {
         Promise.resolve(
           structuredClone(Object.fromEntries([...this.objects].filter(([id]) => id.startsWith("alias.")))),
         ),
-      deleteTreeCarryingEnums: (root, carry) => {
-        const rootFull = `${NS}.${root}`;
+      removeCarryingEnums: (ids, successors) => {
         let carried = 0;
         for (const e of this.enums.values()) {
           const next: string[] = [];
           for (const member of e.common.members) {
-            if (member === rootFull || member.startsWith(`${rootFull}.`)) {
-              for (const id of carry.get(member) ?? []) {
+            if (ids.includes(member)) {
+              for (const id of successors(member)) {
                 next.push(id);
                 carried++;
               }
@@ -67,11 +70,10 @@ class Db {
           }
           e.common.members = next;
         }
-        for (const id of [...this.objects.keys()]) {
-          if (id === rootFull || id.startsWith(`${rootFull}.`)) {
-            this.objects.delete(id);
-            this.states.delete(id);
-          }
+        for (const id of ids) {
+          this.deleted.push(id);
+          this.objects.delete(id);
+          this.states.delete(id);
         }
         return Promise.resolve(carried);
       },
@@ -286,5 +288,54 @@ describe("migrateDeviceIds", () => {
     expect(db.objects.get(`${NS}.devices.h61be_525f`)?.native).toMatchObject({ movingTo: "devices.h61be-525f" });
     expect(db.objects.has(`${NS}.devices.h6160-0011`)).toBe(true);
     expect(db.logs.some(l => l.startsWith('warn: Device "Couch": could not move devices.h61be_525f'))).toBe(true);
+  });
+
+  it("a tree that cannot move stays under its old id this session, unmarked — the next start moves it with its recording (M8, 3.0.2)", async () => {
+    const db = new Db();
+    db.tree("devices.h61be_525f", A_ID);
+    db.failMoveOf = `${NS}.devices.h61be-525f`;
+    const first = new DeviceIdRegistry();
+    await migrateDeviceIds(db.deps(), first);
+    expect(first.prefixFor("H61BE", A_ID)).toBe("devices.h61be_525f");
+    expect(first.isUnmoved("devices.h61be_525f")).toBe(true);
+    // Next start, the store works again: the move completes and the recording travels with power.
+    db.failMoveOf = undefined;
+    const second = new DeviceIdRegistry();
+    expect(await migrateDeviceIds(db.deps(), second)).toBe(1);
+    expect(second.prefixFor("H61BE", A_ID)).toBe("devices.h61be-525f");
+    const custom = (db.objects.get(`${NS}.devices.h61be-525f.control.power`)?.common as { custom?: unknown }).custom;
+    expect(custom).toEqual({ "influxdb.0": { enabled: true, aliasId: `${NS}.devices.h61be_525f.control.power` } });
+  });
+
+  it("deletes the old tree deepest first and the root with its journal last (M9, round 72)", async () => {
+    const db = new Db();
+    db.tree("devices.h61be_525f", A_ID);
+    await migrateDeviceIds(db.deps(), new DeviceIdRegistry());
+    const old = `${NS}.devices.h61be_525f`;
+    expect(db.deleted.at(-1)).toBe(old);
+    expect(db.deleted.indexOf(`${old}.control.power`)).toBeLessThan(db.deleted.indexOf(`${old}.control`));
+  });
+
+  it("a leftover hands its recording to the kept datapoint that has none — the same datapoint lives on (M8, 3.0.2)", async () => {
+    const db = new Db();
+    // A tree a session built after a failed move: no recording on power.
+    db.tree("devices.h61be-525f", A_ID, { idScheme: 3 });
+    const kept = db.objects.get(`${NS}.devices.h61be-525f.control.power`)!;
+    delete (kept.common as { custom?: unknown }).custom;
+    db.tree("devices.h61be_525f", A_ID, { movingTo: "devices.h61be-525f" });
+    await migrateDeviceIds(db.deps(), new DeviceIdRegistry());
+    const custom = (db.objects.get(`${NS}.devices.h61be-525f.control.power`)?.common as { custom?: unknown }).custom;
+    expect(custom).toEqual({ "influxdb.0": { enabled: true, aliasId: `${NS}.devices.h61be_525f.control.power` } });
+  });
+
+  it("a leftover never overwrites a recording the kept datapoint already has", async () => {
+    const db = new Db();
+    db.tree("devices.h61be-525f", A_ID, { idScheme: 3 });
+    const kept = db.objects.get(`${NS}.devices.h61be-525f.control.power`)!;
+    (kept.common as { custom?: unknown }).custom = { "history.0": { enabled: true } };
+    db.tree("devices.h61be_525f", A_ID, { movingTo: "devices.h61be-525f" });
+    await migrateDeviceIds(db.deps(), new DeviceIdRegistry());
+    const custom = (db.objects.get(`${NS}.devices.h61be-525f.control.power`)?.common as { custom?: unknown }).custom;
+    expect(custom).toEqual({ "history.0": { enabled: true } });
   });
 });

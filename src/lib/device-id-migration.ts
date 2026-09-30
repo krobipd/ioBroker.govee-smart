@@ -7,15 +7,18 @@ import { errMessage } from "./err-message";
 
 /** What the migration needs beyond the move itself. */
 export interface IdMigrationDeps extends DeviceMoveDeps {
+  /** The device objects of the instance, keyed by full id — the one read every start needs. */
+  deviceObjects(): Promise<Record<string, ioBroker.Object | null | undefined>>;
   /**
-   * Delete a tree and carry its room and function entries to the ids that take their place — the
-   * fleet helper `moveWithEnums` in its order (read, delete, write).
+   * Delete the given ids one by one, in the given order, and carry their room and function entries to
+   * their successors — the fleet helper `moveAllWithEnums` in its order (read, delete, write). Never a
+   * recursive delete: that removes the root first, and the root holds the move journal (round 72).
    *
-   * @param root the namespace-relative root that goes away
-   * @param carry old full id → the full ids that take its place
+   * @param ids the full ids that go away, deepest first, the root last
+   * @param successors the new full ids of an id that moves
    * @returns how many room/function entries now list one of the new ids
    */
-  deleteTreeCarryingEnums(root: string, carry: ReadonlyMap<string, readonly string[]>): Promise<number>;
+  removeCarryingEnums(ids: readonly string[], successors: (id: string) => readonly string[]): Promise<number>;
   /** Adapter log. */
   log: { info(msg: string): void; debug(msg: string): void; warn(msg: string): void };
 }
@@ -115,7 +118,7 @@ function findTrees(
  * @returns how many trees moved
  */
 export async function migrateDeviceIds(deps: IdMigrationDeps, registry: DeviceIdRegistry): Promise<number> {
-  const trees = findTrees(deps.namespace, await deps.objects(), deps.log);
+  const trees = findTrees(deps.namespace, await deps.deviceObjects(), deps.log);
   const complete = new Set<string>();
   for (const tree of trees) {
     if (tree.marked && !tree.movingTo && registry.seed(tree.sku, tree.deviceId, tree.rel)) {
@@ -144,8 +147,13 @@ export async function migrateDeviceIds(deps: IdMigrationDeps, registry: DeviceId
       complete.add(target);
       moved++;
     } catch (e) {
+      // The device stays where it is for this session, unmarked: its values keep flowing into the tree
+      // its recordings belong to, and the next start tries again. Handing out the new id anyway built a
+      // fresh tree there that the next start took as complete — and only filled around it, without the
+      // recordings of what already stood there.
+      registry.keepUnmoved(tree.sku, tree.deviceId, tree.rel);
       deps.log.warn(
-        `Device "${tree.label}": could not move ${tree.rel} to ${target} — ${errMessage(e)}; retried at the next start`,
+        `Device "${tree.label}": could not move ${tree.rel} to ${target} — ${errMessage(e)}; it stays under its old id and is moved at the next start`,
       );
     }
   }
@@ -168,14 +176,14 @@ async function moveTree(deps: IdMigrationDeps, tree: Tree, target: string, fillO
     await deps.extendObject(fromFull, { native: { movingTo: target } });
   }
   const report = await copyDeviceTree(deps, tree.rel, target, fillOnly);
-  const carry = new Map<string, string[]>();
-  for (const id of Object.keys(await deps.objects())) {
+  // Deepest first, the root (with its journal) last — an interruption leaves the journal in place.
+  const oldIds = Object.keys(await deps.objects())
+    .filter(id => movedId(id, fromFull, toFull) !== undefined)
+    .sort((a, b) => b.split(".").length - a.split(".").length || b.localeCompare(a));
+  report.enums = await deps.removeCarryingEnums(oldIds, id => {
     const next = movedId(id, fromFull, toFull);
-    if (next) {
-      carry.set(id, [next]);
-    }
-  }
-  report.enums = await deps.deleteTreeCarryingEnums(tree.rel, carry);
+    return next ? [next] : [];
+  });
   if (fillOnly) {
     deps.log.info(`Device "${tree.label}": finished the interrupted move of ${tree.rel} to ${target}`);
     return;

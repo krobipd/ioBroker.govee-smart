@@ -15,8 +15,7 @@ import { tDesc, tName, tNameWith } from "./i18n";
 import { errMessage, type DeviceState, type GoveeDevice } from "./types";
 import { DeviceIdRegistry, ID_SCHEME } from "./device-id";
 import { migrateDeviceIds, type IdMigrationDeps } from "./device-id-migration";
-import { enumMembersUnder } from "./device-move";
-import { moveWithEnums } from "./enum-carry";
+import { moveAllWithEnums } from "./enum-carry";
 
 /**
  * High sort-end marker for getObjectView key ranges (`startkey: prefix,
@@ -832,8 +831,9 @@ export class StateManager {
         native: {
           sku: device.sku,
           deviceId: device.deviceId,
-          // The mark of the id rule — the only proof that this tree needs no move.
-          idScheme: ID_SCHEME,
+          // The mark of the id rule — the only proof that this tree needs no move. A tree a failed
+          // move left under its old id stays unmarked, so the next start moves it.
+          ...(this.deviceIds.isUnmoved(prefix) ? {} : { idScheme: ID_SCHEME }),
         },
       });
       this.deviceObjectSignature.set(prefix, signature);
@@ -1715,48 +1715,51 @@ export class StateManager {
       namespace: ns,
       // Every object kind of the instance: a pattern read without a type returns states only.
       objects: async () => (await adapter.getAdapterObjectsAsync()) ?? {},
+      // Every start reads only the device objects — the whole instance only when a tree moves.
+      deviceObjects: async () => {
+        const view = await adapter.getObjectViewAsync("system", "device", {
+          startkey: `${ns}.`,
+          endkey: `${ns}.${SORT_KEY_END}`,
+        });
+        return Object.fromEntries((view?.rows ?? []).map(row => [row.id, row.value]));
+      },
       states: async pattern => (await adapter.getForeignStatesAsync(pattern)) ?? {},
       setObject: (id, obj) => adapter.setForeignObject(id, obj),
       extendObject: (id, patch) => adapter.extendForeignObjectAsync(id, patch),
       setState: (id, state) => adapter.setForeignStateAsync(id, state),
       aliases: async () => (await adapter.getForeignObjectsAsync("alias.*", "state")) ?? {},
-      deleteTreeCarryingEnums: (root, carry) => this.deleteTreeCarryingEnums(root, carry),
+      removeCarryingEnums: (ids, successors) => this.removeCarryingEnums(ids, successors),
       log: adapter.log,
     };
     return migrateDeviceIds(deps, this.deviceIds);
   }
 
   /**
-   * Delete a whole tree and carry the room and function entries of its objects to the ids that take
-   * their place — through the fleet helper, in its order: the entries are read first, the tree is
-   * deleted, the new ids are written last. The delete removes the old ids from every enum, written
-   * back from the adapter's enum cache, and would take away an id written before it.
+   * Delete the ids of a moved tree one by one — deepest first, the root last — and carry their room and
+   * function entries to the ids that take their place, through the fleet helper in its order: the
+   * enums are read once, everything is deleted, every affected enum is written once. Never a recursive
+   * delete: that removes the root first, and the root holds the move journal.
    *
-   * @param root the namespace-relative root that goes away
-   * @param carry old full id → the full ids that take its place
+   * @param ids the full ids that go away, in delete order
+   * @param successors the new full ids of an id that moves
    * @returns how many room/function entries now list one of the new ids
    */
-  private async deleteTreeCarryingEnums(root: string, carry: ReadonlyMap<string, readonly string[]>): Promise<number> {
+  private async removeCarryingEnums(
+    ids: readonly string[],
+    successors: (id: string) => readonly string[],
+  ): Promise<number> {
     const adapter = this.adapter;
-    const members = enumMembersUnder(
-      await adapter.getForeignObjectsAsync("enum.*", "enum"),
-      `${adapter.namespace}.${root}`,
+    const carried = await moveAllWithEnums(
+      adapter,
+      successors,
+      async () => {
+        for (const id of ids) {
+          await adapter.delForeignObjectAsync(id);
+        }
+      },
+      errMessage,
     );
-    const carried = new Set<string>();
-    // One carry per moved member and new id, nested so that every one reads before the single delete runs.
-    let remove = async (): Promise<unknown> => adapter.delObjectAsync(root, { recursive: true });
-    for (const oldId of members) {
-      for (const newId of carry.get(oldId) ?? []) {
-        const inner = remove;
-        remove = async () => {
-          for (const enumId of await moveWithEnums(adapter, oldId, newId, inner, errMessage)) {
-            carried.add(`${enumId}|${newId}`);
-          }
-        };
-      }
-    }
-    await remove();
-    return carried.size;
+    return carried.reduce((n, c) => n + c.newIds.length, 0);
   }
 
   /**

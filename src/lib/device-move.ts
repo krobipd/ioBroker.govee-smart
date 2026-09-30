@@ -19,9 +19,9 @@ import { ID_SCHEME } from "./device-id";
  *
  * The rooms and functions (enum members) are NOT carried here: deleting the old tree removes its ids
  * from every enum, written back from the adapter's enum cache, and would take an id written before it
- * away again. The caller deletes through the fleet helper `moveWithEnums` (`enum-carry.ts`), which
- * reads the memberships first, deletes, and writes the new ids last; {@link enumMembersUnder} names
- * the ids it has to carry. Until that delete the old device object carries `native.movingTo` as a
+ * away again. The caller deletes through the fleet helper `moveAllWithEnums` (`enum-carry.ts`), which
+ * reads the memberships first, deletes, and writes the new ids last — the ids below the root deepest
+ * first, the root last. Until that delete the old device object carries `native.movingTo` as a
  * journal, and an interrupted move is completed on the next start.
  */
 
@@ -182,25 +182,12 @@ export async function retargetAliases(
 }
 
 /**
- * The ids below a root that some room or function lists — what the delete of the old tree has to carry.
+ * Whether a `common.custom` carries any adapter's settings.
  *
- * @param enums the enum objects, as `getForeignObjectsAsync("enum.*", "enum")` returns them
- * @param rootFull the root that goes away, namespace included
- * @returns the old full ids, sorted
+ * @param custom The value as stored
  */
-export function enumMembersUnder(enums: Record<string, unknown> | null | undefined, rootFull: string): string[] {
-  const ids = new Set<string>();
-  for (const obj of Object.values(enums ?? {})) {
-    const members = (obj as { common?: { members?: unknown } } | null)?.common?.members;
-    if (Array.isArray(members)) {
-      for (const member of members) {
-        if (typeof member === "string" && (member === rootFull || member.startsWith(`${rootFull}.`))) {
-          ids.add(member);
-        }
-      }
-    }
-  }
-  return [...ids].sort();
+function hasSettings(custom: unknown): boolean {
+  return !!custom && typeof custom === "object" && Object.keys(custom).length > 0;
 }
 
 /**
@@ -243,10 +230,18 @@ export async function copyDeviceTree(
     let deviceObject: ioBroker.SettableObject | undefined;
     for (const [id, obj] of tree) {
       const next = movedId(id, fromFull, toFull)!;
+      const { object, history } = rewriteMovedObject(id, obj, fromFull, toFull);
       if (fillOnly && all[next]) {
+        // The kept datapoint stays — but a recording the user set on the leftover is the SAME
+        // datapoint's and moves onto it when the kept one has none (a tree built by a session between
+        // a failed and a finished move never had the user's settings).
+        const custom = (object.common as { custom?: unknown }).custom;
+        if (obj.type === "state" && hasSettings(custom) && !hasSettings(all[next]?.common?.custom)) {
+          await deps.extendObject(next, { common: { custom } } as ioBroker.PartialObject);
+          report.history += history;
+        }
         continue;
       }
-      const { object, history } = rewriteMovedObject(id, obj, fromFull, toFull);
       report.history += history;
       if (id === fromFull) {
         deviceObject = object;

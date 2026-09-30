@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   copyDeviceTree,
-  enumMembersUnder,
   keepHistoryUnder,
   movedAliasTarget,
   movedId,
@@ -310,14 +309,5 @@ describe("copyDeviceTree", () => {
     expect(report.aliases).toBe(2);
     // The mark is the kept tree's own — a fill does not write it.
     expect(db.written).not.toContain(NEW);
-  });
-});
-
-describe("enumMembersUnder", () => {
-  it("names every id of the moved tree that a room or function lists, and nothing else", () => {
-    const enums = eNumberTree();
-    expect(enumMembersUnder(enums, OLD)).toEqual([OLD, `${OLD}.status.operationState`]);
-    expect(enumMembersUnder({ "enum.x": { common: { members: [`${NS}.devices.h61be_525f-2.x`] } } }, OLD)).toEqual([]);
-    expect(enumMembersUnder(undefined, OLD)).toEqual([]);
   });
 });

@@ -115,6 +115,8 @@ interface Entry {
 export class DeviceIdRegistry {
   private readonly byKey = new Map<string, Entry>();
   private readonly byPrefix = new Map<string, Entry>();
+  /** Trees a failed move left under their old id for this session — never marked as current. */
+  private readonly unmoved = new Set<string>();
 
   /**
    * Record a tree that already exists under its id.
@@ -163,6 +165,33 @@ export class DeviceIdRegistry {
   idFor(sku: string, deviceId: string): string {
     const prefix = this.prefixFor(sku, deviceId);
     return prefix.slice(prefix.indexOf(".") + 1);
+  }
+
+  /**
+   * A move that failed: the device keeps its old tree for this session (the id handed out for the move
+   * is free again), and that tree is not marked as following the current rule, so the next start moves
+   * it.
+   *
+   * @param sku the Govee SKU
+   * @param deviceId Govee's device id
+   * @param prefix the old tree
+   */
+  keepUnmoved(sku: string, deviceId: string, prefix: string): void {
+    const assigned = this.byKey.get(mapKey(sku, deviceId));
+    if (assigned) {
+      this.release(assigned.prefix);
+    }
+    this.seed(sku, deviceId, prefix);
+    this.unmoved.add(prefix);
+  }
+
+  /**
+   * Whether a tree still waits for its move — its device object must not get the mark.
+   *
+   * @param prefix the tree
+   */
+  isUnmoved(prefix: string): boolean {
+    return this.unmoved.has(prefix);
   }
 
   /**

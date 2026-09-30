@@ -834,6 +834,18 @@ describe("StateManager", () => {
       });
     });
 
+    it("leaves a tree a failed move kept under its old id unmarked — the next start moves it (M8, 3.0.2)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      sm.deviceIds.keepUnmoved("H6160", "AA:BB:CC:DD:EE:FF:52:5F", "devices.h6160_525f");
+      const device = createTestDevice({ deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
+      await sm.createInfoStates(device);
+      expect(sm.devicePrefix(device)).toBe("devices.h6160_525f");
+      const native = (objects.get("devices.h6160_525f") as { native: Record<string, unknown> }).native;
+      expect(native).toMatchObject({ sku: "H6160", deviceId: "AA:BB:CC:DD:EE:FF:52:5F" });
+      expect(native).not.toHaveProperty("idScheme");
+    });
+
     it("frees the id of a device whose tree the cleanup removed", async () => {
       const { adapter } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

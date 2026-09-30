@@ -135,6 +135,19 @@ vi.mock("@iobroker/adapter-core", () => {
       }
       return Promise.resolve();
     });
+    /** One object by full id — like js-controller: the object, its value and its enum entries go. */
+    public delForeignObjectAsync = vi.fn((id: string) => {
+      const key = id.replace(`${this.namespace}.`, "");
+      this.objects.delete(key);
+      this.states.delete(key);
+      for (const e of this.enums.values()) {
+        const common = (e as { common?: { members?: string[] } }).common;
+        if (Array.isArray(common?.members)) {
+          common.members = common.members.filter(m => m !== id);
+        }
+      }
+      return Promise.resolve();
+    });
     public delStateAsync = vi.fn((id: string) => {
       this.states.delete(id.replace(`${this.namespace}.`, ""));
       return Promise.resolve();
@@ -687,7 +700,11 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect((i.enums.get("enum.rooms.living")?.common as { members: string[] }).members.sort()).toEqual(
       ["hm-rpc.0.X.1.STATE", moved, `${moved}.control.power`].sort(),
     );
-    expect((i.enums.get("enum.functions.light")?.common as { members: string[] }).members).toEqual([old]);
+    // The room that vanished during the move gets nothing written back: no carried id appears in it.
+    expect((i.enums.get("enum.functions.light")?.common as { members: string[] }).members).not.toContain(moved);
+    expect(
+      (adapter as unknown as { setForeignObject: ReturnType<typeof vi.fn> }).setForeignObject,
+    ).not.toHaveBeenCalledWith("enum.functions.light", expect.anything());
     // A room that is gone is nothing to report.
     expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("could not be carried"));
     expect(i.objects.has("devices.h61be_ee11")).toBe(false);
