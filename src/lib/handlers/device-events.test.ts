@@ -10,7 +10,14 @@ vi.mock("@iobroker/adapter-core", () => ({
   },
 }));
 
-import { onCloudDataReady, onDeviceStateUpdate, onGroupMembersReady, onLanDeviceReady } from "./device-events";
+import {
+  onCloudDataReady,
+  onDeviceStateUpdate,
+  onGroupMembersReady,
+  onLanDeviceReady,
+  onMqttSegmentEcho,
+  onSegmentBatchEcho,
+} from "./device-events";
 import type { StateDefinition } from "../capability-mapper";
 import type { DeviceState, GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../test-helpers";
@@ -375,5 +382,62 @@ describe("onGroupMembersReady (phase 3)", () => {
     // Both members are LAN-capable → the group gets the LAN-default control set.
     const ids = rig.cloudDefs[0].map(d => d.id);
     expect(ids).toEqual(expect.arrayContaining(["power", "brightness", "color_rgb", "color_temperature"]));
+  });
+});
+
+describe("segment echo — one writer for a batch command and an AA A5 push", () => {
+  function echoRig(): { adapter: Parameters<typeof onSegmentBatchEcho>[0]; writes: string[] } {
+    const writes: string[] = [];
+    const adapter = {
+      log: mockLog,
+      namespace: "govee-smart.0",
+      deviceManager: null,
+      stateManager: { devicePrefix: () => "devices.h6199-0011" } as never,
+      localSnapshots: null,
+      deviceRegistry: new DeviceRegistry({ data: { devices: {} } }),
+      statesReady: true,
+      stateCreationQueue: [],
+      setState: (id: string, state: { val: unknown }) => {
+        writes.push(`${id.replace("devices.h6199-0011.segments.", "")}=${String(state.val)}`);
+        return Promise.resolve();
+      },
+    } as unknown as Parameters<typeof onSegmentBatchEcho>[0];
+    return { adapter, writes };
+  }
+
+  it("a batch echo writes colour and brightness only below the physical strip length", () => {
+    const { adapter, writes } = echoRig();
+    onSegmentBatchEcho(adapter, createTestDevice({ sku: "H6199", segmentCount: 2 }), {
+      segments: [0, 1, 5],
+      color: 0xff0000,
+      brightness: 40,
+    });
+    expect(writes).toEqual(["0.color=#ff0000", "0.brightness=40", "1.color=#ff0000", "1.brightness=40"]);
+  });
+
+  it("a push echo writes each segment's own colour and brightness, capped the same way", () => {
+    const { adapter, writes } = echoRig();
+    onMqttSegmentEcho(adapter, createTestDevice({ sku: "H6199", segmentCount: 1 }), [
+      { index: 0, r: 0, g: 255, b: 0, brightness: 7 },
+      { index: 3, r: 0, g: 0, b: 255, brightness: 9 },
+    ]);
+    expect(writes).toEqual(["0.color=#00ff00", "0.brightness=7"]);
+  });
+
+  it("an echo writes only what the command carried — brightness alone, colour alone", () => {
+    const { adapter, writes } = echoRig();
+    const device = createTestDevice({ sku: "H6199", segmentCount: 2 });
+    onSegmentBatchEcho(adapter, device, { segments: [0], brightness: 55 });
+    onSegmentBatchEcho(adapter, device, { segments: [1], color: 0x0000ff });
+    expect(writes).toEqual(["0.brightness=55", "1.color=#0000ff"]);
+  });
+
+  it("an unknown strip length drops every index", () => {
+    const { adapter, writes } = echoRig();
+    onSegmentBatchEcho(adapter, createTestDevice({ sku: "H6199", segmentCount: 0, capabilities: [] }), {
+      segments: [0],
+      brightness: 10,
+    });
+    expect(writes).toEqual([]);
   });
 });

@@ -4,10 +4,13 @@ import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "../govee-constants";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { StateManager } from "../state-manager";
+import { resolveSegmentCount, type MqttSegmentData } from "../device-manager/lookups";
 import {
   deviceLabel,
   errMessage,
   logRejected,
+  rgbIntToHex,
+  rgbToHex,
   type DeviceState,
   type DeviceStateChanges,
   type GoveeDevice,
@@ -225,4 +228,107 @@ export function onGroupMembersReady<T extends DeviceEventsAdapter & connectionSt
   // BaseGroups go through the same Cloud-data path — group state-defs are
   // intersection of member capabilities, which is Cloud-derived.
   onCloudDataReady(adapter, group, allDevices);
+}
+
+/**
+ * The device's physical segment count, or 0 when not yet known — the cap for
+ * filtering out echo indices above the real strip length.
+ *
+ * `resolveSegmentCount`, not the raw field: the physical length can come from
+ * the catalogue quirk or the Cloud capabilities just as well as from something
+ * the device itself reported, and a device whose count is known only from its
+ * capabilities read as 0 here — which this filter treats as "drop every
+ * index". Deliberately NOT `effectiveSegmentCount`: a user's manual claim
+ * about a cut strip is not evidence about what the hardware echoes back.
+ *
+ * @param device Device whose physical segment count to read
+ * @param registry This instance's device catalog
+ */
+function physicalSegmentCap(device: GoveeDevice, registry: DeviceRegistry): number {
+  const count = resolveSegmentCount(device, registry);
+  return count > 0 ? count : 0;
+}
+
+/** One segment value a device echoed back — its index and what it shows now. */
+interface SegmentEcho {
+  /** Segment index. */
+  index: number;
+  /** Colour as `#rrggbb`, when the echo carries one. */
+  color?: string;
+  /** Brightness 0–100, when the echo carries one. */
+  brightness?: number;
+}
+
+/**
+ * Write what a device echoed into its segment datapoints — the ONE writer for
+ * a batch command's echo and an AA A5 status push. Only into segments that
+ * exist: the wizard sends `segmentBatch` over indices 0..SEGMENT_HARD_MAX so
+ * the strip reveals its real length, and a stale packet can carry indices above
+ * it — a write there is js-controller's "has no existing object" warning per
+ * index (e.g. segments.51..55 on a 19-segment strip).
+ *
+ * @param adapter Adapter surface
+ * @param device The device that echoed
+ * @param echoes Its segment values
+ */
+function writeSegmentEcho(adapter: DeviceEventsAdapter, device: GoveeDevice, echoes: readonly SegmentEcho[]): void {
+  const prefix = adapter.stateManager!.devicePrefix(device);
+  const cap = physicalSegmentCap(device, adapter.deviceRegistry);
+  for (const echo of echoes) {
+    if (cap === 0 || echo.index >= cap) {
+      continue;
+    }
+    if (echo.color !== undefined) {
+      adapter
+        .setState(`${prefix}.segments.${echo.index}.color`, { val: echo.color, ack: true })
+        .catch(logRejected(adapter.log, "best-effort write"));
+    }
+    if (echo.brightness !== undefined) {
+      adapter
+        .setState(`${prefix}.segments.${echo.index}.brightness`, { val: echo.brightness, ack: true })
+        .catch(logRejected(adapter.log, "best-effort write"));
+    }
+  }
+}
+
+/**
+ * A segment batch command went out — mirror it into the segment datapoints.
+ *
+ * @param adapter Adapter surface
+ * @param device The device the batch went to
+ * @param batch The indices with the colour (RGB int) and/or brightness sent
+ * @param batch.segments The segment indices
+ * @param batch.color The colour as an RGB integer
+ * @param batch.brightness The brightness 0–100
+ */
+export function onSegmentBatchEcho(
+  adapter: DeviceEventsAdapter,
+  device: GoveeDevice,
+  batch: { segments: number[]; color?: number; brightness?: number },
+): void {
+  const color = batch.color === undefined ? undefined : rgbIntToHex(batch.color);
+  writeSegmentEcho(
+    adapter,
+    device,
+    batch.segments.map(index => ({ index, color, brightness: batch.brightness })),
+  );
+}
+
+/**
+ * An AA A5 status push reported the segments — mirror them.
+ *
+ * @param adapter Adapter surface
+ * @param device The device that pushed
+ * @param segments Its segments with colour and brightness
+ */
+export function onMqttSegmentEcho(
+  adapter: DeviceEventsAdapter,
+  device: GoveeDevice,
+  segments: MqttSegmentData[],
+): void {
+  writeSegmentEcho(
+    adapter,
+    device,
+    segments.map(seg => ({ index: seg.index, color: rgbToHex(seg.r, seg.g, seg.b), brightness: seg.brightness })),
+  );
 }

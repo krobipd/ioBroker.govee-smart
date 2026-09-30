@@ -4,7 +4,7 @@ import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
 import { DeviceManager } from "./lib/device-manager";
-import { effectiveSegmentCount, resolveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
+import { effectiveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
@@ -35,7 +35,7 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { deviceLabel, errMessage, logRejected, rgbIntToHex, rgbToHex, type GoveeDevice } from "./lib/types";
+import { deviceLabel, errMessage, logRejected, type GoveeDevice } from "./lib/types";
 import type * as diagnostics from "./lib/diagnostics";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
@@ -56,25 +56,6 @@ import { patchChangesNothing } from "./lib/object-write";
 
 // Rate-limit defaults moved to lib/timing-constants.ts as CLOUD_FULL_LIMITS so
 // every module that touches Govee budgeting reads the same canonical values.
-
-/**
- * The device's physical segment count, or 0 when not yet known — the cap for
- * filtering out echo indices above the real strip length.
- *
- * `resolveSegmentCount`, not the raw field: the physical length can come from
- * the catalogue quirk or the Cloud capabilities just as well as from something
- * the device itself reported, and a device whose count is known only from its
- * capabilities read as 0 here — which this filter treats as "drop every
- * index". Deliberately NOT `effectiveSegmentCount`: a user's manual claim
- * about a cut strip is not evidence about what the hardware echoes back.
- *
- * @param device Device whose physical segment count to read
- * @param registry This instance's device catalog
- */
-function physicalSegmentCap(device: GoveeDevice, registry: DeviceRegistry): number {
-  const count = resolveSegmentCount(device, registry);
-  return count > 0 ? count : 0;
-}
 
 /**
  * The one surface the handler modules (`src/lib/handlers/`) see: the
@@ -880,54 +861,12 @@ export class GoveeAdapter extends utils.Adapter {
       this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(logRejected(this.log, "best-effort write"));
     };
 
-    // Sync individual segment states after batch command.
-    // Important: the wizard sends `segmentBatch` with indices 0..SEGMENT_HARD_MAX
-    // so the device reveals its real strip length itself. But we may only
-    // write that ECHO into states that actually exist — otherwise js-controller
-    // produces the "has no existing object" WARN for every index above the cap
-    // (e.g. segments.51..55 on a 19-segment strip).
-    this.deviceManager!.onSegmentBatchUpdate = (device, batch) => {
-      const prefix = this.stateManager!.devicePrefix(device);
-      const cap = physicalSegmentCap(device, this.deviceRegistry);
-      for (const idx of batch.segments) {
-        if (cap === 0 || idx >= cap) {
-          continue;
-        }
-        if (batch.color !== undefined) {
-          const hex = rgbIntToHex(batch.color);
-          this.setState(`${prefix}.segments.${idx}.color`, {
-            val: hex,
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-        }
-        if (batch.brightness !== undefined) {
-          this.setState(`${prefix}.segments.${idx}.brightness`, {
-            val: batch.brightness,
-            ack: true,
-          }).catch(logRejected(this.log, "best-effort write"));
-        }
-      }
-    };
-
-    // Sync per-segment states from MQTT BLE status push (AA A5 packets).
-    // Same cap filter as the batch path — guards against stale packets.
-    this.deviceManager!.onMqttSegmentUpdate = (device, segments) => {
-      const prefix = this.stateManager!.devicePrefix(device);
-      const cap = physicalSegmentCap(device, this.deviceRegistry);
-      for (const seg of segments) {
-        if (cap === 0 || seg.index >= cap) {
-          continue;
-        }
-        this.setState(`${prefix}.segments.${seg.index}.color`, {
-          val: rgbToHex(seg.r, seg.g, seg.b),
-          ack: true,
-        }).catch(logRejected(this.log, "best-effort write"));
-        this.setState(`${prefix}.segments.${seg.index}.brightness`, {
-          val: seg.brightness,
-          ack: true,
-        }).catch(logRejected(this.log, "best-effort write"));
-      }
-    };
+    // Mirror a segment batch command and an AA A5 push into the segment
+    // datapoints — one writer, capped at the physical strip length.
+    this.deviceManager!.onSegmentBatchUpdate = (device, batch) =>
+      deviceEvents.onSegmentBatchEcho(this.handlerHost, device, batch);
+    this.deviceManager!.onMqttSegmentUpdate = (device, segments) =>
+      deviceEvents.onMqttSegmentEcho(this.handlerHost, device, segments);
 
     // When MQTT reveals the device's real segment count differs from what
     // Cloud advertised, rebuild the state tree so the datapoints match
