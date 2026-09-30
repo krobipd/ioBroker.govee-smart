@@ -4,6 +4,7 @@ import {
   type DeviceCacheAdapter,
   cachedToGoveeDevice,
   goveeDeviceToCached,
+  mergeCachedIntoLive,
   persistDeviceToCache,
   populateScenesFromLibrary,
   saveDevicesToCache,
@@ -97,9 +98,62 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       const cached = goveeDeviceToCached(makeFullDevice());
       const restored = cachedToGoveeDevice(cached);
       expect(restored.state).toEqual({ online: false });
-      expect(restored.channels).toEqual({ lan: false, mqtt: false, cloud: false });
+      // The cached capability list IS the cloud path (derived here since 3.0.2, for both restore branches).
+      expect(restored.channels).toEqual({ lan: false, mqtt: false, cloud: restored.capabilities.length > 0 });
       expect(restored.lanIp).toBe(undefined);
       expect(restored.groupMembers).toBe(undefined);
+    });
+
+    it("the three attempt stamps stay in memory — saved never, restored never (C7, 3.0.2)", () => {
+      const original = {
+        ...makeFullDevice(),
+        lastReachabilityRefreshAt: 1,
+        lastLanStatusAt: 2,
+        lastLanStatusAskedAt: 3,
+      };
+      const cached = goveeDeviceToCached(original);
+      for (const key of ["lastReachabilityRefreshAt", "lastLanStatusAt", "lastLanStatusAskedAt"]) {
+        expect(cached).not.toHaveProperty(key);
+      }
+      const restored = cachedToGoveeDevice({ ...cached, lastLanStatusAt: 9 } as never);
+      expect(restored.lastLanStatusAt).toBe(undefined);
+    });
+
+    it("a cache entry merged into a LAN-found light brings every persisted field and keeps the live ones (M4, 3.0.2)", () => {
+      const entry = {
+        ...goveeDeviceToCached(makeFullDevice()),
+        sceneSpeed: 3,
+        librariesCheckedAt: 1_700_000_000_000,
+        accountMissCount: 1,
+        gateway: "H5042 (gw)",
+        gatewayDeviceId: "GW:01",
+        lastSeenOnNetwork: 1_000,
+        lastLanSeenAt: 1_000,
+      } as never;
+      const live = {
+        ...makeFullDevice(),
+        name: "H6160_eeff",
+        capabilities: [],
+        lanIp: "10.0.0.9",
+        state: { online: true },
+        channels: { lan: true, mqtt: false, cloud: false },
+        lastLanReplyAt: 5_000,
+        lastSeenOnNetwork: 5_000,
+        lastLanSeenAt: 5_000,
+      } as GoveeDevice;
+      mergeCachedIntoLive(live, entry);
+      expect(live.sceneSpeed).toBe(3);
+      expect(live.librariesCheckedAt).toBe(1_700_000_000_000);
+      expect(live.accountMissCount).toBe(1);
+      expect(live.gateway).toBe("H5042 (gw)");
+      expect(live.gatewayDeviceId).toBe("GW:01");
+      expect(live.name).toBe(makeFullDevice().name);
+      expect(live.lanIp).toBe("10.0.0.9");
+      expect(live.state).toEqual({ online: true });
+      expect(live.channels).toEqual({ lan: true, mqtt: false, cloud: true });
+      expect(live.lastLanReplyAt).toBe(5_000);
+      expect(live.lastSeenOnNetwork).toBe(5_000);
+      expect(live.lastLanSeenAt).toBe(5_000);
     });
 
     it("does NOT persist 'lastLanReplyAt' to cache (live LAN-freshness timestamp) — L11", () => {

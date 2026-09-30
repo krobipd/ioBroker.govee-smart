@@ -31,22 +31,6 @@ export function populateScenesFromLibrary(adapter: DeviceCacheAdapter, device: G
 }
 
 /**
- * Convert cached data back into a GoveeDevice. Spreads all persisted fields
- * and re-initializes the runtime-only fields (state, channels, lanIp,
- * groupMembers) to their boot defaults — they get refilled by LAN-Discovery,
- * Cloud-API responses, etc. during onReady.
- *
- * Adding a new field to GoveeDevice / CachedDeviceData: no change here.
- * Removing a field: no change here either (extra keys in the cache are
- * silently ignored). The shape is the contract.
- *
- * Runtime-only fields (NOT restored from cache):
- * - state           — recomputed from LAN/MQTT status as devices come online
- * - channels        — recomputed from LAN/MQTT/Cloud connection results
- * - lanIp           — re-discovered by LAN UDP scan each restart
- * - groupMembers    — re-resolved by loadGroupMembers via App-API each restart
- */
-/**
  * The snapshot packets of a cache entry, or undefined when the entry holds
  * none — or holds the index-aligned form written before 2.40.0, which cannot
  * be told apart from a reordered list and is fetched anew (M10). A host-local
@@ -75,70 +59,131 @@ export function snapshotPacketsFromCache(raw: unknown): SnapshotPackets[] | unde
   return packets;
 }
 
+/**
+ * The fields of a device that live only in memory — never written to the cache,
+ * never read back from it (a tampered file or an old save that carries one is
+ * ignored). THE list: saving, restoring and merging all use it.
+ *
+ * - `state`, `channels`, `lanIp`, `groupMembers` — rebuilt by LAN discovery,
+ *   the Cloud list and the App API in every session
+ * - `lastLanReplyAt` — the live LAN freshness stamp; a stale one would survive
+ *   a restart and skew online logic (L11) — `lastLanSeenAt` is its persisted twin
+ * - `iotTopic`, `lastStatusRequestAt` — the broker address the account list
+ *   hands over every two minutes, and the request stamp (2.39.0)
+ * - `lastReachabilityRefreshAt`, `lastLanStatusAt`, `lastLanStatusAskedAt` —
+ *   attempt stamps; a restart allows one immediate attempt (they were written
+ *   to the cache until 3.0.1 although their documentation said otherwise)
+ */
+export const RUNTIME_ONLY_KEYS = [
+  "state",
+  "channels",
+  "lanIp",
+  "groupMembers",
+  "lastLanReplyAt",
+  "iotTopic",
+  "lastStatusRequestAt",
+  "lastReachabilityRefreshAt",
+  "lastLanStatusAt",
+  "lastLanStatusAskedAt",
+] as const satisfies readonly (keyof GoveeDevice)[];
+
+/** One of {@link RUNTIME_ONLY_KEYS}. */
+export type RuntimeOnlyKey = (typeof RUNTIME_ONLY_KEYS)[number];
+
+/**
+ * A copy without the in-memory-only fields.
+ *
+ * @param obj A device or a cache entry
+ */
+function withoutRuntimeFields<T extends object>(obj: T): Omit<T, RuntimeOnlyKey> {
+  const copy = { ...obj } as Record<string, unknown>;
+  for (const key of RUNTIME_ONLY_KEYS) {
+    delete copy[key];
+  }
+  return copy as Omit<T, RuntimeOnlyKey>;
+}
+
+/**
+ * Convert cached data back into a GoveeDevice: every persisted field, the
+ * runtime-only ones at their boot defaults — LAN discovery, the Cloud list and
+ * the App API refill them during onReady. Adding a field to GoveeDevice /
+ * CachedDeviceData needs no change here (the shape is the contract).
+ *
+ * @param cached The cache entry
+ */
 export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
-  // Strip cachedAt (cache-metadata) AND any runtime-only field that might
-  // have leaked into the cache from a tampered file or an old broken save.
-  // Runtime defaults are appended explicitly below — they are NOT influenced
-  // by what the cache contained.
-  const {
-    cachedAt: _cachedAt,
-    // Cast-through 'unknown' because TypeScript doesn't know the malformed
-    // cache could carry these fields; we want the destructure-discard either way.
-    state: _state,
-    channels: _channels,
-    lanIp: _lanIp,
-    groupMembers: _groupMembers,
-    lastLanReplyAt: _lastLanReplyAt,
-    iotTopic: _iotTopic,
-    lastStatusRequestAt: _lastStatusRequestAt,
-    ...rest
-  } = cached as CachedDeviceData &
-    Partial<
-      Pick<
-        GoveeDevice,
-        "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt" | "iotTopic" | "lastStatusRequestAt"
-      >
-    >;
+  const { cachedAt: _cachedAt, ...rest } = withoutRuntimeFields(cached as CachedDeviceData & Partial<GoveeDevice>);
   return {
-    ...rest,
+    ...(rest as Omit<GoveeDevice, RuntimeOnlyKey>),
     // Host-local, editable file: a corrupt count or index list must not become
     // the device's segment map (same gate as the Cloud/MQTT/wizard sources).
     segmentCount: plausibleSegmentCount(rest.segmentCount),
     manualSegments: plausibleSegmentIndices(rest.manualSegments),
     snapshotBleCmds: snapshotPacketsFromCache(rest.snapshotBleCmds),
     state: { online: false },
-    channels: { lan: false, mqtt: false, cloud: false },
+    // The cache carries the account's capability list, and that list IS what
+    // "has a cloud path" means: without it an installation without a single
+    // light never ran a Cloud load on start and every cloud consumer dropped
+    // the device (resolveTransport answered skip/no-channel).
+    channels: { lan: false, mqtt: false, cloud: rest.capabilities.length > 0 },
   };
 }
 
 /**
- * Extract cacheable data from a GoveeDevice — destructures the runtime-only
- * fields out and spreads the rest. Adding a new cacheable field to
- * GoveeDevice: no change here.
+ * Restore a cache entry INTO a device LAN discovery already created this
+ * session — through the same restore as a new device, so every persisted field
+ * arrives (until 3.0.1 this branch copied 16 fields by hand and lost
+ * `sceneSpeed`, `librariesCheckedAt`, `accountMissCount` and the gateway pair
+ * for every light found before the cache was read — with an account, every
+ * light). What LAN discovery found in this session stays: the address, the
+ * live stamps, the reachability, the LAN channel; the network stamps keep the
+ * newer of the two.
  *
- * normalize() handles the few save-time tweaks that exist (e.g. drop
- * segmentCount when 0, drop manualMode flags when falsy/empty) so the cache
- * stays compact.
+ * @param live The LAN-discovered device (updated in place)
+ * @param cached The cache entry
+ */
+export function mergeCachedIntoLive(live: GoveeDevice, cached: CachedDeviceData): void {
+  const restored = cachedToGoveeDevice(cached);
+  const kept: Pick<GoveeDevice, RuntimeOnlyKey> = {
+    state: live.state,
+    channels: { ...live.channels, cloud: restored.channels.cloud },
+    lanIp: live.lanIp,
+    groupMembers: live.groupMembers,
+    lastLanReplyAt: live.lastLanReplyAt,
+    iotTopic: live.iotTopic,
+    lastStatusRequestAt: live.lastStatusRequestAt,
+    lastReachabilityRefreshAt: live.lastReachabilityRefreshAt,
+    lastLanStatusAt: live.lastLanStatusAt,
+    lastLanStatusAskedAt: live.lastLanStatusAskedAt,
+  };
+  Object.assign(live, restored, kept, {
+    name: restored.name || live.name,
+    type: restored.type || live.type,
+    lastSeenOnNetwork: newer(live.lastSeenOnNetwork, restored.lastSeenOnNetwork),
+    lastLanSeenAt: newer(live.lastLanSeenAt, restored.lastLanSeenAt),
+  });
+}
+
+/**
+ * The later of two optional stamps.
+ *
+ * @param a One stamp
+ * @param b The other
+ */
+function newer(a: number | undefined, b: number | undefined): number | undefined {
+  return a === undefined ? b : b === undefined ? a : Math.max(a, b);
+}
+
+/**
+ * Extract cacheable data from a GoveeDevice — everything but the runtime-only
+ * fields, compacted by normalize(). Adding a new cacheable field to GoveeDevice:
+ * no change here.
+ *
+ * @param device The device
  */
 export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
-  // Strip runtime-only fields. Everything else flows into the cache.
-  // lastLanReplyAt is a live LAN-freshness timestamp — it must never be
-  // persisted (a stale value would survive a restart and skew online logic) (L11).
-  const {
-    state: _state,
-    channels: _channels,
-    lanIp: _lanIp,
-    groupMembers: _groupMembers,
-    lastLanReplyAt: _lastLanReplyAt,
-    // The broker topic and the request stamp are runtime-only: the topic is
-    // an address the account list hands over every two minutes, never data
-    // to keep on disk (2.39.0).
-    iotTopic: _iotTopic,
-    lastStatusRequestAt: _lastStatusRequestAt,
-    ...cacheable
-  } = device;
   return {
-    ...normalize(cacheable),
+    ...normalize(withoutRuntimeFields(device)),
     cachedAt: Date.now(),
   };
 }
@@ -154,12 +199,7 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
  * `lanIp` / `groupMembers` here). Returns the same shape minus the dropped
  * keys.
  */
-function normalize<
-  T extends Omit<
-    GoveeDevice,
-    "state" | "channels" | "lanIp" | "groupMembers" | "lastLanReplyAt" | "iotTopic" | "lastStatusRequestAt"
-  >,
->(d: T): Omit<CachedDeviceData, "cachedAt"> {
+function normalize<T extends Omit<GoveeDevice, RuntimeOnlyKey>>(d: T): Omit<CachedDeviceData, "cachedAt"> {
   const segmentCount = typeof d.segmentCount === "number" && d.segmentCount > 0 ? d.segmentCount : undefined;
   const manualMode = d.manualMode ? true : undefined;
   const manualSegments =

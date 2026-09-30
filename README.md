@@ -101,6 +101,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: "Test login" in the connection card counts toward the account's login limit (3 per hour) and says when the next test is possible
 - Fixed: segment colours and brightness are confirmed only after the command went out — a refused Cloud command no longer leaves them acked
 - Fixed: stopping the instance while it moves device ids or loads the saved account no longer starts the LAN listener or a login afterwards
+- Fixed: a light found on the network before the saved data loads keeps its scene speed and remembered libraries after a restart
 
 ### 3.0.1 (2026-09-27)
 

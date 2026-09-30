@@ -10,8 +10,6 @@ import {
   findDeviceBySkuAndId as findDeviceBySkuAndIdHelper,
   isLanDriven,
   parseMqttSegmentData,
-  plausibleSegmentCount,
-  plausibleSegmentIndices,
   readDevicePushAt,
   readReportedReachability,
   resolveSegmentCount,
@@ -1080,41 +1078,12 @@ export class DeviceManager {
       typeof entry.lastSeenOnNetwork === "number" ? Math.round((nowMs - entry.lastSeenOnNetwork) / 86400000) : null;
     const ageInfo = ageDays === null ? "no age data (legacy entry)" : `${ageDays}d since last seen`;
     if (existing) {
-      existing.name = entry.name || existing.name;
-      existing.type = entry.type || existing.type;
-      existing.capabilities = entry.capabilities;
-      existing.scenes = entry.scenes;
-      existing.diyScenes = entry.diyScenes;
-      existing.snapshots = entry.snapshots;
-      existing.sceneLibrary = entry.sceneLibrary;
-      existing.musicLibrary = entry.musicLibrary;
-      existing.diyLibrary = entry.diyLibrary;
-      existing.skuFeatures = entry.skuFeatures;
-      existing.snapshotBleCmds = cacheHelpers.snapshotPacketsFromCache(entry.snapshotBleCmds);
-      existing.scenesChecked = entry.scenesChecked;
-      existing.lastSeenOnNetwork = entry.lastSeenOnNetwork;
-      // The cache file is host-local and editable — a corrupt count must not
-      // become the device's count (same gate as the Cloud/MQTT/wizard sources).
-      existing.segmentCount = plausibleSegmentCount(entry.segmentCount);
-      existing.manualMode = entry.manualMode;
-      existing.manualSegments = plausibleSegmentIndices(entry.manualSegments);
-      existing.channels.cloud = entry.capabilities.length > 0;
+      cacheHelpers.mergeCachedIntoLive(existing, entry);
       this.log.debug(
         `Cache merged into LAN-discovered device ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`,
       );
     } else {
-      const restored = cacheHelpers.cachedToGoveeDevice(entry);
-      // Same derivation as the merge branch above — the cache carries the
-      // account's capability list, and that list IS what "has a cloud path"
-      // means. Without it the flag stayed false for a device that was never
-      // seen on LAN: an installation without a single light never runs a Cloud
-      // load on start (loadFromCache returns true, main.ts skips cloudInit), so
-      // mergeCloudDevices — the only other writer — never ran that session and
-      // every cloud consumer dropped the device: no state load, no reachability
-      // renewal, and resolveTransport answered skip/no-channel, so an appliance
-      // that worked before the restart could not be switched at all.
-      restored.channels.cloud = entry.capabilities.length > 0;
-      this.devices.set(key, restored);
+      this.devices.set(key, cacheHelpers.cachedToGoveeDevice(entry));
       this.log.debug(
         `Cache restored (no LAN discovery yet) for ${entry.sku} ${entry.deviceId} (${ageInfo}, caps=${entry.capabilities.length})`,
       );
