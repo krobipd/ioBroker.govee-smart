@@ -79,6 +79,8 @@ export function classifyError(err: unknown): ErrorCategory {
     msg.includes("ECONNREFUSED") ||
     msg.includes("ENOTFOUND") ||
     msg.includes("ENETUNREACH") ||
+    msg.includes("EHOSTUNREACH") ||
+    msg.includes("EAI_AGAIN") ||
     msg.includes("ECONNRESET")
   ) {
     return "NETWORK";

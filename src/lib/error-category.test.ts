@@ -13,6 +13,16 @@ describe("classifyError", () => {
     expect(classifyError(new Error("ENETUNREACH"))).toBe("NETWORK");
   });
 
+  it("classifies a temporary DNS failure by its text as NETWORK (issue #51)", () => {
+    expect(classifyError(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"))).toBe("NETWORK");
+    expect(classifyError({ message: "getaddrinfo EAI_AGAIN openapi.api.govee.com" })).toBe("NETWORK");
+  });
+
+  it("classifies an unreachable host by its text as NETWORK", () => {
+    expect(classifyError(new Error("connect EHOSTUNREACH 1.2.3.4:443"))).toBe("NETWORK");
+    expect(classifyError("connect EHOSTUNREACH 1.2.3.4:443")).toBe("NETWORK");
+  });
+
   it("should classify ECONNRESET as NETWORK", () => {
     expect(classifyError(new Error("read ECONNRESET"))).toBe("NETWORK");
   });
