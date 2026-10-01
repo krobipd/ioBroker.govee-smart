@@ -30,6 +30,7 @@ coverage/
 /src-admin/build
 /src-admin/node_modules
 /src-admin/package-lock.json
+/src-admin/.__mf__temp
 
 # Packages
 *.tgz
