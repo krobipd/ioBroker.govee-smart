@@ -150,17 +150,25 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     resetToSelect();
   };
 
-  const onStart = async (): Promise<void> => {
+  /**
+   * Open a measuring session on the chosen device and show the measure screen — the ONE start
+   * sequence for Start and Re-measure (audit DRY-16: the copy in Re-measure had neither the device
+   * check nor the cleared error).
+   */
+  const beginMeasure = async (): Promise<void> => {
     if (!device) {
       return;
     }
     setError("");
+    if (!reduce(await api.start(device))) {
+      sessionOpenRef.current = true;
+      setScreen("measure");
+    }
+  };
+
+  const onStart = async (): Promise<void> => {
     try {
-      const res = await api.start(device);
-      if (!reduce(res)) {
-        sessionOpenRef.current = true;
-        setScreen("measure");
-      }
+      await beginMeasure();
     } catch (e) {
       fail(e);
     }
@@ -206,11 +214,7 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
     try {
       await api.abort();
       sessionOpenRef.current = false;
-      const res = await api.start(device);
-      if (!reduce(res)) {
-        sessionOpenRef.current = true;
-        setScreen("measure");
-      }
+      await beginMeasure();
     } catch (e) {
       fail(e);
     }
