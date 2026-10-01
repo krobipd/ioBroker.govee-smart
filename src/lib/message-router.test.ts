@@ -1,28 +1,6 @@
 import { MessageRouter, type MessageRouterHost } from "./message-router";
 import { classifyLoginResponse, type GoveeMqttClient } from "./govee-mqtt-client";
 
-// MessageRouter routes mqttAuth result strings through adapter-core I18n; resolve
-// them against the real en.json with positional %s substitution (mirrors
-// I18n.translate) so the content assertions below hold without booting
-// js-controller.
-vi.mock("@iobroker/adapter-core", async () => {
-  const { readFileSync } = await import("node:fs");
-  const { join } = await import("node:path");
-  const enJson = JSON.parse(readFileSync(join(__dirname, "../../admin/i18n/en.json"), "utf8")) as Record<
-    string,
-    string
-  >;
-  return {
-    I18n: {
-      getTranslatedObject: vi.fn((key: string) => ({ en: key })),
-      translate: vi.fn((key: string, ...args: (string | number)[]) => {
-        let i = 0;
-        return (enJson[key] ?? key).replace(/%s/g, () => String(args[i++] ?? "%s"));
-      }),
-    },
-  };
-});
-
 const mockLog = {
   silly: () => {},
   debug: () => {},
@@ -41,7 +19,7 @@ interface FakeProbeOpts {
    * only readable via getLastError() (H2). A fake that throws from connect()
    * would test dead code.
    */
-  lastError?: { category: string; message: string; reason?: string };
+  lastError?: { category: string; message: string; reason?: string; retryAt?: number };
   /** When set, lastError surfaces only on the SECOND getLastError() read — models a broker-stage failure that lands during the edge-wait. */
   lateError?: boolean;
   /** Throw this from probe.requestVerificationCode. */
@@ -194,8 +172,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       expect(responses).toHaveLength(1);
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("Login successful");
+      expect(responses[0].data).toEqual({ status: "ok" });
     });
 
     it("reports 'MQTT not up' when login succeeds but the connect edge never arrives (M2 timeout)", async () => {
@@ -206,8 +183,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 60));
       expect(responses).toHaveLength(1);
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("MQTT connection is not up");
+      expect(responses[0].data).toEqual({ status: "mqttNotUp" });
     });
 
     it("disposes the probe on the timeout path — no socket leak (M2)", async () => {
@@ -244,8 +220,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("two-factor confirmation");
+      expect(responses[0].data).toEqual({ status: "verifyRequired" });
     });
 
     it("returns invalid-code hint on Verification code invalid", async () => {
@@ -256,8 +231,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("code invalid");
+      expect(responses[0].data).toEqual({ status: "codeInvalid" });
     });
 
     it("returns email-not-registered on matching error", async () => {
@@ -269,8 +243,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("not registered");
+      expect(responses[0].data).toEqual({ status: "emailNotRegistered" });
     });
 
     it("returns rate-limit hint", async () => {
@@ -281,8 +254,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("rate limit");
+      expect(responses[0].data).toEqual({ status: "rateLimited" });
     });
 
     it("returns account-locked hint", async () => {
@@ -293,24 +265,26 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string; status: string };
-      // The status names the case — the generic fallback text would quote Govee's sentence too.
-      expect(r.status).toBe("accountLocked");
-      expect(r.result).toContain("temporarily locked");
+      // The status names the case — the generic fallback would quote Govee's sentence instead.
+      expect(responses[0].data).toEqual({ status: "accountLocked" });
     });
 
     it("an account whose login window is full answers with the adapter's own pause and the time — nothing was sent", async () => {
       const probe = makeProbe({
-        lastError: { category: "RATE_LIMIT", message: "22:15:00", reason: "loginWindowFull" },
+        lastError: {
+          category: "RATE_LIMIT",
+          message: "login window full until 2026-10-01T20:15:00.000Z",
+          reason: "loginWindowFull",
+          retryAt: 1_790_000_000_000,
+        },
       });
       const { host, responses } = makeHost({ probe });
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string; status: string };
-      expect(r.status).toBe("throttled");
-      expect(r.result).toContain("22:15:00");
-      expect(r.result).toContain("Three Govee logins");
+      // Its own case with the time as a number — the card words it in the admin's language and the
+      // viewer's clock (audit DRY-13; until 3.0.2 a server-locale sentence under "throttled").
+      expect(responses[0].data).toEqual({ status: "loginWindowFull", retryAt: 1_790_000_000_000 });
     });
 
     it("a sentence that only LOOKS like a sub-case is not read as one", async () => {
@@ -337,8 +311,7 @@ describe("MessageRouter", () => {
       const t0 = Date.now();
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("rejected the password");
+      expect(responses[0].data).toEqual({ status: "passwordRejected" });
       // Classified synchronously after connect() — no 5s edge-wait burned.
       expect(Date.now() - t0).toBeLessThan(1000);
     });
@@ -352,9 +325,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host, 20);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 60));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("policy mismatch");
-      expect(r.result).not.toContain("MQTT connection is not up");
+      expect(responses[0].data).toEqual({ status: "loginFailed", reason: "Govee login rejected: policy mismatch" });
     });
 
     it("rejects when email or password missing", async () => {
@@ -362,8 +333,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("Email + password");
+      expect(responses[0].data).toEqual({ status: "needCredentials" });
     });
 
     it("throttles a rapid second test within the 30s window (SEC-I1)", async () => {
@@ -374,8 +344,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       expect(responses).toHaveLength(2);
-      const second = responses[1].data as { result: string };
-      expect(second.result).toContain("Please wait");
+      expect(responses[1].data).toEqual({ status: "throttled" });
     });
 
     it("returns a machine-readable status alongside the result — 'ok' on success", async () => {
@@ -383,7 +352,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string; status: string };
+      const r = responses[0].data as { status: string };
       expect(r.status).toBe("ok");
     });
 
@@ -419,8 +388,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "requestCode" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("Code sent");
+      expect(responses[0].data).toEqual({ status: "codeSent" });
     });
 
     it("throttles double-click within 30s window", async () => {
@@ -431,8 +399,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "requestCode" }));
       await new Promise(r => setTimeout(r, 10));
       expect(responses).toHaveLength(2);
-      const second = responses[1].data as { result: string };
-      expect(second.result).toContain("Please wait");
+      expect(responses[1].data).toEqual({ status: "throttled" });
     });
 
     it("surfaces Govee rejection on requestVerificationCode error", async () => {
@@ -441,8 +408,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "requestCode" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("rejected sending the code");
+      expect(responses[0].data).toEqual({ status: "codeRejected", reason: "Govee rejected" });
     });
   });
 
@@ -459,8 +425,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "weirdAction" }));
       await new Promise(r => setTimeout(r, 10));
-      const r = responses[0].data as { result: string };
-      expect(r.result).toContain("Unknown action");
+      expect(responses[0].data).toEqual({ status: "unknownAction" });
     });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { makeConnectionApi, type AuthResponse, type ConnectionSocket } from "./useConnectionApi";
+import type { AuthResponse } from "../../src/lib/auth-status";
+import { makeConnectionApi, type ConnectionSocket } from "./useConnectionApi";
 
 function recordingSocket(response: AuthResponse): {
   socket: ConnectionSocket;
@@ -17,10 +18,10 @@ function recordingSocket(response: AuthResponse): {
 
 describe("makeConnectionApi", () => {
   it("testLogin sends mqttAuth {action:test} with the live credentials + code", async () => {
-    const { socket, calls } = recordingSocket({ result: "Login successful", status: "ok" });
+    const { socket, calls } = recordingSocket({ status: "ok" });
     const api = makeConnectionApi(socket, "govee-smart.0");
     const res = await api.testLogin({ email: "a@b.com", password: "pw", code: "123456" });
-    expect(res).toEqual({ result: "Login successful", status: "ok" });
+    expect(res).toEqual({ status: "ok" });
     expect(calls).toEqual([
       {
         instance: "govee-smart.0",
@@ -31,14 +32,14 @@ describe("makeConnectionApi", () => {
   });
 
   it("returns the structured status so the card can open the 2FA field", async () => {
-    const { socket } = recordingSocket({ result: "needs 2FA", status: "verifyRequired" });
+    const { socket } = recordingSocket({ status: "verifyRequired" });
     const api = makeConnectionApi(socket, "govee-smart.0");
     const res = await api.testLogin({ email: "a@b.com", password: "pw" });
     expect(res.status).toBe("verifyRequired");
   });
 
   it("requestCode sends mqttAuth {action:requestCode} for the given account", async () => {
-    const { socket, calls } = recordingSocket({ result: "Code sent", status: "codeSent" });
+    const { socket, calls } = recordingSocket({ status: "codeSent" });
     const api = makeConnectionApi(socket, "govee-smart.0");
     const res = await api.requestCode({ email: "a@b.com", password: "pw" });
     expect(res.status).toBe("codeSent");

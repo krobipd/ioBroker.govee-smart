@@ -1718,7 +1718,8 @@ describe("LoginWindow — one per account, shared by the live client and the pro
     const err = probe.getLastError();
     expect(err?.category).toBe("RATE_LIMIT");
     expect(err?.reason).toBe("loginWindowFull");
-    expect(err?.message).toMatch(/\d/);
+    // The time travels as a number — the card formats it for the viewer (audit DRY-13).
+    expect(err?.retryAt).toBeGreaterThan(Date.now());
     probe.disconnect();
   });
 

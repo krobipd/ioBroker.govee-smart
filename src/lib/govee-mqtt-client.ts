@@ -262,6 +262,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private loginWindow = new LoginWindow();
   /** Sub-case of the last rejected login, for the connection card. */
   private lastErrorReason: LoginVerdict["reason"] = undefined;
+  /** When the login window has room again (ms) — set with `loginWindowFull`, for the connection card. */
+  private lastErrorRetryAt: number | undefined = undefined;
   /** Logins are paused until this time (ms) once the window is full; 0 = not paused. */
   private loginPausedUntil = 0;
   /** Broker host of the current bundle — for the log line, fresh login and reuse alike. */
@@ -459,11 +461,21 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * admin "test login" button MUST read the outcome from here instead of a
    * try/catch around connect().
    */
-  getLastError(): { category: ErrorCategory; message: string; reason?: LoginVerdict["reason"] } | null {
+  getLastError(): {
+    category: ErrorCategory;
+    message: string;
+    reason?: LoginVerdict["reason"];
+    retryAt?: number;
+  } | null {
     if (this.connected || !this.lastErrorCategory) {
       return null;
     }
-    return { category: this.lastErrorCategory, message: this.lastErrorMessage ?? "", reason: this.lastErrorReason };
+    return {
+      category: this.lastErrorCategory,
+      message: this.lastErrorMessage ?? "",
+      reason: this.lastErrorReason,
+      retryAt: this.lastErrorRetryAt,
+    };
   }
 
   /**
@@ -658,6 +670,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     const category = classifyError(err);
     this.lastErrorMessage = errMessage(err);
     this.lastErrorReason = err instanceof LoginRejectedError ? err.reason : undefined;
+    this.lastErrorRetryAt = undefined;
     if (category === "VERIFICATION_PENDING" || category === "VERIFICATION_FAILED") {
       this.lastErrorCategory = category;
       this.log.debug(`${context}: ${this.lastErrorMessage}`);
@@ -1161,7 +1174,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     if (this.probeMode) {
       this.lastErrorCategory = "RATE_LIMIT";
       this.lastErrorReason = "loginWindowFull";
-      this.lastErrorMessage = new Date(until).toLocaleTimeString();
+      this.lastErrorRetryAt = until;
+      this.lastErrorMessage = `login window full until ${new Date(until).toISOString()}`;
       this.onConnection?.(false);
       return;
     }

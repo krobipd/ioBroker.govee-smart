@@ -4,7 +4,8 @@ import { Alert, Box, Button, CircularProgress, Collapse, Divider, Stack, TextFie
 import { I18n } from "@iobroker/gui-components";
 
 import { errMessage } from "../../src/lib/err-message";
-import { makeConnectionApi, type AuthResponse, type AuthStatus } from "./useConnectionApi";
+import { AUTH_STATUSES, type AuthResponse, type AuthStatus } from "../../src/lib/auth-status";
+import { makeConnectionApi } from "./useConnectionApi";
 
 /**
  * Socket seam the panel needs: the `sendTo` round-trip (login test / code
@@ -136,6 +137,7 @@ function severityFor(status: AuthStatus): "success" | "info" | "warning" | "erro
     case "codeRejected":
     case "needCredentials":
     case "throttled":
+    case "loginWindowFull":
       return "warning";
     default:
       return "error";
@@ -143,29 +145,7 @@ function severityFor(status: AuthStatus): "success" | "info" | "warning" | "erro
 }
 
 /** Every case the backend answers with — anything else is not a status. */
-const AUTH_STATUSES: ReadonlySet<string> = new Set<AuthStatus>([
-  "ok",
-  "verifyRequired",
-  "codeInvalid",
-  "passwordRejected",
-  "emailNotRegistered",
-  "rateLimited",
-  "accountLocked",
-  "loginFailed",
-  "mqttNotUp",
-  "codeSent",
-  "codeRejected",
-  "needCredentials",
-  "throttled",
-  "unknownAction",
-]);
-
-/**
- * The cases whose answer carries the reason — Govee's own text, the seconds
- * to wait. The card shows the adapter's text for them, its own fixed text
- * would drop exactly that (audit E11).
- */
-const REASONED: ReadonlySet<AuthStatus> = new Set<AuthStatus>(["loginFailed", "codeRejected", "throttled"]);
+const KNOWN_STATUSES: ReadonlySet<string> = new Set<string>(AUTH_STATUSES);
 
 /**
  * Whether an outcome means the 2FA code field should be shown.
@@ -274,6 +254,24 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
   };
 
   /**
+   * The card's text for an answer: Govee's reason where the adapter passed one on, the time the
+   * login window has room again, else the case's own text — every word in the admin's language.
+   *
+   * @param status The answered case
+   * @param res The adapter's answer
+   */
+  const feedbackText = (status: AuthStatus, res: Partial<AuthResponse>): string => {
+    const reason = typeof res.reason === "string" ? res.reason : "";
+    if ((status === "loginFailed" || status === "codeRejected") && reason) {
+      return t(`gsw_conn_st_${status}Reason`, reason);
+    }
+    if (status === "loginWindowFull" && typeof res.retryAt === "number" && Number.isFinite(res.retryAt)) {
+      return t("gsw_conn_st_loginWindowFull", new Date(res.retryAt).toLocaleTimeString());
+    }
+    return t(`gsw_conn_st_${status === "loginWindowFull" ? "rateLimited" : status}`);
+  };
+
+  /**
    * Show what the adapter answered. An answer without a known status — the
    * `{ error }` of an adapter that is still starting, a foreign reply — shows
    * its reason instead of the raw key `gsw_conn_st_undefined` (audit E11).
@@ -282,12 +280,11 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
    */
   const showFeedback = (res: Partial<AuthResponse> & { error?: unknown }): void => {
     const status = res?.status;
-    if (typeof status !== "string" || !AUTH_STATUSES.has(status)) {
+    if (typeof status !== "string" || !KNOWN_STATUSES.has(status)) {
       showError(typeof res?.error === "string" && res.error ? res.error : I18n.t("gsw_conn_st_loginFailed"));
       return;
     }
-    const reason = REASONED.has(status) && typeof res.result === "string" && res.result ? res.result : "";
-    setFeedback({ status, text: reason || t(`gsw_conn_st_${status}`) });
+    setFeedback({ status, text: feedbackText(status, res) });
     if (wantsCode(status)) {
       setCodeOpen(true);
     }

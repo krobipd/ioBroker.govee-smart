@@ -4,7 +4,7 @@ import { I18n } from "@iobroker/gui-components";
 
 import enJson from "./i18n/en.json";
 import { ConnectionPanel, type ConnectionValues } from "./ConnectionPanel";
-import type { AuthResponse } from "./useConnectionApi";
+import type { AuthResponse } from "../../src/lib/auth-status";
 
 type Handler = (id: string, state: { val: unknown } | null | undefined) => void;
 
@@ -20,7 +20,7 @@ function fakeSocket(opts: { states?: Record<string, unknown>; auth?: AuthRespons
   emit: (id: string, val: unknown) => void;
 } {
   const states = opts.states ?? {};
-  const auth = opts.auth ?? { result: "ok", status: "ok" };
+  const auth = opts.auth ?? { status: "ok" };
   const subs = new Map<string, Handler[]>();
   const sent: Array<{ command: string; data: Record<string, unknown> }> = [];
   const socket = {
@@ -124,7 +124,7 @@ describe("ConnectionPanel", () => {
   });
 
   it("Connect sends mqttAuth {action:test} with the LIVE credentials + shows feedback", async () => {
-    const { sent } = renderPanel({ auth: { result: "ok", status: "ok" } });
+    const { sent } = renderPanel({ auth: { status: "ok" } });
     fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0].command).toBe("mqttAuth");
@@ -132,15 +132,37 @@ describe("ConnectionPanel", () => {
     expect(await screen.findByText(I18n.t("gsw_conn_st_ok"))).toBeTruthy();
   });
 
-  it("a failed login shows the adapter's text with Govee's reason, not the fixed one (audit E11)", async () => {
-    renderPanel({ auth: { result: "Login failed: account frozen", status: "loginFailed" } });
+  it("a failed login shows Govee's reason in the card's own sentence (audit E11, DRY-13)", async () => {
+    renderPanel({ auth: { status: "loginFailed", reason: "account frozen" } });
     fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
-    expect(await screen.findByText("Login failed: account frozen")).toBeTruthy();
+    expect(await screen.findByText(I18n.t("gsw_conn_st_loginFailedReason", "account frozen"))).toBeTruthy();
     expect(screen.queryByText(I18n.t("gsw_conn_st_loginFailed"))).toBeNull();
   });
 
+  it("a refused code request shows Govee's reason too", async () => {
+    renderPanel({ auth: { status: "codeRejected", reason: "too many codes" } });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_st_codeRejectedReason", "too many codes"))).toBeTruthy();
+  });
+
+  it("a full login window names the time on the viewer's clock", async () => {
+    const retryAt = Date.UTC(2026, 9, 1, 20, 15);
+    renderPanel({ auth: { status: "loginWindowFull", retryAt } });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    const time = new Date(retryAt).toLocaleTimeString();
+    expect(await screen.findByText(I18n.t("gsw_conn_st_loginWindowFull", time))).toBeTruthy();
+    // The adapter's own pause is a wait, not a failure — the same colour as the other throttle.
+    expect(screen.getByRole("alert").className).toMatch(/Warning/);
+  });
+
+  it("a full login window without its time falls back to the rate-limit text, never a sentence with a hole", async () => {
+    renderPanel({ auth: { status: "loginWindowFull" } });
+    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    expect(await screen.findByText(I18n.t("gsw_conn_st_rateLimited"))).toBeTruthy();
+  });
+
   it("a case without a reason keeps the card's own text", async () => {
-    renderPanel({ auth: { result: "anything the adapter says", status: "passwordRejected" } });
+    renderPanel({ auth: { status: "passwordRejected" } });
     fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
     expect(await screen.findByText(I18n.t("gsw_conn_st_passwordRejected"))).toBeTruthy();
   });
@@ -183,7 +205,7 @@ describe("ConnectionPanel", () => {
   });
 
   it("a verifyRequired result opens the 2FA code field", async () => {
-    renderPanel({ auth: { result: "needs code", status: "verifyRequired" } });
+    renderPanel({ auth: { status: "verifyRequired" } });
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
     expect(await screen.findByLabelText(I18n.t("gsw_conn_code_label"))).toBeTruthy();

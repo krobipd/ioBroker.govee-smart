@@ -3,46 +3,9 @@
 // stays a pure, easily-testable factory: the only dependency is a `sendTo`
 // method, injected via the ConnectionSocket seam.
 //
-// The response/status shapes MUST stay in sync with the backend
-// (src/lib/message-router.ts AuthStatus / AuthResponse). They are re-declared
-// here as plain types: src-admin CAN import from ../src (measured — `err-message`
-// is shared that way), but the backend module carries imports the component
-// must not drag into its bundle, so only an import-free module is shared.
+// The answer's shape is the backend's own (src/lib/auth-status.ts, import-free so the bundle can take it).
 
-/** Machine-readable outcome of a `mqttAuth` action (superset of both actions). */
-export type AuthStatus =
-  | "ok"
-  | "verifyRequired"
-  | "codeInvalid"
-  | "passwordRejected"
-  | "emailNotRegistered"
-  | "rateLimited"
-  | "accountLocked"
-  | "loginFailed"
-  | "mqttNotUp"
-  | "codeSent"
-  | "codeRejected"
-  | "needCredentials"
-  | "throttled"
-  | "unknownAction";
-
-/** Structured `mqttAuth` response — `result` = localized text, `status` = the case. */
-export interface AuthResponse {
-  /** Localized, user-readable text (from the adapter i18n). */
-  result: string;
-  /** Machine-readable case the card reacts to. */
-  status: AuthStatus;
-}
-
-/** Credentials the user is currently editing in the card. */
-export interface AuthCreds {
-  /** Account email. */
-  email?: string;
-  /** Account password. */
-  password?: string;
-  /** 2FA verification code. */
-  code?: string;
-}
+import type { AuthCreds, AuthResponse } from "../../src/lib/auth-status";
 
 /**
  * Minimal socket seam — the admin socket's `sendTo(instance, command, data)`
