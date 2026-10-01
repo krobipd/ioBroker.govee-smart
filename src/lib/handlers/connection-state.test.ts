@@ -235,6 +235,17 @@ describe("logDeviceSummary", () => {
     expect(rig.logs.warn.some(m => m.includes("sensor readings require email + password"))).toBe(true);
   });
 
+  it("an e-mail of spaces only is no account — the sensor hint still comes (one rule with the start)", () => {
+    const sensor = createTestDevice({ deviceId: "CC:03", type: "devices.types.thermometer" });
+    const rig = makeRig({ devices: [sensor] });
+    (rig.adapter as { config: { goveeEmail?: string; goveePassword?: string } }).config = {
+      goveeEmail: "   ",
+      goveePassword: "pw",
+    };
+    logDeviceSummary(rig.adapter);
+    expect(rig.logs.warn.some(m => m.includes("sensor readings require email + password"))).toBe(true);
+  });
+
   it("stays quiet about sensors when account credentials are configured (M9)", () => {
     const sensor = createTestDevice({ deviceId: "CC:02", type: "devices.types.sensor" });
     const rig = makeRig({ devices: [sensor] });

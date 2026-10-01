@@ -2,7 +2,8 @@ import type { DeviceManager } from "../device-manager";
 import type { LocalSnapshotStore } from "../local-snapshots";
 import type { SnapshotHandlerHost } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
-import type { GoveeDevice } from "../types";
+import type { ConnectionStateAdapter } from "./connection-state";
+import { onCloudDataReady, type DeviceEventsAdapter } from "./device-events";
 
 /**
  * Adapter surface required to build the SnapshotHandler host. Loose
@@ -15,7 +16,6 @@ export interface SnapshotHandlerGlueAdapter {
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  fireCloudDataReady(device: GoveeDevice, allDevices: GoveeDevice[]): void;
 }
 
 /**
@@ -23,7 +23,9 @@ export interface SnapshotHandlerGlueAdapter {
  * captured as closures so the handler stays decoupled from the adapter shape.
  *
  */
-export function buildSnapshotHost(adapter: SnapshotHandlerGlueAdapter): SnapshotHandlerHost {
+export function buildSnapshotHost(
+  adapter: SnapshotHandlerGlueAdapter & DeviceEventsAdapter & ConnectionStateAdapter,
+): SnapshotHandlerHost {
   return {
     log: adapter.log,
     store: adapter.localSnapshots!,
@@ -37,7 +39,7 @@ export function buildSnapshotHost(adapter: SnapshotHandlerGlueAdapter): Snapshot
     refreshDeviceStates: device => {
       // Snapshot save/delete = new content in the snapshot_local dropdown —
       // Cloud-phase event. Fires onCloudDataReady to surface the change.
-      adapter.fireCloudDataReady(device, adapter.deviceManager?.getDevices() ?? []);
+      onCloudDataReady(adapter, device, adapter.deviceManager?.getDevices() ?? []);
     },
   };
 }

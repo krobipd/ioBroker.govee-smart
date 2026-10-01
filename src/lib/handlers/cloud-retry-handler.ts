@@ -4,14 +4,17 @@ import type { DeviceManager } from "../device-manager";
 import type { CloudContact, GoveeCloudClient } from "../govee-cloud-client";
 import type { StateManager } from "../state-manager";
 import type { ActionableProblems } from "../actionable-problems";
-import { logRejected, type CloudLoadResult } from "../types";
+import { logRejected, type CloudLoadResult, type GoveeDevice } from "../types";
 import { READY_TIMEOUT_MS } from "../timing-constants";
+import { sessionKey } from "../device-key";
+import { loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
+import { reapStaleDevices, type ConnectionStateAdapter } from "./connection-state";
 
 /**
  * Adapter surface required by the cloud-retry handler. Mutates several
  * adapter fields so they need to be writable from outside.
  */
-export interface CloudRetryHandlerAdapter {
+export interface CloudRetryHandlerAdapter extends CloudStateLoaderAdapter {
   readonly log: ioBroker.Logger;
   readonly deviceManager: DeviceManager | null;
   readonly cloudClient: GoveeCloudClient | null;
@@ -30,8 +33,6 @@ export interface CloudRetryHandlerAdapter {
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
-  /** Reload Cloud-state-tree after a recovered connection. */
-  loadCloudStates(): Promise<void>;
   /** Registry to surface a rejected API key as a user-actionable problem. */
   readonly actionableProblems: ActionableProblems;
 }
@@ -77,11 +78,11 @@ export function buildCloudRetryHost(adapter: CloudRetryHandlerAdapter): CloudRet
     clearTimeout: h => adapter.clearTimeout(h as ioBroker.Timeout),
     loadFromCloud: () => cloudInitWithTimeout(adapter),
     onCloudRestored: async () => {
-      adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
-      setCloudConnected(adapter, true);
+      markCloudListAccepted(adapter);
       // The start-up list failed, so its group-member step never saw a list (M9).
       await adapter.deviceManager?.loadGroupMembers();
-      await adapter.loadCloudStates();
+      await treesBuilt(adapter, adapter.deviceManager?.getDevices() ?? []);
+      await loadCloudStates(adapter);
     },
   };
 }
@@ -200,4 +201,72 @@ export function handleCloudFailure(adapter: CloudRetryHandlerAdapter, result: Cl
   const loop = ensureCloudRetry(adapter);
   loop.setConnected(false);
   loop.handleResult(result);
+}
+
+/**
+ * What every accepted Cloud device list sets right — the start, a restored connection and the manual sync alike:
+ * a rejected key is resolved, the Cloud shows reachable, and the retry loop stands down. Until 3.0.2 the manual
+ * sync did none of it: after a failed start a successful sync left `info.cloudConnected` false and the armed retry
+ * later logged "connection restored" (audit DRY-2).
+ *
+ * @param adapter Handler host
+ */
+export function markCloudListAccepted(adapter: CloudRetryHandlerAdapter): void {
+  adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
+  setCloudConnected(adapter, true);
+  ensureCloudRetry(adapter).setConnected(true);
+}
+
+/**
+ * Manual "sync devices" button (info.manualSyncDevices): pull the fresh Govee account device list and reconcile
+ * it — new devices are onboarded, devices deleted from the account are removed — without a restart. A device the
+ * list brought in gets its start value; the devices already known are not read again (each read costs the
+ * device's daily Cloud budget), and their scene/snapshot data is untouched (the per-device refresh does that).
+ *
+ * @param adapter Handler host
+ */
+export async function syncDevicesManually(adapter: CloudRetryHandlerAdapter & ConnectionStateAdapter): Promise<void> {
+  if (!adapter.deviceManager) {
+    return;
+  }
+  if (!adapter.cloudClient) {
+    // The account device list is a Cloud call — without an API key there is
+    // nothing to fetch, and a "failed" warning plus a retry loop that can
+    // never succeed would tell the user something false.
+    adapter.log.info("Manual device sync needs the Cloud API key (adapter settings) — nothing to sync");
+    return;
+  }
+  const known = new Set(adapter.deviceManager.getDevices().map(d => sessionKey(d.sku, d.deviceId)));
+  const result = await adapter.deviceManager.loadFromCloud();
+  if (!result.ok) {
+    // Same single mechanism as the init/retry path: auth-failed reaches the
+    // ActionableProblems registry, every other failure arms the retry loop —
+    // also on a running adapter whose loop counted the list as loaded.
+    // Plus one non-deduplicated line — the user explicitly pressed the
+    // button and must see why nothing happened (M4).
+    adapter.log.warn(`Manual device sync failed (${result.reason}) — see earlier log for details`);
+    handleCloudFailure(adapter, result);
+    return;
+  }
+  markCloudListAccepted(adapter);
+  // A group added in the app since the start gets its members now (M9).
+  await adapter.deviceManager.loadGroupMembers();
+  await reapStaleDevices(adapter);
+  const added = adapter.deviceManager.getDevices().filter(d => !known.has(sessionKey(d.sku, d.deviceId)));
+  await treesBuilt(adapter, added);
+  for (const device of added) {
+    await loadCloudStates(adapter, device);
+  }
+}
+
+/**
+ * Wait until the tree builds queued for these devices are done. A list that brings a device queues its build and
+ * returns; a value read right after would be written before its object exists — js-controller's "has no existing
+ * object" warning (the start avoids it by draining the queue first).
+ *
+ * @param adapter Handler host
+ * @param devices The devices about to be read
+ */
+async function treesBuilt(adapter: CloudRetryHandlerAdapter, devices: readonly GoveeDevice[]): Promise<void> {
+  await Promise.all(devices.map(device => adapter.stateManager!.runDeviceBuild(device, () => Promise.resolve())));
 }

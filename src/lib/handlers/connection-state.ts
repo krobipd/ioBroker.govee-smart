@@ -11,6 +11,7 @@ import { deviceLabel, errMessage, logRejected } from "../types";
 import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
 import { resolveDeviceReachability } from "../device-manager/lookups";
 import { cloudReachable } from "../cloud-outage";
+import { hasAccountCredentials } from "../account-credentials";
 import * as groupFanoutHandler from "./group-fanout-handler";
 
 /**
@@ -269,7 +270,7 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   const sensors = allDevices.filter(
     d => d.type === GOVEE_DEVICE_TYPE.SENSOR || d.type === GOVEE_DEVICE_TYPE.THERMOMETER,
   );
-  if (sensors.length > 0 && (!adapter.config.goveeEmail || !adapter.config.goveePassword)) {
+  if (sensors.length > 0 && !hasAccountCredentials(adapter.config.goveeEmail, adapter.config.goveePassword)) {
     adapter.log.warn(
       `${sensors.length} sensor(s) found, but no Govee account is configured — sensor readings require email + password (adapter settings, "Govee Account" section)`,
     );

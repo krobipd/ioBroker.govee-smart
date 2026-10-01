@@ -9,6 +9,9 @@ vi.mock("@iobroker/adapter-core", () => ({
     translate: vi.fn((key: string) => key),
   },
 }));
+// The router calls the Cloud-state reload and the manual sync directly — observed here, run in their own suites.
+vi.mock("./cloud-state-loader", () => ({ loadCloudStates: vi.fn(() => Promise.resolve()) }));
+vi.mock("./cloud-retry-handler", () => ({ syncDevicesManually: vi.fn(() => Promise.resolve()) }));
 
 import {
   handleGenericCapabilityCommand,
@@ -16,11 +19,13 @@ import {
   handleManualSegmentsChange,
   onStateChange,
   resolveDropdownInput,
-  sendMusicCommand,
   sendTargetTemperatureCommand,
   sendWorkModeCommand,
   type StateChangeRouterAdapter,
 } from "./state-change-router";
+import { sendMusicCommand } from "./music-command";
+import { loadCloudStates } from "./cloud-state-loader";
+import { syncDevicesManually } from "./cloud-retry-handler";
 import type { GoveeDevice } from "../types";
 import { CloudControlRejected } from "../govee-cloud-client";
 import { createTestDevice, mockLog } from "../test-helpers";
@@ -68,7 +73,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   let sendFailure: () => Error | null = () => null;
   let fanOutResult = true; // group fan-out reached a member (ack-worthy) by default
 
-  const adapter: StateChangeRouterAdapter = {
+  const adapter = {
     log: {
       ...mockLog,
       warn: (m: string) => warns.push(m),
@@ -109,11 +114,17 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       persistDeviceToCache: (device: GoveeDevice) => {
         persisted.push(device);
       },
+      syncSegmentCount: (device: GoveeDevice) => device.segmentCount ?? 0,
       generateDiagnostics: (d: GoveeDevice) => ({ adapter: "iobroker.govee-smart", sku: d.sku }),
     } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) =>
         d.sku === "BaseGroup" ? `groups.basegroup_${d.deviceId}` : `devices.${d.sku.toLowerCase()}_0011`,
+      // The manual-segment update rebuilds the segment tree with the flags it just set.
+      createSegmentStates: (d: GoveeDevice) => {
+        manualApplied.push({ mode: d.manualMode === true, indices: d.manualSegments });
+        return Promise.resolve();
+      },
     } as never,
     snapshotHandler: {
       save: (_d: GoveeDevice, name: string) => Promise.resolve(snapshotCalls.push(`save:${name}`)),
@@ -138,26 +149,24 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       setMusicMode: (ip: string, mode: number, includeRgb: boolean, r: number, g: number, b: number) =>
         lanMusic.push({ ip, mode, includeRgb, r, g, b }),
     } as never,
-    getStateAsync: id =>
+    getStateAsync: (id: string) =>
       Promise.resolve(states.has(id) ? ({ val: states.get(id), ack: true } as ioBroker.State) : null),
-    setState: (id, state) => {
+    setState: (id: string, state: unknown) => {
       acks.push({ id, val: (state as { val: unknown }).val });
       return Promise.resolve();
     },
-    getObjectAsync: id => Promise.resolve(structuredClone(objects.get(id) ?? null)),
-    loadCloudStates: () => {
-      loadCloudStatesCalls.push(1);
-      return Promise.resolve();
-    },
-    applyManualSegments: (_device, mode, indices) => {
-      manualApplied.push({ mode, indices });
-      return Promise.resolve();
-    },
-    syncDevicesManually: () => {
-      syncCalls.push(1);
-      return Promise.resolve();
-    },
-  };
+    getObjectAsync: (id: string) => Promise.resolve(structuredClone(objects.get(id) ?? null)),
+  } as unknown as StateChangeRouterAdapter;
+  vi.mocked(loadCloudStates).mockReset();
+  vi.mocked(loadCloudStates).mockImplementation(() => {
+    loadCloudStatesCalls.push(1);
+    return Promise.resolve();
+  });
+  vi.mocked(syncDevicesManually).mockReset();
+  vi.mocked(syncDevicesManually).mockImplementation(() => {
+    syncCalls.push(1);
+    return Promise.resolve();
+  });
   return {
     adapter,
     warns,

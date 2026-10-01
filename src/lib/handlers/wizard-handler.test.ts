@@ -39,16 +39,20 @@ function makeAdapter(devices: GoveeDevice[]): {
       getDevices: () => devices,
       sendCommand: () => Promise.resolve(undefined),
       syncSegmentCount: () => 12,
+      persistDeviceToCache: () => undefined,
     } as never,
-    stateManager: { devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}` } as never,
+    stateManager: {
+      devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
+      // The manual-segment update rebuilds the segment tree with the flags it just set.
+      createSegmentStates: (device: GoveeDevice) => {
+        applied.push({ device, mode: device.manualMode === true, indices: device.manualSegments });
+        return Promise.resolve();
+      },
+    } as never,
     segmentWizard: null,
     getStateAsync: () => Promise.resolve(null),
     setTimeout: () => undefined,
     clearTimeout: () => undefined,
-    applyManualSegments: (device, mode, indices) => {
-      applied.push({ device, mode, indices });
-      return Promise.resolve();
-    },
   };
   return { adapter, applied };
 }
@@ -187,6 +191,8 @@ describe("buildWizardHost — passthrough closures (the adapter ↔ wizard wirin
         sent.push({ id: d.deviceId, command, value });
         return Promise.resolve();
       },
+      syncSegmentCount: () => 12,
+      persistDeviceToCache: () => undefined,
     };
     (adapter as { getStateAsync: unknown }).getStateAsync = (id: string) =>
       Promise.resolve(id.endsWith(".control.power") ? ({ val: true, ack: true } as ioBroker.State) : null);

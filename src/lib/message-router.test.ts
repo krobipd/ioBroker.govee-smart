@@ -173,6 +173,21 @@ describe("MessageRouter", () => {
   });
 
   describe("mqttAuth — test action", () => {
+    it("a password of spaces only is no password — the card asks for credentials, no login is tried", async () => {
+      const created: string[] = [];
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
+      const create = host.createMqttProbeClient;
+      host.createMqttProbeClient = (email, password) => {
+        created.push(email);
+        return create(email, password);
+      };
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test", email: "user@example.com", password: "   " }));
+      await new Promise(r => setTimeout(r, 10));
+      expect((responses[0].data as { status: string }).status).toBe("needCredentials");
+      expect(created).toEqual([]);
+    });
+
     it("returns success message when probe connects", async () => {
       const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
       const router = new MessageRouter(host);

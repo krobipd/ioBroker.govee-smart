@@ -24,7 +24,7 @@ import * as cloudStateLoader from "./lib/handlers/cloud-state-loader";
 import * as connectionState from "./lib/handlers/connection-state";
 import * as deviceEvents from "./lib/handlers/device-events";
 import * as groupFanoutHandler from "./lib/handlers/group-fanout-handler";
-import * as dropdownReset from "./lib/handlers/dropdown-reset-helpers";
+import type * as dropdownReset from "./lib/handlers/dropdown-reset-helpers";
 import * as snapshotHandlerGlue from "./lib/handlers/snapshot-handler-glue";
 import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
@@ -35,10 +35,11 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { deviceLabel, errMessage, logRejected, type GoveeDevice } from "./lib/types";
+import { deviceLabel, errMessage, logRejected } from "./lib/types";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
+import * as accountCredentials from "./lib/account-credentials";
 import * as accountHandler from "./lib/handlers/account-handler";
 import {
   APP_API_INITIAL_DELAY_MS,
@@ -453,19 +454,6 @@ export class GoveeAdapter extends utils.Adapter {
       v => (this.segmentWizard = v),
     );
     // Adapter-owned operations the handlers call back into
-    method("loadCloudStates", (only?: GoveeDevice) => this.loadCloudStates(only));
-    method("applyManualSegments", (device: GoveeDevice, mode: boolean, indices?: number[]) =>
-      deviceEvents.applyManualSegments(host, device, mode, indices),
-    );
-    method("syncDevicesManually", () => this.syncDevicesManually());
-    method("reapStaleDevices", () => this.reapStaleDevices());
-    method("stateToCommand", (suffix: string) => dropdownReset.stateToCommand(suffix));
-    method("sendMusicCommand", (device: GoveeDevice, prefix: string, suffix: string, value: ioBroker.StateValue) =>
-      stateChangeRouter.sendMusicCommand(host, device, prefix, suffix, value),
-    );
-    method("fireCloudDataReady", (device: GoveeDevice, allDevices: GoveeDevice[]) =>
-      deviceEvents.onCloudDataReady(host, device, allDevices),
-    );
     return host;
   }
 
@@ -619,8 +607,8 @@ export class GoveeAdapter extends utils.Adapter {
     // "Connect" test trims it too, so a pasted trailing space must not make
     // the test succeed and the real start-up login fail on the same value.
     // The password stays untouched — surrounding spaces can be part of it.
-    const accountEmail = (config.goveeEmail ?? "").trim();
-    const hasAccountCreds = !!(accountEmail && config.goveePassword?.trim());
+    const accountEmail = accountCredentials.accountEmail(config.goveeEmail);
+    const hasAccountCreds = accountCredentials.hasAccountCredentials(config.goveeEmail, config.goveePassword);
     return {
       config,
       accountEmail,
@@ -765,7 +753,9 @@ export class GoveeAdapter extends utils.Adapter {
     // diagnostics buffers. A poll-driven eviction never fires onCloudDataReady,
     // so reapStaleDevices must be triggered explicitly here.
     this.deviceManager!.onDevicesRemoved = () => {
-      void this.reapStaleDevices().catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
+      void connectionState
+        .reapStaleDevices(this.handlerHost)
+        .catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
     };
 
     // Update info.ip when LAN IP changes
@@ -1121,8 +1111,7 @@ export class GoveeAdapter extends utils.Adapter {
     const result = start.cloudInit;
     if (result) {
       if (result.ok) {
-        cloudRetryHandler.setCloudConnected(this.handlerHost, true);
-        cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
+        cloudRetryHandler.markCloudListAccepted(this.handlerHost);
         start.cloudStateReadable = true;
       } else {
         cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
@@ -1493,54 +1482,6 @@ export class GoveeAdapter extends utils.Adapter {
       // ignore
     }
     callback();
-  }
-
-  /** Delete objects for devices no longer present — the connection-state handler holds the implementation. */
-  private reapStaleDevices(): Promise<void> {
-    return connectionState.reapStaleDevices(this.handlerHost);
-  }
-
-  /**
-   * Manual "sync devices" button (info.manualSyncDevices): pull the fresh
-   * Govee account device list and reconcile it — new devices are onboarded,
-   * devices deleted from the account are removed — without a restart. Existing
-   * devices' scene/snapshot data is untouched (use the per-device refresh).
-   */
-  private async syncDevicesManually(): Promise<void> {
-    if (!this.deviceManager) {
-      return;
-    }
-    if (!this.cloudClient) {
-      // The account device list is a Cloud call — without an API key there is
-      // nothing to fetch, and a "failed" warning plus a retry loop that can
-      // never succeed would tell the user something false.
-      this.log.info("Manual device sync needs the Cloud API key (adapter settings) — nothing to sync");
-      return;
-    }
-    const result = await this.deviceManager.loadFromCloud();
-    if (!result.ok) {
-      // Same single mechanism as the init/retry path: auth-failed reaches the
-      // ActionableProblems registry, every other failure arms the retry loop —
-      // also on a running adapter whose loop counted the list as loaded.
-      // Plus one non-deduplicated line — the user explicitly pressed the
-      // button and must see why nothing happened (M4).
-      this.log.warn(`Manual device sync failed (${result.reason}) — see earlier log for details`);
-      cloudRetryHandler.handleCloudFailure(this.handlerHost, result);
-      return;
-    }
-    // A group added in the app since the start gets its members now (M9).
-    await this.deviceManager.loadGroupMembers();
-    await this.reapStaleDevices();
-  }
-
-  /**
-   * Reload the Cloud-state tree — after a recovered connection or for one
-   * refreshed device.
-   *
-   * @param only Optional single device to reload; omit to reload every device's cloud states
-   */
-  private loadCloudStates(only?: GoveeDevice): Promise<void> {
-    return cloudStateLoader.loadCloudStates(this.handlerHost, only);
   }
 
   // ───────── Segment-Detection-Wizard ─────────

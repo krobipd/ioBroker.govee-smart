@@ -1,3 +1,12 @@
+import { vi } from "vitest";
+
+// The restore path reloads the Cloud states directly — observed here, run in its own suite. The reaper and the
+// state loader reach the capability mapper → adapter-core, whose import-time lookup exits outside a controller.
+vi.mock("./cloud-state-loader", () => ({ loadCloudStates: vi.fn(() => Promise.resolve()) }));
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: { getTranslatedObject: vi.fn((key: string) => ({ en: key })), translate: vi.fn((key: string) => key) },
+}));
+
 import {
   buildCloudRetryHost,
   cloudInitWithTimeout,
@@ -10,6 +19,7 @@ import {
 import type { CloudLoadResult } from "../types";
 import { mockLog } from "../test-helpers";
 import { CloudOutage } from "../cloud-outage";
+import { loadCloudStates } from "./cloud-state-loader";
 
 interface TestRig {
   adapter: CloudRetryHandlerAdapter;
@@ -35,10 +45,16 @@ function makeRig(log: ioBroker.Logger = mockLog): TestRig {
   const groupMemberLoads: number[] = [];
   let load: () => Promise<CloudLoadResult> = () => Promise.resolve({ ok: true });
 
-  const adapter: CloudRetryHandlerAdapter = {
+  vi.mocked(loadCloudStates).mockReset();
+  vi.mocked(loadCloudStates).mockImplementation(() => {
+    loadCloudStatesCalls.push(1);
+    return Promise.resolve();
+  });
+  const adapter = {
     log,
     deviceManager: {
       loadFromCloud: () => load(),
+      getDevices: () => [],
       loadGroupMembers: () => {
         groupMemberLoads.push(1);
         return Promise.resolve(false);
@@ -56,26 +72,22 @@ function makeRig(log: ioBroker.Logger = mockLog): TestRig {
     cloudWasConnected: false,
     cloudConnectedShown: false,
     cloudOutage: new CloudOutage(),
-    setState: (id, state) => {
+    setState: (id: string, state: unknown) => {
       stateWrites.push({ id, val: (state as { val: unknown }).val });
       return Promise.resolve();
     },
-    setTimeout: (cb, ms) => {
+    setTimeout: (cb: () => void, ms: number) => {
       timers.push({ cb, ms });
       return timers.length as unknown as ioBroker.Timeout;
     },
-    clearTimeout: h => {
-      cleared.push(h as unknown as number);
-    },
-    loadCloudStates: () => {
-      loadCloudStatesCalls.push(1);
-      return Promise.resolve();
+    clearTimeout: (h: unknown) => {
+      cleared.push(h as number);
     },
     actionableProblems: {
       report: (p: { key: string; title: string }) => reports.push({ key: p.key, title: p.title }),
       resolve: (key: string, msg?: string) => resolves.push({ key, msg }),
     } as never,
-  };
+  } as unknown as CloudRetryHandlerAdapter;
   return {
     adapter,
     timers,

@@ -1,26 +1,24 @@
-import {
-  declaredOptionValue,
-  pickOption,
-  getMusicModeOptions,
-  musicModeNameUsesRgb,
-  resolveWorkModeStruct,
-} from "../capability-mapper";
+import { declaredOptionValue, pickOption, resolveWorkModeStruct } from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { GOVEE_CAP_TYPE, isAppGroup } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
-import { deviceLabel, errMessage, hexToRgb, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
+import { deviceLabel, errMessage, parseSegmentList, resolveStatesValue, type GoveeDevice } from "../types";
 import { optionLabelsFor } from "../value-labels";
+import { loadCloudStates } from "./cloud-state-loader";
+import * as cloudRetryHandler from "./cloud-retry-handler";
+import type * as connectionState from "./connection-state";
 import * as dropdownReset from "./dropdown-reset-helpers";
+import { sendMusicCommand } from "./music-command";
 
 /**
  * Adapter surface required by the state-change router. Includes everything
  * the onStateChange path touches (devices, snapshots, group-fanout, music
  * commands, dropdown reset, manual segments, generic capability routing).
  */
-export interface StateChangeRouterAdapter {
+interface StateChangeRouterOwnAdapter {
   readonly log: ioBroker.Logger;
   readonly namespace: string;
   readonly unloading: boolean;
@@ -32,13 +30,12 @@ export interface StateChangeRouterAdapter {
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   getObjectAsync(id: string): Promise<unknown>;
-  /** Owned by main.ts — reloads the Cloud-state tree after a per-device refresh. */
-  loadCloudStates(only?: GoveeDevice): Promise<void>;
-  /** Owned by main.ts — central entry point for manual-segment updates. */
-  applyManualSegments(device: GoveeDevice, mode: boolean, indices?: number[]): Promise<void>;
-  /** Owned by main.ts — manual "sync devices" button: reload account list + reconcile. */
-  syncDevicesManually?(): Promise<void>;
 }
+
+/** The router's own surface plus what the Cloud reload, the manual sync and the reaper it calls need. */
+export type StateChangeRouterAdapter = StateChangeRouterOwnAdapter &
+  cloudRetryHandler.CloudRetryHandlerAdapter &
+  connectionState.ConnectionStateAdapter;
 
 /**
  * Locate a device by the state-tree prefix it owns. Linear scan because the
@@ -238,96 +235,39 @@ export async function sendTargetTemperatureCommand(
   return { ack: autoStopChanged ? newValue : temperature };
 }
 
-export async function sendMusicCommand(
-  adapter: StateChangeRouterAdapter,
+/** What the manual-segment update needs. */
+export interface ManualSegmentsAdapter {
+  readonly deviceManager: DeviceManager | null;
+  readonly stateManager: StateManager | null;
+}
+
+/**
+ * Central entry point for manual-segment updates (the wizard and the
+ * state-change router both end here). Sets the device flags, rebuilds the
+ * segment tree (which writes manual_mode + manual_list with ack=true), and
+ * persists to cache.
+ *
+ * @param adapter Adapter surface
+ * @param device Target device
+ * @param mode    Whether manual mode should be active
+ * @param indices Physical indices when mode=true, ignored otherwise
+ */
+export async function applyManualSegments(
+  adapter: ManualSegmentsAdapter,
   device: GoveeDevice,
-  prefix: string,
-  changedSuffix: string,
-  newValue: ioBroker.StateValue,
-): Promise<boolean> {
-  const musicBase = `${adapter.namespace}.${prefix}.music`;
-
-  const modeState = await adapter.getStateAsync(`${musicBase}.music_mode`);
-  const sensState = await adapter.getStateAsync(`${musicBase}.music_sensitivity`);
-  const autoState = await adapter.getStateAsync(`${musicBase}.music_auto_color`);
-
-  const selectedIndex =
-    changedSuffix === "music.music_mode" ? parseInt(String(newValue), 10) : parseInt(String(modeState?.val ?? 0), 10);
-  const sensitivity =
-    changedSuffix === "music.music_sensitivity" ? (newValue as number) : ((sensState?.val as number) ?? 100);
-  const autoColor = changedSuffix === "music.music_auto_color" ? (newValue ? 1 : 0) : autoState?.val ? 1 : 0;
-
-  // Index 0 = the "---" sentinel = nothing selected. Gate the skip on the
-  // INDEX, not the resolved device value: on a 0-based SKU index 1 resolves to
-  // device value 0 (a real mode) which must NOT be swallowed here (A1).
-  // The `<= 0` half has no test of its own on purpose: index 0 would resolve to
-  // `options[-1]` → undefined → NaN and fall through the guard below anyway, so
-  // dropping it only changes which debug line appears (equivalent mutant,
-  // 2026-08-22 test audit). It stays because it names the intent.
-  if (!Number.isFinite(selectedIndex) || selectedIndex <= 0) {
-    adapter.log.debug("Music mode not selected, skipping command");
-    return false;
-  }
-
-  // Resolve the dropdown index to the device's actual mode value through the
-  // SAME option list the dropdown was built from (getMusicModeOptions), so the
-  // index→value mapping can't drift: index N → options[N-1].value.
-  const musicCap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.MUSIC_SETTING && c.instance === "musicMode");
-  const chosen = musicCap ? getMusicModeOptions(musicCap)[selectedIndex - 1] : undefined;
-  const musicMode = chosen ? Number(chosen.value) : NaN;
-  if (!Number.isFinite(musicMode)) {
-    adapter.log.debug(`Music mode index ${selectedIndex} has no matching numeric option, skipping command`);
-    return false;
-  }
-
-  if (device.lanIp && adapter.lanClient) {
-    // The local music packet (33 05 01 <mode> [rgb]) carries no sensitivity /
-    // auto-color fields, so those changes can't be applied over LAN. Warn
-    // instead of silently re-sending just the mode and acking "ok" (A3) — the
-    // music mode itself still works over LAN.
-    if (changedSuffix === "music.music_sensitivity" || changedSuffix === "music.music_auto_color") {
-      adapter.log.warn(
-        `${deviceLabel(device)}: music sensitivity / auto-color can't be set over the local API — ` +
-          `only the music mode applies for LAN-controlled lights.`,
-      );
-      return false;
-    }
-    let r = 0,
-      g = 0,
-      b = 0;
-    // A2: which modes carry a custom RGB colour is keyed on the mode NAME
-    // (Spectrum/Rolling), not the numeric value — Govee's music-mode values are
-    // SKU-specific (A1: 0-based vs 1-based SKUs), so a value gate appended RGB
-    // on the wrong mode for a non-standard-value SKU.
-    const includeRgb = musicModeNameUsesRgb(chosen?.name);
-    if (includeRgb) {
-      const colorState = await adapter.getStateAsync(`${adapter.namespace}.${prefix}.control.color_rgb`);
-      if (colorState?.val && typeof colorState.val === "string") {
-        ({ r, g, b } = hexToRgb(colorState.val));
-      }
-    }
-    // NOTE (A2 residual): the sub-mode BYTE is the raw capability value, which
-    // equals the ptReal sub-mode on every SKU seen so far (0-3). A SKU that
-    // reports music-mode values outside that range is untested — the byte may
-    // then be wrong and needs hardware validation. The RGB gate above is
-    // already name-correct regardless of the numbering.
-    adapter.lanClient.setMusicMode(device.lanIp, musicMode, includeRgb, r, g, b);
-    return true;
-  }
-
-  const structValue: Record<string, unknown> = {
-    musicMode,
-    sensitivity,
-    autoColor,
-  };
-
-  await adapter.deviceManager!.sendCapabilityCommand(device, GOVEE_CAP_TYPE.MUSIC_SETTING, "musicMode", structValue);
-  return true;
+  mode: boolean,
+  indices?: number[],
+): Promise<void> {
+  // Both exist: the router and the wizard run only after the start has built them.
+  device.manualMode = mode;
+  device.manualSegments = mode && Array.isArray(indices) && indices.length > 0 ? indices.slice() : undefined;
+  await adapter.stateManager!.createSegmentStates(device, adapter.deviceManager!.syncSegmentCount(device));
+  adapter.deviceManager!.persistDeviceToCache(device);
 }
 
 /**
  * React to manual-segments state changes — parses list, forwards to
- * {@link StateChangeRouterAdapter.applyManualSegments}. On parse error
+ * {@link applyManualSegments}. On parse error
  * disables manual mode so the rejected value doesn't survive in the state
  * tree.
  *
@@ -350,7 +290,7 @@ export async function handleManualSegmentsChange(
 
   if (!modeVal) {
     adapter.log.info(`${deviceLabel(device)}: manual segments disabled — strip treated as contiguous`);
-    await adapter.applyManualSegments(device, false);
+    await applyManualSegments(adapter, device, false);
     return;
   }
 
@@ -361,14 +301,14 @@ export async function handleManualSegmentsChange(
   const parsed = parseSegmentList(listVal, physical - 1);
   if (parsed.error) {
     adapter.log.warn(`${deviceLabel(device)}: manual_list invalid (${parsed.error}) — disabling manual mode`);
-    await adapter.applyManualSegments(device, false);
+    await applyManualSegments(adapter, device, false);
     return;
   }
 
   adapter.log.debug(
     `${deviceLabel(device)}: manual segments active — ${parsed.indices.length} physical indices (${listVal})`,
   );
-  await adapter.applyManualSegments(device, true, parsed.indices);
+  await applyManualSegments(adapter, device, true, parsed.indices);
 }
 
 /**
@@ -449,7 +389,7 @@ export async function onStateChange(
   if (localId === "info.manualSyncDevices") {
     if (state.val) {
       adapter.log.info("Manual device sync requested — refreshing the device list from your Govee account");
-      await adapter.syncDevicesManually?.();
+      await cloudRetryHandler.syncDevicesManually(adapter);
     }
     await adapter.setState(id, { val: false, ack: true });
     return;
@@ -547,7 +487,7 @@ export async function onStateChange(
           // Scoped to the one refreshed device — the button is per-device by
           // design (Pattern 55); reloading every device burned the budget the
           // pattern exists to protect.
-          await adapter.loadCloudStates(device);
+          await loadCloudStates(adapter, device);
         }
       } catch (e) {
         adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${errMessage(e)}`);

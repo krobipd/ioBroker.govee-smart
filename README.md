@@ -109,6 +109,8 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a light whose scene library has not loaded yet keeps its `scenes.scene_speed` datapoint, value and recording — a start without saved data deleted and re-created it
 - Improved: a restart or a refreshed device list rewrites no object that did not change, and status indicators are written only when their value changes
 - Fixed: a mode or level dropdown only takes a value the device declares — a fan speed no longer shows `50`, an air purifier's level no longer `0` in Auto mode
+- Fixed: the manual device sync after a failed start shows the Cloud connected and stops the pending retry; a device it adds gets its first values without a warning in the log, and devices already known are not read again
+- Fixed: a Govee e-mail or password of spaces only counts as not entered — at start, in the sensor hint and in the connection card's test
 - Improved: appliance modes and levels (Manual, Heat, Low, High, Auto, Keep temperature, Speed 1 …) and `info.type` are labelled in the system language; scripts may still write Govee's names such as `Auto` or `gearMode`
 
 ### 3.0.1 (2026-09-27)

@@ -6,6 +6,7 @@ import type { StateManager } from "../state-manager";
 import { parseSegmentList, type GoveeDevice } from "../types";
 import { sessionKey } from "../device-key";
 import { plausibleSegmentCount } from "../device-manager/lookups";
+import { applyManualSegments } from "./state-change-router";
 
 /**
  * Adapter surface required by the segment-wizard glue.
@@ -20,8 +21,6 @@ export interface WizardHandlerAdapter {
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
   clearTimeout: (h: ioBroker.Timeout) => void;
-  /** Apply manual segments — owned by main.ts because it touches StateManager + cache. */
-  applyManualSegments(device: GoveeDevice, mode: boolean, indices?: number[]): Promise<void>;
 }
 
 /**
@@ -83,7 +82,7 @@ export function buildWizardHost(adapter: WizardHandlerAdapter): WizardHost {
 
 /**
  * Apply a finished wizard's measurement: set the real segment count, then
- * route through {@link WizardHandlerAdapter.applyManualSegments} so the same
+ * route through {@link applyManualSegments} so the same
  * state-tree rebuild and cache-persist path runs for both wizard results
  * and user edits.
  *
@@ -103,9 +102,9 @@ export async function applyWizardResult(
   device.segmentCount = segmentCount;
   if (result.hasGaps) {
     const parsed = parseSegmentList(result.manualList, result.segmentCount - 1);
-    await adapter.applyManualSegments(device, true, parsed.error ? undefined : parsed.indices);
+    await applyManualSegments(adapter, device, true, parsed.error ? undefined : parsed.indices);
   } else {
-    await adapter.applyManualSegments(device, false);
+    await applyManualSegments(adapter, device, false);
   }
   adapter.log.debug(
     `applyWizardResult: ${device.sku} → segmentCount=${result.segmentCount}, ` +

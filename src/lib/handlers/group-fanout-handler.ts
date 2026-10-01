@@ -2,23 +2,21 @@ import type { DeviceManager } from "../device-manager";
 import type { GroupFanoutHost } from "../group-fanout";
 import { resolveGroupMembers } from "../group-fanout";
 import type { StateManager } from "../state-manager";
-import { logRejected, type GoveeDevice } from "../types";
+import { logRejected } from "../types";
 import { isAppGroup } from "../govee-constants";
+import { stateToCommand } from "./dropdown-reset-helpers";
+import { sendMusicCommand, type MusicCommandAdapter } from "./music-command";
 
 /**
  * Adapter surface required by the group-fanout glue. Loose
  * `getObjectAsync` shape for utils.Adapter structural matching.
  */
-export interface GroupFanoutHandlerAdapter {
+export interface GroupFanoutHandlerAdapter extends MusicCommandAdapter {
   readonly log: ioBroker.Logger;
   readonly namespace: string;
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
   getObjectAsync(id: string): Promise<unknown>;
-  /** State-suffix → command lookup — owned by main.ts because it lives next to STATE_TO_COMMAND. */
-  stateToCommand(suffix: string): string | null;
-  /** Music command builder — owned by main.ts because it pulls sibling state values; `false` = nothing sent. */
-  sendMusicCommand(device: GoveeDevice, devicePrefix: string, stateSuffix: string, value: unknown): Promise<boolean>;
 }
 
 // resolveGroupMembers (canonical resolver) lives in ../group-fanout, shared with
@@ -70,9 +68,9 @@ export function buildGroupFanoutHost(adapter: GroupFanoutHandlerAdapter): GroupF
       await adapter.deviceManager?.sendCommand(device, command, value);
     },
     devicePrefix: device => adapter.stateManager?.devicePrefix(device) ?? "",
-    stateToCommand: suffix => adapter.stateToCommand(suffix) ?? undefined,
+    stateToCommand: suffix => stateToCommand(suffix) ?? undefined,
     getObject: id => adapter.getObjectAsync(id) as Promise<ioBroker.Object | null | undefined>,
     sendMusicCommand: (device, devicePrefix, stateSuffix, value) =>
-      adapter.sendMusicCommand(device, devicePrefix, stateSuffix, value),
+      sendMusicCommand(adapter, device, devicePrefix, stateSuffix, value),
   };
 }

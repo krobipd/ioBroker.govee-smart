@@ -39,8 +39,8 @@ function makeAdapter(devices: GoveeDevice[]): {
       },
     } as never,
     getObjectAsync: () => Promise.resolve(null),
-    stateToCommand: () => null,
-    sendMusicCommand: () => Promise.resolve(true),
+    lanClient: null,
+    getStateAsync: () => Promise.resolve(null),
   };
   return { adapter, unreachableCalls };
 }
@@ -107,16 +107,54 @@ describe("buildGroupFanoutHost — passthrough closures", () => {
     expect(host.devicePrefix(dev)).toBe("devices.h6160");
   });
 
-  it("sendMusicCommand forwards to the adapter-owned builder (sibling-state reads live in main)", async () => {
-    const music: string[] = [];
+  it("sendMusicCommand builds the member's own music command — mode from the write, the rest from its datapoints", async () => {
+    const sent: unknown[] = [];
     const { adapter } = makeAdapter([]);
-    (adapter as { sendMusicCommand: unknown }).sendMusicCommand = (_d: GoveeDevice, _p: string, suffix: string) => {
-      music.push(suffix);
-      return Promise.resolve();
+    (adapter as { deviceManager: unknown }).deviceManager = {
+      getDevices: () => [],
+      sendCapabilityCommand: (_d: GoveeDevice, type: string, instance: string, value: unknown) => {
+        sent.push({ type, instance, value });
+        return Promise.resolve();
+      },
     };
+    const member = createTestDevice({
+      lanIp: undefined,
+      capabilities: [
+        {
+          type: "devices.capabilities.music_setting",
+          instance: "musicMode",
+          parameters: {
+            dataType: "STRUCT",
+            fields: [
+              {
+                fieldName: "musicMode",
+                dataType: "ENUM",
+                options: [
+                  { name: "Energic", value: 5 },
+                  { name: "Rhythm", value: 3 },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    });
     const host = buildGroupFanoutHost(adapter);
-    await host.sendMusicCommand(createTestDevice(), "devices.x", "music.music_mode", 1);
-    expect(music).toEqual(["music.music_mode"]);
+    expect(await host.sendMusicCommand(member, "devices.x", "music.music_mode", 2)).toBe(true);
+    expect(sent).toEqual([
+      {
+        type: "devices.capabilities.music_setting",
+        instance: "musicMode",
+        value: { musicMode: 3, sensitivity: 100, autoColor: 0 },
+      },
+    ]);
+  });
+
+  it("stateToCommand answers from the one state-to-command table", () => {
+    const { adapter } = makeAdapter([]);
+    const host = buildGroupFanoutHost(adapter);
+    expect(host.stateToCommand("control.power")).toBe("power");
+    expect(host.stateToCommand("control.nonsense")).toBeUndefined();
   });
 
   it("devicePrefix falls back to '' when the state manager is gone (teardown race)", () => {

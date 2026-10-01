@@ -251,6 +251,8 @@ import { GoveeAdapter } from "./main";
 import { CLOUD_LIMITS, LAN_STATUS_REFRESH_MS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import { CloudControlRejected } from "./lib/govee-cloud-client";
 import * as connectionState from "./lib/handlers/connection-state";
+import * as cloudRetryHandler from "./lib/handlers/cloud-retry-handler";
+import { applyManualSegments } from "./lib/handlers/state-change-router";
 import { StateManager } from "./lib/state-manager";
 import * as cloudCredsModule from "./lib/handlers/cloud-creds-handler";
 import type { DeviceManager } from "./lib/device-manager";
@@ -355,8 +357,7 @@ function internalOf(adapter: GoveeAdapter): {
   delObjectAsync: ReturnType<typeof vi.fn>;
   onStateChange: (id: string, s: unknown) => Promise<void>;
   onMessage: (obj: unknown) => void;
-  syncDevicesManually: () => Promise<void>;
-  handlerHost: { applyManualSegments: (d: GoveeDevice, mode: boolean, idx?: number[]) => Promise<void> };
+  handlerHost: Parameters<typeof cloudRetryHandler.syncDevicesManually>[0];
   buildMessageRouterHost: () => Record<string, unknown>;
 } {
   return adapter as unknown as ReturnType<typeof internalOf>;
@@ -1889,7 +1890,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const device = makeDevice({ segmentCount: 6 });
-    await i.handlerHost.applyManualSegments(device, true, [0, 1, 4]);
+    await applyManualSegments(i.handlerHost, device, true, [0, 1, 4]);
     expect(device.manualMode).toBe(true);
     expect(device.manualSegments).toEqual([0, 1, 4]);
     const prefix = i.stateManager!.devicePrefix(device);
@@ -1904,7 +1905,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const device = makeDevice({ segmentCount: 3, manualMode: true, manualSegments: [0, 2] });
-    await i.handlerHost.applyManualSegments(device, false);
+    await applyManualSegments(i.handlerHost, device, false);
     expect(device.manualMode).toBe(false);
     expect(device.manualSegments).toBeUndefined();
     const prefix = i.stateManager!.devicePrefix(device);
@@ -1916,7 +1917,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const i = internalOf(adapter);
     f.cloud.getDevices.mockRejectedValue(new Error("network down"));
     i.log.warn.mockClear();
-    await i.syncDevicesManually();
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("Manual device sync failed"));
     // A running adapter whose loop counted the list as loaded arms a retry again.
     expect(i.setTimeout.mock.calls.some(c => c[1] === 300_000)).toBe(true);
@@ -1936,7 +1937,7 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
       },
     ]);
     f.api.fetchGroupMembers.mockClear();
-    await i.syncDevicesManually();
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
     expect(f.api.fetchGroupMembers).toHaveBeenCalledTimes(1);
   });
 
@@ -1945,22 +1946,144 @@ describe("GoveeAdapter — manual segments + manual sync", () => {
     const i = internalOf(adapter);
     i.log.warn.mockClear();
     const timersBefore = i.setTimeout.mock.calls.length;
-    await i.syncDevicesManually();
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("needs the Cloud API key"));
     expect(i.log.warn).not.toHaveBeenCalledWith(expect.stringContaining("Manual device sync failed"));
     expect(i.setTimeout.mock.calls.slice(timersBefore).some(c => c[1] === 300_000)).toBe(false);
     expect(f.cloud.getDevices).not.toHaveBeenCalled();
   });
 
-  it("the handler view maps state suffixes to commands (plain + dynamic segment indices)", async () => {
-    // The handlers no longer reach into the adapter — they get one host object
-    // built over its private runtime. stateToCommand is one of its methods.
-    const { adapter } = await setupReady();
-    const host = (adapter as unknown as { handlerHost: { stateToCommand(s: string): string | null } }).handlerHost;
-    expect(host.stateToCommand("control.power")).toBe("power");
-    expect(host.stateToCommand("segments.7.color")).toBe("segmentColor:7");
-    expect(host.stateToCommand("segments.7.brightness")).toBe("segmentBrightness:7");
-    expect(host.stateToCommand("nope.nothing")).toBeNull();
+  const purifier = {
+    sku: "H7127",
+    device: "AA:BB:CC:DD:EE:12",
+    deviceName: "Purifier",
+    type: "devices.types.air_purifier",
+    capabilities: [{ type: "devices.capabilities.property", instance: "filterLifeTime" }],
+  };
+  const strip = {
+    sku: "H61BE",
+    device: "AA:BB:CC:DD:EE:11",
+    deviceName: "Strip",
+    type: "devices.types.light",
+    capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
+  };
+
+  it("a manual sync after a failed start shows the Cloud connected and stands the retry down (DRY-2)", async () => {
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDevices.mockRejectedValueOnce(new Error("network down"));
+    await i.onReady();
+    await settle();
+    const retry = i.setTimeout.mock.calls.find(c => c[1] === 300_000);
+    expect(retry, "the failed start arms the retry").toBeDefined();
+    ctx.f.cloud.getDevices.mockResolvedValue([strip]);
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
+    await settle();
+    expect(i.states.get("info.cloudConnected")?.val).toBe(true);
+    i.log.info.mockClear();
+    (retry![0] as () => void)();
+    await settle();
+    expect(i.log.info).not.toHaveBeenCalledWith("Govee Cloud connection restored");
+  });
+
+  it("a manual sync reads the start value of a device the list brought — never of a known one", async () => {
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.cloud.getDevices.mockResolvedValue([strip]);
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
+    await settle();
+    f.cloud.getDeviceState.mockClear();
+    f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 64 } },
+    ]);
+    f.cloud.getDevices.mockResolvedValue([strip, purifier]);
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
+    await settle();
+    expect(f.cloud.getDeviceState.mock.calls).toEqual([["H7127", "AA:BB:CC:DD:EE:12"]]);
+  });
+
+  it("the start value of a synced device lands in its tree even while the tree is still being built", async () => {
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 64 } },
+    ]);
+    // Hold the Cloud half of the new device's build until the sync has returned.
+    let release!: () => void;
+    const held = new Promise<void>(r => (release = r));
+    const original = StateManager.prototype.createCloudStates;
+    const spy = vi.spyOn(StateManager.prototype, "createCloudStates").mockImplementation(async function (
+      this: StateManager,
+      ...args: Parameters<typeof original>
+    ) {
+      await held;
+      return original.apply(this, args);
+    });
+    // js-controller warns "has no existing object" for a value written before its object.
+    const orphanWrites: string[] = [];
+    const setState = (adapter as unknown as { setState: (id: string, s: unknown) => Promise<void> }).setState;
+    (adapter as unknown as { setState: unknown }).setState = (id: string, s: unknown) => {
+      const local = id.replace(`${i.namespace}.`, "");
+      if (local.startsWith("devices.h7127-ee12.") && !i.objects.has(local)) {
+        orphanWrites.push(local);
+      }
+      return setState(id, s);
+    };
+    try {
+      f.cloud.getDevices.mockResolvedValue([purifier]);
+      const sync = cloudRetryHandler.syncDevicesManually(i.handlerHost);
+      await settle(5);
+      release();
+      await sync;
+      await settle(5);
+      expect(i.states.get("devices.h7127-ee12.sensor.filter_life_time")?.val).toBe(64);
+      expect(i.states.has("devices.h7127-ee12.control.filter_life_time")).toBe(false);
+      expect(orphanWrites).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("a restored Cloud reads the states only after the trees the list queued are built", async () => {
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(ctx.adapter);
+    ctx.f.cloud.getDevices.mockRejectedValueOnce(new Error("network down"));
+    await i.onReady();
+    await settle();
+    const retry = i.setTimeout.mock.calls.find(c => c[1] === 300_000);
+    ctx.f.cloud.getDeviceState.mockResolvedValue([
+      { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 51 } },
+    ]);
+    ctx.f.cloud.getDevices.mockResolvedValue([purifier]);
+    let release!: () => void;
+    const held = new Promise<void>(r => (release = r));
+    const original = StateManager.prototype.createCloudStates;
+    const spy = vi.spyOn(StateManager.prototype, "createCloudStates").mockImplementation(async function (
+      this: StateManager,
+      ...args: Parameters<typeof original>
+    ) {
+      await held;
+      return original.apply(this, args);
+    });
+    const orphanWrites: string[] = [];
+    const setState = (ctx.adapter as unknown as { setState: (id: string, s: unknown) => Promise<void> }).setState;
+    (ctx.adapter as unknown as { setState: unknown }).setState = (id: string, s: unknown) => {
+      const local = id.replace(`${i.namespace}.`, "");
+      if (local.startsWith("devices.h7127-ee12.") && !i.objects.has(local)) {
+        orphanWrites.push(local);
+      }
+      return setState(id, s);
+    };
+    try {
+      (retry![0] as () => void)();
+      await settle(5);
+      release();
+      await settle(10);
+      expect(i.states.get("devices.h7127-ee12.sensor.filter_life_time")?.val).toBe(51);
+      expect(orphanWrites).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("the handler view exposes live values, not copies — a flag flipped later reads through", async () => {
@@ -3144,7 +3267,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
         capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
       },
     ]);
-    await i.syncDevicesManually();
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
     await settle();
 
     const device = i.deviceManager!.getDevices()[0];
@@ -3179,7 +3302,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
         capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch" }],
       },
     ]);
-    await i.syncDevicesManually();
+    await cloudRetryHandler.syncDevicesManually(i.handlerHost);
     await settle();
     const device = i.deviceManager!.getDevices()[0];
     // A group is known to the adapter; its id is digits only, so only the

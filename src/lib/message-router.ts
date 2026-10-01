@@ -1,4 +1,5 @@
 import { errMessage, type ErrorCategory } from "./types";
+import { accountEmail, hasAccountCredentials } from "./account-credentials";
 import type { GoveeMqttClient, LoginVerdict } from "./govee-mqtt-client";
 import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import { resolveLabel } from "./i18n";
@@ -235,10 +236,10 @@ export class MessageRouter {
    */
   private async runMqttAuthAction(action: string, creds: AuthCreds = {}): Promise<AuthResponse> {
     const config = this.host.getConfig();
-    const email = (creds.email ?? config.goveeEmail ?? "").trim();
+    const email = accountEmail(creds.email ?? config.goveeEmail);
     const password = creds.password ?? config.goveePassword ?? "";
     const code = (creds.code ?? config.mqttVerificationCode ?? "").trim();
-    if (!email || !password) {
+    if (!hasAccountCredentials(email, password)) {
       return { result: resolveLabel("mqttAuthNeedCredentials"), status: "needCredentials" };
     }
     if (action === "test") {
