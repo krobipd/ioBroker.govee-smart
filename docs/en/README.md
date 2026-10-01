@@ -11,17 +11,10 @@ scenes and snapshots — and takes over control for devices that have no local A
 
 ## What you get for what you enter
 
-Everything is optional except the first line. Enter more and more becomes available; enter nothing
-and local control still works.
-
-| What you enter                        | What the adapter can do                                                                                 |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Nothing                               | Find lights on your network and switch them: power, brightness, colour, colour temperature, status      |
-| + Govee API key                       | Device names, capabilities, scenes, snapshots and segments                                              |
-| + Govee account (e-mail and password) | Real-time status updates pushed from Govee, so changes made in the app or on the device show up at once |
-
-The API key is free and comes from the Govee Home app. The account login is what the app itself
-uses; the adapter only listens on it and never sends commands through it.
+Everything is optional: with nothing entered, the lights on your network are found and switched
+locally; a free Govee API key adds names, capabilities, scenes, snapshots and segments; your Govee
+account adds real-time status — what each step brings in detail is on the wiki page
+[Setup](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup).
 
 **The local API has to be switched on per device, in the Govee Home app** (device settings → LAN
 Control). Without it, that device is controlled through the cloud — which works, but takes a few
@@ -53,7 +46,7 @@ IDs must be updated.
 
 Open the adapter's **Expert** tab, press **Diagnostics**, pick the device and press the button:
 the adapter builds a report and your browser saves it as a file. Attach that file to a GitHub
-issue — the issue forms ask for exactly this file.
+issue — the device-support form asks for exactly this file.
 
 The device list offers every device, reachable or not — a report is wanted precisely when
 something misbehaves. Each device's `diag.lastExport` datapoint records when its last report was

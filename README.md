@@ -32,7 +32,7 @@ Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroke
 
 ## Features
 
-- **Capability-driven** — states are generated from what the Govee API reports for each device. No SKU hardcoding, no hand-maintained device list to fall behind.
+- **Capability-driven** — states are generated from what the Govee API reports for each device, so a model nobody has listed yet still gets its datapoints. Per-model code exists only where a model needs it: a catalog correction where Govee's own data is wrong, a decoder for a device's status frames once they are measured.
 - **LAN-first for lights** — UDP multicast discovery, sub-50 ms commands, status updates via AWS IoT MQTT
 - **Cloud + MQTT push for sensors and appliances** — readings via the App API, events via the OpenAPI MQTT broker
 - **Per-segment color and brightness** for LED strips with the right capability, including batch commands and a visual segment-detection wizard (with a live, correctable strip map) for cut strips
@@ -117,6 +117,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
 - Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns, as a single light does
 - Fixed: a heater that declares no temperature unit shows none instead of an invented °F; a command delivered after the device came back shows the value that was sent
+- Fixed: the settings describe the experimental switch for what it does — it turns on the catalog corrections of untested models; every device appears without it
 - Improved: the device sync button and the per-device cloud refresh report their result in the log; automatic clean-ups after an update no longer write info lines
 - Fixed: the connection card words every answer in the admin's language — a full login window shows the time on your own clock, and a repeated login test no longer claims a code was just requested
 - Fixed: the music mode read from Govee's state answer showed the mode at that position instead of the reported one; a mode the device never declared is no longer written

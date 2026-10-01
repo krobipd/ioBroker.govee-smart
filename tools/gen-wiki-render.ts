@@ -76,9 +76,9 @@ Mehrere verifizierte Erfahrungsberichte liegen vor.`,
 Erfahrungsbericht eines Anwenders liegt vor. Weitere Tests erwünscht.`,
   statusSeed: `### ⚪ Experimentell
 Ungetestet, es liegen noch keine Erfahrungsberichte vor.
-Standardmäßig deaktiviert — wenn du es ausprobieren willst, in der
-Adapter-Konfiguration aktivieren. Dabei können Probleme auftreten oder
-einzelne Funktionen fehlen.`,
+Das Gerät läuft wie jedes andere; Korrekturen, die der Katalog für das Modell
+mitbringt (falls vorhanden), bleiben aus, bis du die experimentelle
+Unterstützung in der Adapter-Konfiguration einschaltest.`,
   tablesHeading: "## Geräte-Liste",
   tablesHint: "Klick auf einen Gerätetyp öffnet seine Modelle.",
   typeSummary: "<b>{title}</b> · {n} {models} (✅ {v} · 🟢 {r} · ⚪ {s})",
@@ -109,15 +109,16 @@ einzelne Funktionen fehlen.`,
   experimentalBody: `Wir haben dein Gerät noch nicht selbst getestet. Wenn du es ausprobierst,
 hast du echte Daten — und unser Adapter wird mit jedem Bericht besser.
 
-### Aktivieren
+### Ausprobieren
 
-1. Adapter-Konfiguration öffnen (govee-smart in der ioBroker Instanzen-Liste)
-2. Häkchen setzen: **„Experimentelle Geräte-Unterstützung aktivieren"**
-3. Speichern → Adapter startet neu
-4. Nach 1-2 Minuten: dein Gerät erscheint im Object-Browser unter
-   \`govee-smart.0.devices.<sku>-<id>\`
-5. Probier die Funktionen durch (Power, Helligkeit, Farbe, Modes — was
+1. Dein Gerät steht schon im Object-Browser unter
+   \`govee-smart.0.devices.<sku>-<id>\` — dafür braucht es keinen Schalter
+2. Probier die Funktionen durch (Power, Helligkeit, Farbe, Modes — was
    dein Gerät eben kann)
+3. Stimmt etwas nicht (ein Bereich, ein Wert): in der Adapter-Konfiguration
+   **„Experimentelle Geräte-Unterstützung aktivieren"** ankreuzen und
+   speichern — der Adapter startet neu und wendet die Korrekturen an, die der
+   Katalog für dein Modell mitbringt, falls es welche gibt
 
 ### Daten exportieren und teilen
 
@@ -137,8 +138,8 @@ willst: gerne ein Pull-Request gegen \`devices.json\`. Details in
 ### Was passiert mit deinem Bericht
 
 Sobald wir Diagnostics von deinem Gerät haben, wandert es im nächsten Release
-auf 🟢 **User-bestätigt** — dann ist es für alle ohne Sonder-Aktivierung
-direkt nutzbar.`,
+auf 🟢 **User-bestätigt** — seine Korrekturen gelten dann für alle, ohne den
+experimentellen Schalter.`,
   footer: "Diese Seite ist automatisch generiert.",
   entriesWord: "Einträge",
 };
@@ -155,8 +156,9 @@ Multiple verified user reports on file.`,
 One user has reported success with diagnostics. More tests welcome.`,
   statusSeed: `### ⚪ Experimental
 Untested, no user reports yet.
-Disabled by default — to try it, enable it in the adapter configuration.
-Problems or missing functions are possible.`,
+The device works like any other; corrections the catalog carries for the
+model (if any) stay off until you enable experimental support in the
+adapter configuration.`,
   tablesHeading: "## Device list",
   tablesHint: "Click a device type to unfold its models.",
   typeSummary: "<b>{title}</b> · {n} {models} (✅ {v} · 🟢 {r} · ⚪ {s})",
@@ -187,15 +189,16 @@ Problems or missing functions are possible.`,
   experimentalBody: `We haven't tested your device ourselves yet. If you try it, you have
 real data — and the adapter improves with every report.
 
-### Enable
+### Try it
 
-1. Open the adapter configuration (govee-smart in the ioBroker instance list)
-2. Tick **"Enable experimental device support"**
-3. Save → adapter restarts
-4. After 1–2 minutes: your device appears in the object browser under
-   \`govee-smart.0.devices.<sku>-<id>\`
-5. Try the functions (power, brightness, color, modes — whatever your
+1. Your device is already in the object browser under
+   \`govee-smart.0.devices.<sku>-<id>\` — no switch needed for that
+2. Try the functions (power, brightness, color, modes — whatever your
    device supports)
+3. If something is off (a range, a value): tick **"Enable experimental
+   device support"** in the adapter configuration and save — the adapter
+   restarts and applies the corrections the catalog carries for your model,
+   if there are any
 
 ### Export data and share
 
@@ -215,7 +218,7 @@ a pull request against \`devices.json\` is welcome — see
 ### What happens with your report
 
 Once we have diagnostics from your device, it moves to 🟢 **User-confirmed**
-in the next release — then it's directly usable for everyone without the
+in the next release — its corrections then apply for everyone, without the
 experimental toggle.`,
   footer: "This page is auto-generated.",
   entriesWord: "entries",

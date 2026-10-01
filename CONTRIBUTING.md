@@ -17,13 +17,12 @@ The device list lives in [`devices.json`](./devices.json) at the repo root. One 
 ### Workflow
 
 1. **Diagnostics exportieren / Export diagnostics**
-   - Adapter installieren, dein Gerät erkennen lassen
-   - Object-Browser öffnen, beim Gerät `diag.export` auf `true` setzen
-   - Inhalt von `diag.result` kopieren
+   - Adapter installieren, dein Gerät erkennen lassen / install the adapter and let it find your device
+   - In den Adapter-Einstellungen den Reiter **Experte** öffnen, **Diagnose** wählen, das Gerät wählen und den Knopf drücken — der Browser speichert die Berichtsdatei / open the **Expert** tab in the adapter settings, pick **Diagnostics**, choose the device and press the button — your browser saves the report file
 
 2. **Issue oder PR / Issue or PR**
    - **Issue** (einfacher, empfohlen wenn du nicht mit GitHub arbeitest): über das [device-support Template](https://github.com/krobipd/ioBroker.govee-smart/issues/new?template=device-support.yml). Wir tragen den Eintrag selbst ein.
-   - **Pull Request** (wenn du den Eintrag selbst beitragen willst): Fork, neuer Branch, Änderung an `devices.json`, PR mit Diagnostics-JSON in der Description.
+   - **Pull Request** (wenn du den Eintrag selbst beitragen willst): Fork, neuer Branch, Änderung an `devices.json`, PR mit der Berichtsdatei im Anhang. / Fork, new branch, change `devices.json`, attach the report file to the PR.
 
 3. **Schema-Check**
    - Lokal: `npm run validate-devices`
@@ -51,7 +50,7 @@ Fields: `name`, `type`, `status` required; `since` (semver, no `v` prefix) and `
 
 ### Status-Schwellen / Status thresholds
 
-- `seed` — extern importiert (z.B. govee2mqtt), kein Erfahrungsbericht. Quirks werden nur scharf wenn der Adapter-Config-Schalter "Experimentelle Geräte-Unterstützung" aktiv ist.
+- `seed` — extern importiert (homebridge-govee, Govees Modellseite), kein Erfahrungsbericht. Das Gerät erscheint trotzdem; seine Quirks werden nur scharf, wenn der Adapter-Config-Schalter "Experimentelle Geräte-Unterstützung" aktiv ist.
 - `reported` — 1 verifizierter Erfahrungsbericht mit Diagnostics. Quirks aktiv.
 - `verified` — mehrere unabhängige verifizierte Erfahrungsberichte. Quirks aktiv.
 
@@ -59,13 +58,17 @@ Promotion-Pfad: ⚪ → 🟢 → ✅. Linear, jede neue Bestätigung kann hochpr
 
 ### Quirk-Felder / Quirk fields
 
-Aktuelle Quirk-Felder sind die einzigen die im Code etwas bewirken:
+Das Schema ([`devices.schema.json`](./devices.schema.json)) kennt genau diese sieben Felder, und jedes wirkt im Code — `npm run validate-devices` liest seine Regeln aus dem Schema. / The schema knows exactly these seven fields, and every one acts in the code — `npm run validate-devices` reads its rules from the schema.
 
-| Feld                                                | Wann verwenden                                                                                                              |
+| Feld / Field                                        | Wann verwenden / When to use                                                                                                |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `colorTempRange: { min, max }`                      | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                                  |
 | `brokenPlatformApi: true`                           | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                                |
 | `transportOverrides: { <command>: "cloud"\|"lan" }` | Bestimmten Transport pro Operation erzwingen (z.B. Pixel-Matrix-SKUs deren LAN-Bridge Scene-Frames verwirft — H70B3, H70C5) |
+| `segmentCount: 1..56`                               | Die Cloud meldet mehr Segmente als der Streifen hat, und das Gerät korrigiert sich nicht selbst per Status-Push             |
+| `statusCmdVersion: 1 \| 2`                          | Die Statusanfrage über das Konto braucht eine andere Protokoll-Version (H6121: 1)                                           |
+| `platformTempUnit: "F"`                             | `/device/state` meldet die Temperatur in °F statt °C                                                                        |
+| `ignoredCloudCapabilities: ["<instance>", …]`       | Govee bestätigt einen Befehl mit „success“, das Gerät tut nichts (z.B. H1250, H8120)                                        |
 
 Wenn dein Gerät einen Quirk braucht der hier fehlt: erst Issue mit Diagnostics-JSON aufmachen — wir entscheiden gemeinsam ob es ein neues Feld im Schema rechtfertigt oder im bestehenden Vokabular abgebildet werden kann. Schema-Erweiterungen kommen mit dem Code-Pfad der sie auswertet zusammen rein.
 

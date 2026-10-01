@@ -12,17 +12,10 @@ ohne lokale Schnittstelle.
 
 ## Was du bekommst, je nachdem was du einträgst
 
-Alles außer der ersten Zeile ist freiwillig. Je mehr du einträgst, desto mehr steht zur Verfügung;
-trägst du nichts ein, funktioniert die lokale Steuerung trotzdem.
-
-| Was du einträgst                    | Was der Adapter kann                                                                           |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------- |
-| Nichts                              | Lampen im eigenen Netz finden und schalten: Ein/Aus, Helligkeit, Farbe, Farbtemperatur, Status |
-| + Govee-API-Schlüssel               | Gerätenamen, Fähigkeiten, Szenen, Snapshots und Segmente                                       |
-| + Govee-Konto (E-Mail und Passwort) | Echtzeit-Statusmeldungen von Govee: Änderungen aus der App oder am Gerät erscheinen sofort     |
-
-Der API-Schlüssel ist kostenlos und kommt aus der Govee-Home-App. Die Konto-Anmeldung ist dieselbe,
-die die App benutzt; der Adapter hört darüber nur zu und schickt keine Befehle darüber.
+Alles ist freiwillig: ohne Eintrag findet und schaltet der Adapter die Lampen im eigenen Netz lokal;
+ein kostenloser Govee-API-Schlüssel bringt Namen, Fähigkeiten, Szenen, Snapshots und Segmente; das
+Govee-Konto bringt Echtzeit-Status — was jede Stufe im Einzelnen bringt, steht auf der Wiki-Seite
+[Einrichtung](https://github.com/krobipd/ioBroker.govee-smart/wiki/Einrichtung).
 
 **Die lokale Schnittstelle muss je Gerät in der Govee-Home-App eingeschaltet werden**
 (Geräte-Einstellungen → LAN Control). Ohne sie läuft das Gerät über die Cloud — das funktioniert,
@@ -54,7 +47,7 @@ Visualisierungen mit den alten IDs müssen angepasst werden.
 
 Im Reiter **Experte** des Adapters auf **Diagnose** drücken, Gerät wählen und den Knopf drücken:
 Der Adapter erstellt einen Bericht, und der Browser legt ihn als Datei ab. Diese Datei an ein
-GitHub-Issue anhängen — die Issue-Formulare fragen genau nach dieser Datei.
+GitHub-Issue anhängen — das Formular für Geräte-Unterstützung fragt genau nach dieser Datei.
 
 Die Geräteliste zeigt alle Geräte, erreichbar oder nicht — ein Bericht wird gerade dann gebraucht,
 wenn etwas klemmt. Der Datenpunkt `diag.lastExport` je Gerät hält fest, wann der letzte Bericht
