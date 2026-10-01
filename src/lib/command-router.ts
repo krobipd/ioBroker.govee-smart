@@ -89,18 +89,18 @@ export class CommandRouter {
    */
   onDiagLog?: (deviceId: string, level: "debug" | "info" | "warn", msg: string) => void;
   /**
-   * Outcome of a user-triggered command, for the diagnostics report. The LAN
-   * send capture ends at the wire and says nothing about whether the write was
-   * accepted — which is precisely the gap in a "switching does not work"
-   * report.
-   */
-  /**
    * A command Govee refused because the device is offline at the cloud. The
    * host holds it for the device's next sign of life (issue #46, 2.39.0).
    * Reporting is a side effect of the catch — the rejection still propagates,
    * the caller still warns once and never acks (rule 5).
    */
   onDeviceOffline?: (device: GoveeDevice, intent: HeldIntent) => void;
+  /**
+   * Outcome of a user-triggered command, for the diagnostics report. The LAN
+   * send capture ends at the wire and says nothing about whether the write was
+   * accepted — which is precisely the gap in a "switching does not work"
+   * report.
+   */
   onCommandResult?: (
     deviceId: string,
     entry: {

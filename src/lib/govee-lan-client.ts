@@ -831,13 +831,6 @@ export class GoveeLanClient {
   }
 }
 
-// --- BLE Packet Builder for ptReal ---
-
-/**
- * Clamp a value to 0-100. NaN / non-numeric → 0.
- *
- * @param v Input value
- */
 /**
  * The directed broadcast address of each IPv4 network the scan may use:
  * only the network of the selected address, or every non-internal IPv4

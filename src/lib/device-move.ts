@@ -31,7 +31,7 @@ export interface DeviceMoveDeps {
   namespace: string;
   /** Every object under the instance, keyed by full id. */
   objects(): Promise<Record<string, ioBroker.Object | null | undefined>>;
-  /** Every state below a full-id pattern (`govee-smart.0.devices.h61be_525f.*`). */
+  /** Every state below a full-id pattern (`govee-smart.0.devices.h61be-525f.*`). */
   states(pattern: string): Promise<Record<string, ioBroker.State | null | undefined>>;
   /** Write an object whole (full id). */
   setObject(id: string, obj: ioBroker.SettableObject): Promise<unknown>;

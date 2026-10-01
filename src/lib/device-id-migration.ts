@@ -27,7 +27,7 @@ export interface IdMigrationDeps extends DeviceMoveDeps {
 
 /** A device tree found at start. */
 interface Tree {
-  /** Namespace-relative id (`devices.h61be_525f`). */
+  /** Namespace-relative id (`devices.h61be_525f` from 2.x, `devices.h61be-525f` since 3.0.0). */
   rel: string;
   sku: string;
   deviceId: string;

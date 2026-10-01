@@ -485,6 +485,10 @@ export async function onStateChange(
           // pattern exists to protect.
           await loadCloudStates(adapter, device);
         }
+        // The user pressed the button — the result goes on info (logging strategy).
+        adapter.log.info(
+          `Refresh cloud data for ${deviceLabel(device)} done — ${changed ? "scenes and snapshots updated" : "nothing changed"}`,
+        );
       } catch (e) {
         adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${errMessage(e)}`);
       }

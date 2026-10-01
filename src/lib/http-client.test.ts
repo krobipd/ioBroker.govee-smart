@@ -85,10 +85,6 @@ async function startStubServer(): Promise<StubServer> {
 }
 
 /**
- * `httpsRequest` clone using `http` instead of `https` — same logic, no TLS.
- * The point of the tests is the request/response handling, not the TLS layer.
- */
-/**
  * The tests drive the REAL httpsRequest with a node:http transport (the
  * `transport` seam added in v2.26.0). Before that this file carried a copy of
  * the implementation, so a bug in production code failed nothing here.

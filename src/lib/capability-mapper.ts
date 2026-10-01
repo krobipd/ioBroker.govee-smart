@@ -1229,12 +1229,6 @@ function mapEvent(cap: CloudCapability): StateDefinition[] {
 }
 
 /**
- * Map music_setting capability to user-friendly states.
- * Parses STRUCT fields into: mode dropdown, sensitivity slider, auto-color toggle.
- *
- * @param cap Cloud music_setting capability
- */
-/**
  * Whether a music mode carries a custom RGB colour in the ptReal LAN packet
  * (`33 05 01 <mode> R G B`). Spectrum + Rolling are colour-reactive; Energic,
  * Rhythm and any other mode use the device's own auto-colours.
@@ -1300,6 +1294,12 @@ export function getMusicModeOptions(cap: CloudCapability): NamedCapabilityOption
   return modeField.options.filter((o): o is NamedCapabilityOption => !!o && typeof o.name === "string");
 }
 
+/**
+ * Map music_setting capability to user-friendly states.
+ * Parses STRUCT fields into: mode dropdown, sensitivity slider, auto-color toggle.
+ *
+ * @param cap Cloud music_setting capability
+ */
 function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
   const fields = cap.parameters?.fields;
   if (!Array.isArray(fields) || fields.length === 0) {
@@ -1462,11 +1462,6 @@ function sanitizeId(str: string): string {
     .toLowerCase();
 }
 
-/**
- * Convert camelCase to human-readable name
- *
- * @param str camelCase input string
- */
 /** The eleven languages every ioBroker translation object carries. */
 const LANGUAGES = ["en", "de", "ru", "pt", "nl", "fr", "it", "es", "pl", "uk", "zh-cn"] as const;
 
@@ -1583,6 +1578,11 @@ function capabilityName(instance: string): ioBroker.StringOrTranslated {
   }, {}) as ioBroker.StringOrTranslated;
 }
 
+/**
+ * Convert camelCase to human-readable name
+ *
+ * @param str camelCase input string
+ */
 function humanize(str: string): string {
   // Order: first underscore → space, then camelCase split, then trim +
   // uppercase the first character. Previously leading-underscore IDs

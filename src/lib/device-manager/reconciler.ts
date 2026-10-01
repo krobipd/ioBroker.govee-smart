@@ -13,7 +13,7 @@ export interface ReconcileSource {
   ok: boolean;
   keys: Set<string>;
   /**
-   * Object-tree prefixes (`devices.<treeKey>` / `groups.<treeKey>`) of the
+   * Object-tree prefixes (`devices.<id>` / `groups.<id>`, the id registry's) of the
    * devices the source listed — the cleanup never deletes a tree an ok source
    * lists, even when the device map lacks the device (H6: a cache start that
    * lost a light). Absent = no prefixes known.

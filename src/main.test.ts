@@ -2170,7 +2170,7 @@ describe("GoveeAdapter onReady — state-creation drain", () => {
     expect(i.stateCreationQueue).toHaveLength(0);
   });
 
-  it("announces the legacy cloud-state cleanup only when it removed something", async () => {
+  it("the legacy cloud-state cleanup writes no info line — an automatic correction is silent", async () => {
     const dataDir = currentDataDir();
     fsReal.mkdirSync(pathReal.join(dataDir, "cache"), { recursive: true });
     // A pure-LAN light (no API key ever): matches the migration condition on

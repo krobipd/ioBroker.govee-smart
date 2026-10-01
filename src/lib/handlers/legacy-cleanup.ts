@@ -66,11 +66,6 @@ async function removeLegacyReportStore(adapter: LegacyCleanupAdapter): Promise<v
   }
   await adapter.delObjectAsync("diagnostics").catch(() => undefined);
   const removed = entries.filter(e => !e.isDir).length;
-  if (removed > 0) {
-    adapter.log.info(
-      `Removed ${removed} stored diagnostics report(s) and their folder — reports are download-only now`,
-    );
-  } else {
-    adapter.log.debug("Removed the empty diagnostics report store — reports are download-only now");
-  }
+  // An automatic correction is carried out silently (CLAUDE_CODING "Logging-Philosophie").
+  adapter.log.debug(`Removed ${removed} stored diagnostics report(s) and their folder — reports are download-only now`);
 }

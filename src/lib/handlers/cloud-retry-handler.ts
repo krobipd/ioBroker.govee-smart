@@ -4,7 +4,7 @@ import type { DeviceManager } from "../device-manager";
 import type { CloudContact, GoveeCloudClient } from "../govee-cloud-client";
 import type { StateManager } from "../state-manager";
 import type { ActionableProblems } from "../actionable-problems";
-import { logRejected, type CloudLoadResult, type GoveeDevice } from "../types";
+import { deviceLabel, logRejected, type CloudLoadResult, type GoveeDevice } from "../types";
 import { READY_TIMEOUT_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 import { loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
@@ -219,6 +219,19 @@ export function markCloudListAccepted(adapter: CloudRetryHandlerAdapter): void {
 }
 
 /**
+ * A start from the cache: the cache stands in for the device list, so the retry loop has nothing to fetch and a
+ * Cloud-only light counts as reachable. The two datapoints wait for the first call Govee actually accepts (contact
+ * hook) — a cache start has not talked to the Cloud yet. Here, not in main.ts: `cloudWasConnected` has its writers
+ * in this module only (audit, Niedrig).
+ *
+ * @param adapter Handler host
+ */
+export function markCachedListAccepted(adapter: CloudRetryHandlerAdapter): void {
+  adapter.cloudWasConnected = true;
+  ensureCloudRetry(adapter).setConnected(true);
+}
+
+/**
  * Manual "sync devices" button (info.manualSyncDevices): pull the fresh Govee account device list and reconcile
  * it — new devices are onboarded, devices deleted from the account are removed — without a restart. A device the
  * list brought in gets its start value; the devices already known are not read again (each read costs the
@@ -258,6 +271,12 @@ export async function syncDevicesManually(adapter: CloudRetryHandlerAdapter & Co
   for (const device of added) {
     await loadCloudStates(adapter, device);
   }
+  // The user pressed the button — the result goes on info (logging strategy: a user action reports it).
+  adapter.log.info(
+    added.length === 0
+      ? "Manual device sync done — no new device"
+      : `Manual device sync done — ${added.length} new: ${added.map(d => deviceLabel(d)).join(", ")}`,
+  );
 }
 
 /**

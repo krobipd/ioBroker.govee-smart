@@ -16,7 +16,7 @@ export interface SnapshotHandlerHost {
   store: LocalSnapshotStore;
   /** Adapter namespace prefix (e.g. "govee-smart.0"). */
   namespace: string;
-  /** Resolved object prefix for a device (e.g. "devices.h61be_525f"). */
+  /** Resolved object prefix for a device (e.g. "devices.h61be-525f"). */
   devicePrefix: (device: GoveeDevice) => string;
   /** State-read (volles ID `<namespace>.<prefix>.<channel>.<state>`). */
   getState: (id: string) => Promise<ioBroker.State | null | undefined>;

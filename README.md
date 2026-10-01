@@ -117,6 +117,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
 - Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns, as a single light does
 - Fixed: a heater that declares no temperature unit shows none instead of an invented °F; a command delivered after the device came back shows the value that was sent
+- Improved: the device sync button and the per-device cloud refresh report their result in the log; automatic clean-ups after an update no longer write info lines
 - Fixed: the connection card words every answer in the admin's language — a full login window shows the time on your own clock, and a repeated login test no longer claims a code was just requested
 - Fixed: the music mode read from Govee's state answer showed the mode at that position instead of the reported one; a mode the device never declared is no longer written
 - Fixed: a segment measurement that runs to the protocol limit ends the strip at its last lit segment, like the review does

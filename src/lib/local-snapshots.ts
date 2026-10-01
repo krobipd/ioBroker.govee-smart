@@ -96,7 +96,7 @@ const LEGACY_ROOT_STORE = "snapshots";
 export class LocalSnapshotStore {
   private readonly adapter: LocalSnapshotStoreAdapter;
   private readonly log: ioBroker.Logger;
-  /** key = `<sku>_<shortId>`, value = snapshots for that device */
+  /** key = the device's tree id (`h61be-525f`), value = snapshots for that device */
   private readonly cache = new Map<string, LocalSnapshot[]>();
   /** False until init() succeeds — guards save/load while the objects are unreachable */
   private dataAvailable = false;
@@ -381,7 +381,7 @@ export class LocalSnapshotStore {
   }
 
   /**
-   * Build device key for cache + object id.
+   * The device's tree id — key of the cache and of the object below `devices.`.
    *
    * @param sku Product model
    * @param deviceId Device identifier

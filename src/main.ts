@@ -1125,12 +1125,7 @@ export class GoveeAdapter extends utils.Adapter {
       // info — keep this one on debug so a cache-only start isn't announced
       // twice (C9).
       this.log.debug(`Using cached device data — no Cloud calls needed`);
-      // The cache stands in for the device list, so the retry loop has
-      // nothing to fetch and a Cloud-only light counts as reachable. The
-      // two datapoints wait for the first call Govee actually accepts
-      // (contact hook): a cache start has not talked to the Cloud yet.
-      this.cloudWasConnected = true;
-      cloudRetryHandler.ensureCloudRetry(this.handlerHost).setConnected(true);
+      cloudRetryHandler.markCachedListAccepted(this.handlerHost);
       start.cloudStateReadable = true;
     }
     // Load group membership from undocumented API (needs bearer token + device map)
@@ -1211,12 +1206,11 @@ export class GoveeAdapter extends utils.Adapter {
                 this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
                 return 0;
               });
-              // Only announce when something was actually removed: pure-LAN
-              // devices (no API key) match this condition on EVERY start, and
-              // an info-level "Migrated" line for a no-op was permanent log
-              // noise for exactly the credential-less target group (M7).
+              // An automatic correction is carried out silently (CLAUDE_CODING
+              // "Logging-Philosophie"); only a real removal leaves a debug line —
+              // pure-LAN devices match this condition on EVERY start (M7).
               if (deleted > 0) {
-                this.log.info(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
+                this.log.debug(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
               }
             });
           }

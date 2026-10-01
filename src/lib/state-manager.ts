@@ -70,25 +70,12 @@ function channelName(channel: string): ioBroker.StringOrTranslated {
 }
 
 /**
- * Synthetic capabilities written by the App-API poll and OpenAPI-MQTT
- * handler arrive as `(stateId, value)` pairs without a channel hint —
- * `mapCloudStateValue` returns only what the Govee response carries.
- *
- * For lights the LAN/Cloud-state pipeline pre-populates `stateChannelMap`
- * via `createDeviceStates`, so `resolveStatePath` finds the channel.
- * For thermometer/appliance state IDs that are *only* delivered via the
- * App-API path (battery, temperature, humidity, co2, lack_water, …) the map
- * is empty and the lookup would default to "control" — visibly wrong:
- * `info: control.battery has no existing object`.
- *
- * This routing table assigns those IDs to their semantic channel without
- * needing a separate `createDeviceStates` pass for sensor-only devices.
- * Keep IDs lowercase; resolveStatePath calls this on the raw stateId.
- */
-/**
  * Best-effort channel routing for a synthetic state ID with no stateChannelMap
- * entry yet (App-API caps before createDeviceStates). Reads the channel straight
- * from {@link SYNTHETIC_STATE_META}; an unknown ID falls back to the safe default
+ * entry yet. Synthetic capabilities from the App-API poll and the OpenAPI-MQTT
+ * handler arrive as `(stateId, value)` without a channel hint; for a sensor or
+ * appliance the map is empty, and "control" would be visibly wrong (`info:
+ * control.battery has no existing object`). Reads the channel straight from
+ * {@link SYNTHETIC_STATE_META}; an unknown ID falls back to the safe default
  * "control". Keep IDs lowercase — resolveStatePath calls this on the raw stateId.
  *
  * @param stateId The raw state ID (e.g. "battery", "lack_water")
@@ -287,7 +274,7 @@ export class StateManager {
    * one-time transition (first discovery / upgraded install); after the guard
    * is set the object tree is never toggled again.
    *
-   * @param prefix Device object prefix (e.g. "devices.h5109_001a")
+   * @param prefix Device object prefix (e.g. "devices.h5109-001a")
    * @param stateId Info state id under the `info` channel (e.g. "ip")
    */
   async removeInfoStateOnce(prefix: string, stateId: string): Promise<void> {
@@ -557,7 +544,7 @@ export class StateManager {
    * an already-migrated (or empty) state is left alone so this stays a no-op
    * on every start after the first.
    *
-   * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
+   * @param prefix Device state prefix (e.g. `devices.h61be-1d6f`)
    */
   private async resetLastExportIfNotATimestamp(prefix: string): Promise<void> {
     const id = `${prefix}.diag.lastExport`;
@@ -614,7 +601,7 @@ export class StateManager {
    * Idempotent: skips when the meta table doesn't know the stateId, and
    * `setObjectNotExistsAsync` is itself a no-op for existing objects.
    *
-   * @param prefix Device prefix (e.g. "devices.h5179_aabb")
+   * @param prefix Device prefix (e.g. "devices.h5179-aabb")
    * @param stateId State ID without channel (e.g. "battery")
    * @param valueChannel The value's own channel — a value of another channel
    *   than the synthetic one (the `range/humidity` setpoint next to the
@@ -990,7 +977,7 @@ export class StateManager {
    * object once, then create each state. Called from createLanStates and
    * createCloudStates. Idempotent (extendObject).
    *
-   * @param prefix Device prefix (e.g. "devices.h6172_abcd")
+   * @param prefix Device prefix (e.g. "devices.h6172-abcd")
    * @param stateDefs State definitions to write
    * @param logTag Short tag for the per-phase debug log line
    */
@@ -1424,7 +1411,7 @@ export class StateManager {
    * @param currentDevices Current device list
    * @param listedPrefixes Tree prefixes an account list names — kept even when
    *   the device map lacks them (H6: a device the account lists exists)
-   * @returns Prefixes of removed devices (e.g. "devices.h61be_1d6f")
+   * @returns Prefixes of removed devices (e.g. "devices.h61be-1d6f")
    */
   async cleanupDevices(currentDevices: GoveeDevice[], listedPrefixes?: Set<string>): Promise<string[]> {
     const currentPrefixes = new Set(currentDevices.map(d => this.devicePrefix(d)));

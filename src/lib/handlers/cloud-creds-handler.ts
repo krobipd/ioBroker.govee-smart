@@ -196,7 +196,7 @@ export async function loadPersistedCreds(
       // the next start.
       writeCredentialsFile(dataDir, raw);
       await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
-      adapter.log.info("Migrated persisted MQTT credentials from state to the credentials store");
+      adapter.log.debug("Migrated persisted MQTT credentials from state to the credentials store");
     } catch (e) {
       adapter.log.debug(`Credentials file write failed — keeping legacy state for next start: ${errMessage(e)}`);
     }
@@ -264,7 +264,7 @@ export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dat
     if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
       try {
         writeCredentialsFile(dataDir, raw);
-        adapter.log.info("Migrated persisted MQTT credentials into the instance data directory");
+        adapter.log.debug("Migrated persisted MQTT credentials into the instance data directory");
       } catch (e) {
         // Write failure (read-only FS, full disk) is NOT "no blob": keep the
         // legacy meta file as the migration source for the next start —

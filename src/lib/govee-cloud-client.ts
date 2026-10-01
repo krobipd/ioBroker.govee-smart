@@ -526,13 +526,6 @@ export class GoveeCloudClient {
   }
 
   /**
-   * Make an HTTPS request to the Govee Cloud API
-   *
-   * @param method HTTP method (GET, POST)
-   * @param path API endpoint path
-   * @param body Optional request body
-   */
-  /**
    * Read Govee's rate-limit headers off one answer and keep the newest set.
    * The v1 docs name `X-RateLimit-*` (day) and `API-RateLimit-*` (minute);
    * every header whose name mentions the rate limit is kept verbatim as well,
@@ -553,6 +546,13 @@ export class GoveeCloudClient {
     }
   }
 
+  /**
+   * Make an HTTPS request to the Govee Cloud API
+   *
+   * @param method HTTP method (GET, POST)
+   * @param path API endpoint path
+   * @param body Optional request body
+   */
   private async request<T>(method: string, path: string, body?: unknown): Promise<T | null> {
     this.log.debug(`Cloud API: ${method} ${path} auth=apiKey`);
     try {

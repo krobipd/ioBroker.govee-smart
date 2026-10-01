@@ -2,9 +2,8 @@ import { normalizeDeviceId } from "./types";
 
 /**
  * Sanitize a string for use inside an ioBroker object id — lowercase, only
- * `[a-z0-9_-]` survive (everything else becomes `_`). Matches the historical
- * `sanitize` helpers in state-manager/sku-cache so existing object ids and
- * cache filenames keep the exact same shape.
+ * `[a-z0-9_-]` survive (everything else becomes `_`). The character set of the
+ * 2.x names {@link treeKey} still has to find.
  *
  * @param str Raw string
  */

@@ -7,12 +7,14 @@ function makeAdapter(opts: { store?: boolean; files?: Array<{ file: string; isDi
   deletedObjects: string[];
   deletedFiles: string[];
   info: ReturnType<typeof vi.fn>;
+  debug: ReturnType<typeof vi.fn>;
 } {
   const deletedObjects: string[] = [];
   const deletedFiles: string[] = [];
   const info = vi.fn();
+  const debug = vi.fn();
   const adapter: LegacyCleanupAdapter = {
-    log: { ...mockLog, info },
+    log: { ...mockLog, info, debug },
     namespace: "govee-smart.0",
     getObjectAsync: (id: string) =>
       Promise.resolve(id === "diagnostics" && opts.store ? ({ type: "meta" } as ioBroker.Object) : null),
@@ -26,7 +28,7 @@ function makeAdapter(opts: { store?: boolean; files?: Array<{ file: string; isDi
       return Promise.resolve();
     },
   };
-  return { adapter, deletedObjects, deletedFiles, info };
+  return { adapter, deletedObjects, deletedFiles, info, debug };
 }
 
 describe("removeLegacyObjects", () => {
@@ -52,8 +54,8 @@ describe("removeLegacyObjects", () => {
     expect(deletedObjects).toContain("info.wizardStatus");
   });
 
-  it("removes the report files of 2.29.0–2.36.0 and their folder, and says how many", async () => {
-    const { adapter, deletedObjects, deletedFiles, info } = makeAdapter({
+  it("removes the report files of 2.29.0–2.36.0 and their folder, silently — the count on debug", async () => {
+    const { adapter, deletedObjects, deletedFiles, info, debug } = makeAdapter({
       store: true,
       files: [
         { file: "a.json", isDir: false },
@@ -64,7 +66,8 @@ describe("removeLegacyObjects", () => {
     await removeLegacyObjects(adapter);
     expect(deletedFiles).toEqual(["a.json", "b.json"]);
     expect(deletedObjects).toContain("diagnostics");
-    expect(info).toHaveBeenCalledWith(expect.stringContaining("Removed 2 stored diagnostics report(s)"));
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("Removed 2 stored diagnostics report(s)"));
+    expect(info, "an automatic correction is carried out silently").not.toHaveBeenCalled();
   });
 
   it("a fresh install has no report store — nothing is touched and nothing is logged", async () => {

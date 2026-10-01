@@ -110,7 +110,7 @@ export function diagnosticsFileName(device: GoveeDevice, adapterVersion: string,
  * @param deviceManager Device manager (caller-validated non-null)
  * @param lastRun Per-device throttle map (keyed by `sku:deviceId`)
  * @param device Target device
- * @param prefix Device state prefix (e.g. `devices.h61be_1d6f`)
+ * @param prefix Device state prefix (e.g. `devices.h61be-1d6f`)
  * @returns The report with its file name, or null when the export was throttled or failed
  */
 export async function handleDiagnosticsExport(
@@ -264,7 +264,7 @@ export function wireDiagnosticsProviders(host: DiagnosticsProvidersHost): void {
  * subtree, never the whole instance.
  *
  * @param host Adapter surface
- * @param prefix Device prefix, e.g. `devices.h61be_1d6f`
+ * @param prefix Device prefix, e.g. `devices.h61be-1d6f`
  * @returns One entry per datapoint, or an empty list if the tree cannot be read
  */
 export async function readObjectTree(host: DiagnosticsProvidersHost, prefix: string): Promise<ObjectTreeEntry[]> {
