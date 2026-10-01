@@ -288,6 +288,21 @@ export const STATUS_REQUEST_INTERVAL_MS = 10 * 60 * 1000;
  */
 export const PENDING_INTENT_TTL_MS = 5 * 60 * 1000;
 
+/**
+ * Pauses before sending a cloud command again that never reached Govee — the
+ * name did not resolve or the connection was refused (issue #51). A temporary
+ * DNS failure is usually gone a second later; resending such a command cannot
+ * execute it twice, because Govee never received it.
+ */
+export const COMMAND_RETRY_DELAYS_MS = [1000, 2000] as const;
+
+/**
+ * How long after the first attempt a command may still be sent again (krobi
+ * 2026-10-01: "alles über 10-15 sekunden ist zu langsam"). Measured from the
+ * first attempt, including the time a failing name lookup itself took.
+ */
+export const COMMAND_RETRY_WINDOW_MS = 10_000;
+
 // === LAN command-router ===
 
 /**

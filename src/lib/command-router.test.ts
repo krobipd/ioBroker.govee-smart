@@ -1366,3 +1366,123 @@ describe("per-device Cloud budget", () => {
     expect(budgets[0]).toBeUndefined();
   });
 });
+
+describe("a command that never reached Govee is sent again at once (issue #51)", () => {
+  const neverSent = (): Error =>
+    Object.assign(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"), { code: "EAI_AGAIN", neverSent: true });
+  const cloudLight = (): GoveeDevice =>
+    makeDevice({ lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+
+  /**
+   * A router whose cloud client answers each call with the next outcome in line;
+   * `pauses` records every wait the retry took.
+   *
+   * @param outcomes What each successive controlDevice call does
+   * @param onDelay Runs when the router waits — a test can write a newer value there
+   */
+  function bench(
+    outcomes: Array<() => Promise<void>>,
+    onDelay: () => void = () => undefined,
+  ): { router: CommandRouter; calls: unknown[]; pauses: number[]; results: Array<{ ok: boolean }> } {
+    const calls: unknown[] = [];
+    const pauses: number[] = [];
+    const results: Array<{ ok: boolean }> = [];
+    const timers: TimerAdapter = {
+      ...noopTimers,
+      delay: (ms: number) => {
+        pauses.push(ms);
+        onDelay();
+        return Promise.resolve();
+      },
+    };
+    const router = new CommandRouter(mockLog, timers, registry);
+    router.setCloudClient({
+      controlDevice: (...args: unknown[]) => {
+        calls.push(args);
+        const next = outcomes.shift() ?? (() => Promise.resolve());
+        return next();
+      },
+    } as unknown as GoveeCloudClient);
+    router.setRateLimiter(makeRateLimiter());
+    router.onCommandResult = (_d, r) => results.push({ ok: r.ok });
+    return { router, calls, pauses, results };
+  }
+
+  it("the second attempt gets through: one success, nothing left unconfirmed", async () => {
+    const { router, calls, pauses, results } = bench([() => Promise.reject(neverSent())]);
+    await router.sendCommand(cloudLight(), "power", true);
+    expect(calls).toHaveLength(2);
+    expect(pauses).toEqual([1000]);
+    expect(results).toEqual([{ ok: true }]);
+  });
+
+  it("gives up after three attempts and says so — one failure for the caller", async () => {
+    const { router, calls, pauses, results } = bench([
+      () => Promise.reject(neverSent()),
+      () => Promise.reject(neverSent()),
+      () => Promise.reject(neverSent()),
+    ]);
+    const err = await router.sendCommand(cloudLight(), "power", true).catch((e: unknown) => e);
+    expect((err as { attempts?: number }).attempts).toBe(3);
+    expect(calls).toHaveLength(3);
+    expect(pauses).toEqual([1000, 2000]);
+    expect(results).toEqual([{ ok: false }]);
+  });
+
+  it("a failure Govee may have received is never sent again — it could run twice", async () => {
+    const timeout = Object.assign(new Error("Timeout after 15000ms"), { code: "ETIMEDOUT" });
+    const { router, calls, pauses } = bench([() => Promise.reject(timeout)]);
+    const err = await router.sendCommand(cloudLight(), "power", true).catch((e: unknown) => e);
+    expect(err).toBe(timeout);
+    expect((err as { attempts?: number }).attempts).toBeUndefined();
+    expect(calls).toHaveLength(1);
+    expect(pauses).toEqual([]);
+  });
+
+  it("not again once the window is spent — a DNS lookup that hung for 9 s leaves no room", async () => {
+    const start = 1_000_000;
+    const now = vi.spyOn(Date, "now");
+    try {
+      now.mockReturnValue(start);
+      const { router, calls } = bench([
+        () => {
+          now.mockReturnValue(start + 9_500); // the failing lookup itself took 9.5 s
+          return Promise.reject(neverSent());
+        },
+      ]);
+      await expect(router.sendCommand(cloudLight(), "power", true)).rejects.toThrow("EAI_AGAIN");
+      expect(calls).toHaveLength(1);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it("a newer value for the same datapoint supersedes the old one — the old is never delivered after it", async () => {
+    const ref: { router?: CommandRouter } = {};
+    const device = cloudLight();
+    const b = bench([() => Promise.reject(neverSent()), () => Promise.resolve()], () => {
+      // While the old command waits, the user writes a new value.
+      void ref.router?.sendCommand(device, "power", false);
+    });
+    ref.router = b.router;
+    await expect(b.router.sendCommand(device, "power", true)).rejects.toThrow("EAI_AGAIN");
+    await vi.waitFor(() => expect(b.calls).toHaveLength(2));
+    // Two sends: the failed old one and the new one — the old value was not sent again.
+    expect((b.calls[1] as unknown[])[4]).toBe(0);
+  });
+
+  it("another datapoint of the same device does not supersede it", async () => {
+    const ref: { router?: CommandRouter } = {};
+    const device = cloudLight();
+    let wrote = false;
+    const b = bench([() => Promise.reject(neverSent())], () => {
+      if (!wrote) {
+        wrote = true;
+        void ref.router?.sendCommand(device, "brightness", 40);
+      }
+    });
+    ref.router = b.router;
+    await b.router.sendCommand(device, "power", true);
+    expect(b.calls.filter(c => (c as unknown[])[3] === "powerSwitch")).toHaveLength(2);
+  });
+});

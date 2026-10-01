@@ -1,7 +1,12 @@
 import { capMatchesControl, deviceLabel, errMessage, type GoveeDevice, type TimerAdapter } from "./types";
 import { hexToRgb } from "./color";
 import { logDedup, type ErrorCategory } from "./error-category";
-import { FORCE_COLOR_MODE_SETTLE_MS, LAN_STATUS_AFTER_COMMAND_MS } from "./timing-constants";
+import {
+  COMMAND_RETRY_DELAYS_MS,
+  COMMAND_RETRY_WINDOW_MS,
+  FORCE_COLOR_MODE_SETTLE_MS,
+  LAN_STATUS_AFTER_COMMAND_MS,
+} from "./timing-constants";
 import { declaredOptionValue } from "./capability-mapper";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 
@@ -63,6 +68,8 @@ export class CommandRouter {
   private lanClient: GoveeLanClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
+  /** The latest cloud send per device + datapoint — a newer write supersedes an older one's retries (issue #51). */
+  private readonly sendSeq = new Map<string, number>();
   /**
    * Per-category dedup tracker. Replaces the older split between
    * `lastCloudFallbackError` and `lastNoChannelCategory` — one map, one
@@ -161,8 +168,54 @@ export class CommandRouter {
    *
    * @param fn The cloud send to execute
    * @param device The target device, for its own daily allowance
+   * @param key The datapoint the send writes (capability instance, plus the segments) — enables the retry
    */
-  private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
+  private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice, key?: string): Promise<void> {
+    if (!device || key === undefined) {
+      await this.sendOnce(fn, device);
+      return;
+    }
+    // A command that never reached Govee (issue #51: the name did not resolve)
+    // is sent again after 1 s and 2 s while the first attempt is at most
+    // COMMAND_RETRY_WINDOW_MS old — Govee never received it, so it cannot run
+    // twice. A newer write to the same datapoint supersedes it: an old value
+    // is never delivered after a new one. Every attempt goes through the
+    // limiter, and one that never left is given back there.
+    const slot = `${limiterDeviceKey(device)}:${key}`;
+    const seq = (this.sendSeq.get(slot) ?? 0) + 1;
+    this.sendSeq.set(slot, seq);
+    const startedAt = Date.now();
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await this.sendOnce(fn, device);
+        return;
+      } catch (err) {
+        const pause = COMMAND_RETRY_DELAYS_MS[attempt - 1];
+        const again =
+          (err as { neverSent?: unknown } | null)?.neverSent === true &&
+          pause !== undefined &&
+          Date.now() - startedAt + pause <= COMMAND_RETRY_WINDOW_MS &&
+          this.sendSeq.get(slot) === seq;
+        if (!again) {
+          throw attempt > 1 && err instanceof Error ? Object.assign(err, { attempts: attempt }) : err;
+        }
+        this.onDiagLog?.(device.deviceId, "debug", `${key}: never reached Govee — sending again in ${pause} ms`);
+        await this.timers.delay(pause);
+        if (this.sendSeq.get(slot) !== seq) {
+          // Superseded while waiting — the newer write carries its own outcome.
+          throw Object.assign(err as Error, { attempts: attempt });
+        }
+      }
+    }
+  }
+
+  /**
+   * One budgeted send.
+   *
+   * @param fn The cloud send to execute
+   * @param device The target device, for its own daily allowance
+   */
+  private async sendOnce(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
     if (this.rateLimiter) {
       // The control lane of THIS device: a command never waits for another
       // device's calls, only for its own burst of six per second (v2 docs).
@@ -586,7 +639,7 @@ export class CommandRouter {
     };
 
     try {
-      await this.sendBudgeted(execute, device);
+      await this.sendBudgeted(execute, device, capabilityInstance);
       this.onCommandResult?.(device, {
         stateId: capabilityInstance,
         value: cloudValue,
@@ -645,7 +698,7 @@ export class CommandRouter {
           rgb: parsed.color,
         });
       };
-      await this.sendBudgeted(execute, device);
+      await this.sendBudgeted(execute, device, `${cap.instance}:${parsed.segments.join(",")}`);
     }
 
     if (parsed.brightness !== undefined) {
@@ -661,7 +714,7 @@ export class CommandRouter {
           { segment: parsed.segments, brightness: parsed.brightness },
         );
       };
-      await this.sendBudgeted(execute, device);
+      await this.sendBudgeted(execute, device, `${(brightCap ?? cap).instance}:${parsed.segments.join(",")}`);
     }
     // NOTE: no onSegmentBatchUpdate here — dispatchSegmentBatch (the only caller)
     // emits it once for both the LAN and Cloud paths, after the send (I2).
@@ -1134,6 +1187,6 @@ export class CommandRouter {
       await cloudClient.controlDevice(device.sku, device.deviceId, cap.type, cap.instance, cloudValue);
     };
 
-    await this.sendBudgeted(execute, device);
+    await this.sendBudgeted(execute, device, cap.instance);
   }
 }
