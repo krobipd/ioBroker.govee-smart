@@ -3307,8 +3307,12 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     const device = i.deviceManager!.getDevices()[0];
     // A group is known to the adapter; its id is digits only, so only the
     // wired id lookup can keep it out of a report that mentions it.
-    const dm = i.deviceManager as unknown as DeviceManager & { devices: Map<string, GoveeDevice> };
-    dm.devices.set("BaseGroup_98765432", { ...device, sku: "BaseGroup", deviceId: "98765432" });
+    const dm = i.deviceManager as unknown as DeviceManager;
+    (dm as unknown as { devices: Map<string, GoveeDevice> }).devices.set("BaseGroup_98765432", {
+      ...device,
+      sku: "BaseGroup",
+      deviceId: "98765432",
+    });
     dm.getDiagnostics().addLog(device.deviceId, "info", "member of group 98765432");
     // An instance in compact mode says so in its report.
     (adapter as unknown as { common: { compact?: boolean } }).common = { compact: true };

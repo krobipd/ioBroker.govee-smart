@@ -122,21 +122,23 @@ function cloudListFailure(err: unknown): Exclude<CloudLoadResult, { ok: true }> 
  * MQTT is status-push only and never used for commands.
  */
 export class DeviceManager {
-  /** Public for sub-module helpers (cache, cloud-merge). */
-  public readonly log: ioBroker.Logger;
-  /** Public for sub-module helpers (cache, cloud-merge, lookups). */
-  public readonly devices = new Map<string, GoveeDevice>();
-  /** This instance's device catalog — public for sub-module helpers (cloud-merge). */
-  public readonly registry: DeviceRegistry;
+  private readonly log: ioBroker.Logger;
+  private readonly devices = new Map<string, GoveeDevice>();
+  /** This instance's device catalog. */
+  private readonly registry: DeviceRegistry;
   private readonly commandRouter: CommandRouter;
   private readonly diagnostics: DiagnosticsCollector;
   /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
   private readonly nudgedSeedSkus = new Set<string>();
   private cloudClient: GoveeCloudClient | null = null;
   private apiClient: GoveeApiClient | null = null;
-  /** Public for sub-module helpers (cache). */
-  public skuCache: SkuCache | null = null;
-  /** Public for sub-module helpers (cloud-merge). */
+  private skuCache: SkuCache | null = null;
+  /**
+   * What the sub-module helpers (cache, cloud-merge) see — the device map, the
+   * catalog, the cache and the update hook, read live. The fields stay private
+   * (audit S4: they were public only for these helpers).
+   */
+  private readonly helperHost = this.buildHelperHost();
   public onDeviceUpdate:
     ((device: GoveeDevice, state: Partial<DeviceState>, changes?: DeviceStateChanges) => void) | null = null;
   /** Phase-specific callbacks — one per data source. See setCallbacks. */
@@ -267,6 +269,24 @@ export class DeviceManager {
    * must be triggered explicitly.
    */
   public onDevicesRemoved: (() => void) | null = null;
+
+  /**
+   * The helpers' host: every field read live through a getter, so a cache set
+   * later or a replaced hook is what the helper sees.
+   */
+  private buildHelperHost(): cacheHelpers.DeviceCacheAdapter & cloudMergeHelpers.CloudMergeAdapter {
+    const host = {
+      maybeNudgeSeedSku: (sku: string, displayName: string | undefined) => this.maybeNudgeSeedSku(sku, displayName),
+    } as cacheHelpers.DeviceCacheAdapter & cloudMergeHelpers.CloudMergeAdapter;
+    Object.defineProperties(host, {
+      log: { get: () => this.log, enumerable: true },
+      devices: { get: () => this.devices, enumerable: true },
+      registry: { get: () => this.registry, enumerable: true },
+      skuCache: { get: () => this.skuCache, enumerable: true },
+      onDeviceUpdate: { get: () => this.onDeviceUpdate, enumerable: true },
+    });
+    return host;
+  }
 
   /**
    * @param log    ioBroker logger
@@ -776,7 +796,7 @@ export class DeviceManager {
         return;
       }
     }
-    cacheHelpers.populateScenesFromLibrary(this, device);
+    cacheHelpers.populateScenesFromLibrary(this.helperHost, device);
     this.persistDeviceToCache(device);
     // The snapshot masks may have arrived with the libraries — a lowered
     // segment count that waited for them is judged now.
@@ -1117,7 +1137,7 @@ export class DeviceManager {
     // No lights — Cloud refetch not needed. Fill scenes from sceneLibrary
     // for devices where Cloud scenes are missing.
     for (const device of this.devices.values()) {
-      cacheHelpers.populateScenesFromLibrary(this, device);
+      cacheHelpers.populateScenesFromLibrary(this.helperHost, device);
     }
     // Always true here — the empty-cache case returned false at the top.
     return true;
@@ -1261,7 +1281,7 @@ export class DeviceManager {
       this.saveDevicesToCache();
 
       for (const device of this.devices.values()) {
-        cacheHelpers.populateScenesFromLibrary(this, device);
+        cacheHelpers.populateScenesFromLibrary(this.helperHost, device);
       }
 
       if (changed) {
@@ -1392,7 +1412,7 @@ export class DeviceManager {
    * @returns true if any new devices were added
    */
   private mergeCloudDevices(cloudDevices: CloudDevice[]): boolean {
-    return cloudMergeHelpers.mergeCloudDevices(this, cloudDevices);
+    return cloudMergeHelpers.mergeCloudDevices(this.helperHost, cloudDevices);
   }
 
   /**
@@ -1507,7 +1527,7 @@ export class DeviceManager {
 
   /** Save all devices to SKU cache, skipping only those never confirmed via Cloud yet. */
   public saveDevicesToCache(): void {
-    cacheHelpers.saveDevicesToCache(this);
+    cacheHelpers.saveDevicesToCache(this.helperHost);
   }
 
   /**
@@ -1855,9 +1875,7 @@ export class DeviceManager {
     // everything that needs the physical length has it without a rebuild.
     if (!quirkLocked && maxSeen === current && device.segmentCount !== maxSeen) {
       device.segmentCount = maxSeen;
-      if (this.skuCache) {
-        void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
-      }
+      this.persistDeviceToCache(device);
     }
     // Filter by manual-segments override if active — ignore indices the user
     // has declared as "not physically present" (cut strip).
@@ -1931,9 +1949,7 @@ export class DeviceManager {
     device.segmentCount = count;
     // Persist now so a restart starts from the real value instead of
     // falling back to Cloud capabilities.
-    if (this.skuCache) {
-      void this.skuCache.save(cacheHelpers.goveeDeviceToCached(device));
-    }
+    this.persistDeviceToCache(device);
     // Skip per-segment sync for this push — the datapoints are being rebuilt.
     // The next AA A5 push hits the fully-built tree.
     this.onSegmentCountChanged?.(device);
@@ -2127,7 +2143,7 @@ export class DeviceManager {
    * @param device Target device
    */
   public persistDeviceToCache(device: GoveeDevice): void {
-    cacheHelpers.persistDeviceToCache(this, device);
+    cacheHelpers.persistDeviceToCache(this.helperHost, device);
   }
 
   /**
@@ -2428,7 +2444,7 @@ export class DeviceManager {
    * @param caps Capability list from the source pipeline
    */
   private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[]): void {
-    cloudMergeHelpers.applyOnlineCap(this, device, caps);
+    cloudMergeHelpers.applyOnlineCap(this.helperHost, device, caps);
     if (device.state.cloudReportedOnline === true) {
       this.startIntentFlush(device);
     }

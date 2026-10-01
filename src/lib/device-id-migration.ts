@@ -4,6 +4,8 @@ import { copyDeviceTree, movedId, type DeviceMoveDeps } from "./device-move";
 import { ID_SCHEME, idPiece, type DeviceIdRegistry } from "./device-id";
 import { isPseudoGroupSku } from "./govee-constants";
 import { errMessage } from "./err-message";
+import { moveAllWithEnums } from "./enum-carry";
+import type * as utils from "@iobroker/adapter-core";
 
 /** What the migration needs beyond the move itself. */
 export interface IdMigrationDeps extends DeviceMoveDeps {
@@ -197,4 +199,66 @@ async function moveTree(deps: IdMigrationDeps, tree: Tree, target: string, fillO
       extras.length > 0 ? ` with ${extras.join(" and ")}` : ""
     }${report.history > 0 ? `; ${report.history} recording(s) keep their history` : ""}`,
   );
+}
+
+/** End of a sort-key range in an object view — every id below the prefix sorts before it. */
+const SORT_KEY_END = "\u9999";
+
+/**
+ * The move's calls over the running adapter — every object kind, the device objects through the
+ * view, the aliases, and the delete that carries rooms and functions.
+ *
+ * @param adapter The adapter instance
+ */
+export function idMigrationDepsFor(adapter: utils.AdapterInstance): IdMigrationDeps {
+  const ns = adapter.namespace;
+  return {
+    namespace: ns,
+    // Every object kind of the instance: a pattern read without a type returns states only.
+    objects: async () => (await adapter.getAdapterObjectsAsync()) ?? {},
+    // Every start reads only the device objects — the whole instance only when a tree moves.
+    deviceObjects: async () => {
+      const view = await adapter.getObjectViewAsync("system", "device", {
+        startkey: `${ns}.`,
+        endkey: `${ns}.${SORT_KEY_END}`,
+      });
+      return Object.fromEntries((view?.rows ?? []).map(row => [row.id, row.value]));
+    },
+    states: async pattern => (await adapter.getForeignStatesAsync(pattern)) ?? {},
+    setObject: (id, obj) => adapter.setForeignObject(id, obj),
+    extendObject: (id, patch) => adapter.extendForeignObjectAsync(id, patch),
+    setState: (id, state) => adapter.setForeignStateAsync(id, state),
+    aliases: async () => (await adapter.getForeignObjectsAsync("alias.*", "state")) ?? {},
+    removeCarryingEnums: (ids, successors) => removeCarryingEnums(adapter, ids, successors),
+    log: adapter.log,
+  };
+}
+
+/**
+ * Delete the ids of a moved tree one by one — deepest first, the root last — and carry their room and
+ * function entries to the ids that take their place, through the fleet helper in its order: the
+ * enums are read once, everything is deleted, every affected enum is written once. Never a recursive
+ * delete: that removes the root first, and the root holds the move journal.
+ *
+ * @param adapter The adapter instance
+ * @param ids the full ids that go away, in delete order
+ * @param successors the new full ids of an id that moves
+ * @returns how many room/function entries now list one of the new ids
+ */
+async function removeCarryingEnums(
+  adapter: utils.AdapterInstance,
+  ids: readonly string[],
+  successors: (id: string) => readonly string[],
+): Promise<number> {
+  const carried = await moveAllWithEnums(
+    adapter,
+    successors,
+    async () => {
+      for (const id of ids) {
+        await adapter.delForeignObjectAsync(id);
+      }
+    },
+    errMessage,
+  );
+  return carried.reduce((n, c) => n + c.newIds.length, 0);
 }

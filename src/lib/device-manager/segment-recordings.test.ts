@@ -473,6 +473,19 @@ describe("DeviceManager — adopting the count of a recorded push (deleting need
     expect(device.segmentCount).toBe(30);
   });
 
+  it("a count the push confirms is saved — the next start does not fall back to the cloud's guess", () => {
+    const { dm } = setup("H7020", { caps: 30 });
+    const saved: Array<number | undefined> = [];
+    dm.setSkuCache({
+      save: (entry: { segmentCount?: number }) => {
+        saved.push(entry.segmentCount);
+        return Promise.resolve();
+      },
+    } as never);
+    push(dm, "H7020", recording("issue-43-h7020-diag.json.txt", "x_"));
+    expect(saved).toContain(30);
+  });
+
   it("H61A8 with the 19 an older version learned: a complete push corrects it to 15", () => {
     const { dm, rebuilds } = setup("H61A8", { learned: 19, caps: 15 });
     push(dm, "H61A8", recording("issue-13-diag-v2.9.1.json", "v_"));
