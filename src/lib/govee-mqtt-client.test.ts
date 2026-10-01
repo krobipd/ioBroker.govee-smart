@@ -1,6 +1,6 @@
 import { GoveeMqttClient, LoginWindow, classifyLoginResponse } from "./govee-mqtt-client";
 import { type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
-import { mockLog, mockTimers } from "./test-helpers";
+import { mockLog, mockTimers } from "../../test/test-helpers";
 import type { TimerAdapter } from "./types";
 
 /**

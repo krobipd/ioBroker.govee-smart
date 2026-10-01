@@ -1,13 +1,5 @@
 import { LocalSnapshotStore, type LocalSnapshot, type LocalSnapshotStoreAdapter } from "./local-snapshots";
-
-const mockLog: ioBroker.Logger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-};
+import { mockLog } from "../../test/test-helpers";
 
 type StoredObject = { type?: string; common?: Record<string, unknown>; native?: Record<string, unknown> };
 

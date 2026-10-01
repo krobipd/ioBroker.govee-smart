@@ -1,14 +1,6 @@
 import { ReconnectingMqttClient, computeBackoffDelay } from "./reconnecting-mqtt-client";
 import { type TimerAdapter } from "./types";
-
-const mockLog: ioBroker.Logger = {
-  silly: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  level: "debug",
-};
+import { mockLog } from "../../test/test-helpers";
 
 /** Timer adapter that captures scheduled callbacks so a test can fire them on demand. */
 function makeCapturingTimers(): {

@@ -6,7 +6,7 @@ vi.mock("./device-events", () => ({ onCloudDataReady: vi.fn() }));
 import { buildSnapshotHost } from "./snapshot-handler-glue";
 import { onCloudDataReady } from "./device-events";
 import type { GoveeDevice } from "../types";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 
 type GlueAdapter = Parameters<typeof buildSnapshotHost>[0];
 

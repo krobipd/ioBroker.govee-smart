@@ -19,8 +19,6 @@ export default defineConfig({
       exclude: [
         "src/**/*.test.ts",
         "src/**/*.d.ts",
-        // Test scaffolding, not production code.
-        "src/lib/test-helpers.ts",
       ],
       // NOTE: `src/main.ts` used to be excluded here as "covered by
       // test/integration.js". Measured in the 2026-08-22 test audit: it was at

@@ -34,15 +34,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { SkuCache, type CachedDeviceData } from "./sku-cache";
-
-const mockLog: ioBroker.Logger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-};
+import { mockLog } from "../../test/test-helpers";
 
 function createTestData(sku = "H61BE", deviceId = "AA:BB:CC:DD:11:22:33:44"): CachedDeviceData {
   return {

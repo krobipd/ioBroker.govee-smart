@@ -16,7 +16,7 @@ import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import type { RateLimiter } from "./rate-limiter";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, LAN_STATUS_AFTER_COMMAND_MS } from "./timing-constants";
-import { createTestDevice, mockLog } from "./test-helpers";
+import { createTestDevice, mockLog } from "../../test/test-helpers";
 import type { GoveeDevice, TimerAdapter } from "./types";
 
 /** A catalog with no entries — tests that don't care about quirks. */

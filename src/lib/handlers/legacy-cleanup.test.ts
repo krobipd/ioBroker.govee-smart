@@ -1,5 +1,5 @@
 import { vi } from "vitest";
-import { mockLog } from "../test-helpers";
+import { mockLog } from "../../../test/test-helpers";
 import { ORPHANED_INFO_OBJECTS, removeLegacyObjects, type LegacyCleanupAdapter } from "./legacy-cleanup";
 
 function makeAdapter(opts: { store?: boolean; files?: Array<{ file: string; isDir: boolean }> } = {}): {

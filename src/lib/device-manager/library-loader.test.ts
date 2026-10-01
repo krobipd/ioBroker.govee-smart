@@ -3,18 +3,9 @@ import { describe, expect, it } from "vitest";
 import { DiagnosticsCollector } from "../diagnostics";
 import { DeviceRegistry } from "../device-registry";
 import { HttpError } from "../http-client";
-import { createTestDevice, lightCapabilities } from "../test-helpers";
+import { createTestDevice, lightCapabilities, mockLog } from "../../../test/test-helpers";
 import type { CloudCapability, CloudDevice } from "../types";
 import { loadDeviceLibraries, loadDeviceScenes, type LibraryLoaderHost } from "./library-loader";
-
-const mockLog = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-} as unknown as ioBroker.Logger;
 
 /**
  * Host fake: budget runner executes inline (the fire-and-queue semantics of

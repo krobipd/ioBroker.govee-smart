@@ -1,15 +1,7 @@
 import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, applianceBudget, type CallLane } from "./rate-limiter";
 import { CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 import type { GoveeDevice, TimerAdapter } from "./types";
-
-const mockLog: ioBroker.Logger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-};
+import { mockLog } from "../../test/test-helpers";
 
 /**
  * The pre-2.39.0 constructor took (perMinute, perDay); these suites pin the

@@ -35,7 +35,7 @@ import { goveeDeviceToCached } from "./device-manager/cache";
 import { RateLimiter } from "./rate-limiter";
 import { DeviceRegistry } from "./device-registry";
 import { CommandRouter } from "./command-router";
-import { mockLog, mockTimers } from "./test-helpers";
+import { mockLog, mockTimers } from "../../test/test-helpers";
 import type {
   CloudDevice,
   CloudCapability,

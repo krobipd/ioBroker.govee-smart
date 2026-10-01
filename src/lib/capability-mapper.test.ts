@@ -27,7 +27,7 @@ import {
 } from "./capability-mapper";
 import { DeviceRegistry } from "./device-registry";
 import { tDesc, tName } from "./i18n";
-import { createTestDevice, mockLog } from "./test-helpers";
+import { createTestDevice, mockLog } from "../../test/test-helpers";
 import type { CapabilityOption, CloudCapability, CloudStateCapability, GoveeDevice } from "./types";
 
 /** A catalog with no entries — tests that don't care about quirks. */

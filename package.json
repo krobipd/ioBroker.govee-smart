@@ -63,7 +63,6 @@
     "build/main.js",
     "build/main.js.map",
     "devices.json",
-    "devices.schema.json",
     "io-package.json",
     "LICENSE",
     "README.md"

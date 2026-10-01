@@ -12,6 +12,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 import { GoveeOpenapiMqttClient } from "./govee-openapi-mqtt-client";
 import { LAN_STATE_IDS, planCloudCapabilityWrites } from "./capability-mapper";
 import type { CloudStateCapability, TimerAdapter } from "./types";
+import { mockLog } from "../../test/test-helpers";
 
 /**
  * Lifecycle tests for the OpenAPI-MQTT client (constructor + disconnect) plus
@@ -78,15 +79,6 @@ const mqttMock = vi.hoisted(() => {
 vi.mock("mqtt", () => ({
   connect: (_url: string, opts: Record<string, unknown>) => mqttMock.connect(opts),
 }));
-
-const mockLog: ioBroker.Logger = {
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  silly: () => {},
-  level: "debug",
-};
 
 const mockTimers = {
   setInterval: () => undefined,

@@ -1,6 +1,6 @@
 import { CloudControlRejected, GoveeCloudClient } from "./govee-cloud-client";
 import { HttpError, type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
-import { mockLog } from "./test-helpers";
+import { mockLog } from "../../test/test-helpers";
 
 /**
  * Helper to build a fake httpsRequest impl. The recorder collects every

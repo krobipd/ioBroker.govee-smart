@@ -1,14 +1,6 @@
 import { MessageRouter, type MessageRouterHost } from "./message-router";
 import { classifyLoginResponse, type GoveeMqttClient } from "./govee-mqtt-client";
-
-const mockLog = {
-  silly: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  level: "info",
-} as unknown as ioBroker.Logger;
+import { mockLog } from "../../test/test-helpers";
 
 interface FakeProbeOpts {
   /** When set, simulate a successful login + connected state. */

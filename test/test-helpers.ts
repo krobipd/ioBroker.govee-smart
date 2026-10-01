@@ -2,10 +2,12 @@
  * Shared test mocks and factories for all test files.
  *
  * `mockLog`, `mockTimers`, `createTestDevice` etc. were previously inline in
- * `device-manager.test.ts` — duplicated across other tests. Centralised here.
+ * `device-manager.test.ts` — duplicated across other tests. Centralised here,
+ * under `test/` so the build never ships it (until 3.0.2 it lay in `src/lib/`
+ * and went into the npm package, audit YAGNI-1).
  */
 
-import type { CloudCapability, GoveeDevice } from "./types";
+import type { CloudCapability, GoveeDevice } from "../src/lib/types";
 
 /** No-op logger with all ioBroker.Logger methods. */
 export const mockLog: ioBroker.Logger = {

@@ -8,7 +8,7 @@ vi.mock("./connection-state", () => ({
 import * as connectionState from "./connection-state";
 import { onAccountConnection, wireAccountClient, type AccountHandlerAdapter } from "./account-handler";
 import type { GoveeMqttClient } from "../govee-mqtt-client";
-import { mockLog } from "../test-helpers";
+import { mockLog } from "../../../test/test-helpers";
 
 type Hooks = Record<string, (...args: never[]) => unknown>;
 

@@ -21,7 +21,7 @@ import {
 import type { StateDefinition } from "../capability-mapper";
 import * as deviceReaper from "./device-reaper";
 import type { DeviceState, GoveeDevice } from "../types";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 
 interface Rig {
   // onDeviceStateUpdate has the widest adapter constraint (all four

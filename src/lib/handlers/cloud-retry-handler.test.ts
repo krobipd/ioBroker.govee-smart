@@ -17,7 +17,7 @@ import {
   type CloudRetryHandlerAdapter,
 } from "./cloud-retry-handler";
 import type { CloudLoadResult } from "../types";
-import { mockLog } from "../test-helpers";
+import { mockLog } from "../../../test/test-helpers";
 import { CloudOutage } from "../cloud-outage";
 import { loadCloudStates } from "./cloud-state-loader";
 

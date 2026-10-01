@@ -11,7 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { applyCloudCapabilities, loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
 import type { CloudStateCapability, GoveeDevice } from "../types";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 import { DeviceRegistry } from "../device-registry";
 import { buildCapabilitiesFromAppEntry } from "../device-manager/mapping";
 

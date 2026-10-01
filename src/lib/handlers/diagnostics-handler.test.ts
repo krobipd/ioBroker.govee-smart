@@ -9,7 +9,7 @@ import {
 import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 import type { DeviceManager } from "../device-manager";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 
 function makeAdapter(): {
   adapter: DiagnosticsHandlerAdapter;

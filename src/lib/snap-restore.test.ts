@@ -1,15 +1,7 @@
 import type { LocalSnapshot, LocalSnapshotStore, SnapshotSegment } from "./local-snapshots";
 import { SnapshotHandler, type SnapshotHandlerHost } from "./snapshot-handler";
 import type { GoveeDevice } from "./types";
-
-const mockLog = {
-  silly: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  level: "info",
-} as unknown as ioBroker.Logger;
+import { mockLog } from "../../test/test-helpers";
 
 interface RecordedCommand {
   command: string;

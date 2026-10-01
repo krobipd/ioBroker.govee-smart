@@ -10,7 +10,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 import { parseMqttSegmentData, resolveSegmentCountWithSource, segmentCountFromSnapshotFrames } from "./lookups";
 import { DeviceManager } from "../device-manager";
 import { DeviceRegistry } from "../device-registry";
-import { mockLog, mockTimers } from "../test-helpers";
+import { mockLog, mockTimers } from "../../../test/test-helpers";
 import type { CloudCapability, GoveeDevice } from "../types";
 
 // Audit 2026-09-24 (H3/H5): the AA-A5 parser was written for five packets of

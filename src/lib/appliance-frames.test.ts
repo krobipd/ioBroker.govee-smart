@@ -8,7 +8,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { decodeApplianceFrames } from "./appliance-frames";
-import { createTestDevice } from "./test-helpers";
+import { createTestDevice } from "../../test/test-helpers";
 import type { CloudCapability, GoveeDevice } from "./types";
 
 /** The H7127's declared capabilities — issue #47, 2.34.0 export (`capabilities`). */

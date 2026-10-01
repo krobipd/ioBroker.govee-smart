@@ -24,7 +24,7 @@ import {
   type WizardHandlerAdapter,
 } from "./wizard-handler";
 import type { GoveeDevice } from "../types";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 
 function makeAdapter(devices: GoveeDevice[]): {
   adapter: WizardHandlerAdapter;

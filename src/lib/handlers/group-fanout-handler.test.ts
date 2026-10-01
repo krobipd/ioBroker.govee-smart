@@ -11,7 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { buildGroupFanoutHost, updateGroupReachability, type GroupFanoutHandlerAdapter } from "./group-fanout-handler";
 import type { GoveeDevice } from "../types";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 
 function makeGroup(members: Array<{ sku: string; deviceId: string }>): GoveeDevice {
   return createTestDevice({

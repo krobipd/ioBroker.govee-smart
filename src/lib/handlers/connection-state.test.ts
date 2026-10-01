@@ -6,7 +6,7 @@ import {
 } from "./connection-state";
 import type { ChannelStatusSnapshot } from "../log-prefix";
 import type { GoveeDevice } from "../types";
-import { createTestDevice } from "../test-helpers";
+import { createTestDevice } from "../../../test/test-helpers";
 
 interface Rig {
   adapter: ConnectionStateAdapter;

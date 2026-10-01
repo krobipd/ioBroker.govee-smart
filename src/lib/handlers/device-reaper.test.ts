@@ -1,7 +1,7 @@
 import { reapStaleDevices, type DeviceReaperAdapter } from "./device-reaper";
 import { sessionKey } from "../device-key";
 import type { GoveeDevice } from "../types";
-import { createTestDevice } from "../test-helpers";
+import { createTestDevice } from "../../../test/test-helpers";
 
 function makeRig(opts: {
   devices?: GoveeDevice[];

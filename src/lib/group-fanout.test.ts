@@ -11,15 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 
 import { GroupFanoutHandler, type GroupFanoutHost } from "./group-fanout";
 import type { GoveeDevice } from "./types";
-
-const mockLog = {
-  silly: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {},
-  level: "info",
-} as unknown as ioBroker.Logger;
+import { mockLog } from "../../test/test-helpers";
 
 interface RecordedCommand {
   device: string;

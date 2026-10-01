@@ -28,7 +28,7 @@ import { loadCloudStates } from "./cloud-state-loader";
 import { syncDevicesManually } from "./cloud-retry-handler";
 import type { GoveeDevice } from "../types";
 import { CloudControlRejected } from "../govee-cloud-client";
-import { createTestDevice, mockLog } from "../test-helpers";
+import { createTestDevice, mockLog } from "../../../test/test-helpers";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { DeviceIdRegistry } from "../device-id";
 import { GroupFanoutHandler } from "../group-fanout";
