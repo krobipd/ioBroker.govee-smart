@@ -19,7 +19,7 @@ import {
   onSegmentBatchEcho,
 } from "./device-events";
 import type { StateDefinition } from "../capability-mapper";
-import * as connectionState from "./connection-state";
+import * as deviceReaper from "./device-reaper";
 import type { DeviceState, GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../test-helpers";
 
@@ -354,7 +354,7 @@ describe("onCloudDataReady (phase 2)", () => {
 
   it("re-reaps stale devices only after the initial tree is ready (no churn during boot)", () => {
     const device = createTestDevice();
-    const reap = vi.spyOn(connectionState, "reapStaleDevices").mockResolvedValue(undefined);
+    const reap = vi.spyOn(deviceReaper, "reapStaleDevices").mockResolvedValue(undefined);
     try {
       const before = makeRig({ devices: [device], statesReady: false });
       onCloudDataReady(before.adapter, device, [device]);

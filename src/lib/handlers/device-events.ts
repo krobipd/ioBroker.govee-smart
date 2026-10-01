@@ -16,6 +16,7 @@ import {
   type GoveeDevice,
 } from "../types";
 import * as connectionState from "./connection-state";
+import { reapStaleDevices } from "./device-reaper";
 import * as groupFanoutHandler from "./group-fanout-handler";
 import * as dropdownReset from "./dropdown-reset-helpers";
 
@@ -205,7 +206,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
   if (adapter.statesReady) {
-    connectionState.reapStaleDevices(adapter).catch(logRejected(adapter.log, "reap stale devices"));
+    reapStaleDevices(adapter).catch(logRejected(adapter.log, "reap stale devices"));
   }
 }
 

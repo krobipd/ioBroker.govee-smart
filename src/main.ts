@@ -39,6 +39,9 @@ import { deviceLabel, errMessage, logRejected } from "./lib/types";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
+import * as appVersion from "./lib/handlers/app-version";
+import * as deviceReaper from "./lib/handlers/device-reaper";
+import * as onlineSync from "./lib/handlers/online-sync";
 import * as accountCredentials from "./lib/account-credentials";
 import * as accountHandler from "./lib/handlers/account-handler";
 import {
@@ -83,7 +86,7 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   diagnosticsHandler.DiagnosticsProvidersHost &
   legacyCleanup.LegacyCleanupAdapter &
   accountHandler.AccountHandlerAdapter &
-  connectionState.OnlineSyncAdapter;
+  onlineSync.OnlineSyncAdapter;
 
 /** What the start phases of onReady hand each other. */
 interface StartContext {
@@ -571,7 +574,7 @@ export class GoveeAdapter extends utils.Adapter {
     // login / requests already use a current version — the undocumented
     // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
     // this resolves; a daily timer keeps it fresh.
-    void connectionState
+    void appVersion
       .refreshLiveAppVersion(this.handlerHost)
       .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
 
@@ -753,7 +756,7 @@ export class GoveeAdapter extends utils.Adapter {
     // diagnostics buffers. A poll-driven eviction never fires onCloudDataReady,
     // so reapStaleDevices must be triggered explicitly here.
     this.deviceManager!.onDevicesRemoved = () => {
-      void connectionState
+      void deviceReaper
         .reapStaleDevices(this.handlerHost)
         .catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
     };
@@ -1261,7 +1264,7 @@ export class GoveeAdapter extends utils.Adapter {
     // refuses to act until an account list has answered (hasKnownPopulation),
     // because absence proves nothing while the population is unknown.
     this.cleanupTimer = this.setTimeout(() => {
-      connectionState
+      deviceReaper
         .reapStaleDevices(this.handlerHost)
         .catch(e => this.log.debug(`Device cleanup failed: ${errMessage(e)}`));
     }, STALE_DEVICE_CLEANUP_DELAY_MS);
@@ -1273,14 +1276,14 @@ export class GoveeAdapter extends utils.Adapter {
     // group-reachability since the original onDeviceUpdate path no longer
     // sees those transitions for Lights.
     this.onlineSyncTimer = this.setInterval(
-      () => void connectionState.runOnlineSyncRound(this.handlerHost),
+      () => void onlineSync.runOnlineSyncRound(this.handlerHost),
       ONLINE_SYNC_INTERVAL_MS,
     );
 
     // Keep the impersonated Govee-app version current — daily refresh (the
     // initial fetch is fired early in onReady, above).
     this.appVersionCheckTimer = this.setInterval(() => {
-      connectionState
+      appVersion
         .refreshLiveAppVersion(this.handlerHost)
         .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
     }, APP_VERSION_CHECK_INTERVAL_MS);

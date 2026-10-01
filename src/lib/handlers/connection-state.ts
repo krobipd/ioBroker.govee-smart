@@ -4,20 +4,16 @@ import type { GoveeMqttClient } from "../govee-mqtt-client";
 import type { GoveeOpenapiMqttClient } from "../govee-openapi-mqtt-client";
 import type { GoveeLanClient } from "../govee-lan-client";
 import type { StateManager } from "../state-manager";
-import { httpsRequest } from "../http-client";
-import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
-import { deviceLabel, errMessage, logRejected } from "../types";
-import { GOVEE_APP_VERSION, GOVEE_DEVICE_TYPE, getAppVersion, setAppVersion } from "../govee-constants";
+import { deviceLabel, logRejected } from "../types";
+import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import { resolveDeviceReachability } from "../device-manager/lookups";
 import { cloudReachable } from "../cloud-outage";
 import { hasAccountCredentials } from "../account-credentials";
-import * as groupFanoutHandler from "./group-fanout-handler";
 
 /**
- * Adapter surface required by the connection-state helpers — covers the
- * info.connection bookkeeping plus ready-summary + app-version drift
- * monitoring + stale-device reaping.
+ * Adapter surface of the channel-status reporting: `info.connection`, the log
+ * prefix and the ready summary.
  */
 export interface ConnectionStateAdapter {
   readonly log: ioBroker.Logger;
@@ -98,80 +94,6 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
     }
     if (cs.openapi !== "n/a") {
       cs.openapi = adapter.openapiMqttClient?.connected ? "on" : "off";
-    }
-  }
-}
-
-/**
- * Keep the impersonated Govee-app version current — self-healing, no datapoint.
- *
- * Govee's undocumented app2.govee.com endpoints reject very stale app versions.
- * Instead of comparing a hardcoded constant against the live version and asking
- * a human to bump + release, the adapter looks the live iOS version up (iTunes)
- * and just uses it in the request headers ({@link setAppVersion}). A failed or
- * malformed lookup is silently ignored; the bundled {@link GOVEE_APP_VERSION}
- * stays as the fallback.
- *
- */
-export async function refreshLiveAppVersion(adapter: ConnectionStateAdapter): Promise<void> {
-  try {
-    const result = await httpsRequest<{ resultCount?: number; results?: Array<{ version?: string }> }>({
-      method: "GET",
-      url: "https://itunes.apple.com/lookup?bundleId=com.ihoment.GoVeeSensor",
-      headers: { "User-Agent": "ioBroker.govee-smart" },
-      timeout: 10_000,
-    });
-    const liveVersion = result.value?.results?.[0]?.version;
-    // Defence in depth, deliberately kept without its own test: setAppVersion()
-    // validates the same thing itself (typeof + /^\d+(\.\d+)+$/), so removing
-    // this guard changes nothing but one debug line. Measured as an equivalent
-    // mutant in the 2026-08-22 test audit.
-    if (typeof liveVersion !== "string" || liveVersion.length === 0) {
-      return;
-    }
-    setAppVersion(liveVersion);
-    adapter.log.debug(`Govee app version: using ${getAppVersion()} (bundled fallback ${GOVEE_APP_VERSION})`);
-  } catch (e) {
-    adapter.log.debug(`App version lookup failed, keeping ${getAppVersion()}: ${errMessage(e)}`);
-  }
-}
-
-/**
- * Delete ioBroker objects for devices no longer present and drop the same
- * devices from adapter-level maps. Diagnostics-buffer + diagnosticsLastRun
- * are reaped so removed-device data doesn't leak into the next adapter
- * lifetime.
- *
- */
-export async function reapStaleDevices(adapter: ConnectionStateAdapter): Promise<void> {
-  if (!adapter.stateManager || !adapter.deviceManager) {
-    return;
-  }
-  // Absence only means something when the population is known, and only an
-  // account list makes it known. Without one, `getDevices()` holds whatever
-  // LAN discovery found plus whatever the cache happened to hold — and
-  // cleaning up against that deletes live devices' trees including their
-  // recorded history (measured: 249 of 249 objects with an empty cache, 132 of
-  // 249 with a partial one).
-  if (!adapter.deviceManager.hasKnownPopulation()) {
-    adapter.log.debug("Device cleanup skipped: no account list answered this session — absence proves nothing");
-    return;
-  }
-  // A list names a device the map lacks: fetch the Cloud list first — the
-  // light's tree comes back with it, and this pass would judge a gap.
-  if (adapter.deviceManager.reloadForAccountGap()) {
-    return;
-  }
-  const currentDevices = adapter.deviceManager.getDevices();
-  await adapter.stateManager.cleanupDevices(currentDevices, adapter.deviceManager.accountListedPrefixes());
-
-  const liveDeviceIds = new Set(currentDevices.map(d => d.deviceId));
-  adapter.deviceManager.getDiagnostics().pruneOrphans(liveDeviceIds);
-
-  const liveKeys = new Set(currentDevices.map(d => sessionKey(d.sku, d.deviceId)));
-  for (const key of adapter.diagnosticsLastRun.keys()) {
-    if (!liveKeys.has(key)) {
-      adapter.diagnosticsLastRun.delete(key);
     }
   }
 }
@@ -274,61 +196,5 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
     adapter.log.warn(
       `${sensors.length} sensor(s) found, but no Govee account is configured — sensor readings require email + password (adapter settings, "Govee Account" section)`,
     );
-  }
-}
-
-/** What the 20-second round needs: the connection contract, the group contract, and its own two flags. */
-export type OnlineSyncAdapter = ConnectionStateAdapter &
-  groupFanoutHandler.GroupFanoutHandlerAdapter & {
-    readonly unloading: boolean;
-    /** A round has written the groups once this run — later rounds only on a change. */
-    groupReachabilityPrimed: boolean;
-  };
-
-/**
- * One round of the 20-second re-evaluation: every device's `info.online`,
- * the groups' reachability, the rollup and `info.connection`.
- */
-export async function runOnlineSyncRound(adapter: OnlineSyncAdapter): Promise<void> {
-  // The body is one try: the group and connection updates are synchronous,
-  // and a throw there would be an unhandled rejection of the timer's promise
-  // — which ends the process, every 20 s again (fleet rule: top-level
-  // try/catch in the async body).
-  try {
-    if (adapter.unloading || !adapter.stateManager || !adapter.deviceManager) {
-      return;
-    }
-    let anyLightChanged = false;
-    for (const device of adapter.deviceManager.getDevices()) {
-      const changed = await adapter.stateManager.syncInfoOnline(device).catch(() => false);
-      if (changed) {
-        anyLightChanged = true;
-      }
-    }
-    // The first round after a start always re-evaluates the groups: their
-    // members' reachability was just read fresh, and without this the
-    // rollup would keep a value nobody has checked since the last restart.
-    if (anyLightChanged || !adapter.groupReachabilityPrimed) {
-      // Only a round that really wrote a group counts as primed — at the
-      // first tick the cloud device list may still be loading, and a flag
-      // spent on an empty round would put us back to change-only.
-      if (groupFanoutHandler.updateGroupReachability(adapter) > 0) {
-        adapter.groupReachabilityPrimed = true;
-      }
-    }
-    // The rollup rides on the same round: it is derived from exactly the
-    // markers that were just re-evaluated, so it can never drift away from
-    // what the individual devices say.
-    await adapter.stateManager.writeDeviceRollup().catch(e => {
-      adapter.log.debug(`Device rollup failed: ${errMessage(e)}`);
-    });
-    // info.connection rides on the same round: the evidence of the last
-    // device ages out here, and no other event would notice (audit B7 —
-    // it stayed green until the next channel change).
-    if (!adapter.unloading) {
-      updateConnectionState(adapter);
-    }
-  } catch (e) {
-    adapter.log.debug(`Online sync round failed: ${errMessage(e)}`);
   }
 }

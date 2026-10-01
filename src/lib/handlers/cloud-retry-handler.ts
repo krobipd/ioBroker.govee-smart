@@ -8,7 +8,8 @@ import { logRejected, type CloudLoadResult, type GoveeDevice } from "../types";
 import { READY_TIMEOUT_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 import { loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
-import { reapStaleDevices, type ConnectionStateAdapter } from "./connection-state";
+import type { ConnectionStateAdapter } from "./connection-state";
+import { reapStaleDevices } from "./device-reaper";
 
 /**
  * Adapter surface required by the cloud-retry handler. Mutates several

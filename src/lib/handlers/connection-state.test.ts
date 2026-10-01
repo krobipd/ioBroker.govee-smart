@@ -1,29 +1,12 @@
-import { vi } from "vitest";
-
-// refreshLiveAppVersion calls the module-level httpsRequest (no DI) — mock it.
-vi.mock("../http-client", () => ({ httpsRequest: vi.fn() }));
-// The 20 s round reaches group-fanout-handler → capability-mapper → i18n → adapter-core, whose
-// import-time controller lookup process.exits outside a js-controller.
-vi.mock("@iobroker/adapter-core", () => ({
-  I18n: { getTranslatedObject: vi.fn((key: string) => ({ en: key })), translate: vi.fn((key: string) => key) },
-}));
-
 import {
   checkAllReady,
   logDeviceSummary,
-  refreshLiveAppVersion,
-  reapStaleDevices,
   updateConnectionState,
   type ConnectionStateAdapter,
 } from "./connection-state";
-import { httpsRequest } from "../http-client";
-import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-constants";
-import { sessionKey } from "../device-key";
 import type { ChannelStatusSnapshot } from "../log-prefix";
 import type { GoveeDevice } from "../types";
 import { createTestDevice } from "../test-helpers";
-
-const mockHttp = vi.mocked(httpsRequest);
 
 interface Rig {
   adapter: ConnectionStateAdapter;
@@ -291,101 +274,5 @@ describe("logDeviceSummary", () => {
     const ready = rig.logs.info.find(m => m.includes("ready"))!;
     expect(ready).toContain("Cloud REST ✗");
     expect(rig.logs.warn.some(m => m.startsWith("Cloud REST:"))).toBe(true);
-  });
-});
-
-describe("reapStaleDevices", () => {
-  it("cleans the object tree, prunes diag buffers and the throttle map down to live devices", async () => {
-    const live = createTestDevice({ deviceId: "AA:01" });
-    const rig = makeRig({ devices: [live] });
-    rig.adapter.diagnosticsLastRun.set(sessionKey(live.sku, live.deviceId), 123);
-    rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
-
-    await reapStaleDevices(rig.adapter);
-
-    expect(rig.cleanupCalls).toEqual([[live]]);
-    expect(rig.prunedWith[0].has("AA:01")).toBe(true);
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey(live.sku, live.deviceId))).toBe(true);
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(false);
-  });
-
-  it("hands the prefixes an account list names to the cleanup — they are kept (H6)", async () => {
-    const listed = new Set(["devices.h600d_0009"]);
-    const rig = makeRig({ devices: [], listedPrefixes: listed });
-    await reapStaleDevices(rig.adapter);
-    expect(rig.cleanupProtected).toEqual([listed]);
-  });
-
-  it("waits while the Cloud list is re-read for an account gap — no cleanup this pass (H6)", async () => {
-    const rig = makeRig({ devices: [], gapReload: true });
-    await reapStaleDevices(rig.adapter);
-    expect(rig.cleanupCalls).toEqual([]);
-    expect(rig.prunedWith).toEqual([]);
-  });
-
-  it("deletes nothing while no account list has answered (cloud down)", async () => {
-    // The 30 s cleanup timer in onReady fires regardless of what any channel
-    // achieved. Without an account list the device map holds only what LAN
-    // discovery and the cache produced — reaping against that deleted 249 of
-    // 249 device objects of a seeded installation with an empty cache, and 132
-    // of 249 with a partial one (measured 2026-09-07 against the real adapter).
-    const rig = makeRig({ devices: [], populationKnown: false });
-    rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
-
-    await reapStaleDevices(rig.adapter);
-
-    expect(rig.cleanupCalls).toEqual([]);
-    expect(rig.prunedWith).toEqual([]);
-    // The throttle entry survives too — it is keyed on a device whose objects
-    // are still there.
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(true);
-    expect(rig.logs.debug.some(m => m.includes("Device cleanup skipped"))).toBe(true);
-  });
-});
-
-describe("refreshLiveAppVersion", () => {
-  // NOTE: no beforeEach(mockReset) here — vitest 4's mockReset drops the
-  // handled-marker of stored rejected mock results, re-reporting an already
-  // CAUGHT rejection as unhandled at test end. Each test installs its own
-  // implementation, which is isolation enough. We DO reset the module-level app
-  // version so an adopted value doesn't leak between tests.
-  beforeEach(() => setAppVersion(GOVEE_APP_VERSION));
-
-  function itunesVersion(version: string): never {
-    return { value: { resultCount: 1, results: [{ version }] }, statusCode: 200 } as never;
-  }
-
-  it("adopts the live app version for the request headers (no datapoint, no warning)", async () => {
-    mockHttp.mockResolvedValue(itunesVersion("9.9.9"));
-    const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
-    expect(getAppVersion()).toBe("9.9.9");
-    expect(rig.logs.warn).toHaveLength(0);
-    expect(rig.stateWrites.find(w => w.id === "info.appVersionDrift")).toBeUndefined();
-  });
-
-  it("keeps the bundled fallback on a malformed store response", async () => {
-    mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 });
-    const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
-    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
-  });
-
-  it("ignores a non-numeric version string (regex guard never breaks the headers)", async () => {
-    mockHttp.mockResolvedValue(itunesVersion("garbage"));
-    const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
-    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
-  });
-
-  it("keeps the current version + logs debug on a network failure (never alarms)", async () => {
-    mockHttp.mockImplementation(() => {
-      return Promise.reject(new Error("ENOTFOUND itunes.apple.com"));
-    });
-    const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
-    expect(rig.logs.warn).toHaveLength(0);
-    expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
-    expect(rig.logs.debug.some(m => m.includes("App version lookup failed"))).toBe(true);
   });
 });
