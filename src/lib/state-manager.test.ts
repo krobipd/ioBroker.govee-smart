@@ -504,6 +504,27 @@ describe("StateManager", () => {
     });
   });
 
+  describe("the read-only info datapoints (ensureState)", () => {
+    it("carry their explanation and a default, read-only, without a unit (audit YAGNI-3)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      await sm.createInfoStates(createTestDevice({ lastLanReplyAt: Date.now() }));
+      const online = objects.get("devices.h6160-0011.info.online")?.common as ioBroker.StateCommon;
+      expect(online).toMatchObject({
+        type: "boolean",
+        role: "indicator.reachable",
+        read: true,
+        write: false,
+        def: false,
+      });
+      expect(online.desc).toMatchObject({ en: "descOnline" });
+      expect(online).not.toHaveProperty("unit");
+      const name = objects.get("devices.h6160-0011.info.name")?.common as ioBroker.StateCommon;
+      expect(name, "a datapoint whose name says everything has neither").not.toHaveProperty("desc");
+      expect(name).not.toHaveProperty("def");
+    });
+  });
+
   describe("info.type", () => {
     it("carries Govee's type without prefix and a value list that explains it", async () => {
       const { adapter, objects, states } = createMockAdapter();

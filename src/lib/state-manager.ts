@@ -399,18 +399,20 @@ export class StateManager {
    * devices say.
    */
   public async ensureDeviceRollupStates(): Promise<void> {
-    await this.ensureState("info.devicesTotal", tName("devicesTotal"), "number", "value", false, undefined, 0);
-    await this.ensureState("info.devicesOnline", tName("devicesOnline"), "number", "value", false, undefined, 0);
-    await this.ensureState(
-      "info.devicesAllOnline",
-      tName("devicesAllOnline"),
-      "boolean",
-      "indicator",
-      false,
-      undefined,
-      false,
-      tDesc("descDevicesAllOnline"),
-    );
+    await this.ensureState("info.devicesTotal", { name: tName("devicesTotal"), type: "number", role: "value", def: 0 });
+    await this.ensureState("info.devicesOnline", {
+      name: tName("devicesOnline"),
+      type: "number",
+      role: "value",
+      def: 0,
+    });
+    await this.ensureState("info.devicesAllOnline", {
+      name: tName("devicesAllOnline"),
+      type: "boolean",
+      role: "indicator",
+      def: false,
+      desc: tDesc("descDevicesAllOnline"),
+    });
   }
 
   /**
@@ -765,64 +767,57 @@ export class StateManager {
     // snapshot save/delete, …) with mostly identical values — only a real
     // change should write and bump the timestamp. No consumer reads the
     // ts/lc of these states as a freshness signal (grep-verified).
-    await this.ensureState(`${prefix}.info.name`, tName("stateName"), "string", "info.name", false);
+    await this.ensureState(`${prefix}.info.name`, { name: tName("stateName"), type: "string", role: "info.name" });
     await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
       val: device.name,
       ack: true,
     });
 
     if (!isGroup) {
-      await this.ensureState(
-        `${prefix}.info.online`,
-        tName("online"),
-        "boolean",
-        "indicator.reachable",
-        false,
-        undefined,
-        false,
-        tDesc("descOnline"),
-      );
+      await this.ensureState(`${prefix}.info.online`, {
+        name: tName("online"),
+        type: "boolean",
+        role: "indicator.reachable",
+        def: false,
+        desc: tDesc("descOnline"),
+      });
       this.onlineMarkerCache?.add(`${prefix}.info.online`);
       // info.online is written via syncInfoOnline (resolver-based, no
       // ts-rewrite-spam). The initial sync happens right after this method
       // returns — see syncInfoOnline. Direct write here was the source of
       // periodic false→true bounces (captured 2026-05-13).
-      await this.ensureState(`${prefix}.info.model`, tName("model"), "string", "info.model", false, undefined, "");
-      await this.ensureState(
-        `${prefix}.info.serial`,
-        tName("serialNumber"),
-        "string",
-        "info.serial",
-        false,
-        undefined,
-        "",
-      );
+      await this.ensureState(`${prefix}.info.model`, {
+        name: tName("model"),
+        type: "string",
+        role: "info.model",
+        def: "",
+      });
+      await this.ensureState(`${prefix}.info.serial`, {
+        name: tName("serialNumber"),
+        type: "string",
+        role: "info.serial",
+        def: "",
+      });
       // A BLE→gateway sensor (device.gateway set) reaches the cloud only via a
       // gateway and never has an own LAN IP — show which gateway it hangs off
       // (info.gateway) instead of a permanently-empty info.ip. Everything else
       // keeps info.ip as before.
       if (device.gateway) {
-        await this.ensureState(
-          `${prefix}.info.gateway`,
-          tName("gateway"),
-          "string",
-          "text",
-          false,
-          undefined,
-          "",
-          tDesc("descGateway"),
-        );
+        await this.ensureState(`${prefix}.info.gateway`, {
+          name: tName("gateway"),
+          type: "string",
+          role: "text",
+          def: "",
+          desc: tDesc("descGateway"),
+        });
       } else {
-        await this.ensureState(
-          `${prefix}.info.ip`,
-          tName("ipAddress"),
-          "string",
-          "info.ip",
-          false,
-          undefined,
-          "",
-          tDesc("descIpAddress"),
-        );
+        await this.ensureState(`${prefix}.info.ip`, {
+          name: tName("ipAddress"),
+          type: "string",
+          role: "info.ip",
+          def: "",
+          desc: tDesc("descIpAddress"),
+        });
       }
       // Device-type marker — "light", "thermometer", "heater" (Govee's type
       // without the "devices.types." prefix, `unknown` for a type outside the
@@ -877,16 +872,12 @@ export class StateManager {
     } else {
       // Group members: comma-separated device prefix IDs
       const memberIds = (device.groupMembers ?? []).map(m => this.deviceIds.idFor(m.sku, m.deviceId)).join(", ");
-      await this.ensureState(
-        `${prefix}.info.members`,
-        tName("members"),
-        "string",
-        "text",
-        false,
-        undefined,
-        undefined,
-        tDesc("descMembers"),
-      );
+      await this.ensureState(`${prefix}.info.members`, {
+        name: tName("members"),
+        type: "string",
+        role: "text",
+        desc: tDesc("descMembers"),
+      });
       await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
         val: memberIds,
         ack: true,
@@ -1115,16 +1106,12 @@ export class StateManager {
         : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
 
-    await this.ensureState(
-      `${prefix}.segments.count`,
-      tName("segmentCount"),
-      "number",
-      "value",
-      false,
-      undefined,
-      undefined,
-      tDesc("descSegmentCount"),
-    );
+    await this.ensureState(`${prefix}.segments.count`, {
+      name: tName("segmentCount"),
+      type: "number",
+      role: "value",
+      desc: tDesc("descSegmentCount"),
+    });
     await this.adapter.setState(`${prefix}.segments.count`, {
       val: reportedCount,
       ack: true,
@@ -1339,16 +1326,12 @@ export class StateManager {
       common: { name: tName("groupsStatus") },
       native: {},
     });
-    await this.ensureState(
-      "groups.info.online",
-      tName("cloudOnline"),
-      "boolean",
-      "indicator.reachable",
-      false,
-      undefined,
-      undefined,
-      tDesc("descCloudOnline"),
-    );
+    await this.ensureState("groups.info.online", {
+      name: tName("cloudOnline"),
+      type: "boolean",
+      role: "indicator.reachable",
+      desc: tDesc("descCloudOnline"),
+    });
     this.onlineMarkerCache?.add("groups.info.online");
     await this.writeReadOnly("groups.info.online", online);
   }
@@ -1370,16 +1353,12 @@ export class StateManager {
    * @param prefix Group prefix (`groups.<key>`)
    */
   private async ensureGroupMembersUnreachableState(prefix: string): Promise<void> {
-    await this.ensureState(
-      `${prefix}.info.membersUnreachable`,
-      tName("membersUnreachable"),
-      "string",
-      "text",
-      false,
-      undefined,
-      undefined,
-      tDesc("descMembersUnreachable"),
-    );
+    await this.ensureState(`${prefix}.info.membersUnreachable`, {
+      name: tName("membersUnreachable"),
+      type: "string",
+      role: "text",
+      desc: tDesc("descMembersUnreachable"),
+    });
   }
 
   /**
@@ -1682,50 +1661,36 @@ export class StateManager {
    * fires per status update) skip the Redis round-trip.
    *
    * @param id State object ID
-   * @param name Display name
-   * @param type Value type
-   * @param role ioBroker role
-   * @param write Whether state is writable
-   * @param unit Optional unit of measurement
-   * @param def Optional default value — set so the state has a sensible
-   *            initial value before the first writeback (avoids `null`
-   *            display in admin between create and first setState).
-   * @param desc Optional explanation. Omitted where the name already says
-   *             everything; the deliberate omissions are declared, with their
-   *             reason, in `test/self-explaining.json`.
+   * @param spec Name, value type and role; `def` where the state needs a sensible
+   *   value before the first write (no `null` in the admin between create and
+   *   first setState); `desc` unless the name already says everything
    */
   private async ensureState(
     id: string,
-    name: ioBroker.StringOrTranslated,
-    type: ioBroker.CommonType,
-    role: string,
-    write: boolean,
-    unit?: string,
-    def?: ioBroker.StateValue,
-    desc?: ioBroker.StringOrTranslated,
+    spec: Pick<ioBroker.StateCommon, "name" | "type" | "role" | "def" | "desc">,
   ): Promise<void> {
     if (this.ensuredStates.has(id)) {
       return;
     }
+    // Every datapoint this builds is read-only and has no unit (audit YAGNI-3: the
+    // eight positional parameters carried `write` and `unit` with one value each,
+    // and `unit`/`def` could swap without a type error). A datapoint whose name
+    // already says everything gets NO description — an invented sentence is
+    // worse than none. Which ones those are is declared once, in
+    // `test/self-explaining.json`; the fleet gate D08 blocks on anything that is
+    // neither explained nor declared.
     const common: Partial<ioBroker.StateCommon> = {
-      name,
-      type,
-      role,
+      name: spec.name,
+      type: spec.type,
+      role: spec.role,
       read: true,
-      write,
+      write: false,
     };
-    // A datapoint whose name already says everything gets NO description — an
-    // invented sentence is worse than none. Which ones those are is declared
-    // once, in `test/self-explaining.json`, not silently here; the fleet gate
-    // D08 blocks on anything that is neither explained nor declared.
-    if (desc) {
-      common.desc = desc;
+    if (spec.desc) {
+      common.desc = spec.desc;
     }
-    if (unit) {
-      common.unit = unit;
-    }
-    if (def !== undefined) {
-      common.def = def;
+    if (spec.def !== undefined) {
+      common.def = spec.def;
     }
     await this.extendIfChanged(id, {
       type: "state",
