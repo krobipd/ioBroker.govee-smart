@@ -1,4 +1,4 @@
-import { classifyError } from "./types";
+import { classifyError } from "./error-category";
 import * as http from "node:http";
 import { extractHttpStatus, formatFallback, HttpError, httpsRequest, interpretOkBody } from "./http-client";
 import type { HttpResult } from "./http-client";

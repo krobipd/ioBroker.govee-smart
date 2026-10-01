@@ -1,13 +1,6 @@
-import {
-  capMatchesControl,
-  deviceLabel,
-  errMessage,
-  hexToRgb,
-  logDedup,
-  type ErrorCategory,
-  type GoveeDevice,
-  type TimerAdapter,
-} from "./types";
+import { capMatchesControl, deviceLabel, errMessage, type GoveeDevice, type TimerAdapter } from "./types";
+import { hexToRgb } from "./color";
+import { logDedup, type ErrorCategory } from "./error-category";
 import { FORCE_COLOR_MODE_SETTLE_MS, LAN_STATUS_AFTER_COMMAND_MS } from "./timing-constants";
 import { declaredOptionValue } from "./capability-mapper";
 import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
@@ -26,7 +19,8 @@ import type { GoveeLanClient } from "./govee-lan-client";
 import { applySceneSpeed, lanColorTemperatureK } from "./govee-lan-client";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
-import { resolveSegmentCount, SEGMENT_HARD_MAX } from "./device-manager/lookups";
+import { resolveSegmentCount } from "./device-manager/lookups";
+import { SEGMENT_HARD_MAX } from "./segment-list";
 
 /**
  * Outcome of `resolveTransport` — decides which channel handles a command

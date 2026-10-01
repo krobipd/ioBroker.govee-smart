@@ -18,7 +18,7 @@ vi.mock("@iobroker/adapter-core", async () => {
 });
 
 import { SegmentWizard, type WizardHost, type WizardResult } from "./segment-wizard";
-import { SEGMENT_HARD_MAX } from "./device-manager/lookups";
+import { SEGMENT_HARD_MAX } from "./segment-list";
 import type { CloudCapability, GoveeDevice } from "./types";
 
 // A sliced test harness — mirrors enough of the adapter that the wizard

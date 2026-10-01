@@ -1,4 +1,5 @@
-import { errMessage, type ErrorCategory } from "./types";
+import { errMessage } from "./types";
+import { type ErrorCategory } from "./error-category";
 import { accountEmail, hasAccountCredentials } from "./account-credentials";
 import type { GoveeMqttClient, LoginVerdict } from "./govee-mqtt-client";
 import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";

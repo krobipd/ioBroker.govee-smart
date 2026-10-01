@@ -9,12 +9,11 @@ import {
   deviceLabel,
   errMessage,
   logRejected,
-  rgbIntToHex,
-  rgbToHex,
   type DeviceState,
   type DeviceStateChanges,
   type GoveeDevice,
 } from "../types";
+import { rgbIntToHex, rgbToHex } from "../color";
 import * as connectionState from "./connection-state";
 import { reapStaleDevices } from "./device-reaper";
 import * as groupFanoutHandler from "./group-fanout-handler";

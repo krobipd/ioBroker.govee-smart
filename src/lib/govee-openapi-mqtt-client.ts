@@ -2,14 +2,8 @@ import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import { OPENAPI_MQTT_MAX_AUTH_FAILURES } from "./timing-constants";
 import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient } from "./reconnecting-mqtt-client";
-import {
-  classifyError,
-  type OpenApiMqttEvent,
-  type CloudStateCapability,
-  type TimerAdapter,
-  errMessage,
-  maskSecret,
-} from "./types";
+import { type OpenApiMqttEvent, type CloudStateCapability, type TimerAdapter, errMessage, maskSecret } from "./types";
+import { classifyError } from "./error-category";
 
 const BROKER_URL = "mqtts://mqtt.openapi.govee.com:8883";
 

@@ -5,7 +5,8 @@ import { getMusicModeOptions, musicModeNameUsesRgb } from "../capability-mapper"
 import type { DeviceManager } from "../device-manager";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
-import { deviceLabel, hexToRgb, type GoveeDevice } from "../types";
+import { deviceLabel, type GoveeDevice } from "../types";
+import { hexToRgb } from "../color";
 
 /** The adapter surface the music command needs. */
 export interface MusicCommandAdapter {

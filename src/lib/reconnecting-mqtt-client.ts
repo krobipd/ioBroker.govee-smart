@@ -1,5 +1,6 @@
 import type { IClientOptions, MqttClient } from "mqtt";
-import { type ErrorCategory, type TimerAdapter } from "./types";
+import { type TimerAdapter } from "./types";
+import { type ErrorCategory } from "./error-category";
 
 /**
  * Signature of the `mqtt.connect` factory — tests inject a fake client without

@@ -1,4 +1,5 @@
-import { SEGMENT_COUNT_MAX, SEGMENT_HARD_MAX, resolveDeviceReachability } from "./device-manager/lookups";
+import { SEGMENT_COUNT_MAX, resolveDeviceReachability } from "./device-manager/lookups";
+import { SEGMENT_HARD_MAX } from "./segment-list";
 import { WIZARD_IDLE_TIMEOUT_MS } from "./timing-constants";
 import { deviceLabel, errMessage, type GoveeDevice } from "./types";
 import { readDeviceBaseline, restoreSegmentsGrouped } from "./device-baseline";

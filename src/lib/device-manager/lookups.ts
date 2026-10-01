@@ -1,3 +1,4 @@
+import { SEGMENT_HARD_MAX } from "../segment-list";
 import { normalizeDeviceId, type DeviceState, type GoveeDevice, type MqttStatusUpdate } from "../types";
 import { mapKey } from "../device-key";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
@@ -427,9 +428,6 @@ export function isLanDriven(device: GoveeDevice, now: number = Date.now()): bool
   }
   return typeof device.lastLanSeenAt === "number" && now - device.lastLanSeenAt < LAN_CAPABLE_MEMORY_MS;
 }
-
-/** Protocol limit: Govee's segment bitmask is 7 bytes × 8 bits = 56 slots (0..55). */
-export const SEGMENT_HARD_MAX = 55;
 
 /** Number of addressable segment slots (SEGMENT_HARD_MAX + 1 = 56). */
 export const SEGMENT_COUNT_MAX = SEGMENT_HARD_MAX + 1;

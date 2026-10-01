@@ -48,17 +48,13 @@ import {
 } from "./timing-constants";
 import type { CachedDeviceData, SkuCache } from "./sku-cache";
 import {
-  classifyError,
   coerceFiniteNumber,
-  logDedup,
   normalizeDeviceId,
-  rgbToHex,
   type CloudDevice,
   type CloudLoadResult,
   type CloudStateCapability,
   type DeviceState,
   type DeviceStateChanges,
-  type ErrorCategory,
   type GoveeDevice,
   type LanDevice,
   type MqttStatusUpdate,
@@ -67,6 +63,8 @@ import {
   errMessage,
   formatGatewayLabel,
 } from "./types";
+import { classifyError, logDedup, type ErrorCategory } from "./error-category";
+import { rgbToHex } from "./color";
 import { extractHttpStatus, HttpError } from "./http-client";
 
 /** What became of the fetches of one library run — see {@link librariesConfirmed}. */

@@ -1,5 +1,6 @@
 import { HttpError } from "./http-client";
-import { classifyError, errMessage, type ErrorCategory } from "./types";
+import { errMessage } from "./types";
+import { classifyError, type ErrorCategory } from "./error-category";
 
 /**
  * Per-channel/per-category dedup tracker — fires the warn message once per

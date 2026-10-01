@@ -94,7 +94,6 @@ export function readRateLimitHeaders(
   };
 }
 import {
-  classifyError,
   errMessage,
   type CapabilityOption,
   type CloudDevice,
@@ -103,8 +102,8 @@ import {
   type CloudScene,
   type CloudScenesResponse,
   type CloudStateCapability,
-  type ErrorCategory,
 } from "./types";
+import { classifyError, type ErrorCategory } from "./error-category";
 
 const BASE_URL = "https://openapi.api.govee.com";
 

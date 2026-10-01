@@ -14,9 +14,6 @@ import {
 } from "./timing-constants";
 import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient, type MqttConnectFn } from "./reconnecting-mqtt-client";
 import {
-  classifyError,
-  logDedup,
-  type ErrorCategory,
   type GoveeIotKeyResponse,
   type GoveeLoginResponse,
   type MqttStatusUpdate,
@@ -25,6 +22,7 @@ import {
   errMessage,
   maskSecret,
 } from "./types";
+import { classifyError, logDedup, type ErrorCategory } from "./error-category";
 
 const LOGIN_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v2/login`;
 const IOT_KEY_URL = `${GOVEE_APP_BASE_URL}/app/v1/account/iot/key`;

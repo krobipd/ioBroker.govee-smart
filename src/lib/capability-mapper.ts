@@ -1,9 +1,7 @@
 import {
-  buildUniqueLabelMap,
   capMatchesControl,
   deviceLabel,
   errMessage,
-  rgbToHex,
   type CapabilityField,
   type CapabilityOption,
   type NamedCapabilityOption,
@@ -12,6 +10,8 @@ import {
   type ControlKind,
   type GoveeDevice,
 } from "./types";
+import { buildUniqueLabelMap } from "./dropdown-labels";
+import { rgbToHex } from "./color";
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { resolveLabel, tDesc, tName, type I18nKey } from "./i18n";

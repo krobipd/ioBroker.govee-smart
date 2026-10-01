@@ -1,6 +1,7 @@
 import * as dgram from "node:dgram";
 import * as os from "node:os";
-import { clampByte, errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
+import { errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
+import { clampByte } from "./color";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import {
   SEGMENT_BRIGHTNESS_BITMASK_BYTES,

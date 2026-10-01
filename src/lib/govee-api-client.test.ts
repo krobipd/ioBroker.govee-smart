@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import { GoveeApiClient, parseLastData, parseSettings } from "./govee-api-client";
 import { httpsRequest } from "./http-client";
 import type * as HttpClientModule from "./http-client";
-import { classifyError } from "./types";
+import { classifyError } from "./error-category";
 
 // The scene / music / DIY library walkers call the module-level httpsRequest
 // (no DI), so mock it to drive walkCategories + the per-walker extraction.
