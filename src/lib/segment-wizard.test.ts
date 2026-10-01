@@ -464,6 +464,18 @@ describe("SegmentWizard", () => {
       expect(wizard.getSessionSnapshot()).toBeNull();
     });
 
+    it("at the protocol limit the strip ends at its highest lit segment, as in the review (audit DRY-15)", async () => {
+      await wizard.start(key);
+      let last: Record<string, unknown> = {};
+      // Segments 0-29 light, the slots after them stay dark up to the limit.
+      for (let i = 0; i <= SEGMENT_HARD_MAX; i++) {
+        last = await wizard.answer(i < 30);
+      }
+      expect(last.done).toBe(true);
+      expect(last.segmentCount).toBe(30);
+      expect(last.hasGaps).toBe(false);
+    });
+
     it("should restore baseline after applying the result", async () => {
       await wizard.start(key);
       await wizard.answer(true);

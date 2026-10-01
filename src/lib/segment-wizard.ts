@@ -153,6 +153,28 @@ function hasSegmentCapability(device: GoveeDevice): boolean {
 }
 
 /**
+ * The result of a lit-segment map — the ONE rule for a measurement that ran to the protocol limit and for the
+ * review-corrected map (until 3.0.2 the limit took the measured slot count, 56, and the review the highest lit
+ * index + 1; audit DRY-15). The strip ends at its highest lit segment: unlit slots beyond it are no segments.
+ * Only indices the bitmask protocol can address (0..SEGMENT_HARD_MAX) count — the review map comes straight
+ * from the admin socket, and an oversized index would become the segment count and build that many channels.
+ *
+ * @param lit The segment indices that lit (unsorted, may repeat)
+ * @returns the count, the manual list (empty without gaps) and whether there are gaps — null for an empty map
+ */
+function consolidate(lit: readonly number[]): WizardResult | null {
+  const clean = [...new Set(lit.filter(i => Number.isInteger(i) && i >= 0 && i <= SEGMENT_HARD_MAX))].sort(
+    (a, b) => a - b,
+  );
+  if (clean.length === 0) {
+    return null;
+  }
+  const segmentCount = clean[clean.length - 1] + 1;
+  const hasGaps = clean.length < segmentCount;
+  return { segmentCount, manualList: hasGaps ? compactIndices(clean) : "", hasGaps };
+}
+
+/**
  * Interactive segment-detection state machine.
  *
  * Flashes each segment bright white one-by-one up to the protocol limit.
@@ -459,19 +481,14 @@ export class SegmentWizard {
       return { error: this.t("errDeviceGoneShort") };
     }
 
-    const segmentCount = session.current;
-    const visible = session.visible.slice().sort((a, b) => a - b);
-    const allContiguous = visible.length === segmentCount && visible.every((v, i) => v === i);
-    const manualList = allContiguous ? "" : compactIndices(visible);
-    const result: WizardResult = {
-      segmentCount,
-      manualList,
-      hasGaps: !allContiguous,
-    };
+    const result = consolidate(session.visible);
+    if (!result) {
+      return { error: this.t("errAnswerFirst") };
+    }
 
     await this.finalize(device, session, result);
 
-    return { done: true, segmentCount, list: manualList, hasGaps: result.hasGaps };
+    return { done: true, segmentCount: result.segmentCount, list: result.manualList, hasGaps: result.hasGaps };
   }
 
   /**
@@ -491,10 +508,8 @@ export class SegmentWizard {
     // Only indices the bitmask protocol can address (0..SEGMENT_HARD_MAX) — the
     // payload comes straight from the admin socket, and an oversized index would
     // otherwise become the device's segment count and build that many channels.
-    const clean = [...new Set(indices.filter(i => Number.isInteger(i) && i >= 0 && i <= SEGMENT_HARD_MAX))].sort(
-      (a, b) => a - b,
-    );
-    if (clean.length === 0) {
+    const result = consolidate(indices);
+    if (!result) {
       // Nothing selected — the UI prevents this, but never build a -Infinity
       // segment count from an empty map. Keep the session so the user can retry.
       return { error: this.t("errAnswerFirst") };
@@ -506,14 +521,9 @@ export class SegmentWizard {
       return { error: this.t("errDeviceGoneShort") };
     }
 
-    const segmentCount = clean[clean.length - 1] + 1;
-    const hasGaps = clean.length < segmentCount;
-    const manualList = hasGaps ? compactIndices(clean) : "";
-    const result: WizardResult = { segmentCount, manualList, hasGaps };
-
     await this.finalize(device, session, result);
 
-    return { applied: true, segmentCount, list: manualList, hasGaps };
+    return { applied: true, segmentCount: result.segmentCount, list: result.manualList, hasGaps: result.hasGaps };
   }
 
   /**
