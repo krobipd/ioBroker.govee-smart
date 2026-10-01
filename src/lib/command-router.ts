@@ -102,7 +102,7 @@ export class CommandRouter {
    * report.
    */
   onCommandResult?: (
-    deviceId: string,
+    device: GoveeDevice,
     entry: {
       stateId: string;
       value: unknown;
@@ -346,13 +346,13 @@ export class CommandRouter {
     const transport = this.decisionToChannelMarker(decision);
     try {
       const sent = await this.dispatchCommand(device, command, value, decision);
-      this.onCommandResult?.(device.deviceId, { stateId: command, value: sent, transport, ok: true });
+      this.onCommandResult?.(device, { stateId: command, value: sent, transport, ok: true });
       return sent;
     } catch (e) {
       // Report the failure, then rethrow — the caller owns the "Command failed"
       // warn and the ack decision; this only makes the outcome visible in the
       // diagnostics report.
-      this.onCommandResult?.(device.deviceId, {
+      this.onCommandResult?.(device, {
         stateId: command,
         value,
         transport,
@@ -587,14 +587,14 @@ export class CommandRouter {
 
     try {
       await this.sendBudgeted(execute, device);
-      this.onCommandResult?.(device.deviceId, {
+      this.onCommandResult?.(device, {
         stateId: capabilityInstance,
         value: cloudValue,
         transport: "Cloud",
         ok: true,
       });
     } catch (e) {
-      this.onCommandResult?.(device.deviceId, {
+      this.onCommandResult?.(device, {
         stateId: capabilityInstance,
         value: cloudValue,
         transport: "Cloud",

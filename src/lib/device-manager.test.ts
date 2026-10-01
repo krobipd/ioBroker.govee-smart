@@ -5952,3 +5952,210 @@ describe("a cache start that lost a light — the account lists protect its tree
     expect(listCalls()).toBe(0);
   });
 });
+
+describe("a failed command leaves the value unconfirmed — the device is asked once (issue #51)", () => {
+  const cloudLight = (dm: DeviceManager, id = "AABBCCDDEEFF0051", o: Partial<GoveeDevice> = {}): GoveeDevice => {
+    const d = createTestDevice({
+      deviceId: id,
+      lanIp: undefined,
+      lastLanSeenAt: undefined,
+      channels: { lan: false, mqtt: true, cloud: true },
+      ...o,
+    });
+    (dm as any).devices.set(`H6160_${id}`, d);
+    return d;
+  };
+  const dnsFailure = (): Error =>
+    Object.assign(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"), { code: "EAI_AGAIN", neverSent: true });
+
+  describe("the mark", () => {
+    it("is set by a failed command and cleared by a successful one — a group member goes the same way", async () => {
+      const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      let fail = true;
+      dm.setCloudClient({
+        controlDevice: () => (fail ? Promise.reject(dnsFailure()) : Promise.resolve()),
+      } as never);
+      const dev = cloudLight(dm);
+      await expect(dm.sendCommand(dev, "power", false)).rejects.toThrow("EAI_AGAIN");
+      expect(typeof dev.unconfirmedSince).toBe("number");
+      fail = false;
+      await dm.sendCommand(dev, "power", false);
+      expect(dev.unconfirmedSince).toBeUndefined();
+    });
+
+    it("is cleared by a status packet carrying the device's state — its real value is in the tree again", () => {
+      const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      const dev = cloudLight(dm, "AABBCCDDEEFF0052", { unconfirmedSince: Date.now() - 1000 });
+      dm.handleMqttStatus({ sku: dev.sku, device: dev.deviceId, state: { onOff: 1 } });
+      expect(dev.unconfirmedSince).toBeUndefined();
+    });
+
+    it("survives a packet without state — nothing about the value was said", () => {
+      const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      const dev = cloudLight(dm, "AABBCCDDEEFF0053", { unconfirmedSince: Date.now() - 1000 });
+      dm.handleMqttStatus({ sku: dev.sku, device: dev.deviceId });
+      expect(typeof dev.unconfirmedSince).toBe("number");
+    });
+  });
+
+  describe("with an account: one status request per failure, past both 10-minute gates", () => {
+    function bench(sendOk = true): { dm: DeviceManager; asked: string[]; ok: { value: boolean } } {
+      const asked: string[] = [];
+      const ok = { value: sendOk };
+      const timers = {
+        setInterval: () => undefined,
+        clearInterval: () => undefined,
+        clearTimeout: () => undefined,
+        delay: () => Promise.resolve(),
+        setTimeout: (cb: () => void) => {
+          cb();
+          return undefined;
+        },
+      } as never;
+      const dm = new DeviceManager(mockLog, timers, registry, new DeviceIdRegistry());
+      dm.setStatusRequester(device => {
+        asked.push(device.deviceId);
+        return ok.value;
+      });
+      return { dm, asked, ok };
+    }
+
+    it("asks a device that pushed a minute ago and was asked a minute ago — once", () => {
+      const { dm, asked } = bench();
+      const now = Date.now();
+      cloudLight(dm, "AABBCCDDEEFF0054", {
+        iotTopic: "GD/54",
+        lastStatusRequestAt: now - 60_000,
+        unconfirmedSince: now - 1000,
+        state: { online: true, devicePushAt: now - 60_000 },
+      });
+      expect(dm.requestStaleStatuses(now)).toBe(1);
+      expect(dm.requestStaleStatuses(now + 1000)).toBe(0); // the same failure is not asked about twice
+      expect(asked).toEqual(["AABBCCDDEEFF0054"]);
+    });
+
+    it("a new failure is asked about again", () => {
+      const { dm, asked } = bench();
+      const now = Date.now();
+      const dev = cloudLight(dm, "AABBCCDDEEFF0055", {
+        iotTopic: "GD/55",
+        unconfirmedSince: now - 1000,
+        state: { online: true, devicePushAt: now - 60_000 },
+      });
+      dm.requestStaleStatuses(now);
+      dev.unconfirmedSince = now + 5000;
+      expect(dm.requestStaleStatuses(now + 6000)).toBe(1);
+      expect(asked).toHaveLength(2);
+    });
+
+    it("a request the broker could not take is asked again on the next tick", () => {
+      const { dm, asked, ok } = bench(false);
+      const now = Date.now();
+      const dev = cloudLight(dm, "AABBCCDDEEFF0056", {
+        iotTopic: "GD/56",
+        lastStatusRequestAt: now - 60_000,
+        unconfirmedSince: now - 1000,
+        state: { online: true, devicePushAt: now - 60_000 },
+      });
+      dm.requestStaleStatuses(now);
+      expect(dev.lastStatusRequestAt).toBe(now - 60_000);
+      ok.value = true;
+      expect(dm.requestStaleStatuses(now + 120_000)).toBe(1);
+      expect(asked).toHaveLength(2);
+    });
+
+    it("an unmarked device with a fresh push is still left alone", () => {
+      const { dm } = bench();
+      const now = Date.now();
+      cloudLight(dm, "AABBCCDDEEFF0057", { iotTopic: "GD/57", state: { online: true, devicePushAt: now - 60_000 } });
+      expect(dm.requestStaleStatuses(now)).toBe(0);
+    });
+  });
+
+  describe("without a status path: one cloud state read that writes the values", () => {
+    const answer: CloudStateCapability[] = [
+      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+      { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+    ];
+    function bench(read: () => Promise<CloudStateCapability[]> = () => Promise.resolve(answer)): {
+      dm: DeviceManager;
+      reads: string[];
+      written: Array<{ device: string; caps: CloudStateCapability[] }>;
+    } {
+      const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      const reads: string[] = [];
+      const written: Array<{ device: string; caps: CloudStateCapability[] }> = [];
+      dm.setCloudClient({
+        getDeviceState: (_sku: string, id: string) => {
+          reads.push(id);
+          return read();
+        },
+      } as never);
+      dm.setOnCloudStateRead((device, caps) => {
+        written.push({ device: device.deviceId, caps });
+        return Promise.resolve();
+      });
+      return { dm, reads, written };
+    }
+    const fresh = (): Partial<GoveeDevice> => ({
+      unconfirmedSince: Date.now() - 1000,
+      state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() - 60_000 },
+    });
+
+    it("reads a marked device although its evidence is fresh, writes the values, clears the mark", async () => {
+      const { dm, reads, written } = bench();
+      const dev = cloudLight(dm, "AABBCCDDEEFF0058", fresh());
+      expect(await dm.refreshExpiringReachability()).toBe(1);
+      expect(reads).toEqual(["AABBCCDDEEFF0058"]);
+      expect(written).toEqual([{ device: "AABBCCDDEEFF0058", caps: answer }]);
+      expect(dev.unconfirmedSince).toBeUndefined();
+    });
+
+    it("an ordinary refresh does not write values — a lagging state could undo a confirmed command", async () => {
+      const { dm, written } = bench();
+      cloudLight(dm, "AABBCCDDEEFF0059", {
+        state: {
+          online: true,
+          cloudReportedOnline: true,
+          cloudReportedOnlineAt: Date.now() - CLOUD_REACHABILITY_REFRESH_MS - 60_000,
+        },
+      });
+      expect(await dm.refreshExpiringReachability()).toBe(1);
+      expect(written).toEqual([]);
+    });
+
+    it("leaves a device with a topic to the status request when an account broker is wired — no REST budget spent", async () => {
+      const { dm, reads } = bench();
+      dm.setStatusRequester(() => true);
+      cloudLight(dm, "AABBCCDDEEFF005A", { ...fresh(), iotTopic: "GD/5A" });
+      expect(await dm.refreshExpiringReachability()).toBe(0);
+      expect(reads).toEqual([]);
+    });
+
+    it("reads a marked device without a topic even when a broker is wired", async () => {
+      const { dm, reads } = bench();
+      dm.setStatusRequester(() => true);
+      cloudLight(dm, "AABBCCDDEEFF005B", fresh());
+      expect(await dm.refreshExpiringReachability()).toBe(1);
+      expect(reads).toEqual(["AABBCCDDEEFF005B"]);
+    });
+
+    it("a failed read keeps the mark, and the five-minute floor still holds", async () => {
+      const { dm, reads } = bench(() => Promise.reject(dnsFailure()));
+      const dev = cloudLight(dm, "AABBCCDDEEFF005C", fresh());
+      expect(await dm.refreshExpiringReachability()).toBe(1);
+      expect(typeof dev.unconfirmedSince).toBe("number");
+      expect(await dm.refreshExpiringReachability()).toBe(0); // within the floor
+      expect(reads).toHaveLength(1);
+    });
+
+    it("an appliance and a LAN-driven light are not read for the mark", async () => {
+      const { dm, reads } = bench();
+      cloudLight(dm, "AABBCCDDEEFF005D", { ...fresh(), lastLanSeenAt: Date.now() - 60_000 });
+      const appliance = cloudLight(dm, "AABBCCDDEEFF005E", { ...fresh(), type: "devices.types.air_purifier" });
+      appliance.sku = "H7127";
+      expect(await dm.refreshExpiringReachability()).toBe(0);
+      expect(reads).toEqual([]);
+    });
+  });
+});

@@ -462,6 +462,14 @@ export interface GoveeDevice {
    */
   lastReachabilityRefreshAt?: number;
   /**
+   * When a command for this device last failed — its datapoint then holds the
+   * user's unconfirmed wish (issue #51). Set by every failed command, cleared by
+   * every successful one. While set, the device is asked for its real state once
+   * (status request over the account broker, otherwise one cloud state read),
+   * instead of waiting for the regular 10/20-minute gates. Runtime-only.
+   */
+  unconfirmedSince?: number;
+  /**
    * Consecutive account-reconcile passes this device was missing from its
    * authoritative account list (Cloud `/user/devices` for lights/appliances,
    * App-API list for sensors, group list for BaseGroups) while not

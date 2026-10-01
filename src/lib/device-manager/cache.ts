@@ -83,6 +83,7 @@ export const RUNTIME_ONLY_KEYS = [
   "iotTopic",
   "lastStatusRequestAt",
   "lastReachabilityRefreshAt",
+  "unconfirmedSince",
   "lastLanStatusAt",
   "lastLanStatusAskedAt",
 ] as const satisfies readonly (keyof GoveeDevice)[];
@@ -153,6 +154,7 @@ export function mergeCachedIntoLive(live: GoveeDevice, cached: CachedDeviceData)
     iotTopic: live.iotTopic,
     lastStatusRequestAt: live.lastStatusRequestAt,
     lastReachabilityRefreshAt: live.lastReachabilityRefreshAt,
+    unconfirmedSince: live.unconfirmedSince,
     lastLanStatusAt: live.lastLanStatusAt,
     lastLanStatusAskedAt: live.lastLanStatusAskedAt,
   };

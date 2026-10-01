@@ -9,7 +9,12 @@ vi.mock("@iobroker/adapter-core", () => ({
   },
 }));
 
-import { applyCloudCapabilities, loadCloudStates, type CloudStateLoaderAdapter } from "./cloud-state-loader";
+import {
+  applyCloudCapabilities,
+  loadCloudStates,
+  writeCloudStateValues,
+  type CloudStateLoaderAdapter,
+} from "./cloud-state-loader";
 import type { CloudStateCapability, GoveeDevice } from "../types";
 import { createTestDevice, mockLog } from "../../../test/test-helpers";
 import { DeviceRegistry } from "../device-registry";
@@ -551,5 +556,66 @@ describe("an account-list reading carries its own measurement time (audit D9)", 
     const future = { ...entry, lastData: { ...entry.lastData, lastTime: 1780950000000 + 3_600_000 } };
     const caps = buildCapabilitiesFromAppEntry(future, 1780950000000);
     expect(caps.filter(c => c.ts !== undefined)).toEqual([]);
+  });
+});
+
+describe("writeCloudStateValues — the writer shared by the load and the correction read (issue #51)", () => {
+  const cloudOnly = (): GoveeDevice =>
+    createTestDevice({ deviceId: "AA:51", lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+
+  it('"set" writes every value, also an unchanged one — the load behaves as before', async () => {
+    const rig = makeRig([]);
+    const device = cloudOnly();
+    expect(await writeCloudStateValues(rig.adapter, device, [powerCap], "set")).toBe(true);
+    expect(await writeCloudStateValues(rig.adapter, device, [powerCap], "set")).toBe(true);
+    expect(rig.writes.filter(w => w.id.endsWith(".control.power"))).toHaveLength(2);
+  });
+
+  it('"changed" goes through setStateChanged — the correction overwrites an unconfirmed wish, not a confirmed value', async () => {
+    const rig = makeRig([]);
+    const device = cloudOnly();
+    const changed: Array<{ id: string; ack: unknown }> = [];
+    const plain = rig.adapter.setStateChanged.bind(rig.adapter);
+    (rig.adapter as { setStateChanged: unknown }).setStateChanged = (id: string, state: ioBroker.SettableState) => {
+      changed.push({ id, ack: (state as { ack?: unknown }).ack });
+      return plain(id, state);
+    };
+    expect(await writeCloudStateValues(rig.adapter, device, [powerCap], "changed")).toBe(true);
+    expect(changed).toEqual([{ id: expect.stringMatching(/\.control\.power$/), ack: true }]);
+    expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toMatchObject({ val: true });
+  });
+
+  it("writes nothing for a device Govee reports offline, in either mode", async () => {
+    const rig = makeRig([]);
+    const offline: CloudStateCapability = {
+      type: "devices.capabilities.online",
+      instance: "online",
+      state: { value: false },
+    };
+    expect(await writeCloudStateValues(rig.adapter, cloudOnly(), [offline, powerCap], "changed")).toBe(false);
+    expect(await writeCloudStateValues(rig.adapter, cloudOnly(), [offline, powerCap], "set")).toBe(false);
+    expect(rig.writes).toEqual([]);
+  });
+
+  it("keeps the LAN-first rule — a LAN light's power is never written from the cloud", async () => {
+    const rig = makeRig([]);
+    const lanLight = createTestDevice({
+      deviceId: "AA:52",
+      lanIp: "10.0.0.5",
+      channels: { lan: true, mqtt: false, cloud: true },
+    });
+    await writeCloudStateValues(rig.adapter, lanLight, [powerCap, batteryCap], "changed");
+    expect(rig.writes.find(w => w.id.endsWith(".control.power"))).toBeUndefined();
+    expect(rig.writes.find(w => w.id.endsWith(".sensor.battery"))).toMatchObject({ val: 75 });
+  });
+});
+
+describe("writeCloudStateValues without a state manager", () => {
+  it("writes nothing and says so — the tree is not built yet", async () => {
+    const rig = makeRig([]);
+    (rig.adapter as { stateManager: unknown }).stateManager = null;
+    const device = createTestDevice({ deviceId: "AA:5F", lanIp: undefined });
+    expect(await writeCloudStateValues(rig.adapter, device, [powerCap], "changed")).toBe(false);
+    expect(rig.writes).toEqual([]);
   });
 });

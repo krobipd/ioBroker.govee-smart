@@ -918,10 +918,12 @@ describe("DiagnosticsCollector", () => {
             lastReachabilityRefreshAt: 1_700_000_100_000,
             librariesCheckedAt: 1_700_000_200_000,
             accountMissCount: 2,
+            unconfirmedSince: 1_700_000_300_000,
           }),
           "2.39.1",
         )
       ).device as Record<string, unknown>;
+      expect(dev.unconfirmedSince).toBe(1_700_000_300_000); // a failed command left the value unconfirmed (issue #51)
       expect(dev.brokerTopicKnown).toBe(true);
       expect(dev.lastStatusRequestAt).toBe(1_700_000_000_000);
       expect(dev.lastReachabilityRefreshAt).toBe(1_700_000_100_000);

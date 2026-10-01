@@ -65,6 +65,75 @@ export function cloudReportsOffline(caps: CloudStateCapability[]): boolean {
 }
 
 /**
+ * Write the values of one `/device/state` answer — shared by the state load
+ * (start, cloud recovery, the refresh button) and the read that corrects an
+ * unconfirmed value after a failed command (issue #51).
+ *
+ * LAN-first: the LAN state IDs of a LAN-capable device are never overwritten.
+ *
+ * @param adapter Adapter surface
+ * @param device  The device the answer belongs to
+ * @param caps    The answer's capabilities
+ * @param mode    `"set"` writes every value (the load); `"changed"` skips an
+ *   unchanged one — `setStateChanged` compares value AND ack, so a user's
+ *   unconfirmed wish is still overwritten by the device's confirmed value
+ * @returns false when Govee reports the device offline and nothing was written
+ */
+export async function writeCloudStateValues(
+  adapter: CloudStateLoaderAdapter,
+  device: GoveeDevice,
+  caps: CloudStateCapability[],
+  mode: "set" | "changed",
+): Promise<boolean> {
+  if (!adapter.stateManager) {
+    return false;
+  }
+  // Govee's memory of a device it cannot reach is not the device's state:
+  // for an unplugged light the same answer carried `online: false` AND
+  // `powerSwitch: 1`, `brightness: 100` (krobi's H70C5, unplugged for a
+  // week, measured on the first 2.35.0 start) — the values of the last
+  // contact. Written, they showed an unplugged light as switched on. The
+  // online evidence is applied by the caller; the remembered values are not.
+  if (cloudReportsOffline(caps)) {
+    adapter.log.debug(
+      `Cloud state for ${deviceLabel(device)}: Govee reports the device offline — its remembered values are not written`,
+    );
+    return false;
+  }
+  const prefix = adapter.stateManager.devicePrefix(device);
+
+  const writes: Promise<unknown>[] = [];
+  // A model whose platform API speaks °F (catalog quirk, M18) — the
+  // datapoint is °C.
+  // A capability the catalog marks as ignored by the device has no
+  // datapoint (C-O3) — its reading goes nowhere.
+  const ignored = ignoredCloudCapabilities(device.sku, adapter.deviceRegistry);
+  const kept = caps.filter(c => !ignored.has(c.instance));
+  const readings =
+    adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F" ? platformReadingsToCelsius(kept) : kept;
+  // One capability can carry two datapoints (work_mode → mode + level),
+  // so the list is flattened first and the LAN-shadow rule below applies
+  // per RESULT — same shape and same nesting level as before.
+  for (const mapped of readings.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
+    if (device.lanIp && LAN_STATE_IDS.has(mapped.stateId)) {
+      continue;
+    }
+    const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId, mapped.channel);
+    const state = { val: mapped.value, ack: true };
+    // Fire-and-forget — States are created before the load runs; a rejection
+    // here means the state was deleted out-of-band and can be safely ignored.
+    writes.push(
+      (mode === "set" ? adapter.setState(statePath, state) : adapter.setStateChanged(statePath, state)).catch(
+        logRejected(adapter.log, `write ${statePath}`),
+      ),
+    );
+  }
+  await Promise.all(writes);
+  adapter.log.debug(`Cloud state written for ${deviceLabel(device)}`);
+  return true;
+}
+
+/**
  * Load current state for Cloud devices and populate state values.
  * Called after the initial Cloud device list load, on Cloud recovery,
  * and (scoped via `only`) by the per-device refresh_cloud button.
@@ -108,50 +177,7 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         // with no local API this is the ONLY evidence there is, so without it
         // such a device could never be shown as reachable at all.
         adapter.deviceManager?.applyCloudStateOnline(device, caps);
-        // Govee's memory of a device it cannot reach is not the device's state:
-        // for an unplugged light the same answer carried `online: false` AND
-        // `powerSwitch: 1`, `brightness: 100` (krobi's H70C5, unplugged for a
-        // week, measured on the first 2.35.0 start) — the values of the last
-        // contact. Written, they showed an unplugged light as switched on. The
-        // online evidence above is applied; the remembered values are not.
-        if (cloudReportsOffline(caps)) {
-          adapter.log.debug(
-            `Cloud state for ${deviceLabel(device)}: Govee reports the device offline — its remembered values are not written`,
-          );
-          return;
-        }
-        const prefix = adapter.stateManager.devicePrefix(device);
-
-        const writes: Promise<unknown>[] = [];
-        // A model whose platform API speaks °F (catalog quirk, M18) — the
-        // datapoint is °C.
-        // A capability the catalog marks as ignored by the device has no
-        // datapoint (C-O3) — its reading goes nowhere.
-        const ignored = ignoredCloudCapabilities(device.sku, adapter.deviceRegistry);
-        const kept = caps.filter(c => !ignored.has(c.instance));
-        const readings =
-          adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F"
-            ? platformReadingsToCelsius(kept)
-            : kept;
-        // One capability can carry two datapoints (work_mode → mode + level),
-        // so the list is flattened first and the LAN-shadow rule below applies
-        // per RESULT — same shape and same nesting level as before.
-        for (const mapped of readings.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
-          if (device.lanIp && LAN_STATE_IDS.has(mapped.stateId)) {
-            continue;
-          }
-          const statePath = adapter.stateManager.resolveStatePath(prefix, mapped.stateId, mapped.channel);
-          // Fire-and-forget — States are created before loadCloudStates runs;
-          // a rejection here means the state was deleted out-of-band and
-          // can be safely ignored.
-          writes.push(
-            adapter
-              .setState(statePath, { val: mapped.value, ack: true })
-              .catch(logRejected(adapter.log, `write ${statePath}`)),
-          );
-        }
-        await Promise.all(writes);
-        adapter.log.debug(`Cloud state loaded for ${deviceLabel(device)}`);
+        await writeCloudStateValues(adapter, device, caps, "set");
       } catch (e) {
         // v2.9.1 — record failure with HTTP status (and HttpError.responseBody
         // when available) so the diag JSON shows why state-load failed instead

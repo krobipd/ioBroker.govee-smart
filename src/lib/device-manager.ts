@@ -147,6 +147,7 @@ export class DeviceManager {
   public onCloudDataReady: ((device: GoveeDevice, allDevices: GoveeDevice[]) => void) | null = null;
   public onGroupMembersReady: ((group: GoveeDevice, allDevices: GoveeDevice[]) => void) | null = null;
   private onCloudCapabilities: ((device: GoveeDevice, caps: CloudStateCapability[]) => void) | null = null;
+  private onCloudStateRead: ((device: GoveeDevice, caps: CloudStateCapability[]) => Promise<void>) | null = null;
   /** Per-source dedup so a Cloud NETWORK error doesn't shadow an App-API one. */
   private lastErrorCategory: ErrorCategory | null = null;
   /** Shared Cloud budget — owned here for the data loaders since M12. */
@@ -320,8 +321,16 @@ export class DeviceManager {
     // only in the adapter log.
     // What a user command actually did — the diag report's answer to
     // "switching does not work": the LAN capture ends at the wire.
-    this.commandRouter.onCommandResult = (deviceId, entry) => {
-      this.diagnostics.recordCommandResult(deviceId, entry);
+    this.commandRouter.onCommandResult = (device, entry) => {
+      this.diagnostics.recordCommandResult(device.deviceId, entry);
+      // A failed command leaves the user's wish unconfirmed in the datapoint —
+      // the device is asked for its real state once (issue #51); a later
+      // success supersedes it.
+      if (entry.ok) {
+        delete device.unconfirmedSince;
+      } else {
+        device.unconfirmedSince = Date.now();
+      }
     };
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
@@ -376,13 +385,19 @@ export class DeviceManager {
       if (!topic || isAppGroup(device) || isLanDriven(device, now)) {
         continue;
       }
-      const pushAt = device.state.devicePushAt;
-      if (typeof pushAt === "number" && now - pushAt < STATUS_REQUEST_INTERVAL_MS) {
-        continue;
-      }
       const askedAt = device.lastStatusRequestAt;
-      if (typeof askedAt === "number" && now - askedAt < STATUS_REQUEST_INTERVAL_MS) {
-        continue;
+      // A failed command left the user's wish unconfirmed (issue #51): the device
+      // is asked once per failure, past both gates — over the broker, free of the
+      // REST budget. Its answer is an ordinary status packet and clears the mark.
+      const unconfirmed = device.unconfirmedSince !== undefined && (askedAt ?? 0) < device.unconfirmedSince;
+      if (!unconfirmed) {
+        const pushAt = device.state.devicePushAt;
+        if (typeof pushAt === "number" && now - pushAt < STATUS_REQUEST_INTERVAL_MS) {
+          continue;
+        }
+        if (typeof askedAt === "number" && now - askedAt < STATUS_REQUEST_INTERVAL_MS) {
+          continue;
+        }
       }
       device.lastStatusRequestAt = now;
       // The request's protocol version comes from the catalog: 2 for every
@@ -398,6 +413,9 @@ export class DeviceManager {
         }
         if (send(device, cmdVersion)) {
           this.diagnostics.addLog(device.deviceId, "debug", "status request sent over the account broker");
+        } else if (unconfirmed) {
+          // Not sent (broker down): the failure is asked about on the next tick.
+          device.lastStatusRequestAt = askedAt;
         }
       }, delayMs);
     }
@@ -1702,6 +1720,10 @@ export class DeviceManager {
     const state = this.parseMqttStateUpdate(device, update);
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);
+    // The device's own state is in the tree again — nothing left unconfirmed (issue #51).
+    if (update.state) {
+      delete device.unconfirmedSince;
+    }
     // The device's own voice — outside the LAN guard of parseMqttStateUpdate:
     // a light sent over the cloud while it is LAN-driven for reachability must
     // not let its held command expire (issue #46, 2.39.0).
@@ -2365,8 +2387,13 @@ export class DeviceManager {
       if (isLanDriven(device, now)) {
         continue;
       }
+      // A failed command left the user's wish unconfirmed (issue #51). Where no
+      // status request can ask the device (no account broker, or no topic),
+      // this read is the only correction: it runs past the evidence gate and
+      // its values are written. The attempt floor below still applies.
+      const unconfirmed = device.unconfirmedSince !== undefined && (!this.statusRequester || !device.iotTopic);
       const evidenceAt = Math.max(device.state.cloudReportedOnlineAt ?? 0, device.state.cloudLivenessAt ?? 0);
-      if (now - evidenceAt < CLOUD_REACHABILITY_REFRESH_MS) {
+      if (!unconfirmed && now - evidenceAt < CLOUD_REACHABILITY_REFRESH_MS) {
         continue;
       }
       if (
@@ -2384,6 +2411,12 @@ export class DeviceManager {
           // put a second entry of a different shape into the same slots.
           const caps = await cloudClient.getDeviceState(device.sku, device.deviceId);
           this.applyCloudStateOnline(device, caps);
+          if (unconfirmed) {
+            delete device.unconfirmedSince;
+            await this.onCloudStateRead?.(device, caps).catch(e =>
+              this.log.debug(`Correcting ${deviceLabel(device)} from its state failed: ${errMessage(e)}`),
+            );
+          }
         } catch (e) {
           const status =
             e && typeof e === "object" && "statusCode" in e ? (e as { statusCode?: number }).statusCode : undefined;
@@ -2491,6 +2524,17 @@ export class DeviceManager {
    */
   setOnCloudCapabilities(cb: ((device: GoveeDevice, caps: CloudStateCapability[]) => void) | null): void {
     this.onCloudCapabilities = cb;
+  }
+
+  /**
+   * Hook for a state read that corrects an unconfirmed value (issue #51): the
+   * reachability refresh of a device whose last command failed writes the
+   * values it read. Wired to the cloud-state writer.
+   *
+   * @param cb Writes the values of (device, caps)
+   */
+  setOnCloudStateRead(cb: ((device: GoveeDevice, caps: CloudStateCapability[]) => Promise<void>) | null): void {
+    this.onCloudStateRead = cb;
   }
 
   /**

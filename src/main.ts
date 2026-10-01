@@ -991,6 +991,10 @@ export class GoveeAdapter extends utils.Adapter {
         .applyCloudCapabilities(this.handlerHost, device, caps)
         .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
     });
+    // The read that corrects a value left unconfirmed by a failed command (issue #51).
+    this.deviceManager!.setOnCloudStateRead(async (device, caps) => {
+      await cloudStateLoader.writeCloudStateValues(this.handlerHost, device, caps, "changed");
+    });
 
     // App-API poll — every 2 minutes, pulls state for sensors like H5179
     // whose OpenAPI /device/state answer carries the capability with an

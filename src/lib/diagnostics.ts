@@ -1071,6 +1071,9 @@ export class DiagnosticsCollector {
         // (2.39.0), and when it last renewed its cloud reachability proof.
         lastStatusRequestAt: device.lastStatusRequestAt ?? null,
         lastReachabilityRefreshAt: device.lastReachabilityRefreshAt ?? null,
+        // When the last failed command left the datapoint's value unconfirmed —
+        // null once a later command or the device's own state confirmed it (issue #51).
+        unconfirmedSince: device.unconfirmedSince ?? null,
         // When the libraries were last fetched, and how many account lists in a
         // row did not contain the device (the reaper's counter).
         librariesCheckedAt: device.librariesCheckedAt ?? null,
@@ -1250,7 +1253,7 @@ export class DiagnosticsCollector {
       );
       renewers.push("app device list, every 2 min (needs email + password)");
       renewers.push(
-        `status request over the account broker once the device's own push is older than ${Math.round(STATUS_REQUEST_INTERVAL_MS / 60000)} min (needs email + password)`,
+        `status request over the account broker once the device's own push is older than ${Math.round(STATUS_REQUEST_INTERVAL_MS / 60000)} min, and once right after a failed command (needs email + password)`,
       );
       renewers.push("cloud event push, event-driven (needs the API key)");
       // The refresh skips every device with its own daily budget (appliances,
@@ -1259,7 +1262,7 @@ export class DiagnosticsCollector {
       // report waiting for a call that never comes (issue #47, 2026-09-22).
       if (applianceBudget(device) === undefined) {
         renewers.push(
-          `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min (needs the API key)`,
+          `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min, and once after a failed command when no status request can reach the device — that read also corrects the values (needs the API key)`,
         );
       } else {
         silent.push(
