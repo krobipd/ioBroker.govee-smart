@@ -1256,3 +1256,36 @@ describe("group music end to end — fan-out plus the real music sender (audit M
     ]);
   });
 });
+
+describe("a failed command says in words what went wrong (issue #51)", () => {
+  const dns = (): Error =>
+    Object.assign(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"), {
+      code: "EAI_AGAIN",
+      hostname: "openapi.api.govee.com",
+    });
+  const READABLE = "openapi.api.govee.com could not be resolved — DNS problem on this host?";
+
+  it("a plain command", async () => {
+    const rig = makeRig([device]);
+    rig.setSendFailure(dns);
+    await write(rig, id("control.power"), true);
+    expect(rig.warns).toEqual([expect.stringContaining(READABLE)]);
+  });
+
+  it("a capability command", async () => {
+    const rig = makeRig([device]);
+    rig.objects.set(id("control.oscillation_toggle"), {
+      native: { capabilityType: "devices.capabilities.toggle", capabilityInstance: "oscillationToggle" },
+    });
+    rig.setSendFailure(dns);
+    await write(rig, id("control.oscillation_toggle"), true);
+    expect(rig.warns).toEqual([expect.stringContaining(READABLE)]);
+  });
+
+  it("a local snapshot restore", async () => {
+    const rig = makeRig([device]);
+    rig.setSendFailure(dns);
+    await write(rig, id("snapshots.snapshot_local"), "2");
+    expect(rig.warns).toEqual([expect.stringContaining(READABLE)]);
+  });
+});

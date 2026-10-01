@@ -5,6 +5,7 @@ import type { GoveeLanClient } from "../govee-lan-client";
 import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
+import { describeError } from "../error-category";
 import { deviceLabel, errMessage, type GoveeDevice } from "../types";
 import { parseSegmentList } from "../segment-list";
 import { resolveStatesValue } from "../dropdown-labels";
@@ -343,7 +344,8 @@ export async function handleGenericCapabilityCommand(
       await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, sendValue);
       await adapter.setState(id, { val, ack: true });
     } catch (err) {
-      adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
+      adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
+      adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
     }
   } else {
     // No STATE_TO_COMMAND entry + no native capabilityType/Instance — nothing
@@ -454,7 +456,8 @@ export async function onStateChange(
         // The restore replays sendCommand, which refuses a command it cannot
         // place (F9). Same outcome as every other refused command: no ack,
         // one warn with the reason — not main's "onStateChange crashed".
-        adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
+        adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
+        adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
         return;
       }
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, "snapshotLocal");
@@ -490,7 +493,7 @@ export async function onStateChange(
           `Refresh cloud data for ${deviceLabel(device)} done — ${changed ? "scenes and snapshots updated" : "nothing changed"}`,
         );
       } catch (e) {
-        adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+        adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${describeError(e)}`);
       }
     }
     await adapter.setState(id, { val: false, ack: true });
@@ -580,6 +583,7 @@ export async function onStateChange(
     });
     await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
   } catch (err) {
-    adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
+    adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
+    adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
   }
 }

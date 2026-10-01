@@ -135,3 +135,40 @@ export function logDedup(
   }
   return category;
 }
+
+/**
+ * The text a warning shows for an error. A connection that could not be made
+ * is said in words with its probable cause in the same line (issue #51: the raw
+ * `getaddrinfo EAI_AGAIN openapi.api.govee.com` named neither the DNS nor what
+ * to look at); every other error keeps its own message. Node's DNS errors carry
+ * the name as `hostname`, its connect errors the address as `address`. A
+ * command sent again after such a failure carries `attempts` — the line says
+ * how often it was tried.
+ *
+ * @param err The error
+ */
+export function describeError(err: unknown): string {
+  const e = err as { code?: unknown; hostname?: unknown; address?: unknown; attempts?: unknown } | null;
+  const host = typeof e?.hostname === "string" ? e.hostname : typeof e?.address === "string" ? e.address : "the server";
+  let text: string;
+  switch (e?.code) {
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      text = `${host} could not be resolved — DNS problem on this host?`;
+      break;
+    case "ECONNREFUSED":
+      text = `${host} refused the connection`;
+      break;
+    case "EHOSTUNREACH":
+    case "ENETUNREACH":
+      text = `no route to ${host} — network down?`;
+      break;
+    case "ECONNRESET":
+      text = `the connection to ${host} was cut off`;
+      break;
+    default:
+      text = errMessage(err);
+  }
+  const attempts = e?.attempts;
+  return typeof attempts === "number" && attempts > 1 ? `${text} (tried ${attempts} times)` : text;
+}

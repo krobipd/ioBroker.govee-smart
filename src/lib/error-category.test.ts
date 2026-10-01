@@ -1,4 +1,4 @@
-import { classifyError, logDedup, type ErrorCategory } from "./error-category";
+import { classifyError, describeError, logDedup, type ErrorCategory } from "./error-category";
 
 describe("classifyError", () => {
   it("should classify ECONNREFUSED as NETWORK", () => {
@@ -176,5 +176,48 @@ describe("logDedup", () => {
     const lastCat: ErrorCategory | null = logDedup(log, null, "Cloud", new Error("ECONNREFUSED"));
     logDedup(log, lastCat, "Cloud", new Error("status 401 unauthorized"));
     expect(warns).toHaveLength(2);
+  });
+});
+
+describe("describeError — the text a warning shows (issue #51)", () => {
+  const err = (code: string, extra: Record<string, unknown> = {}): Error =>
+    Object.assign(new Error(`${code} raw`), { code, ...extra });
+
+  it("a name that does not resolve: the name and the DNS as probable cause", () => {
+    expect(describeError(err("EAI_AGAIN", { hostname: "openapi.api.govee.com" }))).toBe(
+      "openapi.api.govee.com could not be resolved — DNS problem on this host?",
+    );
+    expect(describeError(err("ENOTFOUND", { hostname: "app2.govee.com" }))).toBe(
+      "app2.govee.com could not be resolved — DNS problem on this host?",
+    );
+  });
+
+  it("a refused connection names the address", () => {
+    expect(describeError(err("ECONNREFUSED", { address: "1.2.3.4" }))).toBe("1.2.3.4 refused the connection");
+  });
+
+  it("no route: the network as probable cause", () => {
+    expect(describeError(err("EHOSTUNREACH", { address: "1.2.3.4" }))).toBe("no route to 1.2.3.4 — network down?");
+    expect(describeError(err("ENETUNREACH"))).toBe("no route to the server — network down?");
+  });
+
+  it("a cut connection", () => {
+    expect(describeError(err("ECONNRESET"))).toBe("the connection to the server was cut off");
+  });
+
+  it("every other error keeps its own message", () => {
+    expect(describeError(new Error("Cloud control rejected: code=400 — Invalid parameter"))).toBe(
+      "Cloud control rejected: code=400 — Invalid parameter",
+    );
+    expect(describeError(err("ETIMEDOUT"))).toBe("ETIMEDOUT raw");
+  });
+
+  it("says how often a command was tried — once is not worth a word", () => {
+    expect(describeError(err("EAI_AGAIN", { hostname: "h", attempts: 3 }))).toBe(
+      "h could not be resolved — DNS problem on this host? (tried 3 times)",
+    );
+    expect(describeError(err("EAI_AGAIN", { hostname: "h", attempts: 1 }))).toBe(
+      "h could not be resolved — DNS problem on this host?",
+    );
   });
 });

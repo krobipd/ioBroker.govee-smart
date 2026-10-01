@@ -31,10 +31,15 @@ describe("formatChannelFail (pure formatter)", () => {
     );
   });
 
-  it("NETWORK: surfaces the err.code in parentheses when available", () => {
-    const err = Object.assign(new Error("getaddrinfo ENOTFOUND host"), { code: "ENOTFOUND" });
+  it("NETWORK: says in words what failed and its probable cause (issue #51)", () => {
+    const err = Object.assign(new Error("getaddrinfo ENOTFOUND openapi.api.govee.com"), {
+      code: "ENOTFOUND",
+      hostname: "openapi.api.govee.com",
+    });
     const out = formatChannelFail("Cloud REST", "NETWORK", err, "retrying every 5 min", "loading device list");
-    expect(out).toBe("Cloud REST: network error (ENOTFOUND) (loading device list) — retrying every 5 min");
+    expect(out).toBe(
+      "Cloud REST: openapi.api.govee.com could not be resolved — DNS problem on this host? (loading device list) — retrying every 5 min",
+    );
   });
 
   it("RATE_LIMIT: includes HTTP 429 + retry-after hint", () => {

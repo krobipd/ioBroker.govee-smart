@@ -1,6 +1,6 @@
 import { HttpError } from "./http-client";
 import { errMessage } from "./types";
-import { classifyError, type ErrorCategory } from "./error-category";
+import { classifyError, describeError, type ErrorCategory } from "./error-category";
 
 /**
  * Per-channel/per-category dedup tracker — fires the warn message once per
@@ -94,11 +94,9 @@ export function formatChannelFail(
       const detail = err instanceof Error ? errMessage(err) : "Timeout";
       return `${channel}: ${detail}${retrySuffix}`;
     }
-    case "NETWORK": {
-      const code = err instanceof Error ? ((err as NodeJS.ErrnoException).code ?? "") : "";
-      const codePart = code ? ` (${code})` : "";
-      return `${channel}: network error${codePart}${contextSuffix}${retrySuffix}`;
-    }
+    case "NETWORK":
+      // In words with the probable cause (issue #51) — "network error (EAI_AGAIN)" named neither.
+      return `${channel}: ${describeError(err)}${contextSuffix}${retrySuffix}`;
     case "RATE_LIMIT": {
       const status = err instanceof HttpError ? err.statusCode : null;
       const statusPart = status ? ` (HTTP ${status})` : "";
