@@ -115,10 +115,11 @@ export class StateManager {
    */
   private readonly ensuredStates = new Set<string>();
   /**
-   * "prefix.stateId" keys already handled by {@link removeSyntheticStateOnce} —
-   * bounds the phantom-state cleanup to one existence-check per adapter run.
+   * Keys of the one-shot cleanups already run ({@link firstThisRun}) — the
+   * leftovers of an older version do not come back while the adapter runs, so
+   * each cleanup costs its existence checks once per run, not once per build.
    */
-  private readonly cleanedSyntheticStates = new Set<string>();
+  private readonly cleanedThisRun = new Set<string>();
   /**
    * Cached `.info.online` marker ids (namespace-less) for the 20-second rollup
    * round. The previous per-round full-namespace `getObjectView` scan grew
@@ -273,12 +274,9 @@ export class StateManager {
    * @param stateId Synthetic state ID (e.g. "humidity")
    */
   async removeSyntheticStateOnce(prefix: string, stateId: string): Promise<void> {
-    const key = `${prefix}.${stateId}`;
-    if (this.cleanedSyntheticStates.has(key)) {
-      return;
+    if (this.firstThisRun(`${prefix}.${stateId}`)) {
+      await this.safeDeleteState(this.resolveStatePath(prefix, stateId));
     }
-    this.cleanedSyntheticStates.add(key);
-    await this.safeDeleteState(this.resolveStatePath(prefix, stateId));
   }
 
   /**
@@ -294,11 +292,22 @@ export class StateManager {
    */
   async removeInfoStateOnce(prefix: string, stateId: string): Promise<void> {
     const id = `${prefix}.info.${stateId}`;
-    if (this.cleanedSyntheticStates.has(id)) {
-      return;
+    if (this.firstThisRun(id)) {
+      await this.safeDeleteState(id);
     }
-    this.cleanedSyntheticStates.add(id);
-    await this.safeDeleteState(id);
+  }
+
+  /**
+   * True the first time this run asks for `key` — the guard of every one-shot cleanup.
+   *
+   * @param key What the cleanup is about (a state id, or a tree plus the cleanup's name)
+   */
+  private firstThisRun(key: string): boolean {
+    if (this.cleanedThisRun.has(key)) {
+      return false;
+    }
+    this.cleanedThisRun.add(key);
+    return true;
   }
 
   /**
@@ -503,8 +512,8 @@ export class StateManager {
   /**
    * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
    * (`diag.*`). Deletes the three old objects + states; the new ones get
-   * created by the regular `createDeviceStates` pass. Idempotent — calling
-   * twice is a no-op once the old objects are gone.
+   * created by the regular `createDeviceStates` pass. Once per run and tree —
+   * until 3.0.2 every build of the device asked again (audit YAGNI-8).
    *
    * @param device Govee device
    */
@@ -513,6 +522,9 @@ export class StateManager {
       return;
     }
     const prefix = this.devicePrefix(device);
+    if (!this.firstThisRun(`${prefix}#legacy-diagnostics`)) {
+      return;
+    }
     for (const stale of ["diagnostics_export", "diagnostics_result", "diagnostics_tier"]) {
       await this.safeDeleteState(`${prefix}.info.${stale}`);
       this.stateChannelMap.delete(`${prefix}.${stale}`);
@@ -891,22 +903,24 @@ export class StateManager {
 
       // Legacy cleanup — groups never carry device-level info states or
       // diagnostics, but older installs had them. Drop any leftovers so the
-      // tree reflects the current layout.
-      for (const staleId of [
-        "online",
-        "model",
-        "serial",
-        "ip",
-        "diagnostics_export",
-        "diagnostics_result",
-        "diagnostics_tier",
-      ]) {
-        await this.safeDeleteState(`${prefix}.info.${staleId}`);
+      // tree reflects the current layout; once per run and group (YAGNI-8).
+      if (this.firstThisRun(`${prefix}#legacy-group`)) {
+        for (const staleId of [
+          "online",
+          "model",
+          "serial",
+          "ip",
+          "diagnostics_export",
+          "diagnostics_result",
+          "diagnostics_tier",
+        ]) {
+          await this.safeDeleteState(`${prefix}.info.${staleId}`);
+        }
+        this.onlineMarkerCache?.delete(`${prefix}.info.online`);
+        this.resolvedOnline.delete(`${prefix}.info.online`);
+        // Groups never had a `diag` channel — drop any leftover from migrated installs.
+        await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
       }
-      this.onlineMarkerCache?.delete(`${prefix}.info.online`);
-      this.resolvedOnline.delete(`${prefix}.info.online`);
-      // Groups never had a `diag` channel — drop any leftover from migrated installs.
-      await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
     }
   }
 

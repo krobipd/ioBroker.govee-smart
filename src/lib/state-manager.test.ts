@@ -841,6 +841,19 @@ describe("StateManager", () => {
     });
   });
 
+  describe("removeInfoStateOnce", () => {
+    it("deletes an info field once and then never asks again in this run", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const id = "devices.h5109-001a.info.ip";
+      objects.set(id, { type: "state", common: {}, native: {} });
+      await sm.removeInfoStateOnce("devices.h5109-001a", "ip");
+      expect(objects.has(id)).toBe(false);
+      await sm.removeInfoStateOnce("devices.h5109-001a", "ip");
+      expect(calls.filter(c => c.method === "getObjectAsync" && c.args[0] === id)).toHaveLength(1);
+    });
+  });
+
   describe("migrateLegacyColorStateIds (B2 hard-cut)", () => {
     it("deletes the legacy camelCase colour objects for a device (existence-checked)", async () => {
       const { adapter, objects } = createMockAdapter();
@@ -1493,6 +1506,20 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, []);
 
       expect(states.get("devices.h6160-0011.info.ip")).toMatchObject({ val: "" });
+    });
+
+    it("a group's legacy cleanup asks once per run — a second build reads nothing (audit YAGNI-8)", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const group = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
+      objects.set("groups.basegroup-1280.info.model", { type: "state" });
+      await sm.createInfoStates(group);
+      expect(objects.has("groups.basegroup-1280.info.model")).toBe(false);
+      const reads = (): number =>
+        calls.filter(c => c.method === "getObjectAsync" && c.args[0] === "groups.basegroup-1280.info.model").length;
+      expect(reads()).toBe(1);
+      await sm.createInfoStates(group);
+      expect(reads()).toBe(1);
     });
 
     it("should not create model/serial/ip/online for BaseGroup", async () => {
@@ -3099,6 +3126,17 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
   });
 
   describe("migrateLegacyDiagnostics", () => {
+    it("asks once per run and tree — a second build reads nothing (audit YAGNI-8)", async () => {
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const reads = (): number =>
+        calls.filter(c => c.method === "getObjectAsync" && c.args[0] === "devices.h6160-0011.diag.result").length;
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+      expect(reads()).toBe(1);
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+      expect(reads()).toBe(1);
+    });
+
     it("removes the fat diag.result datapoint on an upgraded install", async () => {
       // 2.29.0 turned the report into a file. `diag.result` held the whole JSON
       // — 67,917 characters on an H61BE — and it cannot leave on its own:
