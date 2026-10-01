@@ -128,7 +128,7 @@ const TLS_ERROR_CODES = new Set([
 /**
  * A failed call that never reached a working Govee server: no answer (network,
  * DNS, refused, reset, timeout, TLS) or a 5xx. An answer Govee gave — 429,
- * 401/403, any other 4xx — is not an outage, nor is the adapter's own abort.
+ * 401/403, any other 4xx — is not an outage.
  *
  * @param err The error of the failed call
  * @param category What `classifyError` made of it

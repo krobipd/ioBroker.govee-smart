@@ -36,10 +36,8 @@ export interface HttpRequestOptions {
   headers: Record<string, string>;
   /** Request body (POST only, will be JSON-serialized) */
   body?: unknown;
-  /** Timeout in milliseconds (default 15000) */
+  /** Timeout in milliseconds (default 15000; the tests shorten it to reach the timeout path) */
   timeout?: number;
-  /** Optional AbortSignal — the request is aborted as soon as abort() fires. */
-  signal?: AbortSignal;
 }
 
 /**
@@ -155,18 +153,6 @@ export function httpsRequest<T>(
       reqOptions.port = u.port;
     }
 
-    // Track the abort listener so we can detach it when the request resolves
-    // or rejects normally — without this the AbortSignal accumulates one
-    // dead listener per completed request, leaking memory if the same signal
-    // is re-used for many requests.
-    let onAbort: (() => void) | null = null;
-    const cleanupAbort = (): void => {
-      if (onAbort && options.signal) {
-        options.signal.removeEventListener("abort", onAbort);
-        onAbort = null;
-      }
-    };
-
     const req = transport.request(reqOptions, res => {
       const chunks: Buffer[] = [];
       // res.on("error") catches mid-stream failures (TCP RST after headers,
@@ -174,12 +160,10 @@ export function httpsRequest<T>(
       // to the global "uncaughtException" handler instead of rejecting the
       // promise — and the caller sees the request hang until the 15 s timeout.
       res.on("error", err => {
-        cleanupAbort();
         reject(err);
       });
       res.on("data", (chunk: Buffer) => chunks.push(chunk));
       res.on("end", () => {
-        cleanupAbort();
         const raw = Buffer.concat(chunks).toString();
         const statusCode = res.statusCode ?? 0;
 
@@ -203,7 +187,6 @@ export function httpsRequest<T>(
     });
 
     req.on("error", err => {
-      cleanupAbort();
       reject(err);
     });
     // M5 — the timeout error carries the endpoint + wait duration in its text
@@ -220,22 +203,6 @@ export function httpsRequest<T>(
         }),
       );
     });
-
-    // M3 — AbortSignal support. Whoever makes the request can abort it
-    // (e.g. adapter onUnload via AbortController) so the stop doesn't have to
-    // wait 15s for the timeout.
-    if (options.signal) {
-      if (options.signal.aborted) {
-        req.destroy(new Error("Aborted"));
-        reject(new Error("Aborted"));
-        return;
-      }
-      onAbort = (): void => {
-        req.destroy(new Error("Aborted"));
-        reject(new Error("Aborted"));
-      };
-      options.signal.addEventListener("abort", onAbort, { once: true });
-    }
 
     if (postData) {
       req.write(postData);

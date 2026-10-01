@@ -99,7 +99,6 @@ async function startStubServer(): Promise<StubServer> {
  * @param options.headers Request headers
  * @param options.body Request body (JSON-serialisable)
  * @param options.timeout Timeout in milliseconds
- * @param options.signal Abort signal wired through to the request
  */
 function httpRequestPlain<T>(options: {
   method: "GET" | "POST";
@@ -107,7 +106,6 @@ function httpRequestPlain<T>(options: {
   headers: Record<string, string>;
   body?: unknown;
   timeout?: number;
-  signal?: AbortSignal;
 }): Promise<HttpResult<T>> {
   return httpsRequest<T>(options, { request: http.request });
 }
@@ -410,54 +408,6 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     }).catch((e: unknown) => e);
     expect((err as { code?: unknown }).code).toBe("ETIMEDOUT");
     expect(classifyError(err)).toBe("TIMEOUT");
-  });
-
-  it("rejects on AbortSignal aborted before request", async () => {
-    const ctrl = new AbortController();
-    ctrl.abort();
-    try {
-      await httpRequestPlain({
-        method: "GET",
-        url: `http://127.0.0.1:${stub.port}/x`,
-        headers: {},
-        signal: ctrl.signal,
-      });
-      throw new Error("expected throw");
-    } catch (e) {
-      expect((e as Error).message).toBe("Aborted");
-    }
-  });
-
-  it("rejects on AbortSignal mid-flight and detaches its abort listener", async () => {
-    stub.queue.push({ statusCode: 200, body: "{}", delayMs: 500 });
-    const ctrl = new AbortController();
-    const removed = vi.spyOn(ctrl.signal, "removeEventListener");
-    const reqPromise = httpRequestPlain({
-      method: "GET",
-      url: `http://127.0.0.1:${stub.port}/slow`,
-      headers: {},
-      signal: ctrl.signal,
-      timeout: 5_000,
-    });
-    setTimeout(() => ctrl.abort(), 50);
-    await expect(reqPromise).rejects.toThrow("Aborted");
-    // The request's own abort handler is detached again once it fired —
-    // a signal that is re-used for many requests must not collect one dead
-    // listener per completed request.
-    expect(removed).toHaveBeenCalledWith("abort", expect.any(Function));
-  });
-
-  it("detaches the abort listener after a normal completion (no listener leak on a re-used signal)", async () => {
-    stub.queue.push({ statusCode: 200, body: "{}" });
-    const ctrl = new AbortController();
-    const removed = vi.spyOn(ctrl.signal, "removeEventListener");
-    await httpRequestPlain({
-      method: "GET",
-      url: `http://127.0.0.1:${stub.port}/ok`,
-      headers: {},
-      signal: ctrl.signal,
-    });
-    expect(removed).toHaveBeenCalledWith("abort", expect.any(Function));
   });
 });
 
