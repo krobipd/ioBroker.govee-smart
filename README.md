@@ -115,6 +115,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a temperature reading carries °C whichever way it arrives — a model that declares Fahrenheit no longer flips the unit to °F (the value is always °C)
 - Fixed: a segment colour above 255 is sent as 255 — it wrapped to 0 before; a segment brightness is rounded like the light's brightness
 - Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
+- Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns, as a single light does
 - Improved: appliance modes and levels (Manual, Heat, Low, High, Auto, Keep temperature, Speed 1 …) and `info.type` are labelled in the system language; scripts may still write Govee's names such as `Auto` or `gearMode`
 
 ### 3.0.1 (2026-09-27)

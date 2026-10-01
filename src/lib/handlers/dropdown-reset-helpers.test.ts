@@ -2,6 +2,7 @@ import {
   COMMAND_DROPDOWN,
   MODE_DROPDOWNS,
   STATE_TO_COMMAND,
+  resetAfterWrite,
   resetModeDropdowns,
   resetRelatedDropdowns,
   stateToCommand,
@@ -162,5 +163,43 @@ describe("resetRelatedDropdowns", () => {
     await resetRelatedDropdowns(adapter, PREFIX, "brightness");
     await resetRelatedDropdowns(adapter, PREFIX, "segmentColor:3");
     expect(writes).toHaveLength(0);
+  });
+});
+
+describe("resetAfterWrite — one rule for a device and a group (audit DRY-4)", () => {
+  const active = (): Record<string, ioBroker.StateValue> => ({
+    [id("scenes.light_scene")]: "3",
+    [id("music.music_mode")]: "2",
+  });
+
+  it("power off resets every mode", async () => {
+    const { adapter, writes } = makeAdapter(active());
+    await resetAfterWrite(adapter, PREFIX, "control.power", false);
+    expect(writes.map(w => w.id).sort()).toEqual([id("music.music_mode"), id("scenes.light_scene")]);
+  });
+
+  it("power on and the brightness change no mode", async () => {
+    const { adapter, writes } = makeAdapter(active());
+    await resetAfterWrite(adapter, PREFIX, "control.power", true);
+    await resetAfterWrite(adapter, PREFIX, "control.brightness", 40);
+    expect(writes).toEqual([]);
+  });
+
+  it("a colour ends every mode, a scene keeps its own dropdown", async () => {
+    const colour = makeAdapter(active());
+    await resetAfterWrite(colour.adapter, PREFIX, "control.color_rgb", "#ff0000");
+    expect(colour.writes).toHaveLength(2);
+    const scene = makeAdapter(active());
+    await resetAfterWrite(scene.adapter, PREFIX, "scenes.light_scene", "3");
+    expect(scene.writes.map(w => w.id)).toEqual([id("music.music_mode")]);
+  });
+
+  it("the music sensitivity and auto colour change no mode — only the music mode does", async () => {
+    const { adapter, writes } = makeAdapter(active());
+    await resetAfterWrite(adapter, PREFIX, "music.music_sensitivity", 80);
+    await resetAfterWrite(adapter, PREFIX, "music.music_auto_color", true);
+    expect(writes).toEqual([]);
+    await resetAfterWrite(adapter, PREFIX, "music.music_mode", "2");
+    expect(writes.map(w => w.id)).toEqual([id("scenes.light_scene")]);
   });
 });

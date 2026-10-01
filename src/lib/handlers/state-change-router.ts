@@ -435,13 +435,7 @@ export async function onStateChange(
     const reached = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
     if (reached) {
       await adapter.setState(id, { val, ack: true });
-      if (stateSuffix === "scenes.light_scene" || stateSuffix === "music.music_mode") {
-        await dropdownReset.resetRelatedDropdowns(
-          adapter,
-          prefix,
-          stateSuffix === "scenes.light_scene" ? "lightScene" : "music",
-        );
-      }
+      await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
     }
     return;
   }
@@ -569,9 +563,7 @@ export async function onStateChange(
         return;
       }
       await adapter.setState(id, { val, ack: true });
-      if (stateSuffix === "music.music_mode") {
-        await dropdownReset.resetRelatedDropdowns(adapter, prefix, "music");
-      }
+      await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
       return;
     }
 
@@ -582,12 +574,7 @@ export async function onStateChange(
       val: command === "colorTemperature" && typeof sent === "number" ? sent : val,
       ack: true,
     });
-    // Power-off resets all mode dropdowns (device off → no active mode).
-    if (command === "power" && val === false) {
-      await dropdownReset.resetModeDropdowns(adapter, prefix, "");
-    } else {
-      await dropdownReset.resetRelatedDropdowns(adapter, prefix, command);
-    }
+    await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
   } catch (err) {
     adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${errMessage(err)}`);
   }

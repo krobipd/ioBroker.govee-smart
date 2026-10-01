@@ -79,6 +79,37 @@ export function stateToCommand(suffix: string): string | null {
 }
 
 /**
+ * What a written datapoint does to the mode dropdowns — the ONE rule for a device and a group (until 3.0.2 the
+ * group reset only after a scene or music mode, so a group switched off or set to a colour kept showing its old
+ * scene; audit DRY-4): power off resets every mode, a mode or a colour resets the other modes, the music
+ * sensitivity and auto colour change no mode.
+ *
+ * @param adapter ioBroker adapter surface
+ * @param prefix Device or group state prefix
+ * @param stateSuffix The written datapoint (`control.power`, `scenes.light_scene`, …)
+ * @param val The value that went out
+ */
+export async function resetAfterWrite(
+  adapter: GroupStateHelpersAdapter,
+  prefix: string,
+  stateSuffix: string,
+  val: ioBroker.StateValue,
+): Promise<void> {
+  const command = stateToCommand(stateSuffix);
+  if (!command) {
+    return;
+  }
+  if (command === "power" && val === false) {
+    await resetModeDropdowns(adapter, prefix, "");
+    return;
+  }
+  if (command === "music" && stateSuffix !== "music.music_mode") {
+    return;
+  }
+  await resetRelatedDropdowns(adapter, prefix, command);
+}
+
+/**
  * Reset related dropdown states when switching between scenes/snapshots/colors.
  * Each mode-switch resets all OTHER mode dropdowns to "---" (0).
  *

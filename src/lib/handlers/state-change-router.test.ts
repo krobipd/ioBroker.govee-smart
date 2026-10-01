@@ -651,6 +651,19 @@ describe("onStateChange — group fan-out", () => {
     expect(rig.fanOuts).toHaveLength(1); // fan-out was attempted
     expect(rig.acks.find(a => a.id === groupId)).toBeUndefined(); // but NOT falsely acked
   });
+
+  it("a group switched off ends its scene too — the same reset rule as a device (audit DRY-4)", async () => {
+    const group = createTestDevice({
+      sku: "BaseGroup",
+      deviceId: "1311",
+      groupMembers: [{ sku: device.sku, deviceId: device.deviceId }],
+    });
+    const rig = makeRig([group, device]);
+    const scene = `${NS}.groups.basegroup_1311.scenes.light_scene`;
+    rig.states.set(scene, "2");
+    await write(rig, `${NS}.groups.basegroup_1311.control.power`, false);
+    expect(rig.acks).toContainEqual({ id: scene, val: "0" });
+  });
 });
 
 describe("onStateChange — local snapshots", () => {
