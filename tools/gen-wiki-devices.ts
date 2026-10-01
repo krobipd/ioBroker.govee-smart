@@ -13,7 +13,8 @@
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { renderPage, TEXTS_DE, TEXTS_EN, type DevicesFile } from "./gen-wiki-render";
+import type { DevicesFile } from "../src/lib/device-catalog";
+import { renderPage, TEXTS_DE, TEXTS_EN } from "./gen-wiki-render";
 
 const repoRoot = process.cwd();
 const devicesJson = path.resolve(repoRoot, "devices.json");

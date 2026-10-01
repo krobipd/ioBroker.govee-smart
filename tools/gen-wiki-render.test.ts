@@ -1,7 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { renderPage, TEXTS_DE, TEXTS_EN, TYPE_ORDER, type DeviceEntry } from "./gen-wiki-render";
+import type { DeviceEntry } from "../src/lib/device-catalog";
+import { renderPage, TEXTS_DE, TEXTS_EN } from "./gen-wiki-render";
 
 const devices: Record<string, DeviceEntry> = {
   H6160: { name: "Strip", type: "light", status: "verified", since: "2.0.0" },
@@ -50,19 +51,18 @@ describe("renderPage — one folded block per device type", () => {
     expect(renderPage(devices, TEXTS_EN)).toContain("4 entries");
   });
 
-  it("every type of the catalog has an order slot and a title in BOTH languages — a new type word must reach three places", () => {
-    // A device kind that is missing here renders without a block (or without a
-    // heading): 2.39.0 added `gateway` and `composter` and needed all three.
+  it("every entry of the real catalog lands in a block — the page counts all of them", () => {
+    // Order and titles come from DEVICE_TYPES and a Record over its words, so the compiler holds
+    // them; what is left to prove is that no entry falls outside the blocks.
     const real = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "devices.json"), "utf-8")) as {
       devices: Record<string, DeviceEntry>;
     };
-    const kinds = new Set(Object.values(real.devices).map(e => e.type));
-    for (const kind of kinds) {
-      expect(TYPE_ORDER, `${kind} has no slot in TYPE_ORDER`).toContain(kind);
-      expect(TEXTS_EN.typeTitles, `${kind} has no English title`).toHaveProperty(kind);
-      expect(TEXTS_DE.typeTitles, `${kind} has no German title`).toHaveProperty(kind);
+    const total = Object.keys(real.devices).length;
+    for (const t of [TEXTS_EN, TEXTS_DE]) {
+      const page = renderPage(real.devices, t);
+      expect(page).toContain(`${total} ${t.entriesWord}`);
+      expect(page.match(/^\| `[A-Z0-9]{5}` \|/gm)).toHaveLength(total);
     }
-    expect(kinds.has("gateway"), "the gateway is a device of its own since 2.39.0").toBe(true);
   });
 
   it("renders byte-identical output twice, so the wiki gate can diff it", () => {

@@ -6,50 +6,13 @@
  * (`gen-wiki-render.test.ts`).
  */
 
-/** One catalog entry of `devices.json`, keyed by SKU. */
-export interface DeviceEntry {
-  /** Govee model name as shown in the wiki table. */
-  name: string;
-  /** Device kind (`light`, `thermometer`, … — the `type` enum of `devices.schema.json`). */
-  type: string;
-  /** Trust tier: multiple reports / one report with diagnostics / imported and untested. */
-  status: "verified" | "reported" | "seed";
-  /** Adapter version that first carried the entry (semver, without `v`). */
-  since?: string;
-  /** Per-SKU corrections; rendered nowhere on the wiki, kept for type parity with the catalog. */
-  quirks?: Record<string, unknown>;
-}
-
-/** The shape of `devices.json`. */
-export interface DevicesFile {
-  /** SKU → entry. */
-  devices: Record<string, DeviceEntry>;
-}
+import { DEVICE_TYPES, type DeviceEntry, type DeviceType } from "../src/lib/device-catalog";
 
 const STATUS_ICON: Record<DeviceEntry["status"], string> = {
   verified: "✅",
   reported: "🟢",
   seed: "⚪",
 };
-
-/** Order of the folded blocks — every catalog type needs a slot (test-pinned). */
-export const TYPE_ORDER = [
-  "light",
-  "thermometer",
-  "sensor",
-  "heater",
-  "humidifier",
-  "dehumidifier",
-  "fan",
-  "air_purifier",
-  "socket",
-  "kettle",
-  "ice_maker",
-  "aroma_diffuser",
-  "button",
-  "gateway",
-  "composter",
-];
 
 /** Every language-dependent string of the page — one object per language. */
 export interface Texts {
@@ -81,8 +44,8 @@ export interface Texts {
   modelOne: string;
   /** "models" — used otherwise. */
   modelMany: string;
-  /** Type → user-friendly section title (DE+EN) */
-  typeTitles: Record<string, string>;
+  /** Type → user-friendly section title; the compiler asks for every catalog type. */
+  typeTitles: Record<DeviceType, string>;
   /** Table column header: SKU */
   colSku: string;
   /** Table column header: Govee model name */
@@ -304,8 +267,8 @@ function renderTypeSection(title: string, list: Array<[string, DeviceEntry]>, t:
  * @returns the page as Markdown
  */
 export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
-  // Group by type, ordered by TYPE_ORDER
-  const byType = new Map<string, Array<[string, DeviceEntry]>>();
+  // Group by type, in the catalog's order (DEVICE_TYPES); validate-devices admits no other type
+  const byType = new Map<DeviceType, Array<[string, DeviceEntry]>>();
   for (const [sku, entry] of Object.entries(devices)) {
     if (!byType.has(entry.type)) {
       byType.set(entry.type, []);
@@ -337,21 +300,12 @@ export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): stri
   out.push("");
 
   let totalCount = 0;
-  for (const type of TYPE_ORDER) {
+  for (const type of DEVICE_TYPES) {
     const list = byType.get(type);
     if (!list || !list.length) {
       continue;
     }
-    out.push(...renderTypeSection(t.typeTitles[type] ?? type, list, t));
-    totalCount += list.length;
-  }
-
-  // Any types not in TYPE_ORDER (forward-compat)
-  for (const [type, list] of byType) {
-    if (TYPE_ORDER.includes(type)) {
-      continue;
-    }
-    out.push(...renderTypeSection(t.typeTitles[type] ?? type, list, t));
+    out.push(...renderTypeSection(t.typeTitles[type], list, t));
     totalCount += list.length;
   }
 
