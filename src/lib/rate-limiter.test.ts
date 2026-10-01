@@ -970,8 +970,12 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
   });
 
   it("a token goes back only up to the bucket's capacity", async () => {
-    const { rl } = bench();
-    await rl.executeTracked(neverSent, CONTROL);
+    const { rl, clock } = bench();
+    await rl.executeTracked(() => {
+      clock.now += 2000; // the bucket refills to full while the call is in flight
+      currentBooking()?.attempt(false);
+      return Promise.resolve();
+    }, CONTROL);
     const tokens = rl.getUsageSnapshot().lanes.deviceControl.devices.find(d => d.deviceKey === "H6097:AA")?.tokens;
     expect(tokens).toBe(CLOUD_LIMITS.deviceControl.burst);
   });

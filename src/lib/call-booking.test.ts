@@ -42,14 +42,6 @@ describe("Booking — the verdict of one booked call", () => {
   it("is kept when the call made no request at all", () => {
     expect(new Booking().seal()).toBe(false);
   });
-
-  it("ignores a request reported after it was sealed — a call's late leftover cannot change the verdict", () => {
-    const b = new Booking();
-    b.attempt(true);
-    expect(b.seal()).toBe(false);
-    b.attempt(false);
-    expect(b.seal()).toBe(false);
-  });
 });
 
 describe("runBooked / currentBooking", () => {

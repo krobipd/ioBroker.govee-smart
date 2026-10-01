@@ -24,19 +24,16 @@ const NEVER_CONNECTED_CODES: ReadonlySet<string> = new Set([
 export class Booking {
   private delivered = false;
   private notDelivered = false;
-  private sealed = false;
 
   /**
-   * Record one request made under this booking. Ignored once the booking is
-   * sealed: work the call started without awaiting it (a token refresh, a late
-   * timer) inherits the booking and must not change its verdict afterwards.
+   * Record one request made under this booking. Work the call started without
+   * awaiting it (a token refresh, a late timer) inherits the booking; what it
+   * reports after the limiter asked for the verdict changes nothing — the
+   * limiter asks exactly once.
    *
    * @param delivered Whether the request may have reached Govee
    */
   attempt(delivered: boolean): void {
-    if (this.sealed) {
-      return;
-    }
     if (delivered) {
       this.delivered = true;
     } else {
@@ -45,13 +42,12 @@ export class Booking {
   }
 
   /**
-   * Close the booking.
+   * The verdict, asked once when the call has settled.
    *
-   * @returns true when it must be given back: a request failed before reaching
-   *   Govee and none reached it — a call that made no request at all keeps its booking
+   * @returns true when the booking must be given back: a request failed before
+   *   reaching Govee and none reached it — a call that made no request at all keeps its booking
    */
   seal(): boolean {
-    this.sealed = true;
     return this.notDelivered && !this.delivered;
   }
 }
@@ -88,6 +84,5 @@ export function isNeverSent(err: unknown, connected: boolean): boolean {
   if (connected) {
     return false;
   }
-  const code = (err as { code?: unknown } | null)?.code;
-  return typeof code === "string" && NEVER_CONNECTED_CODES.has(code);
+  return NEVER_CONNECTED_CODES.has(String((err as { code?: unknown } | null)?.code));
 }

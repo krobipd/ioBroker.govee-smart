@@ -462,6 +462,18 @@ describe("httpsRequest — which failed requests never reached Govee (issue #51)
     expect(booking.seal()).toBe(false);
   });
 
+  it("an answered request plus one that never left: the booking stays — Govee counted the first", async () => {
+    stub.queue.push({ statusCode: 200, body: "{}" });
+    const booking = new Booking();
+    await runBooked(booking, async () => {
+      await httpRequestPlain({ method: "GET", url: `http://127.0.0.1:${stub.port}/x`, headers: {} });
+      await httpsRequest({ method: "GET", url: "http://openapi.api.govee.com/y", headers: {} }, dnsFailing).catch(
+        () => undefined,
+      );
+    });
+    expect(booking.seal()).toBe(false);
+  });
+
   it("a timeout after the connection may have been received — the booking stays, no never-sent flag", async () => {
     stub.queue.push({ statusCode: 200, body: "{}", delayMs: 300 });
     const booking = new Booking();

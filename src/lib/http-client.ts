@@ -193,13 +193,13 @@ export function httpsRequest<T>(
       });
     });
 
-    // A reused keep-alive socket connected long ago; a fresh one connects now —
-    // or fails before it does, and then the request never left this host. A
-    // socket that is already destroyed here failed before connecting (a name
-    // lookup can fail before this event): it is not "connected" just because it
-    // is no longer connecting.
+    // A live socket that is not connecting is connected (a reused keep-alive
+    // socket); a fresh one connects now — or fails before it does, and then the
+    // request never left this host. A socket that is already destroyed here
+    // failed before connecting (a name lookup can fail before this event): it is
+    // not "connected" just because it is no longer connecting.
     req.on("socket", socket => {
-      if (req.reusedSocket || (!socket.connecting && !socket.destroyed)) {
+      if (!socket.connecting && !socket.destroyed) {
         connected = true;
       } else {
         socket.once("connect", () => {
