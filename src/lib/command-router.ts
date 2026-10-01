@@ -8,7 +8,7 @@ import {
   LAN_STATUS_AFTER_COMMAND_MS,
 } from "./timing-constants";
 import { declaredOptionValue } from "./capability-mapper";
-import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
+import { applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 
 /**
  * A command Govee refused because the device was offline — kept by the host
@@ -170,11 +170,7 @@ export class CommandRouter {
    * @param device The target device, for its own daily allowance
    * @param key The datapoint the send writes (capability instance, plus the segments) — enables the retry
    */
-  private async sendBudgeted(fn: () => Promise<void>, device?: GoveeDevice, key?: string): Promise<void> {
-    if (!device || key === undefined) {
-      await this.sendOnce(fn, device);
-      return;
-    }
+  private async sendBudgeted(fn: () => Promise<void>, device: GoveeDevice, key: string): Promise<void> {
     // A command that never reached Govee (issue #51: the name did not resolve)
     // is sent again after 1 s and 2 s while the first attempt is at most
     // COMMAND_RETRY_WINDOW_MS old — Govee never received it, so it cannot run
@@ -215,13 +211,11 @@ export class CommandRouter {
    * @param fn The cloud send to execute
    * @param device The target device, for its own daily allowance
    */
-  private async sendOnce(fn: () => Promise<void>, device?: GoveeDevice): Promise<void> {
+  private async sendOnce(fn: () => Promise<void>, device: GoveeDevice): Promise<void> {
     if (this.rateLimiter) {
       // The control lane of THIS device: a command never waits for another
       // device's calls, only for its own burst of six per second (v2 docs).
-      const lane: CallLane = device
-        ? { kind: "device-control", deviceKey: limiterDeviceKey(device) }
-        : ACCOUNT_LIST_LANE;
+      const lane: CallLane = { kind: "device-control", deviceKey: limiterDeviceKey(device) };
       await this.rateLimiter.executeTracked(fn, lane, 0, applianceBudget(device));
     } else {
       await fn();
