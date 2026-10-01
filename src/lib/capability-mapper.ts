@@ -594,6 +594,125 @@ export const EVENT_STATE_ROLES = {
   dirt_detected_event: { role: "indicator.maintenance" },
 } as const;
 
+// One spelling per ID — the canonical id from capability-mapper's
+// canonicalSyntheticId (`temperature`, not `sensor_temperature`; `lack_water`,
+// not `lackwater`). An id that is NOT in this table is not a synthetic state:
+// cleanupCloudOwnedStates treats it as stale and removes it on the next
+// Cloud-phase rebuild — that is how the pre-2.28.0 spellings leave an
+// upgraded install.
+
+/**
+ * Per-stateId metadata of the synthetic datapoints — the readings and events that two paths create
+ * (the Cloud capability and the account list / Cloud-events push). ONE table for both: until 3.0.2
+ * the Cloud path took names, descriptions and units from its own tables, and a temperature declared
+ * in °F got °F from one path and °C from the other (the value is always °C; audit DRY-12). The
+ * `channel` is the single source of truth for state-manager's `inferChannelFromStateId`,
+ * so the routing and the state definition never drift apart.
+ */
+export interface SyntheticStateMeta {
+  /** Value type — a reading is a number, an event a boolean. */
+  type: "boolean" | "number";
+  /** State role from the catalog. */
+  role: string;
+  /** Unit of a reading — the unit the value ARRIVES in. */
+  unit?: string;
+  /** i18n key for the name. */
+  nameKey: I18nKey;
+  /**
+   * i18n key for the explanation. Absent where the name already says
+   * everything — an invented sentence is worse than none; the deliberate
+   * omissions are declared, with their reason, in `test/self-explaining.json`.
+   */
+  descKey?: I18nKey;
+  /** Semantic channel — sensor readings vs. device events. */
+  channel: "sensor" | "events";
+}
+/**
+ * Numeric-sensor meta with role + unit pulled from the shared
+ * {@link SENSOR_ROLE_UNIT}, so the App-API/MQTT path can't drift from the
+ * Cloud-capability path. Booleans/events stay inline — they're heterogeneous.
+ *
+ * @param kind Sensor kind keying into {@link SENSOR_ROLE_UNIT}
+ * @param nameKey i18n key for the state's display name
+ */
+const numSensor = (kind: keyof typeof SENSOR_ROLE_UNIT, nameKey: I18nKey): SyntheticStateMeta => ({
+  type: "number",
+  role: SENSOR_ROLE_UNIT[kind].role,
+  unit: SENSOR_ROLE_UNIT[kind].unit,
+  nameKey,
+  channel: "sensor",
+});
+export const SYNTHETIC_STATE_META: Record<string, SyntheticStateMeta> = {
+  temperature: numSensor("temperature", "temperature"),
+  humidity: numSensor("humidity", "humidity"),
+  battery: numSensor("battery", "battery"),
+  co2: numSensor("co2", "co2"),
+  // No `online` entry here on purpose. Reachability lives in `info.online` and
+  // is fed by applyOnlineCap; the synthetic pipe never produces it, because the
+  // cloud-value translator has no `online` branch and the capability falls into
+  // its default. Keeping a dead entry was not free: this table doubles as the
+  // "leave it alone" list for the cloud-phase sweep, so a `sensor.online` left
+  // by an old install was exempt from cleanup and could never be removed —
+  // against the rule that the adapter owns its datapoint inventory. Without the
+  // entry that leftover leaves on the next cloud rebuild, migration-free.
+  lack_water: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.lack_water.role,
+    nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
+    channel: "events",
+  },
+  lack_water_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.lack_water_event.role,
+    nameKey: "lackOfWater",
+    descKey: "descLackOfWater",
+    channel: "events",
+  },
+  ice_full: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.ice_full.role,
+    nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
+    channel: "events",
+  },
+  ice_full_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.ice_full_event.role,
+    nameKey: "iceBucketFull",
+    descKey: "descIceBucketFull",
+    channel: "events",
+  },
+  body_appeared: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.body_appeared.role,
+    nameKey: "bodyDetected",
+    descKey: "descBodyDetected",
+    channel: "events",
+  },
+  body_appeared_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.body_appeared_event.role,
+    nameKey: "bodyDetected",
+    descKey: "descBodyDetected",
+    channel: "events",
+  },
+  dirt_detected: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.dirt_detected.role,
+    nameKey: "dirtDetected",
+    descKey: "descDirtDetected",
+    channel: "events",
+  },
+  dirt_detected_event: {
+    type: "boolean",
+    role: EVENT_STATE_ROLES.dirt_detected_event.role,
+    nameKey: "dirtDetected",
+    descKey: "descDirtDetected",
+    channel: "events",
+  },
+};
+
 /**
  * What an event's value means. Govee's messages carry `state[0].value`
  * (developer.govee.com/reference/subscribe-device-event): H7172/H7151
@@ -661,6 +780,27 @@ export function canonicalSyntheticId(instance: string): string {
  * @param cap Cloud property capability
  */
 function mapProperty(cap: CloudCapability): StateDefinition[] {
+  const id = canonicalSyntheticId(cap.instance);
+  const known = SYNTHETIC_STATE_META[id];
+  if (known?.type === "number") {
+    // A reading the synthetic path creates too: its name, role and unit — the
+    // value arrives in that unit whatever Govee declares (°C, see platformTempUnit).
+    return [
+      {
+        id,
+        name: tName(known.nameKey),
+        desc: known.descKey ? tDesc(known.descKey) : undefined,
+        type: "number",
+        role: known.role,
+        write: false,
+        unit: known.unit,
+        def: 0, // avoid null in vis until the first sensor reading (consistency — B11)
+        capabilityType: cap.type,
+        capabilityInstance: cap.instance,
+        channel: "sensor",
+      },
+    ];
+  }
   const instance = cap.instance.toLowerCase();
   let role = "value";
   let unit: string | undefined;
@@ -682,7 +822,7 @@ function mapProperty(cap: CloudCapability): StateDefinition[] {
 
   return [
     {
-      id: canonicalSyntheticId(cap.instance),
+      id,
       name: capabilityName(cap.instance),
       desc: capabilityDesc(cap.instance),
       type: "number",
@@ -1069,15 +1209,16 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
  */
 function mapEvent(cap: CloudCapability): StateDefinition[] {
   const id = canonicalSyntheticId(cap.instance);
+  // A known event is the synthetic path's datapoint: its name, explanation and
+  // role (M5, N17); a genuinely unknown event is an alarm under Govee's name.
+  const known = SYNTHETIC_STATE_META[id];
   return [
     {
       id,
-      name: capabilityName(cap.instance),
-      desc: capabilityDesc(cap.instance),
+      name: known ? tName(known.nameKey) : capabilityName(cap.instance),
+      desc: known ? (known.descKey ? tDesc(known.descKey) : undefined) : capabilityDesc(cap.instance),
       type: "boolean",
-      // Known events use the shared role table (M5 — same role as the
-      // synthetic write path); a genuinely unknown event is an alarm.
-      role: id in EVENT_STATE_ROLES ? EVENT_STATE_ROLES[id as keyof typeof EVENT_STATE_ROLES].role : "indicator.alarm",
+      role: known?.role ?? "indicator.alarm",
       write: false,
       def: false,
       capabilityType: cap.type,
@@ -1375,25 +1516,8 @@ const CAPABILITY_NAME_KEYS: Record<string, I18nKey> = {
   leftLightToggle: "capLeftLightToggle",
   rightLightToggle: "capRightLightToggle",
   hdmiSource: "capHdmiSource",
-  // Readings that two paths create (Cloud capability and the account list /
-  // cloud events via SYNTHETIC_STATE_META): one name, the synthetic path's.
-  // Until 2.40.0 the Cloud path wrote Govee's "Sensor Temperature" in all
-  // eleven languages and the name of the datapoint depended on which path ran
-  // last (found in the AP13 upgrade run).
-  sensorTemperature: "temperature",
-  sensorHumidity: "humidity",
-  battery: "battery",
   airQuality: "capAirQuality",
   filterLifeTime: "capFilterLifeTime",
-  // The CO2 reading carries the synthetic path's name whatever Govee calls it.
-  carbonDioxideConcentration: "co2",
-  co2Concentration: "co2",
-  // Events: the same name the synthetic path (SYNTHETIC_STATE_META) gives the
-  // same datapoint — two paths create it, one label (audit N17).
-  lackWaterEvent: "lackOfWater",
-  iceFullEvent: "iceBucketFull",
-  bodyAppearedEvent: "bodyDetected",
-  dirtDetectedEvent: "dirtDetected",
 };
 
 /**
@@ -1409,14 +1533,6 @@ const CAPABILITY_DESC_KEYS: Record<string, I18nKey> = {
   dreamViewToggle: "descDreamViewToggle",
   airQuality: "descAirQuality",
   filterLifeTime: "descFilterLifeTime",
-  // Events reach the tree through TWO paths — this cloud-capability one and
-  // state-manager's SYNTHETIC_STATE_META. Both need the explanation, or the
-  // same datapoint carries one only on the installations that happened to
-  // create it the other way.
-  lackWaterEvent: "descLackOfWater",
-  iceFullEvent: "descIceBucketFull",
-  bodyAppearedEvent: "descBodyDetected",
-  dirtDetectedEvent: "descDirtDetected",
   // What the name alone does not say: which way a ceiling fan blows, which part
   // of a two-zone lamp a switch belongs to, and that "warm mist" means the
   // humidifier heats the water. The plain on/off lights (main, background, fan)

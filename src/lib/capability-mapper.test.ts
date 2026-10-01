@@ -1,4 +1,3 @@
-import { SYNTHETIC_STATE_META } from "./state-manager";
 import { vi } from "vitest";
 
 vi.mock("@iobroker/adapter-core", () => ({
@@ -18,6 +17,7 @@ import {
   buildLanStateDefs as buildLanStateDefsRaw,
   getDefaultLanStates,
   LAN_STATE_IDS,
+  SYNTHETIC_STATE_META,
   libraryDecidesPending,
   mapCapabilities as mapCapabilitiesRaw,
   mapCloudStateValue,
@@ -3222,5 +3222,36 @@ describe("mode dropdown labels — settings in the system language, Govee's cont
   it("a scene instance keeps Govee's effect names — content, not settings", () => {
     const def = mapCapabilitiesRaw([mode("nightlightScene", ["Flame", "Sleep"])], mockLog)[0];
     expect(def.states).toEqual({ 0: "---", 1: "Flame", 2: "Sleep" });
+  });
+});
+
+describe("synthetic readings — one table for both paths (audit DRY-12)", () => {
+  it("a temperature Govee declares in Fahrenheit carries °C — the value arrives in °C (platformTempUnit)", () => {
+    const def = mapCapabilitiesRaw(
+      [
+        {
+          type: "devices.capabilities.property",
+          instance: "sensorTemperature",
+          parameters: { unit: "unit.fahrenheit" },
+        } as unknown as CloudCapability,
+      ],
+      mockLog,
+    )[0];
+    expect(def).toMatchObject({ id: "temperature", unit: "°C", role: "value.temperature", channel: "sensor" });
+    expect(def.name).toEqual(tName(SYNTHETIC_STATE_META.temperature.nameKey));
+  });
+
+  it("a known event takes the synthetic name, explanation and role; an unknown one stays an alarm", () => {
+    const [known, unknown] = mapCapabilitiesRaw(
+      [
+        { type: "devices.capabilities.event", instance: "lackWaterEvent" },
+        { type: "devices.capabilities.event", instance: "smokeEvent" },
+      ] as CloudCapability[],
+      mockLog,
+    );
+    expect(known).toMatchObject({ id: "lack_water_event", role: "indicator.maintenance" });
+    expect(known.name).toEqual(tName("lackOfWater"));
+    expect(known.desc).toEqual(tDesc("descLackOfWater"));
+    expect(unknown).toMatchObject({ id: "smoke_event", role: "indicator.alarm" });
   });
 });
