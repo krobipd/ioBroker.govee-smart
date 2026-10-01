@@ -1,5 +1,6 @@
 import { LocalSnapshotStore, type LocalSnapshot, type LocalSnapshotStoreAdapter } from "./local-snapshots";
 import { mockLog } from "../../test/test-helpers";
+import { DeviceIdRegistry } from "./device-id";
 
 type StoredObject = { type?: string; common?: Record<string, unknown>; native?: Record<string, unknown> };
 
@@ -117,7 +118,7 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     objects = mock.objects;
     seedDevices(objects);
-    store = new LocalSnapshotStore(mock.adapter, mockLog);
+    store = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await store.init();
   });
 
@@ -258,7 +259,7 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
     mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = "NOT JSON!";
-    const corruptStore = new LocalSnapshotStore(mock.adapter, mockLog);
+    const corruptStore = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await corruptStore.init();
     expect(corruptStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
   });
@@ -267,7 +268,7 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
     mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = JSON.stringify({ snapshots: "hello" });
-    const driftStore = new LocalSnapshotStore(mock.adapter, mockLog);
+    const driftStore = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await driftStore.init();
     expect(driftStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
   });
@@ -276,7 +277,7 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
     mock.objects.get("devices.h6160-0011")!.native!.localSnapshots = { snapshots: [] };
-    const driftStore = new LocalSnapshotStore(mock.adapter, mockLog);
+    const driftStore = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await driftStore.init();
     expect(driftStore.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
   });
@@ -396,7 +397,7 @@ describe("LocalSnapshotStore", () => {
     // `native`. A write that carried `common` would replace the user's name.
     const mock = createMockAdapter();
     seedDevices(mock.objects);
-    const s = new LocalSnapshotStore(mock.adapter, mockLog);
+    const s = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await s.init();
     await s.saveSnapshot("H6160", "AABBCCDDEEFF0011", {
       name: "Evening",
@@ -421,7 +422,7 @@ describe("LocalSnapshotStore", () => {
     seedDevices(mock.objects);
     const snap = { name: "Kept", power: false, brightness: 0, colorRgb: "#000000", colorTemperature: 0, savedAt: 1 };
     mock.objects.get("devices.h6160-2222")!.native!.localSnapshots = JSON.stringify({ snapshots: [snap] });
-    const s = new LocalSnapshotStore(mock.adapter, mockLog);
+    const s = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await s.init();
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF2222")).toEqual([snap]);
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
@@ -433,7 +434,11 @@ describe("LocalSnapshotStore", () => {
     const warns: string[] = [];
     const mock = createMockAdapter();
     seedDevices(mock.objects);
-    const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, warn: (m: string) => warns.push(m) });
+    const s = new LocalSnapshotStore(
+      mock.adapter,
+      { ...mockLog, warn: (m: string) => warns.push(m) },
+      new DeviceIdRegistry(),
+    );
     await s.init();
     await s.saveSnapshot("H7000", "AABBCCDDEEFF9999", {
       name: "Orphan",
@@ -455,7 +460,11 @@ describe("LocalSnapshotStore", () => {
     const mock = createMockAdapter();
     seedDevices(mock.objects);
     mock.adapter.getObjectViewAsync = () => Promise.reject(new Error("db down"));
-    const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, warn: (m: string) => warns.push(m) });
+    const s = new LocalSnapshotStore(
+      mock.adapter,
+      { ...mockLog, warn: (m: string) => warns.push(m) },
+      new DeviceIdRegistry(),
+    );
     await s.init();
     expect(warns[0]).toContain("device objects unreadable");
     await s.saveSnapshot("H6160", "AABBCCDDEEFF0011", {
@@ -481,7 +490,11 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     mock.objects.set("snapshots", { type: "meta", common: { type: "meta.user" } });
     mock.files.set("govee-smart.0.snapshots/h6160_0011.json", JSON.stringify({ snapshots: [snapA] }, null, 2));
     mock.files.set("govee-smart.0.snapshots/h6160_2222.json", JSON.stringify({ snapshots: [snapB] }, null, 2));
-    const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, info: (m: string) => infos.push(m) });
+    const s = new LocalSnapshotStore(
+      mock.adapter,
+      { ...mockLog, info: (m: string) => infos.push(m) },
+      new DeviceIdRegistry(),
+    );
     await s.init();
 
     expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
@@ -498,7 +511,11 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     seedDevices(mock.objects);
     mock.objects.set("snapshots", { type: "meta", common: { type: "meta.user" } });
     mock.files.set("govee-smart.0.snapshots/h7000_9999.json", JSON.stringify({ snapshots: [snapA] }));
-    const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, info: (m: string) => infos.push(m) });
+    const s = new LocalSnapshotStore(
+      mock.adapter,
+      { ...mockLog, info: (m: string) => infos.push(m) },
+      new DeviceIdRegistry(),
+    );
     await s.init();
     expect(mock.objects.has("devices.h7000-9999")).toBe(false);
     expect(mock.files.size).toBe(0);
@@ -513,7 +530,11 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     mock.objects.set("snapshots", { type: "meta", common: { type: "meta.user" } });
     mock.files.set("govee-smart.0.snapshots/h6160_0011.json", "NOT JSON!");
     mock.files.set("govee-smart.0.snapshots/h6160_2222.json", JSON.stringify({ snapshots: [snapB] }));
-    const s = new LocalSnapshotStore(mock.adapter, { ...mockLog, warn: (m: string) => warns.push(m) });
+    const s = new LocalSnapshotStore(
+      mock.adapter,
+      { ...mockLog, warn: (m: string) => warns.push(m) },
+      new DeviceIdRegistry(),
+    );
     await s.init();
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
     expect(s.getSnapshots("H6160", "AABBCCDDEEFF2222")).toEqual([snapB]);
@@ -530,7 +551,7 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
       listed++;
       return inner(meta, p);
     };
-    const s = new LocalSnapshotStore(mock.adapter, mockLog);
+    const s = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
     await s.init();
     expect(listed).toBe(0);
   });
@@ -545,7 +566,7 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
       fs.writeFileSync(path.join(dataDir, "snapshots", "h6160_0011.json"), JSON.stringify({ snapshots: [snapA] }));
       const mock = createMockAdapter();
       seedDevices(mock.objects);
-      const s = new LocalSnapshotStore(mock.adapter, mockLog);
+      const s = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
       await s.init(dataDir);
       expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
       expect(fs.existsSync(path.join(dataDir, "snapshots"))).toBe(false);
@@ -559,10 +580,14 @@ describe("LocalSnapshotStore — storage not initialised", () => {
   it("refuses to save and says why instead of pretending it worked", async () => {
     const warns: string[] = [];
     const mock = createMockAdapter();
-    const store = new LocalSnapshotStore(mock.adapter, {
-      ...mockLog,
-      warn: (m: string) => warns.push(m),
-    });
+    const store = new LocalSnapshotStore(
+      mock.adapter,
+      {
+        ...mockLog,
+        warn: (m: string) => warns.push(m),
+      },
+      new DeviceIdRegistry(),
+    );
     // init() deliberately NOT called — mirrors a start where the objects are
     // not reachable. Saving anyway would put the snapshot in the in-memory
     // cache only: the dropdown shows it, and it is gone after the next restart.

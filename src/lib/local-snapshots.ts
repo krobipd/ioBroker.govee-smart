@@ -1,7 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { errMessage } from "./types";
-import { DeviceIdRegistry } from "./device-id";
+import type { DeviceIdRegistry } from "./device-id";
 import { treeKey } from "./device-key";
 
 /** Per-segment state in a local snapshot */
@@ -102,18 +102,17 @@ export class LocalSnapshotStore {
   private dataAvailable = false;
 
   /** Where a device's tree lives — see the constructor. */
-  private readonly ids: SnapshotTreeIds;
+  private readonly ids: Pick<DeviceIdRegistry, "idFor">;
 
   /**
    * @param adapter ioBroker adapter (object view + extendObject; file methods only for the carry-over)
    * @param log ioBroker logger
-   * @param ids the adapter's registry of device ids (main.ts hands in the state manager's); without
-   *   one, a registry of its own keeps the rule
+   * @param ids the adapter's one registry of device ids (main.ts hands in the state manager's)
    */
-  constructor(adapter: LocalSnapshotStoreAdapter, log: ioBroker.Logger, ids?: SnapshotTreeIds) {
+  constructor(adapter: LocalSnapshotStoreAdapter, log: ioBroker.Logger, ids: Pick<DeviceIdRegistry, "idFor">) {
     this.adapter = adapter;
     this.log = log;
-    this.ids = ids ?? ownTreeIds();
+    this.ids = ids;
   }
 
   /**
@@ -388,7 +387,7 @@ export class LocalSnapshotStore {
    * @param deviceId Device identifier
    */
   private deviceKey(sku: string, deviceId: string): string {
-    return this.ids.idOf(sku, deviceId);
+    return this.ids.idFor(sku, deviceId);
   }
 
   /**
@@ -418,22 +417,6 @@ export class LocalSnapshotStore {
 
   /** See {@link legacyKeys}. */
   private legacyKeyMap: Map<string, string> | null = null;
-}
-
-/** What the store needs to know about device ids. */
-export interface SnapshotTreeIds {
-  /** The id of a device's tree below `devices.` (`h61be-525f`). */
-  idOf(sku: string, deviceId: string): string;
-}
-
-/**
- * A registry of the store's own, for a store built without the adapter's.
- *
- * @returns the id lookups
- */
-function ownTreeIds(): SnapshotTreeIds {
-  const own = new DeviceIdRegistry();
-  return { idOf: (sku, deviceId) => own.idFor(sku, deviceId) };
 }
 
 /**

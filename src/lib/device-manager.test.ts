@@ -46,6 +46,7 @@ import type {
   MqttStatusUpdate,
 } from "./types";
 import type { MqttSegmentData } from "./device-manager/lookups";
+import { DeviceIdRegistry } from "./device-id";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
@@ -222,7 +223,7 @@ describe("DeviceManager", () => {
   let dm: DeviceManager;
 
   beforeEach(() => {
-    dm = new DeviceManager(mockLog, mockTimers, registry);
+    dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
   });
 
   describe("handleLanDiscovery", () => {
@@ -674,7 +675,7 @@ describe("DeviceManager", () => {
     });
 
     it("loadFromCloud classifies a 429 as rate-limited with the Retry-After delay (L29)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({
         getDevices: () => Promise.reject(new HttpError("Rate limited", 429, { "retry-after": "30" })),
       } as any);
@@ -682,7 +683,7 @@ describe("DeviceManager", () => {
     });
 
     it("loadFromCloud classifies a 401 with a non-'auth' body as auth-failed — no retry loop on a bad key (L29)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({ getDevices: () => Promise.reject(new HttpError("Access denied", 401, {})) } as any);
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
     });
@@ -690,7 +691,7 @@ describe("DeviceManager", () => {
     it("a 429 warns ONCE and names the Retry-After wait, not the transient 5 minutes (M7, 3.0.2)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
-      const dm2 = new DeviceManager(log, mockTimers, registry);
+      const dm2 = new DeviceManager(log, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({
         getDevices: () => Promise.reject(new HttpError("Rate limited", 429, { "retry-after": "120" })),
       } as any);
@@ -704,20 +705,20 @@ describe("DeviceManager", () => {
     it("a rejected key is no warning here — the registry names it once with what to do (M7, 3.0.2)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
-      const dm2 = new DeviceManager(log, mockTimers, registry);
+      const dm2 = new DeviceManager(log, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({ getDevices: () => Promise.reject(new HttpError("Access denied", 403, {})) } as any);
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
       expect(warns).toEqual([]);
     });
 
     it("loadFromCloud classifies a generic network error as transient (L29)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({ getDevices: () => Promise.reject(new Error("network boom")) } as any);
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "transient" });
     });
 
     it("an empty list next to a known device is retried ONCE, then accepted (2.40.0)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       const known = createTestDevice({ sku: "H61BE", deviceId: "DEADBEEF03" });
       (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "DEADBEEF03"), known);
       dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
@@ -726,20 +727,20 @@ describe("DeviceManager", () => {
     });
 
     it("an empty list with a non-empty App-API list counts as evidence too", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       (dm2 as any).lastAppList = { ok: true, keys: new Set(["h5179:aabb"]) };
       dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
       expect(await dm2.loadFromCloud()).toEqual({ ok: false, reason: "transient" });
     });
 
     it("an empty list of an account nothing else knows is a valid account — ok at once", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
       expect(await dm2.loadFromCloud()).toEqual({ ok: true });
     });
 
     it("a non-empty list re-arms the one retry for a later empty list", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       const known = createTestDevice({ sku: "H61BE", deviceId: "DEADBEEF04" });
       (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "DEADBEEF04"), known);
       const lists: unknown[][] = [
@@ -761,15 +762,15 @@ describe("DeviceManager", () => {
     });
 
     it("loadGroupMembers returns false without an api client / without a bearer token (L29)", async () => {
-      const noClient = new DeviceManager(mockLog, mockTimers, registry);
+      const noClient = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       expect(await noClient.loadGroupMembers()).toBe(false);
-      const noBearer = new DeviceManager(mockLog, mockTimers, registry);
+      const noBearer = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       noBearer.setApiClient({ hasBearerToken: () => false } as any);
       expect(await noBearer.loadGroupMembers()).toBe(false);
     });
 
     it("removes a BaseGroup deleted from the account after the debounce (non-empty group list)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       const deletedGroup = createTestDevice({
         sku: "BaseGroup",
         deviceId: "9001",
@@ -1514,7 +1515,7 @@ describe("DeviceManager", () => {
 
   describe("handleMqttStatus — an appliance's own status push (issue #47)", () => {
     it("an appliance's status push reaches the datapoint pipe decoded (H7127, issue #47 — local first)", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H7127" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.air_purifier";
@@ -1599,7 +1600,7 @@ describe("DeviceManager", () => {
       // push now would write filter_life_time into control.* (no channel known
       // yet) and warn "has no existing object". Dropping it would lose the
       // device's only live word if the start-up seed read fails.
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.98", device: "AABBCCDDEEFF0098", sku: "H7127" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.air_purifier";
@@ -1954,7 +1955,7 @@ describe("DeviceManager", () => {
         silly: () => {},
         level: "debug",
       };
-      const noDm = new DeviceManager(warnLog, mockTimers, registry);
+      const noDm = new DeviceManager(warnLog, mockTimers, registry, new DeviceIdRegistry());
 
       const device = createTestDevice({
         lanIp: undefined,
@@ -2762,7 +2763,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   }
 
   it("merges segmentCount + manualMode + manualSegments into existing LAN-discovered device", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     // Simulate LAN discovery — device gets created without segment data.
     dm.handleLanDiscovery({
       sku: "H61BE",
@@ -2810,7 +2811,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     // does not hold: measured 2026-09-07 on the real adapter with 5 of 15
     // devices cached and the cloud answering HTTP 500, it removed 10 device
     // trees — 132 of 249 objects. Only an account list answers the question.
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const cached = [
       {
         sku: "H61BE",
@@ -2839,7 +2840,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   });
 
   it("never restores a SameModeGroup pseudo-device from an older cache", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const cached = [
       {
         sku: "SameModeGroup",
@@ -2884,7 +2885,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   });
 
   it("never restores a DreamViewScenic pseudo-device from an older cache (M6)", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const entry = (sku: string, deviceId: string): Record<string, unknown> => ({
       sku,
       deviceId,
@@ -2921,7 +2922,7 @@ describe("DeviceManager — loadFromCache merge", () => {
    * be switched at all until the user pressed "sync devices".
    */
   it("keeps a cache-restored cloud-only device controllable when the account has no light", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const cached = [
       {
         sku: "H7126",
@@ -2957,7 +2958,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   });
 
   it("leaves merged fields undefined when cache entry has none (no segment data ever captured)", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     dm.handleLanDiscovery({
       sku: "H6102",
       device: "00:11:22:33:44:55:66:77",
@@ -3177,18 +3178,18 @@ describe("DeviceManager — loadFromCache merge", () => {
     }
 
     it("returns 0 without an api client", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       expect(await dm2.pollAppApi()).toBe(0);
     });
 
     it("returns 0 when bearer token missing", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.setApiClient(makeApiMock({ hasBearer: false }) as never);
       expect(await dm2.pollAppApi()).toBe(0);
     });
 
     it("ignores app entries for unknown devices even when known devices exist (L24)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       // A KNOWN device so the registry isn't empty — the unknown entry must be
       // ignored on identity, not via an empty-registry early return.
       dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" });
@@ -3209,7 +3210,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("a 401 from the App API asks for a fresh bearer; any other failure does not (audit 2026-09-24 M1)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0001", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
       const refresh = vi.fn();
@@ -3224,7 +3225,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("gateway is sticky — set when gatewayInfo is present, never cleared on a poll that omits it", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       const dev = createTestDevice({
         sku: "H5109",
         deviceId: "AABBCCDDEEFF0002",
@@ -3270,7 +3271,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("removes a sold sensor absent from the App-API account list after the debounce (reported H5179 bug)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       // A cache-restored, sold thermometer: no LAN, not in any account list.
       const sold = createTestDevice({
         sku: "H5179",
@@ -3299,7 +3300,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("forwards synthetic caps for known devices via onCloudCapabilities", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({
         ip: "192.168.1.50",
         device: "AABBCCDDEEFF0001",
@@ -3331,7 +3332,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("flips a sensor to info.online via data-freshness even when Govee reports offline (ISSUE-2)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.51", device: "AABBCCDDEEFF1109", sku: "H5109" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
@@ -3362,7 +3363,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("keeps a sensor offline when its last reading is stale (ISSUE-2 negative)", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.52", device: "AABBCCDDEEFF110A", sku: "H5109" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
@@ -3385,7 +3386,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("returns 0 on fetch error and does not throw", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       // device must need App-API for fetch to be attempted
       dm2.handleLanDiscovery({ ip: "192.168.1.99", device: "AABBCCDDEEFF0099", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
@@ -3399,7 +3400,7 @@ describe("DeviceManager — loadFromCache merge", () => {
         ...mockLog,
         warn: (msg: string) => warnings.push(msg),
       };
-      const dm2 = new DeviceManager(trackingLog, mockTimers, registry);
+      const dm2 = new DeviceManager(trackingLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
 
@@ -3432,7 +3433,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
   describe("handleOpenApiEvent", () => {
     it("ignores events for unknown devices", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       let called = 0;
       dm2.setOnCloudCapabilities(() => {
         called++;
@@ -3446,7 +3447,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("forwards caps to onCloudCapabilities for known devices", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({
         ip: "192.168.1.51",
         device: "AABBCCDDEEFF0002",
@@ -3464,7 +3465,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("ignores malformed input defensively", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       let called = 0;
       dm2.setOnCloudCapabilities(() => {
         called++;
@@ -3481,7 +3482,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   describe("applyOnlineCap — a statement and an arrival go to different slots", () => {
     /** A cloud-driven, non-Light device the online-cap path is not gated away from. */
     const cloudDrivenDevice = (): { dm: DeviceManager; dev: GoveeDevice } => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.90", device: "AABBCCDDEEFF0090", sku: "H7130" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.heater";
@@ -3577,7 +3578,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 
   describe("applyOnlineCap (Pkt 12 — info.online for App-API + OpenAPI-MQTT)", () => {
     it("flips device.state.online when App-API delivers online:true", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.81", device: "AABBCCDDEEFF0081", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
@@ -3613,7 +3614,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("flips device.state.online when App-API delivers online:false", async () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.82", device: "AABBCCDDEEFF0082", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.thermometer";
@@ -3649,7 +3650,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("OpenAPI-MQTT events drive info.online via applyOnlineCap", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.83", device: "AABBCCDDEEFF0083", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       // H5179 is a thermometer — LAN-Discovery defaults type to Light because
@@ -3684,7 +3685,7 @@ describe("DeviceManager — loadFromCache merge", () => {
     });
 
     it("treats data-without-online-flag as online (matches LAN/MQTT convention)", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.84", device: "AABBCCDDEEFF0084", sku: "H5179" });
       const dev = dm2.getDevices()[0];
       // Same as above — set non-Light type so applyOnlineCap is not skipped.
@@ -3727,7 +3728,7 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
   let dm: DeviceManager;
   beforeEach(() => {
     registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
-    dm = new DeviceManager(mockLog, mockTimers, registry);
+    dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -3823,13 +3824,13 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
 
 describe("DeviceManager — internal logic helpers", () => {
   it("physicalSegmentCount answers the settled strip length — quirk, learned value, capability", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     expect(dm.physicalSegmentCount(createTestDevice({ segmentCount: 12 }))).toBe(12);
     expect(dm.physicalSegmentCount(createTestDevice({ segmentCount: undefined, capabilities: [] }))).toBe(0);
   });
 
   it("removeDevice deletes the device and returns its deviceId, or null if absent", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ sku: "H61BE", deviceId: "AA:BB:CC:DD" });
     const key = (dm as any).deviceKey("H61BE", "AA:BB:CC:DD");
     (dm as any).devices.set(key, device);
@@ -3839,7 +3840,7 @@ describe("DeviceManager — internal logic helpers", () => {
   });
 
   it("getErrorCategorySnapshot mirrors the per-source error trackers", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     expect(dm.getErrorCategorySnapshot()).toEqual({ deviceManager: null, appApi: null, groupMembers: null });
     (dm as any).lastErrorCategory = "TIMEOUT";
     (dm as any).lastAppApiErrorCategory = "RATE_LIMIT";
@@ -3860,7 +3861,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("binds a LAN reply to a same-SKU device only when exactly one candidate exists", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     // Two cloud-only devices of the same SKU: the discovery frame's deviceId
     // matches neither, so a SKU fallback would bind the wrong one.
     const a = createTestDevice({ sku: "H61BE", deviceId: "AAAA0001", name: "Strip A", lanIp: undefined });
@@ -3876,7 +3877,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
     expect(dm2.getDevices()).toHaveLength(3);
 
     // With exactly one candidate the fallback is allowed to bind.
-    const dm3 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm3 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const only = createTestDevice({ sku: "H61BE", deviceId: "AAAA0001", lanIp: undefined });
     (dm3 as any).devices.set((dm3 as any).deviceKey("H61BE", "AAAA0001"), only);
     dm3.handleLanDiscovery({ ip: "192.168.1.50", device: "CC:CC:CC:CC:CC:CC:00:03", sku: "H61BE" });
@@ -3885,7 +3886,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("ignores Cloud entries without capabilities (stale/deleted registrations)", async () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     dm2.setCloudClient({
       getDevices: () =>
         Promise.resolve([
@@ -3915,7 +3916,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("an empty Cloud device list never counts as a valid account list", async () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const cloudOnly = createTestDevice({
       sku: "H61BE",
       deviceId: "DEADBEEF03",
@@ -3946,7 +3947,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("prunes the cache only after a plausible non-empty Cloud response", async () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     let pruneCalls = 0;
     dm2.setSkuCache({
       loadAll: () => [],
@@ -3972,7 +3973,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("a Cloud online flag never overrides a LAN-capable light", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const lanLight = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
     lanLight.state.online = true;
     const cloudLight = createTestDevice({ sku: "H6056", deviceId: "CCDD00000001", lanIp: undefined });
@@ -3998,7 +3999,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("an unchanged online state fires no update (no group-reachability churn)", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const sensor = createTestDevice({
       sku: "H5179",
       deviceId: "EEFF00000001",
@@ -4026,7 +4027,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("a repeated LAN discovery of an already-online device reports no transition", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const updates: unknown[] = [];
     dm2.onDeviceUpdate = (_d, s) => updates.push(s);
     const frame = { ip: "192.168.1.100", device: "AA:BB:CC:DD:EE:FF:00:11", sku: "H61BE" };
@@ -4046,7 +4047,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("a devStatus reply carries `online` only on a real offline→online flip", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const dev = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
     dev.state.online = false;
     (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), dev);
@@ -4076,7 +4077,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   // as a flag so the dropdown reset in onDeviceStateUpdate runs once per
   // switch-off instead of twice a minute per switched-off light.
   it("every devStatus reply carries `power`; the flag marks the real transition", () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const dev = createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011", lanIp: "192.168.1.100" });
     dev.state.online = true; // keep `online` out of the patches
     (dm2 as any).devices.set((dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"), dev);
@@ -4102,7 +4103,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("skips the App-API poll entirely in a lights-only installation", async () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     (dm2 as any).devices.set(
       (dm2 as any).deviceKey("H61BE", "AABBCCDDEEFF0011"),
       createTestDevice({ sku: "H61BE", deviceId: "AABBCCDDEEFF0011" }),
@@ -4129,7 +4130,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
   });
 
   it("re-reports a gateway only when it actually changes", async () => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const dev = createTestDevice({
       sku: "H5109",
       deviceId: "AABBCCDDEEFF0002",
@@ -4181,7 +4182,7 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
   });
 
   it("derives the count from the capabilities without inventing a learned value", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: undefined, capabilities: [segCap(9)] });
     expect(dm.syncSegmentCount(device)).toBe(10);
     // Nothing MEASURED this strip — the number comes from the capabilities and
@@ -4190,14 +4191,14 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
   });
 
   it("a manual list beyond the known range widens the TREE, not the learned count (cut-strip case)", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: 10, manualMode: true, manualSegments: [0, 5, 13] });
     expect(dm.syncSegmentCount(device)).toBe(14);
     expect(device.segmentCount, "the user's claim is not a measurement").toBe(10);
   });
 
   it("an implausible stored count is replaced by the capability-derived one, never propagated", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: 1_000_000_000, capabilities: [segCap(14)] });
     // Every reader runs the stored value through `plausibleSegmentCount`, so a
     // corrupt one can never become the tree size — building a billion segment
@@ -4206,14 +4207,14 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
   });
 
   it("a segmentCount quirk wins over everything the device or the Cloud say", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ sku: "H9999", segmentCount: 20, capabilities: [segCap(14)] });
     expect(dm.syncSegmentCount(device)).toBe(5);
     expect(device.segmentCount, "the quirk overrules the learned value, it does not overwrite it").toBe(20);
   });
 
   it("returns 0 for a device without segments", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
     expect(dm.syncSegmentCount(device)).toBe(0);
   });
@@ -4226,7 +4227,7 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
     // correcting it downward, or switching manual mode off entirely, left the
     // extra segment channels standing, persisted to the cache, surviving every
     // restart. `physicalSegmentCap` (the echo filter) was inflated with it.
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
     device.manualMode = true;
     device.manualSegments = Array.from({ length: 30 }, (_, i) => i);
@@ -4238,7 +4239,7 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
   });
 
   it("a manual list shrinks the tree again when the user corrects it", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: undefined, capabilities: [] });
     device.manualMode = true;
     device.manualSegments = Array.from({ length: 30 }, (_, i) => i);
@@ -4251,7 +4252,7 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
     // `physicalSegmentCap` reads this field to filter BLE echo indices above
     // the real strip length, and the cache persists it. A user's claim about a
     // cut strip is not a measurement and must not end up in either.
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const device = createTestDevice({ segmentCount: 10, manualMode: true, manualSegments: [0, 5, 13] });
     expect(dm.syncSegmentCount(device), "the tree covers the declared index 13").toBe(14);
     expect(device.segmentCount, "but the learned length is untouched").toBe(10);
@@ -4270,6 +4271,7 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
       { ...mockLog, warn: (m: string) => warns.push(m), info: (m: string) => infos.push(m) },
       mockTimers,
       registry,
+      new DeviceIdRegistry(),
     );
     return { dm, warns, infos };
   }
@@ -4606,7 +4608,7 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
    * @param evidenceAgeMs How long ago Govee last said anything for this device
    */
   const cloudOnlyLight = (evidenceAgeMs: number): { dm: DeviceManager; dev: GoveeDevice } => {
-    const dm2 = new DeviceManager(mockLog, mockTimers, registry);
+    const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     dm2.handleLanDiscovery({ ip: "192.168.1.95", device: "AABBCCDDEEFF0095", sku: "H6172" });
     const dev = dm2.getDevices()[0];
     dev.lanIp = undefined;
@@ -4783,7 +4785,7 @@ describe("Account push drives reachability for devices without a local interface
     // Without this order the fix would repair the missing-liveness half and make
     // the other half worse: Govee's own "this device is gone" packet would be
     // counted as a sign of life simply because it arrived.
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({
       sku: "H6160",
@@ -4797,7 +4799,7 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("a packet with no explicit claim still counts as a sign of life", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "status", state: { onOff: 1 } });
     expect(dev.state.online).toBe(true);
@@ -4805,7 +4807,7 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("a status push stamps the device's own voice — with the packet's time, not arrival", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({
       sku: "H6160",
@@ -4819,7 +4821,7 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("a replayed old status packet does not paint the device green for the next 30 minutes", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     const stale = Date.now() - 2 * 60 * 60 * 1000;
     dm.handleMqttStatus({
@@ -4833,14 +4835,14 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("Govee's own online packet never counts as the device's voice", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "online", state: { connected: "true" } });
     expect(dev.state.devicePushAt).toBeUndefined();
   });
 
   it("a status packet that itself says offline does not arm the shield", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     // The H6199 shape (connected as text in every packet) on the fixture's SKU.
     dm.handleMqttStatus({
@@ -4855,7 +4857,7 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("a replayed status packet with an explicit online and an old stamp proves nothing", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     const stale = Date.now() - 2 * 60 * 60 * 1000;
     dm.handleMqttStatus({
@@ -4870,7 +4872,7 @@ describe("Account push drives reachability for devices without a local interface
   });
 
   it("Govee's explicit online packet still beats a fresh push — an event is not a poll", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     const dev = cloudOnlyLight(dm);
     dm.handleMqttStatus({ sku: "H6160", device: "AABBCCDDEEFF0011", cmd: "status", state: { onOff: 1 } });
     expect(resolveDeviceReachability(dev).online).toBe(true);
@@ -4881,7 +4883,7 @@ describe("Account push drives reachability for devices without a local interface
   it("a LAN-driven light is untouched by the push, explicit claim or not", () => {
     // krobi 2026-09-03: the local path stays exactly as it is. Govee's cloud
     // cache lags reality, so its word must not reach a local device at all.
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
     const dev = dm.getDevices()[0];
     dev.state.cloudReportedOnline = undefined;
@@ -4898,7 +4900,7 @@ describe("Account push drives reachability for devices without a local interface
     // It is the guaranteed renewer of the reachability proof: the push is
     // event-driven, so a device that just sits there sends nothing and its
     // proof would expire while the device is perfectly fine.
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry());
+    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry(), new DeviceIdRegistry());
     dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6160" });
     expect(dm.hasDeviceNeedingAppApi()).toBe(false);
     const dev = dm.getDevices()[0];
@@ -4936,7 +4938,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     settle: () => Promise<void>;
     scenesCalls: () => number;
   } {
-    const dm = new DeviceManager(mockLog, mockTimers, registry, opts.isUnloading);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry(), opts.isUnloading);
     // Every device has its own read bucket since 2.39.0, so the bench holds
     // its own gate over all lanes: one free slot → everything after the first
     // scenes call queues until the bench frees the next. (Until 2.40.0 the
@@ -5110,7 +5112,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     // the run's memo. Its own calls (scenes) go through fine, so the host's
     // catch never fires — the loader's cancellation report is its only signal
     // that nothing ran. Without it an empty library is remembered for a week.
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     // A limiter that drops exactly ONE App-API call — the run's first, which
     // is the shared scene-library fetch of the first light. Every later call
     // runs, so the SECOND light's own calls all succeed and its host's catch
@@ -5219,7 +5221,7 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     updates: Array<Partial<DeviceState>>;
     push: (state: Record<string, unknown>, transaction?: string) => void;
   } {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     let rejectsLeft = opts.rejectTimes ?? 1;
     const controls: Array<{ instance: string; value: unknown }> = [];
     dm.setCloudClient({
@@ -5453,7 +5455,7 @@ describe("requestStaleStatuses — the status request over the account broker (i
         return undefined;
       },
     } as never;
-    const dm = new DeviceManager(mockLog, timers, registry);
+    const dm = new DeviceManager(mockLog, timers, registry, new DeviceIdRegistry());
     dm.setStatusRequester(device => {
       asked.push(device.deviceId);
       return true;
@@ -5515,7 +5517,7 @@ describe("requestStaleStatuses — the status request over the account broker (i
           return undefined;
         },
       } as never;
-      const dm = new DeviceManager(mockLog, timers, reg);
+      const dm = new DeviceManager(mockLog, timers, reg, new DeviceIdRegistry());
       const seen: Array<[string, number]> = [];
       dm.setStatusRequester((device, cmdVersion) => {
         seen.push([device.sku, cmdVersion]);
@@ -5547,14 +5549,14 @@ describe("requestStaleStatuses — the status request over the account broker (i
   });
 
   it("without a requester (no account login) nothing is asked", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined, iotTopic: "GD/x" });
     (dm as any).devices.set("H6160_x", d);
     expect(dm.requestStaleStatuses(Date.now())).toBe(0);
   });
 
   it("a later list answer without a topic leaves the known one in place — a partial answer never takes the address away", async () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
     (dm as any).devices.set("H6160_aabbccddeeff0011", d);
     const entry = (settings: Record<string, unknown> | undefined): AppDeviceEntry => ({
@@ -5580,7 +5582,7 @@ describe("requestStaleStatuses — the status request over the account broker (i
   });
 
   it("the report gets Govee's entry as it came, not the parser's projection (issue #50)", async () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
     (dm as any).devices.set("H6160_aabbccddeeff0011", d);
     const withRaw: AppDeviceEntry = {
@@ -5605,7 +5607,7 @@ describe("requestStaleStatuses — the status request over the account broker (i
   });
 
   it("the account list hands the device its topic — in memory, never in the cache", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const d = createTestDevice({ lanIp: undefined, lastLanSeenAt: undefined });
     (dm as any).devices.set("H6160_aabbccddeeff0011", d);
     const entry: AppDeviceEntry = {
@@ -5638,7 +5640,7 @@ describe("what waits for an account token — libraries and group members (M3/M9
     musicCalls: () => number;
     groupCalls: () => number;
   } {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     const bearer = { on: false };
     let music = 0;
     let groups = 0;
@@ -5817,7 +5819,7 @@ describe("what waits for an account token — libraries and group members (M3/M9
 
 describe("a cache start that lost a light — the account lists protect its tree (H6, 2.40.0)", () => {
   it("names the tree prefix of every device an ok list carries, groups under groups.", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     (dm as any).lastAppList = (dm as any).listSource(true, [
       { sku: "H5179", deviceId: "AA:BB:CC:DD:EE:FF:11:22" },
       { sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" },
@@ -5831,23 +5833,23 @@ describe("a cache start that lost a light — the account lists protect its tree
   });
 
   it("names the tree the adapter's registry gave the device, not one derived again (3.0.0)", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
     // The registry kept a long id for this device — the protection must name exactly that tree.
-    dm.setTreeResolver((sku, deviceId) =>
-      deviceId === "11:22:33:44:55:66:52:5F" ? "devices.h61be-112233445566525f" : `devices.${sku.toLowerCase()}-x`,
-    );
+    const dm = new DeviceManager(mockLog, mockTimers, registry, {
+      prefixFor: (sku, deviceId) =>
+        deviceId === "11:22:33:44:55:66:52:5F" ? "devices.h61be-112233445566525f" : `devices.${sku.toLowerCase()}-x`,
+    });
     (dm as any).lastAppList = (dm as any).listSource(true, [{ sku: "H61BE", deviceId: "11:22:33:44:55:66:52:5F" }]);
     expect([...dm.accountListedPrefixes()]).toEqual(["devices.h61be-112233445566525f"]);
   });
 
   it("a list that did not answer plausibly protects nothing", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     (dm as any).lastAppList = (dm as any).listSource(false, [{ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }]);
     expect(dm.accountListedPrefixes().size).toBe(0);
   });
 
   function gapBench(): { dm: DeviceManager; listCalls: () => number } {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     let calls = 0;
     dm.setCloudClient({
       getDevices: () => {
@@ -5913,7 +5915,7 @@ describe("a cache start that lost a light — the account lists protect its tree
   });
 
   it("no reload without a Cloud client (no API key)", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, registry);
+    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
     (dm as any).lastAppList = (dm as any).listSource(true, [{ sku: "H600D", deviceId: "AA:BB:CC:DD:EE:FF:00:09" }]);
     expect(dm.reloadForAccountGap()).toBe(false);
   });

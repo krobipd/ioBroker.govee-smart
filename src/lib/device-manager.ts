@@ -23,7 +23,7 @@ import {
 import * as cacheHelpers from "./device-manager/cache";
 import * as cloudMergeHelpers from "./device-manager/cloud-merge";
 import * as libraryLoader from "./device-manager/library-loader";
-import { DeviceIdRegistry } from "./device-id";
+import type { DeviceIdRegistry } from "./device-id";
 import {
   ABSENT_SOURCE,
   reconcileAccountMembership,
@@ -124,6 +124,8 @@ export class DeviceManager {
   private readonly devices = new Map<string, GoveeDevice>();
   /** This instance's device catalog. */
   private readonly registry: DeviceRegistry;
+  /** Where a listed device's tree lives — the adapter's one registry of device ids. */
+  private readonly deviceIds: Pick<DeviceIdRegistry, "prefixFor">;
   private readonly commandRouter: CommandRouter;
   private readonly diagnostics: DiagnosticsCollector;
   /** SKUs we already nudged about — log only once per adapter lifetime, per SKU. */
@@ -291,6 +293,8 @@ export class DeviceManager {
    * @param timers Adapter timer wrapper (forwarded to CommandRouter for
    *   onUnload-safe delays).
    * @param registry This instance's device catalog (quirks, trust tiers)
+   * @param deviceIds The adapter's one registry of device ids (the state manager's) — names the
+   *   trees the cleanup protects
    * @param isUnloading Reads main's `unloading` flag — a scene job that
    *   finishes after onUnload began neither persists nor rebuilds
    */
@@ -298,11 +302,13 @@ export class DeviceManager {
     log: ioBroker.Logger,
     timers: TimerAdapter,
     registry: DeviceRegistry,
+    deviceIds: Pick<DeviceIdRegistry, "prefixFor">,
     isUnloading: () => boolean = () => false,
   ) {
     this.log = log;
     this.timers = timers;
     this.registry = registry;
+    this.deviceIds = deviceIds;
     this.isUnloading = isUnloading;
     this.commandRouter = new CommandRouter(log, timers, registry);
     this.diagnostics = new DiagnosticsCollector(registry);
@@ -901,22 +907,6 @@ export class DeviceManager {
   }
 
   /**
-   * Where a listed device's tree lives — the adapter's one registry of device ids (main.ts hands in
-   * the state manager's). Without one, a registry of its own keeps the rule.
-   *
-   * @param treeOf `(sku, deviceId) → devices.<id> | groups.<id>`
-   */
-  setTreeResolver(treeOf: (sku: string, deviceId: string) => string): void {
-    this.treeOf = treeOf;
-  }
-
-  /** See {@link setTreeResolver}. */
-  private treeOf: (sku: string, deviceId: string) => string = (() => {
-    const own = new DeviceIdRegistry();
-    return (sku: string, deviceId: string): string => own.prefixFor(sku, deviceId);
-  })();
-
-  /**
    * Set the phase-specific callbacks. Each fires when its data source has
    * delivered its part of the picture — never with stale / half-filled data.
    *
@@ -954,7 +944,7 @@ export class DeviceManager {
     return {
       ok,
       keys: new Set(listed.map(l => this.deviceKey(l.sku, l.deviceId))),
-      trees: new Set(listed.map(l => this.treeOf(l.sku, l.deviceId))),
+      trees: new Set(listed.map(l => this.deviceIds.prefixFor(l.sku, l.deviceId))),
     };
   }
 

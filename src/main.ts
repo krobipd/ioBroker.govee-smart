@@ -708,17 +708,20 @@ export class GoveeAdapter extends utils.Adapter {
     await this.stateManager.createGroupsOnlineState(false);
     // The unloading reader: a scene job that finishes after onUnload began
     // must not persist or rebuild into a closing database (2026-09-22).
-    this.deviceManager = new DeviceManager(this.log, this, this.deviceRegistry, () => this.unloading);
+    this.deviceManager = new DeviceManager(
+      this.log,
+      this,
+      this.deviceRegistry,
+      this.stateManager.deviceIds,
+      () => this.unloading,
+    );
     const { dataDir } = start;
 
     this.skuCache = new SkuCache(dataDir, this.log);
     // The store carries the snapshot files of earlier versions (root meta
     // object 2.11.0–2.36.0, instance data dir before 2.11) into the device
     // objects once and removes the root folder — see LocalSnapshotStore.
-    const deviceIds = this.stateManager.deviceIds;
-    this.localSnapshots = new LocalSnapshotStore(this, this.log, {
-      idOf: (sku, deviceId) => deviceIds.idFor(sku, deviceId),
-    });
+    this.localSnapshots = new LocalSnapshotStore(this, this.log, this.stateManager.deviceIds);
     await this.localSnapshots.init(dataDir);
     return true;
   }
@@ -734,8 +737,6 @@ export class GoveeAdapter extends utils.Adapter {
     this.groupFanout = new GroupFanoutHandler(groupFanoutHandler.buildGroupFanoutHost(this.handlerHost));
     this.messageRouter = new MessageRouter(this.buildMessageRouterHost());
     this.deviceManager!.setSkuCache(this.skuCache!);
-    // The cleanup's protection of listed devices names their trees from the same registry.
-    this.deviceManager!.setTreeResolver((sku, deviceId) => this.stateManager!.deviceIds.prefixFor(sku, deviceId));
 
     diagnosticsHandlerImpl.wireDiagnosticsProviders(this.handlerHost);
 

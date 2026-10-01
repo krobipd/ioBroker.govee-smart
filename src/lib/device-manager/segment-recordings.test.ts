@@ -12,6 +12,7 @@ import { DeviceManager } from "../device-manager";
 import { DeviceRegistry } from "../device-registry";
 import { mockLog, mockTimers } from "../../../test/test-helpers";
 import type { CloudCapability, GoveeDevice } from "../types";
+import { DeviceIdRegistry } from "../device-id";
 
 // Audit 2026-09-24 (H3/H5): the AA-A5 parser was written for five packets of
 // four slots. The recordings below — every AA-A5 push in the user exports —
@@ -449,7 +450,12 @@ describe("DeviceManager — adopting the count of a recorded push (deleting need
     sku: string,
     opts: { learned?: number; caps?: number; snapshots?: string[][][] },
   ): { dm: DeviceManager; device: GoveeDevice; rebuilds: number[] } {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry({ data: { devices: {} } }));
+    const dm = new DeviceManager(
+      mockLog,
+      mockTimers,
+      new DeviceRegistry({ data: { devices: {} } }),
+      new DeviceIdRegistry(),
+    );
     dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku });
     const device = dm.getDevices()[0];
     device.segmentCount = opts.learned;
@@ -676,7 +682,12 @@ describe("parseMqttSegmentData — edges of the rules", () => {
 
 describe("DeviceManager — a parked shrink whose masks disagree", () => {
   it("masks that name another count leave the tree alone", () => {
-    const dm = new DeviceManager(mockLog, mockTimers, new DeviceRegistry({ data: { devices: {} } }));
+    const dm = new DeviceManager(
+      mockLog,
+      mockTimers,
+      new DeviceRegistry({ data: { devices: {} } }),
+      new DeviceIdRegistry(),
+    );
     dm.handleLanDiscovery({ ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H6076" });
     const device = dm.getDevices()[0];
     device.segmentCount = 8;
