@@ -1471,6 +1471,22 @@ describe("a command that never reached Govee is sent again at once (issue #51)",
     expect((b.calls[1] as unknown[])[4]).toBe(0);
   });
 
+  it("superseded while the first attempt is still under way: no wait, no second attempt", async () => {
+    const ref: { router?: CommandRouter } = {};
+    const device = cloudLight();
+    const b = bench([
+      async () => {
+        await ref.router?.sendCommand(device, "power", false); // the newer write, sent right away
+        throw neverSent();
+      },
+      () => Promise.resolve(),
+    ]);
+    ref.router = b.router;
+    await expect(b.router.sendCommand(device, "power", true)).rejects.toThrow("EAI_AGAIN");
+    expect(b.pauses).toEqual([]);
+    expect(b.calls).toHaveLength(2);
+  });
+
   it("another datapoint of the same device does not supersede it", async () => {
     const ref: { router?: CommandRouter } = {};
     const device = cloudLight();
