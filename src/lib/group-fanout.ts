@@ -1,5 +1,6 @@
 import { deviceLabel, errMessage, type GoveeDevice } from "./types";
 import { sessionKey } from "./device-key";
+import { describeError } from "./error-category";
 import { memberMusicModes, musicNameKey } from "./capability-mapper";
 
 /**
@@ -114,6 +115,7 @@ export class GroupFanoutHandler {
       return false;
     }
     let succeeded = 0;
+    const failed: Array<{ member: GoveeDevice; reason: string }> = [];
     for (const member of members) {
       try {
         if (command === "lightScene") {
@@ -132,8 +134,10 @@ export class GroupFanoutHandler {
           await this.host.sendCommand(member, command, value);
         }
         succeeded += 1;
+        this.warnedMembers.delete(`${group.deviceId}:${member.deviceId}`); // took it → re-arm its warning
       } catch (err) {
         this.host.log.debug(`Group fan-out to ${deviceLabel(member)}: ${errMessage(err)}`);
+        failed.push({ member, reason: describeError(err) });
       }
     }
     if (succeeded === 0) {
@@ -141,7 +145,36 @@ export class GroupFanoutHandler {
       return false;
     }
     this.warnedGroups.delete(group.deviceId); // recovered → re-arm the warn-once
+    if (failed.length > 0) {
+      this.reportFailedMembers(group, failed);
+    }
     return true;
+  }
+
+  /** Group members already warned about (`group:member`) — warn once, then debug until the member takes a command. */
+  private readonly warnedMembers = new Set<string>();
+
+  /**
+   * One line for the members a group command did not reach while others took it
+   * (issue #51): the group's datapoint is confirmed by the members that switched,
+   * and until now the ones that did not stood in the debug log only. Warn while a
+   * member in it is new to the warning, debug when all were named before — a
+   * script writing to the group would otherwise repeat the line.
+   *
+   * @param group The group
+   * @param failed The members that did not take the command, with the reason
+   */
+  private reportFailedMembers(group: GoveeDevice, failed: Array<{ member: GoveeDevice; reason: string }>): void {
+    const names = failed.map(f => deviceLabel(f.member)).join(", ");
+    const reasons = [...new Set(failed.map(f => f.reason))].join("; ");
+    const msg = `Command failed for ${names} (group "${group.name}"): ${reasons}`;
+    const keys = failed.map(f => `${group.deviceId}:${f.member.deviceId}`);
+    if (keys.some(k => !this.warnedMembers.has(k))) {
+      keys.forEach(k => this.warnedMembers.add(k));
+      this.host.log.warn(msg);
+    } else {
+      this.host.log.debug(msg);
+    }
   }
 
   /** Groups already warned about (unreachable / all-failed) — warn once, then debug. */

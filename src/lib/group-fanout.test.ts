@@ -507,3 +507,89 @@ describe("GroupFanoutHandler", () => {
     });
   });
 });
+
+describe("fanOut — members a group command did not reach while others took it (issue #51)", () => {
+  const dns = (): Error =>
+    Object.assign(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"), {
+      code: "EAI_AGAIN",
+      hostname: "openapi.api.govee.com",
+    });
+
+  function bench(): {
+    handler: GroupFanoutHandler;
+    group: GoveeDevice;
+    warns: string[];
+    debugs: string[];
+    failing: Set<string>;
+  } {
+    const warns: string[] = [];
+    const debugs: string[] = [];
+    const failing = new Set<string>();
+    const m1 = makeMember({ deviceId: "AA:01", name: "TV" });
+    const m2 = makeMember({ deviceId: "AA:02", name: "Shelf" });
+    const group = makeGroup([
+      { sku: m1.sku, deviceId: m1.deviceId },
+      { sku: m2.sku, deviceId: m2.deviceId },
+    ]);
+    const { host } = makeHost({ devices: [m1, m2] });
+    host.log = { ...mockLog, warn: (m: string) => warns.push(m), debug: (m: string) => debugs.push(m) };
+    host.sendCommand = device => (failing.has(device.deviceId) ? Promise.reject(dns()) : Promise.resolve());
+    return { handler: new GroupFanoutHandler(host), group, warns, debugs, failing };
+  }
+
+  it("names the member and the reason in words — the group is still confirmed by the one that switched", async () => {
+    const { handler, group, warns, failing } = bench();
+    failing.add("AA:02");
+    expect(await handler.fanOut(group, "control.power", true)).toBe(true);
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("Command failed for");
+    expect(warns[0]).toContain("Shelf");
+    expect(warns[0]).not.toContain("TV");
+    expect(warns[0]).toContain("openapi.api.govee.com could not be resolved");
+  });
+
+  it("the same member failing again is debug — a script writing to the group does not repeat the warning", async () => {
+    const { handler, group, warns, debugs, failing } = bench();
+    failing.add("AA:02");
+    await handler.fanOut(group, "control.power", true);
+    await handler.fanOut(group, "control.power", false);
+    expect(warns).toHaveLength(1);
+    expect(debugs.some(d => d.startsWith("Command failed for"))).toBe(true);
+  });
+
+  it("a member that took a command in between is warned about again", async () => {
+    const { handler, group, warns, failing } = bench();
+    failing.add("AA:02");
+    await handler.fanOut(group, "control.power", true);
+    failing.delete("AA:02");
+    await handler.fanOut(group, "control.power", false);
+    failing.add("AA:02");
+    await handler.fanOut(group, "control.power", true);
+    expect(warns).toHaveLength(2);
+  });
+
+  it("a new member in the list warns although the other one was named before", async () => {
+    const { handler, group, warns, failing } = bench();
+    failing.add("AA:02");
+    await handler.fanOut(group, "control.power", true);
+    failing.add("AA:01");
+    failing.delete("AA:02");
+    await handler.fanOut(group, "control.power", false);
+    expect(warns).toHaveLength(2);
+  });
+
+  it("when every member failed only the group line is written — the two warnings do not stack", async () => {
+    const { handler, group, warns, failing } = bench();
+    failing.add("AA:01");
+    failing.add("AA:02");
+    expect(await handler.fanOut(group, "control.power", true)).toBe(false);
+    expect(warns).toHaveLength(1);
+    expect(warns[0]).toContain("all 2 member command(s) failed");
+  });
+
+  it("all members took it: no line at all", async () => {
+    const { handler, group, warns } = bench();
+    await handler.fanOut(group, "control.power", true);
+    expect(warns).toEqual([]);
+  });
+});
