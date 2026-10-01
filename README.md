@@ -100,30 +100,30 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a rejected background token refresh of the Govee account now counts toward the login protection and asks to check email/password instead of retrying silently
 - Fixed: "Test login" in the connection card counts toward the account's login limit (3 per hour) and says when the next test is possible
 - Fixed: segment colours and brightness are confirmed only after the command went out — a refused Cloud command no longer leaves them acked
-- Fixed: stopping the instance while it moves device ids or loads the saved account no longer starts the LAN listener or a login afterwards
+- Fixed: stopping the adapter while it is still starting really stops it — it no longer goes on to search the network or log in to your Govee account afterwards
 - Fixed: a light found on the network before the saved data loads keeps its scene speed and remembered libraries after a restart
 - Fixed: a group offers only the colour temperatures every member supports, so no member is sent a value outside its range
 - Fixed: when Govee no longer accepts the account session, scene, music and DIY libraries, snapshots and groups ask for a fresh login instead of reading as empty
 - Fixed: a Cloud rate limit or rejected API key is reported once, with the real waiting time — no longer three times or with a wrong retry hint
 - Fixed: moving a 2.x device tree to its new id no longer loses recordings or room assignments when the move fails or is interrupted
 - Fixed: a light whose scene library has not loaded yet keeps its `scenes.scene_speed` datapoint, value and recording — a start without saved data deleted and re-created it
-- Improved: a restart or a refreshed device list rewrites no object that did not change, and status indicators are written only when their value changes
+- Improved: a restart leaves the object tree untouched when nothing changed, so scripts and history that watch object changes no longer see needless updates
 - Fixed: a mode or level dropdown only takes a value the device declares — a fan speed no longer shows `50`, an air purifier's level no longer `0` in Auto mode
 - Fixed: the manual device sync after a failed start shows the Cloud connected and stops the pending retry; a device it adds gets its first values without a log warning
 - Fixed: a Govee e-mail or password of spaces only counts as not entered — at start, in the sensor hint and in the connection card's test
-- Fixed: the per-device refresh remembers that the scenes answered and settles a pending segment-count correction; devices that are no lights no longer spend Cloud calls on scene libraries
+- Fixed: the refresh button of a light keeps its scene list across restarts and corrects a wrong segment count; devices that are not lights no longer use up Cloud calls
 - Fixed: a temperature reading carries °C whichever way it arrives — a model that declares Fahrenheit no longer flips the unit to °F (the value is always °C)
 - Fixed: a segment colour above 255 is sent as 255 — it wrapped to 0 before; a segment brightness is rounded like the light's brightness
-- Improved: a lamp that cannot be reached over LAN logs one warning per new reason instead of one warning for every single command sent to it
+- Improved: a lamp that is unplugged or unreachable on your network leaves one warning in the log instead of a new warning for every command you send to it
 - Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns the same way a single light already does
 - Fixed: a heater that declares no temperature unit shows none instead of an invented °F; a command delivered after the device came back shows the value that was sent
 - Fixed: an untested model without catalog corrections no longer warns to turn on the experimental switch — it works as it is; the log only asks for a diagnostics report
 - Fixed: the settings describe the experimental switch for what it does — it turns on the catalog corrections of untested models; every device appears without it
-- Improved: the device sync button and the per-device cloud refresh report their result in the log; automatic clean-ups after an update no longer write info lines
+- Improved: after you press the device sync or the refresh button, the log tells you what it found, for example which new devices were added to the object tree
 - Fixed: the connection card words every answer in the admin's language — a full login window shows the time on your own clock, and a repeated login test no longer claims a code was just requested
 - Fixed: the music mode read from Govee's state answer showed the mode at that position instead of the reported one; a mode the device never declared is no longer written
-- Fixed: a segment measurement that runs to the protocol limit ends the strip at its last lit segment, like the review does
-- Improved: appliance modes, levels and `info.type` are labelled in the system language; scripts may still write Govee's own names such as `Auto` or `gearMode`
+- Fixed: the segment detection wizard no longer counts a dark segment at the end when the measurement runs all the way to the longest strip Govee supports
+- Improved: appliance modes and levels and the device type show readable names in your ioBroker language; scripts may still write the names Govee uses, such as Auto
 
 ### 3.0.1 (2026-09-27)
 
