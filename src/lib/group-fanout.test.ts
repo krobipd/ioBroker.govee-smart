@@ -527,11 +527,13 @@ describe("fanOut — members a group command did not reach while others took it 
     const failing = new Set<string>();
     const m1 = makeMember({ deviceId: "AA:01", name: "TV" });
     const m2 = makeMember({ deviceId: "AA:02", name: "Shelf" });
+    const m3 = makeMember({ deviceId: "AA:03", name: "Desk" });
     const group = makeGroup([
       { sku: m1.sku, deviceId: m1.deviceId },
       { sku: m2.sku, deviceId: m2.deviceId },
+      { sku: m3.sku, deviceId: m3.deviceId },
     ]);
-    const { host } = makeHost({ devices: [m1, m2] });
+    const { host } = makeHost({ devices: [m1, m2, m3] });
     host.log = { ...mockLog, warn: (m: string) => warns.push(m), debug: (m: string) => debugs.push(m) };
     host.sendCommand = device => (failing.has(device.deviceId) ? Promise.reject(dns()) : Promise.resolve());
     return { handler: new GroupFanoutHandler(host), group, warns, debugs, failing };
@@ -568,23 +570,25 @@ describe("fanOut — members a group command did not reach while others took it 
     expect(warns).toHaveLength(2);
   });
 
-  it("a new member in the list warns although the other one was named before", async () => {
+  it("a new member in the list warns although the other one in it was named before", async () => {
     const { handler, group, warns, failing } = bench();
     failing.add("AA:02");
     await handler.fanOut(group, "control.power", true);
-    failing.add("AA:01");
-    failing.delete("AA:02");
+    failing.add("AA:01"); // AA:02 still failing and already named, AA:01 new
     await handler.fanOut(group, "control.power", false);
     expect(warns).toHaveLength(2);
+    expect(warns[1]).toContain("TV");
+    expect(warns[1]).toContain("Shelf");
   });
 
   it("when every member failed only the group line is written — the two warnings do not stack", async () => {
     const { handler, group, warns, failing } = bench();
     failing.add("AA:01");
     failing.add("AA:02");
+    failing.add("AA:03");
     expect(await handler.fanOut(group, "control.power", true)).toBe(false);
     expect(warns).toHaveLength(1);
-    expect(warns[0]).toContain("all 2 member command(s) failed");
+    expect(warns[0]).toContain("all 3 member command(s) failed");
   });
 
   it("all members took it: no line at all", async () => {
