@@ -1038,6 +1038,7 @@ describe("DiagnosticsCollector", () => {
         mqttFailureReason: null,
         rateLimiter: {
           usedToday: 42,
+          notDeliveredToday: 0,
           dailyLimit: 9000,
           queueLength: 0,
           lanes: {

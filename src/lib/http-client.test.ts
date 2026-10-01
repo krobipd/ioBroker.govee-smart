@@ -1,7 +1,8 @@
 import { classifyError } from "./error-category";
 import * as http from "node:http";
+import { Booking, runBooked } from "./call-booking";
 import { extractHttpStatus, formatFallback, HttpError, httpsRequest, interpretOkBody } from "./http-client";
-import type { HttpResult } from "./http-client";
+import type { HttpResult, HttpTransport } from "./http-client";
 
 /**
  * Local HTTP stub server — `http`, not `https`, so the tests don't need a
@@ -404,6 +405,138 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     }).catch((e: unknown) => e);
     expect((err as { code?: unknown }).code).toBe("ETIMEDOUT");
     expect(classifyError(err)).toBe("TIMEOUT");
+  });
+});
+
+describe("httpsRequest — which failed requests never reached Govee (issue #51)", () => {
+  let stub: StubServer;
+  beforeEach(async () => {
+    stub = await startStubServer();
+  });
+  afterEach(async () => {
+    await stub.stop();
+  });
+
+  /** A transport whose name lookup fails like an unreachable DNS server — the real socket error path. */
+  const dnsFailing: HttpTransport = {
+    request: (options, callback) =>
+      http.request(
+        {
+          ...options,
+          lookup: (_host: string, _opts: unknown, cb: (err: Error) => void): void =>
+            cb(Object.assign(new Error("getaddrinfo EAI_AGAIN openapi.api.govee.com"), { code: "EAI_AGAIN" })),
+        } as http.RequestOptions,
+        callback,
+      ),
+  };
+
+  it("a name that does not resolve: flagged never-sent and the booking is given back", async () => {
+    const booking = new Booking();
+    const err = await runBooked(booking, () =>
+      httpsRequest({ method: "POST", url: "http://openapi.api.govee.com/x", headers: {} }, dnsFailing),
+    ).catch((e: unknown) => e);
+    expect((err as { code?: string }).code).toBe("EAI_AGAIN");
+    expect((err as { neverSent?: boolean }).neverSent).toBe(true);
+    expect(booking.seal()).toBe(true);
+  });
+
+  it("a refused connection: flagged never-sent and the booking is given back", async () => {
+    const closed = await startStubServer();
+    const port = closed.port;
+    await closed.stop();
+    const booking = new Booking();
+    const err = await runBooked(booking, () =>
+      httpRequestPlain({ method: "GET", url: `http://127.0.0.1:${port}/x`, headers: {} }),
+    ).catch((e: unknown) => e);
+    expect((err as { code?: string }).code).toBe("ECONNREFUSED");
+    expect((err as { neverSent?: boolean }).neverSent).toBe(true);
+    expect(booking.seal()).toBe(true);
+  });
+
+  it("an answered request reached Govee — the booking stays, whatever the status", async () => {
+    stub.queue.push({ statusCode: 500, body: "boom" });
+    const booking = new Booking();
+    await runBooked(booking, () =>
+      httpRequestPlain({ method: "GET", url: `http://127.0.0.1:${stub.port}/x`, headers: {} }),
+    ).catch(() => undefined);
+    expect(booking.seal()).toBe(false);
+  });
+
+  it("a timeout after the connection may have been received — the booking stays, no never-sent flag", async () => {
+    stub.queue.push({ statusCode: 200, body: "{}", delayMs: 300 });
+    const booking = new Booking();
+    const err = await runBooked(booking, () =>
+      httpRequestPlain({ method: "GET", url: `http://127.0.0.1:${stub.port}/x`, headers: {}, timeout: 50 }),
+    ).catch((e: unknown) => e);
+    expect((err as { code?: string }).code).toBe("ETIMEDOUT");
+    expect((err as { neverSent?: boolean }).neverSent).toBeUndefined();
+    expect(booking.seal()).toBe(false);
+  });
+
+  /**
+   * A transport that hands out the request so the test can fail it with a
+   * "never connected" code once the server has the request — the socket HAS
+   * connected by then, so the request may be on its way.
+   *
+   * @param agent Optional connection agent (keep-alive for the reused-socket case)
+   */
+  function failingAfterConnect(agent?: http.Agent): { transport: HttpTransport; fail: () => void } {
+    let req: http.ClientRequest | undefined;
+    return {
+      transport: {
+        request: (options, callback) => {
+          req = http.request({ ...options, agent } as http.RequestOptions, callback);
+          return req;
+        },
+      },
+      fail: () => req?.destroy(Object.assign(new Error("connect EHOSTUNREACH"), { code: "EHOSTUNREACH" })),
+    };
+  }
+
+  it("a 'never connected' code on a socket that DID connect is not given back", async () => {
+    const f = failingAfterConnect();
+    stub.queue.push({ statusCode: 200, body: "{}", delayMs: 300 });
+    const booking = new Booking();
+    const pending = runBooked(booking, () =>
+      httpsRequest({ method: "GET", url: `http://127.0.0.1:${stub.port}/x`, headers: {} }, f.transport),
+    ).catch((e: unknown) => e);
+    await vi.waitFor(() => expect(stub.requests).toHaveLength(1));
+    f.fail();
+    const err = await pending;
+    expect((err as { neverSent?: boolean }).neverSent).toBeUndefined();
+    expect(booking.seal()).toBe(false);
+  });
+
+  it("a reused keep-alive socket counts as connected — its failure is not given back", async () => {
+    const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
+    try {
+      stub.queue.push({ statusCode: 200, body: "{}" });
+      await httpsRequest(
+        { method: "GET", url: `http://127.0.0.1:${stub.port}/first`, headers: {} },
+        { request: (o, cb) => http.request({ ...o, agent } as http.RequestOptions, cb) },
+      );
+      const f = failingAfterConnect(agent);
+      stub.queue.push({ statusCode: 200, body: "{}", delayMs: 300 });
+      const booking = new Booking();
+      const pending = runBooked(booking, () =>
+        httpsRequest({ method: "GET", url: `http://127.0.0.1:${stub.port}/second`, headers: {} }, f.transport),
+      ).catch((e: unknown) => e);
+      await vi.waitFor(() => expect(stub.requests).toHaveLength(2));
+      f.fail();
+      const err = await pending;
+      expect((err as { neverSent?: boolean }).neverSent).toBeUndefined();
+      expect(booking.seal()).toBe(false);
+    } finally {
+      agent.destroy();
+    }
+  });
+
+  it("outside a booked call the flag still travels, nothing else happens", async () => {
+    const err = await httpsRequest(
+      { method: "GET", url: "http://openapi.api.govee.com/x", headers: {} },
+      dnsFailing,
+    ).catch((e: unknown) => e);
+    expect((err as { neverSent?: boolean }).neverSent).toBe(true);
   });
 });
 

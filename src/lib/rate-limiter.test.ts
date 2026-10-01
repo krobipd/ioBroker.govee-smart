@@ -1,3 +1,4 @@
+import { currentBooking } from "./call-booking";
 import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, applianceBudget, type CallLane } from "./rate-limiter";
 import { CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 import type { GoveeDevice, TimerAdapter } from "./types";
@@ -888,5 +889,180 @@ describe("a spent daily counter refuses, it does not queue (audit A10)", () => {
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
     expect(warns.filter(w => w.includes("daily ceiling"))).toHaveLength(2);
     rl.stop();
+  });
+});
+
+describe("a call that never reached Govee is given back (issue #51)", () => {
+  // The HTTP client reports each request to the booking of the call it runs in;
+  // these executes do the same by hand. Most real callers (state reads, the
+  // reachability refresh) swallow their own error — the limiter must see the
+  // outcome anyway, which is why the report travels with the booking.
+  const neverSent = async (): Promise<void> => {
+    currentBooking()?.attempt(false);
+    return Promise.resolve();
+  };
+  const delivered = async (): Promise<void> => {
+    currentBooking()?.attempt(true);
+    return Promise.resolve();
+  };
+  const READ: CallLane = { kind: "device-read", deviceKey: "H6097:AA" };
+  const CONTROL: CallLane = { kind: "device-control", deviceKey: "H6097:AA" };
+
+  function bench(over: Partial<CloudLimits> = {}): { rl: RateLimiter; clock: { now: number } } {
+    const clock = { now: 1_000_000 };
+    return { rl: new RateLimiter(mockLog, mockTimers, { ...CLOUD_LIMITS, ...over }, () => clock.now), clock };
+  }
+  const readsOf = (rl: RateLimiter): number =>
+    rl.getUsageSnapshot().lanes.deviceRead.devices.find(d => d.deviceKey === "H6097:AA")?.used ?? 0;
+
+  it("a swallowed DNS failure gives back the lane slot and the daily count, and the report counts it", async () => {
+    const { rl } = bench();
+    await rl.tryExecute(neverSent, READ);
+    expect(readsOf(rl)).toBe(0);
+    expect(rl.getUsageSnapshot().usedToday).toBe(0);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1);
+  });
+
+  it("a call that reached Govee keeps its booking", async () => {
+    const { rl } = bench();
+    await rl.tryExecute(delivered, READ);
+    expect(readsOf(rl)).toBe(1);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(0);
+  });
+
+  it("a call that made no request keeps its booking", async () => {
+    const { rl } = bench();
+    await rl.tryExecute(() => Promise.resolve(), READ);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+  });
+
+  it("one request through after a failed one: the booking stays", async () => {
+    const { rl } = bench();
+    await rl.tryExecute(async () => {
+      currentBooking()?.attempt(false);
+      currentBooking()?.attempt(true);
+      return Promise.resolve();
+    }, READ);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+  });
+
+  it("each lane gets its slot back: device list and app API", async () => {
+    const { rl } = bench();
+    await rl.tryExecute(neverSent, ACCOUNT_LIST_LANE);
+    await rl.tryExecute(neverSent, { kind: "appapi" });
+    expect(rl.getUsageSnapshot().lanes.accountList.used).toBe(0);
+    expect(rl.getUsageSnapshot().lanes.appApi.used).toBe(0);
+  });
+
+  it("control: six commands that never left do not empty the burst — the seventh still goes at once", async () => {
+    const { rl } = bench();
+    for (let i = 0; i < 6; i++) {
+      await rl.executeTracked(neverSent, CONTROL);
+    }
+    let ran = false;
+    await rl.executeTracked(async () => {
+      ran = true;
+      return delivered();
+    }, CONTROL);
+    expect(ran).toBe(true);
+    expect(rl.getUsageSnapshot().lanes.deviceControl.accountTokens).toBe(CLOUD_LIMITS.accountControl.burst - 1);
+  });
+
+  it("a token goes back only up to the bucket's capacity", async () => {
+    const { rl } = bench();
+    await rl.executeTracked(neverSent, CONTROL);
+    const tokens = rl.getUsageSnapshot().lanes.deviceControl.devices.find(d => d.deviceKey === "H6097:AA")?.tokens;
+    expect(tokens).toBe(CLOUD_LIMITS.deviceControl.burst);
+  });
+
+  it("executeTracked: the failure still reaches the caller, the booking goes back", async () => {
+    const { rl } = bench();
+    await expect(
+      rl.executeTracked(() => {
+        currentBooking()?.attempt(false);
+        return Promise.reject(new Error("getaddrinfo EAI_AGAIN"));
+      }, CONTROL),
+    ).rejects.toThrow("EAI_AGAIN");
+    expect(rl.getUsageSnapshot().usedToday).toBe(0);
+  });
+
+  it("a queued call that never reached Govee is given back too", async () => {
+    const { rl } = bench({ deviceReadPerMinute: 1 });
+    await rl.tryExecute(delivered, READ); // the minute window is full
+    await rl.tryExecute(neverSent, READ); // queued
+    expect(rl.getUsageSnapshot().queueLength).toBe(1);
+    (rl as any).resetMinuteWindow(); // the waiter runs and fails
+    await vi.waitFor(() => expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1));
+    expect(readsOf(rl)).toBe(0);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+  });
+
+  it("an appliance at the end of its allowance: a DNS failure does not spend the last call", async () => {
+    const { rl } = bench();
+    const budget = { key: "H7127:AA", perDay: 2 };
+    await rl.executeTracked(delivered, CONTROL, 0, budget);
+    await rl.executeTracked(neverSent, CONTROL, 0, budget);
+    let ran = false;
+    await rl.executeTracked(
+      async () => {
+        ran = true;
+        return delivered();
+      },
+      CONTROL,
+      0,
+      budget,
+    );
+    expect(ran).toBe(true);
+    await expect(rl.executeTracked(delivered, CONTROL, 0, budget)).rejects.toThrow("Daily Govee budget");
+  });
+
+  it("a minute reset between booking and failure: the new window keeps its count, the day still gets it back", async () => {
+    const { rl } = bench();
+    let release!: () => void;
+    const slow = rl.tryExecute(async () => {
+      await new Promise<void>(resolve => (release = resolve));
+      currentBooking()?.attempt(false);
+    }, READ);
+    (rl as any).resetMinuteWindow(); // a new minute while the call is in flight
+    await rl.tryExecute(delivered, READ); // one call booked in the NEW window
+    release();
+    await slow;
+    expect(readsOf(rl)).toBe(1);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+  });
+
+  it("a day reset between booking and failure: the new day keeps its count and reports nothing given back", async () => {
+    const { rl } = bench();
+    const budget = { key: "H7127:AA", perDay: 5 };
+    let release!: () => void;
+    const slow = rl.executeTracked(
+      async () => {
+        await new Promise<void>(resolve => (release = resolve));
+        currentBooking()?.attempt(false);
+      },
+      CONTROL,
+      0,
+      budget,
+    );
+    (rl as any).resetDaily(); // midnight while the call is in flight
+    await rl.executeTracked(delivered, CONTROL, 0, budget); // booked on the NEW day
+    release();
+    await slow;
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(0);
+    expect((rl as any).callsTodayPerDevice.get("H7127:AA")).toBe(1);
+  });
+
+  it("a leftover the call did not await cannot give the booking back after it settled", async () => {
+    const { rl } = bench();
+    let late!: () => void;
+    await rl.tryExecute(() => {
+      const booking = currentBooking();
+      late = () => booking?.attempt(false);
+      return Promise.resolve();
+    }, READ);
+    late();
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
   });
 });

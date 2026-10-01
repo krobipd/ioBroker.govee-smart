@@ -1,5 +1,6 @@
 import type * as http from "node:http";
 import * as https from "node:https";
+import { currentBooking, isNeverSent } from "./call-booking";
 import { errMessage } from "./types";
 
 /**
@@ -128,6 +129,11 @@ export function httpsRequest<T>(
   transport: HttpTransport = httpsTransport,
 ): Promise<HttpResult<T>> {
   return new Promise((resolve, reject) => {
+    // The rate limiter's booking of this call — read here, synchronously: a
+    // listener can run in another call's context (issue #51, the limiter gives
+    // back what never reached Govee). Outside a booked call this is undefined.
+    const booking = currentBooking();
+    let connected = false;
     const u = new URL(options.url);
     const postData = options.body ? JSON.stringify(options.body) : undefined;
 
@@ -154,6 +160,7 @@ export function httpsRequest<T>(
     }
 
     const req = transport.request(reqOptions, res => {
+      booking?.attempt(true);
       const chunks: Buffer[] = [];
       // res.on("error") catches mid-stream failures (TCP RST after headers,
       // socket-close before "end" fires). Without this, such errors propagate
@@ -186,8 +193,26 @@ export function httpsRequest<T>(
       });
     });
 
+    // A reused keep-alive socket connected long ago; a fresh one connects now —
+    // or fails before it does, and then the request never left this host. A
+    // socket that is already destroyed here failed before connecting (a name
+    // lookup can fail before this event): it is not "connected" just because it
+    // is no longer connecting.
+    req.on("socket", socket => {
+      if (req.reusedSocket || (!socket.connecting && !socket.destroyed)) {
+        connected = true;
+      } else {
+        socket.once("connect", () => {
+          connected = true;
+        });
+      }
+    });
     req.on("error", err => {
-      reject(err);
+      const neverSent = isNeverSent(err, connected);
+      booking?.attempt(!neverSent);
+      // The flag travels with the error: a command that never reached Govee
+      // may be sent again at once without being executed twice.
+      reject(neverSent ? Object.assign(err, { neverSent: true }) : err);
     });
     // M5 — the timeout error carries the endpoint + wait duration in its text
     // so the warn log tells the user WHERE and HOW LONG it waited. Previously

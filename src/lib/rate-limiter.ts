@@ -1,3 +1,4 @@
+import { Booking, runBooked } from "./call-booking";
 import { errMessage, type GoveeDevice, type TimerAdapter } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
@@ -72,6 +73,16 @@ class TokenBucket {
   }
 
   /**
+   * Put one token back — a booked call that never reached Govee (issue #51).
+   *
+   * @param now Current time (ms)
+   */
+  give(now: number): void {
+    this.refill(now);
+    this.tokens = Math.min(this.capacity, this.tokens + 1);
+  }
+
+  /**
    * Whole tokens available, for the usage snapshot.
    *
    * @param now Current time (ms)
@@ -80,6 +91,22 @@ class TokenBucket {
     this.refill(now);
     return Math.floor(this.tokens);
   }
+}
+
+/**
+ * What one booked call took: its lane and allowance, and the minute and day
+ * windows it was booked in — a booking given back after a window reset must not
+ * free a slot of the NEW window.
+ */
+interface SpentCall {
+  /** The actor the call was charged to */
+  lane: CallLane;
+  /** The device allowance it was charged to, if any */
+  budget?: DeviceBudget;
+  /** The minute window it was booked in */
+  minuteEpoch: number;
+  /** The day it was booked on */
+  dayEpoch: number;
 }
 
 /** A queued API call */
@@ -176,6 +203,12 @@ export class RateLimiter {
   /** `/device/control` per account. */
   private readonly accountControl: TokenBucket;
   private callsToday = 0;
+  /** Calls given back today because none of their requests reached Govee — for the report. */
+  private notDeliveredToday = 0;
+  /** Counted up by every minute reset — see {@link SpentCall}. */
+  private minuteEpoch = 0;
+  /** Counted up by every daily reset — see {@link SpentCall}. */
+  private dayEpoch = 0;
   private minuteResetTimer: ioBroker.Interval | undefined = undefined;
   private dayResetTimer: ioBroker.Interval | undefined = undefined;
   private dayResetKickoff: ioBroker.Timeout | undefined = undefined;
@@ -289,6 +322,8 @@ export class RateLimiter {
     );
     this.callsToday = 0;
     this.warnedDayBudget = false;
+    this.notDeliveredToday = 0;
+    this.dayEpoch++;
     // The per-device allowances reset with the global one — Govee rolls both
     // over at the same time. The warn-once set goes too, so a device that hit
     // its limit yesterday says so again if it hits it today.
@@ -380,8 +415,7 @@ export class RateLimiter {
     // A spent day needs no check of its own: canMakeCall refuses it first, and
     // enqueue then turns the call away without queueing it.
     if (this.canMakeCall(lane)) {
-      this.spend(lane, budget);
-      await execute();
+      await this.runSpent(execute, this.spend(lane, budget));
       return true;
     }
     this.enqueue(execute, lane, priority, undefined, budget);
@@ -444,7 +478,7 @@ export class RateLimiter {
    * @param lane The actor the call is charged to
    * @param budget The device's allowance, when the call belongs to one
    */
-  private spend(lane: CallLane, budget?: DeviceBudget): void {
+  private spend(lane: CallLane, budget?: DeviceBudget): SpentCall {
     const now = this.clock();
     switch (lane.kind) {
       case "account-list":
@@ -465,6 +499,65 @@ export class RateLimiter {
     if (budget) {
       this.callsTodayPerDevice.set(budget.key, (this.callsTodayPerDevice.get(budget.key) ?? 0) + 1);
     }
+    return { lane, budget, minuteEpoch: this.minuteEpoch, dayEpoch: this.dayEpoch };
+  }
+
+  /**
+   * Run a booked call and give the booking back when none of its requests
+   * reached Govee (issue #51): a call that failed on the name lookup or a
+   * refused connection was never counted by Govee, so it must not use up the
+   * adapter's mirror of Govee's limits either — least of all an appliance's
+   * daily allowance, which otherwise refused real commands after an outage.
+   *
+   * @param execute The API call
+   * @param spent What {@link spend} booked for it
+   */
+  private async runSpent(execute: () => Promise<void>, spent: SpentCall): Promise<void> {
+    const booking = new Booking();
+    try {
+      await runBooked(booking, execute);
+    } finally {
+      if (booking.seal()) {
+        this.refund(spent);
+      }
+    }
+  }
+
+  /**
+   * Give one booking back — only to the windows it was taken from.
+   *
+   * @param spent The booking
+   */
+  private refund(spent: SpentCall): void {
+    const { lane, budget } = spent;
+    if (spent.minuteEpoch === this.minuteEpoch) {
+      switch (lane.kind) {
+        case "account-list":
+          this.accountListUsed = Math.max(0, this.accountListUsed - 1);
+          break;
+        case "appapi":
+          this.appApiUsed = Math.max(0, this.appApiUsed - 1);
+          break;
+        case "device-read":
+          this.deviceReadUsed.set(lane.deviceKey, Math.max(0, (this.deviceReadUsed.get(lane.deviceKey) ?? 0) - 1));
+          break;
+        case "device-control":
+          break;
+      }
+    }
+    // The control buckets refill continuously — a token goes back whatever the window.
+    if (lane.kind === "device-control") {
+      const now = this.clock();
+      this.controlBucket(lane.deviceKey, now).give(now);
+      this.accountControl.give(now);
+    }
+    if (spent.dayEpoch === this.dayEpoch) {
+      this.callsToday = Math.max(0, this.callsToday - 1);
+      this.notDeliveredToday++;
+      if (budget) {
+        this.callsTodayPerDevice.set(budget.key, Math.max(0, (this.callsTodayPerDevice.get(budget.key) ?? 0) - 1));
+      }
+    }
   }
 
   private controlBucket(deviceKey: string, now: number): TokenBucket {
@@ -478,6 +571,7 @@ export class RateLimiter {
 
   /** Zero the minute windows and run what waited for them. */
   private resetMinuteWindow(): void {
+    this.minuteEpoch++;
     this.accountListUsed = 0;
     this.appApiUsed = 0;
     this.deviceReadUsed.clear();
@@ -510,8 +604,7 @@ export class RateLimiter {
     }
     // A spent day: canMakeCall refuses, and enqueue rejects with DAY_BUDGET_SPENT.
     if (this.canMakeCall(lane)) {
-      this.spend(lane, budget);
-      await execute();
+      await this.runSpent(execute, this.spend(lane, budget));
       return;
     }
     await new Promise<void>((resolve, reject) => {
@@ -568,6 +661,7 @@ export class RateLimiter {
     const now = this.clock();
     return {
       usedToday: this.callsToday,
+      notDeliveredToday: this.notDeliveredToday,
       dailyLimit: this.limits.perDay,
       queueLength: this.queue.length,
       lanes: {
@@ -623,8 +717,7 @@ export class RateLimiter {
       }
       // spend(), not two raw increments: this was the second booking site and
       // the only one that did not know about device allowances.
-      this.spend(call.lane, call.budget);
-      call.execute().catch(err => {
+      this.runSpent(call.execute, this.spend(call.lane, call.budget)).catch(err => {
         this.log.debug(`Queued call failed: ${errMessage(err)}`);
       });
     }
@@ -639,6 +732,8 @@ export class RateLimiter {
 export interface RateLimiterSnapshot {
   /** OpenAPI + App-API calls made today, all lanes together. */
   usedToday: number;
+  /** Calls given back today because none of their requests reached Govee (DNS, refused connection). */
+  notDeliveredToday: number;
   /** The daily ceiling those calls count against. */
   dailyLimit: number;
   /** Calls waiting for a free bucket right now. */
