@@ -54,6 +54,7 @@ Nichts → LAN (Suche, Ein/Aus, Helligkeit, Farbe, Status) · + API-Key → Ger�
 - **Fünf API-Clients:** `govee-cloud-client` (REST v2, API-Key) · `govee-mqtt-client` (AWS-IoT, Konto) · `govee-openapi-mqtt-client` (Cloud-Ereignisse, API-Key) · `govee-lan-client` (UDP) · `govee-api-client` (App-API `app2.govee.com`). Beide MQTT-Clients erben Reconnect/Backoff von `reconnecting-mqtt-client`.
 - **Importfreie Module, die `src-admin/` und `tools/` mitlesen:** `err-message.ts`, `auth-status.ts` (der `mqttAuth`-Vertrag), `device-catalog.ts` (Katalogwörter). `src-admin/vite.config.ts` braucht deshalb `dts: false` (sonst TS6059 und eine `.d.ts` neben der Quelle).
 - `cloud-creds-handler` legt die MQTT-Zugangsdaten als verschlüsselte Datei ins Instanz-Datenverzeichnis, nicht in ein Objekt.
+- Das Instanz-Datenverzeichnis (SKU-Cache `cache/`, Zugangsdaten-Datei) ist als `common.dataFolder` deklariert — nur so nimmt das ioBroker-Backup es mit.
 
 `src-admin/` ist eine Module-Federation-React-Komponente (Vite) → `admin/custom/` (git-getrackt). Den Bau fährt der Release-Vorlauf (Gate D05 `npm run build:admin`), die Artefakte gehen in den Release-Commit; von Hand nur `npm run publish:manual`. Eigene i18n mit `gsw_`-Schlüsseln (11 Sprachen); zwei Mounts: `ConnectionConfig` (Reiter Konfiguration) und `ExpertConfig` (Reiter Experte, Umschalter Assistent ODER Diagnose). `index.html` ist nur der Pflicht-Einstieg von Vite und lädt nichts.
 
@@ -239,6 +240,7 @@ Suche `239.255.255.250:4001` · Antworten an `:4002` · Befehle an Geräte-IP `:
 - `httpsRequest` nimmt einen `transport`; die Tests fahren den echten Code über `node:http`. LAN-Test mit `node:dgram`-Attrappe (`sends`, `sendError`), SKU-Cache mit `failNextOpen`, HTTP-Abbruch mitten im Körper mit `content-length`.
 - **Echte Antworten statt erfundener Formen:** wo eine Aufzeichnung existiert, läuft der Test damit. Die Inventar-Fixture (`test/fixtures/inventory/govee-cloud.json`) kennt Geräte MIT `_source` (ganzer aufgezeichneter Eintrag) und OHNE (Teilsatz echter Blöcke, zu ersetzen, sobald ein Export da ist); der Fixture-Server (`test/inventory.js`) antwortet in Govees Hüllen und meldet sich mit Konto-Zugangsdaten an. `movieMode` ist bewusst nicht gebaut.
 - `test:inventory` fährt `build/` — vorher `npm run build`; die Upgrade-Suite lokal nur mit `INVENTORY_PREVIOUS`. Abnahme sind zwei Läufe mit byte-gleichem `objects.inventory.json`.
+- Die Upgrade-Suite sät den Datenordner (`seedInstanceData`) mit den SKU-Cache-Dateien, die das VORIGE Release für die Fixture-Geräte hielt, gebaut aus der Fixture; die Form wird gegen einen Lauf des Vorgänger-Tags gemessen, nie aus dem Code gelesen.
 
 ## Konkurrenz
 
