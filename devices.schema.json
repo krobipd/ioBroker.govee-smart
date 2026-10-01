@@ -116,7 +116,7 @@
         },
         "transportOverrides": {
           "type": "object",
-          "description": "Per-command transport override — forces a command through Cloud or LAN regardless of the default LAN-first heuristic. Value 'lan' is a no-op (default routing).",
+          "description": "Per-command transport override — forces a command through Cloud or LAN regardless of the default LAN-first heuristic. Value 'lan' is a no-op (default routing). segmentBatch routes the batch command only; per-segment commands carry no override.",
           "properties": {
             "power": {
               "enum": ["cloud", "lan"]

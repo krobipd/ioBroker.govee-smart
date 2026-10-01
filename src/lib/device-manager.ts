@@ -9,6 +9,7 @@ import {
   findDeviceBySkuAndId as findDeviceBySkuAndIdHelper,
   isLanDriven,
   parseMqttSegmentData,
+  plausibleSegmentCount,
   readDevicePushAt,
   readReportedReachability,
   resolveSegmentCount,
@@ -1848,8 +1849,8 @@ export class DeviceManager {
     // A segmentCount quirk is a hard override (a cloud-only SKU whose capability
     // count lies and which never pushes AA-A5 to self-correct) — a live packet
     // must never fight it.
-    const quirk = this.registry.getQuirks(device.sku)?.segmentCount;
-    const quirkLocked = typeof quirk === "number" && quirk > 0;
+    // The same validity rule resolveSegmentCount applies (1..56, integer) — a quirk it ignores locks nothing.
+    const quirkLocked = plausibleSegmentCount(this.registry.getQuirks(device.sku)?.segmentCount) !== undefined;
     // Compared with the count the tree is built from (quirk, learned value or
     // the cloud capability) — not with the learned value alone: a first push
     // on a fresh installation (learned 0) used to "grow" a 30-segment H7020 to

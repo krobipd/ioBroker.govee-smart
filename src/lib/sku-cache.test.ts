@@ -154,15 +154,6 @@ describe("SkuCache", () => {
     expect(cache.loadAll()).toEqual([]);
   });
 
-  it("should clear all cache entries", async () => {
-    const cache = new SkuCache(dir, mockLog);
-    await cache.save(createTestData("H61BE", "AA:BB:CC:DD:11:22:33:44"));
-    await cache.save(createTestData("H6160", "EE:FF:00:11:22:33:44:55"));
-    expect(cache.loadAll()).toHaveLength(2);
-    cache.clear();
-    expect(cache.loadAll()).toHaveLength(0);
-  });
-
   it("should handle corrupt JSON gracefully", () => {
     const cache = new SkuCache(dir, mockLog);
     const cacheDir = path.join(dir, "cache");
@@ -431,14 +422,9 @@ describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)"
     expect(cache.loadAll()).toHaveLength(1);
   });
 
-  it("clear() and evictDevice() also forget the fingerprint — a later identical save writes", async () => {
+  it("evictDevice() also forgets the fingerprint — a later identical save writes", async () => {
     const cache = new SkuCache(dir, mockLog);
     const a = createTestData("H6100", "CL:00:00:00:00:00:00:01");
-    const b = createTestData("H6101", "EV:00:00:00:00:00:00:02");
-    await cache.save(a);
-    await cache.save(b);
-    cache.clear();
-    expect(cache.loadAll()).toHaveLength(0);
     await cache.save(a);
     expect(cache.loadAll()).toHaveLength(1);
 

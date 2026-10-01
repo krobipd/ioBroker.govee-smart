@@ -357,17 +357,6 @@ export class SkuCache {
     }
   }
 
-  /** Delete all cached files. */
-  clear(): void {
-    this.lastWritten.clear();
-    try {
-      this.forEachCacheFile(full => fs.unlinkSync(full));
-      this.log.debug("Cache cleared");
-    } catch (e) {
-      this.log.debug(`Cache clear failed: ${errMessage(e)}`);
-    }
-  }
-
   /**
    * Iterate the `*.json` files in the cache dir, calling `cb` with each file's
    * absolute path. A missing or vanished dir is swallowed (cb not called).

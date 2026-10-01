@@ -43,9 +43,9 @@ export interface DeviceQuirks {
    * by the WiFi firmware before reaching the BLE side).
    *
    * Value "cloud" forces sendCloudCommand. Value "lan" is a no-op (identical
-   * to omitting the field) and exists for schema symmetry. Segment-suffix
-   * commands (segmentColor:N, segmentBrightness:N) inherit the segmentBatch
-   * override automatically.
+   * to omitting the field) and exists for schema symmetry. `segmentBatch`
+   * routes the batch command (`segments.command`) only; the per-segment
+   * commands carry no override.
    */
   transportOverrides?: Partial<Record<ConfigurableOverrideCommand, TransportTarget>>;
   /**
@@ -83,8 +83,8 @@ export interface DeviceQuirks {
 
 /**
  * The commands that may appear as a key of `transportOverrides` in devices.json.
- * Dynamic-suffix commands are excluded — covering all segment ops through
- * a single segmentBatch entry is both shorter and structurally correct.
+ * The per-segment commands (segmentColor:N, segmentBrightness:N) carry no
+ * dynamic-suffix key and no override.
  */
 export const CONFIGURABLE_OVERRIDE_COMMANDS = [
   "power",

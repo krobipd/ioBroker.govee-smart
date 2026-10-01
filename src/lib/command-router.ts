@@ -200,26 +200,16 @@ export class CommandRouter {
   }
 
   /**
-   * Look up the quirk-driven transport override for a (device, command) pair.
-   * Segment-suffix commands (segmentColor:N / segmentBrightness:N) inherit
-   * the segmentBatch override — devices.json carries one key for all segment
-   * ops, not one per index.
+   * Look up the quirk-driven transport override for a (device, command) pair. Only the
+   * commands devices.json names carry one; a per-segment command (segmentColor:N) has
+   * none — until 3.0.2 it inherited segmentBatch's, which no catalog entry used (YAGNI-6).
    *
    * @param device Target device
    * @param command Command type
    */
   private lookupOverride(device: GoveeDevice, command: string): TransportTarget | undefined {
     const overrides = this.registry.getQuirks(device.sku)?.transportOverrides;
-    if (!overrides) {
-      return undefined;
-    }
-    if (command in overrides) {
-      return overrides[command as ConfigurableOverrideCommand];
-    }
-    if (command.startsWith("segmentColor:") || command.startsWith("segmentBrightness:")) {
-      return overrides.segmentBatch;
-    }
-    return undefined;
+    return overrides && command in overrides ? overrides[command as ConfigurableOverrideCommand] : undefined;
   }
 
   /**

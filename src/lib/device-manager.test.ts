@@ -80,6 +80,8 @@ const QUIRK_TEST_REGISTRY = {
     H70D1: { name: "LED Strip", type: "light", status: "verified" },
     // H9999 is a SYNTHETIC test SKU (not in devices.json) — only exercises the segmentCount quirk.
     H9999: { name: "Segment Quirk Strip", type: "light", status: "verified", quirks: { segmentCount: 5 } },
+    // Synthetic too: a quirk past the bitmask (57+) that resolveSegmentCount ignores.
+    H9998: { name: "Implausible Quirk Strip", type: "light", status: "verified", quirks: { segmentCount: 80 } },
   },
 };
 
@@ -2538,6 +2540,32 @@ describe("DeviceManager", () => {
 
       expect(changed).toBeNull(); // quirk-locked — no rebuild
       expect(dm.getDevices()[0].segmentCount).toBe(5);
+    });
+
+    it("a quirk resolveSegmentCount ignores (past the bitmask) locks nothing — one validity rule (YAGNI-6)", () => {
+      const lanDevice: LanDevice = { ip: "192.168.1.100", device: "AABBCCDDEEFF0011", sku: "H9998" };
+      dm.handleLanDiscovery(lanDevice);
+      dm.getDevices()[0].segmentCount = 5;
+      dm.setCallbacks({
+        onUpdate: () => {},
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      let changed: GoveeDevice | null = null;
+      dm.onSegmentCountChanged = d => {
+        changed = d;
+      };
+      dm.onMqttSegmentUpdate = () => {};
+      expect(resolveSegmentCount({ sku: "H9998", segmentCount: 5 } as GoveeDevice)).toBe(5);
+
+      const real: [number, number, number, number] = [100, 255, 206, 146];
+      const pkt1 = buildAaA5Packet(1, [real, real, real, real]);
+      const pkt2 = buildAaA5Packet(2, [real, real, real, [146, 100, 100, 100]]);
+      dm.handleMqttStatus({ sku: "H9998", device: "AABBCCDDEEFF0011", op: { command: [pkt1, pkt2] } });
+
+      expect(changed).not.toBeNull(); // the push grows the strip like on any device without a quirk
+      expect(dm.getDevices()[0].segmentCount).toBe(7);
     });
 
     it("resolveSegmentCount: a segmentCount quirk hard-overrides a cached value", () => {

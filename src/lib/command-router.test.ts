@@ -982,7 +982,7 @@ describe("CommandRouter", () => {
       ]);
     });
 
-    it("segmentBatch=cloud + command segmentColor:5 → suffix-inherits Cloud path", async () => {
+    it("segmentBatch=cloud leaves a per-segment command on LAN — the override names the batch only (YAGNI-6)", async () => {
       registry = new DeviceRegistry({
         data: {
           devices: {
@@ -997,18 +997,13 @@ describe("CommandRouter", () => {
       });
       const lan = makeLanStub();
       const cloud = makeCloudStub();
-      const limiter = makeRateLimiter();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
       router.setCloudClient(cloud.client);
-      router.setRateLimiter(limiter);
+      router.setRateLimiter(makeRateLimiter());
       await router.sendCommand(makeDevice(), "segmentColor:5", "#00FF00");
-      // No LAN setSegmentColor
-      expect(lan.calls.find(c => c.method === "setSegmentColor")).toBeUndefined();
-      // Cloud got exactly the one segment colour write
-      expect(cloud.calls.map(c => [c.instance, c.value])).toEqual([
-        ["segmentedColorRgb", { segment: [5], rgb: 0x00ff00 }],
-      ]);
+      expect(lan.calls.find(c => c.method === "setSegmentColor")).toBeDefined();
+      expect(cloud.calls).toEqual([]);
     });
 
     it("unknown SKU + segmentCount=0 + lightScene → hasSegments-Heuristic fires (regression-guard)", async () => {
