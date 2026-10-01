@@ -298,7 +298,7 @@ export const COMMAND_RETRY_DELAYS_MS = [1000, 2000] as const;
 
 /**
  * How long after the first attempt a command may still be sent again (krobi
- * 2026-10-01: "alles über 10-15 sekunden ist zu langsam"). Measured from the
+ * 2026-10-01: "anything beyond 10-15 seconds is too slow"). Measured from the
  * first attempt, including the time a failing name lookup itself took.
  */
 export const COMMAND_RETRY_WINDOW_MS = 10_000;
