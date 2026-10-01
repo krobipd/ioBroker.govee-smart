@@ -1,9 +1,22 @@
 {
   "common": {
     "name": "govee-smart",
-    "version": "3.0.1",
+    "version": "3.1.0",
     "dataFolder": "govee-smart.%INSTANCE%",
     "news": {
+      "3.1.0": {
+        "en": "Safer Govee login, dropdowns with only the values a device declares, matching colour ranges for groups, segment and music fixes, and a connection card in your admin language.",
+        "de": "Sicherere Govee-Anmeldung, Auswahllisten nur mit Werten, die das Gerät nennt, passende Farbbereiche für Gruppen, Segment- und Musik-Korrekturen, Verbindungskarte in deiner Admin-Sprache.",
+        "ru": "Более безопасный вход в Govee, списки только со значениями устройства, подходящие диапазоны цвета для групп, исправления сегментов и музыки, карточка подключения на языке админки.",
+        "pt": "Login Govee mais seguro, listas só com valores que o dispositivo declara, faixas de cor certas para grupos, correções de segmentos e música e cartão de conexão no idioma do admin.",
+        "nl": "Veiligere Govee-login, keuzelijsten alleen met waarden die het apparaat noemt, passende kleurbereiken voor groepen, segment- en muziekfixes en een verbindingskaart in je admin-taal.",
+        "fr": "Connexion Govee plus sûre, listes limitées aux valeurs déclarées par l'appareil, plages de couleur adaptées aux groupes, correctifs segments et musique, carte de connexion dans votre langue.",
+        "it": "Accesso Govee più sicuro, elenchi solo con valori dichiarati dal dispositivo, gamme di colore adatte ai gruppi, correzioni a segmenti e musica e scheda connessione nella lingua dell'admin.",
+        "es": "Inicio de sesión Govee más seguro, listas solo con valores que declara el dispositivo, rangos de color correctos para grupos, arreglos de segmentos y música y tarjeta de conexión en tu idioma.",
+        "pl": "Bezpieczniejsze logowanie Govee, listy tylko z wartościami podanymi przez urządzenie, właściwe zakresy barw dla grup, poprawki segmentów i muzyki, karta połączenia w języku admina.",
+        "uk": "Безпечніший вхід у Govee, списки лише зі значеннями пристрою, відповідні діапазони кольору для груп, виправлення сегментів і музики, картка підключення мовою адмінки.",
+        "zh-cn": "更安全的 Govee 登录，下拉列表只显示设备声明的值，群组色温范围匹配，分段和音乐修复，连接卡片使用管理界面语言。"
+      },
       "3.0.1": {
         "en": "The note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details.",
         "de": "Der Hinweis, den der Admin vor einem Update auf 3.x zeigt, ist jetzt kurz: die Warnung, ein Beispiel alt → neu und ein Link zu den Details.",
@@ -81,19 +94,6 @@
         "pl": "Raport diagnostyczny nie zawiera już nazwy sieci Wi-Fi, numeru urządzenia z aplikacji Govee ani identyfikatora grupy — były jawnie w każdym eksportowanym pliku\nRaport diagnostyczny zachowuje pełny wpis z listy konta Govee i pokazuje polecenia czekające na urządzenie offline oraz czas uruchomienia adaptera",
         "uk": "Діагностичний звіт більше не містить назву мережі Wi-Fi, номер пристрою в застосунку Govee та ідентифікатор групи — раніше вони стояли відкритим текстом у кожному файлі\nДіагностичний звіт зберігає повний запис списку облікового запису Govee і показує команди, що чекають на офлайн-пристрій, та час запуску адаптера",
         "zh-cn": "诊断报告不再包含 Wi-Fi 网络名称、Govee 应用中的设备编号和群组标识——此前它们以明文出现在每个导出的文件中\n诊断报告保留 Govee 账户列表中的完整条目，并显示等待离线设备的命令以及适配器的启动时间"
-      },
-      "2.39.0": {
-        "en": "A quiet device is asked for its status over the Govee account connection and stays reachable; a command refused while it was offline is delivered once it is back\n28 more Govee models are recognised — meat thermometers, motion and pressure sensors, heaters, kettles and the gateways that carry battery sensors",
-        "de": "Ein verstummtes Gerät wird über die Govee-Kontoverbindung nach seinem Status gefragt und bleibt erreichbar; ein bei Offline abgelehnter Befehl wird zugestellt, sobald es zurück ist\n28 weitere Govee-Modelle werden erkannt — Fleischthermometer, Bewegungs- und Drucksensoren, Heizgeräte, Wasserkocher und die Gateways der Batteriesensoren",
-        "ru": "Замолчавшее устройство запрашивается о статусе через подключение к аккаунту Govee и остаётся доступным; команда, отклонённая офлайн, доставляется, когда оно снова на связи\nРаспознаются ещё 28 моделей Govee — термометры для мяса, датчики движения и давления, обогреватели, чайники и шлюзы для батарейных датчиков",
-        "pt": "Um dispositivo silencioso é consultado sobre o seu estado pela ligação à conta Govee e mantém-se acessível; um comando recusado offline é entregue quando ele volta\nMais 28 modelos Govee são reconhecidos — termómetros de carne, sensores de movimento e pressão, aquecedores, chaleiras e os gateways dos sensores a pilhas",
-        "nl": "Een stil geworden apparaat wordt via de Govee-accountverbinding naar zijn status gevraagd en blijft bereikbaar; een offline geweigerd commando wordt bezorgd zodra het terug is\n28 extra Govee-modellen worden herkend — vleesthermometers, bewegings- en druksensoren, kachels, waterkokers en de gateways van sensoren op batterijen",
-        "fr": "Un appareil devenu silencieux est interrogé sur son état via la connexion au compte Govee et reste joignable ; une commande refusée hors ligne est livrée dès son retour\n28 modèles Govee supplémentaires sont reconnus : thermomètres à viande, capteurs de mouvement et de pression, chauffages, bouilloires et passerelles des capteurs à pile",
-        "it": "Un dispositivo silenzioso viene interrogato sullo stato tramite la connessione all'account Govee e resta raggiungibile; un comando rifiutato offline viene consegnato al suo rientro\nVengono riconosciuti altri 28 modelli Govee — termometri per carne, sensori di movimento e pressione, stufe, bollitori e i gateway dei sensori a batteria",
-        "es": "Un dispositivo silencioso recibe una consulta de estado por la conexión de cuenta Govee y sigue accesible; un comando rechazado sin conexión se entrega cuando vuelve\nSe reconocen 28 modelos Govee más: termómetros de carne, sensores de movimiento y presión, calefactores, hervidores y las pasarelas de los sensores con pila",
-        "pl": "Milczące urządzenie jest pytane o stan przez połączenie z kontem Govee i pozostaje osiągalne; polecenie odrzucone offline jest dostarczane, gdy urządzenie wraca\nRozpoznawanych jest kolejnych 28 modeli Govee — termometry do mięsa, czujniki ruchu i nacisku, grzejniki, czajniki oraz bramki czujników bateryjnych",
-        "uk": "Пристрій, що замовк, запитується про стан через з'єднання з обліковим записом Govee і лишається доступним; команду, відхилену офлайн, буде доставлено після повернення\nРозпізнається ще 28 моделей Govee — термометри для м'яса, датчики руху й тиску, обігрівачі, чайники та шлюзи для датчиків на батарейках",
-        "zh-cn": "沉默的设备会通过 Govee 账户连接被询问状态并保持可达；设备离线时被拒绝的命令会在设备恢复后送达\n新增识别 28 款 Govee 设备——肉类温度计、移动与压力传感器、取暖器、电热水壶，以及电池传感器所依赖的网关"
       }
     },
     "messages": [

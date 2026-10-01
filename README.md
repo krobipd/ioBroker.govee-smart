@@ -95,7 +95,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 3.1.0 (2026-10-01)
 
 - Fixed: a rejected background token refresh of the Govee account now counts toward the login protection and asks to check email/password instead of retrying silently
 - Fixed: "Test login" in the connection card counts toward the account's login limit (3 per hour) and says when the next test is possible
@@ -165,11 +165,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: The diagnostics report hides Govee account topics and the device's LAN address in number form, and a device name only replaces whole words
 - Improved: Temperature, humidity, battery, air quality and filter life carry translated names — the cloud path wrote Govee's English wording in every language
 - Improved: Bluetooth-only models are no longer listed as supported, and the Wi-Fi meat thermometer H5610 was added
-
-### 2.39.2 (2026-09-22)
-
-- Fixed: App groups are no longer asked for a device state at every start — Govee answered each call with an error that only filled the diagnostics report
-- Fixed: A scene request Govee refuses is no longer taken as "no scenes" — the cached scenes and snapshots stay, and the report names the reason once
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
