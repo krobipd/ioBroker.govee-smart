@@ -38,6 +38,18 @@ export type TransportDecision =
   | { kind: "skip"; reason: "no-channel" | "override-cloud-missing" };
 
 /**
+ * Commands that address one fixed Cloud capability: its type without the `devices.capabilities.`
+ * prefix and its instance. One row per command instead of one branch each (audit S9).
+ */
+const CAPABILITY_OF_COMMAND: Readonly<Record<string, { shortType: string; instance: string }>> = {
+  scene: { shortType: "mode", instance: "presetScene" },
+  lightScene: { shortType: "dynamic_scene", instance: "lightScene" },
+  diyScene: { shortType: "dynamic_scene", instance: "diyScene" },
+  snapshot: { shortType: "dynamic_scene", instance: "snapshot" },
+  gradientToggle: { shortType: "toggle", instance: "gradientToggle" },
+};
+
+/**
  * Command router — routes device commands through the fastest available
  * channel: LAN → Cloud. Quirk-driven overrides (devices.json
  * `transportOverrides`) take precedence over the LAN-first default.
@@ -895,19 +907,8 @@ export class CommandRouter {
       ) {
         return cap;
       }
-      if (command === "scene" && shortType === "mode" && cap.instance === "presetScene") {
-        return cap;
-      }
-      if (command === "lightScene" && shortType === "dynamic_scene" && cap.instance === "lightScene") {
-        return cap;
-      }
-      if (command === "diyScene" && shortType === "dynamic_scene" && cap.instance === "diyScene") {
-        return cap;
-      }
-      if (command === "snapshot" && shortType === "dynamic_scene" && cap.instance === "snapshot") {
-        return cap;
-      }
-      if (command === "gradientToggle" && shortType === "toggle" && cap.instance === "gradientToggle") {
+      const fixed = CAPABILITY_OF_COMMAND[command];
+      if (fixed && shortType === fixed.shortType && cap.instance === fixed.instance) {
         return cap;
       }
       if (
