@@ -109,13 +109,13 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a light whose scene library has not loaded yet keeps its `scenes.scene_speed` datapoint, value and recording — a start without saved data deleted and re-created it
 - Improved: a restart or a refreshed device list rewrites no object that did not change, and status indicators are written only when their value changes
 - Fixed: a mode or level dropdown only takes a value the device declares — a fan speed no longer shows `50`, an air purifier's level no longer `0` in Auto mode
-- Fixed: the manual device sync after a failed start shows the Cloud connected and stops the pending retry; a device it adds gets its first values without a warning in the log, and devices already known are not read again
+- Fixed: the manual device sync after a failed start shows the Cloud connected and stops the pending retry; a device it adds gets its first values without a log warning
 - Fixed: a Govee e-mail or password of spaces only counts as not entered — at start, in the sensor hint and in the connection card's test
 - Fixed: the per-device refresh remembers that the scenes answered and settles a pending segment-count correction; devices that are no lights no longer spend Cloud calls on scene libraries
 - Fixed: a temperature reading carries °C whichever way it arrives — a model that declares Fahrenheit no longer flips the unit to °F (the value is always °C)
 - Fixed: a segment colour above 255 is sent as 255 — it wrapped to 0 before; a segment brightness is rounded like the light's brightness
-- Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
-- Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns, as a single light does
+- Improved: a lamp that cannot be reached over LAN logs one warning per new reason instead of one warning for every single command sent to it
+- Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns the same way a single light already does
 - Fixed: a heater that declares no temperature unit shows none instead of an invented °F; a command delivered after the device came back shows the value that was sent
 - Fixed: an untested model without catalog corrections no longer warns to turn on the experimental switch — it works as it is; the log only asks for a diagnostics report
 - Fixed: the settings describe the experimental switch for what it does — it turns on the catalog corrections of untested models; every device appears without it
@@ -123,7 +123,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: the connection card words every answer in the admin's language — a full login window shows the time on your own clock, and a repeated login test no longer claims a code was just requested
 - Fixed: the music mode read from Govee's state answer showed the mode at that position instead of the reported one; a mode the device never declared is no longer written
 - Fixed: a segment measurement that runs to the protocol limit ends the strip at its last lit segment, like the review does
-- Improved: appliance modes and levels (Manual, Heat, Low, High, Auto, Keep temperature, Speed 1 …) and `info.type` are labelled in the system language; scripts may still write Govee's names such as `Auto` or `gearMode`
+- Improved: appliance modes, levels and `info.type` are labelled in the system language; scripts may still write Govee's own names such as `Auto` or `gearMode`
 
 ### 3.0.1 (2026-09-27)
 
