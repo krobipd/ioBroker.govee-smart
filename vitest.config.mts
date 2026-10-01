@@ -16,10 +16,7 @@ export default defineConfig({
       // handler modules were invisible at "81 %" while true src coverage
       // was 66 %).
       include: ["src/**/*.ts"],
-      exclude: [
-        "src/**/*.test.ts",
-        "src/**/*.d.ts",
-      ],
+      exclude: ["src/**/*.test.ts", "src/**/*.d.ts"],
       // NOTE: `src/main.ts` used to be excluded here as "covered by
       // test/integration.js". Measured in the 2026-08-22 test audit: it was at
       // 0 % — the integration harness asserts exactly one thing ("the adapter

@@ -43,17 +43,22 @@ const VOLATILE = ["ts", "from", "user", "acl"];
 // Key order carries no meaning in an ioBroker object: extendObject keeps the key order an existing
 // object already has, while adapter-core's I18n.getTranslatedObject builds its own — the same eleven
 // texts in another order are the same name. Arrays keep their order.
-const canonical = (v) =>
-    JSON.stringify(v, (_k, x) =>
-        x && typeof x === "object" && !Array.isArray(x)
-            ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]]))
-            : x);
+const canonical = v =>
+  JSON.stringify(v, (_k, x) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.fromEntries(
+          Object.keys(x)
+            .sort()
+            .map(k => [k, x[k]]),
+        )
+      : x,
+  );
 // How long the upgrade suite keeps watching after its verdict: a write in that window means the wait ended before
 // the adapter did (round 61, measured 2026-09-29 over the fleet: none in 10 s at HEAD; parcelapp's old wait judged
 // 5 ms before the first of 187 writes).
 const SETTLE_MS = 10000;
 const INSTANCE_OBJECTS = new Set(
-    (require(path.join(ADAPTER_DIR, "io-package.json")).instanceObjects ?? []).map((o) => `${NS}${o._id}`),
+  (require(path.join(ADAPTER_DIR, "io-package.json")).instanceObjects ?? []).map(o => `${NS}${o._id}`),
 );
 // govee-smart: the https hook routes every Govee host to the fake cloud on this port. The harness hands the
 // mocha process's environment to the adapter process (`env: { ...process.env, ...env }`, @iobroker/testing 6.2.2).
@@ -74,11 +79,11 @@ const RESOURCE_DIR = fs.mkdtempSync(path.join(require("node:os").tmpdir(), `${AD
 const READ_ONLY = new Set();
 // The environment of every adapter start: the resource probe first, then the test hooks of this adapter.
 function adapterEnv(...hooks) {
-    return {
-        NODE_OPTIONS: [RESOURCE_PROBE, ...hooks].map((file) => `--require ${file}`).join(" "),
-        RESOURCE_PROBE_DIR: RESOURCE_DIR,
-        RESOURCE_PROBE_NS: NS,
-    };
+  return {
+    NODE_OPTIONS: [RESOURCE_PROBE, ...hooks].map(file => `--require ${file}`).join(" "),
+    RESOURCE_PROBE_DIR: RESOURCE_DIR,
+    RESOURCE_PROBE_NS: NS,
+  };
 }
 
 /**
@@ -91,72 +96,73 @@ function adapterEnv(...hooks) {
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function watchObjectWrites(harness) {
-    const watch = { writes: new Map(), peak: new Map(), unchanged: [], deleted: [], times: [], unchangedIndicators: [] };
-    const known = new Map();
-    const roles = new Map();
-    const states = new Map();
-    const content = (obj) => {
-        const { ts, from, user, ...rest } = obj;
-        return canonical(rest);
-    };
-    harness.on("objectChange", (id, obj) => {
-        if (!id.startsWith(NS)) {
-            return;
-        }
-        if (!obj) {
-            watch.deleted.push(id);
-            known.delete(id);
-            roles.delete(id);
-            return;
-        }
-        roles.set(id, obj.common?.role);
-        if (obj.type === "state" && obj.common?.write === false) {
-            READ_ONLY.add(id);
-        } else {
-            READ_ONLY.delete(id);
-        }
-        const now = content(obj);
-        if (obj.from === `system.adapter.${ADAPTER}.0`) {
-            const n = (watch.writes.get(id) ?? 0) + 1;
-            watch.writes.set(id, n);
-            watch.peak.set(id, Math.max(watch.peak.get(id) ?? 0, n));
-            watch.times.push([id, Date.now()]);
-            if (known.get(id) === now && !(n === 1 && INSTANCE_OBJECTS.has(id))) {
-                watch.unchanged.push(id);
-            }
-        }
-        known.set(id, now);
-    });
-    // Round 62: an indicator state (`indicator.*`) is written only on a change (read-only: compared in memory,
-    // writable: setStateChangedAsync) — a write that changes nothing is a finding. Compared is what js-controller
-    // 7.2.2 compares in setStateChangedAsync: val strictly, ack, q, c; an object value always counts as changed.
-    harness.on("stateChange", (id, state) => {
-        if (!id.startsWith(NS) || !state || state.from !== `system.adapter.${ADAPTER}.0`) {
-            return;
-        }
-        const now = state.val !== null && typeof state.val === "object" ? null : canonical([state.val, state.ack, state.q, state.c]);
-        if (now !== null && states.get(id) === now && String(roles.get(id)).startsWith("indicator")) {
-            watch.unchangedIndicators.push(id);
-        }
-        states.set(id, now);
-    });
-    // Round 64: a restart the harness plays (playControllerRestarts) is a new start — the per-start counts begin again,
-    // the known object content stays (it is the database's).
-    watch.newStart = () => {
-        watch.writes.clear();
-        states.clear();
-    };
-    const list = await harness.objects.getObjectListAsync({ startkey: NS, endkey: `${NS}香` });
-    for (const row of list.rows) {
-        if (row.value) {
-            known.set(row.id, content(row.value));
-            roles.set(row.id, row.value.common?.role);
-            if (row.value.type === "state" && row.value.common?.write === false) {
-                READ_ONLY.add(row.id);
-            }
-        }
+  const watch = { writes: new Map(), peak: new Map(), unchanged: [], deleted: [], times: [], unchangedIndicators: [] };
+  const known = new Map();
+  const roles = new Map();
+  const states = new Map();
+  const content = obj => {
+    const { ts, from, user, ...rest } = obj;
+    return canonical(rest);
+  };
+  harness.on("objectChange", (id, obj) => {
+    if (!id.startsWith(NS)) {
+      return;
     }
-    return watch;
+    if (!obj) {
+      watch.deleted.push(id);
+      known.delete(id);
+      roles.delete(id);
+      return;
+    }
+    roles.set(id, obj.common?.role);
+    if (obj.type === "state" && obj.common?.write === false) {
+      READ_ONLY.add(id);
+    } else {
+      READ_ONLY.delete(id);
+    }
+    const now = content(obj);
+    if (obj.from === `system.adapter.${ADAPTER}.0`) {
+      const n = (watch.writes.get(id) ?? 0) + 1;
+      watch.writes.set(id, n);
+      watch.peak.set(id, Math.max(watch.peak.get(id) ?? 0, n));
+      watch.times.push([id, Date.now()]);
+      if (known.get(id) === now && !(n === 1 && INSTANCE_OBJECTS.has(id))) {
+        watch.unchanged.push(id);
+      }
+    }
+    known.set(id, now);
+  });
+  // Round 62: an indicator state (`indicator.*`) is written only on a change (read-only: compared in memory,
+  // writable: setStateChangedAsync) — a write that changes nothing is a finding. Compared is what js-controller
+  // 7.2.2 compares in setStateChangedAsync: val strictly, ack, q, c; an object value always counts as changed.
+  harness.on("stateChange", (id, state) => {
+    if (!id.startsWith(NS) || !state || state.from !== `system.adapter.${ADAPTER}.0`) {
+      return;
+    }
+    const now =
+      state.val !== null && typeof state.val === "object" ? null : canonical([state.val, state.ack, state.q, state.c]);
+    if (now !== null && states.get(id) === now && String(roles.get(id)).startsWith("indicator")) {
+      watch.unchangedIndicators.push(id);
+    }
+    states.set(id, now);
+  });
+  // Round 64: a restart the harness plays (playControllerRestarts) is a new start — the per-start counts begin again,
+  // the known object content stays (it is the database's).
+  watch.newStart = () => {
+    watch.writes.clear();
+    states.clear();
+  };
+  const list = await harness.objects.getObjectListAsync({ startkey: NS, endkey: `${NS}香` });
+  for (const row of list.rows) {
+    if (row.value) {
+      known.set(row.id, content(row.value));
+      roles.set(row.id, row.value.common?.role);
+      if (row.value.type === "state" && row.value.common?.write === false) {
+        READ_ONLY.add(row.id);
+      }
+    }
+  }
+  return watch;
 }
 
 /** Envelope of the OpenAPI device LIST (`/user/devices`): `data`. */
@@ -502,7 +508,6 @@ function startFakeLanDevice() {
   });
 }
 
-
 /** The fake cloud and the fake LAN light — up before the first start, for every suite of the run. */
 const FIXTURE_SERVERS = Promise.all([startFakeCloud(), startFakeLanDevice()]);
 
@@ -516,14 +521,14 @@ const FIXTURE_SERVERS = Promise.all([startFakeCloud(), startFakeLanDevice()]);
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function feedFixtures(harness) {
-    void harness;
-    const [, lan] = await FIXTURE_SERVERS;
-    // The LAN scan runs every 30 s; announcing repeatedly makes the first one land whenever the adapter's listen
-    // socket came up.
-    for (let i = 0; i < 12; i++) {
-        lan.announce();
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
+  void harness;
+  const [, lan] = await FIXTURE_SERVERS;
+  // The LAN scan runs every 30 s; announcing repeatedly makes the first one land whenever the adapter's listen
+  // socket came up.
+  for (let i = 0; i < 12; i++) {
+    lan.announce();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
 }
 
 /**
@@ -563,50 +568,52 @@ async function feedFixtures(harness) {
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function waitForAdapterWork(harness) {
-    // govee-smart, one signal per area — each written only after that area's cycle ran on THIS start (the seed
-    // writes objects, never values): the device rollup (`info.devicesTotal`, first written by the 20-second
-    // round after every device's marker was re-evaluated — its value is the number of device trees), the
-    // app group's member list (the account's group list, one round trip after the device list) and the
-    // gateway-backed sensor's battery (the App API list, the last source to answer).
-    const committed = fs.existsSync(INVENTORY) ? JSON.parse(fs.readFileSync(INVENTORY, "utf8")) : {};
-    const trees = Object.entries(committed).filter(
-        ([id, obj]) => id.startsWith(`${NS}devices.`) && obj.type === "device",
-    ).length;
-    const wanted = Object.keys(committed).filter(
-        (id) => /\.groups\.[^.]+\.info\.members$/.test(id) || /\.devices\.[^.]+\.sensor\.battery$/.test(id),
-    );
-    const deadline = Date.now() + 120000;
-    for (;;) {
-        const missing = [];
-        for (const id of wanted) {
-            const state = await harness.states.getState(id);
-            if (!state || state.val === undefined || state.val === null) missing.push(id);
-        }
-        const total = await harness.states.getState(`${NS}info.devicesTotal`);
-        if (!total || total.val !== trees) missing.push(`${NS}info.devicesTotal = ${trees}`);
-        if (missing.length === 0) break;
-        if (Date.now() > deadline) {
-            throw new Error(`no completed cycle — ${missing.length} signal(s) missing, e.g. ${missing.slice(0, 5).join(", ")}`);
-        }
-        await new Promise((resolve) => setTimeout(resolve, 250));
+  // govee-smart, one signal per area — each written only after that area's cycle ran on THIS start (the seed
+  // writes objects, never values): the device rollup (`info.devicesTotal`, first written by the 20-second
+  // round after every device's marker was re-evaluated — its value is the number of device trees), the
+  // app group's member list (the account's group list, one round trip after the device list) and the
+  // gateway-backed sensor's battery (the App API list, the last source to answer).
+  const committed = fs.existsSync(INVENTORY) ? JSON.parse(fs.readFileSync(INVENTORY, "utf8")) : {};
+  const trees = Object.entries(committed).filter(
+    ([id, obj]) => id.startsWith(`${NS}devices.`) && obj.type === "device",
+  ).length;
+  const wanted = Object.keys(committed).filter(
+    id => /\.groups\.[^.]+\.info\.members$/.test(id) || /\.devices\.[^.]+\.sensor\.battery$/.test(id),
+  );
+  const deadline = Date.now() + 120000;
+  for (;;) {
+    const missing = [];
+    for (const id of wanted) {
+      const state = await harness.states.getState(id);
+      if (!state || state.val === undefined || state.val === null) missing.push(id);
     }
-    // Then the tree must be at REST: a scene answer that lands late fills `common.states` of an object that
-    // already exists, so the check reads content, not a count.
-    let previous = "";
-    let stable = 0;
-    for (let i = 0; i < 120 && stable < 5; i++) {
-        const rows = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` })).rows;
-        const signature = rows
-            .map((r) => `${r.id}:${Object.keys(r.value?.common?.states ?? {}).length}`)
-            .sort()
-            .join("|");
-        stable = signature === previous ? stable + 1 : 0;
-        previous = signature;
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+    const total = await harness.states.getState(`${NS}info.devicesTotal`);
+    if (!total || total.val !== trees) missing.push(`${NS}info.devicesTotal = ${trees}`);
+    if (missing.length === 0) break;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `no completed cycle — ${missing.length} signal(s) missing, e.g. ${missing.slice(0, 5).join(", ")}`,
+      );
     }
-    if (stable < 5) {
-        throw new Error(`object tree never settled — still changing after 120 s (${previous.split("|").length} objects)`);
-    }
+    await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  // Then the tree must be at REST: a scene answer that lands late fills `common.states` of an object that
+  // already exists, so the check reads content, not a count.
+  let previous = "";
+  let stable = 0;
+  for (let i = 0; i < 120 && stable < 5; i++) {
+    const rows = (await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` })).rows;
+    const signature = rows
+      .map(r => `${r.id}:${Object.keys(r.value?.common?.states ?? {}).length}`)
+      .sort()
+      .join("|");
+    stable = signature === previous ? stable + 1 : 0;
+    previous = signature;
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  if (stable < 5) {
+    throw new Error(`object tree never settled — still changing after 120 s (${previous.split("|").length} objects)`);
+  }
 }
 
 /**
@@ -658,15 +665,15 @@ function hasTree(objects, entry) {
 }
 
 async function dumpObjects(harness) {
-    // The range starts at "<adapter>.0." — the instance root object itself is not part of the tree.
-    const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` });
-    const out = {};
-    for (const row of list.rows.sort((a, b) => a.id.localeCompare(b.id))) {
-        const obj = { ...row.value };
-        for (const key of VOLATILE) delete obj[key];
-        out[row.id] = obj;
-    }
-    return out;
+  // The range starts at "<adapter>.0." — the instance root object itself is not part of the tree.
+  const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` });
+  const out = {};
+  for (const row of list.rows.sort((a, b) => a.id.localeCompare(b.id))) {
+    const obj = { ...row.value };
+    for (const key of VOLATILE) delete obj[key];
+    out[row.id] = obj;
+  }
+  return out;
 }
 
 /**
@@ -676,9 +683,9 @@ async function dumpObjects(harness) {
  * @param {string} language an ioBroker language code
  */
 async function setSystemLanguage(harness, language) {
-    const config = await harness.objects.getObject("system.config");
-    config.common.language = language;
-    await harness.objects.setObject("system.config", config);
+  const config = await harness.objects.getObject("system.config");
+  config.common.language = language;
+  await harness.objects.setObject("system.config", config);
 }
 
 /**
@@ -688,13 +695,13 @@ async function setSystemLanguage(harness, language) {
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function dumpStates(harness) {
-    const keys = (await harness.states.getKeys(`${NS}*`)).sort();
-    const values = await harness.states.getStates(keys);
-    const out = {};
-    keys.forEach((key, i) => {
-        if (values[i]) out[key] = { val: values[i].val, ack: values[i].ack };
-    });
-    return out;
+  const keys = (await harness.states.getKeys(`${NS}*`)).sort();
+  const values = await harness.states.getStates(keys);
+  const out = {};
+  keys.forEach((key, i) => {
+    if (values[i]) out[key] = { val: values[i].val, ack: values[i].ack };
+  });
+  return out;
 }
 
 /**
@@ -711,18 +718,18 @@ async function dumpStates(harness) {
  * @param {Record<string, unknown>} native the instance's native for this start (FIXTURE_NATIVE, or one computed per run)
  */
 async function resetInstanceNative(harness, native = FIXTURE_NATIVE) {
-    const id = `system.adapter.${ADAPTER}.0`;
-    const instance = await harness.objects.getObjectAsync(id);
-    const stale = {};
-    for (const key of Object.keys(instance?.native ?? {})) {
-        if (!Object.hasOwn(native, key)) stale[key] = null;
-    }
-    await harness.changeAdapterConfig(ADAPTER, { native: { ...stale, ...native } });
-    const written = await harness.objects.getObjectAsync(id);
-    for (const [key, value] of Object.entries(native)) {
-        if (!written.encryptedNative?.includes(key)) written.native[key] = value;
-    }
-    await harness.objects.setObjectAsync(id, written);
+  const id = `system.adapter.${ADAPTER}.0`;
+  const instance = await harness.objects.getObjectAsync(id);
+  const stale = {};
+  for (const key of Object.keys(instance?.native ?? {})) {
+    if (!Object.hasOwn(native, key)) stale[key] = null;
+  }
+  await harness.changeAdapterConfig(ADAPTER, { native: { ...stale, ...native } });
+  const written = await harness.objects.getObjectAsync(id);
+  for (const [key, value] of Object.entries(native)) {
+    if (!written.encryptedNative?.includes(key)) written.native[key] = value;
+  }
+  await harness.objects.setObjectAsync(id, written);
 }
 
 /**
@@ -736,10 +743,10 @@ async function resetInstanceNative(harness, native = FIXTURE_NATIVE) {
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 function clearInstanceData(harness) {
-    if (typeof harness.testDir !== "string") {
-        throw new Error("the harness no longer carries testDir — clearInstanceData cannot find the instance data folder");
-    }
-    fs.rmSync(path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`), { recursive: true, force: true });
+  if (typeof harness.testDir !== "string") {
+    throw new Error("the harness no longer carries testDir — clearInstanceData cannot find the instance data folder");
+  }
+  fs.rmSync(path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`), { recursive: true, force: true });
 }
 
 /**
@@ -758,34 +765,53 @@ function clearInstanceData(harness) {
  * @param {...string} hooks the test hooks the suite starts the adapter with (as for adapterEnv)
  */
 function playControllerRestarts(harness, watch, ...hooks) {
-    const restarts = { count: 0, again: [], done: Promise.resolve() };
-    harness.on("objectChange", (id, obj) => {
-        if (id !== `system.adapter.${ADAPTER}.0` || obj?.from !== `system.adapter.${ADAPTER}.0` || !harness.isAdapterRunning()) {
-            return;
-        }
-        if (restarts.count > 0) {
-            restarts.again.push(Date.now());
-            return;
-        }
-        restarts.count++;
-        restarts.done = (async () => {
-            await withinDeadline(harness.stopAdapter(), STOP_DEADLINE_MS, "the adapter did not stop after it changed its instance object");
-            watch?.newStart();
-            // What the host does when the process exits: `alive` false (a start that still sees it true ends with
-            // ADAPTER_ALREADY_RUNNING, exit code 7), then the start after stopTimeout + 2.5 s.
-            await harness.states.setState(`system.adapter.${ADAPTER}.0.alive`, { val: false, ack: true, from: "system.host.testing" });
-            await new Promise((resolve) => setTimeout(resolve, RESTART_DELAY_MS));
-            // @iobroker/testing refuses a second start of one harness ("already been used"); the host starts the same
-            // instance again — reset the exit marker, and fail loudly should the harness no longer keep it there.
-            harness._adapterExit = undefined;
-            assert.ok(!harness.didAdapterStop(), "@iobroker/testing changed its exit marker — the restart play needs a new form");
-            await withinDeadline(harness.startAdapterAndWait(false, adapterEnv(...hooks)), START_DEADLINE_MS, "the adapter did not come back after the restart");
-        })();
-        // Awaited by the suite later — a wait before that (feedFixtures) fails first on an adapter that hangs in its stop,
-        // so a missed deadline is logged the moment it happens (and never counts as an unhandled rejection).
-        restarts.done.catch((err) => console.error(`restart play failed: ${err.message}`));
-    });
-    return restarts;
+  const restarts = { count: 0, again: [], done: Promise.resolve() };
+  harness.on("objectChange", (id, obj) => {
+    if (
+      id !== `system.adapter.${ADAPTER}.0` ||
+      obj?.from !== `system.adapter.${ADAPTER}.0` ||
+      !harness.isAdapterRunning()
+    ) {
+      return;
+    }
+    if (restarts.count > 0) {
+      restarts.again.push(Date.now());
+      return;
+    }
+    restarts.count++;
+    restarts.done = (async () => {
+      await withinDeadline(
+        harness.stopAdapter(),
+        STOP_DEADLINE_MS,
+        "the adapter did not stop after it changed its instance object",
+      );
+      watch?.newStart();
+      // What the host does when the process exits: `alive` false (a start that still sees it true ends with
+      // ADAPTER_ALREADY_RUNNING, exit code 7), then the start after stopTimeout + 2.5 s.
+      await harness.states.setState(`system.adapter.${ADAPTER}.0.alive`, {
+        val: false,
+        ack: true,
+        from: "system.host.testing",
+      });
+      await new Promise(resolve => setTimeout(resolve, RESTART_DELAY_MS));
+      // @iobroker/testing refuses a second start of one harness ("already been used"); the host starts the same
+      // instance again — reset the exit marker, and fail loudly should the harness no longer keep it there.
+      harness._adapterExit = undefined;
+      assert.ok(
+        !harness.didAdapterStop(),
+        "@iobroker/testing changed its exit marker — the restart play needs a new form",
+      );
+      await withinDeadline(
+        harness.startAdapterAndWait(false, adapterEnv(...hooks)),
+        START_DEADLINE_MS,
+        "the adapter did not come back after the restart",
+      );
+    })();
+    // Awaited by the suite later — a wait before that (feedFixtures) fails first on an adapter that hangs in its stop,
+    // so a missed deadline is logged the moment it happens (and never counts as an unhandled rejection).
+    restarts.done.catch(err => console.error(`restart play failed: ${err.message}`));
+  });
+  return restarts;
 }
 
 /**
@@ -796,15 +822,15 @@ function playControllerRestarts(harness, watch, ...hooks) {
  * @param {string} what what did not happen, in the failure message
  */
 async function withinDeadline(promise, ms, what) {
-    let timer;
-    const expired = new Promise((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error(`${what} (deadline ${ms} ms)`)), ms);
-    });
-    try {
-        return await Promise.race([promise, expired]);
-    } finally {
-        clearTimeout(timer);
-    }
+  let timer;
+  const expired = new Promise((_resolve, reject) => {
+    timer = setTimeout(() => reject(new Error(`${what} (deadline ${ms} ms)`)), ms);
+  });
+  try {
+    return await Promise.race([promise, expired]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** Round 64: the host's wait before it starts a stopped instance again (controller main.ts, `stopTimeout || 500` + 2.5 s). */
@@ -828,11 +854,13 @@ const RECORDING = "inventory-recording.0";
  * @param {Record<string, ioBroker.Object>} previous the previous release's inventory
  */
 async function seedPrevious(harness, previous) {
-    for (const [id, obj] of Object.entries(previous)) {
-        const common =
-            obj.type === "state" ? { ...obj.common, custom: { ...obj.common?.custom, [RECORDING]: { enabled: true, origin: id } } } : obj.common;
-        await harness.objects.setObjectAsync(id, { ...obj, common });
-    }
+  for (const [id, obj] of Object.entries(previous)) {
+    const common =
+      obj.type === "state"
+        ? { ...obj.common, custom: { ...obj.common?.custom, [RECORDING]: { enabled: true, origin: id } } }
+        : obj.common;
+    await harness.objects.setObjectAsync(id, { ...obj, common });
+  }
 }
 
 /** Round 67: the text a dump puts where the adapter stored a secret encrypted with its installation's secret. */
@@ -857,285 +885,303 @@ async function restoreMaskedSecrets(harness) {}
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
 async function maskedSecretsLeft(harness) {
-    const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` });
-    return list.rows.filter((row) => JSON.stringify(row.value).includes(ENCRYPTED_MARKER)).map((row) => row.id);
+  const list = await harness.objects.getObjectList({ startkey: NS, endkey: `${NS}香` });
+  return list.rows.filter(row => JSON.stringify(row.value).includes(ENCRYPTED_MARKER)).map(row => row.id);
 }
 
 tests.integration(ADAPTER_DIR, {
-    controllerVersion: "stable",
-    defineAdditionalTests({ suite }) {
-        suite("object inventory", getHarness => {
-            let harness;
-            let watch;
-            let restarts;
-            before(async function () {
-                this.timeout(120000);
-                harness = getHarness();
-                clearInstanceData(harness);
-                watch = await watchObjectWrites(harness);
-                await resetInstanceNative(harness);
-                await setSystemLanguage(harness, FIRST_LANGUAGE);
-                restarts = playControllerRestarts(harness, watch, HOOK);
-                await harness.startAdapterAndWait(false, adapterEnv(HOOK));
-                await feedFixtures(harness);
-                await restarts.done;
-                await waitForAdapterWork(harness);
-            });
+  controllerVersion: "stable",
+  defineAdditionalTests({ suite }) {
+    suite("object inventory", getHarness => {
+      let harness;
+      let watch;
+      let restarts;
+      before(async function () {
+        this.timeout(120000);
+        harness = getHarness();
+        clearInstanceData(harness);
+        watch = await watchObjectWrites(harness);
+        await resetInstanceNative(harness);
+        await setSystemLanguage(harness, FIRST_LANGUAGE);
+        restarts = playControllerRestarts(harness, watch, HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+        await feedFixtures(harness);
+        await restarts.done;
+        await waitForAdapterWork(harness);
+      });
 
-            it("writes test/objects.inventory.json", async function () {
-                this.timeout(30000);
-                const objects = await dumpObjects(harness);
-                assert.ok(Object.keys(objects).length > 0, "no objects created — fixtures did not reach the adapter");
-                // govee-smart: "not empty" passed on a run with 26 objects instead of 262 (the cloud never answered) —
-                // every fixture device must have reached the tree. The pseudo-devices Govee lists get none.
-                const missing = FIXTURE.devices
-                    .filter((d) => d.sku !== "SameModeGroup" && d.sku !== "BaseGroup")
-                    .filter((d) => !hasTree(objects, d))
-                    .map((d) => `${d.sku} ${d.device}`);
-                assert.deepStrictEqual(missing, [], `fixture devices missing from the object tree: ${missing.join(", ")}`);
-                fs.writeFileSync(INVENTORY, `${JSON.stringify(objects, null, 2)}\n`);
-            });
+      it("writes test/objects.inventory.json", async function () {
+        this.timeout(30000);
+        const objects = await dumpObjects(harness);
+        assert.ok(Object.keys(objects).length > 0, "no objects created — fixtures did not reach the adapter");
+        // govee-smart: "not empty" passed on a run with 26 objects instead of 262 (the cloud never answered) —
+        // every fixture device must have reached the tree. The pseudo-devices Govee lists get none.
+        const missing = FIXTURE.devices
+          .filter(d => d.sku !== "SameModeGroup" && d.sku !== "BaseGroup")
+          .filter(d => !hasTree(objects, d))
+          .map(d => `${d.sku} ${d.device}`);
+        assert.deepStrictEqual(missing, [], `fixture devices missing from the object tree: ${missing.join(", ")}`);
+        fs.writeFileSync(INVENTORY, `${JSON.stringify(objects, null, 2)}\n`);
+      });
 
-            it("writes test/states.inventory.json", async function () {
-                this.timeout(30000);
-                const states = await dumpStates(harness);
-                assert.ok(Object.keys(states).length > 0, "no states written — fixtures did not reach the adapter");
-                fs.writeFileSync(STATES_INVENTORY, `${JSON.stringify(states, null, 2)}\n`);
-            });
+      it("writes test/states.inventory.json", async function () {
+        this.timeout(30000);
+        const states = await dumpStates(harness);
+        assert.ok(Object.keys(states).length > 0, "no states written — fixtures did not reach the adapter");
+        fs.writeFileSync(STATES_INVENTORY, `${JSON.stringify(states, null, 2)}\n`);
+      });
 
-            it("writes no object more than MAX_OBJECT_WRITES times", function () {
-                const churn = [...watch.peak].filter(([, n]) => n > MAX_OBJECT_WRITES).map(([id, n]) => `${id} ×${n}`);
-                assert.deepStrictEqual(churn, [], `objects written more than ${MAX_OBJECT_WRITES} times in one start`);
-            });
+      it("writes no object more than MAX_OBJECT_WRITES times", function () {
+        const churn = [...watch.peak].filter(([, n]) => n > MAX_OBJECT_WRITES).map(([id, n]) => `${id} ×${n}`);
+        assert.deepStrictEqual(churn, [], `objects written more than ${MAX_OBJECT_WRITES} times in one start`);
+      });
 
-            it("rewrites no object unchanged", function () {
-                const idle = [...new Set(watch.unchanged)];
-                assert.deepStrictEqual(idle, [], `objects written without a change:\n${idle.join("\n")}`);
-            });
+      it("rewrites no object unchanged", function () {
+        const idle = [...new Set(watch.unchanged)];
+        assert.deepStrictEqual(idle, [], `objects written without a change:\n${idle.join("\n")}`);
+      });
 
-            it("rewrites no indicator state unchanged", function () {
-                const idle = [...new Set(watch.unchangedIndicators)];
-                assert.deepStrictEqual(idle, [], `indicator states written without a change:\n${idle.join("\n")}`);
-            });
+      it("rewrites no indicator state unchanged", function () {
+        const idle = [...new Set(watch.unchangedIndicators)];
+        assert.deepStrictEqual(idle, [], `indicator states written without a change:\n${idle.join("\n")}`);
+      });
 
-            it("restarts at most once for its own instance object", function () {
-                assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
-            });
+      it("restarts at most once for its own instance object", function () {
+        assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
+      });
+    });
+
+    // The same run once more in a second system language: a label that stays the same in both was never
+    // translated. A suite of its own — the harness starts an adapter only once per suite (a second
+    // startAdapterAndWait in the same suite never resolves), and every suite gets a fresh database.
+    suite("second system language", getHarness => {
+      let harness;
+      let restarts;
+      before(async function () {
+        this.timeout(120000);
+        harness = getHarness();
+        clearInstanceData(harness);
+        await resetInstanceNative(harness);
+        await setSystemLanguage(harness, SECOND_LANGUAGE);
+        restarts = playControllerRestarts(harness, null, HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+        await feedFixtures(harness);
+        await restarts.done;
+        await waitForAdapterWork(harness);
+      });
+
+      it("restarts at most once for its own instance object", function () {
+        assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
+      });
+
+      it("writes test/objects.inventory.de.json", async function () {
+        this.timeout(30000);
+        const objects = await dumpObjects(harness);
+        assert.ok(Object.keys(objects).length > 0, "no objects created — fixtures did not reach the adapter");
+        fs.writeFileSync(OBJECTS_SECOND_LANGUAGE, `${JSON.stringify(objects, null, 2)}\n`);
+      });
+    });
+
+    const previousFile = process.env.INVENTORY_PREVIOUS;
+    if (previousFile && fs.existsSync(previousFile)) {
+      suite("upgrade from the previous release", getHarness => {
+        let harness;
+        let watch;
+        let restarts;
+        let verdictAt;
+        let maskedLeft;
+        const previous = JSON.parse(fs.readFileSync(previousFile, "utf8"));
+        before(async function () {
+          this.timeout(120000);
+          harness = getHarness();
+          clearInstanceData(harness);
+          watch = await watchObjectWrites(harness);
+          // The harness registers its own before() (fresh DB) ahead of this one,
+          // so the seed survives and the adapter starts on top of the OLD objects.
+          await seedPrevious(harness, previous);
+          await restoreMaskedSecrets(harness);
+          maskedLeft = await maskedSecretsLeft(harness);
+          await resetInstanceNative(harness);
+          // The inventory was written in FIRST_LANGUAGE: labels an adapter localises itself (`states`)
+          // only compare in the same language.
+          await setSystemLanguage(harness, FIRST_LANGUAGE);
+          restarts = playControllerRestarts(harness, watch, HOOK);
+          await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+          await feedFixtures(harness);
+          // On the seeded set feedFixtures may return at once, or wait for a state this run writes
+          // itself; waitForAdapterWork adds the adapter's last start step either way.
+          await waitForAdapterWork(harness);
+          // A migration that wrote the instance object restarts the instance (round 64) — the verdict
+          // comes after the second start has done its work.
+          await restarts.done;
+          await waitForAdapterWork(harness);
+          verdictAt = Date.now();
+          fs.writeFileSync(
+            path.join(RESOURCE_DIR, "window.json"),
+            JSON.stringify({ start: verdictAt, end: verdictAt + SETTLE_MS }),
+          );
         });
 
-        // The same run once more in a second system language: a label that stays the same in both was never
-        // translated. A suite of its own — the harness starts an adapter only once per suite (a second
-        // startAdapterAndWait in the same suite never resolves), and every suite gets a fresh database.
-        suite("second system language", getHarness => {
-            let harness;
-            let restarts;
-            before(async function () {
-                this.timeout(120000);
-                harness = getHarness();
-                clearInstanceData(harness);
-                await resetInstanceNative(harness);
-                await setSystemLanguage(harness, SECOND_LANGUAGE);
-                restarts = playControllerRestarts(harness, null, HOOK);
-                await harness.startAdapterAndWait(false, adapterEnv(HOOK));
-                await feedFixtures(harness);
-                await restarts.done;
-                await waitForAdapterWork(harness);
-            });
-
-            it("restarts at most once for its own instance object", function () {
-                assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
-            });
-
-            it("writes test/objects.inventory.de.json", async function () {
-                this.timeout(30000);
-                const objects = await dumpObjects(harness);
-                assert.ok(Object.keys(objects).length > 0, "no objects created — fixtures did not reach the adapter");
-                fs.writeFileSync(OBJECTS_SECOND_LANGUAGE, `${JSON.stringify(objects, null, 2)}\n`);
-            });
+        it("every current object carries the current texts and roles", async function () {
+          this.timeout(30000);
+          const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
+          const live = await dumpObjects(harness);
+          const stale = [];
+          for (const [id, obj] of Object.entries(current)) {
+            const got = live[id];
+            if (!got) {
+              stale.push(`${id}: missing after upgrade`);
+              continue;
+            }
+            // Every field of `common`, not a chosen few: an adapter writes only what differs (round 61),
+            // so every changed field must reach an existing installation.
+            for (const f of new Set([...Object.keys(obj.common ?? {}), ...Object.keys(got.common ?? {})])) {
+              if (f === "custom") {
+                continue; // the user's recording — judged on its own below (round 64)
+              }
+              if (canonical(got.common?.[f]) !== canonical(obj.common?.[f])) {
+                stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
+              }
+            }
+            // The KIND of the object (state/channel/device/folder/meta) lives one level
+            // ABOVE `common`; `common.type` is the VALUE type (string/number/
+            // boolean) — something entirely different that merely shares the name. Without
+            // this comparison a type migration that never reaches an existing installation
+            // stays green: every text matches while every datapoint under the wrongly
+            // declared container is a repochecker E2001 (hueemu v1.17.0, `clients` from
+            // `meta` to `folder` — found on the live tree, by no gate).
+            if (got.type !== obj.type) {
+              stale.push(`${id}: type still ${JSON.stringify(got.type)}, want ${JSON.stringify(obj.type)}`);
+            }
+          }
+          assert.deepStrictEqual(stale, [], "objects an update did not reach:\n" + stale.join("\n"));
         });
 
-        const previousFile = process.env.INVENTORY_PREVIOUS;
-        if (previousFile && fs.existsSync(previousFile)) {
-            suite("upgrade from the previous release", getHarness => {
-                let harness;
-                let watch;
-                let restarts;
-                let verdictAt;
-                let maskedLeft;
-                const previous = JSON.parse(fs.readFileSync(previousFile, "utf8"));
-                before(async function () {
-                    this.timeout(120000);
-                    harness = getHarness();
-                    clearInstanceData(harness);
-                    watch = await watchObjectWrites(harness);
-                    // The harness registers its own before() (fresh DB) ahead of this one,
-                    // so the seed survives and the adapter starts on top of the OLD objects.
-                    await seedPrevious(harness, previous);
-                    await restoreMaskedSecrets(harness);
-                    maskedLeft = await maskedSecretsLeft(harness);
-                    await resetInstanceNative(harness);
-                    // The inventory was written in FIRST_LANGUAGE: labels an adapter localises itself (`states`)
-                    // only compare in the same language.
-                    await setSystemLanguage(harness, FIRST_LANGUAGE);
-                    restarts = playControllerRestarts(harness, watch, HOOK);
-                    await harness.startAdapterAndWait(false, adapterEnv(HOOK));
-                    await feedFixtures(harness);
-                    // On the seeded set feedFixtures may return at once, or wait for a state this run writes
-                    // itself; waitForAdapterWork adds the adapter's last start step either way.
-                    await waitForAdapterWork(harness);
-                    // A migration that wrote the instance object restarts the instance (round 64) — the verdict
-                    // comes after the second start has done its work.
-                    await restarts.done;
-                    await waitForAdapterWork(harness);
-                    verdictAt = Date.now();
-                    fs.writeFileSync(path.join(RESOURCE_DIR, "window.json"), JSON.stringify({ start: verdictAt, end: verdictAt + SETTLE_MS }));
-                });
+        it("objects the release removed are gone (no leftovers)", async function () {
+          this.timeout(30000);
+          const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
+          const live = await dumpObjects(harness);
+          const leftovers = Object.keys(previous).filter(id => !(id in current) && id in live);
+          assert.deepStrictEqual(leftovers, [], "leftover objects:\n" + leftovers.join("\n"));
+        });
 
-                it("every current object carries the current texts and roles", async function () {
-                    this.timeout(30000);
-                    const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
-                    const live = await dumpObjects(harness);
-                    const stale = [];
-                    for (const [id, obj] of Object.entries(current)) {
-                        const got = live[id];
-                        if (!got) { stale.push(`${id}: missing after upgrade`); continue; }
-                        // Every field of `common`, not a chosen few: an adapter writes only what differs (round 61),
-                        // so every changed field must reach an existing installation.
-                        for (const f of new Set([...Object.keys(obj.common ?? {}), ...Object.keys(got.common ?? {})])) {
-                            if (f === "custom") {
-                                continue; // the user's recording — judged on its own below (round 64)
-                            }
-                            if (canonical(got.common?.[f]) !== canonical(obj.common?.[f])) {
-                                stale.push(`${id}: ${f} still ${JSON.stringify(got.common?.[f])}`);
-                            }
-                        }
-                        // The KIND of the object (state/channel/device/folder/meta) lives one level
-                        // ABOVE `common`; `common.type` is the VALUE type (string/number/
-                        // boolean) — something entirely different that merely shares the name. Without
-                        // this comparison a type migration that never reaches an existing installation
-                        // stays green: every text matches while every datapoint under the wrongly
-                        // declared container is a repochecker E2001 (hueemu v1.17.0, `clients` from
-                        // `meta` to `folder` — found on the live tree, by no gate).
-                        if (got.type !== obj.type) {
-                            stale.push(`${id}: type still ${JSON.stringify(got.type)}, want ${JSON.stringify(obj.type)}`);
-                        }
-                    }
-                    assert.deepStrictEqual(stale, [], "objects an update did not reach:\n" + stale.join("\n"));
-                });
+        it("rewrites no object unchanged", function () {
+          const idle = [...new Set(watch.unchanged)];
+          assert.deepStrictEqual(idle, [], `objects written without a change:\n${idle.join("\n")}`);
+        });
 
-                it("objects the release removed are gone (no leftovers)", async function () {
-                    this.timeout(30000);
-                    const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
-                    const live = await dumpObjects(harness);
-                    const leftovers = Object.keys(previous).filter(id => !(id in current) && id in live);
-                    assert.deepStrictEqual(leftovers, [], "leftover objects:\n" + leftovers.join("\n"));
-                });
+        it("rewrites no indicator state unchanged", function () {
+          const idle = [...new Set(watch.unchangedIndicators)];
+          assert.deepStrictEqual(idle, [], `indicator states written without a change:\n${idle.join("\n")}`);
+        });
 
-                it("rewrites no object unchanged", function () {
-                    const idle = [...new Set(watch.unchanged)];
-                    assert.deepStrictEqual(idle, [], `objects written without a change:\n${idle.join("\n")}`);
-                });
+        // A kept object that is deleted and created anew makes the suite judge a fresh object, not the
+        // upgraded one (hassemu v1.43.1: the stale cleanup removed 18 seeded clients before the dump).
+        it("deletes no object the release keeps", function () {
+          const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
+          const lost = [...new Set(watch.deleted)].filter(id => id in previous && id in current);
+          assert.deepStrictEqual(lost, [], `kept objects deleted during the upgrade:\n${lost.join("\n")}`);
+        });
 
-                it("rewrites no indicator state unchanged", function () {
-                    const idle = [...new Set(watch.unchangedIndicators)];
-                    assert.deepStrictEqual(idle, [], `indicator states written without a change:\n${idle.join("\n")}`);
-                });
+        it("starts on no masked secret from the previous dump", function () {
+          assert.deepStrictEqual(
+            maskedLeft,
+            [],
+            `seeded objects still carry ${ENCRYPTED_MARKER}:\n${maskedLeft.join("\n")}`,
+          );
+        });
 
-                // A kept object that is deleted and created anew makes the suite judge a fresh object, not the
-                // upgraded one (hassemu v1.43.1: the stale cleanup removed 18 seeded clients before the dump).
-                it("deletes no object the release keeps", function () {
-                    const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
-                    const lost = [...new Set(watch.deleted)].filter((id) => id in previous && id in current);
-                    assert.deepStrictEqual(lost, [], `kept objects deleted during the upgrade:\n${lost.join("\n")}`);
-                });
+        it("a recording goes on only with its own datapoint", async function () {
+          this.timeout(30000);
+          const live = await dumpObjects(harness);
+          const carriers = new Map();
+          for (const [id, obj] of Object.entries(live)) {
+            const origin = obj.common?.custom?.[RECORDING]?.origin;
+            if (origin) {
+              carriers.set(origin, [...(carriers.get(origin) ?? []), id]);
+            }
+          }
+          const wrong = [];
+          for (const [origin, ids] of carriers) {
+            if (ids.length > 1) {
+              wrong.push(`${origin} → ${ids.join(", ")}: one recording on several datapoints`);
+            } else if (ids[0] !== origin && origin in live) {
+              wrong.push(`${origin} → ${ids[0]}: copied while ${origin} lives on`);
+            } else if (ids[0] !== origin && live[ids[0]].common?.type !== previous[origin]?.common?.type) {
+              wrong.push(`${origin} → ${ids[0]}: another value type — a new datapoint, not the same one moved`);
+            }
+          }
+          // A state that lives on keeps what hangs on it — the recording is the user's, never destroyed.
+          for (const [id, obj] of Object.entries(previous)) {
+            if (obj.type === "state" && live[id]?.type === "state" && !carriers.get(id)?.includes(id)) {
+              wrong.push(`${id}: its recording is gone although the datapoint lives on`);
+            }
+          }
+          // A state the release moves under a new id (MOVES) takes its recording along (krobi 2026-09-02).
+          for (const [from, to] of Object.entries(MOVES)) {
+            if (previous[from]?.type === "state" && !carriers.get(from)?.includes(to)) {
+              wrong.push(`${from} → ${to}: its recording did not move with the datapoint`);
+            }
+          }
+          assert.deepStrictEqual(wrong, [], `recordings that left their datapoint:\n${wrong.join("\n")}`);
+        });
 
-                it("starts on no masked secret from the previous dump", function () {
-                    assert.deepStrictEqual(maskedLeft, [], `seeded objects still carry ${ENCRYPTED_MARKER}:\n${maskedLeft.join("\n")}`);
-                });
+        // What a fresh installation does not have, an upgrade must not have either — whatever made it (round 64:
+        // a datapoint created because the old one was recorded is exactly that).
+        it("creates nothing a fresh installation lacks", async function () {
+          this.timeout(30000);
+          const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
+          const live = await dumpObjects(harness);
+          const extra = Object.keys(live).filter(id => !(id in current));
+          assert.deepStrictEqual(extra, [], `objects a fresh installation does not have:\n${extra.join("\n")}`);
+        });
 
-                it("a recording goes on only with its own datapoint", async function () {
-                    this.timeout(30000);
-                    const live = await dumpObjects(harness);
-                    const carriers = new Map();
-                    for (const [id, obj] of Object.entries(live)) {
-                        const origin = obj.common?.custom?.[RECORDING]?.origin;
-                        if (origin) {
-                            carriers.set(origin, [...(carriers.get(origin) ?? []), id]);
-                        }
-                    }
-                    const wrong = [];
-                    for (const [origin, ids] of carriers) {
-                        if (ids.length > 1) {
-                            wrong.push(`${origin} → ${ids.join(", ")}: one recording on several datapoints`);
-                        } else if (ids[0] !== origin && origin in live) {
-                            wrong.push(`${origin} → ${ids[0]}: copied while ${origin} lives on`);
-                        } else if (ids[0] !== origin && live[ids[0]].common?.type !== previous[origin]?.common?.type) {
-                            wrong.push(`${origin} → ${ids[0]}: another value type — a new datapoint, not the same one moved`);
-                        }
-                    }
-                    // A state that lives on keeps what hangs on it — the recording is the user's, never destroyed.
-                    for (const [id, obj] of Object.entries(previous)) {
-                        if (obj.type === "state" && live[id]?.type === "state" && !carriers.get(id)?.includes(id)) {
-                            wrong.push(`${id}: its recording is gone although the datapoint lives on`);
-                        }
-                    }
-                    // A state the release moves under a new id (MOVES) takes its recording along (krobi 2026-09-02).
-                    for (const [from, to] of Object.entries(MOVES)) {
-                        if (previous[from]?.type === "state" && !carriers.get(from)?.includes(to)) {
-                            wrong.push(`${from} → ${to}: its recording did not move with the datapoint`);
-                        }
-                    }
-                    assert.deepStrictEqual(wrong, [], `recordings that left their datapoint:\n${wrong.join("\n")}`);
-                });
+        it("restarts at most once for its own instance object", function () {
+          assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
+        });
 
-                // What a fresh installation does not have, an upgrade must not have either — whatever made it (round 64:
-                // a datapoint created because the old one was recorded is exactly that).
-                it("creates nothing a fresh installation lacks", async function () {
-                    this.timeout(30000);
-                    const current = JSON.parse(fs.readFileSync(INVENTORY, "utf8"));
-                    const live = await dumpObjects(harness);
-                    const extra = Object.keys(live).filter((id) => !(id in current));
-                    assert.deepStrictEqual(extra, [], `objects a fresh installation does not have:\n${extra.join("\n")}`);
-                });
-
-                it("restarts at most once for its own instance object", function () {
-                    assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
-                });
-
-                // Last in the suite: a write after the verdict means waitForAdapterWork ended before the adapter did.
-                it("writes nothing after the verdict", async function () {
-                    this.timeout(SETTLE_MS + 5000);
-                    await new Promise((resolve) => setTimeout(resolve, Math.max(0, verdictAt + SETTLE_MS - Date.now())));
-                    const late = [...new Set(watch.times.filter(([, t]) => t > verdictAt).map(([id]) => id))];
-                    assert.deepStrictEqual(late, [], `objects written after the verdict:\n${late.join("\n")}`);
-                });
-            });
-        }
-    },
+        // Last in the suite: a write after the verdict means waitForAdapterWork ended before the adapter did.
+        it("writes nothing after the verdict", async function () {
+          this.timeout(SETTLE_MS + 5000);
+          await new Promise(resolve => setTimeout(resolve, Math.max(0, verdictAt + SETTLE_MS - Date.now())));
+          const late = [...new Set(watch.times.filter(([, t]) => t > verdictAt).map(([id]) => id))];
+          assert.deepStrictEqual(late, [], `objects written after the verdict:\n${late.join("\n")}`);
+        });
+      });
+    }
+  },
 });
 
 // govee-smart: the fake cloud and LAN light end with the run.
 after(async function () {
-    const [cloud, lan] = await FIXTURE_SERVERS;
-    cloud.close();
-    lan.socket.close();
+  const [cloud, lan] = await FIXTURE_SERVERS;
+  cloud.close();
+  lan.socket.close();
 });
 
 // Round 62: after every suite, every adapter process of this run has exited — what it left open after onUnload fails
 // the run. Every start leaves a marker: no marker means a start without adapterEnv(), a marker without a report a
 // process that never reached its exit (killed after a hanging onUnload, or crashed).
 after(function () {
-    const files = fs.readdirSync(RESOURCE_DIR);
-    const starts = files.filter((f) => f.endsWith(".start")).map((f) => f.slice(0, -".start".length));
-    const silent = starts.filter((pid) => !files.includes(`${pid}.json`));
-    const reports = starts
-        .filter((pid) => !silent.includes(pid))
-        .map((pid) => JSON.parse(fs.readFileSync(path.join(RESOURCE_DIR, `${pid}.json`), "utf8")));
-    const left = reports.flatMap((r) => r.left);
-    const reread = reports.flatMap((r) => Object.entries(r.quiet).filter(([id]) => READ_ONLY.has(id)).map(([id, n]) => `${id} ×${n}`));
-    fs.rmSync(RESOURCE_DIR, { recursive: true, force: true });
-    assert.ok(starts.length > 0, "no adapter start loaded the resource probe — a start without adapterEnv()");
-    assert.deepStrictEqual(silent, [], "adapter processes that never reached their exit (killed or crashed)");
-    assert.deepStrictEqual(left, [], `left open after onUnload:\n${left.join("\n")}`);
-    assert.deepStrictEqual(reread, [], `read-only states read back from the database while nothing changed:\n${reread.join("\n")}`);
+  const files = fs.readdirSync(RESOURCE_DIR);
+  const starts = files.filter(f => f.endsWith(".start")).map(f => f.slice(0, -".start".length));
+  const silent = starts.filter(pid => !files.includes(`${pid}.json`));
+  const reports = starts
+    .filter(pid => !silent.includes(pid))
+    .map(pid => JSON.parse(fs.readFileSync(path.join(RESOURCE_DIR, `${pid}.json`), "utf8")));
+  const left = reports.flatMap(r => r.left);
+  const reread = reports.flatMap(r =>
+    Object.entries(r.quiet)
+      .filter(([id]) => READ_ONLY.has(id))
+      .map(([id, n]) => `${id} ×${n}`),
+  );
+  fs.rmSync(RESOURCE_DIR, { recursive: true, force: true });
+  assert.ok(starts.length > 0, "no adapter start loaded the resource probe — a start without adapterEnv()");
+  assert.deepStrictEqual(silent, [], "adapter processes that never reached their exit (killed or crashed)");
+  assert.deepStrictEqual(left, [], `left open after onUnload:\n${left.join("\n")}`);
+  assert.deepStrictEqual(
+    reread,
+    [],
+    `read-only states read back from the database while nothing changed:\n${reread.join("\n")}`,
+  );
 });
