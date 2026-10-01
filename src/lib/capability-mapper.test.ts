@@ -851,6 +851,40 @@ describe("CapabilityMapper", () => {
       expect(result[2].type).toBe("boolean");
     });
 
+    it("music_setting: the state answer's mode VALUE reaches the dropdown as its POSITION (audit DRY-7)", () => {
+      // 0-based list: Govee's 1 is Sprouting — the second entry, key "2". Until 3.0.2 the
+      // value itself was written and the dropdown showed Rhythm.
+      const declared: CloudCapability[] = [
+        {
+          type: "devices.capabilities.music_setting",
+          instance: "musicMode",
+          parameters: {
+            dataType: "STRUCT",
+            fields: [
+              {
+                fieldName: "musicMode",
+                dataType: "ENUM",
+                options: [
+                  { name: "Rhythm", value: 0 },
+                  { name: "Sprouting", value: 1 },
+                  { name: "Shiny", value: 2 },
+                ],
+              },
+            ],
+          },
+        },
+      ];
+      const answer = (musicMode: unknown): CloudStateCapability => ({
+        type: "devices.capabilities.music_setting",
+        instance: "musicMode",
+        state: { value: { musicMode } },
+      });
+      expect(mapCloudStateValues(answer(1), declared)).toEqual([{ stateId: "music_mode", value: "2" }]);
+      expect(mapCloudStateValues(answer(0), declared)).toEqual([{ stateId: "music_mode", value: "1" }]);
+      expect(mapCloudStateValues(answer(9), declared), "a mode the device never declared").toEqual([]);
+      expect(mapCloudStateValues(answer(1)), "without the declared list there is no position").toEqual([]);
+    });
+
     it("music_setting: 0-based option values keep the '---' sentinel (A1)", () => {
       // h612f-class SKU: options start at value 0. The old value-keyed scheme
       // let the value-0 option overwrite modeStates["0"] = "---", so the sentinel
@@ -2410,17 +2444,18 @@ describe("CapabilityMapper", () => {
         };
         const result = mapCloudStateValue(cap);
         expect(result!.stateId).toBe("music_mode");
-        expect(result!.value).toBe("7");
+        expect(result!.value).toBe(7);
       });
 
-      it("should default music_setting to '0' when musicMode is garbage", () => {
-        const cap: CloudStateCapability = {
-          type: "devices.capabilities.music_setting",
-          instance: "musicMode",
-          state: { value: { musicMode: "abc" } },
-        };
-        const result = mapCloudStateValue(cap);
-        expect(result!.value).toBe("0");
+      it("a garbage or empty musicMode is no statement — nothing is written", () => {
+        for (const musicMode of ["abc", ""]) {
+          const cap: CloudStateCapability = {
+            type: "devices.capabilities.music_setting",
+            instance: "musicMode",
+            state: { value: { musicMode } },
+          };
+          expect(mapCloudStateValue(cap), JSON.stringify(musicMode)).toBeNull();
+        }
       });
 
       it("should coerce colorRgb numeric-string to hex", () => {

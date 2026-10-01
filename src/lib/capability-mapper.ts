@@ -1728,17 +1728,13 @@ export function mapCloudStateValue(cap: CloudStateCapability): CloudStateValue |
       return { stateId: canonicalSyntheticId(cap.instance), value, channel: "events" };
     }
 
-    case "music_setting":
-      // Extract mode value from STRUCT state
-      if (typeof raw === "object" && raw !== null) {
-        const struct = raw as Record<string, unknown>;
-        const mode = coerceNum(struct.musicMode);
-        return {
-          stateId: "music_mode",
-          value: mode !== null ? String(mode) : "0",
-        };
-      }
-      return null;
+    case "music_setting": {
+      // Govee's mode VALUE from the STRUCT; the dropdown key is its position in the
+      // declared list, which only mapCloudStateValues can look up (audit DRY-7).
+      const mode =
+        typeof raw === "object" && raw !== null ? coerceNum((raw as Record<string, unknown>).musicMode) : null;
+      return mode === null ? null : { stateId: "music_mode", value: mode };
+    }
 
     case "property": {
       const n = coerceNum(raw);
@@ -1864,6 +1860,14 @@ function cloudStateValuesOf(cap: CloudStateCapability, declared?: readonly Cloud
   const primary = mapCloudStateValue(cap);
   if (!primary) {
     return [];
+  }
+  if (primary.stateId === "music_mode") {
+    // The dropdown is keyed by position (mapMusicSetting: 1..N, 0 = "---"), Govee answers the
+    // mode's value — translated through the SAME getMusicModeOptions() list the send path uses.
+    // Until 3.0.2 the value itself was written: on a 0-based list Govee's 1 showed the first mode.
+    const own = declared?.find(c => c.type === cap.type && c.instance === cap.instance);
+    const index = own ? getMusicModeOptions(own).findIndex(o => coerceNum(o.value) === primary.value) : -1;
+    return index < 0 ? [] : [{ ...primary, value: String(index + 1) }];
   }
   if (primary.stateId === "target_temperature") {
     // The heater's STRUCT answer carries `autoStop` next to the temperature (C-O2).
