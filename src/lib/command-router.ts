@@ -16,7 +16,8 @@ export type HeldIntent =
   | { kind: "capability"; capabilityType: string; capabilityInstance: string; value: unknown };
 import { CloudControlRejected, type GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
-import { applySceneSpeed, lanColorTemperatureK } from "./govee-lan-client";
+import { lanColorTemperatureK } from "./govee-lan-client";
+import { applySceneSpeed } from "./ble-frame";
 import type { ConfigurableOverrideCommand, DeviceRegistry, TransportTarget } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { resolveSegmentCount } from "./device-manager/lookups";

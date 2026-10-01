@@ -1,0 +1,467 @@
+import {
+  buildScenePackets,
+  buildGradientPacket,
+  buildMusicModePacket,
+  buildDiyPackets,
+  buildSegmentBitmask,
+  buildSegmentColorPacket,
+  buildSegmentBrightnessPacket,
+  applySceneSpeed,
+  decodeBleFrame,
+} from "./ble-frame";
+
+describe("buildScenePackets", () => {
+  it("should build a single activation packet for scene code only", () => {
+    const packets = buildScenePackets(42, "");
+    expect(packets).toHaveLength(1);
+    // Decode the activation packet
+    const buf = Buffer.from(packets[0], "base64");
+    expect(buf).toHaveLength(20);
+    expect(buf[0]).toBe(0x33); // cmd
+    expect(buf[1]).toBe(0x05);
+    expect(buf[2]).toBe(0x04);
+    expect(buf[3]).toBe(42); // lo byte
+    expect(buf[4]).toBe(0); // hi byte
+    // Bytes 5-18 should be zero padding
+    for (let i = 5; i < 19; i++) {
+      expect(buf[i]).toBe(0);
+    }
+    // Last byte is XOR checksum
+    let xor = 0;
+    for (let i = 0; i < 19; i++) {
+      xor ^= buf[i];
+    }
+    expect(buf[19]).toBe(xor);
+  });
+
+  it("should encode scene code as little-endian 16-bit", () => {
+    const packets = buildScenePackets(0x1234, "");
+    const buf = Buffer.from(packets[0], "base64");
+    expect(buf[3]).toBe(0x34); // lo
+    expect(buf[4]).toBe(0x12); // hi
+  });
+
+  it("should include A3 data packets for scenceParam", () => {
+    // Small param: 5 bytes → fits in one A3 packet + activation
+    const param = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05]).toString("base64");
+    const packets = buildScenePackets(100, param);
+    expect(packets.length).toBeGreaterThan(1);
+    // Last packet is always the activation packet
+    const lastBuf = Buffer.from(packets[packets.length - 1], "base64");
+    expect(lastBuf[0]).toBe(0x33);
+    expect(lastBuf[1]).toBe(0x05);
+    expect(lastBuf[2]).toBe(0x04);
+    expect(lastBuf[3]).toBe(100); // lo
+    expect(lastBuf[4]).toBe(0); // hi
+    // First packet should start with A3 header
+    const firstBuf = Buffer.from(packets[0], "base64");
+    expect(firstBuf[0]).toBe(0xa3);
+  });
+
+  it("should produce 20-byte packets with valid XOR checksums", () => {
+    // Larger param data to produce multiple A3 packets
+    const bigParam = Buffer.alloc(40, 0xab).toString("base64");
+    const packets = buildScenePackets(500, bigParam);
+    for (const p of packets) {
+      const buf = Buffer.from(p, "base64");
+      expect(buf).toHaveLength(20);
+      // Verify XOR checksum
+      let xor = 0;
+      for (let i = 0; i < 19; i++) {
+        xor ^= buf[i];
+      }
+      expect(buf[19]).toBe(xor);
+    }
+  });
+
+  it("should handle empty scenceParam (scene code only)", () => {
+    const packets = buildScenePackets(1, "");
+    expect(packets).toHaveLength(1);
+  });
+});
+
+describe("buildGradientPacket", () => {
+  it("should build gradient ON packet", () => {
+    const buf = Buffer.from(buildGradientPacket(true), "base64");
+    expect(buf).toHaveLength(20);
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x14);
+    expect(buf[2]).toBe(0x01);
+    for (let i = 3; i < 19; i++) {
+      expect(buf[i]).toBe(0);
+    }
+  });
+
+  it("should build gradient OFF packet", () => {
+    const buf = Buffer.from(buildGradientPacket(false), "base64");
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x14);
+    expect(buf[2]).toBe(0x00);
+  });
+
+  it("should have valid XOR checksum", () => {
+    const buf = Buffer.from(buildGradientPacket(true), "base64");
+    let xor = 0;
+    for (let i = 0; i < 19; i++) {
+      xor ^= buf[i];
+    }
+    expect(buf[19]).toBe(xor);
+  });
+});
+
+describe("buildMusicModePacket", () => {
+  // Standard layout stays byte-identical: Spectrum/Rolling append RGB
+  // (includeRgb=true), Energic/Rhythm don't (includeRgb=false). This is the
+  // A2 no-regression proof — the caller passes includeRgb via the mode NAME.
+  it("should build Energic mode (0) without RGB", () => {
+    const buf = Buffer.from(buildMusicModePacket(0, false), "base64");
+    expect(buf).toHaveLength(20);
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x05);
+    expect(buf[2]).toBe(0x01);
+    expect(buf[3]).toBe(0x00);
+    for (let i = 4; i < 19; i++) {
+      expect(buf[i]).toBe(0);
+    }
+  });
+
+  it("should build Spectrum mode (1) with RGB", () => {
+    const buf = Buffer.from(buildMusicModePacket(1, true, 0xff, 0x80, 0x00), "base64");
+    expect(buf[3]).toBe(0x01);
+    expect(buf[4]).toBe(0xff);
+    expect(buf[5]).toBe(0x80);
+    expect(buf[6]).toBe(0x00);
+  });
+
+  it("should build Rolling mode (2) with RGB", () => {
+    const buf = Buffer.from(buildMusicModePacket(2, true, 0x10, 0x20, 0x30), "base64");
+    expect(buf[3]).toBe(0x02);
+    expect(buf[4]).toBe(0x10);
+    expect(buf[5]).toBe(0x20);
+    expect(buf[6]).toBe(0x30);
+  });
+
+  it("should build Rhythm mode (3) without RGB", () => {
+    const buf = Buffer.from(buildMusicModePacket(3, false, 0xff, 0xff, 0xff), "base64");
+    expect(buf[3]).toBe(0x03);
+    expect(buf[4]).toBe(0x00);
+  });
+
+  it("gates RGB on includeRgb, not the sub-mode value (A2): a non-standard mode value still gets RGB", () => {
+    // A SKU whose Spectrum is at value 6 must still receive its colour.
+    const buf = Buffer.from(buildMusicModePacket(6, true, 0x11, 0x22, 0x33), "base64");
+    expect(buf[3]).toBe(0x06);
+    expect(buf[4]).toBe(0x11);
+    expect(buf[5]).toBe(0x22);
+    expect(buf[6]).toBe(0x33);
+  });
+
+  it("withholds RGB when includeRgb is false even for value 1 (no value-based leak)", () => {
+    const buf = Buffer.from(buildMusicModePacket(1, false, 0xff, 0xff, 0xff), "base64");
+    expect(buf[3]).toBe(0x01);
+    expect(buf[4]).toBe(0x00); // no RGB appended
+  });
+
+  it("should have valid XOR checksum", () => {
+    const buf = Buffer.from(buildMusicModePacket(1, true, 255, 0, 128), "base64");
+    let xor = 0;
+    for (let i = 0; i < 19; i++) {
+      xor ^= buf[i];
+    }
+    expect(buf[19]).toBe(xor);
+  });
+});
+
+describe("buildDiyPackets", () => {
+  it("should build activation-only packet when no param data", () => {
+    const packets = buildDiyPackets("");
+    expect(packets).toHaveLength(1);
+    const buf = Buffer.from(packets[0], "base64");
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x05);
+    expect(buf[2]).toBe(0x0a);
+  });
+
+  it("should include A1 data packets for scenceParam", () => {
+    const param = Buffer.from([0x01, 0x02, 0x03, 0x04, 0x05]).toString("base64");
+    const packets = buildDiyPackets(param);
+    expect(packets.length).toBeGreaterThan(1);
+    const firstBuf = Buffer.from(packets[0], "base64");
+    expect(firstBuf[0]).toBe(0xa1);
+    const lastBuf = Buffer.from(packets[packets.length - 1], "base64");
+    expect(lastBuf[0]).toBe(0x33);
+    expect(lastBuf[1]).toBe(0x05);
+    expect(lastBuf[2]).toBe(0x0a);
+  });
+
+  it("should produce 20-byte packets with valid checksums", () => {
+    const bigParam = Buffer.alloc(30, 0xcd).toString("base64");
+    const packets = buildDiyPackets(bigParam);
+    for (const p of packets) {
+      const buf = Buffer.from(p, "base64");
+      expect(buf).toHaveLength(20);
+      let xor = 0;
+      for (let i = 0; i < 19; i++) {
+        xor ^= buf[i];
+      }
+      expect(buf[19]).toBe(xor);
+    }
+  });
+
+  it("preserves the A1-02 prefix on the continuation line (M1: no off-by-one)", () => {
+    const bigParam = Buffer.alloc(30, 0xcd).toString("base64"); // >15 bytes → forces a continuation line
+    const packets = buildDiyPackets(bigParam);
+    // packets = [data0, data1(continuation), activation]. The continuation line
+    // must start A1 02 FF — the off-by-one clobbered the mandatory 0x02.
+    const cont = Buffer.from(packets[1], "base64");
+    expect([cont[0], cont[1], cont[2]]).toEqual([0xa1, 0x02, 0xff]);
+  });
+});
+
+// Byte-golden master for the A3/A1 packet framing — pins the exact base64
+// output so a DRY refactor of buildScenePackets/buildDiyPackets is provably
+// byte-identical. The structural tests above check headers/checksums; these
+// lock every byte, including the multi-packet continuation where numLines
+// increments and lastLineMarker moves (the subtle off-by-one spot).
+describe("A-frame packet framing (byte-golden)", () => {
+  const small = Buffer.from([1, 2, 3, 4, 5]).toString("base64"); // 5B → single data chunk
+  const big = Buffer.from(Array.from({ length: 40 }, (_, i) => i)).toString("base64"); // 40B → crosses the 19-byte boundary twice
+
+  it("buildScenePackets: empty / single / multi-packet are byte-exact", () => {
+    expect(buildScenePackets(42, "")).toEqual(["MwUEKgAAAAAAAAAAAAAAAAAAABg="]);
+    expect(buildScenePackets(100, small)).toEqual(["o/8BAQIBAgMEBQAAAAAAAAAAAF8=", "MwUEZAAAAAAAAAAAAAAAAAAAAFY="]);
+    expect(buildScenePackets(500, big)).toEqual([
+      "owABAwIAAQIDBAUGBwgJCgsMDaI=",
+      "owEODxAREhMUFRYXGBkaGxwdHrw=",
+      "o/8fICEiIyQlJicAAAAAAAAAAEM=",
+      "MwUE9AEAAAAAAAAAAAAAAAAAAMc=",
+    ]);
+  });
+
+  it("buildDiyPackets: empty / single / multi-packet are byte-exact", () => {
+    expect(buildDiyPackets("")).toEqual(["MwUKAAAAAAAAAAAAAAAAAAAAADw="]);
+    expect(buildDiyPackets(small)).toEqual(["oQL/AQECAwQFAAAAAAAAAAAAAFw=", "MwUKAAAAAAAAAAAAAAAAAAAAADw="]);
+    expect(buildDiyPackets(big)).toEqual([
+      "oQIAAwABAgMEBQYHCAkKCwwNDq8=",
+      "oQIBDxAREhMUFRYXGBkaGxwdHrI=",
+      "oQL/HyAhIiMkJSYnAAAAAAAAAEM=",
+      "MwUKAAAAAAAAAAAAAAAAAAAAADw=",
+    ]);
+  });
+});
+
+describe("buildSegmentBitmask", () => {
+  it("should set bit 0 for segment 0", () => {
+    const mask = buildSegmentBitmask([0], 7);
+    expect(mask[0]).toBe(0x01);
+    for (let i = 1; i < 7; i++) {
+      expect(mask[i]).toBe(0);
+    }
+  });
+
+  it("should set bit 5 for segment 5", () => {
+    const mask = buildSegmentBitmask([5], 7);
+    expect(mask[0]).toBe(0x20);
+  });
+
+  it("should set bits across multiple bytes", () => {
+    const mask = buildSegmentBitmask([0, 8, 16], 7);
+    expect(mask[0]).toBe(0x01);
+    expect(mask[1]).toBe(0x01);
+    expect(mask[2]).toBe(0x01);
+  });
+
+  it("should handle multi-segment in same byte (3+4+5 = 0x38)", () => {
+    const mask = buildSegmentBitmask([3, 4, 5], 7);
+    expect(mask[0]).toBe(0x38);
+  });
+
+  it("should ignore segments beyond byte count", () => {
+    const mask = buildSegmentBitmask([56], 7);
+    for (let i = 0; i < 7; i++) {
+      expect(mask[i]).toBe(0);
+    }
+  });
+});
+
+describe("buildSegmentColorPacket", () => {
+  it("should build 20-byte packet with correct header", () => {
+    const buf = Buffer.from(buildSegmentColorPacket(0, 255, 0, [5]), "base64");
+    expect(buf).toHaveLength(20);
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x05);
+    expect(buf[2]).toBe(0x15);
+    expect(buf[3]).toBe(0x01);
+    expect(buf[4]).toBe(0);
+    expect(buf[5]).toBe(255);
+    expect(buf[6]).toBe(0);
+  });
+
+  it("should match verified test packet for segment 5 green", () => {
+    // Research: 33 05 15 01 00 ff 00 00 00 00 00 00 20 00 00 00 00 00 00 fd
+    const buf = Buffer.from(buildSegmentColorPacket(0, 0xff, 0, [5]), "base64");
+    expect(buf[12]).toBe(0x20);
+    expect(buf[19]).toBe(0xfd);
+  });
+
+  it("should match verified test packet for segments 3+4+5 blue", () => {
+    // Research: 33 05 15 01 00 00 ff 00 00 00 00 00 38 00 00 00 00 00 00 e5
+    const buf = Buffer.from(buildSegmentColorPacket(0, 0, 0xff, [3, 4, 5]), "base64");
+    expect(buf[12]).toBe(0x38);
+    expect(buf[19]).toBe(0xe5);
+  });
+
+  it("should handle high segment numbers (10+11+12)", () => {
+    // Research: 33 05 15 01 ff 00 00 00 00 00 00 00 00 1c 00 00 00 00 00 c1
+    const buf = Buffer.from(buildSegmentColorPacket(0xff, 0, 0, [10, 11, 12]), "base64");
+    expect(buf[13]).toBe(0x1c);
+    expect(buf[19]).toBe(0xc1);
+  });
+
+  it("should have valid XOR checksum", () => {
+    const buf = Buffer.from(buildSegmentColorPacket(128, 64, 32, [0, 7]), "base64");
+    let xor = 0;
+    for (let i = 0; i < 19; i++) {
+      xor ^= buf[i];
+    }
+    expect(buf[19]).toBe(xor);
+  });
+});
+
+describe("buildSegmentBrightnessPacket", () => {
+  it("should build 20-byte packet with correct header", () => {
+    const buf = Buffer.from(buildSegmentBrightnessPacket(30, [5]), "base64");
+    expect(buf).toHaveLength(20);
+    expect(buf[0]).toBe(0x33);
+    expect(buf[1]).toBe(0x05);
+    expect(buf[2]).toBe(0x15);
+    expect(buf[3]).toBe(0x02);
+    expect(buf[4]).toBe(30);
+  });
+
+  it("should match verified test packet for segment 5 brightness 30%", () => {
+    // Research: 33 05 15 02 1e 20 00 00 00 00 00 00 00 00 00 00 00 00 00 1f
+    const buf = Buffer.from(buildSegmentBrightnessPacket(30, [5]), "base64");
+    expect(buf[4]).toBe(0x1e);
+    expect(buf[5]).toBe(0x20);
+    expect(buf[19]).toBe(0x1f);
+  });
+
+  it("should clamp brightness to 0-100", () => {
+    const buf = Buffer.from(buildSegmentBrightnessPacket(150, [0]), "base64");
+    expect(buf[4]).toBe(100);
+  });
+
+  it("should have valid XOR checksum", () => {
+    const buf = Buffer.from(buildSegmentBrightnessPacket(50, [0, 1, 2]), "base64");
+    let xor = 0;
+    for (let i = 0; i < 19; i++) {
+      xor ^= buf[i];
+    }
+    expect(buf[19]).toBe(xor);
+  });
+});
+
+describe("applySceneSpeed", () => {
+  it("should replace speed byte at pageLength - 5", () => {
+    // 1 page, 26 bytes data. Speed byte at position 21 (26-5).
+    const pageData = new Array(26).fill(0);
+    pageData[21] = 255; // default speed
+    const param = Buffer.from([1, 26, ...pageData]).toString("base64");
+    const config = JSON.stringify([{ page: 0, defaultIndex: 1, moveIn: [242, 249, 254] }]);
+
+    const result = applySceneSpeed(param, 0, config);
+    const bytes = Array.from(Buffer.from(result, "base64"));
+    expect(bytes[2 + 21]).toBe(242); // moveIn[0]
+  });
+
+  it("should handle multiple pages with different configs", () => {
+    // 2 pages, each 10 bytes. Speed at position 5 (10-5).
+    const page0 = new Array(10).fill(0);
+    page0[5] = 200;
+    const page1 = new Array(10).fill(0);
+    page1[5] = 200;
+    const param = Buffer.from([2, 10, ...page0, 10, ...page1]).toString("base64");
+    const config = JSON.stringify([
+      { page: 0, moveIn: [100, 110] },
+      { page: 1, moveIn: [120, 130] },
+    ]);
+
+    const result = applySceneSpeed(param, 1, config);
+    const bytes = Array.from(Buffer.from(result, "base64"));
+    // Page 0: offset=1, data starts at 2, speed at 2+5=7
+    expect(bytes[7]).toBe(110); // moveIn[1] for page 0
+    // Page 1: offset=1+1+10=12, data starts at 13, speed at 13+5=18
+    expect(bytes[18]).toBe(130); // moveIn[1] for page 1
+  });
+
+  it("should return original param when no config matches", () => {
+    const pageData = new Array(10).fill(0xaa);
+    const param = Buffer.from([1, 10, ...pageData]).toString("base64");
+    const config = JSON.stringify([{ page: 5, moveIn: [100] }]); // page 5 doesn't exist
+
+    const result = applySceneSpeed(param, 0, config);
+    expect(result).toBe(param);
+  });
+
+  it("should return original param for empty config", () => {
+    const param = Buffer.from([1, 5, 0, 0, 0, 0, 0]).toString("base64");
+    expect(applySceneSpeed(param, 0, "")).toBe(param);
+    expect(applySceneSpeed(param, 0, "invalid")).toBe(param);
+    expect(applySceneSpeed(param, 0, "[]")).toBe(param);
+  });
+
+  it("should not modify when speedLevel exceeds moveIn range", () => {
+    const pageData = new Array(10).fill(0);
+    pageData[5] = 200;
+    const param = Buffer.from([1, 10, ...pageData]).toString("base64");
+    const config = JSON.stringify([{ page: 0, moveIn: [100, 110] }]);
+
+    const result = applySceneSpeed(param, 5, config); // level 5 > moveIn.length
+    const bytes = Array.from(Buffer.from(result, "base64"));
+    expect(bytes[7]).toBe(200); // unchanged
+  });
+});
+
+describe("decodeBleFrame — the one rule a received frame passes (audit DRY-8)", () => {
+  const frame = (bytes: number[]): string => Buffer.from(bytes).toString("base64");
+  const valid = (): number[] => {
+    const b = [0xaa, 0xa5, 0x01, ...new Array<number>(16).fill(0x10)];
+    return [...b, b.reduce((x, y) => x ^ y, 0)];
+  };
+
+  it("takes a 20-byte frame whose byte 19 is the XOR of bytes 0–18", () => {
+    expect(decodeBleFrame(frame(valid()))?.length).toBe(20);
+  });
+
+  it("rejects a wrong checksum", () => {
+    const b = valid();
+    b[19] ^= 0xff;
+    expect(decodeBleFrame(frame(b))).toBeNull();
+  });
+
+  it("rejects a frame of more than 20 bytes — the checksum sits in byte 19 of exactly 20", () => {
+    expect(decodeBleFrame(frame([...valid(), 0]))).toBeNull();
+  });
+
+  it("rejects a short frame and anything that is no text", () => {
+    expect(decodeBleFrame(frame(valid().slice(0, 19)))).toBeNull();
+    expect(decodeBleFrame(42)).toBeNull();
+    expect(decodeBleFrame("")).toBeNull();
+  });
+});
+
+describe("encoder byte bounds — one clamp rule (audit DRY-9)", () => {
+  const bytes = (b64: string): number[] => [...Buffer.from(b64, "base64")];
+
+  it("a colour channel outside 0–255 is clamped, not wrapped (256 used to send 0, 300 sent 44)", () => {
+    expect(bytes(buildSegmentColorPacket(300, -5, 128.6, [0])).slice(4, 7)).toEqual([255, 0, 129]);
+    expect(bytes(buildMusicModePacket(1, true, 256, 0, 0)).slice(4, 7)).toEqual([255, 0, 0]);
+  });
+
+  it("a segment brightness is rounded like the LAN brightness, and no number is 0", () => {
+    expect(bytes(buildSegmentBrightnessPacket(50.7, [0]))[4]).toBe(51);
+    expect(bytes(buildSegmentBrightnessPacket(Number.NaN, [0]))[4]).toBe(0);
+    expect(bytes(buildSegmentBrightnessPacket(140, [0]))[4]).toBe(100);
+  });
+});

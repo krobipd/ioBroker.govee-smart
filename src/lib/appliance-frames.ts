@@ -1,3 +1,4 @@
+import { decodeBleFrame } from "./ble-frame";
 import { GOVEE_CAP_TYPE } from "./govee-constants";
 import type { CapabilityOption, CloudStateCapability, GoveeDevice } from "./types";
 
@@ -14,18 +15,8 @@ interface Frame {
 }
 
 function parseFrame(raw: unknown): Frame | null {
-  if (typeof raw !== "string" || raw.length === 0) {
-    return null;
-  }
-  const bytes = Buffer.from(raw, "base64");
-  if (bytes.length !== 20 || bytes[0] !== 0xaa) {
-    return null;
-  }
-  let xor = 0;
-  for (let i = 0; i < 19; i++) {
-    xor ^= bytes[i];
-  }
-  if (xor !== bytes[19]) {
+  const bytes = decodeBleFrame(raw);
+  if (!bytes || bytes[0] !== 0xaa) {
     return null;
   }
   return { fn: bytes[1], sub: bytes[2], bytes };

@@ -113,6 +113,8 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a Govee e-mail or password of spaces only counts as not entered — at start, in the sensor hint and in the connection card's test
 - Fixed: the per-device refresh remembers that the scenes answered and settles a pending segment-count correction; devices that are no lights no longer spend Cloud calls on scene libraries
 - Fixed: a temperature reading carries °C whichever way it arrives — a model that declares Fahrenheit no longer flips the unit to °F (the value is always °C)
+- Fixed: a segment colour above 255 is sent as 255 — it wrapped to 0 before; a segment brightness is rounded like the light's brightness
+- Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
 - Improved: appliance modes and levels (Manual, Heat, Low, High, Auto, Keep temperature, Speed 1 …) and `info.type` are labelled in the system language; scripts may still write Govee's names such as `Auto` or `gearMode`
 
 ### 3.0.1 (2026-09-27)

@@ -1,3 +1,4 @@
+import { decodeBleFrame } from "../ble-frame";
 import { SEGMENT_HARD_MAX } from "../segment-list";
 import { normalizeDeviceId, type DeviceState, type GoveeDevice, type MqttStatusUpdate } from "../types";
 import { mapKey } from "../device-key";
@@ -88,21 +89,10 @@ export function parseMqttSegmentData(commands: string[]): ParsedMqttSegments {
       break;
     }
     scanned++;
-    if (typeof cmd !== "string") {
-      continue;
-    }
-    const bytes = Buffer.from(cmd, "base64");
-    if (bytes.length < 20) {
-      continue;
-    }
-    // M2 — XOR checksum validation. Govee BLE packets carry an XOR over bytes
-    // 0-18 in the last byte (index 19). Spoofed/malformed packets would
-    // otherwise slip through and persist a wrong segmentCount.
-    let xor = 0;
-    for (let i = 0; i < 19; i++) {
-      xor ^= bytes[i];
-    }
-    if (xor !== bytes[19]) {
+    // M2 — a frame with a wrong checksum or length is no frame: spoofed or
+    // malformed packets would otherwise persist a wrong segmentCount.
+    const bytes = decodeBleFrame(cmd);
+    if (!bytes) {
       continue;
     }
     frames.push(bytes);
@@ -486,12 +476,6 @@ export function plausibleSegmentIndices(list: unknown): number[] | undefined {
   ].sort((a, b) => a - b);
   return clean.length > 0 ? clean : undefined;
 }
-
-/** ptReal color-segment bitmask size (Govee protocol-fixed): one bit per segment, 56 segments → 7 bytes. */
-export const SEGMENT_COLOR_BITMASK_BYTES = 7;
-
-/** ptReal brightness-segment bitmask size (Govee protocol-fixed): twice the color width → 14 bytes. */
-export const SEGMENT_BRIGHTNESS_BITMASK_BYTES = 14;
 
 /**
  * Generate the stable runtime map key for a device — thin wrapper over

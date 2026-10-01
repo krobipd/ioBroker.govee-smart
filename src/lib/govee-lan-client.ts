@@ -2,12 +2,17 @@ import * as dgram from "node:dgram";
 import * as os from "node:os";
 import { errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
 import { clampByte } from "./color";
-import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import {
-  SEGMENT_BRIGHTNESS_BITMASK_BYTES,
-  SEGMENT_COLOR_BITMASK_BYTES,
-  SEGMENT_COUNT_MAX,
-} from "./device-manager/lookups";
+  buildScenePackets,
+  buildDiyPackets,
+  buildGradientPacket,
+  buildMusicModePacket,
+  buildSegmentColorPacket,
+  buildSegmentBrightnessPacket,
+  clampByte0_100,
+} from "./ble-frame";
+import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import { SEGMENT_COUNT_MAX } from "./device-manager/lookups";
 
 const MULTICAST_ADDR = "239.255.255.250";
 const SCAN_PORT = 4001;
@@ -58,6 +63,8 @@ export class GoveeLanClient {
    * fire into a half-torn-down adapter.
    */
   private sendSocket: dgram.Socket | null = null;
+  /** The last send failure per address — warned once, repeats on debug until a send succeeds. */
+  private readonly failedSends = new Map<string, string>();
   private scanTimer: ioBroker.Interval | undefined = undefined;
   /**
    * True after `stop()` was called — bind-callbacks check this flag before
@@ -392,9 +399,21 @@ export class GoveeLanClient {
     }
     this.sendSocket.send(buf, 0, buf.length, COMMAND_PORT, ip, err => {
       if (err) {
-        this.log.debug(`LAN send error to ${ip}: ${err.message}`);
+        // One send path, one rule (audit DRY-9): the first failure towards an
+        // address warns — a scene or snapshot that "did nothing" has a reason in
+        // the log —, a repeat of the same failure stays on debug until a send
+        // to that address succeeds again (an unplugged lamp is a state, not a
+        // line per command).
+        if (this.failedSends.get(ip) !== err.message) {
+          this.failedSends.set(ip, err.message);
+          this.log.warn(`LAN ${cmd} to ${ip} failed: ${err.message}`);
+        } else {
+          this.log.debug(`LAN ${cmd} to ${ip} failed again: ${err.message}`);
+        }
         this.onSend?.(ip, cmd, data, buf.length, err.message);
       } else {
+        this.failedSends.delete(ip);
+        this.log.debug(`LAN ${cmd} sent to ${ip}: ${buf.length} bytes`);
         this.lastCommandSentMs.set(ip, Date.now());
         this.onSend?.(ip, cmd, data, buf.length);
       }
@@ -479,35 +498,7 @@ export class GoveeLanClient {
    * @param base64Packets Array of Base64-encoded 20-byte BLE packets
    */
   sendPtReal(ip: string, base64Packets: string[]): void {
-    if (!this.sendSocket) {
-      this.log.debug(`LAN ptReal dropped (socket not ready): ${ip}`);
-      this.onSend?.(ip, "ptReal", { command: base64Packets }, 0, "socket not ready");
-      return;
-    }
-    const message = {
-      msg: { cmd: "ptReal", data: { command: base64Packets } },
-    };
-    const buf = Buffer.from(JSON.stringify(message));
-    if (buf.length > 1400) {
-      this.log.debug(`ptReal payload large (${buf.length} bytes) — may be PMTU-fragmented for ${ip}`);
-    }
-    this.sendSocket.send(buf, 0, buf.length, COMMAND_PORT, ip, err => {
-      if (err) {
-        // warn (was: debug) — a silent UDP-send failure leaves the user
-        // wondering why a scene/snapshot "did nothing". One log per failed
-        // send is acceptable noise; recurring sends to the same offline IP
-        // will repeat, which is the right signal.
-        this.log.warn(`LAN ptReal error to ${ip}: ${err.message}`);
-        this.onSend?.(ip, "ptReal", { command: base64Packets }, buf.length, err.message);
-      } else {
-        // Success on debug: confirms the UDP datagram left the socket so
-        // a "snapshot/scene did not activate" report can be triaged
-        // without enabling silly-level wire logging.
-        this.log.debug(`LAN ptReal sent to ${ip}: ${base64Packets.length} packet(s), ${buf.length} bytes`);
-        this.lastCommandSentMs.set(ip, Date.now());
-        this.onSend?.(ip, "ptReal", { command: base64Packets }, buf.length);
-      }
-    });
+    this.sendCommand(ip, "ptReal", { command: base64Packets });
   }
 
   /**
@@ -880,287 +871,6 @@ export function interfaceBroadcasts(
     }
   }
   return [...out];
-}
-
-function clampByte0_100(v: number): number {
-  if (typeof v !== "number" || !Number.isFinite(v)) {
-    return 0;
-  }
-  return Math.max(0, Math.min(100, Math.round(v)));
-}
-
-/**
- * XOR checksum over all bytes
- *
- * @param data Array of byte values
- */
-function xorChecksum(data: number[]): number {
-  let checksum = 0;
-  for (const b of data) {
-    checksum ^= b;
-  }
-  return checksum;
-}
-
-/**
- * Pad data to 19 bytes + append XOR checksum = 20-byte BLE packet
- *
- * @param data Array of byte values to pad and checksum
- */
-function finishPacket(data: number[]): number[] {
-  while (data.length < 19) {
-    data.push(0);
-  }
-  data.push(xorChecksum(data));
-  return data;
-}
-
-/**
- * Frame arbitrary payload bytes into 19-byte BLE packets using Govee's
- * line-continuation protocol, then base64 each. Scenes (A3) and DIY (A1) differ
- * only in the header bytes, the per-line continuation prefix, and which header
- * index the 0xff line-marker defaults to when the payload fits a single line —
- * the `% 19` chunking, the `rawData[3] = numLines + 1` count, and the chunk →
- * checksum → base64 tail are identical. Byte-locked by the
- * "A-frame packet framing (byte-golden)" test.
- *
- * @param paramBytes Decoded payload bytes
- * @param header Leading frame bytes (the line count is written at index 3)
- * @param contPrefix Bytes that open each continuation line (before its number)
- * @param initMarker Header index the 0xff marker defaults to for a single line
- */
-function buildAFramedPackets(
-  paramBytes: number[],
-  header: number[],
-  contPrefix: number[],
-  initMarker: number,
-): string[] {
-  const rawData: number[] = [...header];
-  let numLines = 0;
-  let lastLineMarker = initMarker;
-
-  for (const b of paramBytes) {
-    if (rawData.length % 19 === 0) {
-      numLines++;
-      rawData.push(...contPrefix);
-      lastLineMarker = rawData.length;
-      rawData.push(numLines);
-    }
-    rawData.push(b);
-  }
-  rawData[lastLineMarker] = 0xff;
-  rawData[3] = numLines + 1;
-
-  // Split into 19-byte chunks, pad + checksum each
-  const packets: string[] = [];
-  for (let i = 0; i < rawData.length; i += 19) {
-    packets.push(Buffer.from(finishPacket(rawData.slice(i, i + 19))).toString("base64"));
-  }
-  return packets;
-}
-
-/**
- * Build Base64-encoded BLE packets for scene activation via ptReal.
- *
- * @param sceneCode Scene code from library (> 0)
- * @param scenceParam Base64-encoded scene parameter data (may be empty)
- */
-export function buildScenePackets(sceneCode: number, scenceParam: string): string[] {
-  const packets: string[] = [];
-
-  // Multi-packet scene data (A3 framing: header A3 00 01 00 02, continuation A3)
-  if (scenceParam) {
-    const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    packets.push(...buildAFramedPackets(paramBytes, [0xa3, 0x00, 0x01, 0x00, 0x02], [0xa3], 1));
-  }
-
-  // Final scene-code activation packet: 33 05 04 lo hi
-  const lo = sceneCode & 0xff;
-  const hi = (sceneCode >> 8) & 0xff;
-  const activatePacket = finishPacket([0x33, 0x05, 0x04, lo, hi]);
-  packets.push(Buffer.from(activatePacket).toString("base64"));
-
-  return packets;
-}
-
-/**
- * Build Base64-encoded BLE packets for DIY scene activation via ptReal.
- * Uses A1 framing for multi-packet data, then sends activation command.
- *
- * @param scenceParam Base64-encoded DIY parameter data (may be empty)
- */
-export function buildDiyPackets(scenceParam: string): string[] {
-  const packets: string[] = [];
-
-  // Multi-packet DIY data (A1 framing: header A1 02 00 00, continuation A1 02)
-  if (scenceParam) {
-    const paramBytes = Array.from(Buffer.from(scenceParam, "base64"));
-    packets.push(...buildAFramedPackets(paramBytes, [0xa1, 0x02, 0x00, 0x00], [0xa1, 0x02], 2));
-  }
-
-  // Activation: 33 05 0A
-  packets.push(Buffer.from(finishPacket([0x33, 0x05, 0x0a])).toString("base64"));
-  return packets;
-}
-
-/**
- * Build a Base64-encoded BLE packet for gradient toggle via ptReal.
- *
- * @param on Gradient on/off
- */
-export function buildGradientPacket(on: boolean): string {
-  return Buffer.from(finishPacket([0x33, 0x14, on ? 0x01 : 0x00])).toString("base64");
-}
-
-/**
- * Build a Base64-encoded BLE packet for music mode via ptReal
- * (`33 05 01 <mode> [R G B]`).
- *
- * Whether RGB is appended is decided by the CALLER (via {@link
- * musicModeNameUsesRgb} on the mode name), not by the sub-mode value here:
- * Govee's music-mode values are SKU-specific, so a value-based gate would
- * append RGB on the wrong mode for a SKU whose Spectrum/Rolling isn't at the
- * usual value 1/2 (A1 proved mode values vary across the fleet).
- *
- * @param subMode Music sub-mode value sent to the device (raw capability value)
- * @param includeRgb Whether this mode carries a custom RGB colour (Spectrum/Rolling)
- * @param r Red channel 0-255
- * @param g Green channel 0-255
- * @param b Blue channel 0-255
- */
-export function buildMusicModePacket(subMode: number, includeRgb: boolean, r = 0, g = 0, b = 0): string {
-  const data = [0x33, 0x05, 0x01, subMode & 0xff];
-  if (includeRgb) {
-    data.push(r & 0xff, g & 0xff, b & 0xff);
-  }
-  return Buffer.from(finishPacket(data)).toString("base64");
-}
-
-/**
- * Build a little-endian segment bitmask.
- * Segment 0 = byte[0] bit 0, Segment 8 = byte[1] bit 0, etc.
- *
- * @param segments Array of 0-based segment indices
- * @param byteCount Number of bitmask bytes (7 for color, 14 for brightness)
- */
-export function buildSegmentBitmask(segments: number[], byteCount: number): number[] {
-  const mask = new Array<number>(byteCount).fill(0);
-  for (const seg of segments) {
-    const byteIdx = Math.floor(seg / 8);
-    const bitIdx = seg % 8;
-    if (byteIdx < byteCount) {
-      mask[byteIdx] |= 1 << bitIdx;
-    }
-  }
-  return mask;
-}
-
-/**
- * Build a Base64-encoded BLE packet for segment color via ptReal.
- * Command: 33 05 15 01 RR GG BB 00×5 bitmask×7
- *
- * @param r Red 0-255
- * @param g Green 0-255
- * @param b Blue 0-255
- * @param segments Array of 0-based segment indices
- */
-export function buildSegmentColorPacket(r: number, g: number, b: number, segments: number[]): string {
-  const data = [
-    0x33,
-    0x05,
-    0x15,
-    0x01,
-    r & 0xff,
-    g & 0xff,
-    b & 0xff,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    0x00,
-    ...buildSegmentBitmask(segments, SEGMENT_COLOR_BITMASK_BYTES),
-  ];
-  return Buffer.from(finishPacket(data)).toString("base64");
-}
-
-/**
- * Build a Base64-encoded BLE packet for segment brightness via ptReal.
- * Command: 33 05 15 02 BB bitmask×14
- *
- * @param brightness Brightness 0-100
- * @param segments Array of 0-based segment indices
- */
-export function buildSegmentBrightnessPacket(brightness: number, segments: number[]): string {
-  const data = [
-    0x33,
-    0x05,
-    0x15,
-    0x02,
-    Math.max(0, Math.min(100, brightness)),
-    ...buildSegmentBitmask(segments, SEGMENT_BRIGHTNESS_BITMASK_BYTES),
-  ];
-  return Buffer.from(finishPacket(data)).toString("base64");
-}
-
-/**
- * Apply speed level to a scene's scenceParam by replacing speed bytes in each page.
- * scenceParam structure: byte[0] = page count, then per page: 1 byte length + N bytes data.
- * Speed byte position within each page: pageLength - 5.
- *
- * @param scenceParam Base64-encoded scene parameter data
- * @param speedLevel Speed level index (0-based)
- * @param speedConfig JSON config string from speedInfo.config
- * @returns Modified Base64-encoded scenceParam with speed bytes replaced
- */
-export function applySceneSpeed(scenceParam: string, speedLevel: number, speedConfig: string): string {
-  if (!scenceParam || !speedConfig) {
-    return scenceParam;
-  }
-
-  let configEntries: Array<{
-    page: number;
-    moveIn?: number[];
-  }>;
-  try {
-    configEntries = JSON.parse(speedConfig);
-  } catch {
-    // Govee's speedInfo.config schema can drift — this is a pure helper
-    // without a logger, so a malformed config falls back silently: the
-    // un-modified scenceParam keeps the activation working at default
-    // speed instead of failing the whole scene command.
-    return scenceParam;
-  }
-
-  if (!Array.isArray(configEntries) || configEntries.length === 0) {
-    return scenceParam;
-  }
-
-  const bytes = Array.from(Buffer.from(scenceParam, "base64"));
-  if (bytes.length === 0) {
-    return scenceParam;
-  }
-
-  const pageCount = bytes[0];
-  let offset = 1;
-
-  for (let pageIdx = 0; pageIdx < pageCount && offset < bytes.length; pageIdx++) {
-    const pageLen = bytes[offset];
-    if (offset + 1 + pageLen > bytes.length) {
-      break;
-    }
-
-    const cfg = configEntries.find(c => c.page === pageIdx);
-    if (cfg?.moveIn && speedLevel >= 0 && speedLevel < cfg.moveIn.length) {
-      const speedBytePos = offset + 1 + (pageLen - 5);
-      if (speedBytePos > offset && speedBytePos < offset + 1 + pageLen) {
-        bytes[speedBytePos] = cfg.moveIn[speedLevel];
-      }
-    }
-
-    offset += 1 + pageLen;
-  }
-
-  return Buffer.from(bytes).toString("base64");
 }
 
 /**
