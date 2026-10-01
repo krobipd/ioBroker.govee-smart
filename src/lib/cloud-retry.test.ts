@@ -102,7 +102,7 @@ describe("CloudRetryLoop", () => {
         message: "HTTP 403",
       });
       expect(host.timers).toHaveLength(0);
-      // Told once by the actionable-problems registry, never by the loop (M7, 3.0.2).
+      // Told once by the actionable-problems registry, never by the loop (M7, 3.1.0).
       expect(host.lastWarn()).toBeUndefined();
       expect(host.lastDebug()).toContain("key rejected");
       // Stopped-for-good is observable behaviour: a later transient result
@@ -147,7 +147,7 @@ describe("CloudRetryLoop", () => {
       });
       expect(host.timers).toHaveLength(1);
       expect(host.timers[0].ms).toBe(30_000);
-      // The list failure warned once, naming the wait — the loop's line is debug (M7, 3.0.2).
+      // The list failure warned once, naming the wait — the loop's line is debug (M7, 3.1.0).
       expect(host.lastWarn()).toBeUndefined();
       expect(host.lastDebug()).toContain("30s");
     });

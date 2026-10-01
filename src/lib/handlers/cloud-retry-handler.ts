@@ -206,7 +206,7 @@ export function handleCloudFailure(adapter: CloudRetryHandlerAdapter, result: Cl
 
 /**
  * What every accepted Cloud device list sets right — the start, a restored connection and the manual sync alike:
- * a rejected key is resolved, the Cloud shows reachable, and the retry loop stands down. Until 3.0.2 the manual
+ * a rejected key is resolved, the Cloud shows reachable, and the retry loop stands down. Until 3.1.0 the manual
  * sync did none of it: after a failed start a successful sync left `info.cloudConnected` false and the armed retry
  * later logged "connection restored" (audit DRY-2).
  *

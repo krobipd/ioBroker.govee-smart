@@ -79,7 +79,7 @@ export function stateToCommand(suffix: string): string | null {
 }
 
 /**
- * What a written datapoint does to the mode dropdowns — the ONE rule for a device and a group (until 3.0.2 the
+ * What a written datapoint does to the mode dropdowns — the ONE rule for a device and a group (until 3.1.0 the
  * group reset only after a scene or music mode, so a group switched off or set to a colour kept showing its old
  * scene; audit DRY-4): power off resets every mode, a mode or a colour resets the other modes, the music
  * sensitivity and auto colour change no mode.

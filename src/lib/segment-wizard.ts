@@ -154,7 +154,7 @@ function hasSegmentCapability(device: GoveeDevice): boolean {
 
 /**
  * The result of a lit-segment map — the ONE rule for a measurement that ran to the protocol limit and for the
- * review-corrected map (until 3.0.2 the limit took the measured slot count, 56, and the review the highest lit
+ * review-corrected map (until 3.1.0 the limit took the measured slot count, 56, and the review the highest lit
  * index + 1; audit DRY-15). The strip ends at its highest lit segment: unlit slots beyond it are no segments.
  * Only indices the bitmask protocol can address (0..SEGMENT_HARD_MAX) count — the review map comes straight
  * from the admin socket, and an oversized index would become the segment count and build that many channels.

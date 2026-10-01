@@ -202,7 +202,7 @@ export class CommandRouter {
   /**
    * Look up the quirk-driven transport override for a (device, command) pair. Only the
    * commands devices.json names carry one; a per-segment command (segmentColor:N) has
-   * none — until 3.0.2 it inherited segmentBatch's, which no catalog entry used (YAGNI-6).
+   * none — until 3.1.0 it inherited segmentBatch's, which no catalog entry used (YAGNI-6).
    *
    * @param device Target device
    * @param command Command type

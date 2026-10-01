@@ -281,7 +281,7 @@ describe("GoveeOpenapiMqttClient", () => {
     });
   });
 
-  describe("openBroker — the one way a broker connection is made (3.0.2)", () => {
+  describe("openBroker — the one way a broker connection is made (3.1.0)", () => {
     beforeEach(() => mqttMock.reset());
 
     it("a new connect ends the previous socket first and never lets mqtt.js reconnect on its own", () => {

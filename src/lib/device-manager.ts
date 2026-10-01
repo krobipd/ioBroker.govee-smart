@@ -775,7 +775,7 @@ export class DeviceManager {
 
   /**
    * What every library run of a light ends with — the scene job, the token
-   * follow-up and the per-device refresh alike (until 3.0.2 three copies, and
+   * follow-up and the per-device refresh alike (until 3.1.0 three copies, and
    * the refresh set no `scenesChecked` and never judged a deferred segment
    * shrink, audit DRY-5).
    *
@@ -1234,7 +1234,7 @@ export class DeviceManager {
 
       // Step 2: Load scenes, snapshots, and libraries for every light — the
       // same rule the tree builder uses for the scene, snapshot and music
-      // datapoints (`buildCloudStateDefs`: the device type). Until 3.0.2 the
+      // datapoints (`buildCloudStateDefs`: the device type). Until 3.1.0 the
       // loader also took any device with a `dynamic_scene` capability: such a
       // device spent its Cloud budget on libraries and never got a dropdown
       // to show them (audit DRY-11).
@@ -1633,12 +1633,12 @@ export class DeviceManager {
    *   - verified / reported: silent (the catalog backs the device, no
    *     action needed). The tier is still surfaced via the
    *     `diag.tier` state for any user who wants to check.
-   *   - seed (toggle off): warn — points the user at the experimental
-   *     toggle. With catalog quirks it names the corrections the toggle
-   *     applies; without them (the homebridge-govee seeds of 2.33.0) it asks
-   *     to try the model and to send a diagnostics report.
-   *   - seed (toggle on): info — confirms quirks are active, or (no quirks)
-   *     asks for the diagnostics report that would promote the model.
+   *   - seed with catalog quirks, toggle off: warn — the corrections stay off
+   *     until the experimental toggle is on.
+   *   - seed with quirks, toggle on: info — the corrections are active.
+   *   - seed without quirks: info, whatever the toggle — the device works
+   *     either way, so only the diagnostics report that would confirm the
+   *     model is asked for.
    *   - unknown: warn — asks for a diagnostics export so we can add the
    *     SKU to the catalogue.
    *
@@ -1658,22 +1658,15 @@ export class DeviceManager {
       case "reported":
         return;
       case "seed": {
-        // A seed without quirks (the 486 models imported from homebridge-govee in
-        // 2.33.0) has no corrections the toggle could apply — promising them was a
-        // lie (advisor 2026-09-08). The opt-in stays the rule for every seed
-        // (reference_community_quirks_pattern); what such a model needs is the
-        // report that confirms it.
+        // The device works with or without the toggle — it only turns on catalog
+        // corrections. A seed without any (most of the imported models) has
+        // nothing the toggle could change; telling its owner to switch it on "to
+        // try it" was the same false claim the settings text made (audit M10).
         const hasQuirks = this.registry.getEntry(upper)?.quirks !== undefined;
         if (!hasQuirks) {
-          if (this.registry.isSeedAndDormant(upper)) {
-            this.log.warn(
-              `Device ${label} is in beta and untested — enable "Enable experimental device support" in adapter settings to try it, then create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
-            );
-          } else {
-            this.log.info(
-              `Device ${label} is in beta and untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
-            );
-          }
+          this.log.info(
+            `Device ${label} is in beta and untested — it works as it is; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
+          );
           return;
         }
         if (this.registry.isSeedAndDormant(upper)) {

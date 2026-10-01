@@ -328,7 +328,7 @@ describe("onCloudDataReady (phase 2)", () => {
   });
 
   it("derives the definitions when the build RUNS — a build queued before the scene library keeps scene_speed", async () => {
-    // Until 3.0.2 the definitions were derived at the call: a build queued
+    // Until 3.1.0 the definitions were derived at the call: a build queued
     // behind another ran after the library had arrived, with the old list, and
     // its cleanup deleted scenes.scene_speed with the user's recording.
     const config = JSON.stringify([{ page: 0, defaultIndex: 2, moveIn: [242, 247, 252] }]);

@@ -1399,7 +1399,7 @@ describe("GoveeMqttClient", () => {
       h.client.disconnect();
     });
 
-    it("every rejected silent refresh counts on the #39 cap — the third stops it and tells the user (3.0.2)", async () => {
+    it("every rejected silent refresh counts on the #39 cap — the third stops it and tells the user (3.1.0)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => warns.push(m) } as ioBroker.Logger;
       const h = liveClient(log, 3600, "acc", true, { status: 401, message: "wrong password" });
@@ -1699,7 +1699,7 @@ describe("classifyLoginResponse — Govee's numeric answer, read in ONE place", 
   });
 });
 
-describe("LoginWindow — one per account, shared by the live client and the probe (3.0.2)", () => {
+describe("LoginWindow — one per account, shared by the live client and the probe (3.1.0)", () => {
   it("a probe on a full window sends no login and reports the adapter's own pause with the time", async () => {
     const window = new LoginWindow();
     const now = Date.now();

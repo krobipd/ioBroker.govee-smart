@@ -117,6 +117,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Improved: a lamp that cannot be reached over LAN logs one warning instead of one per command
 - Fixed: a group that is switched off or set to a colour clears its scene and music dropdowns, as a single light does
 - Fixed: a heater that declares no temperature unit shows none instead of an invented °F; a command delivered after the device came back shows the value that was sent
+- Fixed: an untested model without catalog corrections no longer warns to turn on the experimental switch — it works as it is; the log only asks for a diagnostics report
 - Fixed: the settings describe the experimental switch for what it does — it turns on the catalog corrections of untested models; every device appears without it
 - Improved: the device sync button and the per-device cloud refresh report their result in the log; automatic clean-ups after an update no longer write info lines
 - Fixed: the connection card words every answer in the admin's language — a full login window shows the time on your own clock, and a repeated login test no longer claims a code was just requested

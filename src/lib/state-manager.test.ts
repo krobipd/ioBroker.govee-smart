@@ -941,7 +941,7 @@ describe("StateManager", () => {
       });
     });
 
-    it("leaves a tree a failed move kept under its old id unmarked — the next start moves it (M8, 3.0.2)", async () => {
+    it("leaves a tree a failed move kept under its old id unmarked — the next start moves it (M8, 3.1.0)", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       sm.deviceIds.keepUnmoved("H6160", "AA:BB:CC:DD:EE:FF:52:5F", "devices.h6160_525f");

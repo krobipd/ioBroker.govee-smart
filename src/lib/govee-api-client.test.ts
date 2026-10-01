@@ -423,7 +423,7 @@ describe("GoveeApiClient — fetchGroupMembers", () => {
   });
 });
 
-describe("GoveeApiClient — a rejected token in the body is an error at EVERY token endpoint (M6, 3.0.2)", () => {
+describe("GoveeApiClient — a rejected token in the body is an error at EVERY token endpoint (M6, 3.1.0)", () => {
   beforeEach(() => mockHttp.mockReset());
 
   // Govee's own answer when it does not accept the bearer (ptreal-ble-research.md §4.2).

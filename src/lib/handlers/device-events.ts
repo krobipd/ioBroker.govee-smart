@@ -173,7 +173,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
   // build runs: derived at the call, a build queued before the scene library
   // arrived ran after it with the old list and deleted `scenes.scene_speed` —
   // its value and the user's recording with it (the inventory upgrade suite
-  // showed it, 3.0.2).
+  // showed it, 3.1.0).
   const p = sm
     .runDeviceBuild(device, async () => {
       await sm.createInfoStates(device);

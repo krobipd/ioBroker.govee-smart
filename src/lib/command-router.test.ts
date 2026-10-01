@@ -421,7 +421,7 @@ describe("CommandRouter", () => {
       expect(lan.calls).toHaveLength(0); // nothing sent
     });
 
-    it("the LAN path confirms the segments once, after the batch went out (M2, 3.0.2)", async () => {
+    it("the LAN path confirms the segments once, after the batch went out (M2, 3.1.0)", async () => {
       const lan = makeLanStub();
       const router = new CommandRouter(mockLog, noopTimers, registry);
       router.setLanClient(lan.client);
@@ -947,7 +947,7 @@ describe("CommandRouter", () => {
         "declares no segment capability",
       );
       expect(cloud.calls).toEqual([]);
-      // Principle 5: the segment datapoints are not confirmed either (M2, 3.0.2 —
+      // Principle 5: the segment datapoints are not confirmed either (M2, 3.1.0 —
       // the echo fired before the send until then).
       expect(echoes).toEqual([]);
     });

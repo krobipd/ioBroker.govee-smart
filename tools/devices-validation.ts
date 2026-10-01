@@ -2,7 +2,7 @@
  * Validation of devices.json against devices.schema.json.
  *
  * The schema is the one spec: every word list and bound (SKU pattern, fields, types, tiers, quirk
- * fields, override commands and targets, segment limit, semver) is READ from it — until 3.0.2
+ * fields, override commands and targets, segment limit, semver) is READ from it — until 3.1.0
  * this file carried its own copies and two of them had already drifted (audit S9). Kept
  * dependency-free: it reads the parts of the schema the catalog uses, not JSON Schema in general,
  * and fails loudly when one of them is missing, so a renamed schema path can never turn into

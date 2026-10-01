@@ -852,7 +852,7 @@ describe("CapabilityMapper", () => {
     });
 
     it("music_setting: the state answer's mode VALUE reaches the dropdown as its POSITION (audit DRY-7)", () => {
-      // 0-based list: Govee's 1 is Sprouting — the second entry, key "2". Until 3.0.2 the
+      // 0-based list: Govee's 1 is Sprouting — the second entry, key "2". Until 3.1.0 the
       // value itself was written and the dropdown showed Rhythm.
       const declared: CloudCapability[] = [
         {
@@ -1964,7 +1964,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(0);
     });
 
-    it("offers only the colour temperatures every member takes — the intersection of their own ranges (M5, 3.0.2)", () => {
+    it("offers only the colour temperatures every member takes — the intersection of their own ranges (M5, 3.1.0)", () => {
       const ctCap = (min: number, max: number): GoveeDevice["capabilities"][number] =>
         ({
           type: "devices.capabilities.color_setting",

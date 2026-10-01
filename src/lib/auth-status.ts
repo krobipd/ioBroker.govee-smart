@@ -1,6 +1,6 @@
 // The connection card's `mqttAuth` contract: the cases the adapter answers with and the answer's shape.
 // Import-free, because the card (src-admin) imports it too — router and card read the SAME list (audit
-// DRY-13; until 3.0.2 both declared the type and the card held a third copy as a Set). The answer is data
+// DRY-13; until 3.1.0 both declared the type and the card held a third copy as a Set). The answer is data
 // only: the card words every case in the admin's language, the adapter sends no sentence.
 
 /** Every case a `mqttAuth` action answers with (superset of both actions). */

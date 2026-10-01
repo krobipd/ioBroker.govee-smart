@@ -2,7 +2,7 @@
 
 /**
  * Highest addressable segment index — the Govee bitmask protocol limit (56 slots, 0..55). The ONE value: the
- * segment list, the batch parser, the wizard and the device manager all read it (until 3.0.2 the list parser kept
+ * segment list, the batch parser, the wizard and the device manager all read it (until 3.1.0 the list parser kept
  * its own copy, and the adapter docs named a third value).
  */
 export const SEGMENT_HARD_MAX = 55;

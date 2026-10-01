@@ -98,13 +98,13 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       const cached = goveeDeviceToCached(makeFullDevice());
       const restored = cachedToGoveeDevice(cached);
       expect(restored.state).toEqual({ online: false });
-      // The cached capability list IS the cloud path (derived here since 3.0.2, for both restore branches).
+      // The cached capability list IS the cloud path (derived here since 3.1.0, for both restore branches).
       expect(restored.channels).toEqual({ lan: false, mqtt: false, cloud: restored.capabilities.length > 0 });
       expect(restored.lanIp).toBe(undefined);
       expect(restored.groupMembers).toBe(undefined);
     });
 
-    it("the three attempt stamps stay in memory — saved never, restored never (C7, 3.0.2)", () => {
+    it("the three attempt stamps stay in memory — saved never, restored never (C7, 3.1.0)", () => {
       const original = {
         ...makeFullDevice(),
         lastReachabilityRefreshAt: 1,
@@ -119,7 +119,7 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       expect(restored.lastLanStatusAt).toBe(undefined);
     });
 
-    it("a cache entry merged into a LAN-found light brings every persisted field and keeps the live ones (M4, 3.0.2)", () => {
+    it("a cache entry merged into a LAN-found light brings every persisted field and keeps the live ones (M4, 3.1.0)", () => {
       const entry = {
         ...goveeDeviceToCached(makeFullDevice()),
         sceneSpeed: 3,

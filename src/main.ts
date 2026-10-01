@@ -1207,11 +1207,8 @@ export class GoveeAdapter extends utils.Adapter {
                 return 0;
               });
               // An automatic correction is carried out silently (CLAUDE_CODING
-              // "Logging-Philosophie"); only a real removal leaves a debug line —
-              // pure-LAN devices match this condition on EVERY start (M7).
-              if (deleted > 0) {
-                this.log.debug(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
-              }
+              // "Logging-Philosophie"): one debug line with the count.
+              this.log.debug(`Removed ${deleted} legacy cloud-owned state(s) for ${deviceLabel(device)} (pure-LAN)`);
             });
           }
         }

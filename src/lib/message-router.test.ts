@@ -275,7 +275,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       // Its own case with the time as a number — the card words it in the admin's language and the
-      // viewer's clock (audit DRY-13; until 3.0.2 a server-locale sentence under "throttled").
+      // viewer's clock (audit DRY-13; until 3.1.0 a server-locale sentence under "throttled").
       expect(responses[0].data).toEqual({ status: "loginWindowFull", retryAt: 1_790_000_000_000 });
     });
 

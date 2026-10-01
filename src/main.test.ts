@@ -988,7 +988,7 @@ describe("GoveeAdapter onReady — timers", () => {
     }
   });
 
-  it("a throw inside the 20 s round stays in the round — no unhandled rejection that would end the process (M3, 3.0.2)", async () => {
+  it("a throw inside the 20 s round stays in the round — no unhandled rejection that would end the process (M3, 3.1.0)", async () => {
     const { adapter } = await setupReady();
     const i = internalOf(adapter);
     const debugs: string[] = [];
@@ -1094,7 +1094,7 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.statesReady).toBe(false);
   });
 
-  it("a stop during the id move ends the start — no LAN socket, no login, no Cloud (M1, 3.0.2)", async () => {
+  it("a stop during the id move ends the start — no LAN socket, no login, no Cloud (M1, 3.1.0)", async () => {
     const { adapter, f } = setup({ apiKey: "key", goveeEmail: "a@b.c", goveePassword: "pw" });
     const i = internalOf(adapter);
     let release!: () => void;
@@ -1116,7 +1116,7 @@ describe("GoveeAdapter onReady — timers", () => {
     }
   });
 
-  it("an id move that cannot read the object tree stops the start with one error line (M8, 3.0.2)", async () => {
+  it("an id move that cannot read the object tree stops the start with one error line (M8, 3.1.0)", async () => {
     const { adapter, f } = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     const errors: string[] = [];
@@ -1135,7 +1135,7 @@ describe("GoveeAdapter onReady — timers", () => {
     }
   });
 
-  it("a stop while the saved account session loads starts no login (M1, 3.0.2)", async () => {
+  it("a stop while the saved account session loads starts no login (M1, 3.1.0)", async () => {
     const { adapter, f } = setup({ goveeEmail: "a@b.c", goveePassword: "pw" });
     const i = internalOf(adapter);
     let release!: () => void;
@@ -2808,7 +2808,7 @@ describe("GoveeAdapter — callback wiring", () => {
     return fn.mock.calls[0][0] as T;
   };
 
-  it("the admin login test counts into the live client's login window — never a fresh one per click (H2, 3.0.2)", async () => {
+  it("the admin login test counts into the live client's login window — never a fresh one per click (H2, 3.1.0)", async () => {
     const { adapter, f } = await fullSetup();
     const live = f.mqtt.useLoginWindow.mock.calls[0]?.[0];
     expect(live, "the live client must get the account's window").toBeDefined();

@@ -690,7 +690,7 @@ describe("DeviceManager", () => {
       expect(await dm2.loadFromCloud()).toMatchObject({ ok: false, reason: "auth-failed" });
     });
 
-    it("a 429 warns ONCE and names the Retry-After wait, not the transient 5 minutes (M7, 3.0.2)", async () => {
+    it("a 429 warns ONCE and names the Retry-After wait, not the transient 5 minutes (M7, 3.1.0)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
       const dm2 = new DeviceManager(log, mockTimers, registry, new DeviceIdRegistry());
@@ -704,7 +704,7 @@ describe("DeviceManager", () => {
       expect(warns[0]).not.toContain("5 min");
     });
 
-    it("a rejected key is no warning here — the registry names it once with what to do (M7, 3.0.2)", async () => {
+    it("a rejected key is no warning here — the registry names it once with what to do (M7, 3.1.0)", async () => {
       const warns: string[] = [];
       const log = { ...mockLog, warn: (m: string) => void warns.push(m) } as ioBroker.Logger;
       const dm2 = new DeviceManager(log, mockTimers, registry, new DeviceIdRegistry());
@@ -4320,21 +4320,15 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     expect(infos).toEqual(["Device H6141 is in beta — experimental quirks are active."]);
   });
 
-  it("a seed WITHOUT quirks does not promise corrections — it asks for the toggle and a diagnostics report", () => {
-    const { dm, warns } = nudgeDm(false);
-    dm.maybeNudgeSeedSku("H6001", "Bulb");
-    expect(warns).toEqual([
-      'Device Bulb (H6001) is in beta and untested — enable "Enable experimental device support" in adapter settings to try it, then create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
-    ]);
-  });
-
-  it("a seed WITHOUT quirks and the toggle ON asks for the report on info", () => {
-    const { dm, warns, infos } = nudgeDm(true);
-    dm.maybeNudgeSeedSku("H6001", "Bulb");
-    expect(warns).toEqual([]);
-    expect(infos).toEqual([
-      "Device Bulb (H6001) is in beta and untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
-    ]);
+  it("a seed WITHOUT quirks never sends its owner to the toggle — the device works as it is; only the report is asked for, on info", () => {
+    for (const experimental of [false, true]) {
+      const { dm, warns, infos } = nudgeDm(experimental);
+      dm.maybeNudgeSeedSku("H6001", "Bulb");
+      expect(warns, `toggle ${experimental}`).toEqual([]);
+      expect(infos).toEqual([
+        "Device Bulb (H6001) is in beta and untested — it works as it is; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
+      ]);
+    }
   });
 
   it("verified / reported models stay silent, an unknown model asks for a diag export", () => {
@@ -5109,7 +5103,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     expect(libraryCalls).toEqual(["H600D", "H600D"]); // a new run, a new fetch — still one for the SKU
   });
 
-  it("a library Govee rejects is not stamped as checked, and a rejected token asks for a fresh one (M6, 3.0.2)", async () => {
+  it("a library Govee rejects is not stamped as checked, and a rejected token asks for a fresh one (M6, 3.1.0)", async () => {
     const { dm, settle } = build();
     const refresh = vi.fn();
     dm.setBearerRefresher(refresh);

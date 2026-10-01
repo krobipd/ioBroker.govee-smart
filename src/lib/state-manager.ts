@@ -500,7 +500,7 @@ export class StateManager {
    * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
    * (`diag.*`). Deletes the three old objects + states; the new ones get
    * created by the regular `createDeviceStates` pass. Once per run and tree —
-   * until 3.0.2 every build of the device asked again (audit YAGNI-8).
+   * until 3.1.0 every build of the device asked again (audit YAGNI-8).
    *
    * @param device Govee device
    */

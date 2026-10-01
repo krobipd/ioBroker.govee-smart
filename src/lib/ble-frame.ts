@@ -40,7 +40,7 @@ function xorChecksum(data: ArrayLike<number>, end = data.length): number {
 /**
  * A received BLE frame, base64 as Govee relays it (`op.command`, snapshot packets): exactly
  * {@link BLE_FRAME_BYTES} bytes with a matching checksum, else null. The ONE rule for the status
- * push, the segment echo and the snapshot masks — until 3.0.2 three copies, one of them taking any
+ * push, the segment echo and the snapshot masks — until 3.1.0 three copies, one of them taking any
  * frame of 20 bytes OR MORE (audit DRY-8).
  *
  * @param raw The base64 text

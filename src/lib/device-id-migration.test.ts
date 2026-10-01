@@ -290,7 +290,7 @@ describe("migrateDeviceIds", () => {
     expect(db.logs.some(l => l.startsWith('warn: Device "Couch": could not move devices.h61be_525f'))).toBe(true);
   });
 
-  it("a tree that cannot move stays under its old id this session, unmarked — the next start moves it with its recording (M8, 3.0.2)", async () => {
+  it("a tree that cannot move stays under its old id this session, unmarked — the next start moves it with its recording (M8, 3.1.0)", async () => {
     const db = new Db();
     db.tree("devices.h61be_525f", A_ID);
     db.failMoveOf = `${NS}.devices.h61be-525f`;
@@ -316,7 +316,7 @@ describe("migrateDeviceIds", () => {
     expect(db.deleted.indexOf(`${old}.control.power`)).toBeLessThan(db.deleted.indexOf(`${old}.control`));
   });
 
-  it("a leftover hands its recording to the kept datapoint that has none — the same datapoint lives on (M8, 3.0.2)", async () => {
+  it("a leftover hands its recording to the kept datapoint that has none — the same datapoint lives on (M8, 3.1.0)", async () => {
     const db = new Db();
     // A tree a session built after a failed move: no recording on power.
     db.tree("devices.h61be-525f", A_ID, { idScheme: 3 });

@@ -603,7 +603,7 @@ export const EVENT_STATE_ROLES = {
 
 /**
  * Per-stateId metadata of the synthetic datapoints — the readings and events that two paths create
- * (the Cloud capability and the account list / Cloud-events push). ONE table for both: until 3.0.2
+ * (the Cloud capability and the account list / Cloud-events push). ONE table for both: until 3.1.0
  * the Cloud path took names, descriptions and units from its own tables, and a temperature declared
  * in °F got °F from one path and °C from the other (the value is always °C; audit DRY-12). The
  * `channel` is the single source of truth for state-manager's `inferChannelFromStateId`,
@@ -1822,7 +1822,7 @@ export function planCloudCapabilityWrites(
  *
  * A value for a datapoint with a value list is kept only when the list the
  * builder makes from the DECLARED capability carries it — the same builder,
- * so the two cannot disagree. Until 3.0.2 any number Govee sent landed in the
+ * so the two cannot disagree. Until 3.1.0 any number Govee sent landed in the
  * dropdown (a fan-speed mode showed `50`, a level in Auto mode `0`), a value no
  * label explains and no command can send back.
  *
@@ -1864,7 +1864,7 @@ function cloudStateValuesOf(cap: CloudStateCapability, declared?: readonly Cloud
   if (primary.stateId === "music_mode") {
     // The dropdown is keyed by position (mapMusicSetting: 1..N, 0 = "---"), Govee answers the
     // mode's value — translated through the SAME getMusicModeOptions() list the send path uses.
-    // Until 3.0.2 the value itself was written: on a 0-based list Govee's 1 showed the first mode.
+    // Until 3.1.0 the value itself was written: on a 0-based list Govee's 1 showed the first mode.
     const own = declared?.find(c => c.type === cap.type && c.instance === cap.instance);
     const index = own ? getMusicModeOptions(own).findIndex(o => coerceNum(o.value) === primary.value) : -1;
     return index < 0 ? [] : [{ ...primary, value: String(index + 1) }];
