@@ -1426,14 +1426,16 @@ const UNIT_MAP: Record<string, string> = {
  *
  * @param cap Cloud temperature_setting capability
  */
-function temperatureUnit(cap: CloudCapability): string {
+function temperatureUnit(cap: CloudCapability): string | undefined {
   const fields = cap.parameters?.fields;
   const unitField = fields?.find(f => f && f.fieldName === "unit");
   const declared = typeof unitField?.defaultValue === "string" ? unitField.defaultValue : undefined;
   // Second source: some payloads carry the unit on the `temperature` field
   // itself (`unit.celsius`) instead of declaring a separate `unit` field.
   const onTemperature = fields?.find(f => f && f.fieldName === "temperature")?.unit;
-  return normalizeUnit(declared) ?? normalizeUnit(onTemperature) ?? normalizeUnit(cap.parameters?.unit) ?? "°F";
+  // Nothing declared → no unit: an invented "°F" labelled the only recorded
+  // heater (5–30, declared °C) wrongly — the mapper invents no unit, like no limit.
+  return normalizeUnit(declared) ?? normalizeUnit(onTemperature) ?? normalizeUnit(cap.parameters?.unit);
 }
 
 /**

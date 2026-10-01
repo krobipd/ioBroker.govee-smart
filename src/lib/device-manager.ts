@@ -512,8 +512,10 @@ export class DeviceManager {
       }
       try {
         if (intent.kind === "command") {
-          await this.sendCommand(device, intent.command, intent.value);
-          this.mirrorDelivered(device, intent.command, intent.value);
+          // Mirror what went out — the LAN colour temperature is clamped on the
+          // way (N19), the held value may lie outside what the light took.
+          const sent = await this.sendCommand(device, intent.command, intent.value);
+          this.mirrorDelivered(device, intent.command, sent ?? intent.value);
         } else {
           await this.sendCapabilityCommand(device, intent.capabilityType, intent.capabilityInstance, intent.value);
         }

@@ -5271,6 +5271,18 @@ describe("a command Govee rejected as 'device offline' is delivered when the dev
     expect((await dm.generateDiagnostics(device, "2.39.1")).heldCommands).toEqual([]);
   });
 
+  it("a delivered command mirrors what went out, not the held wish (audit C10, N19 rule)", async () => {
+    const { dm, device, updates, push } = bench();
+    await expect(dm.sendCommand(device, "colorTemperature", 12000)).rejects.toThrow(/offline/i);
+    // On delivery the transport sends a clamped value (the LAN range ends at 9000 K).
+    const spy = vi.spyOn(dm, "sendCommand").mockResolvedValue(9000);
+    push({ onOff: 1 });
+    await dm.whenIntentsSettled();
+    expect(spy).toHaveBeenCalledWith(device, "colorTemperature", 12000);
+    expect(updates.some(u => u.colorTemperature === 9000)).toBe(true);
+    expect(updates.some(u => u.colorTemperature === 12000)).toBe(false);
+  });
+
   it("holds the rejected command, delivers it once on the device's own push, and mirrors the value as acked", async () => {
     const { dm, device, controls, updates, push } = bench();
     await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);

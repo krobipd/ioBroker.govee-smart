@@ -468,7 +468,7 @@ describe("temperature_setting unit", () => {
     expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBe("°C");
   });
 
-  it("still falls back to °F when the device declares no unit at all", () => {
+  it('invents no unit when the device declares none (audit C11 — the old "°F" fallback mislabelled a °C heater)', () => {
     const caps: CloudCapability[] = [
       {
         type: "devices.capabilities.temperature_setting",
@@ -479,7 +479,7 @@ describe("temperature_setting unit", () => {
         },
       },
     ];
-    expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBe("°F");
+    expect(mapCapabilities(caps).find(s => s.id === "target_temperature")!.unit).toBeUndefined();
   });
 });
 const applyQuirksToStates = (sku: string, states: StateDefinition[]): StateDefinition[] =>
