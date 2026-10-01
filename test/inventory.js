@@ -878,6 +878,142 @@ const ENCRYPTED_MARKER = "<encrypted with the installation secret>";
 async function restoreMaskedSecrets(harness) {}
 
 /**
+ * The options of a scenes-endpoint capability as the adapter keeps them: named, with an object or number value.
+ *
+ * @param {Array<{name?: unknown, value?: unknown}> | undefined} options the capability's options
+ */
+function sceneOptions(options) {
+  return (Array.isArray(options) ? options : [])
+    .filter(o => o && typeof o.name === "string" && o.value != null && ["object", "number"].includes(typeof o.value))
+    .map(o => ({ name: o.name, value: o.value }));
+}
+
+/**
+ * A scene library answer in the form the adapter caches it: one entry per light effect with a code, variants named
+ * `<scene>-<variant>`.
+ *
+ * @param {object | undefined} answer the light-effect-libraries answer of the fake cloud
+ */
+function cachedSceneLibrary(answer) {
+  const library = [];
+  for (const category of answer?.data?.categories ?? []) {
+    for (const scene of category.scenes ?? []) {
+      if (typeof scene?.sceneName !== "string" || !scene.sceneName) continue;
+      const effects = Array.isArray(scene.lightEffects) ? scene.lightEffects : [];
+      if (effects.length === 0) {
+        if ((scene.sceneCode ?? 0) > 0) library.push({ name: scene.sceneName, sceneCode: scene.sceneCode });
+        continue;
+      }
+      for (const effect of effects) {
+        const sceneCode = effect.sceneCode ?? scene.sceneCode ?? 0;
+        if (sceneCode <= 0) continue;
+        const entry = {
+          name: effects.length > 1 && effect.scenceName ? `${scene.sceneName}-${effect.scenceName}` : scene.sceneName,
+          sceneCode,
+        };
+        if (effect.scenceParam) entry.scenceParam = effect.scenceParam;
+        if (effect.speedInfo?.supSpeed) {
+          entry.speedInfo = {
+            supSpeed: true,
+            speedIndex: effect.speedInfo.speedIndex ?? 0,
+            config: effect.speedInfo.config ?? "",
+          };
+        }
+        library.push(entry);
+      }
+    }
+  }
+  return library;
+}
+
+/**
+ * The SKU-cache entry the previous release (3.0.1) kept for one fixture device after a start against the fake cloud:
+ * capabilities from the device list; for a light (the app group included) scenes, DIY scenes and snapshots from the
+ * scenes endpoints, the scene library and the empty SKU features; the online stamp where the state answer reports the
+ * device online; the LAN stamps for the fake LAN light; the gateway the account list names.
+ *
+ * @param {object} device a FIXTURE device
+ * @param {number} now the seed time
+ */
+function previousCacheEntry(device, now) {
+  const light = device.type === "devices.types.light";
+  const entry = {
+    sku: device.sku,
+    deviceId: device.device,
+    name: device.deviceName,
+    type: device.type,
+    capabilities: device.capabilities,
+    scenes: [],
+    diyScenes: [],
+    snapshots: [],
+    sceneLibrary: [],
+    musicLibrary: [],
+    diyLibrary: [],
+    skuFeatures: null,
+  };
+  if (light) {
+    const captured = CAPTURED[device.device];
+    const answer = captured?.scenes ?? scenesFor();
+    const of = instance => sceneOptions(answer.capabilities.find(c => c.instance === instance)?.parameters?.options);
+    entry.scenes = of("lightScene");
+    entry.diyScenes = of("diyScene");
+    if (entry.diyScenes.length === 0) {
+      entry.diyScenes = (captured?.diyScenes ?? scenesFor()).capabilities.flatMap(c =>
+        sceneOptions(c.parameters?.options),
+      );
+    }
+    entry.snapshots = of("snapshot");
+    if (entry.snapshots.length === 0) {
+      const own = device.capabilities.find(
+        c => c.type === "devices.capabilities.dynamic_scene" && c.instance === "snapshot",
+      );
+      entry.snapshots = sceneOptions(own?.parameters?.options);
+    }
+    entry.sceneLibrary = cachedSceneLibrary(SCENE_LIBRARIES[device.sku]);
+    entry.skuFeatures = {};
+    entry.librariesCheckedAt = now;
+    entry.scenesChecked = true;
+  }
+  const state =
+    device.sku === "BaseGroup" ? [] : (CAPTURED[device.device]?.state.capabilities ?? stateFor(device.device));
+  if (state.find(c => c.instance === "online")?.state?.value === true) {
+    entry.lastSeenOnNetwork = now;
+  }
+  if (device.device === LAN_DEVICE.device) {
+    Object.assign(entry, { lastLanSeenAt: now, lastLanStatusAskedAt: now, lastLanStatusAt: now });
+  }
+  const listed = APP_LIST.find(a => a.device === device.device);
+  const gatewayInfo = listed && JSON.parse(listed.deviceExt.deviceSettings).gatewayInfo;
+  if (gatewayInfo) {
+    entry.gateway = gatewayInfo.bleName ? `${gatewayInfo.sku} (${gatewayInfo.bleName})` : gatewayInfo.sku;
+    entry.gatewayDeviceId = gatewayInfo.device;
+  }
+  entry.cachedAt = now;
+  return entry;
+}
+
+/**
+ * Round 75 (reported by dl-manager): adapter-specific like feedFixtures. The previous release's dump carries objects
+ * only; what that release kept in the instance data folder is not in it, and clearInstanceData has just emptied the
+ * folder. 3.0.1 held one SKU-cache file per fixture device there (`cache/<sku>_<id>.json`, measured on a 3.0.1 run
+ * against this fixture); the MQTT credentials file it did not write, because the fixture's IoT-key answer carries no
+ * certificate and the login stops before the bundle is saved. The cache is written in 3.0.1's form from the fixture,
+ * stamped with the seed time so pruning and the 7-day memories judge it as fresh.
+ *
+ * @param {import("@iobroker/testing").IntegrationTestHarness} harness
+ * @param {object} previous the previous release's dump
+ */
+async function seedInstanceData(harness, previous) {
+  const cacheDir = path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`, "cache");
+  fs.mkdirSync(cacheDir, { recursive: true });
+  const now = Date.now();
+  for (const device of FIXTURE.devices) {
+    const key = `${device.sku}_${device.device.replace(/:/g, "")}`.toLowerCase();
+    fs.writeFileSync(path.join(cacheDir, `${key}.json`), JSON.stringify(previousCacheEntry(device, now), null, 2));
+  }
+}
+
+/**
  * Round 67: the objects of the namespace that still carry ENCRYPTED_MARKER — read raw from the database, never through
  * dumpObjects (an adapter's dump masks again). Checked right after the restore, before the start: later the adapter may
  * have rewritten or deleted the object, and a clean result would prove nothing about the seeded one.
@@ -999,6 +1135,7 @@ tests.integration(ADAPTER_DIR, {
           // The harness registers its own before() (fresh DB) ahead of this one,
           // so the seed survives and the adapter starts on top of the OLD objects.
           await seedPrevious(harness, previous);
+          await seedInstanceData(harness, previous);
           await restoreMaskedSecrets(harness);
           maskedLeft = await maskedSecretsLeft(harness);
           await resetInstanceNative(harness);

@@ -2,6 +2,7 @@
   "common": {
     "name": "govee-smart",
     "version": "3.0.1",
+    "dataFolder": "govee-smart.%INSTANCE%",
     "news": {
       "3.0.1": {
         "en": "The note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details.",
