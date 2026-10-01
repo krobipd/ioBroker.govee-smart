@@ -5180,6 +5180,15 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
   });
 
+  it("only a light gets a scene job — a device of another type spends no Cloud budget on libraries (DRY-11)", async () => {
+    const { dm, settle, scenesCalls } = build();
+    const plug = { ...cloudLight("PLUG000000000003"), type: "devices.types.socket" };
+    (dm as any).cloudClient.getDevices = () => Promise.resolve([plug]);
+    await dm.loadFromCloud();
+    await settle();
+    expect(scenesCalls()).toBe(0);
+  });
+
   it("a scene job that throws still saves its light, unconfirmed (H6)", async () => {
     const { dm, saved, settle } = build();
     (dm as any).loadSceneDataFor = () => Promise.reject(new Error("boom"));

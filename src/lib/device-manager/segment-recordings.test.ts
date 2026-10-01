@@ -504,6 +504,24 @@ describe("DeviceManager — adopting the count of a recorded push (deleting need
     expect(withoutMasks.rebuilds).toEqual([7]);
   });
 
+  it("H6076: the per-device refresh judges a parked shrink too, like the scene job (audit DRY-5)", async () => {
+    const { dm, device, rebuilds } = setup("H6076", { learned: 8, caps: 15 });
+    push(dm, "H6076", recording("issue-44-h6076-diag.json.txt", "a_"));
+    expect(rebuilds).toEqual([]); // parked
+    device.snapshotBleCmds = (SNAPSHOT_RECORDINGS["issue-44-h6076-diag.json.txt"] as unknown as string[][][]).map(
+      (cmds, i) => ({ name: `snapshot ${i + 1}`, cmds }),
+    );
+    dm.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([{ sku: "H6076", device: "AABBCCDDEEFF0011", deviceName: "Lamp", capabilities: [] }]),
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011");
+    expect(rebuilds).toEqual([7]);
+    expect(device.scenesChecked, "the scene endpoint answered").toBe(true);
+  });
+
   it("H6076: the x_ and the a_ push agree — no 7 ↔ 8 pendulum (#44)", () => {
     const { dm, device, rebuilds } = setup("H6076", { learned: 7, caps: 15 });
     push(dm, "H6076", recording("issue-44-h6076-diag.json.txt", "a_"));

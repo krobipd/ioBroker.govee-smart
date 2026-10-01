@@ -1,4 +1,3 @@
-import { hasDynamicSceneCapability } from "./capability-mapper";
 import { CommandRouter, type HeldIntent, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
 import { DiagnosticsCollector, type HeldCommandEntry } from "./diagnostics";
@@ -741,31 +740,48 @@ export class DeviceManager {
       this.persistDeviceToCache(device);
       return;
     }
+    if (track.skipped) {
+      this.awaitBearerForLibraries(device);
+    }
+    this.finishLibraryRun(device, track, scenesChanged || librariesChanged, true);
+  }
+
+  /**
+   * What every library run of a light ends with — the scene job, the token
+   * follow-up and the per-device refresh alike (until 3.0.2 three copies, and
+   * the refresh set no `scenesChecked` and never judged a deferred segment
+   * shrink, audit DRY-5).
+   *
+   * @param device The light
+   * @param track What became of the run's fetches
+   * @param changed Scenes or libraries changed this run
+   * @param scenesAsked The run asked the scene endpoint too (not the token follow-up)
+   */
+  private finishLibraryRun(device: GoveeDevice, track: LibraryTrack, changed: boolean, scenesAsked: boolean): void {
     if (librariesConfirmed(track)) {
       // The libraries were confirmed this round (filled or empty) — an empty
       // answer is remembered until LIBRARY_RECHECK_MS has passed. An endpoint
       // left unasked for want of an account token is no answer (M3).
       device.librariesCheckedAt = Date.now();
     }
-    if (track.skipped) {
-      this.awaitBearerForLibraries(device);
-    }
-    // Checked = the cloud answered this round, even with an empty list (empty
-    // is legitimate and must not refetch forever). A cancelled call is NOT
-    // checked: the light is persisted anyway — its capability entry has to
-    // survive a cloud hiccup — but without the flag, so the next start asks
-    // again instead of trusting an answer that never came.
-    device.scenesChecked = !track.cancelled;
-    if (track.cancelled) {
-      this.persistDeviceToCache(device);
-      return;
+    if (scenesAsked) {
+      // Checked = the cloud answered this round, even with an empty list (empty
+      // is legitimate and must not refetch forever). A cancelled call is NOT
+      // checked: the light is persisted anyway — its capability entry has to
+      // survive a cloud hiccup — but without the flag, so the next start asks
+      // again instead of trusting an answer that never came.
+      device.scenesChecked = !track.cancelled;
+      if (track.cancelled) {
+        this.persistDeviceToCache(device);
+        return;
+      }
     }
     cacheHelpers.populateScenesFromLibrary(this, device);
     this.persistDeviceToCache(device);
     // The snapshot masks may have arrived with the libraries — a lowered
     // segment count that waited for them is judged now.
     this.reviewDeferredSegmentShrink(device);
-    if (scenesChanged || librariesChanged) {
+    if (changed) {
       this.onCloudDataReady?.(device, this.getDevices());
     }
   }
@@ -838,18 +854,11 @@ export class DeviceManager {
     if (this.isUnloading()) {
       return;
     }
-    if (librariesConfirmed(track)) {
-      device.librariesCheckedAt = Date.now();
-    }
     if (track.skipped) {
+      // Only noted — this runs inside onBearerToken, which would call itself.
       this.librariesAwaitingBearer.add(this.deviceKey(device.sku, device.deviceId));
     }
-    cacheHelpers.populateScenesFromLibrary(this, device);
-    this.persistDeviceToCache(device);
-    this.reviewDeferredSegmentShrink(device);
-    if (changed) {
-      this.onCloudDataReady?.(device, this.getDevices());
-    }
+    this.finishLibraryRun(device, track, changed, false);
   }
 
   /**
@@ -1212,20 +1221,14 @@ export class DeviceManager {
       // one, so nothing has to be cleared.
       const sharedFetches = new Map<string, Promise<libraryLoader.SharedFetchOutcome<unknown>>>();
 
-      // Step 2: Load scenes, snapshots, and libraries for any device that
-      // exposes a `dynamic_scene` capability — independent of `cd.type`.
-      // Govee occasionally returns devices with `type` missing or a value
-      // we don't recognise; keying off the capability is what the rest of
-      // the codebase already uses to decide whether scene/snapshot states
-      // exist, so the loader has to follow the same rule.
+      // Step 2: Load scenes, snapshots, and libraries for every light — the
+      // same rule the tree builder uses for the scene, snapshot and music
+      // datapoints (`buildCloudStateDefs`: the device type). Until 3.0.2 the
+      // loader also took any device with a `dynamic_scene` capability: such a
+      // device spent its Cloud budget on libraries and never got a dropdown
+      // to show them (audit DRY-11).
       for (const cd of cloudDevices) {
-        const caps = Array.isArray(cd.capabilities) ? cd.capabilities : [];
-        const hasSceneCap =
-          hasDynamicSceneCapability(caps, "lightScene") ||
-          hasDynamicSceneCapability(caps, "diyScene") ||
-          hasDynamicSceneCapability(caps, "snapshot");
-        const isLight = cd.type === GOVEE_DEVICE_TYPE.LIGHT || hasSceneCap;
-        if (isLight) {
+        if (cd.type === GOVEE_DEVICE_TYPE.LIGHT) {
           const device = this.devices.get(this.deviceKey(cd.sku, cd.device));
           if (device) {
             // Not awaited: with more lights than the minute window holds, the
@@ -1373,18 +1376,11 @@ export class DeviceManager {
     if (await libraryLoader.loadDeviceLibraries(host, target, cd.sku, /* force */ true)) {
       changed = true;
     }
-    if (librariesConfirmed(track)) {
-      target.librariesCheckedAt = Date.now();
-    }
     if (track.skipped) {
       this.awaitBearerForLibraries(target);
     }
-    if (changed) {
-      this.saveDevicesToCache();
-      cacheHelpers.populateScenesFromLibrary(this, target);
-      // Per-device Cloud-phase fire — only the targeted device needs a rebuild.
-      this.onCloudDataReady?.(target, this.getDevices());
-    }
+    // Per-device follow-up — only the targeted device needs a rebuild.
+    this.finishLibraryRun(target, track, changed, true);
     return changed;
   }
 
