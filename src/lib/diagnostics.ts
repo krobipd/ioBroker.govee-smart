@@ -1,5 +1,6 @@
 import { HttpError } from "./http-client";
-import { Anonymiser } from "./anonymiser";
+import { Placeholders } from "./diagnostics/placeholders";
+import { pseudonymiseReport } from "./report-placeholders";
 import type { DeviceRegistry } from "./device-registry";
 import { errText, type GoveeDevice } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
@@ -34,6 +35,8 @@ export interface MqttPacketEntry {
   hex?: string;
   /** Raw JSON envelope around the message — captured so state-correlation isn't lost. */
   rawJson?: string;
+  /** A payload over the size limit keeps only its size — whole or nothing, never cut (fleet R3). */
+  omittedBytes?: number;
 }
 
 /** One captured API call (success or failure) for a Cloud / App-API endpoint. */
@@ -196,15 +199,15 @@ const MAX_PACKET_RAW_BYTES = 4_096;
 const MAX_LAN_SEND_BYTES = 16_384;
 
 /**
- * Cut a captured text to `max` characters with a marker. Real MQTT envelopes
- * and ptReal payloads are a few hundred bytes to a few KB — anything larger
- * is a Govee anomaly worth seeing the head of, not worth keeping whole.
+ * Whole or nothing (fleet R3): a captured text over the limit keeps only its size. A cut text could carry half of a
+ * personal value that no placeholder pattern recognises any more — and the placeholders run when the report is made.
  *
  * @param text Captured text
- * @param max Character cap
+ * @param max Size limit in characters
+ * @returns The text, or undefined when it is over the limit
  */
-function capText(text: string, max: number): string {
-  return text.length > max ? `${text.slice(0, max)}…<truncated ${text.length}b>` : text;
+function wholeOrNothing(text: string, max: number): string | undefined {
+  return text.length > max ? undefined : text;
 }
 
 /**
@@ -419,7 +422,6 @@ export class DiagnosticsCollector {
    * One pseudonymiser for the whole adapter run, so a marker means the same
    * thing in every buffer and in every report exported from this run.
    */
-  private readonly anon = new Anonymiser();
   /**
    * Every device name currently known, for replacing them inside free text.
    * A name has no detectable shape, so unlike an address it cannot be found by
@@ -517,11 +519,8 @@ export class DiagnosticsCollector {
    * blocked"): the report showed a dead push channel and no reason.
    *
    * Carries NO credentials. Endpoint, verdict, status code and Govee's own
-   * message are what tell the cases apart. The message also goes through the
-   * anonymiser here — defence in depth: `generate()` runs the whole report
-   * through the same pass, so removing this call changes no output. It stays
-   * because this buffer is account-wide and a future caller might read it
-   * without going through `generate()`.
+   * message are what tell the cases apart; the report's placeholders replace
+   * whatever personal the message names when the report is made.
    *
    * Account-wide rather than per-device: these two calls belong to the account,
    * not to a device, and every device's report needs to show them.
@@ -535,7 +534,7 @@ export class DiagnosticsCollector {
     if (typeof endpoint !== "string" || !endpoint) {
       return;
     }
-    const text = message ? this.anon.text(String(message)) : undefined;
+    const text = message ? String(message) : undefined;
     // A rejected login REPEATS — the client retries, and the 24 h lockout in
     // issue #39 came from exactly that loop. A plain ring buffer would fill with
     // ten identical entries and push out the FIRST one, which is the one that
@@ -579,10 +578,10 @@ export class DiagnosticsCollector {
       {
         ts: new Date().toISOString(),
         stateId: String(entry.stateId),
-        value: this.anon.walk(entry.value),
+        value: this.cloneAndCap(entry.value),
         transport: String(entry.transport),
         ok: entry.ok === true,
-        ...(entry.error ? { error: this.anon.text(String(entry.error)) } : {}),
+        ...(entry.error ? { error: String(entry.error) } : {}),
       },
       MAX_COMMAND_RESULTS,
     );
@@ -648,11 +647,7 @@ export class DiagnosticsCollector {
     if (typeof msg !== "string") {
       return;
     }
-    pushBounded(
-      this.get(deviceId).logs,
-      { ts: new Date().toISOString(), level, msg: this.anon.text(msg, this.deviceNames()) },
-      MAX_LOGS,
-    );
+    pushBounded(this.get(deviceId).logs, { ts: new Date().toISOString(), level, msg }, MAX_LOGS);
   }
 
   /**
@@ -669,36 +664,34 @@ export class DiagnosticsCollector {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
     }
-    // The topic embeds the account id (`GA/<hash>`, `GD/<hash>`): the
-    // anonymiser turns it into `GA/topic-N` (audit M12 — until 2.39.x it had
-    // no pattern for it and the topic shipped as it was).
-    const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: this.anon.text(String(topic)) };
-    if (typeof payload === "string") {
-      if (!payload) {
-        return;
-      }
-      entry.hex = capText(payload, MAX_PACKET_RAW_BYTES);
-    } else if (payload && typeof payload === "object") {
-      if (typeof payload.hex === "string" && payload.hex) {
-        entry.hex = capText(payload.hex, MAX_PACKET_RAW_BYTES);
-      }
-      if (typeof payload.rawJson === "string" && payload.rawJson) {
-        entry.rawJson = capText(this.cleanRawJson(payload.rawJson), MAX_PACKET_RAW_BYTES);
-      }
-      if (!entry.hex && !entry.rawJson) {
-        return;
-      }
-    } else {
+    // The topic embeds the account id (`GA/<hash>`, `GD/<hash>`): the report's
+    // placeholders turn it into `GA/topic-N` (audit M12).
+    const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: String(topic) };
+    const hex =
+      typeof payload === "string" ? payload : payload && typeof payload === "object" ? payload.hex : undefined;
+    const rawJson = payload && typeof payload === "object" ? payload.rawJson : undefined;
+    let omitted = 0;
+    if (typeof hex === "string" && hex) {
+      entry.hex = wholeOrNothing(hex, MAX_PACKET_RAW_BYTES);
+      omitted += entry.hex === undefined ? hex.length : 0;
+    }
+    if (typeof rawJson === "string" && rawJson) {
+      const clean = this.cleanRawJson(rawJson);
+      entry.rawJson = wholeOrNothing(clean, MAX_PACKET_RAW_BYTES);
+      omitted += entry.rawJson === undefined ? clean.length : 0;
+    }
+    if (omitted > 0) {
+      entry.omittedBytes = omitted;
+    }
+    if (!entry.hex && !entry.rawJson && !entry.omittedBytes) {
       return;
     }
     pushBounded(this.get(deviceId).packets, entry, MAX_PACKETS);
   }
 
   /**
-   * Redact and pseudonymise an MQTT envelope BEFORE it is capped — the same
-   * order as {@link recordApiFailure}. Capped first, the envelope was text that
-   * no longer parses, and a secret in front of the cut stayed out of reach of
-   * the key-based redaction (audit E4).
+   * Redact the secrets of an MQTT envelope when it is captured — the placeholders run when the report is made, on
+   * the whole envelope (audit E4: nothing is cut before that).
    *
    * @param rawJson The envelope as received
    */
@@ -706,9 +699,9 @@ export class DiagnosticsCollector {
     try {
       const parsed: unknown = JSON.parse(rawJson);
       redactSecretsInPlace(parsed);
-      return JSON.stringify(this.anon.walk(parsed));
+      return JSON.stringify(parsed);
     } catch {
-      return this.anon.text(rawJson);
+      return rawJson;
     }
   }
 
@@ -731,7 +724,7 @@ export class DiagnosticsCollector {
     }
     const entry: LanSendEntry = {
       ts: new Date().toISOString(),
-      ip: this.anon.ip(String(ip)),
+      ip: String(ip),
       cmd: String(cmd),
       payload: this.cloneAndCap(payload, MAX_LAN_SEND_BYTES),
     };
@@ -812,7 +805,7 @@ export class DiagnosticsCollector {
     // A body that parses as JSON goes through the same key-based redaction as
     // a successful one; whatever it is, addresses and mail addresses inside it
     // are replaced before the length cap can hide them in a truncated string.
-    const errMsg = this.anon.text(errText(error));
+    const errMsg = errText(error);
     const responseBody = error instanceof HttpError ? error.responseBody : undefined;
     const body: Record<string, unknown> = { error: errMsg, status: statusCode };
     if (typeof responseBody === "string" && responseBody.length > 0) {
@@ -820,11 +813,16 @@ export class DiagnosticsCollector {
       try {
         const parsed: unknown = JSON.parse(responseBody);
         redactSecretsInPlace(parsed);
-        cleaned = JSON.stringify(this.anon.walk(parsed));
+        cleaned = JSON.stringify(parsed);
       } catch {
-        cleaned = this.anon.text(responseBody);
+        cleaned = responseBody;
       }
-      body.responseBody = cleaned.length > MAX_BODY_BYTES ? `${cleaned.slice(0, MAX_BODY_BYTES)}…` : cleaned;
+      // whole or nothing (R3) — the placeholders of the report need the whole text
+      if (cleaned.length > MAX_BODY_BYTES) {
+        body.responseBodyOmittedBytes = cleaned.length;
+      } else {
+        body.responseBody = cleaned;
+      }
     }
     this.appendResponse(this.get(deviceId), {
       ts: new Date().toISOString(),
@@ -852,18 +850,14 @@ export class DiagnosticsCollector {
       // cap so a truncated body is masked too.
       const clone = JSON.parse(serialised) as unknown;
       redactSecretsInPlace(clone);
-      // Redact, THEN pseudonymise, THEN cap — in that order. The cap turns an
-      // oversized body into a plain truncated string, and neither pass can
-      // reach inside one afterwards, so a real address would ship in the
-      // truncated remainder. Names are not replaced here: they have no
-      // detectable shape and the report-wide pass in `generate` catches them
-      // (nothing this cap truncates is short enough to be a name).
-      const clean = this.anon.walk(clone);
-      const capped = JSON.stringify(clean);
-      if (typeof capped === "string" && capped.length > maxBytes) {
-        return `<truncated ${capped.length}b: ${capped.slice(0, maxBytes)}…>`;
+      // Redact now; the placeholders run when the report is made. A body over
+      // the limit keeps only its size (R3): a cut body could carry half of a
+      // personal value no placeholder pattern recognises any more.
+      const redacted = JSON.stringify(clone);
+      if (typeof redacted === "string" && redacted.length > maxBytes) {
+        return { omittedBytes: redacted.length };
       }
-      return clean;
+      return clone;
     } catch {
       return String(body);
     }
@@ -992,8 +986,8 @@ export class DiagnosticsCollector {
       readMe: {
         what: "Diagnostics export of one Govee device, for a GitHub issue. Pseudonymised; credentials removed.",
         markers:
-          "Markers (device-1, address-local-1, …) and the shortened device ids are stable INSIDE this file only. " +
-          "Never compare them across two exports — a second export, especially after a restart, may number them differently.",
+          "Placeholders (name-1, address-1, mac-1, …) are stable INSIDE this file only. " +
+          "Never compare them across two exports — every export numbers them anew.",
       },
       adapter: "iobroker.govee-smart",
       version: adapterVersion,
@@ -1003,8 +997,8 @@ export class DiagnosticsCollector {
       environment,
       device: {
         sku: device.sku,
-        deviceId: this.anon.deviceId(device.deviceId),
-        name: this.anon.deviceName(device.name),
+        deviceId: device.deviceId,
+        name: device.name,
         type: device.type,
         objectPrefix: prefix ?? null,
         // The strip's PHYSICAL length as the adapter settles it (quirk >
@@ -1025,8 +1019,8 @@ export class DiagnosticsCollector {
         // device kind by design.
         reachabilitySource: this.reachabilitySource(device),
         channels: { ...device.channels },
-        lanIp: device.lanIp ? this.anon.ip(device.lanIp) : null,
-        gateway: device.gateway ? this.anon.text(device.gateway) : null,
+        lanIp: device.lanIp ?? null,
+        gateway: device.gateway ?? null,
         // v2.9.1 — runtime flags / timestamps that were previously invisible
         manualMode: device.manualMode ?? false,
         manualSegments: device.manualSegments ?? null,
@@ -1145,12 +1139,24 @@ export class DiagnosticsCollector {
       objectTree,
     };
 
-    // Final report-wide pass. Device names have no detectable shape, so they can
-    // only be replaced by lookup — and the buffers were filled before some of
-    // them were even known. Re-running the pattern passes over the whole report
-    // is harmless: a marker no longer matches an address or an id, and the same
-    // mapping is reused, so markers stay stable.
-    return this.anon.walk(report, this.deviceNames(), this.digitDeviceIds()) as Record<string, unknown>;
+    // The report's placeholders (fleet DB-04), new for every report: the names
+    // the user gave — devices, groups, and this device's snapshots and DIY
+    // scenes (GV-30) — by lookup, the shapeless Govee values by key, then
+    // names, mail, hardware ids and addresses by their form.
+    const snapshotNames = [
+      ...device.snapshots.map(s => s.name),
+      ...device.diyScenes.map(s => s.name),
+      ...(Array.isArray(localSnapshots)
+        ? localSnapshots
+            .map(s => (s as { name?: unknown } | null)?.name)
+            .filter((n): n is string => typeof n === "string")
+        : []),
+    ];
+    return pseudonymiseReport(
+      report,
+      { names: [...this.deviceNames(), ...snapshotNames], digitIds: this.digitDeviceIds() },
+      new Placeholders(),
+    ) as Record<string, unknown>;
   }
 
   /**

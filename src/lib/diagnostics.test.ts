@@ -160,11 +160,9 @@ describe("DiagnosticsCollector", () => {
       const json = JSON.stringify(result);
       expect(json).not.toContain("CANARYsecret0=");
       expect(json).not.toContain("GD/f501fb");
-      // and it really is the truncated shape, not a body that stayed small
+      // and it really is the oversized shape: the body keeps only its size (whole or nothing, fleet R3)
       const entry = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/device/rest/devices/v1/list"][0];
-      expect(typeof entry.body).toBe("string");
-      expect(entry.body as string).toContain("<truncated");
-      expect(entry.body as string).toContain("***");
+      expect(entry.body).toEqual({ omittedBytes: expect.any(Number) as number });
     });
 
     it("keeps multiple slots per endpoint (no overwrite)", async () => {
@@ -205,16 +203,15 @@ describe("DiagnosticsCollector", () => {
       expect(hist["/ep24"]).toBeDefined();
     });
 
-    it("truncates large bodies with marker (v2.9.1 cap=65536)", async () => {
+    it("keeps only the size of a body over the limit — never a cut body (fleet R3, cap=65536)", async () => {
       const c = new DiagnosticsCollector(registry);
-      // Body must exceed MAX_BODY_BYTES (65_536) to trigger truncation. Use
-      // ~70 KB so the cloneAndCap branch fires.
+      // Body must exceed MAX_BODY_BYTES (65_536). A cut body could carry half of
+      // a personal value the report's placeholders no longer recognise.
       const big = "x".repeat(70_000);
       c.recordApiSuccess("dev1", "/api/big", { huge: big });
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
       const list = (result.apiHistory as Record<string, Array<{ body: unknown }>>)["/api/big"];
-      expect(typeof list[0].body).toBe("string");
-      expect(list[0].body as string).toContain("<truncated");
+      expect(list[0].body).toEqual({ omittedBytes: JSON.stringify({ huge: big }).length });
     });
 
     it("keeps a device's API history under the byte budget — oldest entries anywhere go first, the newest stays", async () => {
@@ -242,18 +239,17 @@ describe("DiagnosticsCollector", () => {
       expect(hist["/api/scenes"]?.[0]?.body.i ?? 6).toBeGreaterThan(0);
     });
 
-    it("caps a captured MQTT envelope and a LAN payload instead of storing them whole", async () => {
+    it("an MQTT envelope or LAN payload over its limit keeps only its size — whole or nothing (fleet R3)", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", { rawJson: "y".repeat(20_000), hex: "aa" });
       c.addLanSend("dev1", "10.0.0.5", "ptReal", { command: ["z".repeat(40_000)] });
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
-      const packet = (result.lastMqttPackets as Array<{ rawJson: string; hex: string }>)[0];
+      const packet = (result.lastMqttPackets as Array<{ rawJson?: string; hex: string; omittedBytes?: number }>)[0];
       expect(packet.hex).toBe("aa");
-      expect(packet.rawJson.length).toBeLessThan(4_200);
-      expect(packet.rawJson).toContain("<truncated 20000b>");
+      expect(packet.rawJson).toBeUndefined();
+      expect(packet.omittedBytes).toBe(20_000);
       const send = (result.lanSends as Array<{ payload: unknown }>)[0];
-      expect(typeof send.payload).toBe("string");
-      expect(send.payload as string).toContain("<truncated");
+      expect(send.payload).toEqual({ omittedBytes: JSON.stringify({ command: ["z".repeat(40_000)] }).length });
     });
 
     it("falls back to String() when body is non-serialisable", async () => {
@@ -593,7 +589,8 @@ describe("DiagnosticsCollector", () => {
       const snaps = result.snapshots as { count: number; bleCmds: Array<{ name: string; packets: string[][] }> };
       expect(snaps.count).toBe(1);
       expect(snaps.bleCmds).toHaveLength(1);
-      expect(snaps.bleCmds[0].name).toBe("n8licht");
+      // the snapshot name is the user's own — a placeholder in the report (GV-30)
+      expect(snaps.bleCmds[0].name).toMatch(/^name-\d+$/);
       expect(snaps.bleCmds[0].packets).toEqual(N8LICHT_BLE_CMDS);
     });
 
@@ -663,9 +660,10 @@ describe("DiagnosticsCollector", () => {
           Array<Record<string, unknown>>
         >
       )["/api/oops"];
+      // whole or nothing (fleet R3): only the size of an oversized body stays
       const body = list[0].body as Record<string, unknown>;
-      expect((body.responseBody as string).length).toBeLessThan(80_000);
-      expect((body.responseBody as string).endsWith("…")).toBe(true);
+      expect(body.responseBody).toBeUndefined();
+      expect(body.responseBodyOmittedBytes).toBeGreaterThan(65_536);
     });
   });
 
@@ -679,7 +677,7 @@ describe("DiagnosticsCollector", () => {
       // The destination is pseudonymised — a marker, never the real address —
       // but it stays a stable one, so two sends to the same device remain
       // recognisably the same device.
-      expect(sends[0].ip).toBe("address-local-1");
+      expect(sends[0].ip).toBe("address-1");
       expect(JSON.stringify(result)).not.toContain("192.168.1.36");
       expect(sends[0].cmd).toBe("ptReal");
       expect(sends[0].bytes).toBe(572);
@@ -903,7 +901,7 @@ describe("DiagnosticsCollector", () => {
       );
       const text = JSON.stringify(report);
       expect(text).not.toContain("12345678");
-      expect((report.device as Record<string, unknown>).objectPrefix).toBe("groups.id-…5678");
+      expect((report.device as Record<string, unknown>).objectPrefix).toBe("groups.group-1");
     });
   });
 
@@ -1044,11 +1042,11 @@ describe("DiagnosticsCollector", () => {
       expect((rt.rateLimiter as Record<string, number>).usedToday).toBe(42);
       // The discovery trace lists every device seen on the network — the one
       // field that carried addresses of devices the report is not even about.
-      expect(rt.lanSeenDeviceIps).toEqual(["id-…1d6f:address-local-1"]);
+      expect(rt.lanSeenDeviceIps).toEqual([expect.stringMatching(/^mac-\d+:address-\d+$/)]);
       expect(JSON.stringify(result)).not.toContain("10.0.0.1");
       expect(JSON.stringify(result)).not.toContain("AA:BB:CC:DD:EE:FF");
       // The per-device buckets of the limiter (2.39.0) are keyed by device id —
-      // the keys go through the anonymiser like every other id in the report.
+      // the keys go through the report's placeholders like every other id.
       const lanes = (rt.rateLimiter as { lanes: { deviceRead: { devices: Array<{ deviceKey: string }> } } }).lanes;
       expect(lanes.deviceRead.devices[0].deviceKey).not.toContain("AA:BB:CC:DD:EE:FF:00:11");
       expect(lanes.deviceRead.devices[0].deviceKey).toMatch(/^H6172:/);
@@ -1084,7 +1082,8 @@ describe("DiagnosticsCollector", () => {
       const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
       const snaps = result.localSnapshots as Array<Record<string, unknown>>;
       expect(snaps).toHaveLength(1);
-      expect(snaps[0].name).toBe("Morning");
+      // a local snapshot's name is the user's own — a placeholder in the report (GV-30)
+      expect(snaps[0].name).toMatch(/^name-\d+$/);
       expect(snaps[0].brightness).toBe(60);
     });
   });

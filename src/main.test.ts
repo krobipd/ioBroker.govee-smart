@@ -3322,7 +3322,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     )(`${device.sku}:${device.deviceId}`);
     await settle(6);
     expect(result.content).not.toContain("98765432");
-    expect(result.content).toContain("member of group id-…5432");
+    expect(result.content).toMatch(/member of group group-\d+/);
     const startedAt = JSON.parse(result.content).environment.startedAt as string;
     expect(startedAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
     // The zero point of this run — onReady's start, not the epoch or the process.
