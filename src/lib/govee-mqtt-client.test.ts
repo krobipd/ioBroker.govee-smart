@@ -1,4 +1,5 @@
 import { GoveeMqttClient, LoginWindow, classifyLoginResponse } from "./govee-mqtt-client";
+import { limitOf } from "./api-limits";
 import { type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
 import { mockLog, mockTimers } from "../../test/test-helpers";
 import type { TimerAdapter } from "./types";
@@ -597,6 +598,24 @@ describe("GoveeMqttClient", () => {
           opts: { qos: 0 },
         },
       ]);
+    });
+
+    it("commands and status requests together stay within the broker's minute cap less its protocol writes (GV-08)", async () => {
+      const { client, published } = connectedClient();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      (client as unknown as { client: { connected: boolean } }).client.connected = true;
+      const cap = limitOf("Govee account broker (AWS IoT MQTT)", 60).max - 40;
+      for (let i = 0; i < cap - 1; i++) {
+        expect(client.publishCommand("GD/x", "turn", { val: i % 2 })).toBe(true);
+      }
+      expect(client.requestStatus("GD/x")).toBe(true);
+      // the next one would go over — not sent, so the router takes the Cloud and the status request is retried later
+      expect(client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
+      expect(client.requestStatus("GD/x")).toBe(false);
+      expect(published).toHaveLength(cap);
     });
 
     it("a light command is not sent while the broker is not connected", async () => {

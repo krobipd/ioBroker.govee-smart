@@ -1,4 +1,4 @@
-import { httpsRequest } from "../http-client";
+import type { HttpsRequestFn } from "../http-client";
 import { errText } from "../types";
 import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-constants";
 
@@ -14,10 +14,14 @@ import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-consta
  *
  * @param adapter Adapter surface
  * @param adapter.log The adapter log
+ * @param request The request function — the adapter's call gate (api-limits.json)
  */
-export async function refreshLiveAppVersion(adapter: { readonly log: ioBroker.Logger }): Promise<void> {
+export async function refreshLiveAppVersion(
+  adapter: { readonly log: ioBroker.Logger },
+  request: HttpsRequestFn,
+): Promise<void> {
   try {
-    const result = await httpsRequest<{ resultCount?: number; results?: Array<{ version?: string }> }>({
+    const result = await request<{ resultCount?: number; results?: Array<{ version?: string }> }>({
       method: "GET",
       url: "https://itunes.apple.com/lookup?bundleId=com.ihoment.GoVeeSensor",
       headers: { "User-Agent": "ioBroker.govee-smart" },

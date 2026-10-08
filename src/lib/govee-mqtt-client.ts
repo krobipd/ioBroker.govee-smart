@@ -2,6 +2,8 @@ import * as crypto from "node:crypto";
 import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
+import { limitOf } from "./api-limits";
+import { CallGate } from "./call-gate";
 import { GOVEE_APP_BASE_URL, buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
 import {
   MQTT_LOGIN_WINDOW_MS,
@@ -24,6 +26,25 @@ import {
 } from "./types";
 import { classifyError, logCallFailure, type ErrorCategory } from "./error-category";
 import { LogOnce } from "./log-once";
+
+/**
+ * Writes on the broker connection that are no publish of ours — TLS handshake, CONNECT, SUBSCRIBE and the 60 s keepalive,
+ * with reconnects at least 5 s apart and doubling. They come off the broker's minute cap in api-limits.json; what is left
+ * is the most commands and status requests one minute may publish (K18, GV-08).
+ */
+const BROKER_PROTOCOL_WRITES_PER_MINUTE = 40;
+const BROKER_PUBLISHES = {
+  name: "account broker publishes",
+  match: {},
+  limits: [
+    {
+      max: limitOf("Govee account broker (AWS IoT MQTT)", 60).max - BROKER_PROTOCOL_WRITES_PER_MINUTE,
+      seconds: 60,
+      per: "account" as const,
+      source: "api-limits.json less the protocol writes",
+    },
+  ],
+};
 
 const LOGIN_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v2/login`;
 const IOT_KEY_URL = `${GOVEE_APP_BASE_URL}/app/v1/account/iot/key`;
@@ -181,6 +202,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private accountTopic = "";
   /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
   private readonly logOnce: LogOnce;
+  /** Commands and status requests per minute (K18, GV-08). */
+  private readonly publishGate: CallGate;
   private _bearerToken = "";
   private accountId = "";
   /**
@@ -298,6 +321,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   ) {
     super(log, timers);
     this.logOnce = new LogOnce(log);
+    this.publishGate = new CallGate(ms => timers.delay(ms));
     this.email = email;
     this.password = password;
     this.httpsRequestImpl = httpsRequestImpl;
@@ -397,7 +421,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   requestStatus(deviceTopic: string, now: number = Date.now(), cmdVersion: 1 | 2 = 2): boolean {
     const client = this.client;
-    if (!client || !this.connected) {
+    if (!client || !this.connected || !this.publishGate.tryAdmit(BROKER_PUBLISHES, "")) {
       return false;
     }
     // homebridge-govee (lib/connection/aws.js) adds the account topic to every
@@ -428,11 +452,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param cmd Govee's command word (`turn`, `brightness`, `colorwc`)
    * @param data The command's data object
    * @param now Send time in ms — becomes the transaction stamp
-   * @returns false when the broker is not connected (nothing sent)
+   * @returns false when the broker is not connected or the minute's publishes are used up (nothing sent)
    */
   publishCommand(deviceTopic: string, cmd: string, data: Record<string, unknown>, now: number = Date.now()): boolean {
     const client = this.client;
-    if (!client || !this.connected) {
+    if (!client || !this.connected || !this.publishGate.tryAdmit(BROKER_PUBLISHES, "")) {
       return false;
     }
     const payload = JSON.stringify({ msg: { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 } });

@@ -441,6 +441,38 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     client.stop();
   });
 
+  it("an eleventh datagram to a light within a second waits for its control limit — delayed in order, never dropped (GV-08)", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const pending: Array<() => void> = [];
+    const timers = { ...lanTimers, setTimeout: (fn: () => void) => pending.push(fn) } as unknown as TimerAdapter;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[0];
+    const levels = Array.from({ length: 12 }, (_, i) => i + 1);
+    for (const level of levels) {
+      client.setBrightness("10.0.0.7", level);
+    }
+    const sent = (): number[] =>
+      sendSock.sends
+        .filter(d => d.address === "10.0.0.7")
+        .map(d => (decode(d) as { msg: { data: { value: number } } }).msg.data.value);
+    expect(sent()).toEqual(levels.slice(0, 10));
+    // a second light is not held up by the first one's limit
+    client.setPower("10.0.0.8", true);
+    expect(sendSock.sends.at(-1)?.address).toBe("10.0.0.8");
+    vi.setSystemTime(Date.now() + 1001);
+    expect(pending).toHaveLength(1);
+    pending.shift()!();
+    expect(sent()).toEqual(levels);
+    client.stop();
+    vi.useRealTimers();
+  });
+
   it("setBrightness clamps into 0..100 before it goes on the wire", () => {
     const { client, sendSock } = startedClient();
     client.setBrightness("10.0.0.5", 150);

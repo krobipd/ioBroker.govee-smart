@@ -1,13 +1,12 @@
 import { vi } from "vitest";
 
-// refreshLiveAppVersion calls the module-level httpsRequest (no DI) — mock it.
-vi.mock("../http-client", () => ({ httpsRequest: vi.fn() }));
-
 import { refreshLiveAppVersion } from "./app-version";
-import { httpsRequest } from "../http-client";
+import type { HttpsRequestFn } from "../http-client";
 import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-constants";
 
-const mockHttp = vi.mocked(httpsRequest);
+// refreshLiveAppVersion takes the adapter's request function (its call gate) — a mock stands in for it.
+const mockHttp = vi.fn();
+const request = mockHttp as unknown as HttpsRequestFn;
 
 function makeRig(_opts: Record<string, never>): {
   adapter: { log: ioBroker.Logger };
@@ -42,7 +41,7 @@ describe("refreshLiveAppVersion", () => {
   it("adopts the live app version for the request headers (no datapoint, no warning)", async () => {
     mockHttp.mockResolvedValue(itunesVersion("9.9.9"));
     const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter, request);
     expect(getAppVersion()).toBe("9.9.9");
     expect(rig.logs.warn).toHaveLength(0);
     expect(rig.stateWrites.find(w => w.id === "info.appVersionDrift")).toBeUndefined();
@@ -51,14 +50,14 @@ describe("refreshLiveAppVersion", () => {
   it("keeps the bundled fallback on a malformed store response", async () => {
     mockHttp.mockResolvedValue({ value: { results: [] }, statusCode: 200 });
     const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter, request);
     expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
   });
 
   it("ignores a non-numeric version string (regex guard never breaks the headers)", async () => {
     mockHttp.mockResolvedValue(itunesVersion("garbage"));
     const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter, request);
     expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
   });
 
@@ -67,7 +66,7 @@ describe("refreshLiveAppVersion", () => {
       return Promise.reject(new Error("ENOTFOUND itunes.apple.com"));
     });
     const rig = makeRig({});
-    await refreshLiveAppVersion(rig.adapter);
+    await refreshLiveAppVersion(rig.adapter, request);
     expect(rig.logs.warn).toHaveLength(0);
     expect(getAppVersion()).toBe(GOVEE_APP_VERSION);
     expect(rig.logs.debug.some(m => m.includes("App version lookup failed"))).toBe(true);

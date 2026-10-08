@@ -1,0 +1,88 @@
+{
+  "counterparts": [
+    {
+      "name": "Govee OpenAPI (REST)",
+      "match": { "host": "openapi.api.govee.com", "kind": "http" },
+      "limits": [
+        {
+          "max": 9000,
+          "seconds": 86400,
+          "per": "account",
+          "source": "own cap of 9,000 below the 10,000 calls per account and day in Govee's v1 API PDF; the v2 reference (get-you-devices, 'Friendly Reminder', 2026-07-06) names per-minute limits per device and account but no daily one — kept by the rate limiter (CLOUD_LIMITS.perDay)"
+        }
+      ]
+    },
+    {
+      "name": "Govee App API",
+      "match": { "host": "app2.govee.com", "kind": "http" },
+      "limits": [
+        {
+          "max": 12,
+          "seconds": 60,
+          "per": "account",
+          "source": "own cap of the adapter — Govee documents none for this undocumented app endpoint; every request waits at the call gate (api-limits.ts) until it fits"
+        }
+      ]
+    },
+    {
+      "name": "Apple App Store lookup",
+      "match": { "host": "itunes.apple.com", "kind": "http" },
+      "limits": [
+        {
+          "max": 2,
+          "seconds": 3600,
+          "per": "account",
+          "source": "own cap of the adapter — the Govee app version is looked up at most once a day and kept in the instance data; the call gate (api-limits.ts) holds the rest"
+        }
+      ]
+    },
+    {
+      "name": "Govee OpenAPI events (MQTT)",
+      "match": { "host": "mqtt.openapi.govee.com", "port": 8883 },
+      "limits": [
+        {
+          "max": 40,
+          "seconds": 60,
+          "per": "account",
+          "source": "own cap of the adapter — Govee documents none; the client only connects, subscribes and pings every 60 s, and reconnects back off from 5 s doubling (reconnecting-mqtt-client)"
+        }
+      ]
+    },
+    {
+      "name": "Govee account broker (AWS IoT MQTT)",
+      "match": { "hostPattern": "^[a-z0-9]+-ats\\.iot\\.[a-z0-9-]+\\.amazonaws\\.com$", "port": 8883 },
+      "limits": [
+        {
+          "max": 60,
+          "seconds": 60,
+          "per": "account",
+          "source": "own cap of the adapter — Govee documents none (K18 research 2026-10-08); the client lets at most this cap less 40 protocol writes (TLS, connect, subscribe, the 60 s keepalive under the 5 s doubling reconnect backoff) out as commands and status requests per minute, and refuses the rest (govee-mqtt-client)"
+        }
+      ]
+    },
+    {
+      "name": "Govee LAN discovery",
+      "match": { "kind": "udp", "port": 4001 },
+      "limits": [
+        {
+          "max": 4,
+          "seconds": 30,
+          "per": "host",
+          "source": "own cap of the adapter — one scan datagram per target every 30 s plus the scan at start; the scan skips a target that would go over it (govee-lan-client)"
+        }
+      ]
+    },
+    {
+      "name": "Govee LAN control",
+      "match": { "kind": "udp", "port": 4003 },
+      "limits": [
+        {
+          "max": 10,
+          "seconds": 1,
+          "per": "host",
+          "source": "own cap of the adapter — Govee's LAN API documents none; the LAN client delays a datagram that would go over it (govee-lan-client)"
+        }
+      ]
+    }
+  ]
+}

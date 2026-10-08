@@ -1,3 +1,4 @@
+import { limitOf } from "./api-limits";
 /**
  * Central timing constants for the adapter.
  *
@@ -352,7 +353,8 @@ export const CLOUD_LIMITS: CloudLimits = {
   deviceControl: { perSecond: 2, burst: 6 },
   accountControl: { perSecond: 12, burst: 80 },
   appApiPerMinute: 8,
-  perDay: 9000,
+  // The one source of the daily number is api-limits.json (GV-08).
+  perDay: limitOf("Govee OpenAPI (REST)", 86_400).max,
 };
 
 /**

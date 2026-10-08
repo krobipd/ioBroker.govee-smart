@@ -6,6 +6,7 @@ import { DeviceRegistry } from "./lib/device-registry";
 import { DeviceManager } from "./lib/device-manager";
 import { effectiveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
+import { CallGate } from "./lib/call-gate";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
 import { GoveeMqttClient, LoginWindow } from "./lib/govee-mqtt-client";
@@ -151,6 +152,8 @@ export class GoveeAdapter extends utils.Adapter {
   // run FOR REAL against the stub adapter — that is what makes the state-tree
   // assertions meaningful (hassemu hybrid pattern). Production behaviour is
   // unchanged: every default is the same constructor call as before.
+  /** The short windows of api-limits.json for this instance — every HTTP client waits at it (GV-08). */
+  private readonly callGate = new CallGate(ms => this.delay(ms));
   /**
    * @param log Adapter logger forwarded to the LAN client
    * @param timers Adapter timer wrapper
@@ -168,7 +171,8 @@ export class GoveeAdapter extends utils.Adapter {
     password: string,
     log: ioBroker.Logger,
     timers: GoveeAdapter,
-  ) => GoveeMqttClient = (email, password, log, timers) => new GoveeMqttClient(email, password, log, timers);
+  ) => GoveeMqttClient = (email, password, log, timers) =>
+    new GoveeMqttClient(email, password, log, timers, this.callGate.https());
   /**
    * @param apiKey Govee Cloud API key
    * @param log Adapter logger
@@ -184,9 +188,10 @@ export class GoveeAdapter extends utils.Adapter {
    * @param log Adapter logger
    */
   private makeCloudClient: (apiKey: string, log: ioBroker.Logger) => GoveeCloudClient = (apiKey, log) =>
-    new GoveeCloudClient(apiKey, log);
+    new GoveeCloudClient(apiKey, log, this.callGate.https());
   /** @param log Adapter logger */
-  private makeApiClient: (log: ioBroker.Logger) => GoveeApiClient = log => new GoveeApiClient(log);
+  private makeApiClient: (log: ioBroker.Logger) => GoveeApiClient = log =>
+    new GoveeApiClient(log, this.callGate.https());
   /**
    * @param log Adapter logger
    * @param timers Adapter timer wrapper
@@ -575,7 +580,7 @@ export class GoveeAdapter extends utils.Adapter {
     // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
     // this resolves; a daily timer keeps it fresh.
     void appVersion
-      .refreshLiveAppVersion(this.handlerHost)
+      .refreshLiveAppVersion(this.handlerHost, this.callGate.https())
       .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
 
     // One-shot cleanups: objects earlier versions left behind that nothing reads any more.
@@ -1282,7 +1287,7 @@ export class GoveeAdapter extends utils.Adapter {
     // initial fetch is fired early in onReady, above).
     this.appVersionCheckTimer = this.setInterval(() => {
       appVersion
-        .refreshLiveAppVersion(this.handlerHost)
+        .refreshLiveAppVersion(this.handlerHost, this.callGate.https())
         .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
     }, APP_VERSION_CHECK_INTERVAL_MS);
 

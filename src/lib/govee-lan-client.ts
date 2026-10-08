@@ -14,6 +14,12 @@ import {
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import { logCallFailure } from "./error-category";
 import { LogOnce } from "./log-once";
+import { counterpartNamed } from "./api-limits";
+import { CallGate } from "./call-gate";
+
+/** The LAN counterparts of api-limits.json (GV-08). */
+const LAN_DISCOVERY = counterpartNamed("Govee LAN discovery");
+const LAN_CONTROL = counterpartNamed("Govee LAN control");
 import { SEGMENT_COUNT_MAX } from "./device-manager/lookups";
 
 const MULTICAST_ADDR = "239.255.255.250";
@@ -67,6 +73,12 @@ export class GoveeLanClient {
   private sendSocket: dgram.Socket | null = null;
   /** Send failures per address — said once per kind, repeats on debug until a send succeeds. */
   private readonly logOnce: LogOnce;
+  /** The LAN limits of api-limits.json: scan targets per host, control datagrams per light (GV-08). */
+  private readonly gate: CallGate;
+  /** Datagrams to a light that wait for its control limit, oldest first — delayed, never dropped. */
+  private readonly paced = new Map<string, Array<() => void>>();
+  /** The timer that releases the waiting datagrams of a light. */
+  private readonly pacedTimers = new Map<string, ioBroker.Timeout | undefined>();
   private scanTimer: ioBroker.Interval | undefined = undefined;
   /**
    * True after `stop()` was called — bind-callbacks check this flag before
@@ -130,6 +142,7 @@ export class GoveeLanClient {
     this.log = log;
     this.timers = timers;
     this.logOnce = new LogOnce(log);
+    this.gate = new CallGate(ms => timers.delay(ms));
   }
 
   /**
@@ -335,6 +348,14 @@ export class GoveeLanClient {
       this.timers.clearTimeout(handle);
     }
     this.pendingFlashTimers.clear();
+    // Datagrams still waiting for a light's limit go nowhere after a stop.
+    for (const handle of this.pacedTimers.values()) {
+      if (handle !== undefined) {
+        this.timers.clearTimeout(handle);
+      }
+    }
+    this.pacedTimers.clear();
+    this.paced.clear();
     if (this.scanSocket) {
       // dropMembership symmetric to addMembership — on macOS/Windows the
       // multicast filter could otherwise linger on the NIC until process exit.
@@ -386,6 +407,61 @@ export class GoveeLanClient {
    * @param data Command data
    */
   private sendCommand(ip: string, cmd: string, data: Record<string, unknown>): void {
+    if (!this.sendSocket) {
+      this.log.debug(`LAN send dropped (socket not ready): ${cmd} → ${ip}`);
+      this.onSend?.(ip, cmd, data, 0, "socket not ready");
+      return;
+    }
+    // The light's control limit (api-limits.json): a datagram over it waits, in order, behind the ones before it.
+    const send = (): void => this.transmit(ip, cmd, data);
+    const waiting = this.paced.get(ip);
+    if (waiting) {
+      waiting.push(send);
+      return;
+    }
+    if (this.gate.tryAdmit(LAN_CONTROL, ip)) {
+      send();
+      return;
+    }
+    this.log.debug(`LAN ${cmd} to ${ip} waits for the control limit`);
+    this.paced.set(ip, [send]);
+    this.releaseLater(ip);
+  }
+
+  /**
+   * Arm the release of the datagrams waiting for a light, at the moment its limit has room again.
+   *
+   * @param ip Device IP address
+   */
+  private releaseLater(ip: string): void {
+    this.pacedTimers.set(
+      ip,
+      this.timers.setTimeout(
+        () => {
+          this.pacedTimers.delete(ip);
+          const waiting = this.paced.get(ip);
+          while (waiting && waiting.length > 0 && this.gate.tryAdmit(LAN_CONTROL, ip)) {
+            waiting.shift()!();
+          }
+          if (!waiting || waiting.length === 0) {
+            this.paced.delete(ip);
+          } else {
+            this.releaseLater(ip);
+          }
+        },
+        this.gate.waitMs(LAN_CONTROL, ip),
+      ),
+    );
+  }
+
+  /**
+   * Put one control datagram on the wire.
+   *
+   * @param ip Device IP address
+   * @param cmd Command name
+   * @param data Command data
+   */
+  private transmit(ip: string, cmd: string, data: Record<string, unknown>): void {
     if (!this.sendSocket) {
       this.log.debug(`LAN send dropped (socket not ready): ${cmd} → ${ip}`);
       this.onSend?.(ip, cmd, data, 0, "socket not ready");
@@ -666,6 +742,11 @@ export class GoveeLanClient {
     const broadcasts = interfaceBroadcasts(this.multicastBind, os.networkInterfaces());
     const targets = new Set<string>([MULTICAST_ADDR, ...broadcasts, ...known]);
     for (const target of targets) {
+      // The discovery limit per host (api-limits.json): a target scanned too often is skipped this round.
+      if (!this.gate.tryAdmit(LAN_DISCOVERY, target)) {
+        this.log.debug(`LAN scan to ${target} skipped — discovery limit`);
+        continue;
+      }
       this.scanSocket?.send(buf, 0, buf.length, SCAN_PORT, target, err => {
         if (err) {
           this.log.debug(`LAN scan send error (${target}): ${err.message}`);

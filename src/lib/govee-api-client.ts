@@ -1,4 +1,4 @@
-import { formatFallback, HttpError, httpsRequest, type HttpResult } from "./http-client";
+import { formatFallback, HttpError, httpsRequest, type HttpResult, type HttpsRequestFn } from "./http-client";
 import {
   GOVEE_APP_BASE_URL,
   buildGoveeAppHeaders,
@@ -197,7 +197,14 @@ export class GoveeApiClient {
    *   Issue #13 v2.8.2 hard to triage from the log alone (the App-API path
    *   was completely silent before v2.8.3).
    */
-  constructor(private readonly log: ioBroker.Logger) {}
+  /**
+   * @param log ioBroker logger
+   * @param httpsRequestImpl The request function — the adapter passes its call gate's (api-limits.json); tests the plain one
+   */
+  constructor(
+    private readonly log: ioBroker.Logger,
+    private readonly httpsRequestImpl: HttpsRequestFn = httpsRequest,
+  ) {}
 
   /**
    * Update the bearer token (obtained from MQTT login).
@@ -285,7 +292,7 @@ export class GoveeApiClient {
       return [];
     }
     this.log.debug(`App API POST ${APP_API_PATHS.deviceList} bearer=yes`);
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       status?: number;
       message?: string;
       devices?: Array<{
@@ -385,7 +392,7 @@ export class GoveeApiClient {
   > {
     this.log.debug(`App API GET ${APP_API_PATHS.sceneLibrary} sku=${sku} bearer=no (public endpoint)`);
     const url = appUrl(APP_API_PATHS.sceneLibrary, { sku });
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: {
         categories?: Array<{
           scenes?: Array<{
@@ -471,7 +478,7 @@ export class GoveeApiClient {
     }
     this.log.debug(`App API GET ${APP_API_PATHS.musicLibrary} sku=${sku} bearer=yes`);
     const url = appUrl(APP_API_PATHS.musicLibrary, { sku });
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: {
         categories?: Array<{
           categoryName?: string;
@@ -525,7 +532,7 @@ export class GoveeApiClient {
     }
     this.log.debug(`App API GET ${APP_API_PATHS.diyLibrary} sku=${sku} bearer=yes`);
     const url = appUrl(APP_API_PATHS.diyLibrary, { sku });
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: {
         categories?: Array<{
           scenes?: Array<{
@@ -570,7 +577,7 @@ export class GoveeApiClient {
     }
     this.log.debug(`App API GET ${APP_API_PATHS.skuFeatures} sku=${sku} bearer=yes`);
     const url = appUrl(APP_API_PATHS.skuFeatures, { sku });
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: Record<string, unknown>;
     } | null>({ method: "GET", url, headers: this.authHeaders() });
     this.logFallback(`${APP_API_PATHS.skuFeatures} sku=${sku}`, result);
@@ -598,7 +605,7 @@ export class GoveeApiClient {
     }
     this.log.debug(`App API GET ${APP_API_PATHS.snapshots} sku=${sku} device=${deviceId} bearer=yes`);
     const url = appUrl(APP_API_PATHS.snapshots, { sku, device: deviceId, snapshotId: "-1" });
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: {
         snapshots?: Array<{
           name?: string;
@@ -656,7 +663,7 @@ export class GoveeApiClient {
     }
     this.log.debug(`App API GET ${APP_API_PATHS.groupMembers} bearer=yes`);
     const url = appUrl(APP_API_PATHS.groupMembers);
-    const result = await httpsRequest<{
+    const result = await this.httpsRequestImpl<{
       data?: {
         components?: Array<{
           groups?: Array<{

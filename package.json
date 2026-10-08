@@ -65,7 +65,8 @@
     "devices.json",
     "io-package.json",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "src/lib/api-limits.json"
   ],
   "scripts": {
     "prebuild": "rimraf build",
