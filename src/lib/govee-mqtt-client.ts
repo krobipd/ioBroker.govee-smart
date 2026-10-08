@@ -418,6 +418,33 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   }
 
   /**
+   * Send a light command over the account broker (K18) — the way the Govee app
+   * and govee2mqtt (`src/service/iot.rs`) control a device: a publish on the
+   * device's own topic with `cmdVersion 0`, `type 1`, `v_<ms>000`, QoS 0. The
+   * broker gives no receipt; only the device's status packet on the account
+   * topic says it took the command (GV-13).
+   *
+   * @param deviceTopic The device's publish topic from the account list
+   * @param cmd Govee's command word (`turn`, `brightness`, `colorwc`)
+   * @param data The command's data object
+   * @param now Send time in ms — becomes the transaction stamp
+   * @returns false when the broker is not connected (nothing sent)
+   */
+  publishCommand(deviceTopic: string, cmd: string, data: Record<string, unknown>, now: number = Date.now()): boolean {
+    const client = this.client;
+    if (!client || !this.connected) {
+      return false;
+    }
+    const payload = JSON.stringify({ msg: { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 } });
+    client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
+      if (err) {
+        this.log.debug(`MQTT command ${cmd} to ${deviceTopic.slice(0, 6)}… failed: ${errText(err)}`);
+      }
+    });
+    return true;
+  }
+
+  /**
    * Short user-facing reason for "MQTT not connected", or null if the
    * client has never seen an error. Used by the adapter ready-summary
    * to give a concrete message instead of "still pending".

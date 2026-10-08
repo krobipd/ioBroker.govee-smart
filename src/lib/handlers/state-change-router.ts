@@ -16,6 +16,7 @@ import type * as connectionState from "./connection-state";
 import * as dropdownReset from "./dropdown-reset-helpers";
 import { sendMusicCommand } from "./music-command";
 import { confirmationFor } from "../confirmation";
+import { brokerCommandOf } from "../broker-commands";
 
 /**
  * Adapter surface required by the state-change router. Includes everything
@@ -60,9 +61,11 @@ async function ackUnlessReported(
   stateSuffix: string,
   val: ioBroker.StateValue,
 ): Promise<boolean> {
+  const command = brokerCommandOf(stateSuffix);
   const channels = {
     lanListening: adapter.lanClient?.isListening() ?? false,
     brokerConnected: adapter.mqttClient?.connected ?? false,
+    viaBroker: command !== undefined && adapter.deviceManager?.transportUsed(device, command) === "broker",
   };
   if (confirmationFor(device, stateSuffix, channels) === "report") {
     return false;

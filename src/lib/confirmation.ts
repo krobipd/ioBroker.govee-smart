@@ -11,6 +11,8 @@ export interface ReportChannels {
   lanListening: boolean;
   /** The account broker is connected — the device's own status push arrives over it. */
   brokerConnected: boolean;
+  /** The command went over the account broker (K18) — its publish has no receipt. */
+  viaBroker: boolean;
 }
 
 /** The four values a LAN light answers in its `devStatus` (govee-lan-client `parseStatus`). */
@@ -37,7 +39,8 @@ export function pushReportKey(stateSuffix: string): string {
  * How a write to this datapoint is confirmed (GV-13, krobi 2026-10-08: where Govee delivers a device report only it
  * confirms; elsewhere a clean send or Govee's "success" counts). A report counts only where its writer really runs: the
  * LAN status of a light the LAN client hears, and — with the account broker connected — a field this device's own status
- * push has carried before (learned per device and field, never a model list). Everything else is confirmed by the send.
+ * push has carried before (learned per device and field, never a model list). A command that went over the account broker
+ * (K18) has no receipt at all, so only the device's status packet confirms it. Everything else is confirmed by the send.
  *
  * @param device Target device
  * @param stateSuffix Written datapoint below the device (`control.power`, …)
@@ -50,6 +53,9 @@ export function confirmationFor(
   channels: ReportChannels,
   now: number = Date.now(),
 ): Confirmation {
+  if (channels.viaBroker) {
+    return "report";
+  }
   if (LAN_STATUS_DATAPOINTS.has(stateSuffix) && channels.lanListening && device.lanIp && isLanDriven(device, now)) {
     return "report";
   }

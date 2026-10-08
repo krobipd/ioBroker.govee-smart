@@ -1402,3 +1402,139 @@ describe("a command that never reached Govee is sent again at once (issue #51)",
     expect(b.calls.filter(c => (c as unknown[])[3] === "powerSwitch")).toHaveLength(2);
   });
 });
+
+describe("sendCommand — the account broker between LAN and Cloud (K18)", () => {
+  const TOPIC = "GD/0123456789abcdef0123456789abcdef";
+
+  function makeBroker(connected = true): {
+    client: { connected: boolean; publishCommand: (t: string, c: string, d: Record<string, unknown>) => boolean };
+    published: Array<{ topic: string; cmd: string; data: Record<string, unknown> }>;
+  } {
+    const published: Array<{ topic: string; cmd: string; data: Record<string, unknown> }> = [];
+    const client = {
+      connected,
+      publishCommand: (topic: string, cmd: string, data: Record<string, unknown>) => {
+        if (!client.connected) {
+          return false;
+        }
+        published.push({ topic, cmd, data });
+        return true;
+      },
+    };
+    return { client, published };
+  }
+
+  function cloudRouter(reg: DeviceRegistry = emptyRegistry()): {
+    router: CommandRouter;
+    cloud: ReturnType<typeof makeCloudStub>;
+  } {
+    const cloud = makeCloudStub();
+    const router = new CommandRouter(mockLog, noopTimers, reg);
+    router.setCloudClient(cloud.client);
+    router.setRateLimiter(makeRateLimiter());
+    return { router, cloud };
+  }
+
+  it("a light without LAN sends power over the broker, not the Cloud, and remembers the way", async () => {
+    const { router, cloud } = cloudRouter();
+    const broker = makeBroker();
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({ lanIp: undefined, iotTopic: TOPIC });
+    expect(router.resolveTransport(device, "power")).toEqual({ kind: "broker", reason: "no-lan" });
+    expect(await router.sendCommand(device, "power", true)).toBe(true);
+    expect(broker.published).toEqual([{ topic: TOPIC, cmd: "turn", data: { val: 1 } }]);
+    expect(cloud.calls).toEqual([]);
+    expect(router.transportUsed(device, "power")).toBe("broker");
+  });
+
+  it("LAN goes first: a light with a LAN address never touches the broker", async () => {
+    const lan = makeLanStub();
+    const broker = makeBroker();
+    const router = new CommandRouter(mockLog, noopTimers, emptyRegistry());
+    router.setLanClient(lan.client);
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({ iotTopic: TOPIC });
+    await router.sendCommand(device, "brightness", 40);
+    expect(lan.calls.map(c => c.method)).toEqual(["setBrightness"]);
+    expect(broker.published).toEqual([]);
+    expect(router.transportUsed(device, "brightness")).toBe("lan");
+  });
+
+  it("a scene still goes over the Cloud — the broker carries only the four light commands", () => {
+    const { router } = cloudRouter();
+    router.setBrokerClient(makeBroker().client);
+    expect(router.resolveTransport(makeDevice({ lanIp: undefined, iotTopic: TOPIC }), "lightScene").kind).toBe("cloud");
+  });
+
+  it("the catalog quirk brokenBrokerCommands keeps the model on the Cloud", async () => {
+    const reg = new DeviceRegistry({
+      data: {
+        devices: {
+          H6121: { name: "Smart Light", type: "light", status: "reported", quirks: { brokenBrokerCommands: true } },
+        },
+      },
+    });
+    const { router, cloud } = cloudRouter(reg);
+    const broker = makeBroker();
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({ sku: "H6121", lanIp: undefined, iotTopic: TOPIC });
+    await router.sendCommand(device, "power", true);
+    expect(broker.published).toEqual([]);
+    expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
+    expect(router.transportUsed(device, "power")).toBe("cloud");
+  });
+
+  it("a cloud override in the catalog wins over the broker", () => {
+    const reg = new DeviceRegistry({
+      data: {
+        devices: {
+          H6160: {
+            name: "Strip",
+            type: "light",
+            status: "reported",
+            quirks: { transportOverrides: { power: "cloud" } },
+          },
+        },
+      },
+    });
+    const { router } = cloudRouter(reg);
+    router.setBrokerClient(makeBroker().client);
+    expect(router.resolveTransport(makeDevice({ lanIp: undefined, iotTopic: TOPIC }), "power").kind).toBe("cloud");
+  });
+
+  it("a broker that drops between decision and send hands the command to the Cloud — the next way in the order", async () => {
+    const { router, cloud } = cloudRouter();
+    const broker = makeBroker();
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({ lanIp: undefined, iotTopic: TOPIC });
+    const original = broker.client.publishCommand;
+    broker.client.publishCommand = (t, c, d) => {
+      broker.client.connected = false;
+      return original(t, c, d);
+    };
+    await router.sendCommand(device, "colorRgb", "#00ff00");
+    expect(broker.published).toEqual([]);
+    expect(cloud.calls.map(c => c.instance)).toEqual(["colorRgb"]);
+    expect(router.transportUsed(device, "colorRgb")).toBe("cloud");
+  });
+
+  it("without a Cloud path a broker that dropped refuses the command instead of pretending it went out", async () => {
+    const router = new CommandRouter(mockLog, noopTimers, emptyRegistry());
+    const broker = makeBroker();
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({
+      lanIp: undefined,
+      iotTopic: TOPIC,
+      channels: { lan: false, mqtt: true, cloud: false },
+    });
+    broker.client.publishCommand = () => false;
+    await expect(router.sendCommand(device, "power", false)).rejects.toThrow(/Account broker not connected/);
+    expect(router.transportUsed(device, "power")).toBeUndefined();
+  });
+
+  it("a broker that is down from the start is skipped in the decision", () => {
+    const { router } = cloudRouter();
+    router.setBrokerClient(makeBroker(false).client);
+    expect(router.resolveTransport(makeDevice({ lanIp: undefined, iotTopic: TOPIC }), "power").kind).toBe("cloud");
+  });
+});

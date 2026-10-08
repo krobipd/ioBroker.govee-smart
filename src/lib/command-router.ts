@@ -20,6 +20,7 @@ import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE } from "./govee-constants";
 import { resolveSegmentCount } from "./device-manager/lookups";
 import { SEGMENT_HARD_MAX } from "./segment-list";
+import { brokerCarries, brokerMessage } from "./broker-commands";
 
 /**
  * Outcome of `resolveTransport` — decides which channel handles a command
@@ -28,6 +29,7 @@ import { SEGMENT_HARD_MAX } from "./segment-list";
  */
 export type TransportDecision =
   | { kind: "lan"; reason: "default" }
+  | { kind: "broker"; reason: "no-lan" }
   | {
       kind: "cloud";
       reason: "override" | "no-lan" | "no-segments-heuristic" | "light-no-lan-fallback";
@@ -46,10 +48,25 @@ const CAPABILITY_OF_COMMAND: Readonly<Record<string, { shortType: string; instan
   gradientToggle: { shortType: "toggle", instance: "gradientToggle" },
 };
 
+/** The account broker as far as commands need it (K18) — `GoveeMqttClient` fulfils it. */
+export interface BrokerCommandClient {
+  /** The broker connection is up. */
+  readonly connected: boolean;
+  /**
+   * Publish one command on a device topic; false when nothing was sent.
+   *
+   * @param deviceTopic The device's publish topic
+   * @param cmd Govee's command word
+   * @param data The command's data object
+   */
+  publishCommand(deviceTopic: string, cmd: string, data: Record<string, unknown>): boolean;
+}
+
 /**
  * Command router — routes device commands through the fastest available
- * channel: LAN → Cloud. Quirk-driven overrides (devices.json
- * `transportOverrides`) take precedence over the LAN-first default.
+ * channel: LAN → account broker (the four light commands, K18) → Cloud.
+ * Quirk-driven overrides (devices.json `transportOverrides`) take precedence
+ * over the LAN-first default.
  */
 export class CommandRouter {
   private readonly log: ioBroker.Logger;
@@ -60,6 +77,9 @@ export class CommandRouter {
   private lanClient: GoveeLanClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
   private rateLimiter: RateLimiter | null = null;
+  private brokerClient: BrokerCommandClient | null = null;
+  /** The way the latest command per device + command really went — the ack reads it (GV-13, K18). */
+  private readonly lastTransport = new Map<string, TransportDecision["kind"]>();
   /** The latest cloud send per device + datapoint — a newer write supersedes an older one's retries (issue #51). */
   private readonly sendSeq = new Map<string, number>();
   /** The fleet's log rule (`log-once.ts`): a problem is said once per key and kind, a repeat goes to debug. */
@@ -128,6 +148,26 @@ export class CommandRouter {
    */
   setCloudClient(client: GoveeCloudClient): void {
     this.cloudClient = client;
+  }
+
+  /**
+   * Register the account broker for light commands (K18)
+   *
+   * @param client The account broker client
+   */
+  setBrokerClient(client: BrokerCommandClient): void {
+    this.brokerClient = client;
+  }
+
+  /**
+   * The way the latest successful command to this device went — `broker` means only the device's own status packet
+   * may confirm it (the publish has no receipt).
+   *
+   * @param device Target device
+   * @param command Command token
+   */
+  transportUsed(device: GoveeDevice, command: string): TransportDecision["kind"] | undefined {
+    return this.lastTransport.get(`${device.deviceId}|${command}`);
   }
 
   /**
@@ -289,6 +329,15 @@ export class CommandRouter {
       }
       return { kind: "lan", reason: "default" };
     }
+    if (
+      brokerCarries(device, command, {
+        lanPath: false,
+        brokerConnected: this.brokerClient?.connected === true,
+        brokerExcluded: this.registry.getQuirks(device.sku)?.brokenBrokerCommands === true,
+      })
+    ) {
+      return { kind: "broker", reason: "no-lan" };
+    }
     if (device.channels.cloud && this.cloudClient) {
       if (device.type === GOVEE_DEVICE_TYPE.LIGHT && !device.lanIp) {
         return { kind: "cloud", reason: "light-no-lan-fallback" };
@@ -309,6 +358,8 @@ export class CommandRouter {
     switch (decision.kind) {
       case "lan":
         return "LAN";
+      case "broker":
+        return "Account broker";
       case "cloud":
         if (decision.reason === "light-no-lan-fallback") {
           return "Cloud (no LAN, fallback)";
@@ -361,7 +412,9 @@ export class CommandRouter {
    * routing for batch segment ops goes through `sendSegmentBatchParsed`,
    * not `sendCloudCommand`.
    *
-   * MQTT is status-push only and never used for commands.
+   * The account broker carries the four light commands of a light without a
+   * LAN path (K18); its publish has no receipt, so only the device's status
+   * packet confirms them.
    *
    * @param device Target device
    * @param command Command type
@@ -373,8 +426,14 @@ export class CommandRouter {
     const decision = this.resolveTransport(device, command);
     const transport = this.decisionToChannelMarker(decision);
     try {
-      const sent = await this.dispatchCommand(device, command, value, decision);
-      this.onCommandResult?.(device, { stateId: command, value: sent, transport, ok: true });
+      const { sent, via } = await this.dispatchCommand(device, command, value, decision);
+      this.lastTransport.set(`${device.deviceId}|${command}`, via);
+      this.onCommandResult?.(device, {
+        stateId: command,
+        value: sent,
+        transport: via === decision.kind ? transport : "Cloud (broker not connected)",
+        ok: true,
+      });
       return sent;
     } catch (e) {
       // Report the failure, then rethrow — the caller owns the "Command failed"
@@ -399,14 +458,14 @@ export class CommandRouter {
    * @param command Command type
    * @param value Command value
    * @param decision Routing decision from resolveTransport
-   * @returns The value that went out (see {@link sendCommand})
+   * @returns The value that went out (see {@link sendCommand}) and the way it went
    */
   private async dispatchCommand(
     device: GoveeDevice,
     command: string,
     value: unknown,
     decision: TransportDecision,
-  ): Promise<unknown> {
+  ): Promise<{ sent: unknown; via: TransportDecision["kind"] }> {
     // Diag-log: one line, marker derived from the actual decision (not the
     // configured channel). JSON.stringify keeps `[object Object]` out of
     // the trace for object-valued commands like segmentBatch.
@@ -424,15 +483,15 @@ export class CommandRouter {
     // sendSegmentBatchParsed.
     if (command.startsWith("segmentColor:")) {
       await this.dispatchSegmentColor(device, command, value, decision);
-      return value;
+      return { sent: value, via: decision.kind };
     }
     if (command === "segmentBatch") {
       await this.dispatchSegmentBatch(device, value, decision);
-      return value;
+      return { sent: value, via: decision.kind };
     }
     if (command.startsWith("segmentBrightness:")) {
       await this.dispatchSegmentBrightness(device, command, value, decision);
-      return value;
+      return { sent: value, via: decision.kind };
     }
 
     // Generic dispatch
@@ -440,11 +499,23 @@ export class CommandRouter {
       await this.sendLanCommand(device, command, value);
       this.scheduleLanReadBack(device);
       // The LAN packet carries 2000–9000 K whatever the device declares (N19).
-      return command === "colorTemperature" && typeof value === "number" ? lanColorTemperatureK(value) : value;
+      return {
+        sent: command === "colorTemperature" && typeof value === "number" ? lanColorTemperatureK(value) : value,
+        via: "lan",
+      };
     }
-    // decision.kind === "cloud"
+    if (decision.kind === "broker") {
+      const message = brokerMessage(command, value);
+      if (device.iotTopic && this.brokerClient?.publishCommand(device.iotTopic, message.cmd, message.data)) {
+        return { sent: message.sent, via: "broker" };
+      }
+      // The broker dropped between the decision and the send — the next way in the order is the Cloud.
+      if (!(device.channels.cloud && this.cloudClient)) {
+        throw new Error(`Account broker not connected for ${deviceLabel(device)}/${command}, and no Cloud path`);
+      }
+    }
     await this.sendCloudCommand(device, command, value);
-    return value;
+    return { sent: value, via: "cloud" };
   }
 
   /**

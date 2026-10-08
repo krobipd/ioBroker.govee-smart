@@ -85,6 +85,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       getDiagnostics: () => ({ addLog: () => undefined }),
       // The real rule without the registry: learned value, else 0 (no caps in these fixtures).
       physicalSegmentCount: (device: GoveeDevice) => device.segmentCount ?? 0,
+      // No light in these fixtures has a broker route (K18) — the LAN or the Cloud carried every command.
+      transportUsed: () => undefined,
       sendCommand: (device: GoveeDevice, command: string, value: unknown) => {
         const err = sendFailure();
         if (err) {

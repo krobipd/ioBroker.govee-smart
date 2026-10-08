@@ -916,6 +916,8 @@ export class GoveeAdapter extends utils.Adapter {
     );
     // A 401 from the App API asks the account client for a fresh bearer.
     this.deviceManager!.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
+    // Light commands of a light without LAN go over the broker before the Cloud (K18).
+    this.deviceManager!.setBrokerClient(this.mqttClient);
 
     // Diagnostics hooks, the verification code and the problems the user has to act on.
     accountHandler.wireAccountClient(this.handlerHost, this.mqttClient, config.mqttVerificationCode ?? "");

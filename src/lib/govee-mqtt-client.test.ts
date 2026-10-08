@@ -579,6 +579,37 @@ describe("GoveeMqttClient", () => {
       expect(client.requestStatus("GD/x", Date.now())).toBe(false);
       expect(published).toHaveLength(0);
     });
+
+    it("a light command goes out as govee2mqtt's control envelope — cmdVersion 0, type 1, QoS 0 (K18)", async () => {
+      const { client, published } = connectedClient();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      (client as unknown as { client: { connected: boolean } }).client.connected = true;
+      expect(client.publishCommand("GD/0123456789abcdef0123456789abcdef", "turn", { val: 1 }, 1790071124009)).toBe(
+        true,
+      );
+      expect(published).toEqual([
+        {
+          topic: "GD/0123456789abcdef0123456789abcdef",
+          payload: '{"msg":{"cmd":"turn","data":{"val":1},"cmdVersion":0,"transaction":"v_1790071124009000","type":1}}',
+          opts: { qos: 0 },
+        },
+      ]);
+    });
+
+    it("a light command is not sent while the broker is not connected", async () => {
+      const { client, published } = connectedClient();
+      expect(client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      (client as unknown as { client: { connected: boolean } }).client.connected = false;
+      expect(client.publishCommand("GD/x", "turn", { val: 0 })).toBe(false);
+      expect(published).toHaveLength(0);
+    });
   });
 
   describe("setPersistedCredentials — tryPersistedReuse skip-login behaviour", () => {

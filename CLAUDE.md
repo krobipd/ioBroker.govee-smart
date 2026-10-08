@@ -20,7 +20,7 @@
 
 | Bereich                                                                                | Primär                                                                   | Rückfall                                             |
 | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------- |
-| Lichtsteuerung (power, brightness, color_rgb, color_temperature, Segmente, Gradient)   | LAN UDP                                                                  | Cloud REST, nur ohne lokale Schnittstelle¹           |
+| Lichtsteuerung (power, brightness, color_rgb, color_temperature, Segmente, Gradient)   | LAN UDP                                                                  | Konto-Broker² → Cloud REST, nur ohne LAN¹            |
 | Musikmodus, Szenen-Tempo                                                               | LAN UDP                                                                  | —                                                    |
 | Szene/DIY/Snapshot aktivieren                                                          | LAN UDP (ptReal)                                                         | Cloud REST                                           |
 | Generische Fähigkeit                                                                   | Cloud REST                                                               | —                                                    |
@@ -36,6 +36,8 @@
 | Haushaltsgerät `info.online`                                                           | App-API-Liste (2 min) · eigener Status-Push · `/device/state` beim Start | OpenAPI-MQTT                                         |
 
 ¹ Nur bei `lanIp === null`: 5–10 s je Aufruf, Govee-Budget 2/s je Gerät (Burst 6) und 12/s je Konto. Der Start warnt („LAN ✗“) mit Anleitung.
+
+² Nur mit Govee-Konto; Ein/Aus, Helligkeit, Farbe, Farbtemperatur; Abschnitt „AWS IoT MQTT“.
 
 ## Zugangsdaten-Stufen
 
@@ -149,7 +151,9 @@ Basis `https://openapi.api.govee.com`, Kopf `Govee-API-Key`.
 
 ## AWS IoT MQTT (Konto-Broker)
 
-Auth-Flow und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md`. Befehle gehen NIE über den Konto-Broker; der einzige Publish ist `requestStatus` (`cmdVersion` aus dem Quirk `statusCmdVersion`, Vorgabe 2, mit `accountTopic`).
+Auth-Flow und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md`. Zwei Publishes auf das Geräte-Topic (`device.iotTopic`), beide QoS 0: `requestStatus` (`cmdVersion` aus dem Quirk `statusCmdVersion`, Vorgabe 2, mit `accountTopic`) und `publishCommand` (K18).
+
+- **Befehle über den Broker (K18, `broker-commands.ts`):** Reihenfolge LAN → Broker → Cloud. `brokerCarries` ist die EINE Regel für Router und Bestätigung: nur `power`/`brightness`/`colorRgb`/`colorTemperature`, nur Lichter mit Topic, ohne LAN-Weg, bei verbundenem Broker, außer der Katalog-Quirk `brokenBrokerCommands` schließt das Modell aus; ein `transportOverrides`-Eintrag `cloud` geht vor. Form wie govee2mqtt `iot.rs`: `turn` 1/0, `brightness` 0–100, `colorwc` mit Farbe und 0 K oder Schwarz und Kelvin, `cmdVersion 0`, `type 1`, `v_<ms>000`. Fällt der Broker zwischen Entscheidung und Senden weg, geht der Befehl an die Cloud. Der Publish hat keine Quittung: der Router merkt sich den Weg (`transportUsed`), und ein Befehl über den Broker wird nur durch den Statusbericht des Geräts bestätigt (`viaBroker` in `confirmationFor`).
 
 - **Login-Schutz:** `MQTT_MAX_AUTH_FAILURES` (3) — jeder Versuch, der Govee erreicht und abgelehnt wird, zählt (`category ≠ NETWORK ≠ TIMEOUT`); zurückgesetzt nur bei erfolgreichem Subscribe. `refreshBearerSilently` bucht über dieselbe `recordFailure`, die Antwort liest EINE Funktion (`classifyLoginResponse`). 454/455 pausieren bis zum Code (454 = neuer Client), Code-Anforderung mit 30-s-Drossel.
 - **Login-Fenster je Konto** (`LoginWindow`, `loginWindowFor`): Live-Client und jede Probe zählen; höchstens `MQTT_MAX_LOGINS_PER_WINDOW` (3) je `MQTT_LOGIN_WINDOW_MS` (1 h), gezählt erst nach Govees Antwort. Volles Fenster: Warnung und EIN Neuversuch am Fensterende; die Probe sendet nichts und meldet `loginWindowFull` mit `retryAt`.
@@ -191,7 +195,7 @@ Suche `239.255.255.250:4001` · Antworten an `:4002` · Befehle an Geräte-IP `:
 - **Die Katalogwörter stehen EINMAL im Code** (`device-catalog.ts`: `DEVICE_TYPES`, `DEVICE_STATUSES`, `CONFIGURABLE_OVERRIDE_COMMANDS`, `TRANSPORT_TARGETS`, `DeviceQuirks`) und einmal im Schema; `device-catalog.test.ts` hält beide gleich. `validate-devices` liest seine Regeln aus dem Schema (`tools/devices-validation.ts`) und bricht ab, wenn ein Schema-Pfad fehlt. Die Wiki-Reihenfolge ist `DEVICE_TYPES`, die Titel verlangt der Compiler.
 - **Aufnahme:** jedes Govee-WLAN-Produkt; ein Gerät hinter einem Govee-Gateway zählt, das Gateway ist das WLAN-Gerät (`gateway`, `composter`). Die Laufzeit liest den Katalogtyp nie (nur `quirks`/`status`/`tier`). Katalognamen sind Englisch.
 - **Status:** `seed` (importiert, ungetestet; das Gerät erscheint trotzdem, seine Quirks greifen nur mit dem Schalter `experimentalQuirks`) · `reported` · `verified`. Ein `seed`-Gerät bittet im Log um den Experimentell-Schalter (solange er aus ist) und um einen Diagnose-Bericht und behauptet nie, dass es läuft (GV-25, `maybeNudgeSeedSku`; warn mit Quirks, sonst info). Wiki-Geräteseite per `npm run gen-wiki` (`tools/gen-wiki-render.ts`), Fußzeile ohne Datum (Gate A13 vergleicht).
-- **Quirks:** `colorTempRange` (→ `applyColorTempQuirk`) · `brokenPlatformApi` (→ `buildCloudStateDefs` nimmt die LAN-Vorgaben) · `transportOverrides` (→ `resolveTransport`; nur die genannten Befehle, Einzelsegment-Befehle nie) · `segmentCount` (→ `resolveSegmentCount`) · `statusCmdVersion` (→ `requestStaleStatuses`; falsche Version = Schweigen) · `platformTempUnit: "F"` (→ `loadCloudStates` rechnet `sensorTemperature` in °C) · `ignoredCloudCapabilities` (→ kein Datenpunkt, kein Wert).
+- **Quirks:** `colorTempRange` (→ `applyColorTempQuirk`) · `brokenPlatformApi` (→ `buildCloudStateDefs` nimmt die LAN-Vorgaben) · `transportOverrides` (→ `resolveTransport`; nur die genannten Befehle, Einzelsegment-Befehle nie) · `segmentCount` (→ `resolveSegmentCount`) · `statusCmdVersion` (→ `requestStaleStatuses`; falsche Version = Schweigen) · `platformTempUnit: "F"` (→ `loadCloudStates` rechnet `sensorTemperature` in °C) · `ignoredCloudCapabilities` (→ kein Datenpunkt, kein Wert) · `brokenBrokerCommands` (→ `brokerCarries`; Lichtbefehle nie über den Konto-Broker).
 - **Neues Quirk:** `DeviceQuirks` + Feldliste in `device-catalog.test.ts` → Schema (`additionalProperties:false`; was das Schema nicht ausdrückt, in `tools/devices-validation.ts`) → Konsumstelle → Eintrag mit `since` → Tests.
 - Nicht in den Katalog: `manualMode`/`manualSegments` (Laufzeit), Nutzer-Vorgaben (jsonConfig).
 

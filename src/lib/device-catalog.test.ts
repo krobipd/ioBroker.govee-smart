@@ -15,6 +15,7 @@ const QUIRK_FIELDS: Record<keyof DeviceQuirks, true> = {
   colorTempRange: true,
   segmentCount: true,
   brokenPlatformApi: true,
+  brokenBrokerCommands: true,
   transportOverrides: true,
   statusCmdVersion: true,
   platformTempUnit: true,

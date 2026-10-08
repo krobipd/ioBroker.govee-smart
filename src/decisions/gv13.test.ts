@@ -107,6 +107,7 @@ async function write(
       getDiagnostics: () => ({ addLog: () => {} }),
       sendCommand: send,
       sendCapabilityCommand: send,
+      transportUsed: () => undefined,
     },
     stateManager: { devicePrefix: () => "devices.dev" },
     groupFanout: null,

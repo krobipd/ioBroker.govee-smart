@@ -189,6 +189,9 @@ function validateQuirks(sku: string, q: Record<string, unknown>, rules: CatalogR
   if (q.brokenPlatformApi !== undefined && typeof q.brokenPlatformApi !== "boolean") {
     issues.push({ sku, msg: "'brokenPlatformApi' must be boolean" });
   }
+  if (q.brokenBrokerCommands !== undefined && typeof q.brokenBrokerCommands !== "boolean") {
+    issues.push({ sku, msg: "'brokenBrokerCommands' must be boolean" });
+  }
   if (q.segmentCount !== undefined) {
     const n = q.segmentCount;
     if (typeof n !== "number" || !Number.isInteger(n) || n < rules.segmentCount.min || n > rules.segmentCount.max) {

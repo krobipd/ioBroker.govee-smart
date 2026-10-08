@@ -16,7 +16,7 @@
  *
  * Pattern families of the observed Govee quirks:
  *  1. Range-Override: API reports a wrong numeric range (colorTempRange)
- *  2. Boolean-Flag: per-SKU behaviour toggle (brokenPlatformApi)
+ *  2. Boolean-Flag: per-SKU behaviour toggle (brokenPlatformApi, brokenBrokerCommands)
  *  3. Map-Override: per-operation routing/behaviour map (transportOverrides)
  *  4. Number-Override: API reports a wrong scalar (segmentCount, statusCmdVersion)
  *  5. Unit-Override: API reports a value in another unit (platformTempUnit)
@@ -35,6 +35,13 @@ export interface DeviceQuirks {
   segmentCount?: number;
   /** Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states. */
   brokenPlatformApi?: boolean;
+  /**
+   * The account broker does not carry this model's light commands (K18) — power, brightness, colour and colour
+   * temperature go LAN → Cloud instead of LAN → broker → Cloud. Models per govee2mqtt `src/service/quirks.rs`
+   * (`with_iot_api_support(false)`: H6121, H6154, H6176; issues #40, #49; read 2026-10-08). Dormant on a `seed`
+   * entry like every quirk until the experimental toggle is on.
+   */
+  brokenBrokerCommands?: boolean;
   /**
    * Per-command transport override — forces a command through Cloud or LAN
    * regardless of the default LAN-first heuristic. Use for SKUs where

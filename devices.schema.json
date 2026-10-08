@@ -114,6 +114,10 @@
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."
         },
+        "brokenBrokerCommands": {
+          "type": "boolean",
+          "description": "The account broker does not carry this model's light commands — power, brightness, colour and colour temperature go LAN then Cloud, never over the broker. Models per govee2mqtt quirks.rs (with_iot_api_support(false))."
+        },
         "transportOverrides": {
           "type": "object",
           "description": "Per-command transport override — forces a command through Cloud or LAN regardless of the default LAN-first heuristic. Value 'lan' is a no-op (default routing). segmentBatch routes the batch command only; per-segment commands carry no override.",

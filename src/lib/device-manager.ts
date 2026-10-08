@@ -1,4 +1,4 @@
-import { CommandRouter, type TransportDecision } from "./command-router";
+import { CommandRouter, type BrokerCommandClient, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
 import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE, isAppGroup, isPseudoGroupSku, APP_GROUP_SKU } from "./govee-constants";
@@ -461,6 +461,25 @@ export class DeviceManager {
   setCloudClient(client: GoveeCloudClient): void {
     this.cloudClient = client;
     this.commandRouter.setCloudClient(client);
+  }
+
+  /**
+   * Register the account broker for light commands (K18)
+   *
+   * @param client The account broker client
+   */
+  setBrokerClient(client: BrokerCommandClient): void {
+    this.commandRouter.setBrokerClient(client);
+  }
+
+  /**
+   * The way the latest successful command to this device went (see {@link CommandRouter.transportUsed}).
+   *
+   * @param device Target device
+   * @param command Command token
+   */
+  transportUsed(device: GoveeDevice, command: string): TransportDecision["kind"] | undefined {
+    return this.commandRouter.transportUsed(device, command);
   }
 
   /**
