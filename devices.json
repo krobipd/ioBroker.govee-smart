@@ -358,6 +358,12 @@
       "status": "seed",
       "since": "2.39.0"
     },
+    "H5044": {
+      "name": "Smart Gateway 1s",
+      "type": "gateway",
+      "status": "seed",
+      "since": "3.2.0"
+    },
     "H5051": {
       "name": "Thermo-Hygrometer",
       "type": "thermometer",
@@ -612,6 +618,12 @@
       "type": "sensor",
       "status": "seed",
       "since": "2.18.1"
+    },
+    "H5151": {
+      "name": "Wi-Fi Gateway",
+      "type": "gateway",
+      "status": "seed",
+      "since": "3.2.0"
     },
     "H5160": {
       "name": "Power Strip",
@@ -1356,6 +1368,18 @@
       "type": "light",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H610E": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "3.2.0"
+    },
+    "H610F": {
+      "name": "Smart Light",
+      "type": "light",
+      "status": "seed",
+      "since": "3.2.0"
     },
     "H6110": {
       "name": "Smart Light",
@@ -2559,6 +2583,12 @@
       "status": "seed",
       "since": "2.33.0"
     },
+    "H7030": {
+      "name": "Outdoor String Lights 2",
+      "type": "light",
+      "status": "seed",
+      "since": "3.2.0"
+    },
     "H7031": {
       "name": "Smart Light",
       "type": "light",
@@ -3116,6 +3146,12 @@
       "type": "fan",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "H7108": {
+      "name": "Smart Fan",
+      "type": "fan",
+      "status": "seed",
+      "since": "3.2.0"
     },
     "H7111": {
       "name": "Smart Air Circulator Fan",
@@ -3860,6 +3896,12 @@
       "type": "light",
       "status": "seed",
       "since": "2.33.0"
+    },
+    "R5044": {
+      "name": "Smart Gateway 1s",
+      "type": "gateway",
+      "status": "seed",
+      "since": "3.2.0"
     },
     "R5112": {
       "name": "the refreshed H5112",
