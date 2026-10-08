@@ -174,6 +174,8 @@ export class DeviceManager {
    * the MQTT client). Null without an account login — then nothing is asked.
    */
   private statusRequester: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null = null;
+  /** Who waits for a device's next status packet — the report's live read (E1), by device id. */
+  private readonly statusWaiters = new Map<string, Array<() => void>>();
   /** Asks the account client for a fresh bearer — see {@link setBearerRefresher}. */
   private bearerRefresher: (() => void) | null = null;
   /** Lowered segment counts that wait for the app's snapshot masks — see mayLowerSegmentCount. */
@@ -335,6 +337,51 @@ export class DeviceManager {
   }
 
   // === Status requests over the account broker (issue #47) ===
+
+  /**
+   * Ask one device for its status over the account broker and wait for its answer — the diagnostics report's live
+   * read (krobi 2026-10-06, E1). The answer is an ordinary status packet; no answer is no proof of a power cut (a
+   * wrong `statusCmdVersion` is answered with silence too).
+   *
+   * @param device The device
+   * @param waitMs How long to wait for the answer
+   * @returns Whether it was sent, the protocol version, and after how many ms the device answered (undefined: never)
+   */
+  async askStatus(
+    device: GoveeDevice,
+    waitMs: number,
+  ): Promise<{ sent: boolean; cmdVersion: 1 | 2; answeredAfterMs?: number }> {
+    const cmdVersion = this.registry.getQuirks(device.sku)?.statusCmdVersion ?? 2;
+    const asked = Date.now();
+    const answer = new Promise<number | undefined>(resolve => {
+      const wait: { timer?: ioBroker.Timeout } = {};
+      const done = (): void => {
+        if (wait.timer !== undefined) {
+          this.timers.clearTimeout(wait.timer);
+        }
+        resolve(Date.now() - asked);
+      };
+      this.statusWaiters.set(device.deviceId, [...(this.statusWaiters.get(device.deviceId) ?? []), done]);
+      wait.timer = this.timers.setTimeout(() => {
+        const list = this.statusWaiters.get(device.deviceId)?.filter(w => w !== done);
+        if (list && list.length > 0) {
+          this.statusWaiters.set(device.deviceId, list);
+        } else {
+          this.statusWaiters.delete(device.deviceId);
+        }
+        resolve(undefined);
+      }, waitMs);
+    });
+    const sent =
+      this.statusRequester !== null && device.iotTopic !== undefined && this.statusRequester(device, cmdVersion);
+    if (!sent) {
+      this.statusWaiters.delete(device.deviceId);
+      return { sent: false, cmdVersion };
+    }
+    device.lastStatusRequestAt = asked;
+    const answeredAfterMs = await answer;
+    return answeredAfterMs === undefined ? { sent: true, cmdVersion } : { sent: true, cmdVersion, answeredAfterMs };
+  }
 
   /**
    * Wire the status-request sender (the MQTT client's `requestStatus`).
@@ -1556,6 +1603,11 @@ export class DeviceManager {
     }
     device.channels.mqtt = true;
     device.lastSeenOnNetwork = Date.now();
+    const waiting = this.statusWaiters.get(device.deviceId);
+    if (waiting) {
+      this.statusWaiters.delete(device.deviceId);
+      waiting.forEach(answered => answered());
+    }
     const state = this.parseMqttStateUpdate(device, update);
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);
@@ -2052,20 +2104,6 @@ export class DeviceManager {
    */
   public physicalSegmentCount(device: GoveeDevice): number {
     return resolveSegmentCount(device, this.registry);
-  }
-
-  /**
-   * Generate diagnostics data for a device — structured JSON for GitHub
-   * issue submission. Delegates to the DiagnosticsCollector so the JSON
-   * also includes ring-buffer context (recent logs, MQTT packets, last
-   * API responses).
-   *
-   * @param device Target device
-   * @param adapterVersion Adapter version string
-   * @param prefix Device state prefix, so the report can include the object tree
-   */
-  generateDiagnostics(device: GoveeDevice, adapterVersion: string, prefix?: string): Promise<Record<string, unknown>> {
-    return this.diagnostics.generate(device, adapterVersion, prefix);
   }
 
   /**

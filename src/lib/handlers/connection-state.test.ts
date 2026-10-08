@@ -79,7 +79,6 @@ function makeRig(opts: {
       : null,
     cloudWasConnected: opts.cloudWasConnected ?? false,
     cloudOutage: { confirmed: opts.cloudOutage ?? false },
-    diagnosticsLastRun: new Map<string, number>(),
     mqttClient:
       opts.mqttConnected === null || opts.mqttConnected === undefined
         ? null

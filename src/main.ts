@@ -39,6 +39,8 @@ import { StateManager } from "./lib/state-manager";
 import { deviceLabel, errText, logRejected } from "./lib/types";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
+import * as diagnosticsReport from "./lib/handlers/diagnostics-report";
+import { ReportJobs } from "./lib/diagnostics/report-jobs";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
 import * as appVersion from "./lib/handlers/app-version";
 import * as deviceReaper from "./lib/handlers/device-reaper";
@@ -83,8 +85,8 @@ type AdapterHost = cloudCreds.CloudCredsAdapter &
   snapshotHandlerGlue.SnapshotHandlerGlueAdapter &
   stateChangeRouter.StateChangeRouterAdapter &
   wizardHandler.WizardHandlerAdapter &
-  diagnosticsHandler.DiagnosticsHandlerAdapter &
   diagnosticsHandler.DiagnosticsProvidersHost &
+  diagnosticsReport.DiagnosticsReportAdapter &
   legacyCleanup.LegacyCleanupAdapter &
   accountHandler.AccountHandlerAdapter &
   onlineSync.OnlineSyncAdapter;
@@ -309,7 +311,6 @@ export class GoveeAdapter extends utils.Adapter {
   /** Lazily instantiated by the wizard handler's `runWizardStep`. */
   private segmentWizard: SegmentWizard | null = null;
   /** Per-device timestamp of the last diagnostics export — throttle gate. */
-  private readonly diagnosticsLastRun = new Map<string, number>();
   /**
    * Set true at the start of onUnload — async paths (onStateChange,
    * applyCloudCapabilities, retrySceneData, …) check this between awaits
@@ -318,11 +319,14 @@ export class GoveeAdapter extends utils.Adapter {
   private unloading = false;
   /** The handler-facing view of this adapter — see {@link AdapterHost}. */
   private readonly handlerHost: AdapterHost;
+  /** The fleet's diagnostics report jobs (DB-01: in memory until the card fetches the report). */
+  private readonly reportJobs: ReportJobs<diagnosticsReport.LiveReading>;
 
   /** @param options Adapter options */
   public constructor(options: Partial<utils.AdapterOptions> = {}) {
     super({ ...options, name: "govee-smart" });
     this.handlerHost = this.buildHost();
+    this.reportJobs = new ReportJobs(diagnosticsReport.makeReportSource(this.handlerHost));
     this.on("ready", this.onReady.bind(this));
     this.on("stateChange", this.onStateChange.bind(this));
     this.on("message", this.onMessage.bind(this));
@@ -405,7 +409,6 @@ export class GoveeAdapter extends utils.Adapter {
     read("snapshotHandler", () => this.snapshotHandler);
     read("groupFanout", () => this.groupFanout);
     read("actionableProblems", () => this.actionableProblems);
-    read("diagnosticsLastRun", () => this.diagnosticsLastRun);
     read("stateCreationQueue", () => this.stateCreationQueue);
     read("channelStatus", () => this.channelStatus);
     read("cloudOutage", () => this.cloudOutage);
@@ -1541,26 +1544,7 @@ export class GoveeAdapter extends utils.Adapter {
             segments: effectiveSegmentCount(d, this.deviceRegistry),
           }));
       },
-      buildDiagnosticsReport: async (deviceKey: string) => {
-        const device = (this.deviceManager?.getDevices() ?? []).find(d => `${d.sku}:${d.deviceId}` === deviceKey);
-        if (!device || !this.deviceManager || !this.stateManager) {
-          return { error: `Unknown device '${deviceKey}'` };
-        }
-        const prefix = this.stateManager.devicePrefix(device);
-        const report = await diagnosticsHandlerImpl.handleDiagnosticsExport(
-          this.handlerHost,
-          this.deviceManager,
-          this.diagnosticsLastRun,
-          device,
-          prefix,
-        );
-        if (!report) {
-          return { error: "Export failed or was throttled — try again in a moment" };
-        }
-        // The answer is the only copy of the report — the card offers it as a
-        // download; nothing is kept in the instance (2.37.0).
-        return report;
-      },
+      handleDiagnostics: payload => this.reportJobs.handle(payload),
       runWizardStep: (action, deviceKey, payload) =>
         wizardHandler.runWizardStep(this.handlerHost, action, deviceKey, payload),
       setTimeout: (cb, ms) => this.setTimeout(cb, ms),

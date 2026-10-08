@@ -1,183 +1,332 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import React from "react";
+import "@testing-library/jest-dom/vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+
+vi.mock("@iobroker/gui-components", () => ({
+  I18n: { t: (key: string, ...args: unknown[]) => [key, ...args].join(" "), extendTranslations: vi.fn() },
+}));
+
 import { I18n } from "@iobroker/gui-components";
+import { InstanceUnavailableError } from "./diagnosticsApi";
+import { DiagnosticsPanel, failureText, issueFormUrl } from "./DiagnosticsPanel";
 
-import enJson from "./i18n/en.json";
-import { DeviceListError } from "./useDeviceList";
+/** What every card here is mounted with besides its socket. */
+const MOUNT = {
+  namespace: "demo.0",
+  repository: "https://github.com/owner/ioBroker.demo",
+  tabIds: ["_main", "_expert"],
+};
 
-// Mock the sendTo wrapper so the tests drive the card through controlled
-// answers (no socket). vi.hoisted keeps the mock stable across the hoisted
-// vi.mock factory.
-const mockApi = vi.hoisted(() => ({
-  exportReport: vi.fn(),
-}));
+/** The card asks every few milliseconds here, not every two seconds. */
+const FAST = { listMs: 15_000, exportMs: 180_000, pollMs: 5 };
 
-vi.mock("./useDiagnosticsApi", async importOriginal => {
-  const actual = await importOriginal<typeof import("./useDiagnosticsApi")>();
-  return { ...actual, makeDiagnosticsApi: () => mockApi };
-});
-
-// The device list is shared with the segment wizard since 2.31.0.
-const mockList = vi.hoisted(() => ({ listDevices: vi.fn() }));
-
-vi.mock("./useDeviceList", async importOriginal => ({
-  ...(await importOriginal<typeof import("./useDeviceList")>()),
-  makeDeviceListApi: () => mockList,
-}));
-
-import { DiagnosticsPanel } from "./DiagnosticsPanel";
-
-const DEVICE = { value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE", online: true, segments: 15 };
-const OTHER = { value: "H6160:CC:DD", label: "Lamp (H6160)", model: "H6160", online: false, segments: 0 };
-
-/** Records what the browser was asked to download. */
-function captureDownloads(): { names: string[]; contents: string[] } {
-  const names: string[] = [];
-  const contents: string[] = [];
-  const blobs = new Map<string, string>();
-  vi.stubGlobal("URL", {
-    createObjectURL: (b: Blob) => {
-      const url = `blob:${blobs.size}`;
-      // jsdom's Blob has no sync reader — record what was handed in instead.
-      blobs.set(url, (b as unknown as { __text?: string }).__text ?? "");
-      return url;
-    },
-    revokeObjectURL: () => {},
-  });
-  const origBlob = globalThis.Blob;
-  vi.stubGlobal(
-    "Blob",
-    class {
-      __text: string;
-      constructor(parts: string[]) {
-        this.__text = parts.join("");
-        contents.push(this.__text);
-      }
-    } as unknown as typeof origBlob,
-  );
-  // Patch the prototype through vi.spyOn so vitest restores it afterwards —
-  // a raw assignment would leak into every later test in the file.
-  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement): void {
-    names.push(this.download);
-  });
-  return { names, contents };
+/**
+ * An instance that lists its devices, starts a report as job `j1` and hands back `answers.export` for it.
+ *
+ * @param answers the device list and the report (or error)
+ * @param answers.list the answer to `list`
+ * @param answers.export the answer to `result`
+ */
+function socket(answers: { list: unknown; export?: unknown }): { sendTo: ReturnType<typeof vi.fn> } {
+  return {
+    sendTo: vi.fn((_instance: string, _command: string, data: { action: string }) =>
+      Promise.resolve(data.action === "list" ? answers.list : data.action === "start" ? { job: "j1" } : answers.export),
+    ),
+  };
 }
 
-beforeEach(() => {
-  I18n.extendTranslations(enJson, "en");
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-  mockList.listDevices.mockResolvedValue([DEVICE]);
-  mockApi.exportReport.mockReset();
+describe("DiagnosticsPanel", () => {
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => "blob:report");
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  it("pre-selects the only device and downloads the report under the adapter's file name", async () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const s = socket({
+      list: { devices: [{ value: "lamp-2b3c", label: "Lamp", connected: true }] },
+      export: { fileName: "demo_lamp-2b3c_v3.3.0.json", content: "{}" },
+    });
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    const button = await screen.findByTestId("diag-export");
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    const done = await screen.findByTestId("diag-done");
+    expect(done).toHaveTextContent("diag_done demo_lamp-2b3c_v3.3.0.json");
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      "https://github.com/owner/ioBroker.demo/issues/new?template=device-support.yml",
+    );
+    expect(click).toHaveBeenCalled();
+    expect(s.sendTo).toHaveBeenCalledWith("demo.0", "diagnostics", { action: "start", device: "lamp-2b3c" });
+    expect(s.sendTo).toHaveBeenCalledWith("demo.0", "diagnostics", { action: "result", job: "j1" });
+  });
+
+  it("shows that the report is being generated, with the seconds counting, until the answer comes", async () => {
+    let done = false;
+    const s = {
+      sendTo: vi.fn((_i: string, _c: string, data: { action: string }) =>
+        Promise.resolve(
+          data.action === "list"
+            ? { devices: [{ value: "lamp-2b3c", label: "Lamp", connected: true }] }
+            : data.action === "start"
+              ? { job: "j1" }
+              : done
+                ? { error: "x" }
+                : { pending: true },
+        ),
+      ),
+    };
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    const button = await screen.findByTestId("diag-export");
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    expect(await screen.findByTestId("diag-generating")).toHaveTextContent("diag_generating");
+    expect(screen.getByTestId("diag-export")).toBeDisabled();
+    // The count is wall-clock seconds: a busy runner showed 2 at its first look — any second counts.
+    await waitFor(() => expect(screen.getByTestId("diag-elapsed")).toHaveTextContent(/^diag_elapsed [1-9]\d*$/), {
+      timeout: 2500,
+    });
+    done = true;
+    await waitFor(() => expect(screen.queryByTestId("diag-generating")).toBeNull());
+  });
+
+  it("shows the adapter's error instead of a download", async () => {
+    const s = socket({
+      list: { devices: [{ value: "lamp-2b3c", label: "Lamp", connected: false }] },
+      export: { error: "a report for this device is being made right now" },
+    });
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    const button = await screen.findByTestId("diag-export");
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    expect(await screen.findByTestId("diag-error")).toHaveTextContent("being made right now");
+  });
+
+  it("says when the instance runs no device", async () => {
+    render(
+      <DiagnosticsPanel
+        socket={socket({ list: { devices: [] } })}
+        {...MOUNT}
+      />,
+    );
+    expect(await screen.findByTestId("diag-no-devices")).toBeInTheDocument();
+  });
+
+  it("does not show a broken list as an empty one", async () => {
+    render(
+      <DiagnosticsPanel
+        socket={socket({ list: undefined })}
+        {...MOUNT}
+      />,
+    );
+    expect(await screen.findByTestId("diag-list-failed")).toBeInTheDocument();
+  });
+
+  it("shows the error the adapter answers instead of its device list", async () => {
+    render(
+      <DiagnosticsPanel
+        socket={socket({ list: { error: "diagnostics failed: boom" } })}
+        {...MOUNT}
+      />,
+    );
+    expect(await screen.findByTestId("diag-list-failed")).toHaveTextContent("diagnostics failed: boom");
+  });
+
+  // A stopped instance left the card at "Loading devices…" for good.
+  it("says that the instance is not running instead of loading forever", async () => {
+    const s = {
+      sendTo: vi.fn(() => new Promise(() => {})),
+      subscribeState: vi.fn((id: string, handler: (id: string, state: { val: unknown } | null) => void) => {
+        void Promise.resolve().then(() => handler(id, { val: false }));
+      }),
+      unsubscribeState: vi.fn(),
+    };
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    expect(await screen.findByTestId("diag-list-failed")).toHaveTextContent("diag_notRunning");
+    expect(s.subscribeState).toHaveBeenCalledWith("system.adapter.demo.0.alive", expect.any(Function));
+  });
+
+  // A restart during a report left the button locked.
+  it("frees the button and says why when the instance stops during a report", async () => {
+    let alive: (val: boolean) => void = () => {};
+    const s = {
+      sendTo: vi.fn((_i: string, _c: string, data: { action: string }) =>
+        data.action === "list"
+          ? Promise.resolve({ devices: [{ value: "lamp-2b3c", label: "Lamp", connected: true }] })
+          : new Promise(() => {}),
+      ),
+      subscribeState: vi.fn((id: string, handler: (id: string, state: { val: unknown } | null) => void) => {
+        alive = val => handler(id, { val });
+        handler(id, { val: true });
+      }),
+      unsubscribeState: vi.fn(),
+    };
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    const button = await screen.findByTestId("diag-export");
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    expect(await screen.findByTestId("diag-generating")).toBeInTheDocument();
+    alive(false);
+    expect(await screen.findByTestId("diag-error")).toHaveTextContent("diag_stopped");
+    await waitFor(() => expect(screen.getByTestId("diag-export")).not.toBeDisabled());
+    expect(screen.queryByTestId("diag-generating")).toBeNull();
+  });
+
+  it("forgets the remembered tab when it mounts and when it unmounts", async () => {
+    localStorage.setItem("App.demo", "_expert");
+    const view = render(
+      <DiagnosticsPanel
+        socket={socket({ list: { devices: [] } })}
+        {...MOUNT}
+      />,
+    );
+    expect(localStorage.getItem("App.demo")).toBeNull();
+    await screen.findByTestId("diag-no-devices");
+    localStorage.setItem("App.demo", "_expert");
+    view.unmount();
+    expect(localStorage.getItem("App.demo")).toBeNull();
+  });
+
+  it("registers its own words, the list of what the report contains and the privacy box", async () => {
+    render(
+      <DiagnosticsPanel
+        socket={socket({ list: { devices: [{ value: "lamp-2b3c", label: "Lamp", connected: false }] } })}
+        {...MOUNT}
+      />,
+    );
+    expect(await screen.findByTestId("diag-intro")).toHaveTextContent("diag_contains");
+    expect(screen.getByTestId("diag-privacy")).toHaveTextContent("diag_privacyMarkers");
+    expect(screen.getByTestId("diag-privacy")).toHaveTextContent("diag_privacyMemory");
+    expect(I18n.extendTranslations).toHaveBeenCalledWith(
+      expect.objectContaining({ diag_export: expect.any(String) }),
+      "de",
+    );
+  });
+
+  it("marks an unconnected device and says the report goes without a live read", async () => {
+    render(
+      <DiagnosticsPanel
+        socket={socket({ list: { devices: [{ value: "lamp-2b3c", label: "Lamp", connected: false }] } })}
+        {...MOUNT}
+      />,
+    );
+    expect(await screen.findByText("diag_offlineHint")).toBeInTheDocument();
+  });
+
+  it("lets the user pick one of several devices", async () => {
+    const s = socket({
+      list: {
+        devices: [
+          { value: "a", label: "A", connected: true },
+          { value: "b", label: "B", connected: false },
+        ],
+      },
+      export: { error: "" },
+    });
+    render(
+      <DiagnosticsPanel
+        socket={s}
+        {...MOUNT}
+        timeouts={FAST}
+      />,
+    );
+    const button = await screen.findByTestId("diag-export");
+    expect(button).toBeDisabled();
+    fireEvent.mouseDown(within(screen.getByTestId("diag-device-select")).getByRole("combobox"));
+    fireEvent.click(await screen.findByText("B — diag_notConnected"));
+    await waitFor(() => expect(button).not.toBeDisabled());
+    fireEvent.click(button);
+    expect(await screen.findByTestId("diag-error")).toHaveTextContent("diag_exportFailed");
+  });
 });
 
-describe("DiagnosticsPanel", () => {
-  it("pre-selects the only device so the card is one click", async () => {
-    render(
+describe("DiagnosticsPanel with a new socket", () => {
+  it("drops the device list or the failure of the socket it no longer uses", async () => {
+    let answer: (value: unknown) => void = () => undefined;
+    let fail: (reason: Error) => void = () => undefined;
+    const late = { sendTo: () => new Promise(resolve => (answer = resolve)) };
+    const lateFail = { sendTo: () => new Promise((_resolve, reject) => (fail = reject)) };
+    const fresh = socket({ list: { devices: [{ value: "new-1", label: "New", connected: true }] } });
+    const view = render(
       <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
+        socket={late}
+        {...MOUNT}
       />,
     );
-    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
-    expect(screen.getByTestId("diag-export").hasAttribute("disabled")).toBe(false);
-  });
-
-  it("does not pre-select when there is a choice to make", async () => {
-    mockList.listDevices.mockResolvedValue([DEVICE, OTHER]);
-    render(
+    view.rerender(
       <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
+        socket={fresh}
+        {...MOUNT}
       />,
     );
-    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
-    expect(screen.getByTestId("diag-export").hasAttribute("disabled")).toBe(true);
-  });
-
-  it("hands the browser the file under the name the adapter stored it as", async () => {
-    // The name carries model, device short id, version and timestamp — that is
-    // what lets a stranger tell two attached reports apart.
-    const dl = captureDownloads();
-    const fileName = "govee-smart_H61BE_1d6f_v2.29.0_2026-09-03_101500.json";
-    mockApi.exportReport.mockResolvedValue({ fileName, content: '{"readMe":{}}' });
-    render(
-      <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
-    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
-    fireEvent.click(screen.getByTestId("diag-export"));
-    await waitFor(() => expect(dl.names).toEqual([fileName]));
-    expect(dl.contents).toEqual(['{"readMe":{}}']);
-  });
-
-  it("shows the adapter's reason instead of a download when the export fails", async () => {
-    mockApi.exportReport.mockResolvedValue({ error: "Export failed or was throttled — try again in a moment" });
-    render(
-      <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
-    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
-    fireEvent.click(screen.getByTestId("diag-export"));
-    await waitFor(() => expect(screen.getByText(/throttled/)).toBeTruthy());
-  });
-
-  it("says so when there is nothing to report on yet", async () => {
-    mockList.listDevices.mockResolvedValue([]);
-    render(
-      <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
-    await waitFor(() => expect(screen.getByTestId("diag-no-devices")).toBeTruthy());
-  });
-
-  it("explains that the report is pseudonymised", async () => {
-    // Without that line a reader takes `address-1` in the file for a bug — and
-    // a reporter has no way to know what is safe to attach.
-    render(
-      <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
-    await waitFor(() => expect(screen.getByText(/pseudonymised/i)).toBeTruthy());
-  });
-
-  it("a failed list shows the failure — never the 'no devices yet' message", async () => {
-    // The two must never render the same. On 2026-09-03 they did: a dead
-    // message box produced an empty array, the card said "No devices yet", and
-    // the real cause (the instance object) went unlooked-at for an hour.
-    mockList.listDevices.mockRejectedValue(new DeviceListError("no connection"));
-    render(
-      <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
-    await waitFor(() => expect(screen.getByTestId("list-failed")).toBeTruthy());
+    await screen.findByTestId("diag-export");
+    answer({ devices: [] });
+    await new Promise(resolve => setTimeout(resolve, 0));
     expect(screen.queryByTestId("diag-no-devices")).toBeNull();
-    expect(screen.getByTestId("list-failed").textContent).toContain("no connection");
-  });
-
-  it("says 'loading' while it waits — a bare spinner cannot be told from a stall", async () => {
-    let release: (v: unknown[]) => void = () => {};
-    mockList.listDevices.mockReturnValue(new Promise(r => (release = r)));
-    render(
+    view.rerender(
       <DiagnosticsPanel
-        socket={{}}
-        namespace="govee-smart.0"
+        socket={lateFail}
+        {...MOUNT}
       />,
     );
-    expect(screen.getByText(/loading devices/i)).toBeTruthy();
-    // The extra hint only appears once the wait is genuinely long.
-    expect(screen.queryByTestId("list-slow-hint")).toBeNull();
-    release([DEVICE]);
-    await waitFor(() => expect(screen.getByTestId("diag-export")).toBeTruthy());
+    view.rerender(
+      <DiagnosticsPanel
+        socket={fresh}
+        {...MOUNT}
+      />,
+    );
+    await screen.findByTestId("diag-export");
+    fail(new Error("too late"));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(screen.queryByTestId("diag-list-failed")).toBeNull();
+  });
+});
+
+describe("issueFormUrl", () => {
+  it("opens the device form directly, a trailing slash or not", () => {
+    expect(issueFormUrl("https://github.com/owner/ioBroker.demo/")).toBe(
+      "https://github.com/owner/ioBroker.demo/issues/new?template=device-support.yml",
+    );
+  });
+});
+
+describe("failureText", () => {
+  it("names a failure by its own words, and falls back when it has none", () => {
+    expect(failureText(new Error("boom"), "fallback")).toBe("boom");
+    expect(failureText(new Error(""), "fallback")).toBe("fallback");
+    expect(failureText("not an error", "fallback")).toBe("fallback");
+    expect(failureText(new InstanceUnavailableError("noAnswer", 15), "fallback")).toBe("diag_noAnswer 15");
   });
 });

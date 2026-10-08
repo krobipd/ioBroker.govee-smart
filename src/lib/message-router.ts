@@ -25,20 +25,12 @@ export interface MessageRouterHost {
    */
   createMqttProbeClient: (email: string, password: string) => GoveeMqttClient;
   /**
-   * Every device, for the admin card's picker. One list for both halves of the
-   * Expert tab: the diagnostics picker takes it whole (a report is wanted
-   * precisely when a device misbehaves, so filtering would hide the interesting
-   * ones), and the segment wizard filters it down to what it can measure. Until
-   * 2.31.0 these were two commands returning the same devices under the same
-   * keys, differing only by a server-side filter and a label.
+   * Every device for the segment wizard's picker, with its reachability and segment count — the card offers what
+   * it can measure. The diagnostics card has the fleet's own list (`diagnostics` `list`).
    */
   getDeviceList: () => Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
-  /**
-   * Builds the report for one device and returns it WITH its content — the
-   * admin card hands it to the browser as a download. Nothing is stored on the
-   * adapter side (no report store since 2.37.0).
-   */
-  buildDiagnosticsReport: (deviceKey: string) => Promise<{ fileName: string; content: string } | { error: string }>;
+  /** The fleet's report jobs (`diagnostics/report-jobs.ts`): `list`, `start`, `result`. */
+  handleDiagnostics: (payload: unknown) => Promise<unknown>;
   /** Wizard-step routing — main.ts keeps the wizard state. */
   runWizardStep: (
     action: string,
@@ -57,7 +49,7 @@ export interface MessageRouterHost {
  * Dispatches 3 commands:
  *  - `segmentWizard` — wizard step (start/yes/no/apply/abort)
  *  - `mqttAuth` — login test + verification-code request (with live credentials)
- *  - `diagnostics` — device list + report build for the diagnostics card
+ *  - `diagnostics` — the fleet's report jobs (list, start, result) for the diagnostics card
  */
 export class MessageRouter {
   /** Last time `requestCode` was triggered — guards against double-click email spam. */
@@ -143,6 +135,10 @@ export class MessageRouter {
     try {
       if (obj.command === "segmentWizard") {
         const payload = (obj.message ?? {}) as { action?: string; device?: string; indices?: number[] };
+        if (payload.action === "list") {
+          this.host.sendResponse(obj, { devices: this.host.getDeviceList() });
+          return;
+        }
         const response = await this.host.runWizardStep(payload.action ?? "", payload.device ?? "", {
           indices: payload.indices,
         });
@@ -150,19 +146,8 @@ export class MessageRouter {
         return;
       }
       if (obj.command === "diagnostics") {
-        const payload = (obj.message ?? {}) as { action?: string; device?: string };
-        if (payload.action === "list") {
-          this.host.sendResponse(obj, { devices: this.host.getDeviceList() });
-          return;
-        }
-        if (payload.action === "export") {
-          // The content travels back with the answer so the card can put a file
-          // in the user's download folder in one click. Around 68 KB — well
-          // inside what the admin socket carries, and it happens once per press.
-          this.host.sendResponse(obj, await this.host.buildDiagnosticsReport(payload.device ?? ""));
-          return;
-        }
-        this.host.sendResponse(obj, { error: `Unknown diagnostics action '${payload.action ?? ""}'` });
+        // The fleet's report jobs answer at once — a report may take longer than the admin's 30 s per answer.
+        this.host.sendResponse(obj, await this.host.handleDiagnostics(obj.message));
         return;
       }
       if (obj.command === "mqttAuth") {

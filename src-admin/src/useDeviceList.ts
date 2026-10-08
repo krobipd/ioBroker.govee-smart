@@ -1,9 +1,10 @@
-// The device list both halves of the Expert tab work from. Kept free of
-// React/socket-client imports so it stays a pure, easily-testable factory: the
-// only dependency is a `sendTo` method, injected via the socket seam.
+// The segment wizard's device list. Kept free of React/socket-client imports so
+// it stays a pure, easily-testable factory: the only dependency is a `sendTo`
+// method, injected via the socket seam. The diagnostics card has the fleet's own
+// list (`diagnostics` `list`, master `diagnosticsApi.ts`).
 //
 // The response shape MUST stay in sync with the backend (`main.ts`
-// getDeviceList / `message-router.ts`, `diagnostics` command, action "list").
+// getDeviceList / `message-router.ts`, `segmentWizard` command, action "list").
 // It is re-declared here (a type only) so this file needs nothing from the
 // backend at build time; runtime helpers ARE shared from ../src/lib (see the
 // import-free `err-text` module).
@@ -66,7 +67,7 @@ export function makeDeviceListApi(socket: DeviceListSocket, namespace: string): 
     async listDevices(): Promise<DeviceEntry[]> {
       let res: unknown;
       try {
-        res = await socket.sendTo(namespace, "diagnostics", { action: "list" });
+        res = await socket.sendTo(namespace, "segmentWizard", { action: "list" });
       } catch (e) {
         throw new DeviceListError(errText(e));
       }

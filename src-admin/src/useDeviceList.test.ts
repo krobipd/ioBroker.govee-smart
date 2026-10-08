@@ -24,7 +24,7 @@ describe("makeDeviceListApi", () => {
   it("asks the adapter once, on the diagnostics command", async () => {
     const { socket, calls } = socketReturning({ devices: [entry()] });
     const devices = await makeDeviceListApi(socket, "govee-smart.0").listDevices();
-    expect(calls).toEqual([["govee-smart.0", "diagnostics", { action: "list" }]]);
+    expect(calls).toEqual([["govee-smart.0", "segmentWizard", { action: "list" }]]);
     expect(devices).toHaveLength(1);
     expect(devices[0]).toMatchObject({ online: true, segments: 15 });
   });

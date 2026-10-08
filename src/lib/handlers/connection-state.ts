@@ -25,7 +25,6 @@ export interface ConnectionStateAdapter {
   readonly cloudWasConnected: boolean;
   /** Whether real calls say the Cloud is down (issue #51) — read through `cloudReachable`. */
   readonly cloudOutage: { readonly confirmed: boolean };
-  readonly diagnosticsLastRun: Map<string, number>;
   readonly mqttClient: GoveeMqttClient | null;
   readonly openapiMqttClient: GoveeOpenapiMqttClient | null;
   readonly lanClient: GoveeLanClient | null;

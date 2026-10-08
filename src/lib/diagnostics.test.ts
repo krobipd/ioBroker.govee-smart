@@ -516,15 +516,13 @@ describe("DiagnosticsCollector", () => {
       expect(await source(plain, makeDevice())).toBe("unknown (no segment source)");
     });
 
-    it("contains all v1.x top-level fields plus the v2 ring buffers", async () => {
+    it("contains the device sections and the ring buffers — the frame fields are the fleet's", async () => {
       const c = new DiagnosticsCollector(registry);
       const result = await c.generate(makeDevice(), "2.0.0");
       const keys = Object.keys(result).sort();
       expect(keys).toEqual(
+        // readMe, adapter, version and time come from the fleet frame (ReportJobs)
         expect.arrayContaining([
-          "adapter",
-          "version",
-          "exportedAt",
           "device",
           "capabilities",
           "scenes",

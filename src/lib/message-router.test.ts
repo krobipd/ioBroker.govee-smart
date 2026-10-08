@@ -69,7 +69,8 @@ function makeHost(opts: {
   wizardResponse?: Record<string, unknown>;
   probe?: GoveeMqttClient;
   devices?: Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
-  diagnosticsReport?: { fileName: string; content: string } | { error: string };
+  diagnosticsAnswer?: unknown;
+  diagnosticsCalls?: unknown[];
 }): { host: MessageRouterHost; responses: RecordedResponse[] } {
   const responses: RecordedResponse[] = [];
   const host: MessageRouterHost = {
@@ -82,8 +83,10 @@ function makeHost(opts: {
     sendResponse: (obj, data) => responses.push({ obj, data }),
     createMqttProbeClient: (_email: string, _password: string) => opts.probe ?? makeProbe({ connected: false }),
     getDeviceList: () => opts.devices ?? [],
-    buildDiagnosticsReport: () =>
-      Promise.resolve(opts.diagnosticsReport ?? { error: "no report configured in this test" }),
+    handleDiagnostics: payload => {
+      opts.diagnosticsCalls?.push(payload);
+      return Promise.resolve(opts.diagnosticsAnswer ?? { devices: [] });
+    },
     runWizardStep: () => Promise.resolve(opts.wizardResponse ?? { ok: true }),
     setTimeout: (cb, ms) => globalThis.setTimeout(cb, ms) as unknown as ioBroker.Timeout,
     clearTimeout: handle => globalThis.clearTimeout(handle as unknown as ReturnType<typeof globalThis.setTimeout>),
@@ -466,13 +469,25 @@ describe("onMessage crash boundaries", () => {
   });
 });
 
-describe("diagnostics command", () => {
-  it("lists every real device, reachable or not, with what the wizard needs to filter on", async () => {
-    // A report is wanted precisely when a device misbehaves, so filtering the
-    // list by reachability would hide the interesting ones. Since 2.31.0 this is
-    // ALSO the wizard's list: `online` and `segments` travel with each entry so
-    // the card can narrow it down to what it can measure, instead of a second
-    // command that returned the same devices under the same keys.
+describe("diagnostics command — the fleet's report jobs", () => {
+  it("hands every diagnostics message to the report jobs and answers with what they say", async () => {
+    const calls: unknown[] = [];
+    const { host, responses } = makeHost({ diagnosticsCalls: calls, diagnosticsAnswer: { job: "H61BE:AA:BB#1" } });
+    const router = new MessageRouter(host);
+    router.onMessage({
+      command: "diagnostics",
+      message: { action: "start", device: "H61BE:AA:BB" },
+      from: "x",
+      callback: {},
+    } as never);
+    await new Promise(r => setTimeout(r, 0));
+    expect(calls).toEqual([{ action: "start", device: "H61BE:AA:BB" }]);
+    expect(responses[0].data).toEqual({ job: "H61BE:AA:BB#1" });
+  });
+});
+
+describe("segmentWizard list — the wizard's own device list", () => {
+  it("lists every real device with what the wizard filters on: reachability and segments", async () => {
     const { host, responses } = makeHost({
       devices: [
         { value: "H61BE:AA:BB", label: "Strip (H61BE)", model: "H61BE", online: false, segments: 15 },
@@ -480,34 +495,10 @@ describe("diagnostics command", () => {
       ],
     });
     const router = new MessageRouter(host);
-    router.onMessage({ command: "diagnostics", message: { action: "list" }, from: "x", callback: {} } as never);
+    router.onMessage({ command: "segmentWizard", message: { action: "list" }, from: "x", callback: {} } as never);
     await new Promise(r => setTimeout(r, 0));
     const devices = (responses[0].data as { devices: Array<Record<string, unknown>> }).devices;
     expect(devices).toHaveLength(2);
     expect(devices[0]).toMatchObject({ value: "H61BE:AA:BB", online: false, segments: 15 });
-  });
-
-  it("hands the report back with its content so the card can offer a download", async () => {
-    const { host, responses } = makeHost({
-      diagnosticsReport: { fileName: "govee-smart_H61BE_1d6f_v2.29.0_2026-09-03_101500.json", content: "{}" },
-    });
-    const router = new MessageRouter(host);
-    router.onMessage({
-      command: "diagnostics",
-      message: { action: "export", device: "H61BE:AA:BB" },
-      from: "x",
-      callback: {},
-    } as never);
-    await new Promise(r => setTimeout(r, 0));
-    expect(responses[0].data).toMatchObject({ fileName: expect.stringContaining("H61BE"), content: "{}" });
-  });
-
-  it("answers an unknown action instead of leaving the caller hanging", async () => {
-    // An admin sendTo without an answer hangs until it times out.
-    const { host, responses } = makeHost({});
-    const router = new MessageRouter(host);
-    router.onMessage({ command: "diagnostics", message: { action: "nope" }, from: "x", callback: {} } as never);
-    await new Promise(r => setTimeout(r, 0));
-    expect(responses[0].data).toMatchObject({ error: expect.stringContaining("nope") });
   });
 });

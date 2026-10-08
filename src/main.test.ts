@@ -3245,6 +3245,26 @@ describe("GoveeAdapter — the LAN poll keeps control.power honest", () => {
   });
 });
 
+/**
+ * Ask the fleet's report jobs for one device's report over the message host, the way the card does: start, then fetch
+ * until it is ready.
+ *
+ * @param host The assembled message host
+ * @param key The device key (`sku:deviceId`)
+ */
+async function fetchReport(host: unknown, key: string): Promise<{ fileName: string; content: string }> {
+  const ask = (host as { handleDiagnostics: (payload: unknown) => Promise<unknown> }).handleDiagnostics;
+  const started = (await ask({ action: "start", device: key })) as { job: string };
+  for (let n = 0; n < 50; n++) {
+    const answer = (await ask({ action: "result", job: started.job })) as Record<string, unknown>;
+    if (!answer.pending) {
+      return answer as { fileName: string; content: string };
+    }
+    await settle();
+  }
+  throw new Error("the report never got ready");
+}
+
 describe("GoveeAdapter — the diagnostics export over the REAL host object", () => {
   it("hands the report back in the answer and keeps no copy, over the assembled host", async () => {
     // 2.29.0 shipped this broken: the handlers never get `this`, only the host
@@ -3253,9 +3273,9 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // nothing drove the real host. On the live system the export died with
     // "writeFileAsync is not a function".
     //
-    // Since 2.31.0 the admin card is the ONLY caller, so this drives the real
-    // `buildDiagnosticsReport` — the same seam, one path fewer to be wrong on.
-    // Since 2.37.0 the answer is the only copy: nothing lands in a file store.
+    // The admin card is the ONLY caller, so this drives the real fleet report
+    // jobs — the same seam, one path fewer to be wrong on. The answer is the
+    // only copy: nothing lands in a file store, no value is written (DB-10).
     const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     f.cloud.getDevices.mockResolvedValue([
@@ -3273,9 +3293,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     const device = i.deviceManager!.getDevices()[0];
     const prefix = i.stateManager!.devicePrefix(device);
     const host = i.buildMessageRouterHost();
-    const result = await (
-      host.buildDiagnosticsReport as (key: string) => Promise<{ fileName: string; content: string }>
-    )(`${device.sku}:${device.deviceId}`);
+    const result = await fetchReport(host, `${device.sku}:${device.deviceId}`);
     await settle(6);
 
     // Nothing is written anywhere — the file store of 2.29.0–2.36.0 is gone.
@@ -3283,10 +3301,11 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     expect(i.writeFileAsync).not.toHaveBeenCalled();
     // The card gets the content along with the name, so one press produces the
     // download — the name tells the recipient which device and version.
-    expect(result.fileName).toMatch(/^govee-smart_H61BE_ee11_v.*\.json$/);
+    // The fleet's file name (DB-12): adapter, the device's tree id, version, UTC time.
+    expect(result.fileName).toMatch(/^govee-smart_h61be-ee11_v.*\.json$/);
     expect(JSON.parse(result.content).device.sku).toBe("H61BE");
-    // And the datapoint says WHEN, not which file.
-    expect(i.states.get(`${prefix}.diag.lastExport`)?.val).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/);
+    // A report writes no value (DB-10).
+    expect(i.states.get(`${prefix}.diag.lastExport`)?.val ?? "").toBe("");
   });
 
   it("the wired report carries the start time and never a group's digit id (issue #50)", async () => {
@@ -3317,9 +3336,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // An instance in compact mode says so in its report.
     (adapter as unknown as { common: { compact?: boolean } }).common = { compact: true };
     const host = i.buildMessageRouterHost();
-    const result = await (
-      host.buildDiagnosticsReport as (key: string) => Promise<{ fileName: string; content: string }>
-    )(`${device.sku}:${device.deviceId}`);
+    const result = await fetchReport(host, `${device.sku}:${device.deviceId}`);
     await settle(6);
     expect(result.content).not.toContain("98765432");
     expect(result.content).toMatch(/member of group group-\d+/);

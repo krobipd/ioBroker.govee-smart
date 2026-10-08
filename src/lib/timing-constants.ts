@@ -236,6 +236,12 @@ export const LAN_STATUS_REFRESH_MS = 60_000;
  */
 export const LAN_STATUS_AFTER_COMMAND_MS = 2_000;
 
+/**
+ * How long the diagnostics report waits for the device's answer to its status request (krobi 2026-10-06, E1) —
+ * measured answers came within a second (H61D5, 903 ms); the card's own wait is minutes.
+ */
+export const REPORT_STATUS_WAIT_MS = 5_000;
+
 /** info.online re-evaluation interval for all devices (20 s). */
 export const ONLINE_SYNC_INTERVAL_MS = 20_000;
 
@@ -258,9 +264,6 @@ export const APP_VERSION_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 /** Fallback retry delay after a transient Cloud-load failure (5 min). */
 export const TRANSIENT_RETRY_MS = 5 * 60_000;
-
-/** Per-device diagnostics-export throttle (2 s) — guards against button spam. */
-export const DIAGNOSTICS_EXPORT_THROTTLE_MS = 2_000;
 
 // === Wizard ===
 

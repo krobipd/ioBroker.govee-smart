@@ -1,5 +1,4 @@
 import { reapStaleDevices, type DeviceReaperAdapter } from "./device-reaper";
-import { sessionKey } from "../device-key";
 import type { GoveeDevice } from "../types";
 import { createTestDevice } from "../../../test/test-helpers";
 
@@ -45,24 +44,19 @@ function makeRig(opts: {
         return Promise.resolve([]);
       },
     } as never,
-    diagnosticsLastRun: new Map<string, number>(),
   };
   return { adapter, logs, cleanupCalls, cleanupProtected, prunedWith };
 }
 
 describe("reapStaleDevices", () => {
-  it("cleans the object tree, prunes diag buffers and the throttle map down to live devices", async () => {
+  it("cleans the object tree and prunes the diag buffers down to live devices", async () => {
     const live = createTestDevice({ deviceId: "AA:01" });
     const rig = makeRig({ devices: [live] });
-    rig.adapter.diagnosticsLastRun.set(sessionKey(live.sku, live.deviceId), 123);
-    rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
 
     await reapStaleDevices(rig.adapter);
 
     expect(rig.cleanupCalls).toEqual([[live]]);
     expect(rig.prunedWith[0].has("AA:01")).toBe(true);
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey(live.sku, live.deviceId))).toBe(true);
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(false);
   });
 
   it("hands the prefixes an account list names to the cleanup — they are kept (H6)", async () => {
@@ -86,15 +80,11 @@ describe("reapStaleDevices", () => {
     // 249 device objects of a seeded installation with an empty cache, and 132
     // of 249 with a partial one (measured 2026-09-07 against the real adapter).
     const rig = makeRig({ devices: [], populationKnown: false });
-    rig.adapter.diagnosticsLastRun.set(sessionKey("H9999", "GO:NE"), 456);
 
     await reapStaleDevices(rig.adapter);
 
     expect(rig.cleanupCalls).toEqual([]);
     expect(rig.prunedWith).toEqual([]);
-    // The throttle entry survives too — it is keyed on a device whose objects
-    // are still there.
-    expect(rig.adapter.diagnosticsLastRun.has(sessionKey("H9999", "GO:NE"))).toBe(true);
     expect(rig.logs.debug.some(m => m.includes("Device cleanup skipped"))).toBe(true);
   });
 });

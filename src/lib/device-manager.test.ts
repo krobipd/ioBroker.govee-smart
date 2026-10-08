@@ -58,7 +58,7 @@ let registry: DeviceRegistry = emptyRegistry();
 const resolveSegmentCount = (device: GoveeDevice): number => resolveSegmentCountRaw(device, registry);
 
 /**
- * Quirk-dependent tests (e.g. generateDiagnostics for H6141) need the
+ * Quirk-dependent tests (e.g. the diagnostics body for H6141) need the
  * seed-status entries to be active. Real-world default has them off.
  * beforeEach so other test files cannot leak a reset between cases.
  *
@@ -1971,7 +1971,7 @@ describe("DeviceManager", () => {
     });
   });
 
-  describe("generateDiagnostics", () => {
+  describe("the diagnostics body", () => {
     it("should include all device data in diagnostics export", async () => {
       const device = createTestDevice({
         sceneLibrary: [
@@ -1981,10 +1981,8 @@ describe("DeviceManager", () => {
         diyLibrary: [{ name: "MyDIY", diyCode: 10 }],
       });
 
-      const result = await dm.generateDiagnostics(device, "1.0.1");
-      expect(result.adapter).toBe("iobroker.govee-smart");
-      expect(result.version).toBe("1.0.1");
-      expect(typeof result.exportedAt).toBe("string");
+      // adapter, version and time come from the fleet frame (ReportJobs) — the collector builds the body
+      const result = await dm.getDiagnostics().generate(device, "1.0.1");
       expect((result.device as any).sku).toBe("H6160");
       expect((result.device as any).channels).toEqual({ lan: true, mqtt: true, cloud: true });
       expect((result.scenes as any).count).toBe(2);
@@ -2001,7 +1999,7 @@ describe("DeviceManager", () => {
 
     it("should include quirks for known SKU", async () => {
       const device = createTestDevice({ sku: "H6141" });
-      const result = await dm.generateDiagnostics(device, "1.0.1");
+      const result = await dm.getDiagnostics().generate(device, "1.0.1");
       expect((result.quirks as any).brokenPlatformApi).toBe(true);
     });
   });
@@ -4676,7 +4674,7 @@ describe("refreshExpiringReachability — the renewer for the API-key-only tier"
     const { dm: dm2, dev } = cloudOnlyLight(CLOUD_REACHABILITY_REFRESH_MS + 60_000);
     dm2.setCloudClient(recordingCloud().client as never);
     expect(await dm2.refreshExpiringReachability()).toBe(1);
-    const history = (await dm2.generateDiagnostics(dev, "2.39.1")).apiHistory as Record<string, unknown>;
+    const history = (await dm2.getDiagnostics().generate(dev, "2.39.1")).apiHistory as Record<string, unknown>;
     expect(history["/router/api/v1/device/state"]).toBeUndefined();
   });
 
@@ -5397,9 +5395,12 @@ describe("requestStaleStatuses — the status request over the account broker (i
     dm.setApiClient({ hasBearerToken: () => true, fetchDeviceList: () => Promise.resolve([current]) } as never);
     await dm.pollAppApi();
     const bodyOf = async (): Promise<Record<string, any>> =>
-      ((await dm.generateDiagnostics(d, "2.39.1")).apiHistory as Record<string, Array<{ body: Record<string, any> }>>)[
-        "/device/rest/devices/v1/list"
-      ].at(-1)!.body;
+      (
+        (await dm.getDiagnostics().generate(d, "2.39.1")).apiHistory as Record<
+          string,
+          Array<{ body: Record<string, any> }>
+        >
+      )["/device/rest/devices/v1/list"].at(-1)!.body;
     expect((await bodyOf()).deviceExt.lastDeviceData).toEqual({ online: false, bat: 87 });
     // An entry without the raw copy (a stub, an older client) still records the parsed one.
     current = { ...withRaw, raw: undefined, deviceName: "Strip" };

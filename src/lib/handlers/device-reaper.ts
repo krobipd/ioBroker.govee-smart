@@ -1,6 +1,5 @@
 import type { DeviceManager } from "../device-manager";
 import type { StateManager } from "../state-manager";
-import { sessionKey } from "../device-key";
 
 /** What the stale-device cleanup needs. */
 export interface DeviceReaperAdapter {
@@ -8,7 +7,6 @@ export interface DeviceReaperAdapter {
   readonly deviceManager: DeviceManager | null;
   readonly stateManager: StateManager | null;
   /** Diagnostics-export throttle, keyed per device — reaped with the device. */
-  readonly diagnosticsLastRun: Map<string, number>;
 }
 
 /**
@@ -43,11 +41,4 @@ export async function reapStaleDevices(adapter: DeviceReaperAdapter): Promise<vo
 
   const liveDeviceIds = new Set(currentDevices.map(d => d.deviceId));
   adapter.deviceManager.getDiagnostics().pruneOrphans(liveDeviceIds);
-
-  const liveKeys = new Set(currentDevices.map(d => sessionKey(d.sku, d.deviceId)));
-  for (const key of adapter.diagnosticsLastRun.keys()) {
-    if (!liveKeys.has(key)) {
-      adapter.diagnosticsLastRun.delete(key);
-    }
-  }
 }

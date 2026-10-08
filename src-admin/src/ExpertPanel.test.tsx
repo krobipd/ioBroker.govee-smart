@@ -23,9 +23,11 @@ vi.mock("./useWizardApi", () => ({
   makeWizardApi: () => mockWizard,
 }));
 
-vi.mock("./useDiagnosticsApi", async importOriginal => ({
-  ...(await importOriginal<typeof import("./useDiagnosticsApi")>()),
-  makeDiagnosticsApi: () => ({ exportReport: vi.fn() }),
+const mockDiagnostics = vi.hoisted(() => ({ listDevices: vi.fn(), exportReport: vi.fn() }));
+
+vi.mock("./diagnosticsApi", async importOriginal => ({
+  ...(await importOriginal<typeof import("./diagnosticsApi")>()),
+  makeDiagnosticsApi: () => mockDiagnostics,
 }));
 
 import { ExpertPanel } from "./ExpertPanel";
@@ -38,6 +40,10 @@ beforeEach(() => {
   I18n.extendTranslations(enJson, "en");
   I18n.setLanguage("en");
   mockList.listDevices.mockResolvedValue([STRIP, SENSOR]);
+  mockDiagnostics.listDevices.mockResolvedValue([
+    { value: STRIP.value, label: STRIP.label, connected: true },
+    { value: SENSOR.value, label: SENSOR.label, connected: true },
+  ]);
 });
 
 function renderPanel(): void {
@@ -81,7 +87,7 @@ describe("ExpertPanel", () => {
     await waitFor(() => expect(mockWizard.abort).toHaveBeenCalledTimes(1));
   });
 
-  it("re-reads the device list on every switch — reachability is live state", async () => {
+  it("re-reads the device lists on every switch — reachability is live state", async () => {
     // Deliberately NOT cached across the switch. `online` decides what the
     // wizard offers, and a list kept from four minutes ago would offer a device
     // that has since dropped off.
@@ -89,16 +95,15 @@ describe("ExpertPanel", () => {
     await waitFor(() => expect(mockList.listDevices).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByTestId("expert-tool-diagnostics"));
-    await waitFor(() => expect(mockList.listDevices).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(mockDiagnostics.listDevices).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByTestId("expert-tool-wizard"));
-    await waitFor(() => expect(mockList.listDevices).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(mockList.listDevices).toHaveBeenCalledTimes(2));
   });
 
-  it("the two tools see the same list through different filters", async () => {
-    // One command, two views: the wizard can only measure a reachable device
-    // with segments, while a report is wanted for ANY device — most of all a
-    // misbehaving one.
+  it("the wizard offers what it can measure, the report card every device", async () => {
+    // The wizard can only measure a reachable device with segments, while a
+    // report is wanted for ANY device — most of all a misbehaving one.
     renderPanel();
     await waitFor(() => expect(screen.getByTestId("wiz-device-select")).toBeTruthy());
     expect(screen.getByTestId("wiz-device-select").textContent).toContain("Strip Living");

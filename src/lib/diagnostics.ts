@@ -149,6 +149,22 @@ export interface CommandResultEntry {
   error?: string;
 }
 
+/** A device's buffers frozen before a report's live read (see `DiagnosticsCollector.freeze`). */
+export interface FrozenBuffers {
+  /** Activity log lines. */
+  logs: LogEntry[];
+  /** Captured MQTT packets. */
+  packets: MqttPacketEntry[];
+  /** API history per endpoint. */
+  responses: Record<string, ApiResponseEntry[]>;
+  /** Outgoing LAN datagrams. */
+  lanSends: LanSendEntry[];
+  /** Results of user commands. */
+  commandResults: CommandResultEntry[];
+  /** The account-wide login and IoT-key calls. */
+  accountCalls: AccountCallEntry[];
+}
+
 /** Per-device ring buffers. */
 interface DeviceBuffers {
   logs: LogEntry[];
@@ -944,8 +960,55 @@ export class DiagnosticsCollector {
    * @param prefix Device state prefix — enables the object-tree section
    */
   async generate(device: GoveeDevice, adapterVersion: string, prefix?: string): Promise<Record<string, unknown>> {
+    return (await this.generateReport(device, adapterVersion, prefix)).content;
+  }
+
+  /**
+   * A copy of a device's buffers as they stand now — taken before the report's live read, so the read's own answers
+   * never push the recorded history out of the rings (the live read goes into its own section).
+   *
+   * @param deviceId Govee device id
+   * @returns The frozen buffers, or undefined when the device has none yet
+   */
+  freeze(deviceId: string): FrozenBuffers | undefined {
+    const b = this.buffers.get(deviceId);
+    if (!b) {
+      return undefined;
+    }
+    return structuredClone({
+      logs: b.logs,
+      packets: b.packets,
+      responses: Object.fromEntries(b.responses),
+      lanSends: b.lanSends,
+      commandResults: b.commandResults,
+      accountCalls: this.accountCalls,
+    });
+  }
+
+  /**
+   * One report with its placeholders: the content and the device id for the file name, rendered by the same
+   * placeholders (DB-12 — a scheme id stays as it is).
+   *
+   * @param device Target device
+   * @param adapterVersion Adapter version string
+   * @param prefix Device state prefix — enables the object-tree section
+   * @param extra What the report adds for this export: frozen buffers, the live read, the tree id for the file name
+   * @param extra.frozen Buffers frozen before the live read
+   * @param extra.live The live read's section
+   * @param extra.treeId The device's tree id (`h6199-b24d`)
+   * @returns The pseudonymised content and the file id
+   */
+  async generateReport(
+    device: GoveeDevice,
+    adapterVersion: string,
+    prefix?: string,
+    extra: { frozen?: FrozenBuffers; live?: Record<string, unknown>; treeId?: string } = {},
+  ): Promise<{ content: Record<string, unknown>; fileId: string }> {
     const quirks = this.registry.getQuirks(device.sku);
-    const b = this.buffers.get(device.deviceId);
+    const b = extra.frozen
+      ? { ...extra.frozen, responses: new Map(Object.entries(extra.frozen.responses)) }
+      : this.buffers.get(device.deviceId);
+    const accountCalls = extra.frozen?.accountCalls ?? this.accountCalls;
 
     const runtimeState = this.runtimeStateProvider ? this.runtimeStateProvider() : null;
     const cacheSnapshot = this.cacheSnapshotProvider
@@ -977,21 +1040,8 @@ export class DiagnosticsCollector {
       }
     }
 
+    // readMe, adapter, version, time and runtime come from the fleet frame (`report-file.ts`, DB-06).
     const report: Record<string, unknown> = {
-      // The file is read by someone with none of our context. The privacy
-      // statement itself lives at the export button (gsw_diagPrivacy, 11
-      // languages), where it still decides whether to upload; repeating it
-      // inside the uploaded file changed nothing. What only the file can say
-      // is that its markers stop at its own edge.
-      readMe: {
-        what: "Diagnostics export of one Govee device, for a GitHub issue. Pseudonymised; credentials removed.",
-        markers:
-          "Placeholders (name-1, address-1, mac-1, …) are stable INSIDE this file only. " +
-          "Never compare them across two exports — every export numbers them anew.",
-      },
-      adapter: "iobroker.govee-smart",
-      version: adapterVersion,
-      exportedAt: new Date().toISOString(),
       // What the report used to be missing entirely: which ioBroker this ran on
       // and how the installation as a whole was doing at export time.
       environment,
@@ -1130,13 +1180,15 @@ export class DiagnosticsCollector {
       commandResults: b?.commandResults.slice() ?? [],
       // Account-wide, so it appears in every device's report: without it a dead
       // push channel has no reason in the report at all.
-      accountCalls: this.accountCalls.slice(),
+      accountCalls: accountCalls.slice(),
       // "How is this device actually driven" — the question a report has to
       // answer before a stranger's model can be added to the catalogue.
       controlPaths,
       // The datapoints as they really exist, with type, role, unit and value.
       // Null when no prefix was passed (the device has no tree yet).
       objectTree,
+      // What the device said when the report was asked for (DB-02, E1/E2) — only for a connected device.
+      ...(extra.live ? { live: extra.live } : {}),
     };
 
     // The report's placeholders (fleet DB-04), new for every report: the names
@@ -1152,11 +1204,17 @@ export class DiagnosticsCollector {
             .filter((n): n is string => typeof n === "string")
         : []),
     ];
-    return pseudonymiseReport(
+    const places = new Placeholders();
+    const content = pseudonymiseReport(
       report,
       { names: [...this.deviceNames(), ...snapshotNames], digitIds: this.digitDeviceIds() },
-      new Placeholders(),
+      places,
     ) as Record<string, unknown>;
+    // the same pre-pass and placeholders as the content, so a digit group id becomes the same `group-N`
+    const fileId = String(
+      pseudonymiseReport(extra.treeId ?? device.sku, { names: [], digitIds: this.digitDeviceIds() }, places),
+    );
+    return { content, fileId };
   }
 
   /**

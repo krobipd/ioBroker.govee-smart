@@ -4,73 +4,17 @@ import { Box, Button, Stack, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { forgetLastTab } from "./tabMemory";
 import { SegmentWizard } from "./SegmentWizard";
 
 /** Which half of the Expert tab is showing. */
 type Tool = "wizard" | "diagnostics";
 
-/** The tab ids of `admin/jsonConfig.json` — the only values the tab memory can hold for this adapter. */
-const OWN_TAB_IDS = new Set(["_main", "_expert"]);
+/** The tab ids of `admin/jsonConfig.json` — the settings open on the first one again (fleet tab memory, GV-07). */
+const TAB_IDS = ["_main", "_expert"] as const;
 
-/** What the tab memory is kept in: a real Storage, or the admin's server-synced object without enumeration. */
-type TabMemoryStorage = Pick<Storage, "getItem" | "removeItem"> & Partial<Pick<Storage, "length" | "key">>;
-
-/**
- * Forget which tab was open last, so the next visit to the instance settings
- * starts on the Configuration tab.
- *
- * The admin's json-config remembers the last tab per adapter (measured on
- * Admin 8.0.12 / json-config 10.0.0, `ConfigTabs`): every tab switch writes
- * `localStorage["<dialogName || 'App'>.<adapterName>"] = <tab id>`, and the
- * dialog opens on that entry whenever the URL hash names no tab — which it
- * never does on a fresh open. There is no schema switch against it. This
- * component mounts exactly when the Expert tab is entered, AFTER that write,
- * and unmounts when the settings close — the entry is removed at both ends,
- * whichever order the admin's own write and the mount take.
- *
- * Where the entry lives depends on the admin setting "store GUI settings on
- * the server": then `window._localStorage` is a plain object with getItem /
- * setItem / removeItem only — no `length`, no `key()` — synced to
- * `system.adapter.admin.0.guiSettings` on every write (measured on krobi's
- * admin 8.0.12 after 2.37.0: the enumeration below never ran there, the entry
- * stayed `_expert` on the server, and every open still landed on Expert). The
- * key is known, so it is asked for directly; the enumeration only covers a
- * real Storage, where the same adapter name may sit under another dialog
- * name.
- * so removing the entry here is enough: the next open finds nothing and
- * takes the first tab. Only this adapter's entries are touched, and only
- * those holding one of its own tab ids.
- *
- * @param namespace Adapter instance namespace, e.g. "govee-smart.0"
- */
-export function forgetLastTab(namespace: string): void {
-  const adapterName = namespace.split(".")[0];
-  try {
-    const w = window as Window & { _localStorage?: TabMemoryStorage };
-    const storage: TabMemoryStorage = w._localStorage ?? window.localStorage;
-    const stale = new Set<string>();
-    // The admin's default dialog name is "App" — the key the server-synced
-    // storage holds, which cannot be enumerated.
-    const known = `App.${adapterName}`;
-    if (OWN_TAB_IDS.has(storage.getItem(known) ?? "")) {
-      stale.add(known);
-    }
-    if (typeof storage.length === "number" && typeof storage.key === "function") {
-      for (let i = 0; i < storage.length; i++) {
-        const key = storage.key(i);
-        if (key?.endsWith(`.${adapterName}`) && OWN_TAB_IDS.has(storage.getItem(key) ?? "")) {
-          stale.add(key);
-        }
-      }
-    }
-    // Collect first, then remove — deleting while indexing skips entries.
-    for (const key of stale) {
-      storage.removeItem(key);
-    }
-  } catch {
-    // Storage blocked (private window, disabled site data): nothing to forget.
-  }
-}
+/** The adapter's GitHub repository — the diagnostics card links its issue form there (DB-07). */
+const REPOSITORY = "https://github.com/krobipd/ioBroker.govee-smart";
 
 /** Props for the Expert panel. */
 export interface ExpertPanelProps {
@@ -89,8 +33,9 @@ export interface ExpertPanelProps {
  * buttons.
  *
  * Only the selected tool is mounted. That is what makes the device list fresh
- * on every switch — both tools load it on mount, and `online` is live state
- * that would age in a list kept across switches.
+ * on every switch — both tools load their list on mount (the wizard its own,
+ * the diagnostics card the fleet's), and reachability is live state that would
+ * age in a list kept across switches.
  *
  * @param root0 Component props
  * @param root0.socket Admin socket used for the sendTo round-trips
@@ -99,8 +44,8 @@ export interface ExpertPanelProps {
 export function ExpertPanel({ socket, namespace }: ExpertPanelProps): React.JSX.Element {
   const [tool, setTool] = React.useState<Tool>("wizard");
   React.useEffect(() => {
-    forgetLastTab(namespace);
-    return () => forgetLastTab(namespace);
+    forgetLastTab(namespace, TAB_IDS);
+    return () => forgetLastTab(namespace, TAB_IDS);
   }, [namespace]);
 
   return (
@@ -136,6 +81,8 @@ export function ExpertPanel({ socket, namespace }: ExpertPanelProps): React.JSX.
           <DiagnosticsPanel
             socket={socket}
             namespace={namespace}
+            repository={REPOSITORY}
+            tabIds={TAB_IDS}
           />
         )}
       </Stack>
