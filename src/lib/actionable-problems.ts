@@ -1,3 +1,4 @@
+// Fleet master (.consistency-master/src/lib/actionable-problems.ts) — never edit the copy in an adapter.
 /** A single user-actionable problem: what is wrong + what the user must do. */
 export interface ActionableProblem {
   /**
@@ -30,16 +31,14 @@ export interface ActionableProblemsHost {
 }
 
 /**
- * Central registry for user-actionable problems (Govee verification needed,
- * rejected credentials, …). One mechanism every error site can feed.
+ * Central registry for user-actionable problems (a login the counterpart refuses, a verification it waits for). One
+ * mechanism every error site can feed. Measured 2026-10-03: two adapters carried the same class with one difference —
+ * a resolution line (`resolve`) or none (`forget`); the master has both.
  *
  * Which problems belong here: error classes the USER must fix because they
- * never self-heal — verification pending/failed and rejected credentials
- * (the AUTH-shaped failures). Transient classes (NETWORK, TIMEOUT,
- * RATE_LIMIT, UNKNOWN) keep the warn-once-then-debug policy in
- * `log-channel-fail.ts` and never reach this registry — enforced by where
- * `report()` is wired (only at verification/auth failure sites), not by a
- * runtime gate.
+ * never self-heal — verification pending/failed and rejected credentials (the AUTH-shaped failures). Transient classes
+ * keep the warn-once-then-debug rule of `log-once.ts` and never reach this registry — enforced by where `report()` is
+ * wired (only at verification/auth failure sites), not by a runtime gate.
  *
  * Behaviour (the "intelligent, no-spam" contract):
  *  - **report** a NEW problem → surface it ONCE: a clear "what → what to do"
@@ -51,8 +50,10 @@ export interface ActionableProblemsHost {
  *    notification is left for the user to acknowledge (ioBroker has no adapter
  *    API to clear one — using the platform as designed, no host-command hacks).
  *
- * Transient problems never reach here — they self-heal and keep the existing
- * warn-once-then-debug policy.
+ *  - **forget** a problem without a line → the caller logs what happened instead (the device was deleted, or it starts
+ *    anew and its first answer is logged).
+ *
+ * Transient problems never reach here — they self-heal and keep the warn-once-then-debug rule.
  */
 export class ActionableProblems {
   private readonly active = new Map<string, ActionableProblem>();
@@ -94,5 +95,14 @@ export class ActionableProblems {
     }
     this.active.delete(key);
     this.host.logInfo(resolutionMessage ?? `Resolved: ${problem.title}`);
+  }
+
+  /**
+   * Drop a problem without a line — the caller logs what happened instead.
+   *
+   * @param key the problem key to drop
+   */
+  forget(key: string): void {
+    this.active.delete(key);
   }
 }

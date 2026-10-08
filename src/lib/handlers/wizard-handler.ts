@@ -13,20 +13,30 @@ import { applyManualSegments } from "./state-change-router";
  * Adapter surface required by the segment-wizard glue.
  */
 export interface WizardHandlerAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** The LAN client. */
   readonly lanClient: GoveeLanClient | null;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The running segment wizard — null while none runs. */
   segmentWizard: SegmentWizard | null;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
+  /** The adapter's setTimeout — cleared on unload. */
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
+  /** The adapter's clearTimeout. */
   clearTimeout: (h: ioBroker.Timeout) => void;
 }
 
 /**
  * Stable device key for wizard session tracking.
  *
+ * @param device The device
  */
 export function deviceKeyFor(device: GoveeDevice): string {
   return sessionKey(device.sku, device.deviceId);
@@ -35,6 +45,8 @@ export function deviceKeyFor(device: GoveeDevice): string {
 /**
  * Resolve a wizard session-key back to the live device.
  *
+ * @param adapter The adapter surface
+ * @param key The device key (`sku:deviceId`)
  */
 export function findDeviceByKey(adapter: WizardHandlerAdapter, key: string): GoveeDevice | undefined {
   const devices = adapter.deviceManager?.getDevices() ?? [];
@@ -46,6 +58,7 @@ export function findDeviceByKey(adapter: WizardHandlerAdapter, key: string): Gov
  * dependencies are captured here as closures so the wizard itself stays
  * decoupled from the adapter shape.
  *
+ * @param adapter The adapter surface
  */
 export function buildWizardHost(adapter: WizardHandlerAdapter): WizardHost {
   return {
@@ -87,6 +100,9 @@ export function buildWizardHost(adapter: WizardHandlerAdapter): WizardHost {
  * state-tree rebuild and cache-persist path runs for both wizard results
  * and user edits.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param result The finished measurement
  */
 export async function applyWizardResult(
   adapter: WizardHandlerAdapter,
@@ -119,6 +135,11 @@ export async function applyWizardResult(
  * response verbatim — the React admin component renders the wizard from the
  * response's grid snapshot, so no status is mirrored into a state.
  *
+ * @param adapter The adapter surface
+ * @param action The wizard action
+ * @param deviceKey The device key (`sku:deviceId`)
+ * @param payload The action's data
+ * @param payload.indices The segment indices to apply
  */
 export async function runWizardStep(
   adapter: WizardHandlerAdapter,

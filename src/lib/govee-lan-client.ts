@@ -15,6 +15,7 @@ import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
 import { logCallFailure } from "./error-category";
 import { LogOnce } from "./log-once";
 import { counterpartNamed } from "./api-limits";
+import { carriesAddress, chosenAddress } from "./network-address";
 import { CallGate } from "./call-gate";
 
 /** The LAN counterparts of api-limits.json (GV-08). */
@@ -215,7 +216,15 @@ export class GoveeLanClient {
     this.onDiscovery = onDiscovery;
     this.onStatus = onStatus;
 
-    const bindAddr = bind && bind !== "0.0.0.0" ? bind : undefined;
+    // The fleet's address choice (network-address.ts): empty and the wildcards choose every address; a chosen address
+    // no interface of this host carries falls back to every address, with exactly one warning.
+    let bindAddr = chosenAddress(bind);
+    if (bindAddr && !carriesAddress(bindAddr)) {
+      this.log.warn(
+        `LAN: the selected network address ${bindAddr} is on no network interface of this host — using every address`,
+      );
+      bindAddr = undefined;
+    }
     if (bindAddr) {
       this.log.info(`LAN binding to network interface ${bindAddr}`);
     }

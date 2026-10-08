@@ -10,11 +10,17 @@ import { onCloudDataReady, type DeviceEventsAdapter } from "./device-events";
  * `setState` signature for utils.Adapter structural matching.
  */
 export interface SnapshotHandlerGlueAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** The store of local snapshots. */
   readonly localSnapshots: LocalSnapshotStore | null;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
 }
 
@@ -22,6 +28,7 @@ export interface SnapshotHandlerGlueAdapter {
  * Construct host object for {@link SnapshotHandler} — adapter dependencies
  * captured as closures so the handler stays decoupled from the adapter shape.
  *
+ * @param adapter The adapter surface
  */
 export function buildSnapshotHost(
   adapter: SnapshotHandlerGlueAdapter & DeviceEventsAdapter & ConnectionStateAdapter,

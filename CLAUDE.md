@@ -58,7 +58,7 @@ Nichts → LAN (Suche, Ein/Aus, Helligkeit, Farbe, Status) · + API-Key → Ger�
 - `cloud-creds-handler` legt die MQTT-Zugangsdaten als verschlüsselte Datei ins Instanz-Datenverzeichnis, nicht in ein Objekt.
 - Das Instanz-Datenverzeichnis (SKU-Cache `cache/`, Zugangsdaten-Datei) ist als `common.dataFolder` deklariert — nur so nimmt das ioBroker-Backup es mit.
 
-`src-admin/` ist eine Module-Federation-React-Komponente (Vite) → `admin/custom/` (git-getrackt). Den Bau fährt der Release-Vorlauf (Gate D05 `npm run build:admin`), die Artefakte gehen in den Release-Commit; von Hand nur `npm run publish:manual`. Eigene i18n mit `gsw_`-Schlüsseln (11 Sprachen); zwei Mounts: `ConnectionConfig` (Reiter Konfiguration) und `ExpertConfig` (Reiter Experte, Umschalter Assistent ODER Diagnose). `index.html` ist nur der Pflicht-Einstieg von Vite und lädt nichts.
+`src-admin/` ist eine Module-Federation-React-Komponente (Vite) → `admin/custom/` (git-getrackt). Den Bau fährt der Release-Vorlauf (Gate D05 `npm run build:admin`), die Artefakte gehen in den Release-Commit; veröffentlicht wird nur durch den Tag-Lauf. Eigene i18n mit `gsw_`-Schlüsseln (11 Sprachen); zwei Mounts: `ConnectionConfig` (Reiter Konfiguration) und `ExpertConfig` (Reiter Experte, Umschalter Assistent ODER Diagnose). `index.html` ist nur der Pflicht-Einstieg von Vite und lädt nichts.
 
 ## State Tree
 
@@ -70,11 +70,11 @@ Nichts → LAN (Suche, Ein/Aus, Helligkeit, Farbe, Status) · + API-Key → Ger�
 
 ## Online-Kennzeichnung, Summen, Start
 
-- Das Symbol am Geräteknoten kommt aus `common.statusStates` → `<gerät>.info.online`, nie aus `info.connection`. Beim Abschalten tragen es die vier Flottenteile (`Entwicklung/CLAUDE_CODING.md`): kein `stopInstance`, `clearStopInstanceFlag()` zuerst in `onReady`, `onUnload` mit `.finally(callback)`, `markAllOffline()` vor dem ersten Scan.
+- Das Symbol am Geräteknoten kommt aus `common.statusStates` → `<gerät>.info.online`, nie aus `info.connection`. Beim Abschalten tragen es die vier Flottenteile (`Entwicklung/CLAUDE_CODING.md`): kein `stopInstance`, `clearStopInstanceFlag()` direkt nach `I18n.init` in `onReady`, `onUnload` mit `.finally(callback)`, `markAllOffline()` vor dem ersten Scan.
 - **Summen** `info.devicesTotal`/`devicesOnline`/`devicesAllOnline`: angelegt in `ensureDeviceRollupStates` (vor `markAllOffline`), geschrieben auf der 20-s-Runde aus `resolvedOnline` + `onlineMarkerCache` ohne Rücklesen. Nur `devices.*` zählt; `devicesAllOnline` verlangt `total > 0`; `devicesTotal` bleibt beim Abschalten stehen; `clearDeviceRollup()` legt nichts an.
 - **Start in Phasen:** `prepareInstance`, dann `buildRuntime` · `wireRuntime` · `startLan` · `openAccount` · `connectAccount` · `startCloud` · `settleCloudStart` · `drainStateCreation` · `readStartState` · `runStartMigrations` · `finishStart`. EINE Prüfung `!(await phase()) || this.unloading` in der Schleife; Übergaben nur über `StartContext`, nie über neue Klassenfelder. Ein Id-Umzug, der nicht lesen kann, beendet den Start mit EINER Fehlerzeile.
 - Die 20-s-Runde (`onlineSync.runOnlineSyncRound`) fängt im eigenen Körper, tut nach `onUnload` nichts und trägt auch `info.connection` (das Altern eines Beweises meldet sonst niemand).
-- Eine Nachricht vor dem fertigen Nachrichten-Router bekommt `{ error: "Adapter is starting" }`.
+- `I18n.init` ist die erste Anweisung von `prepareInstance`, der Nachrichten-Handler wird direkt danach registriert (Paket-Prüfung `i18n-before-messages`); eine Nachricht vor dem fertigen Nachrichten-Router bekommt `{ error: "Adapter is starting" }`.
 - `info.name`/`info.model`/`info.serial` tragen die gleichnamigen Katalogrollen.
 
 ## Erreichbarkeit — Beweis oder nichts

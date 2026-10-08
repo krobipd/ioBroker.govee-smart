@@ -10,7 +10,9 @@ import type { GoveeDevice } from "../types";
  * `keys` are the account keys the source reported this pass.
  */
 export interface ReconcileSource {
+  /** Whether the list answered. */
   ok: boolean;
+  /** The device keys the list names. */
   keys: Set<string>;
   /**
    * Object-tree prefixes (`devices.<id>` / `groups.<id>`, the id registry's) of the
@@ -47,6 +49,8 @@ export const DEFAULT_EVICT_THRESHOLD = 2;
  * device catalog uses short labels, and misclassifying a sensor as
  * cloud-authoritative would false-evict an owned sensor on a Cloud refresh
  * (it is never in /user/devices). Defensive because the eviction is irreversible.
+ *
+ * @param type Govee's device type, full or short
  */
 export function isSensorType(type: string): boolean {
   return (

@@ -10,22 +10,35 @@
 
 /** Grid snapshot the backend folds into every wizard response. */
 export interface WizardSnapshot {
+  /** Where the measurement stands. */
   phase: "idle" | "measuring" | "review";
+  /** How many segments the measurement runs over. */
   total: number;
+  /** The segment lit right now. */
   currentIndex: number;
+  /** The segments the user confirmed lit. */
   confirmed: number[];
 }
 
 /** One wizard-step response (superset — most fields are optional per action). */
 export interface WizardResponse {
+  /** The grid as it stands. */
   snapshot?: WizardSnapshot;
+  /** A measurement is running. */
   active?: boolean;
+  /** The measurement reached the protocol limit. */
   done?: boolean;
+  /** The measurement was aborted. */
   aborted?: boolean;
+  /** The result was applied to the device. */
   applied?: boolean;
+  /** The segment count the result sets. */
   segmentCount?: number;
+  /** The manual segment list the result sets, e.g. `0-9`. */
   list?: string;
+  /** The confirmed segments leave gaps. */
   hasGaps?: boolean;
+  /** Why the step failed. */
   error?: string;
 }
 
@@ -35,6 +48,13 @@ export interface WizardResponse {
  * can inject a recording fake without the full Connection surface.
  */
 export interface WizardSocket {
+  /**
+   * The admin socket's `sendTo`.
+   *
+   * @param instance the instance, e.g. `govee-smart.0`
+   * @param command the message command
+   * @param data the message
+   */
   sendTo(instance: string, command: string, data: unknown): Promise<unknown>;
 }
 

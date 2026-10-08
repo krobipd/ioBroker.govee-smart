@@ -21,29 +21,43 @@ export interface HostVersions {
 
 /** What the diagnostics providers read from the running adapter. */
 export interface DiagnosticsProvidersHost {
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
   /** The ioBroker host this instance runs on. */
   readonly hostName: string;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The SKU cache of the instance. */
   readonly skuCache: SkuCache | null;
+  /** The store of local snapshots. */
   readonly localSnapshots: LocalSnapshotStore | null;
+  /** The Cloud REST client — null without an API key. */
   readonly cloudClient: GoveeCloudClient | null;
+  /** The account broker client — null without a Govee account. */
   readonly mqttClient: GoveeMqttClient | null;
+  /** The Cloud rate limiter. */
   readonly rateLimiter: RateLimiter | null;
+  /** The LAN client. */
   readonly lanClient: GoveeLanClient | null;
+  /** The running segment wizard — null while none runs. */
   readonly segmentWizard: SegmentWizard | null;
+  /** The channel status the log prefix shows. */
   readonly channelStatus: ChannelStatusSnapshot;
+  /** The js-controller and admin versions of the host. */
   readonly hostVersions: HostVersions;
   /** When this run started (ms). */
   readonly startedAt: number;
   /** The instance runs in compact mode. */
   readonly compactMode: boolean;
+  /** Read one object by its full id. */
   getForeignObjectAsync(id: string): Promise<ioBroker.Object | null | undefined>;
+  /** Read objects through a view. */
   getObjectViewAsync(
     design: "system",
     search: "state",
     params: { startkey: string; endkey: string },
   ): Promise<{ rows: Array<{ id: string; value: ioBroker.Object | null }> } | null | undefined>;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
 }
 

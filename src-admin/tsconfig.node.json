@@ -5,5 +5,5 @@
     "moduleResolution": "bundler",
     "esModuleInterop": true
   },
-  "include": ["vite.config.ts", "module-federation/vite-importmap-shim.ts"]
+  "include": ["vite.config.ts", "vitest.config.ts"]
 }

@@ -124,7 +124,7 @@ function useLiveConnected(socket: ConnectionSocketFull | null, namespace: string
 /**
  * MUI Alert severity for each auth outcome.
  *
- * @param status
+ * @param status the auth outcome
  */
 function severityFor(status: AuthStatus): "success" | "info" | "warning" | "error" {
   switch (status) {
@@ -150,7 +150,7 @@ const KNOWN_STATUSES: ReadonlySet<string> = new Set<string>(AUTH_STATUSES);
 /**
  * Whether an outcome means the 2FA code field should be shown.
  *
- * @param status
+ * @param status the auth outcome
  */
 function wantsCode(status: AuthStatus): boolean {
   return status === "verifyRequired" || status === "codeSent" || status === "codeInvalid" || status === "codeRejected";
@@ -159,9 +159,9 @@ function wantsCode(status: AuthStatus): boolean {
 /**
  * A small colored status dot: green when connected, grey when not.
  *
- * @param root0
- * @param root0.on
- * @param root0.testId
+ * @param root0 props
+ * @param root0.on whether the channel is connected
+ * @param root0.testId the test id of the dot
  */
 function StatusDot({ on, testId }: { on: boolean; testId?: string }): React.JSX.Element {
   return (

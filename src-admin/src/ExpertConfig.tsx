@@ -15,6 +15,12 @@ import { ExpertPanel } from "./ExpertPanel";
  * identical but for the component they rendered.
  */
 export default class ExpertConfig extends ConfigGeneric<ConfigGenericProps, ConfigGenericState> {
+  /**
+   * Render the card inside the admin's settings page.
+   *
+   * @param _error the field error the admin hands in (unused — the card shows its own)
+   * @param _disabled whether the admin disabled the field (unused)
+   */
   renderItem(_error: string, _disabled: boolean): React.JSX.Element {
     const ctx = this.props.oContext;
     const namespace = `${ctx.adapterName}.${ctx.instance}`;

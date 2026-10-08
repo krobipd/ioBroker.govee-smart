@@ -29,7 +29,6 @@ coverage/
 # Only the src-admin work dirs stay ignored.
 /src-admin/build
 /src-admin/node_modules
-/src-admin/package-lock.json
 /src-admin/.__mf__temp
 
 # Packages

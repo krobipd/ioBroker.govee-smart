@@ -8,8 +8,11 @@ import { plausibleSegmentCount, plausibleSegmentIndices } from "./lookups";
  * `skuCache`, `devices`, and `log` in this shape.
  */
 export interface DeviceCacheAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The SKU cache of the instance. */
   readonly skuCache: SkuCache | null;
+  /** The devices, by session key. */
   readonly devices: Map<string, GoveeDevice>;
 }
 
@@ -203,6 +206,8 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
  * Pure function on the destructured cacheable view (no `state` / `channels` /
  * `lanIp` / `groupMembers` here). Returns the same shape minus the dropped
  * keys.
+ *
+ * @param d The cacheable view of the device
  */
 function normalize<T extends Omit<GoveeDevice, RuntimeOnlyKey>>(d: T): Omit<CachedDeviceData, "cachedAt"> {
   const segmentCount = typeof d.segmentCount === "number" && d.segmentCount > 0 ? d.segmentCount : undefined;
@@ -228,6 +233,8 @@ function normalize<T extends Omit<GoveeDevice, RuntimeOnlyKey>>(d: T): Omit<Cach
  * Persist a device's current runtime state to the SKU cache. Safe no-op
  * when no cache is configured.
  *
+ * @param adapter The adapter surface
+ * @param device The device
  */
 export function persistDeviceToCache(adapter: DeviceCacheAdapter, device: GoveeDevice): void {
   if (!adapter.skuCache) {
@@ -242,6 +249,7 @@ export function persistDeviceToCache(adapter: DeviceCacheAdapter, device: GoveeD
  * Save all devices to SKU cache, skipping only those never confirmed via
  * Cloud yet. Routine persistence — logs at debug.
  *
+ * @param adapter The adapter surface
  */
 export function saveDevicesToCache(adapter: DeviceCacheAdapter): void {
   if (!adapter.skuCache) {

@@ -1,3 +1,5 @@
+// Fleet master — the release run copies this file byte for byte into every adapter; change it in
+// Entwicklung/.consistency-master, never in an adapter.
 import config from "@iobroker/eslint-config";
 
 export default [
@@ -5,10 +7,11 @@ export default [
   {
     languageOptions: {
       parserOptions: {
-        // `tools/` carries its own tsconfig, which projectService discovers on
-        // its own — the folder used to be excluded from the linter entirely,
-        // although it holds a CI gate that decides whether a release goes out.
-        projectService: { allowDefaultProject: ["*.mjs", "vitest.config.mts"] },
+        projectService: {
+          // Only files no tsconfig covers stand here — typescript-eslint refuses a file that is in both. The root
+          // tsconfig covers src/ and test/**/*.ts, test/tsconfig.json the test hooks (*.cjs, *.mjs).
+          allowDefaultProject: ["*.mjs", "*.mts", "scripts/*.mjs"],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -19,50 +22,23 @@ export default [
     },
   },
   {
-    // Handler-modules + device-manager sub-files use a free-fn pattern with
-    // adapter-context interfaces. Most parameters are obvious from name/type
-    // (`adapter`, `device`, `caps`); enforcing a JSDoc @param/@return on
-    // every helper produces noise without informational value.
-    files: ["src/lib/handlers/**/*.ts", "src/lib/device-manager/**/*.ts"],
-    rules: {
-      "jsdoc/require-jsdoc": "off",
-      "jsdoc/require-param": "off",
-      "jsdoc/require-param-description": "off",
-      "jsdoc/require-returns": "off",
-    },
-  },
-  {
     ignores: [
+      // Session files of the note-taking hook: its cooldown marker tmp/last-ndc.ts is a timestamp, not TypeScript.
+      ".remember/**",
       ".dev-server/",
       ".vscode/",
       "*.test.js",
-      // Only the ioBroker template files under `test/` stay out — NOT `test/**`,
-      // which would also take the synchronised standards suite
-      // (`test/standards/repo-standards.test.ts`) off the linter.
+      // The ioBroker template files and the mocha inventory harness under test/ run outside the TypeScript project.
       "test/*.js",
-      "test/*.cjs",
-      // Release tooling, same as in public-holidays: runs under node and is not part
-      // of the adapter's type project (otherwise "not found by the project service").
-      "scripts/**",
       "*.config.mjs",
-      "vitest.config.mts",
+      "tasks.js",
       "build",
       // Generated coverage report (npm run coverage) — never lint it.
       "coverage",
-      // Session files of the note-taking hook (remember plugin): its cooldown
-      // marker `tmp/last-ndc.ts` is a timestamp, not TypeScript — it made the
-      // release lint red whenever it existed (2026-09-08).
-      ".remember/**",
       "admin",
-      // Custom admin React component — its own toolchain (src-admin/eslint.config.mjs).
+      // The admin component is its own project with its own eslint.config.mjs.
       "src-admin",
-      // Root build script for the src-admin Module-Federation component (CommonJS).
-      "tasks.js",
       "node_modules",
-      // Catches macOS-Finder duplicate-on-restore artifacts like "node_modules 2/" —
-      // without this, eslint scans every .ts file in the copy and the type-aware
-      // rules run out of memory.
-      "node_modules*/",
       "**/adapter-config.d.ts",
     ],
   },

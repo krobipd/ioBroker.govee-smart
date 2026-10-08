@@ -22,8 +22,8 @@ type Screen = "select" | "measure" | "review" | "success";
 /**
  * Indices in `[0, limit)` that are not in `confirmed` — the gaps.
  *
- * @param limit
- * @param confirmed
+ * @param limit the end of the range (exclusive)
+ * @param confirmed the confirmed segment indices
  */
 function gapsUpTo(limit: number, confirmed: number[]): number[] {
   const set = new Set(confirmed);

@@ -33,10 +33,15 @@ import {
  * each light's load as a background job (DeviceManager.startSceneLoad).
  */
 export interface LibraryLoaderHost {
+  /** The Cloud REST client. */
   readonly cloudClient: GoveeCloudClient;
+  /** The App API client — null without a Govee account. */
   readonly apiClient: GoveeApiClient | null;
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The diagnostics collector. */
   readonly diagnostics: DiagnosticsCollector;
+  /** Run one call in a lane of the rate limiter; settles when the call really ran. */
   runLimited(fn: () => Promise<void>, lane: CallLane): Promise<void>;
   /**
    * Per-run memo for the SKU-level fetches (scene/music/DIY library, SKU
@@ -72,8 +77,11 @@ export interface LibraryLoaderHost {
 
 /** What a (possibly shared) fetch came back with. `ran: false` = the limiter never ran it. */
 export interface SharedFetchOutcome<T> {
+  /** Whether the call ran. */
   ran: boolean;
+  /** What it returned — null when it failed or did not run. */
   data: T | null;
+  /** Why it failed. */
   error?: unknown;
 }
 

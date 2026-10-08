@@ -3,11 +3,13 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import { I18n } from "@iobroker/gui-components";
 
 import enJson from "./i18n/en.json";
+import type * as DeviceListModule from "./useDeviceList";
+import type * as DiagnosticsApiModule from "./diagnosticsApi";
 
 const mockList = vi.hoisted(() => ({ listDevices: vi.fn() }));
 
 vi.mock("./useDeviceList", async importOriginal => ({
-  ...(await importOriginal<typeof import("./useDeviceList")>()),
+  ...(await importOriginal<typeof DeviceListModule>()),
   makeDeviceListApi: () => mockList,
 }));
 
@@ -26,7 +28,7 @@ vi.mock("./useWizardApi", () => ({
 const mockDiagnostics = vi.hoisted(() => ({ listDevices: vi.fn(), exportReport: vi.fn() }));
 
 vi.mock("./diagnosticsApi", async importOriginal => ({
-  ...(await importOriginal<typeof import("./diagnosticsApi")>()),
+  ...(await importOriginal<typeof DiagnosticsApiModule>()),
   makeDiagnosticsApi: () => mockDiagnostics,
 }));
 
@@ -210,8 +212,9 @@ describe("the loading state", () => {
     expect(screen.getByText(/loading devices/i)).toBeTruthy();
     expect(screen.queryByTestId("list-slow-hint")).toBeNull();
 
-    await act(async () => {
+    await act(() => {
       vi.advanceTimersByTime(5_000);
+      return Promise.resolve();
     });
     expect(screen.getByTestId("list-slow-hint")).toBeTruthy();
   });

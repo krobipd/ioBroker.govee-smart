@@ -17,11 +17,17 @@ export type LiveReading = Record<string, unknown>;
 
 /** Adapter surface of the report source. */
 export interface DiagnosticsReportAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The adapter version. */
   readonly version?: string;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The Cloud REST client — null without an API key. */
   readonly cloudClient: GoveeCloudClient | null;
+  /** The Cloud rate limiter. */
   readonly rateLimiter: RateLimiter | null;
 }
 

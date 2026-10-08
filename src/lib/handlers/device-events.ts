@@ -28,14 +28,21 @@ import * as dropdownReset from "./dropdown-reset-helpers";
  * — the calling adapter implements all three sets implicitly.
  */
 export interface DeviceEventsAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The store of local snapshots. */
   readonly localSnapshots: LocalSnapshotStore | null;
   /** This instance's device catalog (quirks + trust tier for the state-defs). */
   readonly deviceRegistry: DeviceRegistry;
+  /** Whether the device trees are built. */
   readonly statesReady: boolean;
+  /** The tree builds still running. */
   readonly stateCreationQueue: Promise<void>[];
   /** Re-fired into stateManager + connection-state + groupFanout-reachability. */
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
@@ -48,6 +55,10 @@ export interface DeviceEventsAdapter {
  * when the device just powered off (the user shouldn't see "playing
  * Aurora-A" on a device that's off).
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param state The state values that changed
+ * @param changes Which values changed, when the caller knows
  */
 export function onDeviceStateUpdate<
   T extends DeviceEventsAdapter &
@@ -98,6 +109,9 @@ export function onDeviceStateUpdate<
  * Internal — schedule a state-creation promise. Until adapter.statesReady,
  * promises accumulate in stateCreationQueue so onReady can await the full
  * initial batch. After ready, fire-and-forget.
+ *
+ * @param adapter The adapter surface
+ * @param p The state-creation promise
  */
 function trackStateCreation(adapter: DeviceEventsAdapter, p: Promise<void>): void {
   if (!adapter.statesReady) {
@@ -116,6 +130,9 @@ function trackStateCreation(adapter: DeviceEventsAdapter, p: Promise<void>): voi
  * device later gets cloud capabilities, onCloudDataReady will fill them in
  * additively.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param _allDevices Every device the adapter knows
  */
 export function onLanDeviceReady<T extends DeviceEventsAdapter & connectionState.ConnectionStateAdapter>(
   adapter: T,
@@ -146,6 +163,9 @@ export function onLanDeviceReady<T extends DeviceEventsAdapter & connectionState
  * createInfoStates and createLanStates are idempotent — calling them again
  * after a LAN-phase has run only updates `info.online`/`info.ip` values.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param allDevices Every device the adapter knows
  */
 export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState.ConnectionStateAdapter>(
   adapter: T,
@@ -217,6 +237,9 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
  * Member devices fire their own onLanDeviceReady / onCloudDataReady
  * independently — this callback only handles the group itself.
  *
+ * @param adapter The adapter surface
+ * @param group The app group
+ * @param allDevices Every device the adapter knows
  */
 export function onGroupMembersReady<T extends DeviceEventsAdapter & connectionState.ConnectionStateAdapter>(
   adapter: T,

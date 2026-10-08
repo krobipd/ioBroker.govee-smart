@@ -22,6 +22,7 @@
       "info.verificationPending": "infoVerificationPendingDesc"
     }
   },
+  "deviceIds": "unit",
   "forumThread": "https://forum.iobroker.net/topic/84712/test-adapter-govee-smart-2.14.1",
   "listenPorts": [
     {

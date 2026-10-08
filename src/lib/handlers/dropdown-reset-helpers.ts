@@ -3,8 +3,11 @@
  * `setState` shape for utils.Adapter structural matching.
  */
 export interface GroupStateHelpersAdapter {
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
+  /** Write one own state. */
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 

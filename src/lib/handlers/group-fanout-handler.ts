@@ -12,10 +12,15 @@ import { sendMusicCommand, type MusicCommandAdapter } from "./music-command";
  * `getObjectAsync` shape for utils.Adapter structural matching.
  */
 export interface GroupFanoutHandlerAdapter extends MusicCommandAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** Read one own object. */
   getObjectAsync(id: string): Promise<unknown>;
 }
 
@@ -30,6 +35,7 @@ export { resolveGroupMembers };
  * is kept existent and just gets an empty string when no member is
  * unreachable (see device-manager-pattern #46).
  *
+ * @param adapter The adapter surface
  * @returns How many groups were actually written. The caller uses this to tell
  *   a real first round apart from one that ran before the device list arrived —
  *   a "primed" flag set on an empty round would be spent without ever having
@@ -58,6 +64,7 @@ export function updateGroupReachability(adapter: GroupFanoutHandlerAdapter): num
  * Construct host object for {@link GroupFanoutHandler}. Closures capture
  * adapter state.
  *
+ * @param adapter The adapter surface
  */
 export function buildGroupFanoutHost(adapter: GroupFanoutHandlerAdapter): GroupFanoutHost {
   return {

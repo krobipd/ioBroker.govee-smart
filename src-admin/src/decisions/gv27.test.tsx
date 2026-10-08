@@ -1,6 +1,7 @@
 // GV-27 — The segment wizard is a React component of its own (variant B), not built on dm-utils.
 // krobi 2026-07-11 (note, no wording kept): "B (custom React, like public-holidays)"; approved 2026-10-08 09:39
 /// <reference types="node" />
+import type * as DeviceListModule from "../useDeviceList";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { render, screen, waitFor } from "@testing-library/react";
@@ -10,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import enJson from "../i18n/en.json";
 
 vi.mock("../useDeviceList", async importOriginal => ({
-  ...(await importOriginal<typeof import("../useDeviceList")>()),
+  ...(await importOriginal<typeof DeviceListModule>()),
   makeDeviceListApi: () => ({
     listDevices: () =>
       Promise.resolve([{ value: "H6160:AABB", label: "Strip Living", model: "H6160", online: true, segments: 10 }]),

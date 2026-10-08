@@ -12,10 +12,15 @@ import { deriveGoveeClientId } from "../govee-constants";
  * versions.
  */
 export interface CloudCredsAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
+  /** Read one object by its full id. */
   getForeignObjectAsync(id: string): Promise<{ native?: unknown } | null | undefined>;
+  /** Extend one object by its full id. */
   extendForeignObjectAsync(id: string, obj: { native?: Record<string, unknown> }): Promise<unknown>;
   /** Read a file from a meta.user object — one-shot legacy migration; rejects when the file is absent. */
   readFileAsync(meta: string, name: string): Promise<{ file: Buffer | string; mimeType?: string }>;
@@ -23,7 +28,9 @@ export interface CloudCredsAdapter {
   delFileAsync(meta: string, name: string): Promise<void>;
   /** Delete an object — used to drop the migrated-away credentials state/meta objects. */
   delObjectAsync(id: string, options?: unknown): Promise<void>;
+  /** Encrypt a value with the instance's secret. */
   encrypt(value: string): string;
+  /** Decrypt a value encrypted with the instance's secret. */
   decrypt(value: string): string;
 }
 
@@ -52,7 +59,11 @@ export async function clearVerificationCodeSetting(adapter: CloudCredsAdapter): 
 /** File name the encrypted MQTT credentials live in, inside the instance data directory. */
 const CREDENTIALS_FILE = "mqtt-credentials.json";
 
-/** The legacy `<namespace>.credentials` meta.user object id (v2.18.0–v2.18.2). */
+/**
+ * The legacy `<namespace>.credentials` meta.user object id (v2.18.0–v2.18.2).
+ *
+ * @param adapter The adapter surface
+ */
 function legacyCredentialsMeta(adapter: CloudCredsAdapter): string {
   return `${adapter.namespace}.credentials`;
 }
@@ -147,6 +158,7 @@ function readAccountKey(raw: string): string {
  *
  * @param adapter ioBroker adapter surface
  * @param dataDir Adapter instance data directory
+ * @param accountEmail The account email the credentials belong to
  */
 export async function loadPersistedCreds(
   adapter: CloudCredsAdapter,
@@ -216,6 +228,7 @@ export async function loadPersistedCreds(
  * @param adapter ioBroker adapter surface
  * @param dataDir Adapter instance data directory
  * @param creds   The freshly-issued MQTT bundle from a successful login
+ * @param accountEmail The account email the credentials belong to
  */
 export async function persistCreds(
   adapter: CloudCredsAdapter,

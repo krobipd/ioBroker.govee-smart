@@ -18,13 +18,19 @@ import { deviceLabel, logRejected, type CloudStateCapability, type GoveeDevice }
  * `setState` for utils.Adapter structural matching.
  */
 export interface CloudStateLoaderAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The Cloud REST client — null without an API key. */
   readonly cloudClient: GoveeCloudClient | null;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The Cloud rate limiter. */
   readonly rateLimiter: RateLimiter | null;
   /** Catalog — the `platformTempUnit` quirk of a model reporting °F. */
   readonly deviceRegistry: DeviceRegistry;
+  /** Write one own state. */
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
   /** `setStateChangedAsync` of the real adapter — see applyCloudCapabilities. */
   setStateChanged(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
@@ -232,6 +238,9 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
  * exist yet on first write. ensureSyntheticStateObject creates them
  * lazily with the right channel + role + unit.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param caps The capabilities Govee reported
  */
 export async function applyCloudCapabilities(
   adapter: CloudStateLoaderAdapter,

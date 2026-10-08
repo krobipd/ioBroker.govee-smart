@@ -10,8 +10,11 @@ import * as connectionState from "./connection-state";
 
 /** The adapter surface the account handler needs. */
 export interface AccountHandlerAdapter extends cloudCreds.CloudCredsAdapter {
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The problems the user has to act on. */
   readonly actionableProblems: ActionableProblems;
 }
 

@@ -17,26 +17,41 @@ import { hasAccountCredentials } from "../account-credentials";
  * prefix and the ready summary.
  */
 export interface ConnectionStateAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
   /** Credential presence check for the sensors-without-account hint (M9). */
   readonly config: { goveeEmail?: string; goveePassword?: string };
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The Cloud REST client — null without an API key. */
   readonly cloudClient: GoveeCloudClient | null;
+  /** Whether a Cloud key or list was accepted in this run. */
   readonly cloudWasConnected: boolean;
   /** Whether real calls say the Cloud is down (issue #51) — read through `cloudReachable`. */
   readonly cloudOutage: { readonly confirmed: boolean };
+  /** The account broker client — null without a Govee account. */
   readonly mqttClient: GoveeMqttClient | null;
+  /** The OpenAPI events client — null without an API key. */
   readonly openapiMqttClient: GoveeOpenapiMqttClient | null;
+  /** The LAN client. */
   readonly lanClient: GoveeLanClient | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** Whether the first LAN scan is done. */
   readonly lanScanDone: boolean;
+  /** Whether the device trees are built. */
   readonly statesReady: boolean;
+  /** Whether the first Cloud load is done. */
   readonly cloudInitDone: boolean;
+  /** Whether the first App API poll is done. */
   readonly appApiInitialPollDone: boolean;
+  /** Whether the ready line was logged. */
   readyLogged: boolean;
+  /** The last value written to `info.connection` — null before the first. */
   lastConnectionState: boolean | null;
   /** In-memory channel-status snapshot pulled by the log-prefix wrapper. */
   channelStatus?: ChannelStatusSnapshot;
+  /** Write one own state. */
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
 }
 
@@ -52,6 +67,7 @@ export interface ConnectionStateAdapter {
  * Write-only-on-change cache (lastConnectionState) so we don't spam
  * setState on every device-state-update.
  *
+ * @param adapter The adapter surface
  */
 export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   const devices = adapter.deviceManager?.getDevices() ?? [];
@@ -113,6 +129,7 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
  * Check if all configured channels are initialized and log ready message.
  * Called from MQTT onConnection callback and end of onReady.
  *
+ * @param adapter The adapter surface
  */
 export function checkAllReady(adapter: ConnectionStateAdapter): void {
   if (adapter.readyLogged) {
@@ -147,6 +164,7 @@ export function checkAllReady(adapter: ConnectionStateAdapter): void {
 /**
  * Log final ready message with device/group/channel summary.
  *
+ * @param adapter The adapter surface
  */
 export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   // Device/sensor/group counts are intentionally not logged here: at

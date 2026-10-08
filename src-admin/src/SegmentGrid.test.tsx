@@ -15,11 +15,11 @@ describe("SegmentGrid", () => {
       />,
     );
     expect(screen.getAllByTestId(/^seg-cell-\d+$/)).toHaveLength(5);
-    expect(screen.getByTestId("seg-cell-0")).toHaveClass("confirmed");
-    expect(screen.getByTestId("seg-cell-1")).toHaveClass("confirmed");
-    expect(screen.getByTestId("seg-cell-2")).toHaveClass("flashing");
-    expect(screen.getByTestId("seg-cell-3")).toHaveClass("open");
-    expect(screen.getByTestId("seg-cell-4")).toHaveClass("open");
+    expect(screen.getByTestId("seg-cell-0").classList.contains("confirmed")).toBe(true);
+    expect(screen.getByTestId("seg-cell-1").classList.contains("confirmed")).toBe(true);
+    expect(screen.getByTestId("seg-cell-2").classList.contains("flashing")).toBe(true);
+    expect(screen.getByTestId("seg-cell-3").classList.contains("open")).toBe(true);
+    expect(screen.getByTestId("seg-cell-4").classList.contains("open")).toBe(true);
   });
 
   it("marks gap cells with the gap class", () => {
@@ -32,7 +32,7 @@ describe("SegmentGrid", () => {
         editable={false}
       />,
     );
-    expect(screen.getByTestId("seg-cell-1")).toHaveClass("gap");
+    expect(screen.getByTestId("seg-cell-1").classList.contains("gap")).toBe(true);
   });
 
   it("flashing wins over confirmed for the same index", () => {
@@ -45,8 +45,8 @@ describe("SegmentGrid", () => {
         editable={false}
       />,
     );
-    expect(screen.getByTestId("seg-cell-1")).toHaveClass("flashing");
-    expect(screen.getByTestId("seg-cell-1")).not.toHaveClass("confirmed");
+    expect(screen.getByTestId("seg-cell-1").classList.contains("flashing")).toBe(true);
+    expect(screen.getByTestId("seg-cell-1").classList.contains("confirmed")).toBe(false);
   });
 
   it("calls onToggle(idx) when an editable cell is clicked", () => {

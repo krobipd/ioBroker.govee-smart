@@ -16,12 +16,19 @@ import { reapStaleDevices } from "./device-reaper";
  * adapter fields so they need to be writable from outside.
  */
 export interface CloudRetryHandlerAdapter extends CloudStateLoaderAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The Cloud REST client — null without an API key. */
   readonly cloudClient: GoveeCloudClient | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
+  /** The timer that stops waiting for the first Cloud load. */
   cloudInitTimer: ioBroker.Timeout | undefined;
+  /** The Cloud retry loop, once armed. */
   cloudRetry: CloudRetryLoop | undefined;
+  /** Whether a Cloud key or list was accepted in this run. */
   cloudWasConnected: boolean;
   /**
    * The value `info.cloudConnected` and `groups.info.online` carry right now —
@@ -31,8 +38,11 @@ export interface CloudRetryHandlerAdapter extends CloudStateLoaderAdapter {
   cloudConnectedShown: boolean;
   /** Whether real calls say the Cloud is down (issue #51) — see {@link cloudReachable}. */
   readonly cloudOutage: CloudOutage;
+  /** Write one own state. */
   setState(id: string, state: ioBroker.SettableState | ioBroker.StateValue): Promise<unknown>;
+  /** The adapter's setTimeout — cleared on unload. */
   setTimeout: (cb: () => void, ms: number) => ioBroker.Timeout | undefined;
+  /** The adapter's clearTimeout. */
   clearTimeout: (h: ioBroker.Timeout) => void;
   /** Registry to surface a rejected API key as a user-actionable problem. */
   readonly actionableProblems: ActionableProblems;
@@ -43,6 +53,7 @@ export interface CloudRetryHandlerAdapter extends CloudStateLoaderAdapter {
  * if the cloud hangs the adapter continues with LAN+MQTT and the retry loop
  * tries again according to the failure reason.
  *
+ * @param adapter The adapter surface
  */
 export async function cloudInitWithTimeout(adapter: CloudRetryHandlerAdapter): Promise<CloudLoadResult> {
   if (!adapter.deviceManager) {
@@ -71,6 +82,7 @@ export async function cloudInitWithTimeout(adapter: CloudRetryHandlerAdapter): P
 /**
  * Build the host object for {@link CloudRetryLoop}.
  *
+ * @param adapter The adapter surface
  */
 export function buildCloudRetryHost(adapter: CloudRetryHandlerAdapter): CloudRetryHost {
   return {
@@ -91,6 +103,7 @@ export function buildCloudRetryHost(adapter: CloudRetryHandlerAdapter): CloudRet
 /**
  * Lazy-initialise the retry loop on first use.
  *
+ * @param adapter The adapter surface
  */
 export function ensureCloudRetry(adapter: CloudRetryHandlerAdapter): CloudRetryLoop {
   if (!adapter.cloudRetry) {

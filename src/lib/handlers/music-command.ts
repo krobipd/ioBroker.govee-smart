@@ -10,10 +10,15 @@ import { hexToRgb } from "../color";
 
 /** The adapter surface the music command needs. */
 export interface MusicCommandAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The LAN client. */
   readonly lanClient: GoveeLanClient | null;
+  /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
 }
 

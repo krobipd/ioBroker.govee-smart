@@ -13,6 +13,10 @@ type Handler = (id: string, state: { val: unknown } | null | undefined) => void;
  * values, and lets a test `emit` a live state change to the subscribers. No
  * real socket — the panel drives the real `makeConnectionApi` + live-status
  * hook against this.
+ *
+ * @param opts what the fake serves
+ * @param opts.states initial state values by id
+ * @param opts.auth the answer to `mqttAuth`
  */
 function fakeSocket(opts: { states?: Record<string, unknown>; auth?: AuthResponse }): {
   socket: unknown;
@@ -91,7 +95,7 @@ describe("ConnectionPanel", () => {
 
   it("persists a typed email through onChange('goveeEmail') and reflects it locally", () => {
     const { onChange } = renderPanel({ values: { email: "" } });
-    const field = screen.getByLabelText(I18n.t("gsw_conn_email_label")) as HTMLInputElement;
+    const field = screen.getByLabelText<HTMLInputElement>(I18n.t("gsw_conn_email_label"));
     fireEvent.change(field, { target: { value: "new@example.com" } });
     expect(onChange).toHaveBeenCalledWith("goveeEmail", "new@example.com");
     // The local draft buffer shows the keystroke immediately (no round-trip lag).
@@ -110,7 +114,7 @@ describe("ConnectionPanel", () => {
         onChange={onChange}
       />,
     );
-    const field = screen.getByLabelText(I18n.t("gsw_conn_email_label")) as HTMLInputElement;
+    const field = screen.getByLabelText<HTMLInputElement>(I18n.t("gsw_conn_email_label"));
     expect(field.value).toBe("old@example.com");
     rerender(
       <ConnectionPanel
@@ -214,7 +218,7 @@ describe("ConnectionPanel", () => {
   it("info.verificationPending opens the code field passively — without a click", async () => {
     const { emit, sent } = renderPanel();
     // Let the live-status effect subscribe + settle the initial getState reads.
-    await act(async () => undefined);
+    await act(() => Promise.resolve());
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
     act(() => emit("govee-smart.0.info.verificationPending", true));
     expect(await screen.findByLabelText(I18n.t("gsw_conn_code_label"))).toBeTruthy();

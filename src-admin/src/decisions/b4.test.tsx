@@ -87,7 +87,7 @@ describe("B4 login and two-factor code in the connection card", () => {
 
   it("the card follows the adapter live: a pending verification opens the code field without a click", async () => {
     const { emit, sent } = renderCard();
-    await act(async () => undefined);
+    await act(() => Promise.resolve());
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
     act(() => emit("govee-smart.0.info.verificationPending", true));
     expect(await screen.findByLabelText(I18n.t("gsw_conn_code_label"))).toBeTruthy();

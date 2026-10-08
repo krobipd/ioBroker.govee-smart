@@ -79,6 +79,8 @@ async function ackUnlessReported(
  * device count is small (typical Govee account has 5-30 devices) and the
  * call is cheap relative to the surrounding `setState`.
  *
+ * @param adapter The adapter surface
+ * @param localId The state id without the namespace
  */
 export function findDeviceForState(adapter: StateChangeRouterAdapter, localId: string): GoveeDevice | undefined {
   if (!adapter.deviceManager || !adapter.stateManager) {
@@ -105,6 +107,9 @@ export function findDeviceForState(adapter: StateChangeRouterAdapter, localId: s
  * that doesn't match any key or label returns ok=false so the caller can
  * warn and skip the command.
  *
+ * @param adapter The adapter surface
+ * @param id The full state id
+ * @param raw The written value
  */
 export async function resolveDropdownInput(
   adapter: StateChangeRouterAdapter,
@@ -274,7 +279,9 @@ export async function sendTargetTemperatureCommand(
 
 /** What the manual-segment update needs. */
 export interface ManualSegmentsAdapter {
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
 }
 
@@ -308,6 +315,10 @@ export async function applyManualSegments(
  * disables manual mode so the rejected value doesn't survive in the state
  * tree.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param suffix The datapoint below the device
+ * @param newValue The written value
  */
 export async function handleManualSegmentsChange(
   adapter: StateChangeRouterAdapter,
@@ -353,6 +364,11 @@ export async function handleManualSegmentsChange(
  * Reads `native.capabilityType`/`capabilityInstance` from the state object
  * and routes via the Cloud API.
  *
+ * @param adapter The adapter surface
+ * @param device The device
+ * @param id The full state id
+ * @param stateSuffix The datapoint below the device
+ * @param val The value to acknowledge
  */
 export async function handleGenericCapabilityCommand(
   adapter: StateChangeRouterAdapter,
@@ -397,6 +413,9 @@ export async function handleGenericCapabilityCommand(
  * store; manual segments → handler; otherwise route via STATE_TO_COMMAND or
  * the generic capability path. Optimistic ack on success; warn on errors.
  *
+ * @param adapter The adapter surface
+ * @param id The full state id
+ * @param state The state as written
  */
 export async function onStateChange(
   adapter: StateChangeRouterAdapter,

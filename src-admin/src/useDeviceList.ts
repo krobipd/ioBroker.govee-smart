@@ -27,6 +27,13 @@ export interface DeviceEntry {
 
 /** Minimal socket seam — the admin socket's `sendTo(instance, command, data)`. */
 export interface DeviceListSocket {
+  /**
+   * The admin socket's `sendTo`.
+   *
+   * @param instance the instance, e.g. `govee-smart.0`
+   * @param command the message command
+   * @param data the message
+   */
   sendTo(instance: string, command: string, data: unknown): Promise<unknown>;
 }
 

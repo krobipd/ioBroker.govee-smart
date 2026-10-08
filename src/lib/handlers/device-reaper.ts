@@ -3,8 +3,11 @@ import type { StateManager } from "../state-manager";
 
 /** What the stale-device cleanup needs. */
 export interface DeviceReaperAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The device manager — null until the start built it. */
   readonly deviceManager: DeviceManager | null;
+  /** The state manager — null until the start built it. */
   readonly stateManager: StateManager | null;
   /** Diagnostics-export throttle, keyed per device — reaped with the device. */
 }

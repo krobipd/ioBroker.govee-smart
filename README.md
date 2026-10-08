@@ -16,6 +16,8 @@ The adapter uses every available Govee channel (LAN, Cloud REST, AWS IoT MQTT, O
 
 Full user documentation lives in the **[Wiki](https://github.com/krobipd/ioBroker.govee-smart/wiki)**.
 
+A short guide ships with the adapter: [English](docs/en/README.md) · [Deutsch](docs/de/README.md).
+
 | Topic                                                                       | English                                                                                               | Deutsch                                                                                                 |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Landing page                                                                | [Home](https://github.com/krobipd/ioBroker.govee-smart/wiki/Home)                                     | [Startseite](https://github.com/krobipd/ioBroker.govee-smart/wiki/Startseite)                           |
@@ -57,8 +59,6 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 - ioBroker js-controller >= 7.2.2
 - ioBroker Admin >= 8.0.14
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
-
-> The adapter CANNOT be installed via GitHub: The adapter must be installed via the ioBroker repository (stable or latest).
 
 ---
 

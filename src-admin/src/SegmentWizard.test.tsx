@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type * as DeviceListModule from "./useDeviceList";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { I18n } from "@iobroker/gui-components";
 
@@ -24,7 +25,7 @@ vi.mock("./useWizardApi", () => ({
 const mockList = vi.hoisted(() => ({ listDevices: vi.fn() }));
 
 vi.mock("./useDeviceList", async importOriginal => ({
-  ...(await importOriginal<typeof import("./useDeviceList")>()),
+  ...(await importOriginal<typeof DeviceListModule>()),
   makeDeviceListApi: () => mockList,
 }));
 
@@ -45,7 +46,7 @@ beforeEach(() => {
 function renderWizard(): ReturnType<typeof render> {
   return render(
     <SegmentWizard
-      socket={{} as never}
+      socket={{}}
       namespace="govee-smart.0"
     />,
   );
@@ -148,7 +149,7 @@ describe("SegmentWizard", () => {
     mockApi.start.mockResolvedValue({ error: "already active" });
     renderWizard();
     fireEvent.click(await screen.findByTestId("wiz-start"));
-    await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/already active/i));
+    await waitFor(() => expect(screen.getByTestId("wiz-error").textContent).toMatch(/already active/i));
     await screen.findByTestId("wiz-start");
   });
 
@@ -216,7 +217,7 @@ describe("SegmentWizard", () => {
     renderWizard();
     fireEvent.click(await screen.findByTestId("wiz-start"));
     fireEvent.click(await screen.findByTestId("wiz-lit"));
-    await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/socket closed/));
+    await waitFor(() => expect(screen.getByTestId("wiz-error").textContent).toMatch(/socket closed/));
     await screen.findByTestId("wiz-start");
   });
 
@@ -224,7 +225,7 @@ describe("SegmentWizard", () => {
     mockApi.start.mockRejectedValue(new Error("adapter stopped"));
     renderWizard();
     fireEvent.click(await screen.findByTestId("wiz-start"));
-    await waitFor(() => expect(screen.getByTestId("wiz-error")).toHaveTextContent(/adapter stopped/));
+    await waitFor(() => expect(screen.getByTestId("wiz-error").textContent).toMatch(/adapter stopped/));
   });
 
   it("Finished is disabled until at least one segment is answered", async () => {
@@ -234,12 +235,12 @@ describe("SegmentWizard", () => {
     });
     renderWizard();
     fireEvent.click(await screen.findByTestId("wiz-start"));
-    expect(await screen.findByTestId("wiz-finish")).toBeDisabled();
+    expect((await screen.findByTestId("wiz-finish")).hasAttribute("disabled")).toBe(true);
   });
 
   it("shows a hint when no segment-capable devices exist", async () => {
     mockList.listDevices.mockResolvedValue([]);
     renderWizard();
-    expect(await screen.findByTestId("wiz-no-devices")).toBeInTheDocument();
+    expect(await screen.findByTestId("wiz-no-devices")).toBeTruthy();
   });
 });

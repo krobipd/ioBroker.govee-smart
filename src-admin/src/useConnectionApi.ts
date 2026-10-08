@@ -13,6 +13,13 @@ import type { AuthCreds, AuthResponse } from "../../src/lib/auth-status";
  * can inject a recording fake without the full Connection surface.
  */
 export interface ConnectionSocket {
+  /**
+   * The admin socket's `sendTo`.
+   *
+   * @param instance the instance, e.g. `govee-smart.0`
+   * @param command the message command
+   * @param data the message
+   */
   sendTo(instance: string, command: string, data: unknown): Promise<unknown>;
 }
 

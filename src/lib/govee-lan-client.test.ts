@@ -241,12 +241,12 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
       () => {},
       () => {},
       30_000,
-      "10.0.0.5",
+      "192.168.1.5",
     );
     const sendSock = dgramMock.sockets[0];
     const scanSock = dgramMock.sockets[2];
-    expect(sendSock.binds).toContainEqual([0, "10.0.0.5"]); // command socket source-bound to the interface
-    expect(scanSock.mcastIf).toContain("10.0.0.5"); // outgoing multicast pinned to the interface
+    expect(sendSock.binds).toContainEqual([0, "192.168.1.5"]); // command socket source-bound to the interface
+    expect(scanSock.mcastIf).toContain("192.168.1.5"); // outgoing multicast pinned to the interface
     client.stop();
   });
 
@@ -261,19 +261,36 @@ describe("GoveeLanClient — network interface pinning (multi-homed)", () => {
       () => {},
       () => {},
       30_000,
-      "10.0.0.5",
+      "192.168.1.5",
     );
     const listenSock = dgramMock.sockets[1];
-    const err = Object.assign(new Error("bind EADDRNOTAVAIL 10.0.0.5"), { code: "EADDRNOTAVAIL" });
+    const err = Object.assign(new Error("bind EADDRNOTAVAIL 192.168.1.5"), { code: "EADDRNOTAVAIL" });
     listenSock.handlers.error?.forEach(h => h(err));
     // warn-once + actionable message pointing at the Network Interface setting
     expect(warns.some(m => m.includes("LAN listen socket error"))).toBe(true);
     expect(problems).toHaveLength(1);
-    expect(problems[0]).toContain("10.0.0.5");
+    expect(problems[0]).toContain("192.168.1.5");
     expect(problems[0]).toContain("Network Interface setting");
     // repeat errors stay on debug (no warn spam)
     listenSock.handlers.error?.forEach(h => h(err));
     expect(warns.filter(m => m.includes("socket error"))).toHaveLength(1);
+    client.stop();
+  });
+
+  it("a chosen address no interface carries falls back to every address — with exactly one warning", () => {
+    const warns: string[] = [];
+    const client = new GoveeLanClient({ ...lanLog, warn: (m: string) => warns.push(m) }, lanTimers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "10.9.9.9",
+    );
+    const sendSock = dgramMock.sockets[0];
+    const scanSock = dgramMock.sockets[2];
+    expect(sendSock.binds).toHaveLength(0);
+    expect(scanSock.mcastIf).toHaveLength(0);
+    expect(warns).toEqual([expect.stringContaining("10.9.9.9 is on no network interface")]);
     client.stop();
   });
 

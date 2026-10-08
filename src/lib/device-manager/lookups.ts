@@ -481,6 +481,8 @@ export function plausibleSegmentIndices(list: unknown): number[] | undefined {
  * Generate the stable runtime map key for a device — thin wrapper over
  * {@link mapKey} (device-key.ts), kept for the existing call sites.
  *
+ * @param sku The model
+ * @param deviceId The device id
  */
 export function deviceKey(sku: string, deviceId: string): string {
   return mapKey(sku, deviceId);
@@ -492,6 +494,9 @@ export function deviceKey(sku: string, deviceId: string): string {
  * match (device IDs come from multiple sources with different
  * colon/case conventions).
  *
+ * @param devices The devices to search
+ * @param sku The model
+ * @param deviceId The device id
  */
 export function findDeviceBySkuAndId(
   devices: Map<string, GoveeDevice>,

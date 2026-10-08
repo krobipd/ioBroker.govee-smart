@@ -4,11 +4,17 @@
 
 /** The adapter surface the cleanups need. */
 export interface LegacyCleanupAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The instance namespace, e.g. `govee-smart.0`. */
   readonly namespace: string;
+  /** Read one own object. */
   getObjectAsync(id: string): Promise<ioBroker.Object | null | undefined>;
+  /** Delete one own object. */
   delObjectAsync(id: string): Promise<unknown>;
+  /** List a folder of a meta object's files. */
   readDirAsync(meta: string, path: string): Promise<Array<{ file: string; isDir: boolean }>>;
+  /** Delete one file of a meta object. */
   delFileAsync(meta: string, name: string): Promise<unknown>;
 }
 

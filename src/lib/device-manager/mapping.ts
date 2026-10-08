@@ -41,6 +41,7 @@ export function isSensorDataFresh(
 /**
  * Convert Cloud device to internal device model.
  *
+ * @param cd The device as Govee's Cloud list has it
  */
 export function cloudDeviceToGoveeDevice(cd: CloudDevice): GoveeDevice {
   return {

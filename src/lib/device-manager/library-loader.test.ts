@@ -11,6 +11,9 @@ import { loadDeviceLibraries, loadDeviceScenes, type LibraryLoaderHost } from ".
  * Host fake: budget runner executes inline (the fire-and-queue semantics of
  * the real runLimited are covered by the rate-limiter suite), diagnostics is
  * the real collector so record calls can't drift from its API.
+ *
+ * @param cloudClient The Cloud client stub
+ * @param apiClient The App API client stub
  */
 function makeHost(cloudClient: unknown, apiClient: unknown = null): LibraryLoaderHost {
   return {

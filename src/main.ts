@@ -329,7 +329,9 @@ export class GoveeAdapter extends utils.Adapter {
     this.reportJobs = new ReportJobs(diagnosticsReport.makeReportSource(this.handlerHost));
     this.on("ready", this.onReady.bind(this));
     this.on("stateChange", this.onStateChange.bind(this));
-    this.on("message", this.onMessage.bind(this));
+    // The message handler is registered in prepareInstance, right after I18n.init — js-controller delivers messages
+    // before onReady has finished, and an answer that translates before I18n.init throws (fleet check
+    // i18n-before-messages).
     this.on("unload", this.onUnload.bind(this));
     // No process-level unhandledRejection/uncaughtException handlers: in
     // compact mode they catch OTHER adapters' errors, mislabel them as
@@ -558,7 +560,10 @@ export class GoveeAdapter extends utils.Adapter {
    * @returns the start context, or null when a correction restarts the instance
    */
   private async prepareInstance(): Promise<StartContext | null> {
-    // First of all: without this the whole shutdown path stays dead on an updated
+    // The translations first: every message answer may translate (fleet check i18n-before-messages).
+    await I18n.init(path.join(this.adapterDir, "admin"), this);
+    this.on("message", this.onMessage.bind(this));
+    // Then, before anything else starts: without this the whole shutdown path stays dead on an updated
     // install, and the correction restarts us — so nothing else may start up here.
     if (await this.clearStopInstanceFlag()) {
       return null;
@@ -568,7 +573,6 @@ export class GoveeAdapter extends utils.Adapter {
     if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errText)) {
       return null;
     }
-    await I18n.init(path.join(this.adapterDir, "admin"), this);
     // Read once — a controller or admin update restarts every instance, so
     // these cannot go stale while this process lives. Failure is silent: a
     // report without them is worse, but not a reason to refuse starting.

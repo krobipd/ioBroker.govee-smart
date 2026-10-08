@@ -10,8 +10,11 @@ import { deviceKey, isDevicePushFresh } from "./lookups";
  * dispatch hooks the merge path fires when devices change.
  */
 export interface CloudMergeAdapter {
+  /** The adapter log. */
   readonly log: ioBroker.Logger;
+  /** The devices, by session key. */
   readonly devices: Map<string, GoveeDevice>;
+  /** This instance's device catalog. */
   readonly registry: DeviceRegistry;
   /** Fired when a device's cap-derived state changes (online flip etc.). */
   onDeviceUpdate?: ((device: GoveeDevice, state: Partial<DeviceState>) => void) | null;
@@ -25,6 +28,8 @@ export interface CloudMergeAdapter {
  * {@link cloudDeviceToGoveeDevice}. Returns true when at least one new
  * device was added.
  *
+ * @param adapter The adapter surface
+ * @param cloudDevices The devices of Govee's Cloud list
  */
 export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: CloudDevice[]): boolean {
   let changed = false;

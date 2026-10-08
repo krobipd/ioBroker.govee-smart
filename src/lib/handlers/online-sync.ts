@@ -13,6 +13,8 @@ export type OnlineSyncAdapter = ConnectionStateAdapter &
 /**
  * One round of the 20-second re-evaluation: every device's `info.online`,
  * the groups' reachability, the rollup and `info.connection`.
+ *
+ * @param adapter The adapter surface
  */
 export async function runOnlineSyncRound(adapter: OnlineSyncAdapter): Promise<void> {
   // The body is one try: the group and connection updates are synchronous,
