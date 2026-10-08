@@ -1,6 +1,7 @@
-import { capMatchesControl, deviceLabel, errMessage, type GoveeDevice, type TimerAdapter } from "./types";
+import { capMatchesControl, deviceLabel, errText, type GoveeDevice, type TimerAdapter } from "./types";
 import { hexToRgb } from "./color";
-import { logDedup, type ErrorCategory } from "./error-category";
+import { logCallFailure } from "./error-category";
+import { LogOnce } from "./log-once";
 import {
   COMMAND_RETRY_DELAYS_MS,
   COMMAND_RETRY_WINDOW_MS,
@@ -10,16 +11,7 @@ import {
 import { declaredOptionValue } from "./capability-mapper";
 import { applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
 
-/**
- * A command Govee refused because the device was offline — kept by the host
- * for the device's next sign of life. Two shapes, one per send path: the
- * routed command (`power`, `brightness`, …) and the generic capability
- * (appliance work mode, toggles, …).
- */
-export type HeldIntent =
-  | { kind: "command"; command: string; value: unknown }
-  | { kind: "capability"; capabilityType: string; capabilityInstance: string; value: unknown };
-import { CloudControlRejected, type GoveeCloudClient } from "./govee-cloud-client";
+import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { lanColorTemperatureK } from "./govee-lan-client";
 import { applySceneSpeed } from "./ble-frame";
@@ -70,13 +62,8 @@ export class CommandRouter {
   private rateLimiter: RateLimiter | null = null;
   /** The latest cloud send per device + datapoint — a newer write supersedes an older one's retries (issue #51). */
   private readonly sendSeq = new Map<string, number>();
-  /**
-   * Per-category dedup tracker. Replaces the older split between
-   * `lastCloudFallbackError` and `lastNoChannelCategory` — one map, one
-   * lookup, keyed by a short category string (`cloud-fallback`,
-   * `no-channel`, `override-missing-cloud`).
-   */
-  private lastErrorByCategory = new Map<string, ErrorCategory | null>();
+  /** The fleet's log rule (`log-once.ts`): a problem is said once per key and kind, a repeat goes to debug. */
+  private readonly logOnce: LogOnce;
 
   /** Callback for batch segment state sync */
   onSegmentBatchUpdate?: (
@@ -95,13 +82,6 @@ export class CommandRouter {
    * couldn't show why a user's state-write didn't reach the device.
    */
   onDiagLog?: (deviceId: string, level: "debug" | "info" | "warn", msg: string) => void;
-  /**
-   * A command Govee refused because the device is offline at the cloud. The
-   * host holds it for the device's next sign of life (issue #46, 2.39.0).
-   * Reporting is a side effect of the catch — the rejection still propagates,
-   * the caller still warns once and never acks (rule 5).
-   */
-  onDeviceOffline?: (device: GoveeDevice, intent: HeldIntent) => void;
   /**
    * Outcome of a user-triggered command, for the diagnostics report. The LAN
    * send capture ends at the wire and says nothing about whether the write was
@@ -127,6 +107,7 @@ export class CommandRouter {
    */
   constructor(log: ioBroker.Logger, timers: TimerAdapter, registry: DeviceRegistry) {
     this.log = log;
+    this.logOnce = new LogOnce(log);
     this.timers = timers;
     this.registry = registry;
   }
@@ -404,11 +385,8 @@ export class CommandRouter {
         value,
         transport,
         ok: false,
-        error: errMessage(e),
+        error: errText(e),
       });
-      if (e instanceof CloudControlRejected && e.deviceOffline) {
-        this.onDeviceOffline?.(device, { kind: "command", command, value });
-      }
       throw e;
     }
   }
@@ -646,11 +624,8 @@ export class CommandRouter {
         value: cloudValue,
         transport: "Cloud",
         ok: false,
-        error: errMessage(e),
+        error: errText(e),
       });
-      if (e instanceof CloudControlRejected && e.deviceOffline) {
-        this.onDeviceOffline?.(device, { kind: "capability", capabilityType, capabilityInstance, value });
-      }
       throw e;
     }
   }
@@ -1126,10 +1101,12 @@ export class CommandRouter {
     try {
       await this.sendCloudCommand(device, command, value);
     } catch (e) {
-      const prev = this.lastErrorByCategory.get("cloud-fallback") ?? null;
-      this.lastErrorByCategory.set(
+      logCallFailure(
+        this.logOnce,
+        this.log,
         "cloud-fallback",
-        logDedup(this.log, prev, `Cloud fallback for ${deviceLabel(device)}/${command}`, e),
+        e,
+        `Cloud fallback for ${deviceLabel(device)}/${command}: ${errText(e)}`,
       );
       throw e;
     }
@@ -1161,16 +1138,7 @@ export class CommandRouter {
     if (!cap) {
       // M20 — dedup-warn instead of just debug. The user clicks a state, no
       // channel match → troubleshooting needs the first occurrence as a warn.
-      const prev = this.lastErrorByCategory.get("no-capability") ?? null;
-      this.lastErrorByCategory.set(
-        "no-capability",
-        logDedup(
-          this.log,
-          prev,
-          `No channel for ${deviceLabel(device)}/${command}`,
-          new Error("no matching capability"),
-        ),
-      );
+      this.logOnce.report("no-capability", `No channel for ${deviceLabel(device)}/${command}: no matching capability`);
       // Same reason as above — nothing was sent, so nothing may be acked.
       throw new Error(`No matching capability for ${deviceLabel(device)}/${command}`);
     }

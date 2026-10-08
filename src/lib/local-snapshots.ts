@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { errMessage } from "./types";
+import { errText } from "./types";
 import type { DeviceIdRegistry } from "./device-id";
 import { treeKey } from "./device-key";
 
@@ -138,7 +138,7 @@ export class LocalSnapshotStore {
     } catch (e) {
       // Without the objects the cache would be empty and the next save would
       // write that emptiness over the device's real list — refuse instead.
-      this.log.warn(`Local snapshots unavailable — device objects unreadable: ${errMessage(e)}`);
+      this.log.warn(`Local snapshots unavailable — device objects unreadable: ${errText(e)}`);
       return;
     }
     for (const row of view?.rows ?? []) {
@@ -236,7 +236,7 @@ export class LocalSnapshotStore {
         this.log.warn(`Snapshot write failed for ${key}: device object devices.${key} does not exist`);
       }
     } catch (e) {
-      this.log.warn(`Snapshot write failed for ${key}: ${errMessage(e)}`);
+      this.log.warn(`Snapshot write failed for ${key}: ${errText(e)}`);
     }
   }
 
@@ -289,7 +289,7 @@ export class LocalSnapshotStore {
           const { file } = await this.adapter.readFileAsync(meta, entry.file);
           snapshots = parseSnapshots(typeof file === "string" ? file : file.toString("utf-8"));
         } catch (e) {
-          this.log.debug(`Snapshot read failed for ${entry.file}: ${errMessage(e)}`);
+          this.log.debug(`Snapshot read failed for ${entry.file}: ${errText(e)}`);
         }
         if (await this.carryOver(key, snapshots, entry.file)) {
           moved++;
@@ -298,11 +298,11 @@ export class LocalSnapshotStore {
         }
       }
       await this.adapter.delFileAsync(meta, entry.file).catch(e => {
-        this.log.debug(`Could not remove ${entry.file} from the old snapshot store: ${errMessage(e)}`);
+        this.log.debug(`Could not remove ${entry.file} from the old snapshot store: ${errText(e)}`);
       });
     }
     await this.adapter.delObjectAsync(LEGACY_ROOT_STORE).catch(e => {
-      this.log.debug(`Could not remove the old snapshot store: ${errMessage(e)}`);
+      this.log.debug(`Could not remove the old snapshot store: ${errText(e)}`);
     });
     if (moved > 0 || dropped > 0) {
       this.log.info(`Local snapshots moved into their device objects: ${moved} device(s), ${dropped} file(s) dropped`);
@@ -325,7 +325,7 @@ export class LocalSnapshotStore {
     try {
       files = fs.readdirSync(oldDir).filter(f => f.endsWith(".json"));
     } catch (e) {
-      this.log.warn(`Snapshot carry-over: cannot read ${oldDir}: ${errMessage(e)}`);
+      this.log.warn(`Snapshot carry-over: cannot read ${oldDir}: ${errText(e)}`);
       return;
     }
     let moved = 0;
@@ -335,7 +335,7 @@ export class LocalSnapshotStore {
       try {
         snapshots = parseSnapshots(fs.readFileSync(path.join(oldDir, file), "utf-8"));
       } catch (e) {
-        this.log.debug(`Snapshot read failed for ${file}: ${errMessage(e)}`);
+        this.log.debug(`Snapshot read failed for ${file}: ${errText(e)}`);
       }
       try {
         if (await this.carryOver(key, snapshots, file)) {
@@ -343,7 +343,7 @@ export class LocalSnapshotStore {
         }
         fs.unlinkSync(path.join(oldDir, file));
       } catch (e) {
-        this.log.warn(`Snapshot carry-over of ${file} failed: ${errMessage(e)}`);
+        this.log.warn(`Snapshot carry-over of ${file} failed: ${errText(e)}`);
       }
     }
     try {

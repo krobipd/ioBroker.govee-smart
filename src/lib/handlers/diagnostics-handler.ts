@@ -1,5 +1,5 @@
 import type { DeviceManager } from "../device-manager";
-import { deviceLabel, errMessage, type GoveeDevice } from "../types";
+import { deviceLabel, errText, type GoveeDevice } from "../types";
 import { DIAGNOSTICS_EXPORT_THROTTLE_MS } from "../timing-constants";
 import { sessionKey } from "../device-key";
 import { isAppGroup } from "../govee-constants";
@@ -153,7 +153,7 @@ export async function handleDiagnosticsExport(
     // An export that fails silently is the same dead end the old
     // copy-out-of-a-state flow was — say so in the log, and the card shows the
     // caller its own error.
-    adapter.log.warn(`Diagnostics export for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+    adapter.log.warn(`Diagnostics export for ${deviceLabel(device)} failed: ${errText(e)}`);
     return null;
   }
 }

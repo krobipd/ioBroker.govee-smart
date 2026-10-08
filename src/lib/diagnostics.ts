@@ -1,7 +1,7 @@
 import { HttpError } from "./http-client";
 import { Anonymiser } from "./anonymiser";
 import type { DeviceRegistry } from "./device-registry";
-import { errMessage, type GoveeDevice } from "./types";
+import { errText, type GoveeDevice } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import {
   effectiveSegmentCount,
@@ -13,7 +13,6 @@ import {
 import { CLOUD_REACHABILITY_REFRESH_MS, STATUS_REQUEST_INTERVAL_MS } from "./timing-constants";
 import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
 import type { GoveeRateLimit } from "./govee-cloud-client";
-import type { HeldIntent } from "./command-router";
 
 /** Single log line captured for a device. */
 export interface LogEntry {
@@ -318,15 +317,6 @@ export interface EnvironmentSnapshot {
 /** Environment provider — see {@link EnvironmentSnapshot}. */
 export type EnvironmentProvider = () => EnvironmentSnapshot;
 
-/** One command Govee refused while the device was offline, waiting for its next sign of life. */
-export type HeldCommandEntry = HeldIntent & {
-  /** When it was held (ISO). */
-  heldAt: string;
-};
-
-/** Held-command provider — the commands waiting for ONE device. */
-export type HeldCommandsProvider = (device: GoveeDevice) => HeldCommandEntry[];
-
 /**
  * How ONE writable datapoint of this device is actually driven.
  *
@@ -448,7 +438,6 @@ export class DiagnosticsCollector {
   /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
   private readonly accountCalls: AccountCallEntry[] = [];
   private objectTreeProvider: ObjectTreeProvider | null = null;
-  private heldCommandsProvider: HeldCommandsProvider | null = null;
 
   /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
   constructor(private readonly registry: DeviceRegistry) {}
@@ -490,17 +479,6 @@ export class DiagnosticsCollector {
     } catch {
       return [];
     }
-  }
-
-  /**
-   * Wire the held-command reader (issue #46): what the device will be sent at
-   * its next sign of life. Without it a report shows the "held" log line but
-   * not whether the command is still waiting or was delivered since.
-   *
-   * @param provider Returns the commands waiting for one device, or null to clear
-   */
-  setHeldCommandsProvider(provider: HeldCommandsProvider | null): void {
-    this.heldCommandsProvider = provider;
   }
 
   /**
@@ -834,7 +812,7 @@ export class DiagnosticsCollector {
     // A body that parses as JSON goes through the same key-based redaction as
     // a successful one; whatever it is, addresses and mail addresses inside it
     // are replaced before the length cap can hide them in a truncated string.
-    const errMsg = this.anon.text(errMessage(error));
+    const errMsg = this.anon.text(errText(error));
     const responseBody = error instanceof HttpError ? error.responseBody : undefined;
     const body: Record<string, unknown> = { error: errMsg, status: statusCode };
     if (typeof responseBody === "string" && responseBody.length > 0) {
@@ -988,12 +966,6 @@ export class DiagnosticsCollector {
     } catch {
       environment = null;
     }
-    let heldCommands: HeldCommandEntry[] = [];
-    try {
-      heldCommands = this.heldCommandsProvider ? this.heldCommandsProvider(device) : [];
-    } catch {
-      heldCommands = [];
-    }
     let objectTree: ObjectTreeEntry[] | null = null;
     if (this.objectTreeProvider && prefix) {
       objectTree = await this.objectTreeProvider(prefix).catch(() => null);
@@ -1079,9 +1051,6 @@ export class DiagnosticsCollector {
         librariesCheckedAt: device.librariesCheckedAt ?? null,
         accountMissCount: device.accountMissCount ?? 0,
       },
-      // Commands Govee refused while the device was offline and that wait for
-      // its next sign of life (issue #46). Empty when nothing waits.
-      heldCommands,
       capabilities: device.capabilities,
       scenes: {
         count: device.scenes.length,

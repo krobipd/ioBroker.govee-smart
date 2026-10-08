@@ -1,8 +1,8 @@
 // The error-text helper lives in its own import-free module so the admin
 // component (`src-admin/`) can share it; re-exported here for the 20+ callers.
-import { errMessage } from "./err-message";
+import { errText } from "./err-text";
 
-export { errMessage };
+export { errText };
 
 /**
  * Result of a cloud-load attempt. The retry loop inspects `reason` to handle
@@ -529,6 +529,13 @@ export interface GoveeDevice {
    * forever.
    */
   lastLanSeenAt?: number;
+  /**
+   * The writable datapoints this device's own status push has carried
+   * (`control.power`, …, `segments` for the AA A5 segment echo) — learned per
+   * device and field, kept across restarts. A command to one of them is
+   * confirmed only by the push (GV-13); an unlearned one by the clean send.
+   */
+  pushReports?: string[];
   /** Which channels are available */
   channels: {
     /** LAN UDP reachable */
@@ -687,7 +694,7 @@ export function formatGatewayLabel(gatewayInfo: { sku?: unknown; bleName?: unkno
  * @param context What was being written, for the debug line
  */
 export function logRejected(log: ioBroker.Logger, context: string): (e: unknown) => void {
-  return e => log.debug(`${context}: ${errMessage(e)}`);
+  return e => log.debug(`${context}: ${errText(e)}`);
 }
 
 /**

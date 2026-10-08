@@ -1,5 +1,5 @@
 import { httpsRequest } from "../http-client";
-import { errMessage } from "../types";
+import { errText } from "../types";
 import { GOVEE_APP_VERSION, getAppVersion, setAppVersion } from "../govee-constants";
 
 /**
@@ -34,6 +34,6 @@ export async function refreshLiveAppVersion(adapter: { readonly log: ioBroker.Lo
     setAppVersion(liveVersion);
     adapter.log.debug(`Govee app version: using ${getAppVersion()} (bundled fallback ${GOVEE_APP_VERSION})`);
   } catch (e) {
-    adapter.log.debug(`App version lookup failed, keeping ${getAppVersion()}: ${errMessage(e)}`);
+    adapter.log.debug(`App version lookup failed, keeping ${getAppVersion()}: ${errText(e)}`);
   }
 }

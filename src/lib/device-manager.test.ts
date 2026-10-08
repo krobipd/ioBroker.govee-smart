@@ -21,7 +21,6 @@ import {
 import {
   CLOUD_LIMITS,
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
-  PENDING_INTENT_TTL_MS,
   STATUS_REQUEST_INTERVAL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   LAN_CAPABLE_MEMORY_MS,
@@ -30,7 +29,6 @@ import {
 import { buildCapabilitiesFromAppEntry } from "./device-manager/mapping";
 import type { AppDeviceEntry } from "./govee-api-client";
 import { HttpError } from "./http-client";
-import { CloudControlRejected } from "./govee-cloud-client";
 import { goveeDeviceToCached } from "./device-manager/cache";
 import { RateLimiter } from "./rate-limiter";
 import { DeviceRegistry } from "./device-registry";
@@ -3422,7 +3420,7 @@ describe("DeviceManager — loadFromCache merge", () => {
       expect(await dm2.pollAppApi()).toBe(0);
     });
 
-    it("logs success-after-failure as warn again instead of debug-deduping it", async () => {
+    function appApiRig(fail: () => Error | null): { dm2: DeviceManager; warnings: string[] } {
       const warnings: string[] = [];
       const trackingLog = {
         ...mockLog,
@@ -3431,31 +3429,39 @@ describe("DeviceManager — loadFromCache merge", () => {
       const dm2 = new DeviceManager(trackingLog, mockTimers, registry, new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H5179" });
       dm2.getDevices()[0].type = "devices.types.thermometer";
-
-      // Failing client (raises NETWORK each call)
-      let fail = true;
-      const failingClient = {
+      dm2.setApiClient({
         hasBearerToken: () => true,
         fetchDeviceList: () => {
-          if (fail) {
-            return Promise.reject(new Error("ECONNRESET"));
-          }
-          return Promise.resolve([]);
+          const err = fail();
+          return err ? Promise.reject(err) : Promise.resolve([]);
         },
-      };
-      dm2.setApiClient(failingClient as never);
+      } as never);
+      return { dm2, warnings };
+    }
 
+    it("a failure Govee answered warns once, a repeat stays on debug, a success makes it loud again", async () => {
+      let failing = true;
+      const { dm2, warnings } = appApiRig(() =>
+        failing ? Object.assign(new Error("HTTP 400"), { statusCode: 400 }) : null,
+      );
       await dm2.pollAppApi();
       expect(warnings, "first failure warns").toHaveLength(1);
       await dm2.pollAppApi();
-      expect(warnings, "repeated same-category failure stays at debug").toHaveLength(1);
+      expect(warnings, "repeated same-kind failure stays at debug").toHaveLength(1);
 
-      // Success in between resets the dedup slot.
-      fail = false;
+      // Success in between resets the once-slot.
+      failing = false;
       await dm2.pollAppApi();
-      fail = true;
+      failing = true;
       await dm2.pollAppApi();
       expect(warnings, "failure after success warns again").toHaveLength(2);
+    });
+
+    it("a dropped connection (ECONNRESET) is a state, not a line — never a warning", async () => {
+      const { dm2, warnings } = appApiRig(() => new Error("ECONNRESET"));
+      await dm2.pollAppApi();
+      await dm2.pollAppApi();
+      expect(warnings).toEqual([]);
     });
   });
 
@@ -4304,31 +4310,31 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     return { dm, warns, infos };
   }
 
-  it("a seed model with the toggle OFF gets the targeted warn ONCE per model", () => {
+  it("a seed model with quirks and the toggle OFF asks for the toggle and a report, on warn, ONCE per model", () => {
     const { dm, warns } = nudgeDm(false);
     dm.maybeNudgeSeedSku("H6141", "Strip");
     dm.maybeNudgeSeedSku("h6141", "Strip");
     expect(warns).toEqual([
-      'Device Strip (H6141) is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.',
+      'Device Strip (H6141) is untested — please turn on "Enable experimental device support" in the adapter settings, create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
     ]);
   });
 
-  it("a seed model with the toggle ON is only mentioned on info", () => {
+  it("a seed model with the toggle ON asks for the report only, on info", () => {
     const { dm, warns, infos } = nudgeDm(true);
     dm.maybeNudgeSeedSku("H6141", undefined);
     expect(warns).toEqual([]);
-    expect(infos).toEqual(["Device H6141 is in beta — experimental quirks are active."]);
+    expect(infos).toEqual([
+      "Device H6141 is untested — experimental device support is on; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
+    ]);
   });
 
-  it("a seed WITHOUT quirks never sends its owner to the toggle — the device works as it is; only the report is asked for, on info", () => {
-    for (const experimental of [false, true]) {
-      const { dm, warns, infos } = nudgeDm(experimental);
-      dm.maybeNudgeSeedSku("H6001", "Bulb");
-      expect(warns, `toggle ${experimental}`).toEqual([]);
-      expect(infos).toEqual([
-        "Device Bulb (H6001) is in beta and untested — it works as it is; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
-      ]);
-    }
+  it("a seed WITHOUT quirks asks for the toggle and the report on info, and never claims it works", () => {
+    const { dm, warns, infos } = nudgeDm(false);
+    dm.maybeNudgeSeedSku("H6001", "Bulb");
+    expect(warns).toEqual([]);
+    expect(infos).toEqual([
+      'Device Bulb (H6001) is untested — please turn on "Enable experimental device support" in the adapter settings, create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
+    ]);
   });
 
   it("verified / reported models stay silent, an unknown model asks for a diag export", () => {
@@ -5221,233 +5227,6 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     const bulb = saved.filter(s => s.deviceId === "BULB000000000002");
     expect(bulb.length).toBeGreaterThan(0);
     expect(bulb[bulb.length - 1].scenesChecked).toBe(false);
-  });
-});
-
-describe("a command Govee rejected as 'device offline' is delivered when the device shows life (2.39.0, issue #46)", () => {
-  // The bulb was offline at Govee for two minutes; the user's write was lost.
-  // Held per device and command (newest wins), delivered ONCE per sign of
-  // life — the device's own status push, or a state read that says online —
-  // dropped after PENDING_INTENT_TTL_MS. The state is never acked before the
-  // delivery (rule 5).
-  const offlineErr = (): CloudControlRejected =>
-    new CloudControlRejected(
-      "Cloud control rejected for H6160/AABBCCDDEEFF0011/powerSwitch: code=400 — Device is offline.",
-      true,
-    );
-
-  function bench(opts: { rejectTimes?: number } = {}): {
-    dm: DeviceManager;
-    device: GoveeDevice;
-    controls: Array<{ instance: string; value: unknown }>;
-    updates: Array<Partial<DeviceState>>;
-    push: (state: Record<string, unknown>, transaction?: string) => void;
-  } {
-    const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
-    let rejectsLeft = opts.rejectTimes ?? 1;
-    const controls: Array<{ instance: string; value: unknown }> = [];
-    dm.setCloudClient({
-      controlDevice: (_sku: string, _id: string, _type: string, instance: string, value: unknown) => {
-        if (rejectsLeft > 0) {
-          rejectsLeft--;
-          return Promise.reject(offlineErr());
-        }
-        controls.push({ instance, value });
-        return Promise.resolve();
-      },
-    } as never);
-    const device = createTestDevice({
-      lanIp: undefined,
-      lastLanSeenAt: undefined,
-      channels: { lan: false, mqtt: false, cloud: true },
-    });
-    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
-    const updates: Array<Partial<DeviceState>> = [];
-    dm.setCallbacks({
-      onUpdate: (_d, state) => {
-        updates.push(state);
-      },
-      onLanDeviceReady: () => {},
-      onCloudDataReady: () => {},
-      onGroupMembersReady: () => {},
-    });
-    const push = (state: Record<string, unknown>, transaction = `x_${Date.now()}001`): void => {
-      dm.handleMqttStatus({
-        sku: "H6160",
-        device: "AABBCCDDEEFF0011",
-        cmd: "status",
-        transaction,
-        state,
-      });
-    };
-    return { dm, device, controls, updates, push };
-  }
-
-  it("the diagnostics report lists a held command with its time, and drops it once delivered (issue #50)", async () => {
-    const { dm, device, push } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
-    const held = (await dm.generateDiagnostics(device, "2.39.1")).heldCommands as Array<Record<string, unknown>>;
-    expect(held).toHaveLength(1);
-    expect(held[0]).toMatchObject({ kind: "command", command: "power", value: true });
-    expect(String(held[0].heldAt)).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    push({ onOff: 0 });
-    await dm.whenIntentsSettled();
-    expect((await dm.generateDiagnostics(device, "2.39.1")).heldCommands).toEqual([]);
-  });
-
-  it("a delivered command mirrors what went out, not the held wish (audit C10, N19 rule)", async () => {
-    const { dm, device, updates, push } = bench();
-    await expect(dm.sendCommand(device, "colorTemperature", 12000)).rejects.toThrow(/offline/i);
-    // On delivery the transport sends a clamped value (the LAN range ends at 9000 K).
-    const spy = vi.spyOn(dm, "sendCommand").mockResolvedValue(9000);
-    push({ onOff: 1 });
-    await dm.whenIntentsSettled();
-    expect(spy).toHaveBeenCalledWith(device, "colorTemperature", 12000);
-    expect(updates.some(u => u.colorTemperature === 9000)).toBe(true);
-    expect(updates.some(u => u.colorTemperature === 12000)).toBe(false);
-  });
-
-  it("holds the rejected command, delivers it once on the device's own push, and mirrors the value as acked", async () => {
-    const { dm, device, controls, updates, push } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow(/offline/i);
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toEqual([{ kind: "command", command: "power", value: true }]);
-
-    push({ onOff: 0 }); // the bulb is back, still off
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
-    expect(dm.getPendingIntents(device)).toEqual([]);
-    // The confirmation path of a direct command: the mirrored state, acked.
-    expect(updates.some(u => u.power === true)).toBe(true);
-
-    push({ onOff: 1 }); // a second push delivers nothing more
-    await dm.whenIntentsSettled();
-    expect(controls).toHaveLength(1);
-  });
-
-  it("the newest write for the same command replaces the older one", async () => {
-    const { dm, device, controls, push } = bench({ rejectTimes: 2 });
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    await expect(dm.sendCommand(device, "power", false)).rejects.toThrow();
-    expect(dm.getPendingIntents(device)).toEqual([{ kind: "command", command: "power", value: false }]);
-    push({ onOff: 1 });
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "powerSwitch", value: 0 }]);
-  });
-
-  it("an intent older than the TTL is dropped, not delivered", async () => {
-    const { dm, device, controls, push } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power").at -= PENDING_INTENT_TTL_MS + 1;
-    push({ onOff: 0 });
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toEqual([]);
-  });
-
-  it("a delivery Govee rejects again waits for the next sign of life — one attempt per push, no loop", async () => {
-    const { dm, device, controls, push } = bench({ rejectTimes: 2 });
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    push({ onOff: 0 }); // attempt 1 → rejected again
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toHaveLength(1);
-    push({ onOff: 0 }); // attempt 2 → accepted
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
-  });
-
-  it("a refused delivery keeps the intent's original time — the TTL still runs out (M4)", async () => {
-    const { dm, device, controls, push } = bench({ rejectTimes: 3 });
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    const entry = (): { at: number } => (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power");
-    entry().at -= 60_000; // a minute ago — a restarted clock would read "now"
-    const firstAt = entry().at;
-    push({ onOff: 0 }); // delivery → refused again
-    await dm.whenIntentsSettled();
-    expect(entry().at).toBe(firstAt);
-    entry().at -= PENDING_INTENT_TTL_MS + 1;
-    push({ onOff: 0 }); // the next sign of life finds it expired
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toEqual([]);
-  });
-
-  it("a new write of the user sets the clock anew", async () => {
-    const { dm, device } = bench({ rejectTimes: 2 });
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    const entry = (): { at: number } => (dm as any).pendingIntents.get("H6160:AABBCCDDEEFF0011").get("command:power");
-    entry().at -= 60_000;
-    const aged = entry().at;
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    expect(entry().at).toBeGreaterThan(aged);
-  });
-
-  it("a push that already shows the wanted power is confirmation enough — nothing is sent", async () => {
-    const { dm, device, controls, push } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    push({ onOff: 1 }); // someone switched it on meanwhile
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toEqual([]);
-  });
-
-  it("brightness is resent even when the push shows the same value — only power has a known mapping", async () => {
-    const { dm, device, controls, push } = bench();
-    await expect(dm.sendCommand(device, "brightness", 40)).rejects.toThrow();
-    push({ onOff: 1, brightness: 40 });
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "brightness", value: 40 }]);
-  });
-
-  it("a status packet that says connected:false is no sign of life — the held command stays held", async () => {
-    const { dm, device, controls, push } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    push({ onOff: 0, connected: "false" }); // the broker relays what the device last said, not that it is back
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toHaveLength(1);
-  });
-
-  it("a state read that says OFFLINE is no sign of life — nothing is delivered into the void", async () => {
-    const { dm, device, controls } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    (dm as any).maybeApplyCloudOnline(device, [
-      { type: "devices.capabilities.online", instance: "online", state: { value: false } },
-    ]);
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([]);
-    expect(dm.getPendingIntents(device)).toHaveLength(1);
-  });
-
-  it("a state read that says online is a sign of life too", async () => {
-    const { dm, device, controls } = bench();
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    (dm as any).maybeApplyCloudOnline(device, [
-      { type: "devices.capabilities.online", instance: "online", state: { value: true } },
-    ]);
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
-  });
-
-  it("a light that answered over the LAN this week but was sent over the cloud still gets its delivery on a push", async () => {
-    const { dm, device, controls, push } = bench();
-    device.lastLanSeenAt = Date.now() - 60_000; // LAN-driven for reachability
-    await expect(dm.sendCommand(device, "power", true)).rejects.toThrow();
-    push({ onOff: 0 });
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "powerSwitch", value: 1 }]);
-  });
-
-  it("a capability command (appliance work mode) is held and delivered through its own path", async () => {
-    const { dm, device, controls, push } = bench();
-    device.type = "devices.types.air_purifier";
-    await expect(
-      dm.sendCapabilityCommand(device, "devices.capabilities.work_mode", "workMode", { workMode: 1, modeValue: 2 }),
-    ).rejects.toThrow(/offline/i);
-    push({});
-    await dm.whenIntentsSettled();
-    expect(controls).toEqual([{ instance: "workMode", value: { workMode: 1, modeValue: 2 } }]);
   });
 });
 

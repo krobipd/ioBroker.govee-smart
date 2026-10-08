@@ -3,7 +3,7 @@ import React from "react";
 import { Alert, Box, Button, FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
-import { errMessage } from "../../src/lib/err-message";
+import { errText } from "../../src/lib/err-text";
 import { DeviceListStatus, useDeviceList } from "./DeviceListLoader";
 import { SegmentGrid } from "./SegmentGrid";
 import { segmentCapable } from "./useDeviceList";
@@ -146,7 +146,7 @@ export function SegmentWizard(props: SegmentWizardProps): React.JSX.Element {
    */
   const fail = (e: unknown): void => {
     sessionOpenRef.current = false;
-    setError(errMessage(e));
+    setError(errText(e));
     resetToSelect();
   };
 

@@ -7,7 +7,7 @@ import { LIBRARY_RECHECK_MS } from "../timing-constants";
 import { APP_API_LANE, limiterDeviceKey, type CallLane } from "../rate-limiter";
 import {
   deviceLabel,
-  errMessage,
+  errText,
   type CloudDevice,
   type CloudScene,
   type GoveeDevice,
@@ -147,7 +147,7 @@ function logUndocApiFailure(
   e: unknown,
 ): void {
   const httpStatus = extractHttpStatus(e);
-  const msg = errMessage(e);
+  const msg = errText(e);
   // http-client formats invalid-JSON-200 errors as "...body starts with: <snippet>"
   const bodyMatch = msg.match(/body starts with: (.+)$/);
   const bodySnippet = bodyMatch?.[1] ?? "";
@@ -200,7 +200,7 @@ export async function loadDeviceScenes(
       }
     } catch (e) {
       host.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/scenes", e, extractHttpStatus(e));
-      host.log.debug(`Could not load scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
+      host.log.debug(`Could not load scenes for ${deviceLabel(device)}: ${errText(e)}`);
     }
   };
   await host.runLimited(loadScenes, { kind: "device-read", deviceKey: limiterDeviceKey(device) });
@@ -220,7 +220,7 @@ export async function loadDeviceScenes(
         }
       } catch (e) {
         host.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/diy-scenes", e, extractHttpStatus(e));
-        host.log.debug(`Could not load DIY scenes for ${deviceLabel(device)}: ${errMessage(e)}`);
+        host.log.debug(`Could not load DIY scenes for ${deviceLabel(device)}: ${errText(e)}`);
       }
     };
     await host.runLimited(loadDiy, { kind: "device-read", deviceKey: limiterDeviceKey(device) });

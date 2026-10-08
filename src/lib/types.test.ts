@@ -2,7 +2,7 @@ import {
   normalizeDeviceId,
   deviceLabel,
   formatGatewayLabel,
-  errMessage,
+  errText,
   maskSecret,
   coerceFiniteNumber,
   logRejected,
@@ -111,28 +111,28 @@ describe("Types utilities", () => {
     });
   });
 
-  describe("errMessage", () => {
+  describe("errText", () => {
     it("should return only e.message for Errors — the stack stays out of warn/error lines (v2.10.1 contract)", () => {
       const e = new Error("boom");
-      const out = errMessage(e);
+      const out = errText(e);
       expect(out).toBe("boom");
       // A stack trace would contain call-site lines ("at ...") — must not leak.
       expect(out).not.toContain("at ");
     });
 
     it("should return String() for non-Error primitives", () => {
-      expect(errMessage("plain string")).toBe("plain string");
-      expect(errMessage(42)).toBe("42");
-      expect(errMessage(null)).toBe("null");
-      expect(errMessage(undefined)).toBe("undefined");
-      expect(errMessage(Symbol("sym"))).toBe("Symbol(sym)");
+      expect(errText("plain string")).toBe("plain string");
+      expect(errText(42)).toBe("42");
+      expect(errText(null)).toBe("null");
+      expect(errText(undefined)).toBe("undefined");
+      expect(errText(Symbol("sym"))).toBe("Symbol(sym)");
     });
 
     it("should render a thrown plain object's fields, not [object Object]", () => {
       // The one that sent readers nowhere: a rejected HTTP/socket object used to
       // reach the log as "[object Object]". Its fields ARE the diagnosis.
-      expect(errMessage({ code: "ECONNRESET" })).toBe('{"code":"ECONNRESET"}');
-      expect(errMessage({ msg: "obj" })).toBe('{"msg":"obj"}');
+      expect(errText({ code: "ECONNRESET" })).toBe('{"code":"ECONNRESET"}');
+      expect(errText({ msg: "obj" })).toBe('{"msg":"obj"}');
     });
 
     it("should never throw on a value JSON cannot serialise", () => {
@@ -140,9 +140,9 @@ describe("Types utilities", () => {
       // an unhandled rejection — the crash-loop this adapter guards against.
       const circular: Record<string, unknown> = { a: 1 };
       circular.self = circular;
-      expect(errMessage(circular)).toBe("[object Object]");
-      expect(errMessage({ big: 1n })).toBe("[object Object]");
-      expect(errMessage({ toJSON: () => JSON.parse("{") })).toBe("[object Object]");
+      expect(errText(circular)).toBe("[object Object]");
+      expect(errText({ big: 1n })).toBe("[object Object]");
+      expect(errText({ toJSON: () => JSON.parse("{") })).toBe("[object Object]");
     });
 
     it("classifies a thrown plain object by its fields (the F1 payoff)", () => {

@@ -234,13 +234,16 @@ describe("setCloudConnected", () => {
 describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => {
   const warns: string[] = [];
   const infos: string[] = [];
+  const debugs: string[] = [];
   const reachableRig = (): TestRig => {
     warns.length = 0;
     infos.length = 0;
+    debugs.length = 0;
     const rig = makeRig({
       ...mockLog,
       warn: (m: string) => warns.push(m),
       info: (m: string) => infos.push(m),
+      debug: (m: string) => debugs.push(m),
     });
     setCloudConnected(rig.adapter, true);
     rig.stateWrites.length = 0;
@@ -269,7 +272,7 @@ describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => 
     expect(rig.stateWrites).toEqual([]);
   });
 
-  it("a second failure a minute later shows the Cloud down, with ONE warning naming time and reason", () => {
+  it("a second failure a minute later shows the Cloud down; the line naming time and reason stays on debug", () => {
     vi.useFakeTimers();
     const rig = reachableRig();
     onCloudContact(rig.adapter, "unreachable", "getaddrinfo ENOTFOUND openapi.api.govee.com");
@@ -279,9 +282,10 @@ describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => 
     onCloudContact(rig.adapter, "unreachable", "Timeout after 15000ms");
     expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: false }]);
     expect(rig.groupsOnline).toEqual([false]);
-    expect(warns).toHaveLength(1);
-    expect(warns[0]).toContain("Govee Cloud not reachable since");
-    expect(warns[0]).toContain("ENOTFOUND");
+    expect(warns).toEqual([]);
+    const down = debugs.filter(d => d.includes("Govee Cloud not reachable since"));
+    expect(down).toHaveLength(1);
+    expect(down[0]).toContain("ENOTFOUND");
   });
 
   it("an accepted answer in between starts the count again", () => {
@@ -296,7 +300,7 @@ describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => 
     expect(warns).toEqual([]);
   });
 
-  it("the next accepted answer shows the Cloud again, with ONE info line", () => {
+  it("the next accepted answer shows the Cloud again, with ONE debug line and no info line", () => {
     vi.useFakeTimers();
     const rig = reachableRig();
     onCloudContact(rig.adapter, "unreachable", "HTTP 503");
@@ -308,7 +312,8 @@ describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => 
       { id: "info.cloudConnected", val: false },
       { id: "info.cloudConnected", val: true },
     ]);
-    expect(infos.filter(i => i === "Govee Cloud reachable again")).toHaveLength(1);
+    expect(debugs.filter(d => d === "Govee Cloud reachable again")).toHaveLength(1);
+    expect(infos.filter(i => i === "Govee Cloud reachable again")).toEqual([]);
   });
 
   it("an outage never reports the API key, never arms the list retry, keeps the key flag", () => {

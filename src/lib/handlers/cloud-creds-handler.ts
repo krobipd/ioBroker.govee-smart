@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { errMessage, type PersistedMqttCredentials } from "../types";
+import { errText, type PersistedMqttCredentials } from "../types";
 import { writeFileAtomic } from "../atomic-file";
 import { deriveGoveeClientId } from "../govee-constants";
 
@@ -45,7 +45,7 @@ export async function clearVerificationCodeSetting(adapter: CloudCredsAdapter): 
       native: { mqttVerificationCode: "" },
     });
   } catch (e) {
-    adapter.log.warn(`Could not clear mqttVerificationCode: ${errMessage(e)}`);
+    adapter.log.warn(`Could not clear mqttVerificationCode: ${errText(e)}`);
   }
 }
 
@@ -198,11 +198,11 @@ export async function loadPersistedCreds(
       await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
       adapter.log.debug("Migrated persisted MQTT credentials from state to the credentials store");
     } catch (e) {
-      adapter.log.debug(`Credentials file write failed — keeping legacy state for next start: ${errMessage(e)}`);
+      adapter.log.debug(`Credentials file write failed — keeping legacy state for next start: ${errText(e)}`);
     }
     return creds;
   } catch (e) {
-    adapter.log.debug(`Legacy credentials migration failed: ${errMessage(e)}`);
+    adapter.log.debug(`Legacy credentials migration failed: ${errText(e)}`);
     return null;
   }
 }
@@ -271,7 +271,7 @@ export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dat
         // deleting it here would throw away a valid token cache and trigger
         // the fresh-login/2FA path this cache exists to avoid.
         carryOverOk = false;
-        adapter.log.debug(`Credentials carry-over failed — keeping legacy meta for next start: ${errMessage(e)}`);
+        adapter.log.debug(`Credentials carry-over failed — keeping legacy meta for next start: ${errText(e)}`);
       }
     }
   } catch {

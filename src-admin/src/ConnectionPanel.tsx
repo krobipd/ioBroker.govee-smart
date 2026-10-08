@@ -3,7 +3,7 @@ import React from "react";
 import { Alert, Box, Button, CircularProgress, Collapse, Divider, Stack, TextField, Typography } from "@mui/material";
 import { I18n } from "@iobroker/gui-components";
 
-import { errMessage } from "../../src/lib/err-message";
+import { errText } from "../../src/lib/err-text";
 import { AUTH_STATUSES, type AuthResponse, type AuthStatus } from "../../src/lib/auth-status";
 import { makeConnectionApi } from "./useConnectionApi";
 
@@ -295,7 +295,7 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
     try {
       showFeedback(await api.testLogin({ email: draft.email, password: draft.password, code: draft.code }));
     } catch (e) {
-      showError(errMessage(e));
+      showError(errText(e));
     } finally {
       setBusy("");
     }
@@ -306,7 +306,7 @@ export function ConnectionPanel(props: ConnectionPanelProps): React.JSX.Element 
     try {
       showFeedback(await api.requestCode({ email: draft.email, password: draft.password }));
     } catch (e) {
-      showError(errMessage(e));
+      showError(errText(e));
     } finally {
       setBusy("");
     }

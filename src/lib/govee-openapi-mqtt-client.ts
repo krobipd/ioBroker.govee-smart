@@ -2,8 +2,9 @@ import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import { OPENAPI_MQTT_MAX_AUTH_FAILURES } from "./timing-constants";
 import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient } from "./reconnecting-mqtt-client";
-import { type OpenApiMqttEvent, type CloudStateCapability, type TimerAdapter, errMessage, maskSecret } from "./types";
-import { classifyError } from "./error-category";
+import { type OpenApiMqttEvent, type CloudStateCapability, type TimerAdapter, errText, maskSecret } from "./types";
+import { classifyError, logCallFailure } from "./error-category";
+import { LogOnce } from "./log-once";
 
 const BROKER_URL = "mqtts://mqtt.openapi.govee.com:8883";
 
@@ -46,6 +47,8 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
 
   /** Channel label used in reconnect log lines. */
   protected readonly channelLabel = "Cloud-events";
+  /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
+  private readonly logOnce: LogOnce;
 
   /**
    * @param apiKey Govee Cloud API key (used as username AND password)
@@ -54,6 +57,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
    */
   constructor(apiKey: string, log: ioBroker.Logger, timers: TimerAdapter) {
     super(log, timers);
+    this.logOnce = new LogOnce(log);
     this.apiKey = apiKey;
     this.topic = `GA/${apiKey}`;
     this.topicLabel = `GA/${maskSecret(apiKey)}`;
@@ -110,7 +114,9 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
             this.reconnectAttempts = 0;
             this.connectFailCount = 0;
             if (this.lastErrorCategory) {
-              this.log.info(
+              // One info line only where a loud line came before; a return from an outage is a state.
+              this.logOnce.recovered(
+                "events",
                 `Cloud-events connection restored: broker=${BROKER_URL} clientId=${clientId} topic=${this.topicLabel}`,
               );
               this.lastErrorCategory = null;
@@ -119,7 +125,10 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
             this.onConnection?.(true);
           },
           msg =>
-            this.log.warn(`Cloud-events subscribe failed: topic=${this.topicLabel} err="${msg}" — forcing reconnect`),
+            this.logOnce.report(
+              "events-subscribe",
+              `Cloud-events subscribe failed: topic=${this.topicLabel} err="${msg}" — forcing reconnect`,
+            ),
         );
       });
 
@@ -138,7 +147,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
             return;
           }
         }
-        this.log.debug(`Cloud-events error: ${errMessage(err)}`);
+        this.log.debug(`Cloud-events error: ${errText(err)}`);
         // Some error types (TLS handshake fail, unsolicited disconnect) keep
         // the client object alive without firing `close`. Force a close so
         // the close-handler scheduleReconnect runs — without this the
@@ -161,15 +170,14 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         this.scheduleReconnect();
       });
     } catch (err) {
-      const category = classifyError(err);
-      const msg = `Cloud-events connection failed: ${errMessage(err)}`;
-
-      if (category !== this.lastErrorCategory) {
-        this.lastErrorCategory = category;
-        this.log.warn(msg);
-      } else {
-        this.log.debug(msg);
-      }
+      // Said once per kind; an unreachable broker (NETWORK/TIMEOUT) is a state, never a line.
+      this.lastErrorCategory = logCallFailure(
+        this.logOnce,
+        this.log,
+        "events",
+        err,
+        `Cloud-events connection failed: ${errText(err)}`,
+      );
 
       this.scheduleReconnect();
     }
@@ -248,7 +256,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
     try {
       this.onEvent?.(event);
     } catch (e) {
-      this.log.debug(`Cloud-events: event handler failed: ${errMessage(e)}`);
+      this.log.debug(`Cloud-events: event handler failed: ${errText(e)}`);
     }
   }
 }

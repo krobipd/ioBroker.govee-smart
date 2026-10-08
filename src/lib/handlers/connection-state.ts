@@ -9,6 +9,7 @@ import { deviceLabel, logRejected } from "../types";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import { resolveDeviceReachability } from "../device-manager/lookups";
 import { cloudReachable } from "../cloud-outage";
+import { isOutage } from "../error-category";
 import { hasAccountCredentials } from "../account-credentials";
 
 /**
@@ -63,11 +64,22 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   // indicator green while the Cloud is up, because the adapter genuinely can
   // reach it; whether the device itself answers is the device marker's job and
   // needs evidence. 2.29.0 collapsed the two and got both wrong.
-  const anyOnline = devices.some(
-    d =>
+  // A device without a local API is reached only over a cloud path: Govee's
+  // REST cloud or the account broker. With neither working right now nothing
+  // reaches it, so Govee's last "online" (fresh for up to 30 minutes) must not
+  // keep the adapter green (GV-16, issue #51). Whether the device ever pushed
+  // over the broker is history, not a connection.
+  const cloudUp = cloudReachable(adapter);
+  const brokerUp = adapter.mqttClient?.connected ?? false;
+  const anyOnline = devices.some(d => {
+    if (!d.lanIp && !cloudUp && !brokerUp) {
+      return false;
+    }
+    return (
       resolveDeviceReachability(d).online ||
-      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && cloudReachable(adapter)),
-  );
+      (d.type === GOVEE_DEVICE_TYPE.LIGHT && !d.lanIp && d.channels.cloud && cloudUp)
+    );
+  });
   // A LAN client whose listen socket is not bound (port taken) hears nothing (audit N1).
   const lanRunning = adapter.lanClient?.isListening() ?? false;
   const connected = hasDevices ? anyOnline : lanRunning;
@@ -145,8 +157,9 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   // state tree where it stays accurate.
   //
   // Channel status (v2.10.1): only configured channels are shown, with
-  // ✓ (ready) or ✗ (init attempt failed). Each ✗ is followed by a WARN line
-  // with a concrete reason + retry behaviour. Channel names are renamed so the
+  // ✓ (ready) or ✗ (init attempt failed). Each ✗ is followed by a line with a
+  // concrete reason + retry behaviour — a warning, or debug when the counterpart
+  // simply does not answer. Channel names are renamed so the
   // user can tell them apart (Cloud REST vs Lights Push vs Sensor Push —
   // previously everything was inconsistently called "Cloud", "MQTT",
   // "Cloud-events").
@@ -166,13 +179,27 @@ export function logDeviceSummary(adapter: ConnectionStateAdapter): void {
   }
   adapter.log.info(`Govee adapter ready — ${parts.join("  ")}`);
 
+  // Each ✗ names its reason. An unreachable Govee is a state (info.cloudConnected, the ✗ above), not a warning
+  // (krobi 2026-10-03, the cloud included) — that reason goes to debug; anything the user has to fix stays a warning.
   if (adapter.cloudClient && !cloudReachable(adapter)) {
     const reason = adapter.cloudClient.getFailureReason();
-    adapter.log.warn(reason ? `Cloud REST: ${reason}` : `Cloud REST: not connected — see earlier errors`);
+    const line = reason ? `Cloud REST: ${reason}` : `Cloud REST: not connected — see earlier errors`;
+    const unreachable = adapter.cloudOutage.confirmed || isOutage(adapter.cloudClient.getFailureCategory());
+    if (unreachable) {
+      adapter.log.debug(line);
+    } else {
+      adapter.log.warn(line);
+    }
   }
   if (adapter.mqttClient && !adapter.mqttClient.connected) {
     const reason = adapter.mqttClient.getFailureReason();
-    adapter.log.warn(reason ? `Lights Push: ${reason}` : `Lights Push: not connected — see earlier errors`);
+    const line = reason ? `Lights Push: ${reason}` : `Lights Push: not connected — see earlier errors`;
+    const unreachable = isOutage(adapter.mqttClient.getLastError()?.category);
+    if (unreachable) {
+      adapter.log.debug(line);
+    } else {
+      adapter.log.warn(line);
+    }
   }
   if (!lanOk) {
     adapter.log.warn(

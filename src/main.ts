@@ -35,7 +35,7 @@ import { SkuCache } from "./lib/sku-cache";
 import { StateManager } from "./lib/state-manager";
 // AdapterConfig is augmented globally in src/lib/adapter-config.d.ts —
 // TypeScript picks it up via tsconfig.json `include`, no value-import needed.
-import { deviceLabel, errMessage, logRejected } from "./lib/types";
+import { deviceLabel, errText, logRejected } from "./lib/types";
 import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
@@ -500,7 +500,7 @@ export class GoveeAdapter extends utils.Adapter {
       await this.extendForeignObjectAsync(id, { common: { supportedMessages: null } });
       return true;
     } catch (e) {
-      this.log.debug(`Could not check the instance object: ${errMessage(e)}`);
+      this.log.debug(`Could not check the instance object: ${errText(e)}`);
       return false;
     }
   }
@@ -536,7 +536,7 @@ export class GoveeAdapter extends utils.Adapter {
     } catch (error) {
       // One clear line for the user; the stack stays on debug (fleet rule —
       // Node-internal frames in an error line are noise, not diagnosis).
-      this.log.error(`onReady failed: ${errMessage(error)}`);
+      this.log.error(`onReady failed: ${errText(error)}`);
       if (error instanceof Error && error.stack) {
         this.log.debug(error.stack);
       }
@@ -557,7 +557,7 @@ export class GoveeAdapter extends utils.Adapter {
     }
     // Same class of correction, same consequence: a settings key renamed by an
     // earlier release is carried over once, the write restarts the instance.
-    if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errMessage)) {
+    if (await migrateNativeKeys(this, GoveeAdapter.NATIVE_KEY_MIGRATIONS, errText)) {
       return null;
     }
     await I18n.init(path.join(this.adapterDir, "admin"), this);
@@ -576,7 +576,7 @@ export class GoveeAdapter extends utils.Adapter {
     // this resolves; a daily timer keeps it fresh.
     void appVersion
       .refreshLiveAppVersion(this.handlerHost)
-      .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
+      .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
 
     // One-shot cleanups: objects earlier versions left behind that nothing reads any more.
     await legacyCleanup.removeLegacyObjects(this.handlerHost);
@@ -651,7 +651,7 @@ export class GoveeAdapter extends utils.Adapter {
       logInfo: m => this.log.info(m),
       notify: m =>
         this.registerNotification("govee-smart", "userActionRequired", m).catch(e =>
-          this.log.debug(`Could not raise notification: ${errMessage(e)}`),
+          this.log.debug(`Could not raise notification: ${errText(e)}`),
         ),
     });
 
@@ -692,7 +692,7 @@ export class GoveeAdapter extends utils.Adapter {
     try {
       await this.stateManager.migrateDeviceIds();
     } catch (e) {
-      this.log.error(`Device id migration failed — the adapter does not start: ${errMessage(e)}; restart the instance`);
+      this.log.error(`Device id migration failed — the adapter does not start: ${errText(e)}; restart the instance`);
       return false;
     }
     // Nothing has been asked yet, so nothing may still claim to be reachable from
@@ -759,7 +759,7 @@ export class GoveeAdapter extends utils.Adapter {
     this.deviceManager!.onDevicesRemoved = () => {
       void deviceReaper
         .reapStaleDevices(this.handlerHost)
-        .catch(e => this.log.debug(`Post-eviction cleanup failed: ${errMessage(e)}`));
+        .catch(e => this.log.debug(`Post-eviction cleanup failed: ${errText(e)}`));
     };
 
     // Update info.ip when LAN IP changes
@@ -789,7 +789,7 @@ export class GoveeAdapter extends utils.Adapter {
         return;
       }
       this.stateManager.createSegmentStates(device, this.deviceManager.syncSegmentCount(device)).catch(e => {
-        this.log.warn(`Failed to rebuild segment tree for ${deviceLabel(device)} after count change: ${errMessage(e)}`);
+        this.log.warn(`Failed to rebuild segment tree for ${deviceLabel(device)} after count change: ${errText(e)}`);
       });
     };
 
@@ -951,7 +951,7 @@ export class GoveeAdapter extends utils.Adapter {
     }
     this.mqttClient!.setOnCredentialsRefresh(creds => {
       cloudCreds.persistCreds(this.handlerHost, dataDir, creds, accountEmail).catch(e => {
-        this.log.warn(`Could not persist MQTT credentials: ${errMessage(e)}`);
+        this.log.warn(`Could not persist MQTT credentials: ${errText(e)}`);
       });
     });
 
@@ -989,7 +989,7 @@ export class GoveeAdapter extends utils.Adapter {
     this.deviceManager!.setOnCloudCapabilities((device, caps) => {
       cloudStateLoader
         .applyCloudCapabilities(this.handlerHost, device, caps)
-        .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errMessage(e)}`));
+        .catch(e => this.log.warn(`applyCloudCapabilities failed for ${device.sku}: ${errText(e)}`));
     });
     // The read that corrects a value left unconfirmed by a failed command (issue #51).
     this.deviceManager!.setOnCloudStateRead(async (device, caps) => {
@@ -1017,7 +1017,7 @@ export class GoveeAdapter extends utils.Adapter {
       const triggerAppApiPoll = (): void => {
         this.deviceManager
           ?.refreshExpiringReachability()
-          .catch(e => this.log.debug(`Reachability refresh failed: ${errMessage(e)}`));
+          .catch(e => this.log.debug(`Reachability refresh failed: ${errText(e)}`));
         this.deviceManager
           ?.pollAppApi()
           .then(() => {
@@ -1032,7 +1032,7 @@ export class GoveeAdapter extends utils.Adapter {
             // the poll, not before: on the first tick the topics are new.
             this.deviceManager?.requestStaleStatuses();
           })
-          .catch(e => this.log.debug(`pollAppApi failed: ${errMessage(e)}`));
+          .catch(e => this.log.debug(`pollAppApi failed: ${errText(e)}`));
       };
       this.appApiPollTimer = this.setInterval(triggerAppApiPoll, APP_API_POLL_INTERVAL_MS);
       // Initial poll: gives MQTT time for the bearer login. Without this
@@ -1207,7 +1207,7 @@ export class GoveeAdapter extends utils.Adapter {
           if (device.lanIp && device.capabilities.length === 0) {
             await sm.runDeviceBuild(device, async () => {
               const deleted = await sm.cleanupCloudOwnedStates(sm.devicePrefix(device), []).catch(e => {
-                this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+                this.log.debug(`Legacy cloud-state cleanup failed for ${deviceLabel(device)}: ${errText(e)}`);
                 return 0;
               });
               // An automatic correction is carried out silently (CLAUDE_CODING
@@ -1225,7 +1225,7 @@ export class GoveeAdapter extends utils.Adapter {
       // Idempotent + existence-checked; covers devices AND groups.
       for (const device of this.deviceManager.getDevices()) {
         await this.stateManager.migrateLegacyColorStateIds(device).catch(e => {
-          this.log.debug(`B2 colour-state migration failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+          this.log.debug(`B2 colour-state migration failed for ${deviceLabel(device)}: ${errText(e)}`);
         });
       }
     }
@@ -1262,7 +1262,7 @@ export class GoveeAdapter extends utils.Adapter {
     this.cleanupTimer = this.setTimeout(() => {
       deviceReaper
         .reapStaleDevices(this.handlerHost)
-        .catch(e => this.log.debug(`Device cleanup failed: ${errMessage(e)}`));
+        .catch(e => this.log.debug(`Device cleanup failed: ${errText(e)}`));
     }, STALE_DEVICE_CLEANUP_DELAY_MS);
 
     // info.online sync — re-evaluates per-device online truth every 20 s.
@@ -1281,7 +1281,7 @@ export class GoveeAdapter extends utils.Adapter {
     this.appVersionCheckTimer = this.setInterval(() => {
       appVersion
         .refreshLiveAppVersion(this.handlerHost)
-        .catch(e => this.log.debug(`App version refresh error: ${errMessage(e)}`));
+        .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
     }, APP_VERSION_CHECK_INTERVAL_MS);
 
     connectionState.updateConnectionState(this.handlerHost);
@@ -1303,7 +1303,7 @@ export class GoveeAdapter extends utils.Adapter {
     try {
       await stateChangeRouter.onStateChange(this.handlerHost, id, state);
     } catch (e) {
-      this.log.warn(`onStateChange crashed for ${id}: ${errMessage(e)}`);
+      this.log.warn(`onStateChange crashed for ${id}: ${errText(e)}`);
     }
   }
 
@@ -1318,7 +1318,7 @@ export class GoveeAdapter extends utils.Adapter {
       }
       this.messageRouter.onMessage(obj);
     } catch (e) {
-      this.log.warn(`onMessage crashed: ${errMessage(e)}`);
+      this.log.warn(`onMessage crashed: ${errText(e)}`);
     }
   }
 
@@ -1342,7 +1342,7 @@ export class GoveeAdapter extends utils.Adapter {
     // instanceObjects entry is js-controller's, a second unchanged one ours). The
     // texts come from `admin/i18n`, the same source the release gate writes the
     // manifest from, so the two cannot drift apart.
-    const fail = (id: string) => (e: unknown) => this.log.debug(`Could not refresh ${id}: ${errMessage(e)}`);
+    const fail = (id: string) => (e: unknown) => this.log.debug(`Could not refresh ${id}: ${errText(e)}`);
     // The comparison stands before the literal call; the call writes the patch it is handed.
     const refresh = async (
       id: string,
@@ -1473,7 +1473,7 @@ export class GoveeAdapter extends utils.Adapter {
       void Promise.all(writes)
         .catch((e: unknown) => {
           // States DB already going down — nothing left to report to.
-          this.log.debug(`onUnload: final states rejected: ${errMessage(e)}`);
+          this.log.debug(`onUnload: final states rejected: ${errText(e)}`);
         })
         .finally(done);
       return;

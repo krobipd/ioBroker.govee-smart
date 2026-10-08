@@ -4,7 +4,7 @@ import type { ActionableProblems } from "../actionable-problems";
 import type { DeviceManager } from "../device-manager";
 import type { GoveeMqttClient } from "../govee-mqtt-client";
 import type { StateManager } from "../state-manager";
-import { errMessage, logRejected } from "../types";
+import { errText, logRejected } from "../types";
 import * as cloudCreds from "./cloud-creds-handler";
 import * as connectionState from "./connection-state";
 
@@ -49,7 +49,7 @@ export function wireAccountClient(
   client.setVerificationCode(verificationCode);
   client.setOnVerificationConsumed(() => {
     cloudCreds.clearVerificationCodeSetting(adapter).catch(e => {
-      adapter.log.warn(`Could not clear mqttVerificationCode: ${errMessage(e)}`);
+      adapter.log.warn(`Could not clear mqttVerificationCode: ${errText(e)}`);
     });
   });
   client.setOnVerificationFailed(reason => {

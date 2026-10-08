@@ -278,16 +278,6 @@ export const WIZARD_IDLE_TIMEOUT_MS = 5 * 60_000;
  */
 export const STATUS_REQUEST_INTERVAL_MS = 10 * 60 * 1000;
 
-// === Held commands ===
-
-/**
- * How long a command Govee rejected with "Device is offline" is held for
- * delivery at the device's next sign of life. Measured (issue #46): the bulb
- * was back 2 min 4 s after the rejection. Bounded on purpose — a command
- * delivered much later is one nobody asked for any more.
- */
-export const PENDING_INTENT_TTL_MS = 5 * 60 * 1000;
-
 /**
  * Pauses before sending a cloud command again that never reached Govee — the
  * name did not resolve or the connection was refused (issue #51). A temporary

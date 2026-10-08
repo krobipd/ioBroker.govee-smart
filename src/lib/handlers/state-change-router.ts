@@ -6,7 +6,7 @@ import type { GroupFanoutHandler } from "../group-fanout";
 import type { SnapshotHandler } from "../snapshot-handler";
 import type { StateManager } from "../state-manager";
 import { describeError } from "../error-category";
-import { deviceLabel, errMessage, type GoveeDevice } from "../types";
+import { deviceLabel, errText, type GoveeDevice } from "../types";
 import { parseSegmentList } from "../segment-list";
 import { resolveStatesValue } from "../dropdown-labels";
 import { optionLabelsFor } from "../value-labels";
@@ -15,6 +15,7 @@ import * as cloudRetryHandler from "./cloud-retry-handler";
 import type * as connectionState from "./connection-state";
 import * as dropdownReset from "./dropdown-reset-helpers";
 import { sendMusicCommand } from "./music-command";
+import { confirmationFor } from "../confirmation";
 
 /**
  * Adapter surface required by the state-change router. Includes everything
@@ -39,6 +40,36 @@ interface StateChangeRouterOwnAdapter {
 export type StateChangeRouterAdapter = StateChangeRouterOwnAdapter &
   cloudRetryHandler.CloudRetryHandlerAdapter &
   connectionState.ConnectionStateAdapter;
+
+/**
+ * Ack a written datapoint after its command went out — unless a device report
+ * confirms it (GV-13): then the report writes the device's own value with
+ * ack, and until it arrives the user's write stays unconfirmed.
+ *
+ * @param adapter Router surface
+ * @param device Target device
+ * @param id Full state id
+ * @param stateSuffix Datapoint below the device
+ * @param val Value to ack
+ * @returns true when the datapoint was acked here
+ */
+async function ackUnlessReported(
+  adapter: StateChangeRouterAdapter,
+  device: GoveeDevice,
+  id: string,
+  stateSuffix: string,
+  val: ioBroker.StateValue,
+): Promise<boolean> {
+  const channels = {
+    lanListening: adapter.lanClient?.isListening() ?? false,
+    brokerConnected: adapter.mqttClient?.connected ?? false,
+  };
+  if (confirmationFor(device, stateSuffix, channels) === "report") {
+    return false;
+  }
+  await adapter.setState(id, { val, ack: true });
+  return true;
+}
 
 /**
  * Locate a device by the state-tree prefix it owns. Linear scan because the
@@ -342,10 +373,10 @@ export async function handleGenericCapabilityCommand(
       // A dropdown key goes out as the value Govee declared for it (M16).
       const sendValue = declaredOptionValue(device.capabilities, capType, capInstance, val);
       await adapter.deviceManager.sendCapabilityCommand(device, capType, capInstance, sendValue);
-      await adapter.setState(id, { val, ack: true });
+      await ackUnlessReported(adapter, device, id, stateSuffix, val);
     } catch (err) {
       adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
-      adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
+      adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errText(err)}`);
     }
   } else {
     // No STATE_TO_COMMAND entry + no native capabilityType/Instance — nothing
@@ -393,7 +424,10 @@ export async function onStateChange(
   if (localId === "info.manualSyncDevices") {
     if (state.val) {
       adapter.log.info("Manual device sync requested — refreshing the device list from your Govee account");
-      await cloudRetryHandler.syncDevicesManually(adapter);
+      // A button whose work failed stays unconfirmed (GV-13); the run said why.
+      if (!(await cloudRetryHandler.syncDevicesManually(adapter))) {
+        return;
+      }
     }
     await adapter.setState(id, { val: false, ack: true });
     return;
@@ -429,13 +463,12 @@ export async function onStateChange(
   }
   const val = resolved.val;
 
-  // Group fan-out: route commands to each member device. Only ack when the
-  // fan-out actually reached a member — a group with no reachable members (or
-  // where every member send failed) must NOT report success (L3/A6); fanOut
-  // has already warned in that case.
+  // Group fan-out: route commands to each member device. A group has no
+  // report of its own — it is acked only when every member that has to take
+  // the command took it without an error (GV-13); fanOut names the others.
   if (isAppGroup(device) && device.groupMembers) {
-    const reached = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
-    if (reached) {
+    const allTook = await adapter.groupFanout!.fanOut(device, stateSuffix, val);
+    if (allTook) {
       await adapter.setState(id, { val, ack: true });
       await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
     }
@@ -457,7 +490,7 @@ export async function onStateChange(
         // place (F9). Same outcome as every other refused command: no ack,
         // one warn with the reason — not main's "onStateChange crashed".
         adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
-        adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
+        adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errText(err)}`);
         return;
       }
       await dropdownReset.resetRelatedDropdowns(adapter, prefix, "snapshotLocal");
@@ -542,7 +575,7 @@ export async function onStateChange(
   try {
     if (command === "workMode") {
       if (await sendWorkModeCommand(adapter, device, prefix, stateSuffix, val)) {
-        await adapter.setState(id, { val, ack: true });
+        await ackUnlessReported(adapter, device, id, stateSuffix, val);
       }
       return;
     }
@@ -550,7 +583,7 @@ export async function onStateChange(
     if (command === "targetTemperature") {
       const sent = await sendTargetTemperatureCommand(adapter, device, prefix, stateSuffix, val);
       if (sent) {
-        await adapter.setState(id, { val: sent.ack, ack: true });
+        await ackUnlessReported(adapter, device, id, stateSuffix, sent.ack);
       }
       return;
     }
@@ -569,21 +602,25 @@ export async function onStateChange(
       if (!(await sendMusicCommand(adapter, device, prefix, stateSuffix, val))) {
         return;
       }
-      await adapter.setState(id, { val, ack: true });
+      await ackUnlessReported(adapter, device, id, stateSuffix, val);
       await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
       return;
     }
 
     // Ack what went out — the LAN colour temperature is clamped to 2000–9000 K
-    // even where the device declares a wider range (N19).
+    // even where the device declares a wider range (N19). Where the device
+    // reports the value, its report acks it instead (GV-13).
     const sent = await adapter.deviceManager.sendCommand(device, command, val);
-    await adapter.setState(id, {
-      val: command === "colorTemperature" && typeof sent === "number" ? sent : val,
-      ack: true,
-    });
+    await ackUnlessReported(
+      adapter,
+      device,
+      id,
+      stateSuffix,
+      command === "colorTemperature" && typeof sent === "number" ? sent : val,
+    );
     await dropdownReset.resetAfterWrite(adapter, prefix, stateSuffix, val);
   } catch (err) {
     adapter.log.warn(`Command failed for ${deviceLabel(device)}: ${describeError(err)}`);
-    adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errMessage(err)}`);
+    adapter.log.debug(`Command failed for ${deviceLabel(device)} — raw: ${errText(err)}`);
   }
 }

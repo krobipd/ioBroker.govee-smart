@@ -6,16 +6,11 @@
  * (`gen-wiki-render.test.ts`).
  */
 
-import { DEVICE_TYPES, type DeviceEntry, type DeviceType } from "../src/lib/device-catalog";
-
-const STATUS_ICON: Record<DeviceEntry["status"], string> = {
-  verified: "✅",
-  reported: "🟢",
-  seed: "⚪",
-};
+import type { DeviceEntry } from "../src/lib/device-catalog";
+import { renderDeviceSections, type DeviceSectionTexts } from "../src/lib/wiki-device-sections";
 
 /** Every language-dependent string of the page — one object per language. */
-export interface Texts {
+export interface Texts extends DeviceSectionTexts {
   /** Sibling-language link line at top of page */
   langSwitch: string;
   /** Page title */
@@ -34,26 +29,6 @@ export interface Texts {
   tablesHeading: string;
   /** One line under the device-list heading: the types unfold on click. */
   tablesHint: string;
-  /**
-   * Summary line of a type's folded block. Placeholders: `{title}` type title,
-   * `{n}` model count, `{models}` singular/plural word, `{v}`/`{r}`/`{s}` counts
-   * per status (verified / reported / seed).
-   */
-  typeSummary: string;
-  /** "model" — used in the summary when the type has exactly one entry. */
-  modelOne: string;
-  /** "models" — used otherwise. */
-  modelMany: string;
-  /** Type → user-friendly section title; the compiler asks for every catalog type. */
-  typeTitles: Record<DeviceType, string>;
-  /** Table column header: SKU */
-  colSku: string;
-  /** Table column header: Govee model name */
-  colName: string;
-  /** Table column header: status icon */
-  colStatus: string;
-  /** Table column header: first adapter version */
-  colSince: string;
   /** "Your device shows ⚪?" help section heading */
   experimentalHeading: string;
   /** "Your device shows ⚪?" help section body */
@@ -224,44 +199,6 @@ experimental toggle.`,
   entriesWord: "entries",
 };
 
-function escapePipe(s: string): string {
-  return s.replace(/\|/g, "\\|");
-}
-
-function renderTable(entries: Array<[string, DeviceEntry]>, t: Texts): string {
-  const rows: string[] = [];
-  rows.push(`| ${t.colSku} | ${t.colName} | ${t.colStatus} | ${t.colSince} |`);
-  rows.push(`| --- | --- | --- | --- |`);
-  for (const [sku, e] of entries) {
-    const since = e.since ? `v${e.since}` : "—";
-    rows.push(`| \`${sku}\` | ${escapePipe(e.name)} | ${STATUS_ICON[e.status]} | ${since} |`);
-  }
-  return rows.join("\n");
-}
-
-/**
- * One device type as a folded block: the summary carries the title and the
- * per-status counts, the table inside lists every model of the type. With 600
- * entries the flat tables stopped being readable (krobi 2026-09-08, variant A).
- *
- * @param title the type's title in the page language
- * @param list the type's entries, already sorted by SKU
- * @param t the language's texts
- * @returns the block's lines
- */
-function renderTypeSection(title: string, list: Array<[string, DeviceEntry]>, t: Texts): string[] {
-  const count = (status: DeviceEntry["status"]): number => list.filter(([, e]) => e.status === status).length;
-  const summary = t.typeSummary
-    .replace("{title}", title)
-    .replace("{n}", String(list.length))
-    .replace("{models}", list.length === 1 ? t.modelOne : t.modelMany)
-    .replace("{v}", String(count("verified")))
-    .replace("{r}", String(count("reported")))
-    .replace("{s}", String(count("seed")));
-  // GitHub renders Markdown inside <details> only after a blank line.
-  return ["<details>", `<summary>${summary}</summary>`, "", renderTable(list, t), "", "</details>", ""];
-}
-
 /**
  * Render one language's device page.
  *
@@ -270,18 +207,6 @@ function renderTypeSection(title: string, list: Array<[string, DeviceEntry]>, t:
  * @returns the page as Markdown
  */
 export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): string {
-  // Group by type, in the catalog's order (DEVICE_TYPES); validate-devices admits no other type
-  const byType = new Map<DeviceType, Array<[string, DeviceEntry]>>();
-  for (const [sku, entry] of Object.entries(devices)) {
-    if (!byType.has(entry.type)) {
-      byType.set(entry.type, []);
-    }
-    byType.get(entry.type)!.push([sku, entry]);
-  }
-  for (const list of byType.values()) {
-    list.sort((a, b) => a[0].localeCompare(b[0]));
-  }
-
   const out: string[] = [];
   out.push(t.langSwitch);
   out.push("");
@@ -302,15 +227,10 @@ export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): stri
   out.push(t.tablesHint);
   out.push("");
 
-  let totalCount = 0;
-  for (const type of DEVICE_TYPES) {
-    const list = byType.get(type);
-    if (!list || !list.length) {
-      continue;
-    }
-    out.push(...renderTypeSection(t.typeTitles[type], list, t));
-    totalCount += list.length;
-  }
+  // One folded block per type, in the catalog's order (GV-22); validate-devices admits no other type.
+  const sections = renderDeviceSections(devices, t);
+  out.push(...sections.lines);
+  const totalCount = sections.total;
 
   out.push(t.experimentalHeading);
   out.push("");

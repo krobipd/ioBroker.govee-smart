@@ -1,7 +1,7 @@
 import {
   capMatchesControl,
   deviceLabel,
-  errMessage,
+  errText,
   type CapabilityField,
   type CapabilityOption,
   type NamedCapabilityOption,
@@ -2228,7 +2228,7 @@ export function buildCloudStateDefs(
           }
         }
       } catch (e) {
-        log.debug(`${deviceLabel(device)}: speed-config parse failed for scene "${entry.name}": ${errMessage(e)}`);
+        log.debug(`${deviceLabel(device)}: speed-config parse failed for scene "${entry.name}": ${errText(e)}`);
       }
     }
     return max;

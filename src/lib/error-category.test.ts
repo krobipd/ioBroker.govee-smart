@@ -1,4 +1,6 @@
-import { classifyError, describeError, logDedup, type ErrorCategory } from "./error-category";
+import { HttpError } from "./http-client";
+import { LogOnce } from "./log-once";
+import { classifyError, describeError, formatChannelFail, logCallFailure } from "./error-category";
 
 describe("classifyError", () => {
   it("should classify ECONNREFUSED as NETWORK", () => {
@@ -131,50 +133,53 @@ describe("classifyError", () => {
   });
 });
 
-describe("logDedup", () => {
-  function makeMockLog(): {
-    log: ioBroker.Logger;
-    warns: string[];
-    debugs: string[];
-  } {
+describe("logCallFailure — an unreachable Govee is a state, any other failure is said once", () => {
+  function makeMockLog(): { log: ioBroker.Logger; warns: string[]; debugs: string[]; infos: string[] } {
     const warns: string[] = [];
     const debugs: string[] = [];
+    const infos: string[] = [];
     const log: ioBroker.Logger = {
-      info: () => {},
+      info: (m: string) => infos.push(m),
       warn: (m: string) => warns.push(m),
       error: () => {},
       debug: (m: string) => debugs.push(m),
       silly: () => {},
       level: "debug",
     };
-    return { log, warns, debugs };
+    return { log, warns, debugs, infos };
   }
 
-  it("should warn on first error of a category", () => {
+  it("a network or timeout failure goes to debug only — also the first one", () => {
     const { log, warns, debugs } = makeMockLog();
-    const cat = logDedup(log, null, "Cloud", new Error("ECONNREFUSED something"));
-    expect(cat).toBe("NETWORK");
-    expect(warns).toHaveLength(1);
-    expect(warns[0]).toContain("Cloud:");
-    expect(debugs).toHaveLength(0);
+    const once = new LogOnce(log);
+    expect(logCallFailure(once, log, "cloud", new Error("ECONNREFUSED something"), "Cloud: refused")).toBe("NETWORK");
+    expect(
+      logCallFailure(
+        once,
+        log,
+        "cloud",
+        Object.assign(new Error("Timeout after 15000ms"), { code: "ETIMEDOUT" }),
+        "Cloud: timeout",
+      ),
+    ).toBe("TIMEOUT");
+    expect(warns).toEqual([]);
+    expect(debugs).toEqual(["Cloud: refused", "Cloud: timeout"]);
   });
 
-  it("should debug on repeated same category", () => {
+  it("any other failure warns once per key and kind, a repeat goes to debug", () => {
     const { log, warns, debugs } = makeMockLog();
-    const e1 = new Error("ECONNREFUSED first");
-    const e2 = new Error("ECONNREFUSED second");
-    const cat1 = logDedup(log, null, "Cloud", e1);
-    const cat2 = logDedup(log, cat1, "Cloud", e2);
-    expect(cat2).toBe("NETWORK");
-    expect(warns).toHaveLength(1);
-    expect(debugs).toHaveLength(1);
-    expect(debugs[0]).toContain("repeated");
+    const once = new LogOnce(log);
+    logCallFailure(once, log, "cloud", new Error("status 401 unauthorized"), "Cloud: 401");
+    logCallFailure(once, log, "cloud", new Error("status 401 unauthorized"), "Cloud: 401 again");
+    expect(warns).toEqual(["Cloud: 401"]);
+    expect(debugs).toEqual(["Cloud: 401 again"]);
   });
 
-  it("should warn again on category change", () => {
+  it("a new kind on the same key warns again", () => {
     const { log, warns } = makeMockLog();
-    const lastCat: ErrorCategory | null = logDedup(log, null, "Cloud", new Error("ECONNREFUSED"));
-    logDedup(log, lastCat, "Cloud", new Error("status 401 unauthorized"));
+    const once = new LogOnce(log);
+    logCallFailure(once, log, "cloud", new Error("status 401 unauthorized"), "Cloud: 401");
+    logCallFailure(once, log, "cloud", Object.assign(new Error("status 429"), { statusCode: 429 }), "Cloud: 429");
     expect(warns).toHaveLength(2);
   });
 });
@@ -218,6 +223,44 @@ describe("describeError — the text a warning shows (issue #51)", () => {
     );
     expect(describeError(err("EAI_AGAIN", { hostname: "h", attempts: 1 }))).toBe(
       "h could not be resolved — DNS problem on this host?",
+    );
+  });
+});
+
+describe("formatChannelFail (pure formatter)", () => {
+  it("TIMEOUT: uses the enriched http-client message verbatim plus retryHint", () => {
+    const err = Object.assign(
+      new Error("Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/user/devices"),
+      { code: "ETIMEDOUT" },
+    );
+    const out = formatChannelFail("Cloud REST", "TIMEOUT", err, "retrying every 5 min");
+    expect(out).toBe(
+      "Cloud REST: Timeout after 15000ms for POST openapi.api.govee.com/router/api/v1/user/devices — retrying every 5 min",
+    );
+  });
+
+  it("NETWORK: says in words what failed and its probable cause (issue #51)", () => {
+    const err = Object.assign(new Error("getaddrinfo ENOTFOUND openapi.api.govee.com"), {
+      code: "ENOTFOUND",
+      hostname: "openapi.api.govee.com",
+    });
+    const out = formatChannelFail("Cloud REST", "NETWORK", err, "retrying every 5 min", "loading device list");
+    expect(out).toBe(
+      "Cloud REST: openapi.api.govee.com could not be resolved — DNS problem on this host? (loading device list) — retrying every 5 min",
+    );
+  });
+
+  it("RATE_LIMIT: includes HTTP 429 + retry-after hint", () => {
+    const err = new HttpError("Too Many Requests", 429, {}, "");
+    const out = formatChannelFail("Cloud REST", "RATE_LIMIT", err, "retrying in 60 s");
+    expect(out).toBe("Cloud REST: rate-limited by Govee (HTTP 429) — retrying in 60 s");
+  });
+
+  it("UNKNOWN: includes err.message + retryHint", () => {
+    const err = new Error("Govee returned weird payload");
+    const out = formatChannelFail("Cloud REST", "UNKNOWN", err, "retrying every 5 min", "loading device list");
+    expect(out).toBe(
+      "Cloud REST: request failed (loading device list) — Govee returned weird payload — retrying every 5 min",
     );
   });
 });

@@ -497,7 +497,8 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     dgramMock.sockets[0].sendError = new Error("EHOSTUNREACH");
     client.sendPtReal("10.0.0.9", ["AAAA"]);
     expect(hook[0]).toMatchObject({ ip: "10.0.0.9", cmd: "ptReal", error: "EHOSTUNREACH" });
-    expect(warns.some(m => m.includes("LAN ptReal to 10.0.0.9 failed: EHOSTUNREACH"))).toBe(true);
+    // An unreachable lamp is a state, not a line.
+    expect(warns).toEqual([]);
     expect(client.getDiagSnapshot().lastCommandSentMs["10.0.0.9"]).toBeUndefined();
     client.stop();
   });
@@ -512,14 +513,14 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
       "0.0.0.0",
     );
     const sock = dgramMock.sockets[0];
-    sock.sendError = new Error("EHOSTUNREACH");
+    sock.sendError = Object.assign(new Error("send EMSGSIZE 10.0.0.9:4003"), { code: "EMSGSIZE" });
     client.sendPtReal("10.0.0.9", ["AAAA"]);
     client.setPower("10.0.0.9", true);
     client.sendPtReal("10.0.0.9", ["AAAA"]);
     expect(warns).toHaveLength(1);
     sock.sendError = null;
     client.setPower("10.0.0.9", true);
-    sock.sendError = new Error("EHOSTUNREACH");
+    sock.sendError = Object.assign(new Error("send EMSGSIZE 10.0.0.9:4003"), { code: "EMSGSIZE" });
     client.setPower("10.0.0.9", false);
     expect(warns).toHaveLength(2);
     client.stop();

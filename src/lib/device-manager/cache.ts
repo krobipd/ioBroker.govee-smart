@@ -121,6 +121,9 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     segmentCount: plausibleSegmentCount(rest.segmentCount),
     manualSegments: plausibleSegmentIndices(rest.manualSegments),
     snapshotBleCmds: snapshotPacketsFromCache(rest.snapshotBleCmds),
+    pushReports: Array.isArray(rest.pushReports)
+      ? rest.pushReports.filter((k): k is string => typeof k === "string")
+      : undefined,
     state: { online: false },
     // The cache carries the account's capability list, and that list IS what
     // "has a cloud path" means: without it an installation without a single

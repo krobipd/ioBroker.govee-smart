@@ -161,7 +161,7 @@ describe("GroupFanoutHandler", () => {
       expect(commands).toHaveLength(0);
     });
 
-    it("a cloud-only member is sent to even while its (flapping) online flag is false", async () => {
+    it("a cloud-only member is sent to even while its (flapping) online flag is false — a member no channel reaches leaves the group unconfirmed", async () => {
       // Govee's cloud online marker flaps for lights without the local API while
       // control keeps working — the flag alone must not drop the member.
       const cloudOnly = makeMember({
@@ -182,8 +182,8 @@ describe("GroupFanoutHandler", () => {
       ]);
       const { host, commands } = makeHost({ devices: [cloudOnly, noChannel] });
       const handler = new GroupFanoutHandler(host);
-      const reached = await handler.fanOut(group, "control.power", true);
-      expect(reached).toBe(true);
+      const allTook = await handler.fanOut(group, "control.power", true);
+      expect(allTook).toBe(false);
       expect(commands.map(c => c.device)).toEqual(["AA:09"]);
     });
 
@@ -297,7 +297,7 @@ describe("GroupFanoutHandler", () => {
       expect(commands).toEqual([]);
     });
 
-    it("one member that knows the scene is enough", async () => {
+    it("a member that does not know the scene leaves the group unconfirmed — the one that knows it still gets it (GV-13)", async () => {
       const knows = makeMember({ deviceId: "MA:03", scenes: [{ name: "Aurora", value: { x: 2 } }] });
       const not = makeMember({ deviceId: "MA:04", scenes: [{ name: "Boring", value: { x: 1 } }] });
       const group = makeGroup([
@@ -305,7 +305,7 @@ describe("GroupFanoutHandler", () => {
         { sku: not.sku, deviceId: not.deviceId },
       ]);
       const { host, commands } = makeHost({ devices: [knows, not], groupSceneStates: { 0: "---", 1: "Aurora" } });
-      expect(await new GroupFanoutHandler(host).fanOut(group, "scenes.light_scene", "1")).toBe(true);
+      expect(await new GroupFanoutHandler(host).fanOut(group, "scenes.light_scene", "1")).toBe(false);
       expect(commands).toHaveLength(1);
     });
 
@@ -462,16 +462,27 @@ describe("GroupFanoutHandler", () => {
       expect(musicCalls).toHaveLength(2); // both were tried …
     });
 
-    it("one member that took the music command is enough for the ack", async () => {
-      const m1 = makeMember({ deviceId: "MM:01" });
-      const m2 = makeMember({ deviceId: "MM:02" });
+    it("a music member that took nothing leaves the group unconfirmed (GV-13)", async () => {
+      const m1 = makeMember({ deviceId: "MM:01", capabilities: [musicCap(H61E5_MODES)] });
+      const m2 = makeMember({ deviceId: "MM:02", capabilities: [musicCap(H61E5_MODES)] });
       const group = makeGroup([
         { sku: m1.sku, deviceId: m1.deviceId },
         { sku: m2.sku, deviceId: m2.deviceId },
       ]);
       const { host } = makeHost({ devices: [m1, m2], musicResult: d => d.deviceId === "MM:02" });
-      const handler = new GroupFanoutHandler(host);
-      expect(await handler.fanOut(group, "music.music_sensitivity", 80)).toBe(true);
+      expect(await new GroupFanoutHandler(host).fanOut(group, "music.music_sensitivity", 80)).toBe(false);
+    });
+
+    it("a member without music does not count — every music member took the mode, the group is confirmed (krobi 2026-10-08)", async () => {
+      const music = makeMember({ deviceId: "MM:01", capabilities: [musicCap(H61E5_MODES)], musicLibrary: [] });
+      const plain = makeMember({ deviceId: "MM:05", capabilities: [] });
+      const group = makeGroup([
+        { sku: music.sku, deviceId: music.deviceId },
+        { sku: plain.sku, deviceId: plain.deviceId },
+      ]);
+      const { host, musicCalls } = makeHost({ devices: [music, plain], groupMusicStates: { 0: "---", 1: "Spectrum" } });
+      expect(await new GroupFanoutHandler(host).fanOut(group, "music.music_mode", "1")).toBe(true);
+      expect(musicCalls.map(c => c.device)).toEqual(["MM:01"]);
     });
 
     it("ignores music-mode 0 (reset)", async () => {
@@ -539,10 +550,10 @@ describe("fanOut — members a group command did not reach while others took it 
     return { handler: new GroupFanoutHandler(host), group, warns, debugs, failing };
   }
 
-  it("names the member and the reason in words — the group is still confirmed by the one that switched", async () => {
+  it("names the member and the reason in words — the group stays unconfirmed while one member did not switch (GV-13)", async () => {
     const { handler, group, warns, failing } = bench();
     failing.add("AA:02");
-    expect(await handler.fanOut(group, "control.power", true)).toBe(true);
+    expect(await handler.fanOut(group, "control.power", true)).toBe(false);
     expect(warns).toHaveLength(1);
     expect(warns[0]).toContain("Command failed for");
     expect(warns[0]).toContain("Shelf");

@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { deviceLabel, errMessage, type CloudCapability, type CloudScene, type SnapshotPackets } from "./types";
+import { deviceLabel, errText, type CloudCapability, type CloudScene, type SnapshotPackets } from "./types";
 import { cacheKey, treeKey } from "./device-key";
 import { writeFileAtomic } from "./atomic-file";
 
@@ -78,6 +78,8 @@ export interface CachedDeviceData {
   manualMode?: boolean;
   /** Physical indices when manualMode=true; undefined when contiguous. */
   manualSegments?: number[];
+  /** The datapoints the device's own status push has carried (GV-13) — see `GoveeDevice.pushReports`. */
+  pushReports?: string[];
   /**
    * User-selected scene speed level (0-N). Persisted so the adapter
    *  re-applies the same speed after a restart instead of resetting to 0.
@@ -119,7 +121,7 @@ export class SkuCache {
       this.dataAvailable = true;
     } catch (e) {
       this.dataAvailable = false;
-      this.log.warn(`Cache directory not writable (${this.cacheDir}): ${errMessage(e)}`);
+      this.log.warn(`Cache directory not writable (${this.cacheDir}): ${errText(e)}`);
     }
   }
 
@@ -173,7 +175,7 @@ export class SkuCache {
           if (this.lastWritten.get(file) === fingerprint) {
             this.lastWritten.delete(file);
           }
-          this.log.warn(`Cache write failed for ${data.sku}: ${errMessage(e)}`);
+          this.log.warn(`Cache write failed for ${data.sku}: ${errText(e)}`);
         },
       );
     this.inFlight.set(file, current);
@@ -202,7 +204,7 @@ export class SkuCache {
         fs.unlinkSync(legacy);
       }
     } catch (e) {
-      this.log.debug(`Cache: could not remove the old file of ${sku}: ${errMessage(e)}`);
+      this.log.debug(`Cache: could not remove the old file of ${sku}: ${errText(e)}`);
     }
   }
 
@@ -229,7 +231,7 @@ export class SkuCache {
       // The 2.x name could be shared by two devices of one SKU — only this device's data counts.
       return cacheKey(data.sku, data.deviceId) === cacheKey(sku, deviceId) ? data : null;
     } catch (e) {
-      this.log.debug(`Cache loadOne failed for ${sku}: ${errMessage(e)}`);
+      this.log.debug(`Cache loadOne failed for ${sku}: ${errText(e)}`);
       return null;
     }
   }
@@ -353,7 +355,7 @@ export class SkuCache {
         this.log.debug(`Cache: evicted ${label ?? sku} ${deviceId} (removed from Govee account)`);
       }
     } catch (e) {
-      this.log.debug(`Cache evictDevice failed for ${label ?? sku} ${deviceId}: ${errMessage(e)}`);
+      this.log.debug(`Cache evictDevice failed for ${label ?? sku} ${deviceId}: ${errText(e)}`);
     }
   }
 

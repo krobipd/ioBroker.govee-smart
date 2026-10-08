@@ -6,9 +6,9 @@
 // getDeviceList / `message-router.ts`, `diagnostics` command, action "list").
 // It is re-declared here (a type only) so this file needs nothing from the
 // backend at build time; runtime helpers ARE shared from ../src/lib (see the
-// import-free `err-message` module).
+// import-free `err-text` module).
 
-import { errMessage } from "../../src/lib/err-message";
+import { errText } from "../../src/lib/err-text";
 
 /** One device as the backend offers it. */
 export interface DeviceEntry {
@@ -68,7 +68,7 @@ export function makeDeviceListApi(socket: DeviceListSocket, namespace: string): 
       try {
         res = await socket.sendTo(namespace, "diagnostics", { action: "list" });
       } catch (e) {
-        throw new DeviceListError(errMessage(e));
+        throw new DeviceListError(errText(e));
       }
       const devices = (res as { devices?: unknown } | null | undefined)?.devices;
       if (!Array.isArray(devices)) {

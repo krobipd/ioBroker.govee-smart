@@ -19,10 +19,11 @@ import {
   type MqttStatusUpdate,
   type PersistedMqttCredentials,
   type TimerAdapter,
-  errMessage,
+  errText,
   maskSecret,
 } from "./types";
-import { classifyError, logDedup, type ErrorCategory } from "./error-category";
+import { classifyError, logCallFailure, type ErrorCategory } from "./error-category";
+import { LogOnce } from "./log-once";
 
 const LOGIN_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v2/login`;
 const IOT_KEY_URL = `${GOVEE_APP_BASE_URL}/app/v1/account/iot/key`;
@@ -178,6 +179,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private readonly httpsRequestImpl: HttpsRequestFn;
   private readonly mqttConnectImpl: MqttConnectFn;
   private accountTopic = "";
+  /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
+  private readonly logOnce: LogOnce;
   private _bearerToken = "";
   private accountId = "";
   /**
@@ -294,6 +297,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     mqttConnectImpl: MqttConnectFn = mqtt.connect,
   ) {
     super(log, timers);
+    this.logOnce = new LogOnce(log);
     this.email = email;
     this.password = password;
     this.httpsRequestImpl = httpsRequestImpl;
@@ -407,7 +411,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     const payload = JSON.stringify({ msg });
     client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
       if (err) {
-        this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errMessage(err)}`);
+        this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errText(err)}`);
       }
     });
     return true;
@@ -668,7 +672,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   private recordFailure(err: unknown, context: string): boolean {
     const category = classifyError(err);
-    this.lastErrorMessage = errMessage(err);
+    this.lastErrorMessage = errText(err);
     this.lastErrorReason = err instanceof LoginRejectedError ? err.reason : undefined;
     this.lastErrorRetryAt = undefined;
     if (category === "VERIFICATION_PENDING" || category === "VERIFICATION_FAILED") {
@@ -693,14 +697,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         return true;
       }
     }
-    // Error dedup — warn on first/new category, debug on repeat
-    const msg = `${context}: ${this.lastErrorMessage}`;
-    if (category !== this.lastErrorCategory) {
-      this.lastErrorCategory = category;
-      this.log.warn(msg);
-    } else {
-      this.log.debug(msg);
-    }
+    // Said once per kind, repeats on debug; an unreachable Govee (NETWORK/TIMEOUT) is a state, never a line.
+    this.lastErrorCategory = category;
+    logCallFailure(this.logOnce, this.log, "mqtt", err, `${context}: ${this.lastErrorMessage}`);
     return false;
   }
 
@@ -830,7 +829,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       }
       this.onStatus?.(update);
     } catch (e) {
-      this.log.debug(`MQTT: status handler failed: ${errMessage(e)}`);
+      this.log.debug(`MQTT: status handler failed: ${errText(e)}`);
     }
   }
 
@@ -869,7 +868,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     try {
       extracted = this.extractCertsFromP12(creds.p12Cert, creds.p12Pass);
     } catch (e) {
-      this.log.debug(`Persisted P12 cert unusable: ${errMessage(e)} — falling back to fresh login`);
+      this.log.debug(`Persisted P12 cert unusable: ${errText(e)} — falling back to fresh login`);
       return false;
     }
     this._bearerToken = creds.bearerToken;
@@ -913,7 +912,9 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
           this.reconnectAttempts = 0;
           this.authFailCount = 0;
           if (this.lastErrorCategory) {
-            this.log.info(`MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`);
+            // One info line only where a loud line came before; a return from an outage is a state.
+            const restored = `MQTT connection restored: broker=${broker} clientId=${clientId} authMode=${authMode}`;
+            this.logOnce.recovered("mqtt", restored);
             this.lastErrorCategory = null;
           }
           this.lastErrorMessage = null;
@@ -923,7 +924,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         // Subscribe-fail is rare (AWS-IoT policy mismatch, account flagged) but
         // leaves the TCP connection alive — the base forces a close so the
         // close-handler → scheduleReconnect path runs instead of a silent death.
-        msg => this.log.warn(`MQTT subscribe failed: ${msg} — forcing reconnect`),
+        msg => this.logOnce.report("mqtt-subscribe", `MQTT subscribe failed: ${msg} — forcing reconnect`),
       );
     });
     this.client.on("message", (topic, payload) => {
@@ -936,7 +937,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       if (classifyError(err) === "AUTH") {
         this.clientAuthRejected = true;
       }
-      this.lastErrorCategory = logDedup(this.log, this.lastErrorCategory, "MQTT", err);
+      this.lastErrorCategory = logCallFailure(this.logOnce, this.log, "mqtt", err, `MQTT: ${errText(err)}`);
     });
     this.client.on("close", () => {
       this.onConnection?.(false);
@@ -1087,7 +1088,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
           iot = { iotEndpoint: iotResp.data.endpoint, p12Cert: iotResp.data.p12, p12Pass: iotResp.data.p12Pass };
         }
       } catch (e) {
-        this.log.debug(`Silent IoT-key refresh failed: ${errMessage(e)}`);
+        this.log.debug(`Silent IoT-key refresh failed: ${errText(e)}`);
       }
       if (!iot && this.persisted) {
         iot = {
@@ -1108,7 +1109,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       this.scheduleProactiveRefresh(newExpiresAt);
     } catch (e) {
       // Network error / 5xx — the live MQTT session continues.
-      this.log.debug(`Silent bearer refresh failed: ${errMessage(e)} — current session kept, retrying later`);
+      this.log.debug(`Silent bearer refresh failed: ${errText(e)} — current session kept, retrying later`);
       this.armRefresh(MQTT_REFRESH_RETRY_MS);
     } finally {
       this.refreshInFlight = false;

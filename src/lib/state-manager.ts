@@ -8,7 +8,7 @@ import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_DEVICE_TYPE, isAppGroup, PSEUDO_GROUP_SKUS } from "./govee-constants";
 import type { I18nKey } from "./i18n";
 import { tDesc, tName, tNameWith } from "./i18n";
-import { errMessage, type DeviceState, type GoveeDevice } from "./types";
+import { errText, type DeviceState, type GoveeDevice } from "./types";
 import { DeviceIdRegistry, ID_SCHEME } from "./device-id";
 import { idMigrationDepsFor, migrateDeviceIds } from "./device-id-migration";
 
@@ -228,7 +228,7 @@ export class StateManager {
     await this.adapter.setForeignObject(full, existing as ioBroker.SettableObject<ioBroker.StateObject>).catch(e => {
       // The stale keys survive until the next run — the caller's extendObject
       // rewrites the map from the definition before this is reached again.
-      this.adapter.log.debug(`could not rewrite common.states of ${id}: ${errMessage(e)}`);
+      this.adapter.log.debug(`could not rewrite common.states of ${id}: ${errText(e)}`);
     });
   }
 
@@ -360,7 +360,7 @@ export class StateManager {
       });
       return (view?.rows ?? []).map(row => row.id.replace(`${this.adapter.namespace}.`, ""));
     } catch (e) {
-      this.adapter.log.debug(`cannot list states: ${errMessage(e)}`);
+      this.adapter.log.debug(`cannot list states: ${errText(e)}`);
       return [];
     }
   }
@@ -1432,7 +1432,7 @@ export class StateManager {
           endkey: `${this.adapter.namespace}.${folder}.${SORT_KEY_END}`,
         });
       } catch (e) {
-        this.adapter.log.debug(`cleanupDevices: getObjectViewAsync failed for ${folder}: ${errMessage(e)}`);
+        this.adapter.log.debug(`cleanupDevices: getObjectViewAsync failed for ${folder}: ${errText(e)}`);
         continue;
       }
 
@@ -1481,7 +1481,7 @@ export class StateManager {
           endkey: `${stem}${SORT_KEY_END}`,
         });
       } catch (e) {
-        this.adapter.log.debug(`cleanupPseudoGroupOrphansOnce: getObjectViewAsync failed: ${errMessage(e)}`);
+        this.adapter.log.debug(`cleanupPseudoGroupOrphansOnce: getObjectViewAsync failed: ${errText(e)}`);
         continue;
       }
       for (const row of existing?.rows ?? []) {

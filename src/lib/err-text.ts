@@ -1,28 +1,12 @@
+// Fleet master — the release run requires this file byte for byte in every adapter; change it in
+// Entwicklung/.consistency-master, never in an adapter.
 /**
- * One readable line for anything a `catch` receives — never `[object Object]`,
- * never without the reason. Fleet master form (`Entwicklung/CLAUDE_PATTERNS.md`,
- * error-text helper); only the name `errMessage` is this adapter's own.
+ * One readable line for anything a `catch` receives — never `[object Object]`, never without the reason.
  *
- * An Error renders as its message — the stack stays out of warn/error lines,
- * debug paths that want the trace render it themselves — plus, one level deep,
- * the reason in its `cause` (Node's `fetch` rejects every network failure as
- * `fetch failed` with the reason only there). An empty message falls back to
- * the string `code` (`http.get`/`net.connect` reject with an AggregateError
- * whose message is `""`). A thrown plain object is rendered by
- * `JSON.stringify`; a thrown function renders as its type tag, never as its
- * source text. The whole body sits in a `try`: it runs inside a catch block,
- * and a logger that throws there turns a handled failure into an unhandled
- * rejection.
- *
- * This file stays import-free on purpose: the admin component under
- * `src-admin/` imports it too (relative path into `src/lib/`, measured to work
- * with the Module-Federation build), so it lands in both bundles — a
- * dependency here would be dragged into both.
- *
- * @param err Caught value (usually `unknown` in catch blocks)
+ * @param err the caught value
  * @returns the text
  */
-export function errMessage(err: unknown): string {
+export function errText(err: unknown): string {
   // It runs inside a `catch` and must not throw there: any property of a caught value can be a
   // getter that throws, or hold something other than a string.
   try {
@@ -43,7 +27,7 @@ export function errMessage(err: unknown): string {
         reason =
           (typeof causeMessage === "string" ? causeMessage : "") || (typeof causeCode === "string" ? causeCode : "");
       } else if (cause !== undefined && cause !== null) {
-        reason = errMessage(cause);
+        reason = errText(cause);
       }
       // A wrapper that copies its cause's message would say it twice.
       return reason && !text.includes(reason) ? `${text} (${reason})` : text;

@@ -1,5 +1,5 @@
 import { Booking, runBooked } from "./call-booking";
-import { errMessage, type GoveeDevice, type TimerAdapter } from "./types";
+import { errText, type GoveeDevice, type TimerAdapter } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 
@@ -614,7 +614,7 @@ export class RateLimiter {
             await execute();
             resolve();
           } catch (e) {
-            reject(e instanceof Error ? e : new Error(errMessage(e)));
+            reject(e instanceof Error ? e : new Error(errText(e)));
           }
         },
         lane,
@@ -718,7 +718,7 @@ export class RateLimiter {
       // spend(), not two raw increments: this was the second booking site and
       // the only one that did not know about device allowances.
       this.runSpent(call.execute, this.spend(call.lane, call.budget)).catch(err => {
-        this.log.debug(`Queued call failed: ${errMessage(err)}`);
+        this.log.debug(`Queued call failed: ${errText(err)}`);
       });
     }
     if (this.queue.length === 0) {

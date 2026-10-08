@@ -248,14 +248,14 @@ describe("CloudRetryLoop", () => {
       expect(host.timers).toHaveLength(timersBefore);
     });
 
-    it("should log 'Govee Cloud connection restored' on success", async () => {
+    it("logs 'Govee Cloud connection restored' on debug only — an outage is a state, not a line", async () => {
       queueResults(host, { ok: true });
       loop.handleResult({ ok: false, reason: "transient" });
       host.fireLatestTimer();
       await Promise.resolve();
       await Promise.resolve();
-      const info = host.logs.filter(l => l.level === "info");
-      expect(info.some(l => l.msg.includes("restored"))).toBe(true);
+      expect(host.logs.some(l => l.level === "debug" && l.msg.includes("restored"))).toBe(true);
+      expect(host.logs.some(l => l.level !== "debug" && l.msg.includes("restored"))).toBe(false);
     });
 
     it("does not log 'restored' or fire onCloudRestored when disposed mid-load (L13)", async () => {

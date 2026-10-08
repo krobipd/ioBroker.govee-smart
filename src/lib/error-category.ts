@@ -1,5 +1,7 @@
 // The error taxonomy: which kind of failure an error is, and the one dedup rule for logging it.
-import { errMessage } from "./err-message";
+import { errText } from "./err-text";
+import { HttpError } from "./http-client";
+import type { LogOnce } from "./log-once";
 
 /** Error categories for dedup logging */
 export type ErrorCategory =
@@ -74,7 +76,7 @@ export function classifyError(err: unknown): ErrorCategory {
   // Through the same renderer the log uses: a rejected plain object carries its
   // fields here instead of `[object Object]`, so a thrown `{ code: "ECONNRESET" }`
   // reaches the marker test below rather than falling through to UNKNOWN.
-  const msg = errMessage(err);
+  const msg = errText(err);
   if (
     msg.includes("ECONNREFUSED") ||
     msg.includes("ENOTFOUND") ||
@@ -102,36 +104,40 @@ export function classifyError(err: unknown): ErrorCategory {
 }
 
 /**
- * Dedup-aware error logger.
+ * Whether a failure category means the counterpart could not be reached (no answer at all).
  *
- * Compares the new error category against the caller's last category. On
- * change → warn (so the user sees fresh failures). On repeat → debug (so the
- * log doesn't spam). Returns the new category so the caller can update its
- * `lastErrorCategory` member.
- *
- * Caller pattern:
- * ```ts
- * this.lastErrorCategory = logDedup(this.log, this.lastErrorCategory, "Cloud", err);
- * ```
- *
- * @param log Adapter logger
- * @param last Previous category (null on first call)
- * @param context Short prefix (e.g. "Cloud", "MQTT", "App-API")
- * @param err Caught error
- * @returns New category (assign to caller's tracker)
+ * @param category The classified failure, if any
+ * @returns true for TIMEOUT and NETWORK
  */
-export function logDedup(
-  log: ioBroker.Logger,
-  last: ErrorCategory | null,
-  context: string,
+export function isOutage(category: ErrorCategory | null | undefined): boolean {
+  return category === "TIMEOUT" || category === "NETWORK";
+}
+
+/**
+ * Log a failed call to a counterpart. An unreachable counterpart (TIMEOUT, NETWORK) is a state the adapter shows —
+ * `info.connection`, the device's reachability, `info.cloudConnected` — not a line (krobi 2026-10-03, the cloud
+ * included): debug only. Any other failure is said once per key and kind, a repeat goes to debug (fleet master
+ * `log-once.ts`).
+ *
+ * @param once The caller's LogOnce
+ * @param log Adapter logger (for the debug line)
+ * @param key What the failure belongs to — a channel, an endpoint, a device
+ * @param err Caught error
+ * @param line The line to log
+ * @returns The error's category (for the diagnostics report)
+ */
+export function logCallFailure(
+  once: LogOnce,
+  log: Pick<ioBroker.Logger, "debug">,
+  key: string,
   err: unknown,
+  line: string,
 ): ErrorCategory {
   const category = classifyError(err);
-  const msg = errMessage(err);
-  if (category !== last) {
-    log.warn(`${context}: ${msg}`);
+  if (isOutage(category)) {
+    log.debug(line);
   } else {
-    log.debug(`${context}: ${msg} (repeated)`);
+    once.report(key, line, { kind: category });
   }
   return category;
 }
@@ -167,8 +173,54 @@ export function describeError(err: unknown): string {
       text = `the connection to ${host} was cut off`;
       break;
     default:
-      text = errMessage(err);
+      text = errText(err);
   }
   const attempts = e?.attempts;
   return typeof attempts === "number" && attempts > 1 ? `${text} (tried ${attempts} times)` : text;
+}
+
+/**
+ * Pure formatter — exported for tests. Translates an ErrorCategory into a
+ * user-facing line. No I/O, no side-effects. A rejected key never comes here —
+ * the actionable-problems registry names it once with what to do — and the
+ * verification categories belong to the account login, not to a channel call.
+ *
+ * @param channel channel name
+ * @param category classified error category
+ * @param err the original error (used for HttpError statusCode + message)
+ * @param retryHint optional retry hint string
+ * @param context optional rich-context phrase ("while loading device list")
+ */
+export function formatChannelFail(
+  channel: string,
+  category: ErrorCategory,
+  err: unknown,
+  retryHint?: string,
+  context?: string,
+): string {
+  const contextSuffix = context ? ` (${context})` : "";
+  const retrySuffix = retryHint ? ` — ${retryHint}` : "";
+
+  switch (category) {
+    case "TIMEOUT": {
+      // Timeout-Errors carry their own URL+ms in the message (since v2.10.1
+      // http-client.ts:170 enriches the message). Use that directly.
+      const detail = err instanceof Error ? errText(err) : "Timeout";
+      return `${channel}: ${detail}${retrySuffix}`;
+    }
+    case "NETWORK":
+      // In words with the probable cause (issue #51) — "network error (EAI_AGAIN)" named neither.
+      return `${channel}: ${describeError(err)}${contextSuffix}${retrySuffix}`;
+    case "RATE_LIMIT": {
+      const status = err instanceof HttpError ? err.statusCode : null;
+      const statusPart = status ? ` (HTTP ${status})` : "";
+      const hint = retryHint ?? "retrying after Retry-After window";
+      return `${channel}: rate-limited by Govee${statusPart} — ${hint}`;
+    }
+    case "UNKNOWN":
+    default: {
+      const msg = errText(err);
+      return `${channel}: request failed${contextSuffix} — ${msg}${retrySuffix}`;
+    }
+  }
 }

@@ -1,4 +1,4 @@
-import { errMessage } from "../types";
+import { errText } from "../types";
 import { updateConnectionState, type ConnectionStateAdapter } from "./connection-state";
 import * as groupFanoutHandler from "./group-fanout-handler";
 
@@ -45,7 +45,7 @@ export async function runOnlineSyncRound(adapter: OnlineSyncAdapter): Promise<vo
     // markers that were just re-evaluated, so it can never drift away from
     // what the individual devices say.
     await adapter.stateManager.writeDeviceRollup().catch(e => {
-      adapter.log.debug(`Device rollup failed: ${errMessage(e)}`);
+      adapter.log.debug(`Device rollup failed: ${errText(e)}`);
     });
     // info.connection rides on the same round: the evidence of the last
     // device ages out here, and no other event would notice (audit B7 —
@@ -54,6 +54,6 @@ export async function runOnlineSyncRound(adapter: OnlineSyncAdapter): Promise<vo
       updateConnectionState(adapter);
     }
   } catch (e) {
-    adapter.log.debug(`Online sync round failed: ${errMessage(e)}`);
+    adapter.log.debug(`Online sync round failed: ${errText(e)}`);
   }
 }

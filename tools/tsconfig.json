@@ -1,10 +1,11 @@
 // tsconfig for ts-node-executed helper scripts under tools/.
 // TS 6 requires an explicit rootDir when ts-node loads files outside the
-// parent tsconfig's include scope (`src/**`, `test/**`).
+// parent tsconfig's include scope (`src/**`, `test/**`). The tools import the
+// catalog types and the Wiki renderer from src/lib, so the root is the repo.
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
-    "rootDir": "."
+    "rootDir": ".."
   },
   "include": ["./**/*.ts"]
 }

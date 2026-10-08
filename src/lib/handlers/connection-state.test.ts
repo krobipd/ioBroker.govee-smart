@@ -27,7 +27,10 @@ function makeRig(opts: {
   cloudWasConnected?: boolean;
   /** Real calls confirmed a Cloud outage (issue #51). */
   cloudOutage?: boolean;
+  cloudReason?: string;
+  cloudCategory?: string;
   mqttConnected?: boolean | null; // null = no mqtt client
+  mqttCategory?: string;
   openapiConnected?: boolean | null;
   lanScanDone?: boolean;
   statesReady?: boolean;
@@ -68,14 +71,23 @@ function makeRig(opts: {
         pruneOrphans: (live: Set<string>) => prunedWith.push(live),
       }),
     } as never,
-    cloudClient: opts.cloudClient ? ({ getFailureReason: () => "API key rejected" } as never) : null,
+    cloudClient: opts.cloudClient
+      ? ({
+          getFailureReason: () => opts.cloudReason ?? "API key rejected",
+          getFailureCategory: () => opts.cloudCategory ?? "AUTH",
+        } as never)
+      : null,
     cloudWasConnected: opts.cloudWasConnected ?? false,
     cloudOutage: { confirmed: opts.cloudOutage ?? false },
     diagnosticsLastRun: new Map<string, number>(),
     mqttClient:
       opts.mqttConnected === null || opts.mqttConnected === undefined
         ? null
-        : ({ connected: opts.mqttConnected, getFailureReason: () => "login rejected" } as never),
+        : ({
+            connected: opts.mqttConnected,
+            getFailureReason: () => "login rejected",
+            getLastError: () => ({ category: opts.mqttCategory ?? "AUTH", message: "" }),
+          } as never),
     openapiMqttClient:
       opts.openapiConnected === null || opts.openapiConnected === undefined
         ? null
@@ -263,7 +275,7 @@ describe("logDeviceSummary", () => {
     expect(rig.logs.warn.some(m => m.includes("API key rejected"))).toBe(true);
   });
 
-  it("a confirmed Cloud outage shows Cloud REST ✗ with its reason, although the key was accepted (issue #51)", () => {
+  it("a confirmed Cloud outage shows Cloud REST ✗ with its reason on debug — an outage is a state (issue #51)", () => {
     const rig = makeRig({
       devices: [createTestDevice()],
       cloudClient: true,
@@ -273,6 +285,30 @@ describe("logDeviceSummary", () => {
     logDeviceSummary(rig.adapter);
     const ready = rig.logs.info.find(m => m.includes("ready"))!;
     expect(ready).toContain("Cloud REST ✗");
-    expect(rig.logs.warn.some(m => m.startsWith("Cloud REST:"))).toBe(true);
+    expect(rig.logs.warn.filter(m => m.startsWith("Cloud REST:"))).toEqual([]);
+    expect(rig.logs.debug.some(m => m.startsWith("Cloud REST:"))).toBe(true);
+  });
+
+  it("a Cloud never reached at start names its reason on debug, not as a warning", () => {
+    const rig = makeRig({
+      devices: [createTestDevice()],
+      cloudClient: true,
+      cloudReason: "cannot reach Govee servers — will retry",
+      cloudCategory: "NETWORK",
+    });
+    logDeviceSummary(rig.adapter);
+    expect(rig.logs.warn.filter(m => m.startsWith("Cloud REST:"))).toEqual([]);
+    expect(rig.logs.debug).toContain("Cloud REST: cannot reach Govee servers — will retry");
+  });
+
+  it("an unreachable account broker names its reason on debug; a rejected login stays a warning", () => {
+    const down = makeRig({ devices: [createTestDevice()], mqttConnected: false, mqttCategory: "TIMEOUT" });
+    logDeviceSummary(down.adapter);
+    expect(down.logs.warn.filter(m => m.startsWith("Lights Push:"))).toEqual([]);
+    expect(down.logs.debug.some(m => m.startsWith("Lights Push:"))).toBe(true);
+
+    const rejected = makeRig({ devices: [createTestDevice()], mqttConnected: false });
+    logDeviceSummary(rejected.adapter);
+    expect(rejected.logs.warn).toContain("Lights Push: login rejected");
   });
 });

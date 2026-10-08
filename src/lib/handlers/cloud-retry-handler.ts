@@ -159,7 +159,8 @@ export function onCloudContact(adapter: CloudRetryHandlerAdapter, outcome: Cloud
     const now = Date.now();
     if (adapter.cloudOutage.noteUnreachable(now, reason ?? "no answer")) {
       const since = new Date(adapter.cloudOutage.since ?? now).toTimeString().slice(0, 8);
-      adapter.log.warn(
+      // An outage is a state (info.cloudConnected, info.connection), not a line (krobi 2026-10-03, cloud included).
+      adapter.log.debug(
         `Govee Cloud not reachable since ${since} (${adapter.cloudOutage.reason}) — commands over the Cloud fail until it answers again, LAN keeps working`,
       );
       showCloudReachability(adapter);
@@ -168,7 +169,7 @@ export function onCloudContact(adapter: CloudRetryHandlerAdapter, outcome: Cloud
   }
   if (outcome === "ok") {
     if (adapter.cloudOutage.noteAnswer()) {
-      adapter.log.info("Govee Cloud reachable again");
+      adapter.log.debug("Govee Cloud reachable again");
     }
     adapter.actionableProblems.resolve("cloud-auth", "Govee Cloud connected — API key accepted");
     adapter.cloudRetry?.noteKeyAccepted();
@@ -238,17 +239,20 @@ export function markCachedListAccepted(adapter: CloudRetryHandlerAdapter): void 
  * device's daily Cloud budget), and their scene/snapshot data is untouched (the per-device refresh does that).
  *
  * @param adapter Handler host
+ * @returns true when the list came and was reconciled — only then is the button confirmed (GV-13)
  */
-export async function syncDevicesManually(adapter: CloudRetryHandlerAdapter & ConnectionStateAdapter): Promise<void> {
+export async function syncDevicesManually(
+  adapter: CloudRetryHandlerAdapter & ConnectionStateAdapter,
+): Promise<boolean> {
   if (!adapter.deviceManager) {
-    return;
+    return false;
   }
   if (!adapter.cloudClient) {
     // The account device list is a Cloud call — without an API key there is
     // nothing to fetch, and a "failed" warning plus a retry loop that can
     // never succeed would tell the user something false.
     adapter.log.info("Manual device sync needs the Cloud API key (adapter settings) — nothing to sync");
-    return;
+    return false;
   }
   const known = new Set(adapter.deviceManager.getDevices().map(d => sessionKey(d.sku, d.deviceId)));
   const result = await adapter.deviceManager.loadFromCloud();
@@ -257,10 +261,11 @@ export async function syncDevicesManually(adapter: CloudRetryHandlerAdapter & Co
     // ActionableProblems registry, every other failure arms the retry loop —
     // also on a running adapter whose loop counted the list as loaded.
     // Plus one non-deduplicated line — the user explicitly pressed the
-    // button and must see why nothing happened (M4).
-    adapter.log.warn(`Manual device sync failed (${result.reason}) — see earlier log for details`);
+    // button and must see why nothing happened (M4). It names the reason itself:
+    // an unreachable Govee is said on debug only, so "see earlier log" would point at nothing.
+    adapter.log.warn(`Manual device sync failed — ${adapter.cloudClient.getFailureReason() ?? result.reason}`);
     handleCloudFailure(adapter, result);
-    return;
+    return false;
   }
   markCloudListAccepted(adapter);
   // A group added in the app since the start gets its members now (M9).
@@ -277,6 +282,7 @@ export async function syncDevicesManually(adapter: CloudRetryHandlerAdapter & Co
       ? "Manual device sync done — no new device"
       : `Manual device sync done — ${added.length} new: ${added.map(d => deviceLabel(d)).join(", ")}`,
   );
+  return true;
 }
 
 /**

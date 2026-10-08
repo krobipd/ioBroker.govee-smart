@@ -1,8 +1,8 @@
-import { CommandRouter, type HeldIntent, type TransportDecision } from "./command-router";
+import { CommandRouter, type TransportDecision } from "./command-router";
 import type { DeviceRegistry } from "./device-registry";
-import { DiagnosticsCollector, type HeldCommandEntry } from "./diagnostics";
+import { DiagnosticsCollector } from "./diagnostics";
 import { GOVEE_DEVICE_TYPE, isAppGroup, isPseudoGroupSku, APP_GROUP_SKU } from "./govee-constants";
-import { logChannelFail, type ChannelDedupState } from "./log-channel-fail";
+import { LogOnce } from "./log-once";
 import {
   deviceKey as deviceKeyHelper,
   effectiveSegmentCount,
@@ -43,7 +43,6 @@ import {
   LAN_STATUS_REFRESH_MS,
   MAX_RATE_LIMIT_RETRY_MS,
   TRANSIENT_RETRY_MS,
-  PENDING_INTENT_TTL_MS,
   STATUS_REQUEST_INTERVAL_MS,
   clampTimerMs,
 } from "./timing-constants";
@@ -61,10 +60,10 @@ import {
   type MqttStatusUpdate,
   type TimerAdapter,
   deviceLabel,
-  errMessage,
+  errText,
   formatGatewayLabel,
 } from "./types";
-import { classifyError, logDedup, type ErrorCategory } from "./error-category";
+import { classifyError, formatChannelFail, logCallFailure, type ErrorCategory } from "./error-category";
 import { rgbToHex } from "./color";
 import { extractHttpStatus, HttpError } from "./http-client";
 
@@ -110,7 +109,7 @@ function cloudListFailure(err: unknown): Exclude<CloudLoadResult, { ok: true }> 
     };
   }
   if (classifyError(err) === "AUTH") {
-    return { ok: false, reason: "auth-failed", message: errMessage(err) };
+    return { ok: false, reason: "auth-failed", message: errText(err) };
   }
   return { ok: false, reason: "transient" };
 }
@@ -169,17 +168,6 @@ export class DeviceManager {
   private bearerFollowUpsEnabled = false;
   /** Reads main's `unloading` flag — one truth, not a second marker. */
   private readonly isUnloading: () => boolean;
-  /**
-   * Commands Govee refused with "Device is offline", per device and per
-   * command (the newest write wins), waiting for the device's next sign of
-   * life (issue #46, 2.39.0). In memory only: a restart forgets them, the
-   * TTL drops them, a success clears them.
-   */
-  private readonly pendingIntents = new Map<string, Map<string, HeldIntent & { at: number }>>();
-  /** Devices whose held commands are being delivered right now — one flush at a time. */
-  private readonly flushing = new Set<string>();
-  /** The running deliveries, for the tests and the bench. */
-  private readonly intentFlushes = new Set<Promise<void>>();
   private readonly timers: TimerAdapter;
   /**
    * Sends a status request to one device over the account broker (main wires
@@ -191,14 +179,12 @@ export class DeviceManager {
   /** Lowered segment counts that wait for the app's snapshot masks — see mayLowerSegmentCount. */
   private readonly deferredSegmentShrink = new Map<string, number>();
   /**
-   * Dedup state for Cloud REST device-list calls — used by `logChannelFail`
-   * so the user-zentrierte warn message fires once per category and drops
-   * to debug on repeats. Separate from `lastErrorCategory` (which lives in
-   * `logDedup` for group-members + other non-channel errors).
+   * The fleet's log rule (`log-once.ts`) for failed calls: an unreachable Govee is a state, not a line; any other
+   * failure is said once per call kind, a repeat goes to debug (`logCallFailure`).
    */
-  private cloudListDedup: ChannelDedupState = { lastCategory: null };
+  private readonly logOnce: LogOnce;
+  /** The last failure category of each call kind — for the diagnostics report, not for the log. */
   private lastAppApiErrorCategory: ErrorCategory | null = null;
-  /** Dedup tracker for `loadGroupMembers` errors — first warn per category, rest debug. */
   private lastGroupMembersErrorCategory: ErrorCategory | null = null;
 
   // === Account reconcile (auto-remove devices no longer in the Govee account) ===
@@ -308,13 +294,13 @@ export class DeviceManager {
     isUnloading: () => boolean = () => false,
   ) {
     this.log = log;
+    this.logOnce = new LogOnce(log);
     this.timers = timers;
     this.registry = registry;
     this.deviceIds = deviceIds;
     this.isUnloading = isUnloading;
     this.commandRouter = new CommandRouter(log, timers, registry);
     this.diagnostics = new DiagnosticsCollector(registry);
-    this.diagnostics.setHeldCommandsProvider(device => this.getHeldCommandsForReport(device));
     // v2.9.1 — funnel command-router routing decisions into the per-device
     // diag ring buffer. Without this, "I clicked but nothing happened" was
     // not triage-able from diag JSON alone — the channel decision lived
@@ -335,7 +321,6 @@ export class DeviceManager {
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };
-    this.commandRouter.onDeviceOffline = (device, intent) => this.holdIntent(device, intent);
   }
 
   // === Status requests over the account broker (issue #47) ===
@@ -420,183 +405,6 @@ export class DeviceManager {
       }, delayMs);
     }
     return scheduled;
-  }
-
-  // === Held commands (issue #46) ===
-
-  private static intentKey(intent: HeldIntent): string {
-    return intent.kind === "command"
-      ? `command:${intent.command}`
-      : `capability:${intent.capabilityType}/${intent.capabilityInstance}`;
-  }
-
-  /**
-   * Keep a command Govee refused because the device is offline, for the
-   * device's next sign of life. The newest write for the same command wins;
-   * the state is NOT acked here (the rejection propagated to the caller).
-   *
-   * @param device The device Govee reported offline
-   * @param intent What the user wanted
-   */
-  private holdIntent(device: GoveeDevice, intent: HeldIntent): void {
-    const key = limiterDeviceKey(device);
-    let held = this.pendingIntents.get(key);
-    if (!held) {
-      held = new Map();
-      this.pendingIntents.set(key, held);
-    }
-    // A delivery attempt Govee refused again re-holds the SAME intent — it keeps
-    // its original time, or every refusal would restart the TTL and the intent
-    // would never expire (audit M4). Only a new write outside a delivery sets
-    // the clock anew.
-    const intentKey = DeviceManager.intentKey(intent);
-    const existing = held.get(intentKey);
-    const redelivery =
-      existing !== undefined &&
-      this.flushing.has(key) &&
-      JSON.stringify(existing.value) === JSON.stringify(intent.value);
-    held.set(intentKey, { ...intent, at: redelivery ? existing.at : Date.now() });
-    const what = intent.kind === "command" ? intent.command : intent.capabilityInstance;
-    this.diagnostics.addLog(
-      device.deviceId,
-      "debug",
-      `held ${what}=${JSON.stringify(intent.value)} — Govee reports the device offline; delivered at its next sign of life (within ${Math.round(PENDING_INTENT_TTL_MS / 60000)} min)`,
-    );
-  }
-
-  /**
-   * The commands waiting for this device, oldest first — for the tests and
-   * the diagnostics report.
-   *
-   * @param device The device
-   */
-  getPendingIntents(device: GoveeDevice): HeldIntent[] {
-    const held = this.pendingIntents.get(limiterDeviceKey(device));
-    return held ? [...held.values()].map(({ at: _at, ...intent }) => intent) : [];
-  }
-
-  /**
-   * The commands waiting for this device with the time each was held — what
-   * the diagnostics report shows next to the "held" log line.
-   *
-   * @param device The device
-   */
-  private getHeldCommandsForReport(device: GoveeDevice): HeldCommandEntry[] {
-    const held = this.pendingIntents.get(limiterDeviceKey(device));
-    return held
-      ? [...held.values()].map(({ at, ...intent }) => ({ ...intent, heldAt: new Date(at).toISOString() }))
-      : [];
-  }
-
-  /**
-   * The device showed life (its own status push, or a state read that says
-   * online): deliver what waited, ONCE per sign of life. A delivery Govee
-   * refuses again stays held until the next sign or the TTL; a push that
-   * already shows the wanted power is confirmation enough and is not resent.
-   *
-   * @param device The device that came back
-   */
-  private startIntentFlush(device: GoveeDevice): void {
-    const key = limiterDeviceKey(device);
-    const held = this.pendingIntents.get(key);
-    if (!held || held.size === 0 || this.flushing.has(key)) {
-      return;
-    }
-    this.flushing.add(key);
-    const flush: Promise<void> = this.flushIntents(device, key, held)
-      .catch((e: unknown) => {
-        this.log.debug(`Held-command delivery for ${deviceLabel(device)} failed: ${errMessage(e)}`);
-      })
-      .finally(() => {
-        this.flushing.delete(key);
-        this.intentFlushes.delete(flush);
-      });
-    this.intentFlushes.add(flush);
-  }
-
-  private async flushIntents(
-    device: GoveeDevice,
-    key: string,
-    held: Map<string, HeldIntent & { at: number }>,
-  ): Promise<void> {
-    const now = Date.now();
-    let delivered = 0;
-    for (const [intentKey, intent] of [...held]) {
-      if (now - intent.at > PENDING_INTENT_TTL_MS) {
-        held.delete(intentKey);
-        this.diagnostics.addLog(device.deviceId, "debug", `held ${intentKey} dropped — older than the TTL`);
-        continue;
-      }
-      // Already fulfilled — only where the mapping is known: power ↔ onOff. Every
-      // other datapoint is resent; a resend of a value the device already
-      // has is harmless, an invented mapping is not.
-      if (intent.kind === "command" && intent.command === "power" && device.state.power === intent.value) {
-        held.delete(intentKey);
-        delivered++;
-        continue;
-      }
-      try {
-        if (intent.kind === "command") {
-          // Mirror what went out — the LAN colour temperature is clamped on the
-          // way (N19), the held value may lie outside what the light took.
-          const sent = await this.sendCommand(device, intent.command, intent.value);
-          this.mirrorDelivered(device, intent.command, sent ?? intent.value);
-        } else {
-          await this.sendCapabilityCommand(device, intent.capabilityType, intent.capabilityInstance, intent.value);
-        }
-        held.delete(intentKey);
-        delivered++;
-        this.diagnostics.recordCommandResult(device.deviceId, {
-          stateId: intent.kind === "command" ? intent.command : intent.capabilityInstance,
-          value: intent.value,
-          transport: "held → delivered",
-          ok: true,
-        });
-      } catch (e) {
-        // Refused again (or no channel) — the next sign of life tries once more.
-        this.diagnostics.addLog(device.deviceId, "debug", `held ${intentKey} not delivered: ${errMessage(e)}`);
-      }
-    }
-    if (held.size === 0) {
-      this.pendingIntents.delete(key);
-    }
-    if (delivered > 0) {
-      this.log.info(`Delivered ${delivered} held command(s) to ${deviceLabel(device)} after it came back`);
-    }
-  }
-
-  /**
-   * The confirmation path of a direct command, for a delivered one: the four
-   * routed values mirror into their control states as acked (the same path a
-   * device push takes). Everything else is confirmed by the device's own push
-   * or the next state read.
-   *
-   * @param device The device
-   * @param command The routed command
-   * @param value The delivered value
-   */
-  private mirrorDelivered(device: GoveeDevice, command: string, value: unknown): void {
-    const mirror: Partial<DeviceState> = {};
-    if (command === "power" && typeof value === "boolean") {
-      mirror.power = value;
-    } else if (command === "brightness" && typeof value === "number") {
-      mirror.brightness = value;
-    } else if (command === "colorRgb" && typeof value === "string") {
-      mirror.colorRgb = value;
-    } else if (command === "colorTemperature" && typeof value === "number") {
-      mirror.colorTemperature = value;
-    } else {
-      return;
-    }
-    Object.assign(device.state, mirror);
-    this.onDeviceUpdate?.(device, mirror);
-  }
-
-  /** Settles once every running delivery has finished — for the tests. */
-  async whenIntentsSettled(): Promise<void> {
-    while (this.intentFlushes.size > 0) {
-      await Promise.allSettled([...this.intentFlushes]);
-    }
   }
 
   /**
@@ -730,7 +538,7 @@ export class DeviceManager {
           if (track) {
             track.cancelled = true;
           }
-          this.log.debug(`Cloud data call did not run this round: ${errMessage(e)}`);
+          this.log.debug(`Cloud data call did not run this round: ${errText(e)}`);
         }
       },
     };
@@ -755,7 +563,7 @@ export class DeviceManager {
   ): void {
     const job: Promise<void> = this.loadSceneDataFor(device, cd, shared)
       .catch((e: unknown) => {
-        this.log.debug(`Scene load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+        this.log.debug(`Scene load for ${deviceLabel(device)} failed: ${errText(e)}`);
         // The light is saved anyway, unconfirmed — its capability entry has to
         // survive, and the next start asks again (H6: a light missing from the
         // cache is a light the next cache start does not know).
@@ -867,7 +675,7 @@ export class DeviceManager {
     }
     if (!this.lastGroupList?.ok && [...this.devices.values()].some(d => isAppGroup(d))) {
       this.loadGroupMembers().catch((e: unknown) => {
-        this.log.debug(`Group members after the first token failed: ${errMessage(e)}`);
+        this.log.debug(`Group members after the first token failed: ${errText(e)}`);
       });
     }
     for (const key of [...this.librariesAwaitingBearer]) {
@@ -878,7 +686,7 @@ export class DeviceManager {
       }
       const job: Promise<void> = this.loadLibrariesWithBearer(device)
         .catch((e: unknown) => {
-          this.log.debug(`Library load for ${deviceLabel(device)} failed: ${errMessage(e)}`);
+          this.log.debug(`Library load for ${deviceLabel(device)} failed: ${errText(e)}`);
         })
         .finally(() => {
           this.pendingSceneLoads.delete(job);
@@ -1008,7 +816,7 @@ export class DeviceManager {
           this.log.debug(`Cloud device list for the account gap failed (${result.reason})`);
         }
       })
-      .catch((e: unknown) => this.log.debug(`Cloud device list for the account gap failed: ${errMessage(e)}`));
+      .catch((e: unknown) => this.log.debug(`Cloud device list for the account gap failed: ${errText(e)}`));
     return true;
   }
 
@@ -1304,27 +1112,28 @@ export class DeviceManager {
         }
       }
       this.lastErrorCategory = null;
-      this.cloudListDedup.lastCategory = null;
+      this.logOnce.forget("cloud-list");
       return { ok: true };
     } catch (err) {
       const result = cloudListFailure(err);
       if (result.reason === "auth-failed") {
         // Surfaced once, with what to do, by the actionable-problems registry
         // (cloud-retry-handler) — until 3.0.1 the same 401 made three warnings.
-        this.log.debug(`Cloud REST: device list rejected — ${errMessage(err)}`);
+        this.log.debug(`Cloud REST: device list rejected — ${errText(err)}`);
       } else {
-        logChannelFail(this.log, {
-          channel: "Cloud REST",
+        // The hint names the wait that really follows — a 429 waits for
+        // Govee's Retry-After, not the transient 5 minutes.
+        const retryHint =
+          result.reason === "rate-limited"
+            ? `retrying in ${Math.round(result.retryAfterMs / 1000)} s`
+            : `retrying every ${TRANSIENT_RETRY_MS / 60_000} min`;
+        this.lastErrorCategory = logCallFailure(
+          this.logOnce,
+          this.log,
+          "cloud-list",
           err,
-          context: "loading device list",
-          // The hint names the wait that really follows — a 429 waits for
-          // Govee's Retry-After, not the transient 5 minutes.
-          retryHint:
-            result.reason === "rate-limited"
-              ? `retrying in ${Math.round(result.retryAfterMs / 1000)} s`
-              : `retrying every ${TRANSIENT_RETRY_MS / 60_000} min`,
-          dedup: this.cloudListDedup,
-        });
+          formatChannelFail("Cloud REST", classifyError(err), err, retryHint, "loading device list"),
+        );
       }
       return result;
     }
@@ -1384,7 +1193,7 @@ export class DeviceManager {
       const cloudDevices = filterCloudDevicesWithCapabilities(rawCloudDevices);
       this.mergeCloudDevices(cloudDevices);
     } catch (e) {
-      this.log.debug(`refreshSceneDataForDevice: getDevices failed: ${errMessage(e)}`);
+      this.log.debug(`refreshSceneDataForDevice: getDevices failed: ${errText(e)}`);
       // Keep going with stale capabilities — better than aborting the refresh.
     }
 
@@ -1509,6 +1318,7 @@ export class DeviceManager {
       this.runAccountReconcile("group");
       // Reset dedup on success so a future failure warns again.
       this.lastGroupMembersErrorCategory = null;
+      this.logOnce.forget("group-members");
       return changed;
     } catch (e) {
       // A failed group fetch is not authoritative — never reconcile groups on it.
@@ -1523,12 +1333,13 @@ export class DeviceManager {
       }
       // Group-membership is best-effort — but a persistent failure (e.g. API
       // permission revoked) should still surface once so the user knows
-      // groups won't fan-out. logDedup demotes repeats to debug.
-      this.lastGroupMembersErrorCategory = logDedup(
+      // groups won't fan-out; an unreachable Govee is a state, not a line.
+      this.lastGroupMembersErrorCategory = logCallFailure(
+        this.logOnce,
         this.log,
-        this.lastGroupMembersErrorCategory,
-        "Group membership",
+        "group-members",
         e,
+        `Group membership: ${errText(e)}`,
       );
       return false;
     }
@@ -1676,23 +1487,21 @@ export class DeviceManager {
       case "reported":
         return;
       case "seed": {
-        // The device works with or without the toggle — it only turns on catalog
-        // corrections. A seed without any (most of the imported models) has
-        // nothing the toggle could change; telling its owner to switch it on "to
-        // try it" was the same false claim the settings text made (audit M10).
-        const hasQuirks = this.registry.getEntry(upper)?.quirks !== undefined;
-        if (!hasQuirks) {
-          this.log.info(
-            `Device ${label} is in beta and untested — it works as it is; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
-          );
-          return;
-        }
+        // An untested model asks for the experimental toggle and a diagnostics
+        // report, and never claims it runs (GV-25). With the toggle already on,
+        // only the report is left to ask for. Catalog corrections that stay off
+        // without the toggle make the request a warning.
+        const report =
+          "create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed";
         if (this.registry.isSeedAndDormant(upper)) {
-          this.log.warn(
-            `Device ${label} is in beta and needs the "Enable experimental device support" toggle in adapter settings to apply known per-SKU corrections.`,
-          );
+          const msg = `Device ${label} is untested — please turn on "Enable experimental device support" in the adapter settings, ${report}.`;
+          if (this.registry.getEntry(upper)?.quirks !== undefined) {
+            this.log.warn(msg);
+          } else {
+            this.log.info(msg);
+          }
         } else {
-          this.log.info(`Device ${label} is in beta — experimental quirks are active.`);
+          this.log.info(`Device ${label} is untested — experimental device support is on; please ${report}.`);
         }
         return;
       }
@@ -1720,15 +1529,22 @@ export class DeviceManager {
     const state = this.parseMqttStateUpdate(device, update);
     Object.assign(device.state, state);
     this.onDeviceUpdate?.(device, state);
+    this.learnPushReports(
+      device,
+      (
+        [
+          ["control.power", state.power],
+          ["control.brightness", state.brightness],
+          ["control.color_rgb", state.colorRgb],
+          ["control.color_temperature", state.colorTemperature],
+        ] as const
+      )
+        .filter(([, value]) => value !== undefined)
+        .map(([key]) => key),
+    );
     // The device's own state is in the tree again — nothing left unconfirmed (issue #51).
     if (update.state) {
       delete device.unconfirmedSince;
-    }
-    // The device's own voice — outside the LAN guard of parseMqttStateUpdate:
-    // a light sent over the cloud while it is LAN-driven for reachability must
-    // not let its held command expire (issue #46, 2.39.0).
-    if (readDevicePushAt(update, Date.now()) !== undefined && readReportedReachability(update) !== false) {
-      this.startIntentFlush(device);
     }
     if (update.op?.command) {
       this.processMqttSegmentPacket(device, update.op.command);
@@ -1738,6 +1554,9 @@ export class DeviceManager {
       // cloud-event values. Local first: the cloud state read is only the seed
       // at start, the push keeps the datapoints live without a cloud call.
       const pushed = decodeApplianceFrames(device, update.op.command);
+      if (pushed.some(c => c.instance === "workMode")) {
+        this.learnPushReports(device, ["control.work_mode", "control.mode_value"]);
+      }
       if (pushed.length > 0) {
         if (!this.stateTreeReady) {
           // Held, newest wins — released by main.ts after the tree and the seed.
@@ -1756,6 +1575,25 @@ export class DeviceManager {
         }
       }
     }
+  }
+
+  /**
+   * Remember which writable datapoints this device's own status push carries —
+   * per device and field, kept in the device cache so the first command after
+   * a restart is not confirmed by Govee's "success" where the push confirms it
+   * (GV-13). Only ever grows: a field the push carried once is one it carries.
+   *
+   * @param device The pushing device
+   * @param keys Datapoints (or `segments`) this push carried
+   */
+  private learnPushReports(device: GoveeDevice, keys: readonly string[]): void {
+    const known = new Set(device.pushReports ?? []);
+    const fresh = keys.filter(k => !known.has(k));
+    if (fresh.length === 0) {
+      return;
+    }
+    device.pushReports = [...known, ...fresh].sort();
+    this.persistDeviceToCache(device);
   }
 
   /**
@@ -1849,6 +1687,7 @@ export class DeviceManager {
     if (segData.length === 0) {
       return;
     }
+    this.learnPushReports(device, ["segments"]);
     // reduce() rather than Math.max(...spread) so a large segData can never blow
     // the call stack with a huge argument spread (SEC-GC1 defence-in-depth).
     const maxSeen = segData.reduce((m, s) => Math.max(m, s.index), -1) + 1;
@@ -2227,17 +2066,17 @@ export class DeviceManager {
     try {
       entries = await this.apiClient.fetchDeviceList();
     } catch (err) {
-      const category = classifyError(err);
-      const msg = `App API fetch failed: ${errMessage(err)}`;
-      if (category === "AUTH") {
+      if (classifyError(err) === "AUTH") {
         this.bearerRefresher?.();
       }
-      if (category !== this.lastAppApiErrorCategory) {
-        this.lastAppApiErrorCategory = category;
-        this.log.warn(msg);
-      } else {
-        this.log.debug(msg);
-      }
+      // A dropped keep-alive socket (ECONNRESET, "socket hang up") or an unreachable Govee is a state, not a line.
+      this.lastAppApiErrorCategory = logCallFailure(
+        this.logOnce,
+        this.log,
+        "app-api",
+        err,
+        `App API fetch failed: ${errText(err)}`,
+      );
       // The report has to show a failed account-list fetch too. Sensors and
       // appliances get their reachability and their readings from exactly this
       // call — when it fails, the report used to look as if it had never been
@@ -2250,8 +2089,9 @@ export class DeviceManager {
       }
       return 0;
     }
-    // Reset on success so the next failure warns again.
+    // Reset on success so the next failure is said again.
     this.lastAppApiErrorCategory = null;
+    this.logOnce.forget("app-api");
     // Snapshot the App-API list as the second account-membership source. This
     // endpoint (empty-body POST) returns the COMPLETE Govee-Home account list,
     // so it is authoritative for sensors (which never appear in /user/devices).
@@ -2414,14 +2254,14 @@ export class DeviceManager {
           if (unconfirmed) {
             delete device.unconfirmedSince;
             await this.onCloudStateRead?.(device, caps).catch(e =>
-              this.log.debug(`Correcting ${deviceLabel(device)} from its state failed: ${errMessage(e)}`),
+              this.log.debug(`Correcting ${deviceLabel(device)} from its state failed: ${errText(e)}`),
             );
           }
         } catch (e) {
           const status =
             e && typeof e === "object" && "statusCode" in e ? (e as { statusCode?: number }).statusCode : undefined;
           this.diagnostics.recordApiFailure(device.deviceId, "/router/api/v1/device/state", e, status);
-          this.log.debug(`Reachability refresh failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+          this.log.debug(`Reachability refresh failed for ${deviceLabel(device)}: ${errText(e)}`);
         }
       };
       // Priority 3 — below control (0), the regular state load (1) and the
@@ -2462,9 +2302,6 @@ export class DeviceManager {
    */
   private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[]): void {
     cloudMergeHelpers.applyOnlineCap(this.helperHost, device, caps);
-    if (device.state.cloudReportedOnline === true) {
-      this.startIntentFlush(device);
-    }
   }
 
   /**

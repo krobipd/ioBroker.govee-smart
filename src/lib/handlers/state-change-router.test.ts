@@ -11,7 +11,7 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 // The router calls the Cloud-state reload and the manual sync directly — observed here, run in their own suites.
 vi.mock("./cloud-state-loader", () => ({ loadCloudStates: vi.fn(() => Promise.resolve()) }));
-vi.mock("./cloud-retry-handler", () => ({ syncDevicesManually: vi.fn(() => Promise.resolve()) }));
+vi.mock("./cloud-retry-handler", () => ({ syncDevicesManually: vi.fn(() => Promise.resolve(true)) }));
 
 import {
   handleGenericCapabilityCommand,
@@ -146,6 +146,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       },
     } as never,
     lanClient: {
+      // The LAN listener is bound — a LAN light's devStatus answer confirms its four values (GV-13).
+      isListening: () => true,
       setMusicMode: (ip: string, mode: number, includeRgb: boolean, r: number, g: number, b: number) =>
         lanMusic.push({ ip, mode, includeRgb, r, g, b }),
     } as never,
@@ -165,7 +167,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
   vi.mocked(syncDevicesManually).mockReset();
   vi.mocked(syncDevicesManually).mockImplementation(() => {
     syncCalls.push(1);
-    return Promise.resolve();
+    return Promise.resolve(true);
   });
   return {
     adapter,
@@ -570,10 +572,21 @@ describe("onStateChange — early gates", () => {
 });
 
 describe("onStateChange — command dispatch + ack ownership", () => {
-  it("sends the command, then acks with the resolved value", async () => {
+  it("sends the command; a LAN light's power is left to its devStatus report, not acked here (GV-13)", async () => {
     const rig = makeRig([device]);
     await write(rig, id("control.power"), true);
     expect(rig.commands).toEqual([{ device: device.deviceId, command: "power", value: true }]);
+    expect(rig.acks.filter(a => a.id === id("control.power"))).toEqual([]);
+  });
+
+  it("sends the command, then acks with the resolved value where no report confirms it (GV-13)", async () => {
+    const cloudOnly = createTestDevice({
+      lanIp: undefined,
+      lastLanReplyAt: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const rig = makeRig([cloudOnly]);
+    await write(rig, id("control.power"), true);
     expect(rig.acks).toContainEqual({ id: id("control.power"), val: true });
   });
 
@@ -588,8 +601,7 @@ describe("onStateChange — command dispatch + ack ownership", () => {
   it("does NOT ack a command Govee refused because the device is offline — holding it is the device manager's job, not an ack (2.39.0)", async () => {
     const rig = makeRig([device]);
     rig.setSendFailure(
-      () =>
-        new CloudControlRejected("Cloud control rejected for H6160/x/powerSwitch: code=400 — Device is offline.", true),
+      () => new CloudControlRejected("Cloud control rejected for H6160/x/powerSwitch: code=400 — Device is offline."),
     );
     await write(rig, id("control.power"), true);
     expect(rig.acks).toHaveLength(0);
@@ -990,6 +1002,13 @@ describe("onStateChange — manual device sync button (BUG-1)", () => {
     expect(rig.acks).toContainEqual({ id: `${NS}.info.manualSyncDevices`, val: false });
   });
 
+  it("a sync that failed leaves the button unconfirmed (GV-13)", async () => {
+    const rig = makeRig([device]);
+    vi.mocked(syncDevicesManually).mockImplementation(() => Promise.resolve(false));
+    await onStateChange(rig.adapter, `${NS}.info.manualSyncDevices`, { val: true, ack: false } as ioBroker.State);
+    expect(rig.acks.filter(a => a.id === `${NS}.info.manualSyncDevices`)).toEqual([]);
+  });
+
   it("ignores an ack'd echo (no sync)", async () => {
     const rig = makeRig([device]);
     await onStateChange(rig.adapter, `${NS}.info.manualSyncDevices`, { val: true, ack: true } as ioBroker.State);
@@ -1074,9 +1093,10 @@ describe("a mode dropdown sends the value Govee declared, not the text key (audi
 });
 
 describe("the datapoint confirms what went out, not what was written (audit N19)", () => {
-  it("a colour temperature the LAN clamps is acked with the clamped value", async () => {
+  it("a colour temperature the LAN clamps is acked with the clamped value (LAN listener down: no devStatus confirms it)", async () => {
     const dev = createTestDevice({ lanIp: "192.168.1.42" });
     const rig = makeRig([dev]);
+    (rig.adapter.lanClient as unknown as { isListening: () => boolean }).isListening = () => false;
     await onStateChange(rig.adapter, `govee-smart.0.${PREFIX}.control.color_temperature`, {
       val: 1500,
       ack: false,

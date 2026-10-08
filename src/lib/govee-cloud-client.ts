@@ -2,31 +2,17 @@ import { formatFallback, httpsRequest, HttpError, type HttpsRequestFn } from "./
 
 /**
  * Govee accepted the request but refused the command (payload-level `code` or
- * a per-capability `failure`). `deviceOffline` names the one refusal the
- * adapter acts on: the device is not talking to Govee right now — the command
- * is held for the device's next sign of life (issue #46, 2.39.0).
+ * a per-capability `failure`). Govee received it, so it is never sent again
+ * (GV-15) — a "device offline" refusal included.
  */
 export class CloudControlRejected extends Error {
   /**
    * @param message The rejection line (sku/device/instance, code, reason)
-   * @param deviceOffline Whether Govee's reason says the device was offline
    */
-  constructor(
-    message: string,
-    public readonly deviceOffline: boolean,
-  ) {
+  constructor(message: string) {
     super(message);
     this.name = "CloudControlRejected";
   }
-}
-
-/**
- * Whether a rejection reason says the device was offline — a whole word, never a substring.
- *
- * @param reason Govee's `msg` / `errorMsg`
- */
-function reasonSaysOffline(reason: unknown): boolean {
-  return typeof reason === "string" && /\boffline\b/i.test(reason);
 }
 
 /**
@@ -94,7 +80,7 @@ export function readRateLimitHeaders(
   };
 }
 import {
-  errMessage,
+  errText,
   type CapabilityOption,
   type CloudDevice,
   type CloudDeviceListResponse,
@@ -279,6 +265,13 @@ export class GoveeCloudClient {
   }
 
   /**
+   * Category of the last failed call, or null while the last call was answered.
+   */
+  getFailureCategory(): ErrorCategory | null {
+    return this.lastErrorCategory;
+  }
+
+  /**
    * Register a hook called after every successful Cloud API response.
    * Used to populate the DiagnosticsCollector ring buffer.
    *
@@ -432,7 +425,6 @@ export class GoveeCloudClient {
     if (resp && typeof resp.code === "number" && resp.code !== 200 && resp.code !== 0) {
       throw new CloudControlRejected(
         `Cloud control rejected for ${sku}/${device}/${instance}: code=${resp.code}${reason ? ` — ${reason}` : ""}`,
-        reasonSaysOffline(reason),
       );
     }
     // A rejection can arrive with a 200 envelope while the per-capability state
@@ -442,7 +434,6 @@ export class GoveeCloudClient {
     if (capState?.status === "failure" || typeof capState?.errorCode === "number") {
       throw new CloudControlRejected(
         `Cloud control rejected for ${sku}/${device}/${instance}: code=${capState.errorCode ?? "?"}${reason ? ` — ${reason}` : ""}`,
-        reasonSaysOffline(reason),
       );
     }
   }
@@ -590,7 +581,7 @@ export class GoveeCloudClient {
       if (err instanceof HttpError && (err.statusCode === 401 || err.statusCode === 403)) {
         this.reportContact("auth-failed");
       } else if (isUnreachable(err, this.lastErrorCategory)) {
-        this.reportContact("unreachable", errMessage(err));
+        this.reportContact("unreachable", errText(err));
       }
       throw err;
     }
@@ -606,7 +597,7 @@ export class GoveeCloudClient {
     try {
       this.onContact?.(outcome, reason);
     } catch (e) {
-      this.log.debug(`Cloud contact hook failed: ${errMessage(e)}`);
+      this.log.debug(`Cloud contact hook failed: ${errText(e)}`);
     }
   }
 }

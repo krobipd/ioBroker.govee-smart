@@ -939,27 +939,6 @@ describe("DiagnosticsCollector", () => {
       expect(dev.accountMissCount).toBe(0);
     });
 
-    it("lists the commands held for the device's next sign of life", async () => {
-      const c = new DiagnosticsCollector(registry);
-      c.setHeldCommandsProvider(d =>
-        d.deviceId === "dev1"
-          ? [{ kind: "command", command: "power", value: true, heldAt: "2026-09-17T13:13:32.980Z" }]
-          : [],
-      );
-      expect((await c.generate(makeDevice({ deviceId: "dev1" }), "2.39.1")).heldCommands).toEqual([
-        { kind: "command", command: "power", value: true, heldAt: "2026-09-17T13:13:32.980Z" },
-      ]);
-      expect((await c.generate(makeDevice({ deviceId: "dev2" }), "2.39.1")).heldCommands).toEqual([]);
-    });
-
-    it("a failing held-command reader costs the section, not the report", async () => {
-      const c = new DiagnosticsCollector(registry);
-      c.setHeldCommandsProvider(() => {
-        throw new Error("boom");
-      });
-      expect((await c.generate(makeDevice(), "2.39.1")).heldCommands).toEqual([]);
-    });
-
     it("carries the adapter's start time in the environment", async () => {
       const c = new DiagnosticsCollector(registry);
       c.setEnvironmentProvider(() => ({ startedAt: "2026-09-22T17:07:30.000Z" }));

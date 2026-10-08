@@ -1,6 +1,6 @@
 import * as dgram from "node:dgram";
 import * as os from "node:os";
-import { errMessage, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
+import { errText, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
 import { clampByte } from "./color";
 import {
   buildScenePackets,
@@ -12,6 +12,8 @@ import {
   clampByte0_100,
 } from "./ble-frame";
 import { FORCE_COLOR_MODE_SETTLE_MS } from "./timing-constants";
+import { logCallFailure } from "./error-category";
+import { LogOnce } from "./log-once";
 import { SEGMENT_COUNT_MAX } from "./device-manager/lookups";
 
 const MULTICAST_ADDR = "239.255.255.250";
@@ -63,8 +65,8 @@ export class GoveeLanClient {
    * fire into a half-torn-down adapter.
    */
   private sendSocket: dgram.Socket | null = null;
-  /** The last send failure per address — warned once, repeats on debug until a send succeeds. */
-  private readonly failedSends = new Map<string, string>();
+  /** Send failures per address — said once per kind, repeats on debug until a send succeeds. */
+  private readonly logOnce: LogOnce;
   private scanTimer: ioBroker.Interval | undefined = undefined;
   /**
    * True after `stop()` was called — bind-callbacks check this flag before
@@ -127,6 +129,7 @@ export class GoveeLanClient {
   constructor(log: ioBroker.Logger, timers: TimerAdapter) {
     this.log = log;
     this.timers = timers;
+    this.logOnce = new LogOnce(log);
   }
 
   /**
@@ -153,7 +156,7 @@ export class GoveeLanClient {
    * @param bindAddr The pinned interface IP, if any
    */
   private reportSocketError(kind: string, err: Error, bindAddr: string | undefined): void {
-    const msg = `LAN ${kind} socket error: ${errMessage(err)}`;
+    const msg = `LAN ${kind} socket error: ${errText(err)}`;
     if (this.socketErrorWarned) {
       this.log.debug(msg);
     } else {
@@ -162,7 +165,7 @@ export class GoveeLanClient {
     }
     if (bindAddr) {
       this.onInterfaceError?.(
-        `LAN ${kind} socket failed on the selected network interface ${bindAddr} (${errMessage(err)}) — check the Network Interface setting; the selected IP may no longer exist`,
+        `LAN ${kind} socket failed on the selected network interface ${bindAddr} (${errText(err)}) — check the Network Interface setting; the selected IP may no longer exist`,
       );
     }
   }
@@ -399,20 +402,14 @@ export class GoveeLanClient {
     }
     this.sendSocket.send(buf, 0, buf.length, COMMAND_PORT, ip, err => {
       if (err) {
-        // One send path, one rule (audit DRY-9): the first failure towards an
-        // address warns — a scene or snapshot that "did nothing" has a reason in
-        // the log —, a repeat of the same failure stays on debug until a send
-        // to that address succeeds again (an unplugged lamp is a state, not a
-        // line per command).
-        if (this.failedSends.get(ip) !== err.message) {
-          this.failedSends.set(ip, err.message);
-          this.log.warn(`LAN ${cmd} to ${ip} failed: ${err.message}`);
-        } else {
-          this.log.debug(`LAN ${cmd} to ${ip} failed again: ${err.message}`);
-        }
+        // One send path, one rule (audit DRY-9): an unreachable lamp is a state,
+        // not a line (krobi 2026-10-03), so a network failure stays on debug; any
+        // other failure towards an address warns once per kind until a send to
+        // it succeeds again.
+        logCallFailure(this.logOnce, this.log, `send:${ip}`, err, `LAN ${cmd} to ${ip} failed: ${err.message}`);
         this.onSend?.(ip, cmd, data, buf.length, err.message);
       } else {
-        this.failedSends.delete(ip);
+        this.logOnce.forget(`send:${ip}`);
         this.log.debug(`LAN ${cmd} sent to ${ip}: ${buf.length} bytes`);
         this.lastCommandSentMs.set(ip, Date.now());
         this.onSend?.(ip, cmd, data, buf.length);
@@ -723,7 +720,7 @@ export class GoveeLanClient {
         this.handleStatusResponse(payload, sourceIp);
       }
     } catch (e) {
-      this.log.debug(`LAN: ${cmd} handler failed for ${sourceIp}: ${errMessage(e)}`);
+      this.log.debug(`LAN: ${cmd} handler failed for ${sourceIp}: ${errText(e)}`);
     }
   }
 

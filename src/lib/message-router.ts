@@ -1,4 +1,4 @@
-import { errMessage } from "./types";
+import { errText } from "./types";
 import { type ErrorCategory } from "./error-category";
 import { accountEmail, hasAccountCredentials } from "./account-credentials";
 import type { GoveeMqttClient, LoginVerdict } from "./govee-mqtt-client";
@@ -129,8 +129,8 @@ export class MessageRouter {
       return;
     }
     this.handleMessage(obj).catch(e => {
-      this.host.log.warn(`onMessage handler crashed for ${obj.command}: ${errMessage(e)}`);
-      this.host.sendResponse(obj, { error: errMessage(e) });
+      this.host.log.warn(`onMessage handler crashed for ${obj.command}: ${errText(e)}`);
+      this.host.sendResponse(obj, { error: errText(e) });
     });
   }
 
@@ -180,8 +180,8 @@ export class MessageRouter {
       this.host.log.debug(`onMessage: unknown command '${obj.command}'`);
       this.host.sendResponse(obj, { error: `Unknown command '${obj.command}'` });
     } catch (e) {
-      this.host.log.warn(`onMessage failed for ${obj.command}: ${errMessage(e)}`);
-      this.host.sendResponse(obj, { error: errMessage(e) });
+      this.host.log.warn(`onMessage failed for ${obj.command}: ${errText(e)}`);
+      this.host.sendResponse(obj, { error: errText(e) });
     }
   }
 
@@ -261,7 +261,7 @@ export class MessageRouter {
       } catch (e) {
         // Safety net for unexpected synchronous throws only — the regular
         // failure paths never reject (see above).
-        return { status: "loginFailed", reason: errMessage(e) };
+        return { status: "loginFailed", reason: errText(e) };
       } finally {
         // Dispose on every path — success, timeout, and error — so the probe's
         // MQTT socket + reconnect timer never leak (the old code disconnected
@@ -283,7 +283,7 @@ export class MessageRouter {
         await probe.requestVerificationCode();
         return { status: "codeSent" };
       } catch (e) {
-        return { status: "codeRejected", reason: errMessage(e) };
+        return { status: "codeRejected", reason: errText(e) };
       }
     }
     return { status: "unknownAction" };

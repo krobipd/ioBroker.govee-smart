@@ -495,7 +495,7 @@ describe("GoveeCloudClient", () => {
   });
 
   describe("controlDevice — the rejection names whether the device was offline (2.39.0, issue #46)", () => {
-    it("'Device is offline' is a CloudControlRejected with deviceOffline=true", async () => {
+    it("'Device is offline' is a CloudControlRejected", async () => {
       const fake = makeFakeHttps(() => ({
         requestId: "ctrl_1",
         msg: "Device is offline. Please check the Wi-Fi connection.",
@@ -515,13 +515,12 @@ describe("GoveeCloudClient", () => {
         .controlDevice("H600D", "AA:BB", "devices.capabilities.on_off", "powerSwitch", 1)
         .catch(e => e);
       expect(err).toBeInstanceOf(CloudControlRejected);
-      expect((err as CloudControlRejected).deviceOffline).toBe(true);
       expect(String((err as Error).message)).toContain("Device is offline");
     });
 
-    it("a 200 envelope whose capability state failed carries the offline flag as well", async () => {
+    it("a 200 envelope whose capability state failed is a rejection as well", async () => {
       // Govee answers 200 while the per-capability state says failure — the
-      // second throw. Its flag decides whether the command is held (#46).
+      // second throw.
       const fake = makeFakeHttps(() => ({
         requestId: "ctrl_3",
         msg: "Device is offline. Please check the Wi-Fi connection.",
@@ -537,17 +536,15 @@ describe("GoveeCloudClient", () => {
         .controlDevice("H600D", "AA:BB", "devices.capabilities.on_off", "powerSwitch", 1)
         .catch(e => e);
       expect(err).toBeInstanceOf(CloudControlRejected);
-      expect((err as CloudControlRejected).deviceOffline).toBe(true);
     });
 
-    it("any other rejection is a CloudControlRejected with deviceOffline=false", async () => {
+    it("any other rejection is a CloudControlRejected too", async () => {
       const fake = makeFakeHttps(() => ({ requestId: "ctrl_2", msg: "Invalid parameter type", code: 400 }));
       const client = new GoveeCloudClient("test-api-key", mockLog, fake.fn);
       const err = await client
         .controlDevice("H7127", "AA:BB", "devices.capabilities.work_mode", "workMode", 1)
         .catch(e => e);
       expect(err).toBeInstanceOf(CloudControlRejected);
-      expect((err as CloudControlRejected).deviceOffline).toBe(false);
     });
   });
 

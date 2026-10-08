@@ -3,7 +3,7 @@
 import { copyDeviceTree, movedId, type DeviceMoveDeps } from "./device-move";
 import { ID_SCHEME, idPiece, type DeviceIdRegistry } from "./device-id";
 import { isPseudoGroupSku } from "./govee-constants";
-import { errMessage } from "./err-message";
+import { errText } from "./err-text";
 import { moveAllWithEnums } from "./enum-carry";
 import type * as utils from "@iobroker/adapter-core";
 
@@ -155,7 +155,7 @@ export async function migrateDeviceIds(deps: IdMigrationDeps, registry: DeviceId
       // recordings of what already stood there.
       registry.keepUnmoved(tree.sku, tree.deviceId, tree.rel);
       deps.log.warn(
-        `Device "${tree.label}": could not move ${tree.rel} to ${target} — ${errMessage(e)}; it stays under its old id and is moved at the next start`,
+        `Device "${tree.label}": could not move ${tree.rel} to ${target} — ${errText(e)}; it stays under its old id and is moved at the next start`,
       );
     }
   }
@@ -258,7 +258,7 @@ async function removeCarryingEnums(
         await adapter.delForeignObjectAsync(id);
       }
     },
-    errMessage,
+    errText,
   );
   return carried.reduce((n, c) => n + c.newIds.length, 0);
 }

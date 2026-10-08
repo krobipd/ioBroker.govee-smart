@@ -1,4 +1,4 @@
-import { errMessage, type CloudLoadResult } from "./types";
+import { errText, type CloudLoadResult } from "./types";
 import { MAX_RATE_LIMIT_RETRY_MS, MIN_RATE_LIMIT_RETRY_MS, TRANSIENT_RETRY_MS, clampTimerMs } from "./timing-constants";
 
 /**
@@ -150,7 +150,7 @@ export class CloudRetryLoop {
     }
     this.retryTimer = this.host.setTimeout(() => {
       this.retryTimer = undefined;
-      this.runAttempt().catch(e => this.host.log.debug(`Cloud retry failed: ${errMessage(e)}`));
+      this.runAttempt().catch(e => this.host.log.debug(`Cloud retry failed: ${errText(e)}`));
     }, delayMs);
   }
 
@@ -167,7 +167,8 @@ export class CloudRetryLoop {
     }
     if (result.ok) {
       this.connected = true;
-      this.host.log.info("Govee Cloud connection restored");
+      // The Cloud coming back is a state (info.cloudConnected), not a line (krobi 2026-10-03, cloud included).
+      this.host.log.debug("Govee Cloud connection restored");
       await this.host.onCloudRestored();
     } else {
       this.handleResult(result);

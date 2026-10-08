@@ -1,4 +1,4 @@
-import { deviceLabel, errMessage, type GoveeDevice } from "./types";
+import { deviceLabel, errText, type GoveeDevice } from "./types";
 import { sessionKey } from "./device-key";
 import { describeError } from "./error-category";
 import { memberMusicModes, musicNameKey } from "./capability-mapper";
@@ -101,13 +101,18 @@ export class GroupFanoutHandler {
       return true;
     }
     const devices = this.host.getDevices();
+    // Who has to take the command for the group to be confirmed: every member —
+    // for a music mode every member that has music at all (krobi 2026-10-08:
+    // a member without music would leave the group unconfirmed forever).
+    const all = this.resolveMembers(group, devices);
+    const counted = command === "music" ? all.filter(d => memberMusicModes(d).length > 0) : all;
     // A member gets the command when a channel can carry it. For LAN lights the
     // online flag is trustworthy (LAN-reply TTL) and an offline one is skipped.
     // A cloud-only member (no local API) is always attempted: Govee's cloud
     // online marker is known to flap while control keeps working, and a real
     // Cloud rejection surfaces as a failed send below anyway — silently
     // dropping the member on the flag alone left half the group dark.
-    const members = this.resolveMembers(group, devices).filter(d => d.state.online || (d.channels.cloud && !d.lanIp));
+    const members = all.filter(d => d.state.online || (d.channels.cloud && !d.lanIp));
     if (members.length === 0) {
       // Used to return silently while the caller acked "success" (L3/A6). Signal
       // failure so the caller withholds the ack, and warn once so the user knows.
@@ -115,12 +120,24 @@ export class GroupFanoutHandler {
       return false;
     }
     let succeeded = 0;
-    const failed: Array<{ member: GoveeDevice; reason: string }> = [];
+    // A group has no report of its own: it is confirmed only when every member
+    // that has to take the command took it without an error (GV-13). A skipped
+    // member counts against it like a failed one.
+    const failed: Array<{ member: GoveeDevice; reason: string }> = counted
+      .filter(d => !members.includes(d))
+      .map(member => ({ member, reason: "not reachable over LAN" }));
+    // What a member outside `counted` did not take is no failure of the group.
+    const fail = (member: GoveeDevice, reason: string): void => {
+      if (counted.includes(member)) {
+        failed.push({ member, reason });
+      }
+    };
     for (const member of members) {
       try {
         if (command === "lightScene") {
           // Same rule as music: a member without the scene took nothing (C10).
           if (!(await this.fanOutScene(group, member, value))) {
+            fail(member, "does not know this scene");
             continue;
           }
         } else if (command === "music") {
@@ -128,6 +145,7 @@ export class GroupFanoutHandler {
           // the answer was ignored and a group of LAN lights acked a
           // sensitivity write no member could apply.
           if (!(await this.fanOutMusic(group, member, stateSuffix, value))) {
+            fail(member, "took no music command");
             continue;
           }
         } else {
@@ -136,17 +154,18 @@ export class GroupFanoutHandler {
         succeeded += 1;
         this.warnedMembers.delete(`${group.deviceId}:${member.deviceId}`); // took it → re-arm its warning
       } catch (err) {
-        this.host.log.debug(`Group fan-out to ${deviceLabel(member)}: ${errMessage(err)}`);
-        failed.push({ member, reason: describeError(err) });
+        this.host.log.debug(`Group fan-out to ${deviceLabel(member)}: ${errText(err)}`);
+        fail(member, describeError(err));
       }
     }
     if (succeeded === 0) {
-      this.warnGroupOnce(group, `all ${members.length} member command(s) failed — command not sent`);
+      this.warnGroupOnce(group, `all ${counted.length} member command(s) failed — command not sent`);
       return false;
     }
     this.warnedGroups.delete(group.deviceId); // recovered → re-arm the warn-once
     if (failed.length > 0) {
       this.reportFailedMembers(group, failed);
+      return false;
     }
     return true;
   }
@@ -156,8 +175,8 @@ export class GroupFanoutHandler {
 
   /**
    * One line for the members a group command did not reach while others took it
-   * (issue #51): the group's datapoint is confirmed by the members that switched,
-   * and until now the ones that did not stood in the debug log only. Warn while a
+   * (issue #51): the group's datapoint stays unconfirmed (GV-13), and until 3.1.1
+   * the members that did not switch stood in the debug log only. Warn while a
    * member in it is new to the warning, debug when all were named before — a
    * script writing to the group would otherwise repeat the line.
    *

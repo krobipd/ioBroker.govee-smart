@@ -1,4 +1,4 @@
-import { errMessage } from "./types";
+import { errText } from "./types";
 import type { DeviceEntry, DeviceQuirks, DevicesFile, DeviceStatus } from "./device-catalog";
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -75,7 +75,7 @@ export class DeviceRegistry {
     try {
       raw = fs.readFileSync(filePath, "utf-8");
     } catch (err) {
-      this.log?.warn(`device-registry: cannot read ${filePath}: ${errMessage(err)}`);
+      this.log?.warn(`device-registry: cannot read ${filePath}: ${errText(err)}`);
       return;
     }
 
@@ -83,7 +83,7 @@ export class DeviceRegistry {
     try {
       parsed = JSON.parse(raw) as DevicesFile;
     } catch (err) {
-      this.log?.warn(`device-registry: invalid JSON in ${filePath}: ${errMessage(err)}`);
+      this.log?.warn(`device-registry: invalid JSON in ${filePath}: ${errText(err)}`);
       return;
     }
 

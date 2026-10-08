@@ -7,7 +7,7 @@ import type { StateManager } from "../state-manager";
 import { resolveSegmentCount, type MqttSegmentData } from "../device-manager/lookups";
 import {
   deviceLabel,
-  errMessage,
+  errText,
   logRejected,
   type DeviceState,
   type DeviceStateChanges,
@@ -132,7 +132,7 @@ export function onLanDeviceReady<T extends DeviceEventsAdapter & connectionState
       await sm.createLanStates(device);
     })
     .catch(e => {
-      adapter.log.error(`onLanDeviceReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+      adapter.log.error(`onLanDeviceReady failed for ${deviceLabel(device)}: ${errText(e)}`);
     });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);
@@ -200,7 +200,7 @@ export function onCloudDataReady<T extends DeviceEventsAdapter & connectionState
       await sm.updateDeviceTier(device, adapter.deviceRegistry.getTier(device.sku));
     })
     .catch(e => {
-      adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errMessage(e)}`);
+      adapter.log.error(`onCloudDataReady failed for ${deviceLabel(device)}: ${errText(e)}`);
     });
   trackStateCreation(adapter, p);
   connectionState.updateConnectionState(adapter);

@@ -3458,8 +3458,8 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
 });
 
 // ===========================================================================
-describe("scenario issue #46 — a command Govee refused as 'device offline' is delivered when the bulb pushes again", () => {
-  it("no ack at the refusal, one warn; the bulb's own push delivers the command and control.power ends acked", async () => {
+describe("scenario issue #46 — a command Govee refused as 'device offline' is not sent again (GV-15)", () => {
+  it("no ack at the refusal, one warn; the bulb's own push later sends nothing and acks nothing", async () => {
     const { adapter, f } = await setupReady({
       apiKey: "12345678-1234-1234-1234-123456789abc",
       goveeEmail: "a@b.c",
@@ -3497,10 +3497,7 @@ describe("scenario issue #46 — a command Govee refused as 'device offline' is 
       if (refusals > 0) {
         refusals--;
         return Promise.reject(
-          new CloudControlRejected(
-            "Cloud control rejected for H600D/x/powerSwitch: code=400 — Device is offline.",
-            true,
-          ),
+          new CloudControlRejected("Cloud control rejected for H600D/x/powerSwitch: code=400 — Device is offline."),
         );
       }
       controls.push(args);
@@ -3522,12 +3519,12 @@ describe("scenario issue #46 — a command Govee refused as 'device offline' is 
       transaction: `x_${Date.now()}008`,
       state: { onOff: 0 },
     });
-    await (i.deviceManager as unknown as { whenIntentsSettled: () => Promise<void> }).whenIntentsSettled();
     await settle();
 
-    expect(controls).toHaveLength(1);
-    expect(i.states.get(`${prefix}.control.power`)).toEqual({ val: true, ack: true });
-    expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Delivered 1 held command"));
+    // Govee received the refused call — a second send would be an extra call,
+    // minutes late (GV-15). The push mirrors the bulb's own state, still off.
+    expect(controls).toHaveLength(0);
+    expect(i.states.get(`${prefix}.control.power`)).toEqual({ val: false, ack: true });
   });
 });
 

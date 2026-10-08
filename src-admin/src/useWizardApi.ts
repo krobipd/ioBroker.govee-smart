@@ -5,7 +5,7 @@
 // The response shapes MUST stay in sync with the backend
 // (src/lib/segment-wizard.ts WizardSnapshot / WizardResponse). They are
 // re-declared here as plain types: src-admin CAN import from ../src (measured —
-// `err-message` is shared that way), but the backend module carries imports the
+// `err-text` is shared that way), but the backend module carries imports the
 // component must not drag into its bundle, so only an import-free module is shared.
 
 /** Grid snapshot the backend folds into every wizard response. */
