@@ -1,61 +1,47 @@
-name: Geräte-Support melden / Report device support
-description: Erfahrung mit einem bisher experimentellen oder nicht gelisteten Govee-Gerät teilen / Share experience with an experimental or unlisted Govee device
-title: "[Gerät] H???? — kurz beschreiben"
+name: Gerät melden / Report a device
+description: Ein Gerät tut nicht, was es soll — mit Diagnosebericht / A device does not do what it should — with a diagnostics report
+title: "[Gerät] Modell — kurz beschreiben"
 labels: ["device-support"]
 body:
   - type: markdown
     attributes:
       value: |
-        Danke für deinen Bericht! Diese Vorlage hilft uns, dein Gerät auf 🟢 **User-bestätigt** oder ✅ **Voll getestet** zu promoten.
+        Danke für deinen Bericht! Mit dem Diagnosebericht sehen wir, was dein Gerät kann und was es geantwortet hat — meist ohne Rückfrage.
 
-        Thanks for the report! This template helps us promote your device to 🟢 **User-confirmed** or ✅ **Fully tested**.
+        Thanks for the report! The diagnostics report shows what your device can do and what it answered — usually without a follow-up question.
 
   - type: input
-    id: sku
+    id: model
     attributes:
-      label: SKU / Modell (optional)
-      description: Steht auf dem Gerät und in der Govee Home App, z.B. `H7160`. Steckt auch im Diagnose-Export. / On the device and in the Govee Home app. Also part of the diagnostics export.
-      placeholder: H7160
-
-  - type: dropdown
-    id: status-current
-    attributes:
-      label: Aktueller Status im Wiki (optional) / Current Wiki status (optional)
-      options:
-        - "⚪ Experimentell / Experimental"
-        - "🟢 User-bestätigt / User-confirmed (Folge-Bestätigung)"
-        - "Nicht gelistet / Not listed yet"
+      label: Modell (optional) / Model (optional)
+      description: Steht auch im Diagnosebericht. / Also part of the diagnostics report.
 
   - type: textarea
     id: behavior
     attributes:
-      label: Was hast du probiert? Was funktioniert? Was nicht?
+      label: Was funktioniert nicht? / What does not work?
       description: |
-        Konkret, kurz, ehrlich. Was geht? Was geht nicht? Hattest du Fehler im Adapter-Log?
+        Was hast du gemacht, was hast du erwartet, was ist passiert? Welcher Datenpunkt?
 
-        Concrete, brief, honest. What works? What doesn't? Any errors in the adapter log?
-      placeholder: |
-        - Power on/off: works / funktioniert
-        - Change mode / Modus wechseln: works / funktioniert
-        - Set temperature / Temperatur setzen: no effect on the device / kein Effekt am Gerät
+        What did you do, what did you expect, what happened? Which datapoint?
     validations:
       required: true
 
   - type: textarea
     id: diagnostics
     attributes:
-      label: Diagnose-Export / Diagnostics export
+      label: Diagnosebericht / Diagnostics report
       description: |
-        In der Instanz-Konfiguration: Reiter **Experte** → **Diagnose** → Gerät wählen → **Bericht erstellen und herunterladen**, dann die heruntergeladene Datei hier hineinziehen. Der Bericht enthält auch die letzten Protokollzeilen und ist anonymisiert.
+        In den Instanz-Einstellungen: Reiter **Experte** → Gerät wählen → **Diagnosebericht erstellen**, dann die heruntergeladene Datei hier hineinziehen. Am besten direkt nach dem Fehler — der Bericht enthält auch, was davor passiert ist, und die letzten Logzeilen. Adressen, Seriennummern, Netzwerk- und Raumnamen sind ersetzt.
 
-        In the instance settings: tab **Expert** → **Diagnostics** → pick the device → **Create report and download**, then drag the downloaded file in here. The report also contains the most recent log lines and is anonymised.
+        In the instance settings: tab **Expert** → pick the device → **Create diagnostics report**, then drag the downloaded file in here. Best right after the problem — the report also holds what happened before it and the recent log lines. Addresses, serial numbers, network and room names are replaced.
     validations:
       required: true
 
   - type: input
     id: adapter-version
     attributes:
-      label: govee-smart Version
+      label: Adapter-Version / Adapter version
       description: Reiter Instanzen / Instances tab
       placeholder: "x.y.z"
     validations:
@@ -64,5 +50,8 @@ body:
   - type: textarea
     id: extras
     attributes:
-      label: Sonstiges (optional)
-      description: Firmware-Version, ungewöhnliche Setup-Details, weitere Beobachtungen / Firmware version, unusual setup, additional observations
+      label: Sonstiges (optional) / Anything else (optional)
+      description: |
+        Bildschirmfotos, Firmware, Besonderheiten deiner Installation.
+
+        Screenshots, firmware, peculiarities of your setup.
