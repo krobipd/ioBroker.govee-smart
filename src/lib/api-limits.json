@@ -20,7 +20,7 @@
           "max": 12,
           "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none for this undocumented app endpoint; every request waits at the call gate (api-limits.ts) until it fits"
+          "source": "own cap of the adapter — Govee documents none for this undocumented app endpoint; every request waits at the call gate (call-gate.ts) until it fits"
         }
       ]
     },
@@ -30,9 +30,9 @@
       "limits": [
         {
           "max": 2,
-          "seconds": 3600,
+          "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — the Govee app version is looked up at most once a day and kept in the instance data; the call gate (api-limits.ts) holds the rest"
+          "source": "own cap of the adapter — the Govee app version is looked up once per adapter start and once a day; a restart right after a start makes two within a minute, the call gate (call-gate.ts) holds a third"
         }
       ]
     },
