@@ -58,9 +58,59 @@ export function littleEndianIpv4(value: unknown): string | undefined {
   return [n & 0xff, (n >>> 8) & 0xff, (n >>> 16) & 0xff, (n >>> 24) & 0xff].join(".");
 }
 
+/** Govee's capability instances whose option names the user gave (GV-30); `lightScene` is Govee's own. */
+const OWN_NAME_INSTANCES: ReadonlySet<string> = new Set(["snapshot", "diyScene"]);
+
+/** Keys whose array lists the user's own snapshots or DIY scenes by `name` (the live read, E5). */
+const OWN_NAME_LISTS: ReadonlySet<string> = new Set(["snapshots", "diyScenes", "cloudDiyScenes", "snapshotPackets"]);
+
 /**
- * Pseudonymise one report: register the names, mark the shapeless values with exact boundaries, then the master's
- * `deep` over everything, keys included.
+ * The own snapshot and DIY names inside the report itself (GV-30): the option names of a `snapshot` or `diyScene`
+ * capability in a Govee answer, and the names in the live read's lists — a name the device record does not carry
+ * (new, renamed, deleted) is still the user's.
+ *
+ * @param value The report or a part of it
+ * @param out The names found so far
+ * @returns The names found
+ */
+export function ownSceneNamesIn(value: unknown, out: string[] = []): string[] {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      ownSceneNamesIn(item, out);
+    }
+    return out;
+  }
+  if (!value || typeof value !== "object") {
+    return out;
+  }
+  const obj = value as Record<string, unknown>;
+  const params = obj.parameters as { options?: unknown } | null | undefined;
+  if (typeof obj.instance === "string" && OWN_NAME_INSTANCES.has(obj.instance) && Array.isArray(params?.options)) {
+    out.push(...namesOf(params.options));
+  }
+  for (const [key, child] of Object.entries(obj)) {
+    if (OWN_NAME_LISTS.has(key) && Array.isArray(child)) {
+      out.push(...namesOf(child));
+    }
+    ownSceneNamesIn(child, out);
+  }
+  return out;
+}
+
+/**
+ * The `name` texts of a list's entries.
+ *
+ * @param list The list
+ */
+function namesOf(list: readonly unknown[]): string[] {
+  return list
+    .map(e => (e && typeof e === "object" ? (e as { name?: unknown }).name : undefined))
+    .filter((n): n is string => typeof n === "string");
+}
+
+/**
+ * Pseudonymise one report: register the names (those known by lookup and the own scene names the report carries),
+ * mark the shapeless values with exact boundaries, then the master's `deep` over everything, keys included.
  *
  * @param report The report as the collector built it (secrets already redacted)
  * @param personal Names and digit ids known by lookup
@@ -68,7 +118,7 @@ export function littleEndianIpv4(value: unknown): string | undefined {
  * @returns The report with placeholders
  */
 export function pseudonymiseReport(report: unknown, personal: ReportPersonal, places: Placeholders): unknown {
-  for (const name of new Set(personal.names)) {
+  for (const name of new Set([...personal.names, ...ownSceneNamesIn(report)])) {
     if (typeof name === "string" && name.trim().length >= MIN_NAME_LENGTH) {
       places.name(name);
     }

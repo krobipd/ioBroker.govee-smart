@@ -68,4 +68,48 @@ describe("pseudonymiseReport — the Govee values no form pattern finds", () => 
     expect(out).toContain("name-1 and Jennys Leselampen");
     expect(out).toContain('"tiny":"on"');
   });
+
+  it("own snapshot and DIY names in Govee's answers are found by the report itself (GV-30); scene names stay", () => {
+    const out = run({
+      live: {
+        libraries: {
+          cloudScenes: {
+            lightScenes: [{ name: "Aurora", value: { id: 1 } }],
+            snapshots: [{ name: "Omas Sonntag", value: 815 }],
+            diyScenes: [{ name: "Lenas Party", value: 4711 }],
+          },
+          cloudDiyScenes: [{ name: "Kinderzimmer Blau", value: 4712 }],
+          snapshotPackets: [{ name: "Fernsehabend Huber", bleCmds: [["MwUB"]] }],
+        },
+      },
+      apiHistory: {
+        "/router/api/v1/device/scenes": [
+          {
+            body: {
+              payload: {
+                capabilities: [
+                  { instance: "lightScene", parameters: { options: [{ name: "Sunrise", value: {} }] } },
+                  { instance: "snapshot", parameters: { options: [{ name: "Alter Abend", value: 1 }] } },
+                  { instance: "diyScene", parameters: { options: [{ name: "Papas Werkstatt", value: 2 }] } },
+                ],
+              },
+            },
+          },
+        ],
+      },
+      note: "Omas Sonntag again",
+    });
+    for (const own of [
+      "Omas Sonntag",
+      "Lenas Party",
+      "Kinderzimmer Blau",
+      "Fernsehabend Huber",
+      "Alter Abend",
+      "Papas Werkstatt",
+    ]) {
+      expect(out).not.toContain(own);
+    }
+    expect(out).toContain("Aurora");
+    expect(out).toContain("Sunrise");
+  });
 });
