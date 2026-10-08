@@ -1290,18 +1290,19 @@ export class DeviceManager {
    * touched. Rate-limit pressure scales linearly with account size.
    *
    * @param deviceId Target device's deviceId (mac-like identifier)
-   * @returns true when scene/snapshot/library data changed
+   * @returns `ran` when every call reached Govee and answered (only then is the button confirmed, GV-13), `changed`
+   *   when scene/snapshot/library data changed
    */
-  async refreshSceneDataForDevice(deviceId: string): Promise<boolean> {
+  async refreshSceneDataForDevice(deviceId: string): Promise<{ ran: boolean; changed: boolean }> {
     if (!this.cloudClient) {
-      return false;
+      return { ran: false, changed: false };
     }
     const target = Array.from(this.devices.values()).find(
       d => normalizeDeviceId(d.deviceId) === normalizeDeviceId(deviceId),
     );
     if (!target) {
       this.log.debug(`refreshSceneDataForDevice: device ${deviceId} not found`);
-      return false;
+      return { ran: false, changed: false };
     }
     this.diagnostics.addLog(target.deviceId, "info", `User-triggered refresh-cloud-data for ${target.sku}`);
 
@@ -1309,6 +1310,7 @@ export class DeviceManager {
     // this was the v2.6.7 bug — the button re-ran /device/scenes only, which
     // never carries newly-created snapshots for some SKUs; the authoritative
     // list lives in /user/devices.
+    let listed = false;
     try {
       // Budgeted + coupled to real execution: this is a user-triggered
       // refresh that NEEDS the fresh list before proceeding — and it must
@@ -1324,6 +1326,7 @@ export class DeviceManager {
       }
       const cloudDevices = filterCloudDevicesWithCapabilities(rawCloudDevices);
       this.mergeCloudDevices(cloudDevices);
+      listed = true;
     } catch (e) {
       this.log.debug(`refreshSceneDataForDevice: getDevices failed: ${errText(e)}`);
       // Keep going with stale capabilities — better than aborting the refresh.
@@ -1351,7 +1354,7 @@ export class DeviceManager {
     }
     // Per-device follow-up — only the targeted device needs a rebuild.
     this.finishLibraryRun(target, track, changed, true);
-    return changed;
+    return { ran: listed && !track.failed && !track.cancelled, changed };
   }
 
   /**

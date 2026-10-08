@@ -55,7 +55,7 @@ interface Rig {
   setFanOutResult(v: boolean): void;
 }
 
-function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}): Rig {
+function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean; refreshRan?: boolean } = {}): Rig {
   const warns: string[] = [];
   const commands: Array<{ device: string; command: string; value: unknown }> = [];
   const capCommands: Array<{ device: string; type: string; instance: string; value: unknown }> = [];
@@ -111,7 +111,7 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean } = {}
       },
       refreshSceneDataForDevice: (deviceId: string) => {
         refreshCalls.push(deviceId);
-        return Promise.resolve(opts.refreshChanged ?? false);
+        return Promise.resolve({ ran: opts.refreshRan ?? true, changed: opts.refreshChanged ?? false });
       },
       persistDeviceToCache: (device: GoveeDevice) => {
         persisted.push(device);
@@ -731,6 +731,15 @@ describe("onStateChange — per-device cloud refresh", () => {
     await write(unchanged, id("snapshots.refresh_cloud"), true);
     expect(unchanged.loadCloudStatesCalls).toHaveLength(0);
     expect(unchanged.acks).toContainEqual({ id: id("snapshots.refresh_cloud"), val: false });
+  });
+
+  it("a refresh Govee did not answer stays unconfirmed, with one warning (GV-13)", async () => {
+    const rig = makeRig([device], { refreshRan: false });
+    await write(rig, id("snapshots.refresh_cloud"), true);
+    expect(rig.refreshCalls).toEqual([device.deviceId]);
+    expect(rig.acks.find(a => a.id === id("snapshots.refresh_cloud"))).toBeUndefined();
+    expect(rig.warns).toHaveLength(1);
+    expect(rig.warns[0]).toMatch(/Refresh cloud data for .* failed/);
   });
 });
 

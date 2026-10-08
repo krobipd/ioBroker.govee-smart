@@ -3816,12 +3816,30 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     };
     dm.setCloudClient(mockCloud as any);
 
-    const changed = await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011");
+    const { changed, ran } = await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011");
 
+    expect(ran).toBe(true);
     expect(getDevicesCallCount, "getDevices must be called by refreshSceneDataForDevice").toBe(1);
     expect(getScenesCallCount, "getScenes must be called after device-list refresh").toBe(1);
     expect(device.snapshots.map(s => s.name)).toEqual(["OldSnap", "NewSnap"]);
     expect(changed).toBe(true);
+  });
+
+  it("a refresh whose device list Govee did not answer has not run — the button stays unconfirmed (GV-13)", async () => {
+    const device = createTestDevice();
+    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+    dm.setCloudClient({
+      getDevices: () => Promise.reject(Object.assign(new Error("connect ETIMEDOUT"), { code: "ETIMEDOUT" })),
+      getScenes: () => Promise.resolve({ lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: () => Promise.resolve([]),
+    } as any);
+    expect((await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011")).ran).toBe(false);
+  });
+
+  it("a refresh without the Cloud or for an unknown device has not run", async () => {
+    expect(await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011")).toEqual({ ran: false, changed: false });
+    dm.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
+    expect(await dm.refreshSceneDataForDevice("FFFFFFFFFFFFFFFF")).toEqual({ ran: false, changed: false });
   });
 
   it("the refresh button does not remember an empty library when the call never ran", async () => {

@@ -531,10 +531,14 @@ export async function onStateChange(
   // info.refresh_cloud_data button (removed in v2.7.0); see
   // DeviceManager.refreshSceneDataForDevice for the API-budget rationale.
   if (stateSuffix === "snapshots.refresh_cloud" && val) {
+    // Confirmed only when the refresh reached Govee — a failed one stays unconfirmed (GV-13).
+    let ran = false;
     if (adapter.deviceManager) {
       adapter.log.info(`Refresh cloud data for ${deviceLabel(device)}: re-fetching scenes and snapshots`);
       try {
-        const changed = await adapter.deviceManager.refreshSceneDataForDevice(device.deviceId);
+        const result = await adapter.deviceManager.refreshSceneDataForDevice(device.deviceId);
+        const changed = result.changed;
+        ran = result.ran;
         if (changed) {
           // Rebuild the Cloud-state tree so the fresh snapshot_cloud / scene
           // dropdown options propagate to the ioBroker objects.
@@ -544,14 +548,20 @@ export async function onStateChange(
           await loadCloudStates(adapter, device);
         }
         // The user pressed the button — the result goes on info (logging strategy).
-        adapter.log.info(
-          `Refresh cloud data for ${deviceLabel(device)} done — ${changed ? "scenes and snapshots updated" : "nothing changed"}`,
-        );
+        if (ran) {
+          adapter.log.info(
+            `Refresh cloud data for ${deviceLabel(device)} done — ${changed ? "scenes and snapshots updated" : "nothing changed"}`,
+          );
+        } else {
+          adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: Govee did not answer every call`);
+        }
       } catch (e) {
         adapter.log.warn(`Refresh cloud data for ${deviceLabel(device)} failed: ${describeError(e)}`);
       }
     }
-    await adapter.setState(id, { val: false, ack: true });
+    if (ran) {
+      await adapter.setState(id, { val: false, ack: true });
+    }
     return;
   }
 
