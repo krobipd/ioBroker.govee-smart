@@ -17,10 +17,10 @@
       "match": { "host": "app2.govee.com", "kind": "http" },
       "limits": [
         {
-          "max": 12,
+          "max": 60,
           "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none for this undocumented app endpoint; every request waits at the call gate (call-gate.ts) until it fits"
+          "source": "own cap of the adapter — Govee documents none for this undocumented app endpoint: one call a second on average; every request waits at the call gate (call-gate.ts) until it fits, and the libraries keep their own lane of 8 a minute (rate-limiter.ts)"
         }
       ]
     },
