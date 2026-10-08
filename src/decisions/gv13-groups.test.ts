@@ -83,6 +83,7 @@ function bench(members: GoveeDevice[], opts: { failing?: string[]; groupMusic?: 
     },
     devicePrefix: prefixOf,
     stateToCommand: s => stateToCommand(s) ?? undefined,
+    awaitsReport: () => false,
     getObject: id =>
       Promise.resolve(
         id.endsWith(".music.music_mode")

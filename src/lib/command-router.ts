@@ -73,6 +73,8 @@ export class CommandRouter {
   private readonly timers: TimerAdapter;
   /** Pending read-back after a LAN command, per light IP (audit B5). */
   private readonly lanReadBack = new Map<string, ReturnType<TimerAdapter["setTimeout"]>>();
+  /** Pending status request after a broker command, per device (K18, GV-13). */
+  private readonly brokerReadBack = new Map<string, ReturnType<TimerAdapter["setTimeout"]>>();
   private readonly registry: DeviceRegistry;
   private lanClient: GoveeLanClient | null = null;
   private cloudClient: GoveeCloudClient | null = null;
@@ -84,6 +86,12 @@ export class CommandRouter {
   private readonly sendSeq = new Map<string, number>();
   /** The fleet's log rule (`log-once.ts`): a problem is said once per key and kind, a repeat goes to debug. */
   private readonly logOnce: LogOnce;
+
+  /**
+   * Asks the device for its status over the account broker — fired once,
+   * {@link LAN_STATUS_AFTER_COMMAND_MS} after the last broker command to it.
+   */
+  onBrokerReadBack?: (device: GoveeDevice) => void;
 
   /** Callback for batch segment state sync */
   onSegmentBatchUpdate?: (
@@ -507,6 +515,7 @@ export class CommandRouter {
     if (decision.kind === "broker") {
       const message = brokerMessage(command, value);
       if (device.iotTopic && this.brokerClient?.publishCommand(device.iotTopic, message.cmd, message.data)) {
+        this.scheduleBrokerReadBack(device);
         return { sent: message.sent, via: "broker" };
       }
       // The broker dropped between the decision and the send — the next way in the order is the Cloud.
@@ -1034,6 +1043,29 @@ export class CommandRouter {
       this.timers.setTimeout(() => {
         this.lanReadBack.delete(ip);
         this.lanClient?.requestStatus(ip);
+      }, LAN_STATUS_AFTER_COMMAND_MS),
+    );
+  }
+
+  /**
+   * One status request after the last broker command to a device (K18, GV-13:
+   * the adapter asks once, and the answer confirms or corrects the datapoint).
+   * The publish has no receipt; a device that ignores the command answers with
+   * its old state. Debounced per device like the LAN read-back.
+   *
+   * @param device The device the command went to
+   */
+  private scheduleBrokerReadBack(device: GoveeDevice): void {
+    const key = device.deviceId;
+    const pending = this.brokerReadBack.get(key);
+    if (pending !== undefined) {
+      this.timers.clearTimeout(pending);
+    }
+    this.brokerReadBack.set(
+      key,
+      this.timers.setTimeout(() => {
+        this.brokerReadBack.delete(key);
+        this.onBrokerReadBack?.(device);
       }, LAN_STATUS_AFTER_COMMAND_MS),
     );
   }

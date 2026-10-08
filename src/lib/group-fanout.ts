@@ -44,8 +44,13 @@ export interface GroupFanoutHost {
   namespace: string;
   /** Device list — typically DeviceManager.getDevices(). */
   getDevices: () => GoveeDevice[];
-  /** Send-command via LAN→Cloud-Routing (DeviceManager.sendCommand). */
+  /** Send-command via LAN → account broker → Cloud routing (DeviceManager.sendCommand). */
   sendCommand: (device: GoveeDevice, command: string, value: unknown) => Promise<void>;
+  /**
+   * Whether the member's last command can only be confirmed by its own report — it went over the account broker,
+   * whose publish has no receipt (K18, DeviceManager.transportUsed).
+   */
+  awaitsReport: (device: GoveeDevice, command: string) => boolean;
   /** Resolved object prefix for a device. */
   devicePrefix: (device: GoveeDevice) => string;
   /** State-suffix → command-name lookup (main.ts STATE_TO_COMMAND map). */
@@ -120,6 +125,8 @@ export class GroupFanoutHandler {
       return false;
     }
     let succeeded = 0;
+    // A member that took the command over the account broker has not confirmed it yet — its report will (K18).
+    let awaitingReport = false;
     // A group has no report of its own: it is confirmed only when every member
     // that has to take the command took it without an error (GV-13). A skipped
     // member counts against it like a failed one.
@@ -150,6 +157,9 @@ export class GroupFanoutHandler {
           }
         } else {
           await this.host.sendCommand(member, command, value);
+          if (counted.includes(member) && this.host.awaitsReport(member, command)) {
+            awaitingReport = true;
+          }
         }
         succeeded += 1;
         this.warnedMembers.delete(`${group.deviceId}:${member.deviceId}`); // took it → re-arm its warning
@@ -167,7 +177,8 @@ export class GroupFanoutHandler {
       this.reportFailedMembers(group, failed);
       return false;
     }
-    return true;
+    // Nothing failed, but a member's own report is still due: the group stays unconfirmed, without a warning.
+    return !awaitingReport;
   }
 
   /** Group members already warned about (`group:member`) — warn once, then debug until the member takes a command. */

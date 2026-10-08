@@ -67,6 +67,7 @@ export function buildGroupFanoutHost(adapter: GroupFanoutHandlerAdapter): GroupF
     sendCommand: async (device, command, value) => {
       await adapter.deviceManager?.sendCommand(device, command, value);
     },
+    awaitsReport: (device, command) => adapter.deviceManager?.transportUsed(device, command) === "broker",
     devicePrefix: device => adapter.stateManager?.devicePrefix(device) ?? "",
     stateToCommand: suffix => stateToCommand(suffix) ?? undefined,
     getObject: id => adapter.getObjectAsync(id) as Promise<ioBroker.Object | null | undefined>,

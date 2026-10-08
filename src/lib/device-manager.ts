@@ -321,6 +321,17 @@ export class DeviceManager {
     this.commandRouter.onDiagLog = (deviceId, level, msg) => {
       this.diagnostics.addLog(deviceId, level, msg);
     };
+    // A broker command has no receipt — the device is asked once, and its status packet confirms or corrects the
+    // datapoint (K18, GV-13).
+    this.commandRouter.onBrokerReadBack = device => {
+      if (this.isUnloading() || !this.statusRequester) {
+        return;
+      }
+      if (this.statusRequester(device, this.registry.getQuirks(device.sku)?.statusCmdVersion ?? 2)) {
+        device.lastStatusRequestAt = Date.now();
+        this.diagnostics.addLog(device.deviceId, "debug", "status request after a broker command");
+      }
+    };
   }
 
   // === Status requests over the account broker (issue #47) ===

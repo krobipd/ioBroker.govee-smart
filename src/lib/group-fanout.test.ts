@@ -115,6 +115,7 @@ function makeHost(opts: {
         ? `groups.basegroup_${device.deviceId}`
         : `devices.${device.sku.toLowerCase()}_${device.deviceId.replace(/:/g, "").slice(-4).toLowerCase()}`,
     stateToCommand: suffix => stateToCommandMap[suffix],
+    awaitsReport: () => false,
     getObject: id => Promise.resolve(structuredClone(objects.get(id) ?? null)),
     sendMusicCommand: (device, devicePrefix, stateSuffix, value) => {
       musicCalls.push({ device: device.deviceId, prefix: devicePrefix, suffix: stateSuffix, value });
@@ -141,6 +142,25 @@ describe("GroupFanoutHandler", () => {
       // m3 offline → skipped
       expect(commands).toHaveLength(2);
       expect(commands.map(c => c.device).sort()).toEqual(["AA:01", "AA:02"]);
+    });
+
+    it("a member switched over the account broker leaves the group unconfirmed until its report — no warning (K18)", async () => {
+      const warns: string[] = [];
+      const m1 = makeMember({ deviceId: "AA:01" });
+      const m2 = makeMember({ deviceId: "AA:02" });
+      const group = makeGroup([
+        { sku: m1.sku, deviceId: m1.deviceId },
+        { sku: m2.sku, deviceId: m2.deviceId },
+      ]);
+      const { host, commands } = makeHost({ devices: [m1, m2] });
+      host.log = { ...mockLog, warn: (m: string) => warns.push(m) };
+      host.awaitsReport = device => device.deviceId === "AA:02";
+      const handler = new GroupFanoutHandler(host);
+      expect(await handler.fanOut(group, "control.power", true)).toBe(false);
+      expect(commands.map(c => c.device).sort()).toEqual(["AA:01", "AA:02"]);
+      expect(warns).toEqual([]);
+      host.awaitsReport = () => false;
+      expect(await handler.fanOut(group, "control.power", true)).toBe(true);
     });
 
     it("forwards brightness verbatim", async () => {

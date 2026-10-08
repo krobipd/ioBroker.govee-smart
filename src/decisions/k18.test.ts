@@ -16,6 +16,8 @@ import { onStateChange } from "../lib/handlers/state-change-router";
 import { DeviceManager } from "../lib/device-manager";
 import { DeviceIdRegistry } from "../lib/device-id";
 import { DeviceRegistry } from "../lib/device-registry";
+import { GroupFanoutHandler } from "../lib/group-fanout";
+import { buildGroupFanoutHost } from "../lib/handlers/group-fanout-handler";
 import type { GoveeDevice } from "../lib/types";
 
 const log: ioBroker.Logger = {
@@ -147,6 +149,43 @@ describe("K18 commands over the account broker", () => {
     expect(r.published).toEqual([]);
     expect(r.cloud).toEqual(["powerSwitch"]);
     expect(r.acked.get("control.power")).toBe(true);
+  });
+
+  it("an app group whose member switched over the broker stays unconfirmed until that member reports", async () => {
+    const published: string[] = [];
+    const member = light("H9K01");
+    const group = {
+      ...light("BaseGroup", { deviceId: "1318", type: "BaseGroup", iotTopic: undefined }),
+      groupMembers: [{ sku: member.sku, deviceId: member.deviceId }],
+    };
+    const dm = new DeviceManager(
+      log,
+      timers,
+      new DeviceRegistry({ data: { devices: { H9K01: { name: "Strip", type: "light", status: "reported" } } } }),
+      new DeviceIdRegistry(),
+    );
+    (dm as unknown as { devices: Map<string, GoveeDevice> }).devices.set("m", member);
+    (dm as unknown as { devices: Map<string, GoveeDevice> }).devices.set("g", group);
+    (dm as unknown as { setBrokerClient?: (client: unknown) => void }).setBrokerClient?.({
+      connected: true,
+      publishCommand: (topic: string, cmd: string) => {
+        published.push(`${topic} ${cmd}`);
+        return true;
+      },
+    });
+    dm.setCloudClient({ controlDevice: () => Promise.resolve() } as never);
+    const handler = new GroupFanoutHandler(
+      buildGroupFanoutHost({
+        log,
+        namespace: "govee-smart.0",
+        deviceManager: dm,
+        stateManager: { devicePrefix: () => "devices.dev" },
+        getObjectAsync: () => Promise.resolve(null),
+      } as never),
+    );
+    const confirmed = await handler.fanOut(group, "control.power", true);
+    expect(published).toEqual([`${TOPIC} turn`]);
+    expect(confirmed).toBe(false);
   });
 
   it("a light with LAN takes the LAN and never the broker (positive control: LAN first)", async () => {

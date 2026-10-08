@@ -1268,6 +1268,7 @@ describe("group music end to end — fan-out plus the real music sender (audit M
       sendCommand: () => Promise.resolve(),
       devicePrefix: d => `devices.${d.deviceId.toLowerCase()}`,
       stateToCommand: suffix => (suffix === "music.music_mode" ? "music" : undefined),
+      awaitsReport: () => false,
       getObject: () => Promise.resolve({ common: { states: { 0: "---", 1: "Separation" } } } as never),
       sendMusicCommand: (device, prefix, suffix, value) => sendMusicCommand(rig.adapter, device, prefix, suffix, value),
     });

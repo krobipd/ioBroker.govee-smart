@@ -1532,6 +1532,36 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(router.transportUsed(device, "power")).toBeUndefined();
   });
 
+  it("asks the device once, 2 s after the last broker command — its report confirms or corrects the datapoint (GV-13)", async () => {
+    const pending: Array<{ fn: () => void; ms: number; cleared: boolean }> = [];
+    const timers = {
+      ...noopTimers,
+      setTimeout: (fn: () => void, ms: number) => {
+        const t = { fn, ms, cleared: false };
+        pending.push(t);
+        return t;
+      },
+      clearTimeout: (t: { cleared: boolean }) => {
+        t.cleared = true;
+      },
+    } as unknown as TimerAdapter;
+    const router = new CommandRouter(mockLog, timers, emptyRegistry());
+    router.setBrokerClient(makeBroker().client);
+    const asked: string[] = [];
+    router.onBrokerReadBack = device => asked.push(device.deviceId);
+    const device = makeDevice({
+      lanIp: undefined,
+      iotTopic: TOPIC,
+      channels: { lan: false, mqtt: true, cloud: false },
+    });
+    await router.sendCommand(device, "power", true);
+    await router.sendCommand(device, "brightness", 30);
+    const live = pending.filter(t => !t.cleared);
+    expect(live.map(t => t.ms)).toEqual([LAN_STATUS_AFTER_COMMAND_MS]);
+    live[0].fn();
+    expect(asked).toEqual([device.deviceId]);
+  });
+
   it("a broker that is down from the start is skipped in the decision", () => {
     const { router } = cloudRouter();
     router.setBrokerClient(makeBroker(false).client);
