@@ -2145,6 +2145,27 @@ describe("StateManager", () => {
       expect(after).toMatchObject({ val: true });
     });
 
+    describe("syncInfoOnline — the reachability history for the report (plan G4)", () => {
+      it("tells every change of the shown value with its deciding source, and nothing while it stays", async () => {
+        const { adapter } = createMockAdapter();
+        const sm = new StateManager(adapter as never, registry);
+        const changes: Array<{ online: boolean; was: boolean | null; decidedBy: string }> = [];
+        sm.onReachabilityChange = (_d, change) => changes.push(change);
+        const dev = createTestDevice({
+          lanIp: undefined,
+          lastLanReplyAt: undefined,
+          state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
+          channels: { lan: false, mqtt: false, cloud: true },
+        });
+        await createAllStatesForTest(sm, dev, []);
+        changes.length = 0;
+        dev.state.cloudReportedOnline = false;
+        await sm.syncInfoOnline(dev);
+        await sm.syncInfoOnline(dev);
+        expect(changes).toEqual([expect.objectContaining({ online: false, was: true, decidedBy: "cloudReport" })]);
+      });
+    });
+
     describe("syncInfoOnline — cloud-only lights (local-first, not local-only)", () => {
       it("cloud-only light (no lanIp): info.online follows the cloud-reported online", async () => {
         const { adapter, states } = createMockAdapter();

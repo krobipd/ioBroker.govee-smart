@@ -41,6 +41,7 @@ import type * as diagnosticsHandler from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsHandlerImpl from "./lib/handlers/diagnostics-handler";
 import * as diagnosticsReport from "./lib/handlers/diagnostics-report";
 import { ReportJobs } from "./lib/diagnostics/report-jobs";
+import { LogRing } from "./lib/diagnostics/log-ring";
 import * as legacyCleanup from "./lib/handlers/legacy-cleanup";
 import * as appVersion from "./lib/handlers/app-version";
 import * as deviceReaper from "./lib/handlers/device-reaper";
@@ -319,6 +320,8 @@ export class GoveeAdapter extends utils.Adapter {
   private unloading = false;
   /** The handler-facing view of this adapter — see {@link AdapterHost}. */
   private readonly handlerHost: AdapterHost;
+  /** The adapter's log at every level, for the diagnostics report (fleet master, plan G2). */
+  private readonly logRing = new LogRing();
   /** The fleet's diagnostics report jobs (DB-01: in memory until the card fetches the report). */
   private readonly reportJobs: ReportJobs<diagnosticsReport.LiveReading>;
 
@@ -517,6 +520,8 @@ export class GoveeAdapter extends utils.Adapter {
 
   private async onReady(): Promise<void> {
     this.startedAt = Date.now();
+    // Every line from the first one on, also debug — a report is wanted after the fact (plan G2).
+    this.logRing.hook(this.log);
     try {
       const start = await this.prepareInstance();
       if (!start) {
@@ -727,6 +732,10 @@ export class GoveeAdapter extends utils.Adapter {
       this.stateManager.deviceIds,
       () => this.unloading,
     );
+    this.deviceManager.getDiagnostics().setLogRing(this.logRing);
+    // every change of a device's shown reachability, for the report (plan G4)
+    this.stateManager.onReachabilityChange = (device, change) =>
+      this.deviceManager?.getDiagnostics().recordReachability(device.deviceId, change);
     const { dataDir } = start;
 
     this.skuCache = new SkuCache(dataDir, this.log);
@@ -873,10 +882,12 @@ export class GoveeAdapter extends utils.Adapter {
       }
       this.deviceManager!.getDiagnostics().recordApiSuccess(dev.deviceId, "lan://devStatus", status);
     });
+    // Counted per address instead of one activity line per reply — the scan answers every 30 s (plan G1, #50).
+    // packets the LAN client could not read, for the report (plan G5)
+    this.lanClient.onUnreadable = (from, raw, reason) =>
+      this.deviceManager?.getDiagnostics().recordUnreadable("lan", from, raw, reason);
     this.lanClient.setScanRecordHook(lanDevice => {
-      this.deviceManager
-        ?.getDiagnostics()
-        .addLog(lanDevice.device, "debug", `LAN scan reply: ip=${lanDevice.ip} sku=${lanDevice.sku}`);
+      this.deviceManager?.getDiagnostics().recordLanReply(lanDevice.device, lanDevice.ip, lanDevice.sku);
     });
 
     this.lanClient.start(
@@ -920,6 +931,8 @@ export class GoveeAdapter extends utils.Adapter {
       return true;
     }
     this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+    this.mqttClient.onUnreadable = (from, raw, reason) =>
+      this.deviceManager?.getDiagnostics().recordUnreadable("account-broker", from, raw, reason);
     this.mqttClient.useLoginWindow(this.loginWindowFor(accountEmail));
     // The status request over the account broker — the DeviceManager
     // decides WHOM to ask, the client only publishes.
@@ -1082,6 +1095,8 @@ export class GoveeAdapter extends utils.Adapter {
     // separate credentials required. Connection runs in parallel to
     // the AWS-IoT MQTT used for status push of regular devices.
     this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
+    this.openapiMqttClient.onUnreadable = (from, raw, reason) =>
+      this.deviceManager?.getDiagnostics().recordUnreadable("openapi-events", from, raw, reason);
     this.openapiMqttClient.connect(
       event => this.deviceManager?.handleOpenApiEvent(event),
       connected => {

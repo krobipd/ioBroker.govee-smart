@@ -49,6 +49,10 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
   protected readonly channelLabel = "Cloud-events";
   /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
   private readonly logOnce: LogOnce;
+  /**
+   * Told every packet the client could not read — the diagnostics report keeps them (plan G5).
+   */
+  onUnreadable?: (from: string, raw: string, reason: string) => void;
 
   /**
    * @param apiKey Govee Cloud API key (used as username AND password)
@@ -243,12 +247,14 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
       );
       if (caps.length === 0) {
         this.log.debug(`Cloud-events: capabilities all malformed from ${sku}`);
+        this.onUnreadable?.("openapi-events", payload.toString(), "every capability malformed");
         return;
       }
 
       event = { sku, device, capabilities: caps.map(normaliseEventState) };
     } catch {
       this.log.debug(`Cloud-events: failed to parse message: ${payload.toString().slice(0, 200)}`);
+      this.onUnreadable?.("openapi-events", payload.toString(), "not JSON");
       return;
     }
     // Hand-over outside the parse `try` (as in the account client): an

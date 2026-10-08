@@ -1702,6 +1702,15 @@ export class StateManager {
   }
 
   /**
+   * Told every change of a device's shown reachability (`info.online`) — the diagnostics report keeps the history
+   * (plan G4).
+   */
+  onReachabilityChange?: (
+    device: GoveeDevice,
+    change: { online: boolean; was: boolean | null; decidedBy: string; lastEvidenceAt: number | null },
+  ) => void;
+
+  /**
    * Resolver-based info.online sync — one rule for every device kind, via
    * {@link resolveDeviceReachability}.
    *
@@ -1738,8 +1747,19 @@ export class StateManager {
     const prefix = this.devicePrefix(device);
     const stateId = `${prefix}.info.online`;
 
-    const { online: desiredOnline, proven } = resolveDeviceReachability(device);
+    const decision = resolveDeviceReachability(device);
+    const { online: desiredOnline, proven } = decision;
 
+    const before = this.resolvedOnline.get(stateId);
+    if (before !== desiredOnline) {
+      // every change of the shown reachability, for the diagnostics report (plan G4)
+      this.onReachabilityChange?.(device, {
+        online: desiredOnline,
+        was: before ?? null,
+        decidedBy: decision.decidedBy,
+        lastEvidenceAt: decision.lastEvidenceAt,
+      });
+    }
     this.resolvedOnline.set(stateId, desiredOnline);
     await this.writeReadOnly(stateId, desiredOnline).catch(() => undefined);
 

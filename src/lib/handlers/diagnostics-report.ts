@@ -2,7 +2,7 @@
 // when the report is asked for (krobi 2026-10-06, E1 and E2 — only for a connected device, DB-03; the answers go into
 // the report and change nothing else), and the report body with its placeholders.
 import type { DeviceManager } from "../device-manager";
-import type { FrozenBuffers } from "../diagnostics";
+import type { FrozenBuffers, LogMentions } from "../diagnostics";
 import type { ReportBody, ReportSource, ReportSourceDevice } from "../diagnostics/report-jobs";
 import type { GoveeCloudClient } from "../govee-cloud-client";
 import { isAppGroup } from "../govee-constants";
@@ -41,6 +41,15 @@ function reportKey(device: GoveeDevice): string {
 }
 
 /**
+ * The strings that name a device in a log line: its id, its key, its name and its address.
+ *
+ * @param device The device
+ */
+function mentionsOf(device: GoveeDevice): string[] {
+  return [device.deviceId, reportKey(device), device.name, device.lanIp ?? ""].filter(m => m.length > 0);
+}
+
+/**
  * The adapter's side of the report jobs.
  *
  * @param adapter The adapter surface
@@ -50,6 +59,10 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
   const frozen = new Map<string, FrozenBuffers | undefined>();
   const find = (id: string): GoveeDevice | undefined =>
     adapter.deviceManager?.getDevices().find(d => !isAppGroup(d) && reportKey(d) === id);
+  const mentions = (device: GoveeDevice): LogMentions => ({
+    mine: mentionsOf(device),
+    others: (adapter.deviceManager?.getDevices() ?? []).filter(d => d !== device).flatMap(mentionsOf),
+  });
 
   return {
     adapter: "govee-smart",
@@ -72,7 +85,7 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
         throw new Error("the device is gone");
       }
       // The history as it stood before the read — the read's own answers never push it out of the rings.
-      frozen.set(id, dm.getDiagnostics().freeze(device.deviceId));
+      frozen.set(id, dm.getDiagnostics().freeze(device.deviceId, mentions(device)));
       const [status, cloud] = await Promise.all([askBroker(dm, device), readCloud(adapter, device)]);
       const reading: LiveReading = { statusRequest: status, cloudState: cloud };
       if (status.answeredAfterMs === undefined && cloud.capabilities === undefined) {
@@ -97,6 +110,7 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
           frozen: kept,
           live: live ?? (liveError !== undefined ? { error: liveError } : undefined),
           treeId: prefix.slice(prefix.lastIndexOf(".") + 1),
+          mentions: mentions(device),
         });
       return { fileId, content };
     },

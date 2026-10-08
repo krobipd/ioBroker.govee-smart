@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { vi, type Mock } from "vitest";
 import type * as HttpClient from "./lib/http-client";
 
 type HttpClientModule = typeof HttpClient;
@@ -59,7 +59,17 @@ vi.mock("./lib/http-client", async importOriginal => {
 
 vi.mock("@iobroker/adapter-core", () => {
   class Adapter {
-    public log = { silly: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    // info/warn/error stay the spies the tests read: the diagnostics log ring (plan G2) wraps every level, and a
+    // wrapped spy is no spy any more. Its own tests are the master's; here only the wiring counts.
+    public log = Object.defineProperties(
+      { silly: vi.fn(), debug: vi.fn() },
+      Object.fromEntries(
+        (["info", "warn", "error"] as const).map(level => {
+          const spy = vi.fn();
+          return [level, { get: () => spy, set: () => undefined, enumerable: true }];
+        }),
+      ),
+    ) as { silly: Mock; debug: Mock; info: Mock; warn: Mock; error: Mock };
     public namespace = "govee-smart.0";
     public adapterDir = "/tmp/govee-adapter";
     public version = "2.25.0";
@@ -1120,7 +1130,7 @@ describe("GoveeAdapter onReady — timers", () => {
     const { adapter, f } = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     const errors: string[] = [];
-    (adapter as unknown as { log: ioBroker.Logger }).log.error = (m: string) => void errors.push(m);
+    (adapter as unknown as { log: { error: Mock } }).log.error.mockImplementation((m: string) => void errors.push(m));
     const spy = vi.spyOn(StateManager.prototype, "migrateDeviceIds").mockRejectedValue(new Error("db down"));
     try {
       await i.onReady();

@@ -490,6 +490,17 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     vi.useRealTimers();
   });
 
+  it("hands a packet it cannot read to the report instead of only a debug line (plan G5)", () => {
+    const client = new GoveeLanClient(lanLog, lanTimers);
+    const unreadable: string[] = [];
+    client.onUnreadable = (from, raw, reason) => unreadable.push(`${from} ${reason} ${raw}`);
+    (client as unknown as { handleMessage(msg: Buffer, ip: string): void }).handleMessage(
+      Buffer.from("{broken"),
+      "10.0.0.9",
+    );
+    expect(unreadable).toEqual(["10.0.0.9 not JSON {broken"]);
+  });
+
   it("setBrightness clamps into 0..100 before it goes on the wire", () => {
     const { client, sendSock } = startedClient();
     client.setBrightness("10.0.0.5", 150);

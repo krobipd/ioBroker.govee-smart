@@ -202,6 +202,10 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private accountTopic = "";
   /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
   private readonly logOnce: LogOnce;
+  /**
+   * Told every packet the client could not read — the diagnostics report keeps them (plan G5).
+   */
+  onUnreadable?: (from: string, raw: string, reason: string) => void;
   /** Commands and status requests per minute (K18, GV-08). */
   private readonly publishGate: CallGate;
   private _bearerToken = "";
@@ -850,11 +854,13 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       const transaction = typeof raw.transaction === "string" ? raw.transaction : undefined;
       if (!sku && !device) {
         this.log.debug(`MQTT: message without sku/device ignored: ${rawText.slice(0, 200)}`);
+        this.onUnreadable?.(topic, rawText, "no sku or device");
         return;
       }
       update = { sku, device, cmd, state, op, transaction };
     } catch {
       this.log.debug(`MQTT: Failed to parse message: ${rawText.slice(0, 200)}`);
+      this.onUnreadable?.(topic, rawText, "not JSON");
       return;
     }
 

@@ -74,6 +74,10 @@ export class GoveeLanClient {
   private sendSocket: dgram.Socket | null = null;
   /** Send failures per address — said once per kind, repeats on debug until a send succeeds. */
   private readonly logOnce: LogOnce;
+  /**
+   * Told every packet the client could not read — the diagnostics report keeps them (plan G5).
+   */
+  onUnreadable?: (from: string, raw: string, reason: string) => void;
   /** The LAN limits of api-limits.json: scan targets per host, control datagrams per light (GV-08). */
   private readonly gate: CallGate;
   /** Datagrams to a light that wait for its control limit, oldest first — delayed, never dropped. */
@@ -776,6 +780,7 @@ export class GoveeLanClient {
     // noticeable with many devices at once.
     if (msg.length > 8192) {
       this.log.debug(`LAN message dropped from ${sourceIp}: oversize ${msg.length} bytes`);
+      this.onUnreadable?.(sourceIp, msg.toString(), `oversize ${msg.length} bytes`);
       return;
     }
     let cmd: string;
@@ -793,11 +798,13 @@ export class GoveeLanClient {
         // No data object is no report — handed on as `{}`, a devStatus without
         // data read as "off, brightness 0" and switched the light off in the tree.
         this.log.debug(`LAN: ${cmd} from ${sourceIp} carries no data object — ignored`);
+        this.onUnreadable?.(sourceIp, msg.toString(), `${cmd} without a data object`);
         return;
       }
       payload = rawPayload;
     } catch {
       this.log.debug(`LAN: Failed to parse message: ${msg.toString().slice(0, 200)}`);
+      this.onUnreadable?.(sourceIp, msg.toString(), "not JSON");
       return;
     }
     // Handing on is separate from parsing (audit A9): a handler that throws

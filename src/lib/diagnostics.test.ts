@@ -1,4 +1,5 @@
 import { DiagnosticsCollector } from "./diagnostics";
+import { LogRing } from "./diagnostics/log-ring";
 import { DeviceRegistry } from "./device-registry";
 import { HttpError } from "./http-client";
 import type { GoveeDevice } from "./types";
@@ -1114,5 +1115,86 @@ describe("pruneOrphans — buffers of removed devices are released", () => {
     c.addLog("a", "info", "x");
     c.pruneOrphans(new Set(["a", "b"]));
     expect((await c.generate(makeDevice({ deviceId: "a" }), "2.0.0")).recentLogs).toHaveLength(1);
+  });
+});
+
+describe("the adapter log and the LAN replies in the report (plan G1, G2)", () => {
+  it("counts a device's LAN scan replies per address instead of one line each", async () => {
+    const c = new DiagnosticsCollector(registry);
+    for (let n = 0; n < 5; n++) {
+      c.recordLanReply("dev1", "10.0.0.7", "H6199");
+    }
+    c.recordLanReply("dev1", "10.0.0.8", "H6199");
+    const report = await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0");
+    const replies = report.lanReplies as Array<{ count: number }>;
+    expect(replies.map(r => r.count)).toEqual([5, 1]);
+    expect(report.recentLogs).toEqual([]);
+  });
+
+  it("carries the adapter's own log at every level — the lines naming this device or none of the others", async () => {
+    const ring = new LogRing();
+    const c = new DiagnosticsCollector(registry);
+    c.setLogRing(ring);
+    ring.add("debug", "dev1: status answer");
+    ring.add("warn", "dev2: command failed");
+    ring.add("info", "adapter ready");
+    const { content } = await c.generateReport(makeDevice({ deviceId: "dev1" }), "3.2.0", undefined, {
+      mentions: { mine: ["dev1"], others: ["dev2"] },
+    });
+    expect((content.adapterLog as Array<{ level: string; msg: string }>).map(l => `${l.level} ${l.msg}`)).toEqual([
+      "debug dev1: status answer",
+      "info adapter ready",
+    ]);
+  });
+
+  it("a frozen report keeps the log as it stood before the live read", async () => {
+    const ring = new LogRing();
+    const c = new DiagnosticsCollector(registry);
+    c.setLogRing(ring);
+    ring.add("info", "before");
+    const frozen = c.freeze("dev1");
+    ring.add("debug", "during the live read");
+    const { content } = await c.generateReport(makeDevice({ deviceId: "dev1" }), "3.2.0", undefined, { frozen });
+    expect((content.adapterLog as Array<{ msg: string }>).map(l => l.msg)).toEqual(["before"]);
+  });
+});
+
+describe("the reachability history in the report (plan G4)", () => {
+  it("keeps every change with the deciding source and its evidence, at most 50", async () => {
+    const c = new DiagnosticsCollector(registry);
+    c.recordReachability("dev1", { online: true, was: null, decidedBy: "lanReply", lastEvidenceAt: 1_790_000_000_000 });
+    c.recordReachability("dev1", { online: false, was: true, decidedBy: "noEvidence", lastEvidenceAt: null });
+    for (let n = 0; n < 60; n++) {
+      c.recordReachability("dev2", {
+        online: n % 2 === 0,
+        was: n % 2 === 1,
+        decidedBy: "cloudReport",
+        lastEvidenceAt: null,
+      });
+    }
+    const one = (await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0")).reachabilityHistory as Array<
+      Record<string, unknown>
+    >;
+    expect(one.map(e => [e.was, e.online, e.decidedBy])).toEqual([
+      [null, true, "lanReply"],
+      [true, false, "noEvidence"],
+    ]);
+    expect(one[0].lastEvidenceAt).toBe(new Date(1_790_000_000_000).toISOString());
+    const two = (await c.generate(makeDevice({ deviceId: "dev2" }), "3.2.0")).reachabilityHistory as unknown[];
+    expect(two).toHaveLength(50);
+  });
+});
+
+describe("packets no client could read (plan G5)", () => {
+  it("keeps them account-wide in every report — whole, or only the size over the limit", async () => {
+    const c = new DiagnosticsCollector(registry);
+    c.recordUnreadable("lan", "10.0.0.9", "{not json", "not JSON");
+    c.recordUnreadable("account-broker", "GA/0badc0de0badc0de0badc0de0badc0de", "x".repeat(5_000), "not JSON");
+    const report = await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0");
+    const packets = report.unreadablePackets as Array<Record<string, unknown>>;
+    expect(packets[0]).toMatchObject({ source: "lan", from: "address-1", raw: "{not json", reason: "not JSON" });
+    expect(packets[1]).toMatchObject({ source: "account-broker", omittedBytes: 5_000 });
+    expect(packets[1].raw).toBeUndefined();
+    expect(JSON.stringify(report)).not.toContain("0badc0de0badc0de");
   });
 });

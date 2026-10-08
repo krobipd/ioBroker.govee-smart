@@ -1,5 +1,6 @@
 import { HttpError } from "./http-client";
 import { Placeholders } from "./diagnostics/placeholders";
+import type { LogLine, LogRing } from "./diagnostics/log-ring";
 import { pseudonymiseReport } from "./report-placeholders";
 import type { DeviceRegistry } from "./device-registry";
 import { errText, type GoveeDevice } from "./types";
@@ -163,6 +164,72 @@ export interface FrozenBuffers {
   commandResults: CommandResultEntry[];
   /** The account-wide login and IoT-key calls. */
   accountCalls: AccountCallEntry[];
+  /** The adapter's log lines about this device, at every level. */
+  adapterLog: LogLine[];
+  /** The device's LAN scan replies, counted. */
+  lanReplies: LanReplyEntry[];
+  /** Every change of the shown reachability. */
+  reachabilityHistory: ReachabilityChangeEntry[];
+  /** The packets no client could read. */
+  unreadablePackets: UnreadableEntry[];
+}
+
+/** One packet a client could not read (plan G5) — account-wide, the sender is not always a known device. */
+export interface UnreadableEntry {
+  /** When it arrived (ISO time). */
+  ts: string;
+  /** Which client: `account-broker`, `lan` or `openapi-events`. */
+  source: string;
+  /** Where it came from: a topic or an address. */
+  from: string;
+  /** Why it could not be read. */
+  reason: string;
+  /** The packet as it arrived — absent when over the size limit (whole or nothing, fleet R3). */
+  raw?: string;
+  /** The size of a packet over the limit. */
+  omittedBytes?: number;
+}
+
+/** How many unreadable packets the report keeps, account-wide. */
+const MAX_UNREADABLE = 30;
+
+/** One change of a device's shown reachability (plan G4). */
+export interface ReachabilityChangeEntry {
+  /** When it changed (ISO time). */
+  ts: string;
+  /** What `info.online` shows now. */
+  online: boolean;
+  /** What it showed before — null for the first value of the run. */
+  was: boolean | null;
+  /** The source that decided it (`resolveDeviceReachability`). */
+  decidedBy: string;
+  /** The time of the evidence it rests on (ISO), null without one. */
+  lastEvidenceAt: string | null;
+}
+
+/** How many reachability changes a device keeps. */
+const MAX_REACHABILITY_CHANGES = 50;
+
+/** One address a device answered the LAN scan from — counted, first and last time kept (fleet R1). */
+export interface LanReplyEntry {
+  /** The address it answered from. */
+  ip: string;
+  /** The model it named. */
+  sku: string;
+  /** First reply (ISO time). */
+  first: string;
+  /** Last reply (ISO time). */
+  last: string;
+  /** How many replies. */
+  count: number;
+}
+
+/** Which strings name a device in a log line, and which name the other devices. */
+export interface LogMentions {
+  /** The device's own id, name and address. */
+  mine: string[];
+  /** The ids, names and addresses of every other device. */
+  others: string[];
 }
 
 /** Per-device ring buffers. */
@@ -455,6 +522,14 @@ export class DiagnosticsCollector {
   private controlPathProvider: ControlPathProvider | null = null;
   /** Account-level call outcomes (login, IoT key) — see {@link recordAccountCall}. */
   private readonly accountCalls: AccountCallEntry[] = [];
+  /** The adapter's log at every level (fleet master `log-ring.ts`, plan G2) — wired by main.ts at the start. */
+  private logRing: LogRing | null = null;
+  /** LAN scan replies per device (plan G1) — counted instead of one log line each. */
+  private readonly lanReplies = new Map<string, Map<string, LanReplyEntry>>();
+  /** Reachability changes per device (plan G4). */
+  private readonly reachability = new Map<string, ReachabilityChangeEntry[]>();
+  /** Packets no client could read (plan G5), account-wide. */
+  private readonly unreadable: UnreadableEntry[] = [];
   private objectTreeProvider: ObjectTreeProvider | null = null;
 
   /** @param registry This instance's device catalog — the export shows the quirks active for the SKU */
@@ -968,13 +1043,11 @@ export class DiagnosticsCollector {
    * never push the recorded history out of the rings (the live read goes into its own section).
    *
    * @param deviceId Govee device id
+   * @param mentions The strings naming this device and the others in a log line
    * @returns The frozen buffers, or undefined when the device has none yet
    */
-  freeze(deviceId: string): FrozenBuffers | undefined {
-    const b = this.buffers.get(deviceId);
-    if (!b) {
-      return undefined;
-    }
+  freeze(deviceId: string, mentions?: LogMentions): FrozenBuffers {
+    const b = this.get(deviceId);
     return structuredClone({
       logs: b.logs,
       packets: b.packets,
@@ -982,7 +1055,110 @@ export class DiagnosticsCollector {
       lanSends: b.lanSends,
       commandResults: b.commandResults,
       accountCalls: this.accountCalls,
+      adapterLog: this.adapterLogAbout(mentions),
+      lanReplies: [...(this.lanReplies.get(deviceId)?.values() ?? [])],
+      reachabilityHistory: this.reachability.get(deviceId) ?? [],
+      unreadablePackets: this.unreadable,
     });
+  }
+
+  /**
+   * Record one change of a device's shown reachability (plan G4) — when, to what, from what, and which source decided
+   * it on which evidence.
+   *
+   * @param deviceId Govee device id
+   * @param change The change as the state manager resolved it
+   * @param change.online What `info.online` shows now
+   * @param change.was What it showed before (null for the first value)
+   * @param change.decidedBy The deciding source
+   * @param change.lastEvidenceAt The evidence time (ms), null without one
+   */
+  recordReachability(
+    deviceId: string,
+    change: { online: boolean; was: boolean | null; decidedBy: string; lastEvidenceAt: number | null },
+  ): void {
+    if (typeof deviceId !== "string" || !deviceId) {
+      return;
+    }
+    pushBounded(
+      this.reachability.get(deviceId) ?? this.reachability.set(deviceId, []).get(deviceId)!,
+      {
+        ts: new Date().toISOString(),
+        online: change.online,
+        was: change.was,
+        decidedBy: change.decidedBy,
+        lastEvidenceAt: change.lastEvidenceAt === null ? null : new Date(change.lastEvidenceAt).toISOString(),
+      },
+      MAX_REACHABILITY_CHANGES,
+    );
+  }
+
+  /**
+   * Record one packet a client could not read (plan G5). The raw text is kept whole or only its size, and goes
+   * through the report's placeholders like everything else.
+   *
+   * @param source Which client
+   * @param from The topic or address it came from
+   * @param raw The packet as text
+   * @param reason Why it could not be read
+   */
+  recordUnreadable(source: string, from: string, raw: string, reason: string): void {
+    const text = typeof raw === "string" ? raw : String(raw);
+    const kept = wholeOrNothing(text, MAX_PACKET_RAW_BYTES);
+    pushBounded(
+      this.unreadable,
+      {
+        ts: new Date().toISOString(),
+        source: String(source),
+        from: String(from),
+        reason: String(reason),
+        ...(kept === undefined ? { omittedBytes: text.length } : { raw: kept }),
+      },
+      MAX_UNREADABLE,
+    );
+  }
+
+  /**
+   * Wire the adapter's log ring (plan G2).
+   *
+   * @param ring The ring main.ts hooked into the adapter log
+   */
+  setLogRing(ring: LogRing | null): void {
+    this.logRing = ring;
+  }
+
+  /**
+   * Count one LAN scan reply of a device (plan G1) — the scan answers every 30 s, one log line per reply pushed every
+   * other line out of the device's activity log (#50: 100 of 100 lines).
+   *
+   * @param deviceId Govee device id
+   * @param ip The address it answered from
+   * @param sku The model it named
+   */
+  recordLanReply(deviceId: string, ip: string, sku: string): void {
+    if (typeof deviceId !== "string" || !deviceId || typeof ip !== "string") {
+      return;
+    }
+    const now = new Date().toISOString();
+    const byIp = this.lanReplies.get(deviceId) ?? new Map<string, LanReplyEntry>();
+    const seen = byIp.get(ip);
+    if (seen) {
+      seen.last = now;
+      seen.count += 1;
+      seen.sku = String(sku);
+    } else {
+      byIp.set(ip, { ip, sku: String(sku), first: now, last: now, count: 1 });
+    }
+    this.lanReplies.set(deviceId, byIp);
+  }
+
+  /**
+   * The adapter's log lines about one device — all of them when no mentions are given.
+   *
+   * @param mentions The strings naming this device and the others
+   */
+  private adapterLogAbout(mentions?: LogMentions): LogLine[] {
+    return this.logRing?.about(mentions?.mine ?? [], mentions?.others ?? []) ?? [];
   }
 
   /**
@@ -996,13 +1172,14 @@ export class DiagnosticsCollector {
    * @param extra.frozen Buffers frozen before the live read
    * @param extra.live The live read's section
    * @param extra.treeId The device's tree id (`h6199-b24d`)
+   * @param extra.mentions The strings naming this device and the others in a log line
    * @returns The pseudonymised content and the file id
    */
   async generateReport(
     device: GoveeDevice,
     adapterVersion: string,
     prefix?: string,
-    extra: { frozen?: FrozenBuffers; live?: Record<string, unknown>; treeId?: string } = {},
+    extra: { frozen?: FrozenBuffers; live?: Record<string, unknown>; treeId?: string; mentions?: LogMentions } = {},
   ): Promise<{ content: Record<string, unknown>; fileId: string }> {
     const quirks = this.registry.getQuirks(device.sku);
     const b = extra.frozen
@@ -1156,6 +1333,14 @@ export class DiagnosticsCollector {
       skuFeatures: device.skuFeatures,
       state: { ...device.state },
       recentLogs: b?.logs.slice() ?? [],
+      // The adapter's own log at every level, also debug (plan G2) — the lines naming this device or no other one.
+      adapterLog: extra.frozen?.adapterLog ?? this.adapterLogAbout(extra.mentions),
+      // Every address the device answered the LAN scan from, counted (plan G1).
+      lanReplies: extra.frozen?.lanReplies ?? [...(this.lanReplies.get(device.deviceId)?.values() ?? [])],
+      // Every change of what info.online showed, with the deciding source and its evidence (plan G4).
+      reachabilityHistory: (extra.frozen?.reachabilityHistory ?? this.reachability.get(device.deviceId) ?? []).slice(),
+      // Packets no client could read — account-wide, the sender is not always a known device (plan G5).
+      unreadablePackets: (extra.frozen?.unreadablePackets ?? this.unreadable).slice(),
       lastMqttPackets: b?.packets.slice() ?? [],
       // History per endpoint (most-recent at the end). Each entry has
       // {ts, ok, statusCode, body}. body holds either the success
