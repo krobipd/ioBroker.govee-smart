@@ -5939,3 +5939,60 @@ describe("a failed command leaves the value unconfirmed — the device is asked 
     });
   });
 });
+
+describe("readLibrariesLive — the report's fresh look at Govee (E5)", () => {
+  it("asks the Cloud for scenes and DIY scenes and the App API for a light's libraries — and changes nothing", async () => {
+    const dm = new DeviceManager(
+      mockLog,
+      mockTimers,
+      new DeviceRegistry({ data: { devices: {} } }),
+      new DeviceIdRegistry(),
+    );
+    const asked: string[] = [];
+    const answer = (name: string, value: unknown) => (): Promise<unknown> => {
+      asked.push(name);
+      return Promise.resolve(value);
+    };
+    dm.setCloudClient({
+      getScenes: answer("scenes", { lightScenes: [], diyScenes: [], snapshots: [] }),
+      getDiyScenes: answer("diy-scenes", []),
+    } as never);
+    dm.setApiClient({
+      fetchSceneLibrary: answer("scene-library", [{ name: "Aurora", sceneCode: 1 }]),
+      fetchMusicLibrary: answer("music-library", []),
+      fetchDiyLibrary: answer("diy-library", []),
+      fetchSkuFeatures: answer("features", null),
+      fetchSnapshots: answer("snapshots", []),
+      hasBearerToken: () => true,
+    } as never);
+    const device = createTestDevice({ sceneLibrary: [] });
+    const live = await dm.readLibrariesLive(device);
+    expect(asked).toEqual([
+      "scenes",
+      "diy-scenes",
+      "scene-library",
+      "music-library",
+      "diy-library",
+      "features",
+      "snapshots",
+    ]);
+    expect(live.sceneLibrary).toEqual([{ name: "Aurora", sceneCode: 1 }]);
+    // the answer goes into the report only — the device keeps what it had
+    expect(device.sceneLibrary).toEqual([]);
+  });
+
+  it("an answer that fails stands as its error, the others still come", async () => {
+    const dm = new DeviceManager(
+      mockLog,
+      mockTimers,
+      new DeviceRegistry({ data: { devices: {} } }),
+      new DeviceIdRegistry(),
+    );
+    dm.setCloudClient({
+      getScenes: () => Promise.reject(new Error("HTTP 503")),
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    const live = await dm.readLibrariesLive(createTestDevice({ type: "devices.types.heater" }));
+    expect(live).toEqual({ cloudScenes: { error: expect.stringContaining("503") as string }, cloudDiyScenes: [] });
+  });
+});

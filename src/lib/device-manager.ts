@@ -36,7 +36,14 @@ import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
 import type { GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { decodeApplianceFrames } from "./appliance-frames";
-import { ACCOUNT_LIST_LANE, applianceBudget, limiterDeviceKey, type CallLane, type RateLimiter } from "./rate-limiter";
+import {
+  ACCOUNT_LIST_LANE,
+  APP_API_LANE,
+  applianceBudget,
+  limiterDeviceKey,
+  type CallLane,
+  type RateLimiter,
+} from "./rate-limiter";
 import {
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
@@ -334,6 +341,54 @@ export class DeviceManager {
         this.diagnostics.addLog(device.deviceId, "debug", "status request after a broker command");
       }
     };
+  }
+
+  // === Live read for the diagnostics report (krobi 2026-10-06, E5) ===
+
+  /**
+   * Scenes, DIY scenes and — for a light — the libraries, snapshots and features, fresh from Govee for the
+   * diagnostics report: at most two Cloud calls in the device's window and five App API calls in their lane. The
+   * answers go into the report only — nothing is assigned, cached or rebuilt (13:40 rule: never through
+   * `refreshSceneDataForDevice`).
+   *
+   * @param device The device the report is for
+   * @returns Each answer or its error, by source
+   */
+  async readLibrariesLive(device: GoveeDevice): Promise<Record<string, unknown>> {
+    const out: Record<string, unknown> = {};
+    const read = async (name: string, lane: CallLane, fetch: () => Promise<unknown>): Promise<void> => {
+      let answer: unknown;
+      const run = async (): Promise<void> => {
+        answer = await fetch();
+      };
+      try {
+        if (this.rateLimiter) {
+          await this.rateLimiter.executeTracked(run, lane, 1, applianceBudget(device));
+        } else {
+          await run();
+        }
+        out[name] = answer;
+      } catch (e) {
+        out[name] = { error: errText(e) };
+      }
+    };
+    const cloud = this.cloudClient;
+    if (cloud && device.channels.cloud && !isAppGroup(device)) {
+      const lane: CallLane = { kind: "device-read", deviceKey: limiterDeviceKey(device) };
+      await read("cloudScenes", lane, () => cloud.getScenes(device.sku, device.deviceId));
+      await read("cloudDiyScenes", lane, () => cloud.getDiyScenes(device.sku, device.deviceId));
+    }
+    const app = this.apiClient;
+    if (app && device.type === GOVEE_DEVICE_TYPE.LIGHT) {
+      await read("sceneLibrary", APP_API_LANE, () => app.fetchSceneLibrary(device.sku));
+      await read("musicLibrary", APP_API_LANE, () => app.fetchMusicLibrary(device.sku));
+      await read("diyLibrary", APP_API_LANE, () => app.fetchDiyLibrary(device.sku));
+      await read("skuFeatures", APP_API_LANE, () => app.fetchSkuFeatures(device.sku));
+      if (app.hasBearerToken()) {
+        await read("snapshotPackets", APP_API_LANE, () => app.fetchSnapshots(device.sku, device.deviceId));
+      }
+    }
+    return out;
   }
 
   // === Status requests over the account broker (issue #47) ===

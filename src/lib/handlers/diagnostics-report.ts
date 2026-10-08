@@ -86,8 +86,13 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
       }
       // The history as it stood before the read — the read's own answers never push it out of the rings.
       frozen.set(id, dm.getDiagnostics().freeze(device.deviceId, mentions(device)));
-      const [status, cloud] = await Promise.all([askBroker(dm, device), readCloud(adapter, device)]);
-      const reading: LiveReading = { statusRequest: status, cloudState: cloud };
+      const [status, cloud, libraries] = await Promise.all([
+        askBroker(dm, device),
+        readCloud(adapter, device),
+        dm.readLibrariesLive(device),
+      ]);
+      // Govee's answers beside the stored ones — the report shows disk, memory, the last answer and this one (E5)
+      const reading: LiveReading = { statusRequest: status, cloudState: cloud, libraries };
       if (status.answeredAfterMs === undefined && cloud.capabilities === undefined) {
         // Nothing answered: a failed read, never `read` (DB-02). The details stay in the error text of the report.
         throw new Error(`no answer — status request: ${JSON.stringify(status)}; cloud state: ${JSON.stringify(cloud)}`);

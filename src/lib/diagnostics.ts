@@ -513,8 +513,18 @@ export interface ObjectTreeEntry {
   role?: string;
   /** Declared unit, when the state has one. */
   unit?: string;
+  /** Whether the state is readable. */
+  read?: boolean;
   /** Whether the state is writable. */
   write?: boolean;
+  /** Declared lower bound. */
+  min?: number;
+  /** Declared upper bound. */
+  max?: number;
+  /** Declared step. */
+  step?: number;
+  /** Declared value list of a dropdown. */
+  states?: unknown;
   /** Current value. */
   val?: unknown;
   /** Whether the value is acknowledged. */

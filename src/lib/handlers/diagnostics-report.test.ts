@@ -45,6 +45,7 @@ function rig(
     deviceManager: {
       getDevices: () => devices,
       getDiagnostics: () => collector,
+      readLibrariesLive: () => Promise.resolve({ sceneLibrary: [{ name: "Aurora", sceneCode: 2981 }] }),
       askStatus: (d: GoveeDevice, waitMs: number) => {
         asked.push(d.deviceId);
         // the device's answer lands in the rings while the report waits — it must not reach the frozen history
@@ -111,6 +112,10 @@ describe("the govee report source behind the fleet's report jobs", () => {
     expect(content.liveRead).toBe("read");
     expect(content.live.statusRequest.answeredAfterMs).toBe(903);
     expect(content.live.cloudState.capabilities).toEqual([{ instance: "powerSwitch" }]);
+    // Govee's libraries fresh beside the stored ones (E5)
+    expect((content.live as unknown as { libraries: unknown }).libraries).toEqual({
+      sceneLibrary: [{ name: "Aurora", sceneCode: 2981 }],
+    });
     // the history as it stood before the read
     expect(content.recentLogs.map(l => l.msg)).toEqual(["before the report"]);
   });

@@ -46,6 +46,7 @@ describe("diagnostics providers — what the report reads from the running adapt
       getForeignObjectAsync: () => Promise.resolve(null),
       getObjectViewAsync: () => Promise.resolve(null),
       getStateAsync: () => Promise.resolve(null),
+      getForeignStatesAsync: () => Promise.resolve({}),
       ...overrides,
     };
     return { host, providers };
@@ -98,6 +99,7 @@ describe("diagnostics providers — what the report reads from the running adapt
 
   it("the object tree is ONE device prefix, ids relative to it, with the current value", async () => {
     const views: Array<{ startkey: string; endkey: string }> = [];
+    const patterns: string[] = [];
     const { host } = providersHost({
       getObjectViewAsync: (_d, _s, params) => {
         views.push(params);
@@ -110,12 +112,28 @@ describe("diagnostics providers — what the report reads from the running adapt
           ],
         });
       },
-      getStateAsync: () => Promise.resolve({ val: true, ack: true } as ioBroker.State),
+      getForeignStatesAsync: pattern => {
+        patterns.push(pattern);
+        return Promise.resolve({
+          "govee-smart.0.devices.h6160-0011.control.power": { val: true, ack: true } as ioBroker.State,
+        });
+      },
     });
     expect(await readObjectTree(host, "devices.h6160-0011")).toEqual([
-      { id: "control.power", type: "boolean", role: "switch", unit: undefined, write: true, val: true, ack: true },
+      {
+        id: "control.power",
+        type: "boolean",
+        role: "switch",
+        unit: undefined,
+        read: undefined,
+        write: true,
+        val: true,
+        ack: true,
+      },
     ]);
     expect(views[0].startkey).toBe("govee-smart.0.devices.h6160-0011.");
+    // one read for the whole subtree (plan G8)
+    expect(patterns).toEqual(["govee-smart.0.devices.h6160-0011.*"]);
   });
 
   it("an unreadable tree is an empty list, not a failed report", async () => {

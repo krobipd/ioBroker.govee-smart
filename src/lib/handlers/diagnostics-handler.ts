@@ -59,6 +59,8 @@ export interface DiagnosticsProvidersHost {
   ): Promise<{ rows: Array<{ id: string; value: ioBroker.Object | null }> } | null | undefined>;
   /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
+  /** Read the states matching a pattern of full ids in one call. */
+  getForeignStatesAsync(pattern: string): Promise<Record<string, ioBroker.State | null | undefined>>;
 }
 
 /**
@@ -181,17 +183,25 @@ export async function readObjectTree(host: DiagnosticsProvidersHost, prefix: str
   if (!view?.rows) {
     return [];
   }
+  // One read for every value of the subtree (plan G8) — one call per datapoint was a hundred round trips on a strip.
+  const states: Record<string, ioBroker.State | null | undefined> =
+    (await host.getForeignStatesAsync(`${start}*`).catch(() => null)) ?? {};
   const entries: ObjectTreeEntry[] = [];
   for (const row of view.rows) {
     const localId = row.id.replace(`${host.namespace}.`, "");
     const common = row.value?.common as ioBroker.StateCommon | undefined;
-    const state = await host.getStateAsync(localId).catch(() => null);
+    const state = states[row.id];
     entries.push({
       id: localId.replace(`${prefix}.`, ""),
       type: common?.type,
       role: common?.role,
       unit: common?.unit,
+      read: common?.read,
       write: common?.write,
+      ...(common?.min !== undefined ? { min: common.min } : {}),
+      ...(common?.max !== undefined ? { max: common.max } : {}),
+      ...(common?.step !== undefined ? { step: common.step } : {}),
+      ...(common?.states !== undefined ? { states: common.states } : {}),
       val: state?.val,
       ack: state?.ack,
     });
