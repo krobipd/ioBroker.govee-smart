@@ -86,16 +86,41 @@ describe("DiagnosticsCollector", () => {
       expect(packets[0].hex).toBe("qqgFAQEEAAAAA=");
     });
 
-    it("bounds at 50 packets — newest 50 retained (v2.9.1 raised cap)", async () => {
+    it("counts the same packet instead of stacking it — the transaction stamp makes no packet another (plan G3)", async () => {
       const c = new DiagnosticsCollector(registry);
       for (let i = 0; i < 60; i++) {
-        c.addMqttPacket("dev1", "GA/topic", `hex${i}`);
+        c.addMqttPacket("dev1", "GA/topic", {
+          rawJson: JSON.stringify({ cmd: "status", transaction: `v_${1790000000000 + i}000`, state: { onOff: 1 } }),
+        });
       }
-      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0");
-      const packets = result.lastMqttPackets as Array<{ hex: string }>;
-      expect(packets).toHaveLength(50);
-      expect(packets[0].hex).toBe("hex10");
-      expect(packets[49].hex).toBe("hex59");
+      c.addMqttPacket("dev1", "GA/topic", { rawJson: JSON.stringify({ cmd: "online", state: { connected: "true" } }) });
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0")).lastMqttPackets as Array<{
+        kind: string;
+        count: number;
+      }>;
+      expect(packets.map(p => [p.kind, p.count])).toEqual([
+        ["status", 60],
+        ["online", 1],
+      ]);
+    });
+
+    it("each kind keeps its own byte budget — a flood of one kind never pushes another out (plan G3)", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.addMqttPacket("dev1", "GA/topic", {
+        rawJson: JSON.stringify({ cmd: "online", state: { connected: "false" } }),
+      });
+      for (let i = 0; i < 200; i++) {
+        c.addMqttPacket("dev1", "GA/topic", {
+          rawJson: JSON.stringify({ cmd: "status", state: { n: i, pad: "x".repeat(500) } }),
+        });
+      }
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0")).lastMqttPackets as Array<{
+        kind: string;
+      }>;
+      expect(packets.filter(p => p.kind === "online")).toHaveLength(1);
+      const status = packets.filter(p => p.kind === "status");
+      expect(status.length).toBeGreaterThan(5);
+      expect(status.length).toBeLessThan(200);
     });
 
     it("rejects empty hex strings", async () => {
@@ -1196,5 +1221,38 @@ describe("packets no client could read (plan G5)", () => {
     expect(packets[1]).toMatchObject({ source: "account-broker", omittedBytes: 5_000 });
     expect(packets[1].raw).toBeUndefined();
     expect(JSON.stringify(report)).not.toContain("0badc0de0badc0de");
+  });
+});
+
+describe("the report's new sections stay bounded and redacted", () => {
+  it("an unreadable packet that is JSON loses its secrets before it is kept", async () => {
+    const c = new DiagnosticsCollector(registry);
+    c.recordUnreadable(
+      "account-broker",
+      "GA/x",
+      JSON.stringify({ secretCode: "CANARYsecret0=", note: 1 }),
+      "no sku or device",
+    );
+    const text = JSON.stringify(await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0"));
+    expect(text).not.toContain("CANARYsecret0=");
+  });
+
+  it("a device answering from ever new addresses keeps only its latest eight", async () => {
+    const c = new DiagnosticsCollector(registry);
+    for (let n = 1; n <= 20; n++) {
+      c.recordLanReply("dev1", `10.0.0.${n}`, "H6199");
+    }
+    const replies = (await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0")).lanReplies as unknown[];
+    expect(replies).toHaveLength(8);
+  });
+
+  it("forgets the LAN replies and the reachability history of a removed device", async () => {
+    const c = new DiagnosticsCollector(registry);
+    c.recordLanReply("gone", "10.0.0.1", "H6199");
+    c.recordReachability("gone", { online: true, was: null, decidedBy: "lanReply", lastEvidenceAt: null });
+    c.pruneOrphans(new Set(["dev1"]));
+    const report = await c.generate(makeDevice({ deviceId: "gone" }), "3.2.0");
+    expect(report.lanReplies).toEqual([]);
+    expect(report.reachabilityHistory).toEqual([]);
   });
 });

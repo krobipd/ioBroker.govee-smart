@@ -1,6 +1,7 @@
 import { HttpError } from "./http-client";
 import { Placeholders } from "./diagnostics/placeholders";
 import type { LogLine, LogRing } from "./diagnostics/log-ring";
+import { ByteRing } from "./diagnostics/byte-ring";
 import { pseudonymiseReport } from "./report-placeholders";
 import type { DeviceRegistry } from "./device-registry";
 import { errText, type GoveeDevice } from "./types";
@@ -28,8 +29,14 @@ export interface LogEntry {
 
 /** A captured MQTT packet (op.command-array hex-joined or raw JSON payload). */
 export interface MqttPacketEntry {
-  /** ISO timestamp */
+  /** When it arrived last (ISO time) — the ring folds the same packet into one entry (fleet R1). */
   ts: string;
+  /** When the same packet arrived first (ISO time). */
+  first?: string;
+  /** How often the same packet arrived. */
+  count?: number;
+  /** Its kind: `status`, `online`, `ptReal`, `events` or `other` — each kind has its own ring (plan G3). */
+  kind?: string;
   /** AWS-IoT account topic or Cloud-events topic the packet arrived on */
   topic: string;
   /** Hex-encoded BLE bytes (lowercase, space-separated) — set for AWS-IoT op.command entries. */
@@ -154,7 +161,7 @@ export interface CommandResultEntry {
 export interface FrozenBuffers {
   /** Activity log lines. */
   logs: LogEntry[];
-  /** Captured MQTT packets. */
+  /** Captured MQTT packets, flattened from the rings, oldest first. */
   packets: MqttPacketEntry[];
   /** API history per endpoint. */
   responses: Record<string, ApiResponseEntry[]>;
@@ -192,6 +199,9 @@ export interface UnreadableEntry {
 
 /** How many unreadable packets the report keeps, account-wide. */
 const MAX_UNREADABLE = 30;
+
+/** How many addresses a device's LAN replies are kept for — the newest. */
+const MAX_LAN_REPLY_ADDRESSES = 8;
 
 /** One change of a device's shown reachability (plan G4). */
 export interface ReachabilityChangeEntry {
@@ -235,7 +245,8 @@ export interface LogMentions {
 /** Per-device ring buffers. */
 interface DeviceBuffers {
   logs: LogEntry[];
-  packets: MqttPacketEntry[];
+  /** MQTT packets per kind (plan G3): the same packet is counted, each kind keeps its own byte budget. */
+  packets: Map<string, ByteRing<Omit<MqttPacketEntry, "ts" | "first" | "count">>>;
   /**
    * Per-endpoint history (most-recent at the end). Keeping multiple slots
    * is essential for diagnosing "the first call returned X, the refresh
@@ -268,7 +279,6 @@ interface DeviceBuffers {
  * {@link MAX_LAN_SEND_BYTES} per outgoing datagram payload.
  */
 const MAX_LOGS = 100;
-const MAX_PACKETS = 50;
 const MAX_RESPONSE_ENDPOINTS = 24;
 const MAX_RESPONSES_PER_ENDPOINT = 6;
 const MAX_LAN_SENDS = 30;
@@ -291,6 +301,58 @@ const MAX_LAN_SEND_BYTES = 16_384;
  */
 function wholeOrNothing(text: string, max: number): string | undefined {
   return text.length > max ? undefined : text;
+}
+
+/** Each kind of MQTT packet keeps up to this many bytes per device (plan G3: 128 KB over four kinds). */
+const MQTT_RING_BYTES = 32 * 1024;
+
+/** One packet entry up to this size keeps its content; a larger one only its size (fleet R3). */
+const MQTT_ENTRY_BYTES = 2 * MAX_PACKET_RAW_BYTES + 256;
+
+/** The transaction stamp of a Govee envelope — it differs on every packet and makes no packet another one. */
+const TRANSACTION_RE = /\\?"transaction\\?"\s*:\s*\\?"[^"\\]*\\?"/g;
+
+/**
+ * The kind of an MQTT packet: the OpenAPI events, or the account broker's `cmd` (`status`, `online`, `ptReal`).
+ *
+ * @param topic The topic it came on
+ * @param rawJson The envelope, when there is one
+ * @param hex The BLE frames, when there are any
+ */
+function packetKind(topic: string, rawJson?: string, hex?: string): string {
+  if (topic === "openapi-events") {
+    return "events";
+  }
+  try {
+    const parsed = rawJson ? (JSON.parse(rawJson) as { cmd?: unknown; msg?: { cmd?: unknown } }) : undefined;
+    const cmd = parsed?.cmd ?? parsed?.msg?.cmd;
+    if (cmd === "status" || cmd === "online" || cmd === "ptReal") {
+      return cmd;
+    }
+  } catch {
+    // not JSON — the kind stays open
+  }
+  return hex && !rawJson ? "status" : "other";
+}
+
+/**
+ * The packets of all kinds as one list, oldest first.
+ *
+ * @param rings The device's rings
+ */
+function packetView(rings?: Map<string, ByteRing<Omit<MqttPacketEntry, "ts" | "first" | "count">>>): MqttPacketEntry[] {
+  return [...(rings?.values() ?? [])]
+    .flatMap(ring =>
+      ring.snapshot().map(e => ({
+        ...(e.content ?? {}),
+        ...(e.omittedBytes !== undefined ? { omittedBytes: e.omittedBytes } : {}),
+        topic: e.content?.topic ?? "",
+        ts: e.last,
+        first: e.first,
+        count: e.count,
+      })),
+    )
+    .sort((a, b) => a.ts.localeCompare(b.ts));
 }
 
 /**
@@ -717,7 +779,7 @@ export class DiagnosticsCollector {
   private get(deviceId: string): DeviceBuffers {
     let b = this.buffers.get(deviceId);
     if (!b) {
-      b = { logs: [], packets: [], responses: new Map(), responseBytes: 0, lanSends: [], commandResults: [] };
+      b = { logs: [], packets: new Map(), responses: new Map(), responseBytes: 0, lanSends: [], commandResults: [] };
       this.buffers.set(deviceId, b);
     }
     return b;
@@ -742,7 +804,7 @@ export class DiagnosticsCollector {
   }
 
   /**
-   * Append an MQTT packet for a device. Bounded to MAX_PACKETS most-recent.
+   * Append an MQTT packet for a device — into the ring of its kind, the same packet counted (plan G3).
    * `hex` (BLE-payload) and `rawJson` (envelope) are optional and stored as
    * provided — callers may pass one or both. v2.9.1: AWS-IoT path now passes
    * rawJson so state-only pushes are also captured.
@@ -757,7 +819,7 @@ export class DiagnosticsCollector {
     }
     // The topic embeds the account id (`GA/<hash>`, `GD/<hash>`): the report's
     // placeholders turn it into `GA/topic-N` (audit M12).
-    const entry: MqttPacketEntry = { ts: new Date().toISOString(), topic: String(topic) };
+    const entry: Omit<MqttPacketEntry, "ts" | "first" | "count"> = { topic: String(topic) };
     const hex =
       typeof payload === "string" ? payload : payload && typeof payload === "object" ? payload.hex : undefined;
     const rawJson = payload && typeof payload === "object" ? payload.rawJson : undefined;
@@ -777,7 +839,12 @@ export class DiagnosticsCollector {
     if (!entry.hex && !entry.rawJson && !entry.omittedBytes) {
       return;
     }
-    pushBounded(this.get(deviceId).packets, entry, MAX_PACKETS);
+    entry.kind = packetKind(entry.topic, entry.rawJson, entry.hex);
+    const rings = this.get(deviceId).packets;
+    const ring =
+      rings.get(entry.kind) ?? rings.set(entry.kind, new ByteRing(MQTT_RING_BYTES, MQTT_ENTRY_BYTES)).get(entry.kind)!;
+    // The same packet again — the transaction stamp aside — raises a counter instead of pushing others out (R1).
+    ring.add(`${entry.topic}|${entry.hex ?? ""}|${(entry.rawJson ?? "").replace(TRANSACTION_RE, "")}`, entry);
   }
 
   /**
@@ -1014,9 +1081,11 @@ export class DiagnosticsCollector {
    * @param liveDeviceIds Set of the currently active device ids
    */
   pruneOrphans(liveDeviceIds: Set<string>): void {
-    for (const id of this.buffers.keys()) {
-      if (!liveDeviceIds.has(id)) {
-        this.buffers.delete(id);
+    for (const map of [this.buffers, this.lanReplies, this.reachability]) {
+      for (const id of map.keys()) {
+        if (!liveDeviceIds.has(id)) {
+          map.delete(id);
+        }
       }
     }
   }
@@ -1050,7 +1119,7 @@ export class DiagnosticsCollector {
     const b = this.get(deviceId);
     return structuredClone({
       logs: b.logs,
-      packets: b.packets,
+      packets: packetView(b.packets),
       responses: Object.fromEntries(b.responses),
       lanSends: b.lanSends,
       commandResults: b.commandResults,
@@ -1103,7 +1172,8 @@ export class DiagnosticsCollector {
    * @param reason Why it could not be read
    */
   recordUnreadable(source: string, from: string, raw: string, reason: string): void {
-    const text = typeof raw === "string" ? raw : String(raw);
+    // the same redaction as every captured envelope: a packet that is JSON loses its secrets now (SENSITIVE_KEYS)
+    const text = this.cleanRawJson(typeof raw === "string" ? raw : String(raw));
     const kept = wholeOrNothing(text, MAX_PACKET_RAW_BYTES);
     pushBounded(
       this.unreadable,
@@ -1143,11 +1213,20 @@ export class DiagnosticsCollector {
     const byIp = this.lanReplies.get(deviceId) ?? new Map<string, LanReplyEntry>();
     const seen = byIp.get(ip);
     if (seen) {
+      byIp.delete(ip);
       seen.last = now;
       seen.count += 1;
       seen.sku = String(sku);
+      byIp.set(ip, seen);
     } else {
       byIp.set(ip, { ip, sku: String(sku), first: now, last: now, count: 1 });
+      // a device answering from ever new addresses (spoofed sources) keeps only its latest ones
+      for (const oldest of byIp.keys()) {
+        if (byIp.size <= MAX_LAN_REPLY_ADDRESSES) {
+          break;
+        }
+        byIp.delete(oldest);
+      }
     }
     this.lanReplies.set(deviceId, byIp);
   }
@@ -1341,7 +1420,8 @@ export class DiagnosticsCollector {
       reachabilityHistory: (extra.frozen?.reachabilityHistory ?? this.reachability.get(device.deviceId) ?? []).slice(),
       // Packets no client could read — account-wide, the sender is not always a known device (plan G5).
       unreadablePackets: (extra.frozen?.unreadablePackets ?? this.unreadable).slice(),
-      lastMqttPackets: b?.packets.slice() ?? [],
+      // Per kind, the same packet counted (plan G3) — flattened, oldest first.
+      lastMqttPackets: extra.frozen?.packets ?? packetView(this.buffers.get(device.deviceId)?.packets),
       // History per endpoint (most-recent at the end). Each entry has
       // {ts, ok, statusCode, body}. body holds either the success
       // response or `{error, status, responseBody?}` for failed calls.
