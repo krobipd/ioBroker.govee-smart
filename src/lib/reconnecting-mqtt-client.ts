@@ -32,6 +32,15 @@ export interface BackoffOpts {
 }
 
 /**
+ * The reconnect backoff of both broker clients: 5 s doubling to at most 120 s, plus up to 30 s jitter. The ceiling keeps
+ * the longest wait (150 s) well inside the fleet's 300 s for showing a counterpart's return (inventory suite "counterpart
+ * gone and back", round 87) — with 300 s a Govee outage of a few minutes left the push channel down up to 330 s after
+ * Govee was back (CI 38647499985, 2026-10-14). Govee is not called more often for it: the connect gate allows at most
+ * {@link MAX_CONNECTS_PER_WINDOW} connects a minute either way.
+ */
+export const RECONNECT_BACKOFF: BackoffOpts = { base: 5_000, cap: 120_000, jitterCap: 30_000 };
+
+/**
  * Pure exponential-backoff-with-jitter delay (ms) for a 1-based reconnect
  * attempt. Extracted from the two MQTT clients (identical curve) so it is
  * unit-testable without timers or a live socket. `rand` defaults to
@@ -130,10 +139,7 @@ export abstract class ReconnectingMqttClient {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.max(
-      computeBackoffDelay(this.reconnectAttempts, { base: 5_000, cap: 300_000, jitterCap: 30_000 }),
-      this.connectWaitMs(),
-    );
+    const delay = Math.max(computeBackoffDelay(this.reconnectAttempts, RECONNECT_BACKOFF), this.connectWaitMs());
     this.log.debug(`${this.channelLabel}: reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimer = this.timers.setTimeout(() => {

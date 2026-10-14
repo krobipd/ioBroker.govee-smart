@@ -1,6 +1,11 @@
 import * as net from "node:net";
 import * as mqtt from "mqtt";
-import { CONNECT_WINDOW_MS, ReconnectingMqttClient, computeBackoffDelay } from "./reconnecting-mqtt-client";
+import {
+  CONNECT_WINDOW_MS,
+  RECONNECT_BACKOFF,
+  ReconnectingMqttClient,
+  computeBackoffDelay,
+} from "./reconnecting-mqtt-client";
 import { type TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
 
@@ -76,6 +81,26 @@ class TestClient extends ReconnectingMqttClient {
     return this.reconnectAttempts;
   }
 }
+
+describe("RECONNECT_BACKOFF — the broker clients' backoff", () => {
+  it("never waits longer than 150 s, well inside the fleet's 300 s for showing a counterpart's return", () => {
+    const longest = Math.max(...Array.from({ length: 40 }, (_, i) => computeBackoffDelay(i + 1, RECONNECT_BACKOFF, 1)));
+    expect(longest).toBe(150_000);
+    expect(longest).toBeLessThan(300_000);
+  });
+
+  it("is what a client arms after a long run of failed attempts", () => {
+    const t = makeCapturingTimers();
+    const c = new TestClient(mockLog, t.timers);
+    for (let i = 0; i < 12; i++) {
+      c.arm();
+      t.fireLast();
+    }
+    c.arm();
+    expect(t.scheduled.at(-1)!.ms).toBeLessThanOrEqual(150_000);
+    expect(t.scheduled.at(-1)!.ms).toBeGreaterThanOrEqual(120_000);
+  });
+});
 
 describe("computeBackoffDelay", () => {
   const OPTS = { base: 5_000, cap: 300_000, jitterCap: 30_000 };

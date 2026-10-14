@@ -33,17 +33,17 @@ export class CallGate {
    */
   waitMs(c: Counterpart, host: string): number {
     const now = this.now();
-    let wait = 0;
+    let longest = 0;
     for (const [i, limit] of c.limits.entries()) {
       if (limit.seconds > GATE_MAX_WINDOW_SECONDS) {
         continue;
       }
       const times = this.window(this.key(c, i, limit, host), limit, now);
       if (times.length >= limit.max) {
-        wait = Math.max(wait, times[times.length - limit.max] + limit.seconds * 1000 - now + 1);
+        longest = Math.max(longest, times[times.length - limit.max] + limit.seconds * 1000 - now + 1);
       }
     }
-    return wait;
+    return longest;
   }
 
   /**
