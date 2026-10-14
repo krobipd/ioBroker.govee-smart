@@ -1607,6 +1607,8 @@ describe("DeviceManager", () => {
         { instance: "filterLifeTime", value: 73 },
       ]);
       expect(dev.state.power, "the packet's own onOff still lands as before").toBe(false);
+      // a push that carries the mode reports mode and level itself — only that report confirms them (GV-13)
+      expect(dev.pushReports).toEqual(expect.arrayContaining(["control.mode_value", "control.work_mode"]));
     });
 
     it("a push that arrives before the state tree exists is held — and applied once the tree is released, newest packet only", () => {
@@ -6054,5 +6056,105 @@ describe("readLibrariesLive — the report's fresh look at Govee (E5)", () => {
     } as never);
     const live = await dm.readLibrariesLive(createTestDevice({ type: "devices.types.heater" }));
     expect(live).toEqual({ cloudScenes: { error: expect.stringContaining("503") as string }, cloudDiyScenes: [] });
+  });
+});
+
+describe("askStatus and the broker read-back — asking a device over the account broker (E1, K18)", () => {
+  function bench(unloading = false): {
+    dm: DeviceManager;
+    asked: Array<{ id: string; version: number }>;
+    fire: (i: number) => void;
+    cleared: unknown[];
+    device: GoveeDevice;
+    answer: () => void;
+    setAnswer: (v: boolean) => void;
+  } {
+    const asked: Array<{ id: string; version: number }> = [];
+    const pending: Array<() => void> = [];
+    const cleared: unknown[] = [];
+    let reply = true;
+    const timers = {
+      setInterval: () => undefined,
+      clearInterval: () => undefined,
+      delay: () => Promise.resolve(),
+      setTimeout: (cb: () => void) => {
+        pending.push(cb);
+        return pending.length as never;
+      },
+      clearTimeout: (h: unknown) => {
+        cleared.push(h);
+      },
+    } as never;
+    const dm = new DeviceManager(mockLog, timers, registry, new DeviceIdRegistry(), () => unloading);
+    dm.setStatusRequester((device, version) => {
+      asked.push({ id: device.deviceId, version });
+      return reply;
+    });
+    const device = createTestDevice({
+      lanIp: undefined,
+      lastLanSeenAt: undefined,
+      channels: { lan: false, mqtt: true, cloud: true },
+      iotTopic: "GD/abc",
+    });
+    (dm as any).devices.set(`${device.sku}_${device.deviceId}`, device);
+    return {
+      dm,
+      asked,
+      fire: i => pending[i](),
+      cleared,
+      device,
+      answer: () => dm.handleMqttStatus({ sku: device.sku, device: device.deviceId, state: { onOff: 1 } }),
+      setAnswer: v => {
+        reply = v;
+      },
+    };
+  }
+
+  it("returns as soon as the device answers, says after how long, and drops its own wait", async () => {
+    const b = bench();
+    const asking = b.dm.askStatus(b.device, 3000);
+    expect(b.asked).toEqual([{ id: b.device.deviceId, version: 2 }]);
+    expect(b.device.lastStatusRequestAt).toBeTypeOf("number");
+    b.answer();
+    const result = await asking;
+    expect(result.sent).toBe(true);
+    expect(result.answeredAfterMs).toBeTypeOf("number");
+    expect(b.cleared).toEqual([1]);
+  });
+
+  it("says nothing was sent when the broker cannot carry it, and waits for nothing", async () => {
+    const b = bench();
+    b.setAnswer(false);
+    await expect(b.dm.askStatus(b.device, 3000)).resolves.toEqual({ sent: false, cmdVersion: 2 });
+    expect(b.device.lastStatusRequestAt).toBeUndefined();
+  });
+
+  it("a device that stays silent is no answer — and a second report asking at the same time still gets its own", async () => {
+    const b = bench();
+    const first = b.dm.askStatus(b.device, 3000);
+    const second = b.dm.askStatus(b.device, 3000);
+    b.fire(0); // the first wait runs out
+    await expect(first).resolves.toEqual({ sent: true, cmdVersion: 2 });
+    b.answer();
+    const result = await second;
+    expect(result.answeredAfterMs).toBeTypeOf("number");
+  });
+
+  it("asks once after a broker command and stamps the request only when it went out", () => {
+    const b = bench();
+    (b.dm as any).commandRouter.onBrokerReadBack(b.device);
+    expect(b.asked).toEqual([{ id: b.device.deviceId, version: 2 }]);
+    expect(b.device.lastStatusRequestAt).toBeTypeOf("number");
+    const c = bench();
+    c.setAnswer(false);
+    (c.dm as any).commandRouter.onBrokerReadBack(c.device);
+    expect(c.asked).toHaveLength(1);
+    expect(c.device.lastStatusRequestAt).toBeUndefined();
+  });
+
+  it("asks nothing once the adapter is unloading", () => {
+    const b = bench(true);
+    (b.dm as any).commandRouter.onBrokerReadBack(b.device);
+    expect(b.asked).toEqual([]);
   });
 });

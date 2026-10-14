@@ -123,6 +123,32 @@ describe("DiagnosticsCollector", () => {
       expect(status.length).toBeLessThan(200);
     });
 
+    it("a secret in a packet's envelope is redacted when the packet is kept, not only when the report is made", () => {
+      const c = new DiagnosticsCollector(registry);
+      c.addMqttPacket("dev1", "GA/topic", {
+        rawJson: JSON.stringify({ cmd: "status", secretCode: "9f8e7d6c", state: { onOff: 1 } }),
+      });
+      const kept = JSON.stringify(
+        (c as unknown as { get(id: string): { packets: unknown } }).get("dev1").packets,
+        (_k, v: unknown) => (v instanceof Map ? [...v.values()] : v),
+      );
+      expect(kept).not.toContain("9f8e7d6c");
+    });
+
+    it("frames without an envelope are a status packet; frames with an envelope of another kind are not", async () => {
+      const c = new DiagnosticsCollector(registry);
+      c.addMqttPacket("dev1", "GA/topic", "qqgFAQEEAAAAA=");
+      c.addMqttPacket("dev1", "GA/topic", { hex: "qqgFAQEEAAAAB=", rawJson: JSON.stringify({ cmd: "multiSync" }) });
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.0.0")).lastMqttPackets as Array<{
+        kind: string;
+        hex?: string;
+      }>;
+      expect(packets.map(p => [p.hex, p.kind])).toEqual([
+        ["qqgFAQEEAAAAA=", "status"],
+        ["qqgFAQEEAAAAB=", "other"],
+      ]);
+    });
+
     it("rejects empty hex strings", async () => {
       const c = new DiagnosticsCollector(registry);
       c.addMqttPacket("dev1", "topic", "");

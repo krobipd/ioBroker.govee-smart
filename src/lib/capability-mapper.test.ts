@@ -23,6 +23,7 @@ import {
   mapCloudStateValue,
   musicModeNameUsesRgb,
   planCloudCapabilityWrites,
+  targetReadingsToCelsius,
   type StateDefinition,
 } from "./capability-mapper";
 import { DeviceRegistry } from "./device-registry";
@@ -3289,5 +3290,35 @@ describe("synthetic readings — one table for both paths (audit DRY-12)", () =>
     expect(known.name).toEqual(tName("lackOfWater"));
     expect(known.desc).toEqual(tDesc("descLackOfWater"));
     expect(unknown).toMatchObject({ id: "smoke_event", role: "indicator.alarm" });
+  });
+});
+
+describe("targetReadingsToCelsius — a /device/state target temperature in °C (GV-11)", () => {
+  const target = (value: unknown): { type: string; instance: string; state: { value: unknown } } => ({
+    type: "devices.capabilities.temperature_setting",
+    instance: "targetTemperature",
+    state: { value },
+  });
+
+  it("converts a bare number only for a device that works in °F", () => {
+    expect(targetReadingsToCelsius([target(77)] as never, true)[0].state.value).toBe(25);
+    expect(targetReadingsToCelsius([target(25)] as never, false)[0].state.value).toBe(25);
+  });
+
+  it("lets the unit the answer names decide over the device's default", () => {
+    const named = targetReadingsToCelsius([target({ targetTemperature: 77, unit: "Fahrenheit" })] as never, false)[0];
+    expect((named.state.value as Record<string, unknown>).targetTemperature).toBe(25);
+    const celsius = targetReadingsToCelsius([target({ targetTemperature: 25, unit: "Celsius" })] as never, true)[0];
+    expect((celsius.state.value as Record<string, unknown>).targetTemperature).toBe(25);
+  });
+
+  it("falls back to the device's unit when the answer names none", () => {
+    const plain = targetReadingsToCelsius([target({ temperature: 77 })] as never, true)[0];
+    expect((plain.state.value as Record<string, unknown>).temperature).toBe(25);
+  });
+
+  it("leaves every other capability alone", () => {
+    const other = { type: "devices.capabilities.range", instance: "brightness", state: { value: 77 } };
+    expect(targetReadingsToCelsius([other] as never, true)[0]).toBe(other);
   });
 });

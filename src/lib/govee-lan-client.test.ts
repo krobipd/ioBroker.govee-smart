@@ -491,6 +491,48 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     vi.useRealTimers();
   });
 
+  it("a release that leaves datagrams waiting arms the next one, an empty queue arms none, and stop drops the wait", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const pending: Array<() => void> = [];
+    const cleared: unknown[] = [];
+    const timers = {
+      ...lanTimers,
+      setTimeout: (fn: () => void) => pending.push(fn),
+      clearTimeout: (h: unknown) => cleared.push(h),
+    } as unknown as TimerAdapter;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[0];
+    const levels = Array.from({ length: 25 }, (_, i) => i + 1);
+    for (const level of levels) {
+      client.setBrightness("10.0.0.7", level);
+    }
+    const sent = (): number[] =>
+      sendSock.sends
+        .filter(d => d.address === "10.0.0.7")
+        .map(d => (decode(d) as { msg: { data: { value: number } } }).msg.data.value);
+    vi.setSystemTime(Date.now() + 1001);
+    pending.shift()!();
+    expect(sent()).toEqual(levels.slice(0, 20));
+    expect(pending, "five still wait — the next release is armed").toHaveLength(1);
+    vi.setSystemTime(Date.now() + 1001);
+    pending.shift()!();
+    expect(sent()).toEqual(levels);
+    expect(pending, "nothing waits — nothing is armed").toHaveLength(0);
+    for (const level of levels.slice(0, 12)) {
+      client.setBrightness("10.0.0.9", level);
+    }
+    expect(pending).toHaveLength(1);
+    client.stop();
+    expect(cleared, "the waiting release is dropped").toContain(1);
+    vi.useRealTimers();
+  });
+
   it("a datagram held for the limit goes out in the context of its own command — not of the one that armed the release", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const pending: Array<() => void> = [];

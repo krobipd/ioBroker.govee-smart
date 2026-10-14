@@ -39,6 +39,21 @@ describe("pseudonymiseReport — the Govee values no form pattern finds", () => 
     expect(out).toContain('"matterId":"matter-1"');
   });
 
+  it("each way a network name can stand is found on its own — ssid as a field, wifiName inside escaped JSON", () => {
+    const field = run({ ssid: "Hotspot Berg" });
+    expect(leaked(field, ["Hotspot Berg"])).toEqual([]);
+    expect(field).toContain('"ssid":"wifi-1"');
+    const escaped = run({ raw: '{\\"wifiName\\":\\"Alpenblick\\"}' });
+    expect(leaked(escaped, ["Alpenblick"])).toEqual([]);
+  });
+
+  it("an empty network name, an addr of 0 and a short digit id stay as they are — there is nothing to hide", () => {
+    const out = run({ wifiName: "", lanInfo: { addr: 0 }, log: "step 1234 done" }, [], ["1234"]);
+    expect(out).toContain('"wifiName":""');
+    expect(out).toContain('"addr":0');
+    expect(out).toContain("step 1234 done");
+  });
+
   it("the app's device number and a group id become placeholders; a groupId of 0 stays", () => {
     const out = run({ deviceId: 98765432, groupId: 7654321, none: { groupId: 0 }, text: '{"deviceId":98765432}' });
     expect(out).not.toContain("98765432");

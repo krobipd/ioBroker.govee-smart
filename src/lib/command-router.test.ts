@@ -1518,6 +1518,18 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(router.transportUsed(device, "colorRgb")).toBe("cloud");
   });
 
+  it("a command over the broker is recorded as the account broker's in the report and the diag log", async () => {
+    const { router } = cloudRouter();
+    router.setBrokerClient(makeBroker().client);
+    const results: Array<{ transport: string; ok: boolean }> = [];
+    const lines: string[] = [];
+    router.onCommandResult = (_, r) => results.push(r);
+    router.onDiagLog = (_, _level, msg) => lines.push(msg);
+    await router.sendCommand(makeDevice({ lanIp: undefined, iotTopic: TOPIC }), "power", true);
+    expect(results.map(r => r.transport)).toEqual(["Account broker"]);
+    expect(lines).toEqual(["sendCommand power=true → Account broker"]);
+  });
+
   it("without a Cloud path a broker that dropped refuses the command instead of pretending it went out", async () => {
     const router = new CommandRouter(mockLog, noopTimers, emptyRegistry());
     const broker = makeBroker();

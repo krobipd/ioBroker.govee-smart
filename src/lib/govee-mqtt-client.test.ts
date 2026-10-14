@@ -603,6 +603,30 @@ describe("GoveeMqttClient", () => {
       ]);
     });
 
+    it("a command the broker socket refuses is named on debug; a clean publish says nothing", async () => {
+      const { client } = connectedClient();
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      const inner = (client as unknown as { client: { connected: boolean; publish: unknown } }).client;
+      inner.connected = true;
+      const debug = vi.spyOn(mockLog, "debug");
+      try {
+        inner.publish = (_t: string, _p: string, _o: unknown, cb: (e?: Error) => void) => cb();
+        client.publishCommand("GD/0123456789abcdef0123456789abcdef", "turn", { val: 1 });
+        expect(debug.mock.calls.filter(([m]) => /MQTT command turn/.test(String(m)))).toEqual([]);
+        inner.publish = (_t: string, _p: string, _o: unknown, cb: (e?: Error) => void) =>
+          cb(new Error("socket closed"));
+        client.publishCommand("GD/0123456789abcdef0123456789abcdef", "turn", { val: 0 });
+        expect(
+          debug.mock.calls.filter(([m]) => /MQTT command turn to GD\/012… failed: socket closed/.test(String(m))),
+        ).toHaveLength(1);
+      } finally {
+        debug.mockRestore();
+      }
+    });
+
     it("commands and status requests together stay within the broker's minute cap less its protocol writes (GV-08)", async () => {
       const { client, published } = connectedClient();
       await client.connect(

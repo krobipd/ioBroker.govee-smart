@@ -21,6 +21,12 @@ describe("renderPage — one folded block per device type", () => {
     expect(page, "the type heading lives in the summary now").not.toContain("### Lights");
   });
 
+  it("each row names the version the model came with, and a dash where the catalog names none", () => {
+    const page = renderPage({ ...devices, H7101: { name: "Tower Fan", type: "fan", status: "seed" } }, TEXTS_EN);
+    expect(page).toContain("| `H6160` | Strip | ✅ | v2.0.0 |");
+    expect(page).toContain("| `H7101` | Tower Fan | ⚪ | — |");
+  });
+
   it("lists every model of the type inside its block, alphabetically", () => {
     const page = renderPage(devices, TEXTS_EN);
     const lights = page.slice(page.indexOf("<b>Lights</b>"), page.indexOf("<b>Fans</b>"));
