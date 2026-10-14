@@ -232,6 +232,11 @@ jobs:
           fi
       - name: Fail when the committed inventory differs from what the code produces
         run: |
+          # Round 110 (audit E-M1): `git diff` sees no file that was never committed — an untracked inventory passed.
+          if ! git ls-files --error-unmatch test/objects.inventory.json > /dev/null 2>&1; then
+            echo "::error ::test/objects.inventory.json is not committed — regenerate it (npm run test:inventory) and commit it with the code"
+            exit 1
+          fi
           if ! git diff --quiet -- test/objects.inventory.json; then
             git diff --stat -- test/objects.inventory.json
             echo "::error ::test/objects.inventory.json differs from what the adapter produces — regenerate it (npm run test:inventory) and commit it with the code"

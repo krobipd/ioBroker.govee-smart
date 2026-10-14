@@ -80,20 +80,20 @@ const RESOURCE_DIR = fs.mkdtempSync(path.join(require("node:os").tmpdir(), `${AD
 // any time (Round 77) — the start fills the memory with one bulk getStatesAsync.
 const READ_ONLY = new Set();
 /**
- * The environment of every adapter start: the resource probe first, then the test hooks of this adapter.
+ * The environment of every adapter start: the resource probe first, then the adapter's fixture hooks (FIXTURE_HOOKS,
+ * round 113), then the fleet hooks of this start — NETWORK_HOOK always last.
  *
- * @param {...string} hooks absolute paths of `--require` hooks (fixture servers, DNS)
+ * @param {...string} hooks the fleet hooks of this start (none, or NETWORK_HOOK)
  */
 function adapterEnv(...hooks) {
   return {
-    NODE_OPTIONS: [RESOURCE_PROBE, ...hooks].map(file => `--require ${file}`).join(" "),
+    NODE_OPTIONS: [RESOURCE_PROBE, ...FIXTURE_HOOKS, ...hooks].map(file => `--require ${file}`).join(" "),
     RESOURCE_PROBE_DIR: RESOURCE_DIR,
     RESOURCE_PROBE_NS: NS,
   };
 }
 // govee-smart: the https hook routes every Govee host to the fake cloud on this port. The harness hands the
 // mocha process's environment to the adapter process (`env: { ...process.env, ...env }`, @iobroker/testing 6.2.2).
-const HOOK = path.join(__dirname, "inventory-https-hook.cjs");
 const FIXTURE = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "inventory", "govee-cloud.json"), "utf8"));
 const FIXTURE_PORT = 18099;
 process.env.GOVEE_FIXTURE_PORT = String(FIXTURE_PORT);
@@ -129,6 +129,9 @@ const HANG_DEADLINE_MS = 120000;
 // Round 107 (W100-5): how long the adapter talks to its counterparts undisturbed before one of them begins to hang — long
 // enough for its own rhythm to show (a cadence seen only in the start burst is no rhythm).
 const HANG_WARMUP_MS = 90000;
+// Round 113 (the limits count each installation on its own — two quick starts of one installation still count together):
+// how long the suite "a restart right after the start" waits at most for the restarted process to fall quiet.
+const RESTART_QUIET_DEADLINE_MS = 120000;
 // Round 100 (krobi 2026-10-07 10:14: API limits are defined in the adapter and checked): the one place the adapter defines
 // the limits of every counterpart it calls — it imports the file itself, and the suite counts every call against it.
 const API_LIMITS = path.join(ADAPTER_DIR, "src", "lib", "api-limits.json");
@@ -841,6 +844,25 @@ const FIXTURE_NATIVE = {
   bind: "0.0.0.0",
 };
 /**
+ * Round 113 (krobi 2026-10-14 11:28, every copy improvised its own hook names before): adapter-specific — the `--require`
+ * hooks that route the adapter to its fixtures inside its own process (a host, a device address or `fetch` sent to the
+ * fixture; a DNS answer), each `path.join(__dirname, "<file>")`. adapterEnv puts them into EVERY start; no suite names
+ * a hook of its own. govee-smart: the https hook routes every Govee host to the fake cloud and both MQTT brokers to the
+ * fixture broker.
+ */
+const FIXTURE_HOOKS = [path.join(__dirname, "inventory-https-hook.cjs")];
+/**
+ * Round 113: adapter-specific — the instance's native for one start: FIXTURE_NATIVE, or what this run computes (fixture
+ * servers on ports chosen now, a device table built from them), plus what a suite asks for in `extra` (the chosen
+ * address, an adapter's own knob). Every suite sets its native through this, nothing else.
+ *
+ * @param {Record<string, unknown>} [extra] what this suite sets on top
+ * @returns {Promise<Record<string, unknown>>} the native for resetInstanceNative
+ */
+async function fixtureNative(extra = {}) {
+  return { ...FIXTURE_NATIVE, ...extra };
+}
+/**
  * Round 66 (reported by dl-manager): every datapoint of the previous release this release moves under a new id —
  * previous full id → current full id (adapter-specific like FIXTURE_NATIVE, may be computed). The recording is the
  * user's and goes on with the moved datapoint (krobi 2026-09-02); the upgrade suite checks that it arrived there.
@@ -1098,9 +1120,9 @@ async function dumpStates(harness) {
  * as a whole.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
- * @param {Record<string, unknown>} native the instance's native for this start (FIXTURE_NATIVE, or one computed per run)
+ * @param {Record<string, unknown>} native the instance's native for this start (from fixtureNative)
  */
-async function resetInstanceNative(harness, native = FIXTURE_NATIVE) {
+async function resetInstanceNative(harness, native) {
   const id = `system.adapter.${ADAPTER}.0`;
   const instance = await harness.objects.getObjectAsync(id);
   const stale = {};
@@ -1121,7 +1143,8 @@ async function resetInstanceNative(harness, native = FIXTURE_NATIVE) {
  * survives every suite and every run. A file the fresh-install suite wrote was still there when the upgrade suite
  * started, and hid the move of the seeded previous objects into that file — the suite stayed green without the move
  * ever running. A fresh installation has no data folder, so each suite starts without one; the second start of
- * `playControllerRestarts` keeps it, as a real host does.
+ * `playControllerRestarts` keeps it, as a real host does. Round 113: it marks the new installation (`<time>.install`) —
+ * the declared limits count each installation on its own (two fresh installations a minute apart cannot share a budget).
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  */
@@ -1130,6 +1153,7 @@ function clearInstanceData(harness) {
     throw new Error("the harness no longer carries testDir — clearInstanceData cannot find the instance data folder");
   }
   fs.rmSync(path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`), { recursive: true, force: true });
+  fs.writeFileSync(path.join(RESOURCE_DIR, `${Date.now()}.install`), "");
 }
 
 /**
@@ -1162,34 +1186,7 @@ function playControllerRestarts(harness, watch, ...hooks) {
       return;
     }
     restarts.count++;
-    restarts.done = (async () => {
-      await withinDeadline(
-        harness.stopAdapter(),
-        STOP_DEADLINE_MS,
-        "the adapter did not stop after it changed its instance object",
-      );
-      watch?.newStart();
-      // What the host does when the process exits: `alive` false (a start that still sees it true ends with
-      // ADAPTER_ALREADY_RUNNING, exit code 7), then the start after stopTimeout + 2.5 s.
-      await harness.states.setState(`system.adapter.${ADAPTER}.0.alive`, {
-        val: false,
-        ack: true,
-        from: "system.host.testing",
-      });
-      await new Promise(resolve => setTimeout(resolve, RESTART_DELAY_MS));
-      // @iobroker/testing refuses a second start of one harness ("already been used"); the host starts the same
-      // instance again — reset the exit marker, and fail loudly should the harness no longer keep it there.
-      harness._adapterExit = undefined;
-      assert.ok(
-        !harness.didAdapterStop(),
-        "@iobroker/testing changed its exit marker — the restart play needs a new form",
-      );
-      await withinDeadline(
-        harness.startAdapterAndWait(false, adapterEnv(...hooks)),
-        START_DEADLINE_MS,
-        "the adapter did not come back after the restart",
-      );
-    })();
+    restarts.done = restartAsTheHost(harness, watch, "after it changed its instance object", ...hooks);
     // Awaited by the suite later — a wait before that (feedFixtures) fails first on an adapter that hangs in its stop,
     // so a missed deadline is logged the moment it happens (and never counts as an unhandled rejection).
     restarts.done.catch(err => console.error(`restart play failed: ${err.message}`));
@@ -1213,6 +1210,59 @@ async function withinDeadline(promise, ms, what) {
     return await Promise.race([promise, expired]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * Round 64, a helper since round 113: stop the running adapter and start it again as the host does after a change of its
+ * instance object — the data folder stays, `alive` false, the start after RESTART_DELAY_MS. playControllerRestarts plays it
+ * on the adapter's own write; the suite "a restart right after the start" plays it on purpose.
+ *
+ * @param {import("@iobroker/testing").IntegrationTestHarness} harness
+ * @param {{ newStart(): void } | undefined} watch what watchObjectWrites returned
+ * @param {string} why when the restart comes, in the stop's failure message
+ * @param {...string} hooks the test hooks of the start (as for adapterEnv)
+ */
+async function restartAsTheHost(harness, watch, why, ...hooks) {
+  await withinDeadline(harness.stopAdapter(), STOP_DEADLINE_MS, `the adapter did not stop ${why}`);
+  watch?.newStart();
+  // What the host does when the process exits: `alive` false (a start that still sees it true ends with
+  // ADAPTER_ALREADY_RUNNING, exit code 7), then the start after stopTimeout + 2.5 s.
+  await harness.states.setState(`system.adapter.${ADAPTER}.0.alive`, {
+    val: false,
+    ack: true,
+    from: "system.host.testing",
+  });
+  await new Promise(resolve => setTimeout(resolve, RESTART_DELAY_MS));
+  // @iobroker/testing refuses a second start of one harness ("already been used"); the host starts the same
+  // instance again — reset the exit marker, and fail loudly should the harness no longer keep it there.
+  harness._adapterExit = undefined;
+  assert.ok(!harness.didAdapterStop(), "@iobroker/testing changed its exit marker — the restart play needs a new form");
+  await withinDeadline(
+    harness.startAdapterAndWait(false, adapterEnv(...hooks)),
+    START_DEADLINE_MS,
+    "the adapter did not come back after the restart",
+  );
+}
+
+/**
+ * Round 113: wait until no call was counted for SETTLE_MS since `since` — the restarted process has done its start's work
+ * (its state values exist from the first start, so waitForAdapterWork would end at once) — at most
+ * RESTART_QUIET_DEADLINE_MS (an adapter with a steady poll never falls quiet).
+ *
+ * @param {number} since the moment of the restart
+ */
+async function waitForQuietCalls(since) {
+  const deadline = Date.now() + RESTART_QUIET_DEADLINE_MS;
+  for (;;) {
+    const last =
+      readCalls()
+        .filter(c => c.t >= since)
+        .at(-1)?.t ?? since;
+    if (Date.now() - last >= SETTLE_MS || Date.now() > deadline) {
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, 250));
   }
 }
 
@@ -1529,24 +1579,33 @@ function channel(c) {
  * (round 100, yamaha copy with one planted MusicCast queue: green) — the suite "one counterpart hangs mid-run" sees it
  * (round 107, playHangMidRun). Returns it
  * and every channel of the OTHER counterparts in those starts (a device reached over one channel can still wait on the hung
- * one over another); `hung` is null where there are fewer than two channels — the rule does not apply there.
+ * one over another); `hung` is null where there are fewer than two channels — the rule does not apply there. Round 113
+ * (govee inv4): `usual` holds, per channel, the earliest it was reached in those starts, counted from its process's first
+ * call — a channel whose first contact always comes later than the moment the adapter gives up on the hung one cannot
+ * show a wait, and is not judged.
  */
 function startHang() {
   const calls = readCalls().filter(c => !c.kind.startsWith("hang-"));
+  const opened = new Map();
+  const usual = {};
+  for (const c of calls) {
+    opened.set(c.pid, opened.get(c.pid) ?? c.t);
+    usual[channel(c)] = Math.min(usual[channel(c)] ?? Infinity, c.t - opened.get(c.pid));
+  }
   const hosts = [...new Set(calls.map(c => c.host))];
   if (hosts.length >= 2) {
     fs.writeFileSync(HANG_FLAG, hosts[0]);
     const others = [...new Set(calls.filter(c => c.host !== hosts[0]).map(channel))];
-    return { hung: hosts[0], others, since: Date.now() };
+    return { hung: hosts[0], others, usual, since: Date.now() };
   }
   // Round 104: every counterpart on one host (fixtures on 127.0.0.1) — one CHANNEL hangs, the hook takes `<host> <port>`
   const ports = [...new Set(calls.map(c => `${c.host} ${c.port}`))];
   if (ports.length < 2) {
-    return { hung: null, others: [], since: Date.now() };
+    return { hung: null, others: [], usual, since: Date.now() };
   }
   fs.writeFileSync(HANG_FLAG, ports[0]);
   const others = [...new Set(calls.filter(c => `${c.host} ${c.port}` !== ports[0]).map(channel))];
-  return { hung: ports[0], others, since: Date.now() };
+  return { hung: ports[0], others, usual, since: Date.now() };
 }
 
 /**
@@ -1554,7 +1613,7 @@ function startHang() {
  * every call since the start; feedFixtures runs alongside, because it may wait for the hung counterpart too.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
- * @param {{ hung: string | null, others: string[], since: number }} hang what startHang chose
+ * @param {{ hung: string | null, others: string[], usual: Record<string, number>, since: number }} hang what startHang chose
  */
 async function playHang(harness, hang, restarts) {
   try {
@@ -1589,9 +1648,32 @@ async function playHang(harness, hang, restarts) {
 }
 
 /**
+ * Round 113 (govee inv4: an app-version check called once at the start was chosen and never hung): the counterpart that
+ * hangs mid-run is the one this process talked to last over a request or a connection, among those it reached at least
+ * twice in the warm-up — a single contact never comes again. One that only gets datagrams never waits on an answer; a
+ * host hangs as a whole where the requests go to two hosts or more, else one channel. Returns the word for the hang file
+ * (null where none qualifies) and every channel of the others.
+ *
+ * @param {{ kind: string, host: string, port: number, t: number }[]} seen the warm-up's calls of one process, oldest first
+ */
+function midRunHang(seen) {
+  const asked = seen.filter(c => c.kind !== "udp");
+  const byHost = new Set(asked.map(c => c.host)).size >= 2;
+  const wordOf = c => (byHost ? c.host : `${c.host} ${c.port}`);
+  const count = new Map();
+  for (const c of asked) {
+    count.set(wordOf(c), (count.get(wordOf(c)) ?? 0) + 1);
+  }
+  const last = asked.filter(c => count.get(wordOf(c)) >= 2).at(-1);
+  const word = last === undefined ? null : wordOf(last);
+  const others = word === null ? [] : [...new Set(seen.filter(c => wordOf(c) !== word).map(channel))];
+  return { word, others };
+}
+
+/**
  * Round 107 (W100-5, krobi 2026-10-07 10:12: one device never blocks another): the adapter first runs undisturbed for
- * HANG_WARMUP_MS (a restart the host plays starts the warm-up again), then the counterpart it reached first over a request
- * or a connection begins to hang while the adapter already talks to it — an open connection goes silent, every new contact
+ * HANG_WARMUP_MS (a restart the host plays starts the warm-up again), then the counterpart it talks to (midRunHang, round
+ * 113) begins to hang while the adapter already talks to it — an open connection goes silent, every new contact
  * hangs — until HANG_DEADLINE_MS have passed. Returns the hung counterpart and every channel of the others, the calls of
  * that one process from the start of its warm-up, and the end.
  *
@@ -1619,16 +1701,13 @@ async function playHangMidRun(harness, restarts) {
     }
     await new Promise(resolve => setTimeout(resolve, 500));
   }
-  // the counterpart this process reached first over a request or a connection — one that only gets datagrams never
-  // waits on an answer; a host hangs as a whole where the requests go to two hosts or more, else one channel
   const seen = readCalls().filter(c => c.pid === pid && c.t >= warm && !c.kind.startsWith("hang-"));
-  const first = seen.find(c => c.kind !== "udp");
-  const byHost = new Set(seen.filter(c => c.kind !== "udp").map(c => c.host)).size >= 2;
-  const word = first === undefined ? null : byHost ? first.host : `${first.host} ${first.port}`;
-  const others =
-    word === null
-      ? []
-      : [...new Set(seen.filter(c => (byHost ? c.host : `${c.host} ${c.port}`) !== word).map(channel))];
+  const { word, others } = midRunHang(seen);
+  if (word === null) {
+    console.log(
+      "      no counterpart was reached twice over a request or a connection in the warm-up — nothing hangs mid-run",
+    );
+  }
   const hang = { hung: others.length > 0 ? word : null, others, since: Date.now() };
   if (hang.hung !== null) {
     fs.writeFileSync(HANG_FLAG, hang.hung);
@@ -2135,11 +2214,11 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         seen = networkFiles();
-        restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         await feedFixtures(harness);
         await restarts.done;
         await waitForAdapterWork(harness);
@@ -2214,10 +2293,10 @@ tests.integration(ADAPTER_DIR, {
         this.timeout(120000);
         harness = getHarness();
         clearInstanceData(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, SECOND_LANGUAGE);
-        restarts = playControllerRestarts(harness, null, HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+        restarts = playControllerRestarts(harness, null);
+        await harness.startAdapterAndWait(false, adapterEnv());
         await feedFixtures(harness);
         await restarts.done;
         await waitForAdapterWork(harness);
@@ -2248,10 +2327,10 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
-        restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         await feedFixtures(harness);
         await restarts.done;
         await waitForAdapterWork(harness);
@@ -2343,6 +2422,49 @@ tests.integration(ADAPTER_DIR, {
       });
     });
 
+    // Round 113 (the limits count each installation on its own, rule 9 of the tool: what was blocked stays blocked): the
+    // instance restarts right after its first start, the data folder kept as a host keeps it. An adapter that fetches
+    // everything again on every start calls its account twice within a minute — the limit test of the next suite judges
+    // this installation with both processes. Placed before `one counterpart hangs`, whose limit test reads it.
+    suite("a restart right after the start", getHarness => {
+      let harness;
+      let watch;
+      let restarts;
+      let pids;
+      before(async function () {
+        this.timeout(
+          120000 + STOP_DEADLINE_MS + RESTART_DELAY_MS + START_DEADLINE_MS + RESTART_QUIET_DEADLINE_MS + 60000,
+        );
+        harness = getHarness();
+        clearInstanceData(harness);
+        watch = await watchObjectWrites(harness);
+        await resetInstanceNative(harness, await fixtureNative());
+        await setSystemLanguage(harness, FIRST_LANGUAGE);
+        const since = Date.now();
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
+        await feedFixtures(harness);
+        await restarts.done;
+        await waitForAdapterWork(harness);
+        const again = Date.now();
+        await restartAsTheHost(harness, watch, "right after the start", NETWORK_HOOK);
+        await feedFixtures(harness);
+        await waitForQuietCalls(again);
+        pids = new Set(
+          readCalls()
+            .filter(c => c.t >= since)
+            .map(c => c.pid),
+        );
+      });
+
+      it("comes up again in the same installation", function () {
+        assert.ok(
+          pids.size >= 2,
+          `${pids.size} counted process(es) after the restart — the limit test would judge one start only`,
+        );
+      });
+    });
+
     // Round 100 (krobi 2026-10-07 10:12/10:14): one counterpart hangs from the start — the adapter reaches every other one
     // before it gives up on the hung one, so one device never blocks another. Every call of this run and the one before
     // goes to a counterpart the adapter declares in src/lib/api-limits.json, and stays within every limit there.
@@ -2356,11 +2478,11 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
-        restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         hang = startHang();
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         hang = await playHang(harness, hang, restarts);
       });
       // Mocha may give up on before() while playHang still waits — the next suite must not start with a hung counterpart.
@@ -2378,7 +2500,16 @@ tests.integration(ADAPTER_DIR, {
           `${hang.hung} never hung — a pooled connection or a hook below answered for it`,
         );
         const end = hang.calls.find(c => c.kind === "hang-idle" && hungIs(c))?.t ?? Infinity;
-        const late = hang.others.filter(
+        // round 113 (govee inv4): a channel first reached in the starts before only after the moment this process
+        // gave up on the hung one (counted from its first line) cannot show a wait — it is judged where it came earlier
+        const gaveUp = end - (hang.calls[0]?.t ?? end);
+        const judged = hang.others.filter(k => hang.usual[k] < gaveUp);
+        if (hang.hung !== null && judged.length === 0) {
+          console.log(
+            `      no other counterpart came before ${hang.hung} was given up in the starts before — this run measured nothing`,
+          );
+        }
+        const late = judged.filter(
           k => !(hang.calls.find(c => !c.kind.startsWith("hang-") && channel(c) === k)?.t < end),
         );
         assert.deepStrictEqual(
@@ -2410,12 +2541,22 @@ tests.integration(ADAPTER_DIR, {
 
       it("stays within every limit it declares", function () {
         const calls = readCalls().filter(c => !c.kind.startsWith("hang-"));
+        // round 113 (govee inv4): each installation counts on its own — a suite begins one in clearInstanceData; a
+        // process belongs to the installation its first call falls in, with the restarts the host plays in it
+        const installs = fs
+          .readdirSync(RESOURCE_DIR)
+          .filter(f => f.endsWith(".install"))
+          .map(f => Number(f.slice(0, -".install".length)));
+        const installOf = new Map();
+        for (const c of calls) {
+          installOf.set(c.pid, installOf.get(c.pid) ?? installs.filter(t => t <= c.t).length);
+        }
         const over = [];
         for (const d of apiLimits()) {
           for (const limit of d.limits) {
             const lanes = new Map();
             for (const c of calls.filter(c => fits(c, d.match))) {
-              const lane = limit.per === "host" ? c.host : "account";
+              const lane = `${limit.per === "host" ? c.host : "account"}, installation ${installOf.get(c.pid)}`;
               lanes.set(lane, [...(lanes.get(lane) ?? []), c.t]);
             }
             for (const [lane, times] of lanes) {
@@ -2452,10 +2593,10 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
-        restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         hang = await playHangMidRun(harness, restarts);
       });
       // Mocha may give up on before() while playHangMidRun still waits — the next suite must not start with a hung counterpart.
@@ -2529,12 +2670,12 @@ tests.integration(ADAPTER_DIR, {
           this.timeout(TAKEN_WINDOW_MS + 120000);
           harness = getHarness();
           clearInstanceData(harness);
-          await resetInstanceNative(harness);
+          await resetInstanceNative(harness, await fixtureNative());
           const plan = listenPortPlan();
           held = await takePorts(plan.taken, plan.address);
           const seen = networkFiles();
           const since = Date.now();
-          await harness.startAdapter(adapterEnv(HOOK, NETWORK_HOOK));
+          await harness.startAdapter(adapterEnv(NETWORK_HOOK));
           const fed = feedFixtures(harness).then(
             () => undefined,
             err => err,
@@ -2600,10 +2741,10 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
-        restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+        restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+        await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         await feedFixtures(harness);
         await restarts.done;
         await waitForAdapterWork(harness);
@@ -2668,10 +2809,10 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
-        await resetInstanceNative(harness);
+        await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
-        restarts = playControllerRestarts(harness, watch, HOOK);
-        await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+        restarts = playControllerRestarts(harness, watch);
+        await harness.startAdapterAndWait(false, adapterEnv());
         await feedFixtures(harness);
         await feedReservedNames(harness);
         await restarts.done;
@@ -2711,9 +2852,9 @@ tests.integration(ADAPTER_DIR, {
           harness = getHarness();
           clearInstanceData(harness);
           const seen = networkFiles();
-          await resetInstanceNative(harness, { ...FIXTURE_NATIVE, [ADDRESS_KEY]: CHOSEN_ADDRESS });
-          restarts = playControllerRestarts(harness, null, HOOK, NETWORK_HOOK);
-          await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+          await resetInstanceNative(harness, await fixtureNative({ [ADDRESS_KEY]: CHOSEN_ADDRESS }));
+          restarts = playControllerRestarts(harness, null, NETWORK_HOOK);
+          await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
           await feedFixtures(harness);
           await restarts.done;
           await waitForAdapterWork(harness);
@@ -2749,9 +2890,9 @@ tests.integration(ADAPTER_DIR, {
           this.timeout(180000);
           harness = getHarness();
           clearInstanceData(harness);
-          await resetInstanceNative(harness, { ...FIXTURE_NATIVE, [ADDRESS_KEY]: MISSING_ADDRESS });
-          restarts = playControllerRestarts(harness, null, HOOK, NETWORK_HOOK);
-          await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+          await resetInstanceNative(harness, await fixtureNative({ [ADDRESS_KEY]: MISSING_ADDRESS }));
+          restarts = playControllerRestarts(harness, null, NETWORK_HOOK);
+          await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
           // The fixtures reach the adapter on every address — that it keeps working. No waitForAdapterWork: a
           // missing address may keep the adapter's state short of green (fakeroku F-06: yellow until changed).
           await feedFixtures(harness);
@@ -2790,10 +2931,10 @@ tests.integration(ADAPTER_DIR, {
           harness = getHarness();
           clearInstanceData(harness);
           watch = await watchObjectWrites(harness);
-          await resetInstanceNative(harness);
+          await resetInstanceNative(harness, await fixtureNative());
           await setSystemLanguage(harness, FIRST_LANGUAGE);
-          restarts = playControllerRestarts(harness, watch, HOOK, NETWORK_HOOK);
-          await harness.startAdapterAndWait(false, adapterEnv(HOOK, NETWORK_HOOK));
+          restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
+          await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
           await feedFixtures(harness);
           await restarts.done;
           await waitForAdapterWork(harness);
@@ -3006,12 +3147,12 @@ tests.integration(ADAPTER_DIR, {
           await seedInstanceData(harness, previous);
           await restoreMaskedSecrets(harness);
           maskedLeft = await maskedSecretsLeft(harness);
-          await resetInstanceNative(harness);
+          await resetInstanceNative(harness, await fixtureNative());
           // The inventory was written in FIRST_LANGUAGE: labels an adapter localises itself (`states`)
           // only compare in the same language.
           await setSystemLanguage(harness, FIRST_LANGUAGE);
-          restarts = playControllerRestarts(harness, watch, HOOK);
-          await harness.startAdapterAndWait(false, adapterEnv(HOOK));
+          restarts = playControllerRestarts(harness, watch);
+          await harness.startAdapterAndWait(false, adapterEnv());
           await feedFixtures(harness);
           // On the seeded set feedFixtures may return at once, or wait for a state this run writes
           // itself; waitForAdapterWork adds the adapter's last start step either way.
@@ -3187,6 +3328,17 @@ after(function () {
       .filter(([id]) => READ_ONLY.has(id))
       .map(([id, n]) => `${id} ×${n}`),
   );
+  // Round 113: every TCP connection and unicast datagram of the run ends on this machine (the probe sees where a fixture
+  // hook sent it)
+  const away = [
+    ...new Set(
+      files
+        .filter(f => f.endsWith(".lands"))
+        .flatMap(f => fs.readFileSync(path.join(RESOURCE_DIR, f), "utf8").split("\n").filter(Boolean))
+        .map(l => JSON.parse(l))
+        .map(c => `${c.kind} ${c.host}:${c.port}`),
+    ),
+  ];
   fs.rmSync(RESOURCE_DIR, { recursive: true, force: true });
   assert.ok(starts.length > 0, "no adapter start loaded the resource probe — a start without adapterEnv()");
   assert.deepStrictEqual(silent, [], "adapter processes that never reached their exit (killed or crashed)");
@@ -3200,5 +3352,10 @@ after(function () {
     single,
     [],
     `read-only states read one by one from the database (one bulk getStatesAsync at the start, then compare in memory):\n${single.join("\n")}`,
+  );
+  assert.deepStrictEqual(
+    away,
+    [],
+    `connections that left this machine — the run reached the real world (a route missing in FIXTURE_HOOKS, a device on the network):\n${away.join("\n")}`,
   );
 });
