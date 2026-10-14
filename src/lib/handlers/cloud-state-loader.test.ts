@@ -111,6 +111,19 @@ const batteryCap: CloudStateCapability = {
 };
 
 describe("loadCloudStates", () => {
+  it("writes only a change — a restart or an upgrade loads the same values without rewriting them (round 104)", async () => {
+    const cloudOnly = createTestDevice({
+      deviceId: "AA:03",
+      lanIp: undefined,
+      channels: { lan: false, mqtt: false, cloud: true },
+    });
+    const rig = makeRig([cloudOnly]);
+    rig.setDeviceState(() => Promise.resolve([powerCap]));
+    await loadCloudStates(rig.adapter);
+    await loadCloudStates(rig.adapter);
+    expect(rig.writes.filter(w => w.id.endsWith(".control.power"))).toHaveLength(1);
+  });
+
   it("writes mapped values for cloud devices, filtering LAN-owned ids on LAN-capable lights (LAN-first invariant)", async () => {
     const lanLight = createTestDevice({
       deviceId: "AA:01",
@@ -563,7 +576,7 @@ describe("writeCloudStateValues — the writer shared by the load and the correc
   const cloudOnly = (): GoveeDevice =>
     createTestDevice({ deviceId: "AA:51", lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
 
-  it('"set" writes every value, also an unchanged one — the load behaves as before', async () => {
+  it('"set" writes every value, also an unchanged one', async () => {
     const rig = makeRig([]);
     const device = cloudOnly();
     expect(await writeCloudStateValues(rig.adapter, device, [powerCap], "set")).toBe(true);

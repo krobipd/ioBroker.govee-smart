@@ -179,6 +179,38 @@ describe("library-loader — loadDeviceLibraries", () => {
       { name: "Snap2", cmds: [["FRESH_PACKET_2"]] },
     ]);
   });
+
+  it("an answer without packets is remembered — the next start does not ask for the same snapshots again", async () => {
+    const device = createTestDevice({
+      snapshots: [
+        { name: "Snap1", value: 1 },
+        { name: "Snap2", value: 2 },
+      ],
+    });
+    let asked = 0;
+    const api = {
+      hasBearerToken: () => true,
+      fetchSceneLibrary: () => Promise.resolve([]),
+      fetchMusicLibrary: () => Promise.resolve([]),
+      fetchDiyLibrary: () => Promise.resolve([]),
+      fetchSkuFeatures: () => Promise.resolve(null),
+      fetchSnapshots: () => {
+        asked++;
+        return Promise.resolve([]);
+      },
+    };
+    const host = makeHost(setupMockCloud([]), api);
+    await loadDeviceLibraries(host, device, device.sku, false);
+    expect(device.snapshotBleCmds).toEqual([
+      { name: "Snap1", cmds: [] },
+      { name: "Snap2", cmds: [] },
+    ]);
+    await loadDeviceLibraries(host, device, device.sku, false);
+    expect(asked).toBe(1);
+    device.snapshots = [...device.snapshots, { name: "Snap3", value: 3 }]; // a snapshot added in the app
+    await loadDeviceLibraries(host, device, device.sku, false);
+    expect(asked).toBe(2);
+  });
 });
 
 describe("library-loader — without an account token the token endpoints are not asked (M3, 2.40.0)", () => {
@@ -336,8 +368,13 @@ describe("library-loader — one library fetch per SKU and run, an empty answer 
     (api as { fetchSceneLibrary: () => Promise<unknown> }).fetchSceneLibrary = () =>
       Promise.reject(new HttpError("HTTP 500", 500, {}));
     const host = { ...makeHost(setupMockCloud([]), api), sharedFetches: new Map() };
-    const a = createTestDevice({ deviceId: "AA:01", sceneLibrary: [{ name: "Old", sceneCode: 9, scenceParam: "" }] });
-    const b = createTestDevice({ deviceId: "AA:02", sceneLibrary: [] });
+    // no snapshots: their packet answer (remembered even when empty) is not what this test is about
+    const a = createTestDevice({
+      deviceId: "AA:01",
+      sceneLibrary: [{ name: "Old", sceneCode: 9, scenceParam: "" }],
+      snapshots: [],
+    });
+    const b = createTestDevice({ deviceId: "AA:02", sceneLibrary: [], snapshots: [] });
     await expect(
       Promise.all([loadDeviceLibraries(host, a, "H6160", true), loadDeviceLibraries(host, b, "H6160", true)]),
     ).resolves.toEqual([false, false]);

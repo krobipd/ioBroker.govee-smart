@@ -499,13 +499,13 @@ export async function loadDeviceLibraries(
         host.log.debug(
           `Snapshot BLE for ${sku}: ${snaps.length} snapshot(s) with local data${snaps.length === 0 ? " — Govee returned no BLE-cmds for this SKU/device" : ""}`,
         );
-        if (snaps.length > 0) {
-          device.snapshotBleCmds = device.snapshots.map(ds => ({
-            name: ds.name,
-            cmds: snaps.find(s => s.name === ds.name)?.bleCmds ?? [],
-          }));
-          changed = true;
-        }
+        // An answer without packets is remembered too (each snapshot with no commands, it goes over the Cloud):
+        // otherwise every restart asked again for the same snapshots — only a changed name list fetches anew.
+        device.snapshotBleCmds = device.snapshots.map(ds => ({
+          name: ds.name,
+          cmds: snaps.find(s => s.name === ds.name)?.bleCmds ?? [],
+        }));
+        changed = true;
       } catch (e) {
         host.diagnostics.recordApiFailure(device.deviceId, ep, e, extractHttpStatus(e));
         logUndocApiFailure(host.log, sku, "snapshot BLE", ep, hasBearer, e);

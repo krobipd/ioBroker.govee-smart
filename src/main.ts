@@ -698,12 +698,6 @@ export class GoveeAdapter extends utils.Adapter {
         ),
     });
 
-    // info channel + states are declared as instanceObjects in
-    // io-package.json, so js-controller materialises them on install /
-    // upgrade. We only initialise the runtime values here.
-    await this.setState("info.connection", { val: false, ack: true });
-    await this.setState("info.cloudConnected", { val: false, ack: true });
-
     // Device catalog from devices.json in the adapter package root — built
     // before anything that applies quirks. Status filter: verified+reported
     // active by default; seed-status entries need the experimentalQuirks toggle.
@@ -715,6 +709,12 @@ export class GoveeAdapter extends utils.Adapter {
     this.stateManager = new StateManager(this, this.deviceRegistry);
     // One bulk read of every stored value: read-only states are compared in memory from here on (fleet rule, round 77).
     await this.stateManager.primeReadOnly();
+    // info channel + states are declared as instanceObjects in io-package.json, so js-controller materialises them on
+    // install / upgrade. Only the runtime values start here — read-only, so written only when the last run left another.
+    await this.stateManager.writeReadOnly("info.connection", false);
+    await this.stateManager.writeReadOnly("info.cloudConnected", false);
+    // the change-only writers of both flags start from what was just written (cloudConnectedShown starts false)
+    this.lastConnectionState = false;
     // The account and event flags go through the state manager's read-only
     // writer from their first write on: every later callback writes only a
     // change (a login retry used to rewrite `false` each time). The stale

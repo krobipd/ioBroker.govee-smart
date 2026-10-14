@@ -82,7 +82,7 @@ export function cloudReportsOffline(caps: CloudStateCapability[]): boolean {
  * @param adapter Adapter surface
  * @param device  The device the answer belongs to
  * @param caps    The answer's capabilities
- * @param mode    `"set"` writes every value (the load); `"changed"` skips an
+ * @param mode    `"set"` writes every value; `"changed"` (the load and the correction read) skips an
  *   unchanged one — `setStateChanged` compares value AND ack, so a user's
  *   unconfirmed wish is still overwritten by the device's confirmed value
  * @returns false when Govee reports the device offline and nothing was written
@@ -190,7 +190,8 @@ export async function loadCloudStates(adapter: CloudStateLoaderAdapter, only?: G
         // with no local API this is the ONLY evidence there is, so without it
         // such a device could never be shown as reachable at all.
         adapter.deviceManager?.applyCloudStateOnline(device, caps);
-        await writeCloudStateValues(adapter, device, caps, "set");
+        // Only a change is written (round 104, GV-05): a restart or an upgrade loads the same values again.
+        await writeCloudStateValues(adapter, device, caps, "changed");
       } catch (e) {
         // v2.9.1 — record failure with HTTP status (and HttpError.responseBody
         // when available) so the diag JSON shows why state-load failed instead
