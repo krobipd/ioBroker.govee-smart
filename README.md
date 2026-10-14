@@ -113,6 +113,8 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Changed: an untested model asks in the log for the experimental switch and a diagnostics report again, and never claims that it works
 - New: seven models added as untested: Smart Gateway 1s (H5044, R5044), Wi-Fi Gateway (H5151), Smart Light (H610E, H610F), Outdoor String Lights 2 (H7030), Smart Fan (H7108)
 - Improved: a Govee service that does not answer is shown as a state instead of repeated log warnings; any other error is warned once until it is gone
+- Fixed: with a network address chosen in the settings, every connection to Govee now leaves from it — the Cloud, your account and the event connection included
+- Improved: a restart writes no unchanged value again and does not ask Govee once more for snapshot data it already has, which saves calls and database writes
 
 ### 3.1.1 (2026-10-01)
 
