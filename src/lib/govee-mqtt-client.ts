@@ -1,5 +1,4 @@
 import * as crypto from "node:crypto";
-import * as forge from "node-forge";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
 import { limitOf } from "./api-limits";
@@ -14,6 +13,7 @@ import {
   clampTimerMs,
   tokenTtlSeconds,
 } from "./timing-constants";
+import { readPkcs12 } from "./pkcs12";
 import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient, type MqttConnectFn } from "./reconnecting-mqtt-client";
 import {
   type GoveeIotKeyResponse,
@@ -1366,27 +1366,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param password PKCS12 password
    */
   private extractCertsFromP12(p12Base64: string, password: string): { key: string; cert: string; ca: string } {
-    const p12Der = forge.util.decode64(p12Base64);
-    const p12Asn1 = forge.asn1.fromDer(p12Der);
-    const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, password);
-
-    // Extract private key
-    const keyBags = p12.getBags({
-      bagType: forge.pki.oids.pkcs8ShroudedKeyBag,
-    });
-    const keyBag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0];
-    if (!keyBag?.key) {
-      throw new Error("No private key found in P12");
-    }
-    const key = forge.pki.privateKeyToPem(keyBag.key);
-
-    // Extract certificate
-    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-    const certBag = certBags[forge.pki.oids.certBag]?.[0];
-    if (!certBag?.cert) {
-      throw new Error("No certificate found in P12");
-    }
-    const cert = forge.pki.certificateToPem(certBag.cert);
+    const { key, cert } = readPkcs12(Buffer.from(p12Base64, "base64"), password);
 
     // AWS IoT uses Amazon Root CA
     const ca = AMAZON_ROOT_CA1;

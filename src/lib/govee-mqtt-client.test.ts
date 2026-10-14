@@ -644,7 +644,7 @@ describe("GoveeMqttClient", () => {
       client.setPersistedCredentials({
         bearerToken: "stale-tok",
         iotEndpoint: "iot.example.com",
-        p12Cert: "AAA=", // invalid → forge throws
+        p12Cert: "AAA=", // invalid → readPkcs12 throws
         p12Pass: "x",
         accountId: "acc-stale",
         accountTopic: "GA/topic-stale",
@@ -677,7 +677,7 @@ describe("GoveeMqttClient", () => {
         fake.fn,
         (() => fakeMqtt) as never,
       );
-      // Valid p12 (bypass forge) + valid TTL → tryPersistedReuse succeeds → the
+      // Valid p12 (bypass the P12 parse) + valid TTL → tryPersistedReuse succeeds → the
       // MQTT socket is opened from the cache with NO login/getIotKey HTTP.
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
@@ -866,8 +866,8 @@ describe("GoveeMqttClient", () => {
   });
 
   // The connect→subscribe happy path was previously unreachable in tests (the
-  // node-forge P12 parse gates it). Drive login + getIotKey to success, bypass
-  // the forge parse, and inject a fake mqtt client so the connect handler runs —
+  // the P12 parse gates it). Drive login + getIotKey to success, bypass
+  // the P12 parse, and inject a fake mqtt client so the connect handler runs —
   // proving the M3 backoff-reset timing symmetrically with the openapi client.
   describe("connect → subscribe backoff timing (M3)", () => {
     function driveToConnected(subscribeErr: Error | null): {
@@ -907,7 +907,7 @@ describe("GoveeMqttClient", () => {
         fake.fn,
         (() => fakeMqtt) as never,
       );
-      // Bypass the node-forge PKCS12 parse — not what this test exercises.
+      // Bypass the PKCS12 parse — not what this test exercises.
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
         cert: "c",

@@ -41,7 +41,7 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 **ioBroker Govee Smart Adapter** — steuert Govee-WLAN-Geräte: Lichter (Strips, Lampen, Panels), Sensoren (Thermo-/Hygrometer, Luftqualität), Haushaltsgeräte (Heizer, Luftbefeuchter, Wasserkocher, Eiswürfelbereiter, Ventilator, Luftreiniger …). **LAN first** für Lichter, **App-API + OpenAPI-MQTT** für Sensoren/Haushaltsgeräte, **Cloud-REST** für Fähigkeiten und als Steuer-Rückfall.
 
 - Version in `io-package.json`; Changelog in `README.md` + `io-package.json:common.news` (11 Sprachen, handgeschrieben); interne Historie `.claude/dev-history.md`.
-- GitHub https://github.com/krobipd/ioBroker.govee-smart · npm `iobroker.govee-smart` · Runtime-Deps `@iobroker/adapter-core`, `mqtt`, `node-forge` · Wiki bilingual EN/DE (über `wiki.json` Teil der Release-Kette).
+- GitHub https://github.com/krobipd/ioBroker.govee-smart · npm `iobroker.govee-smart` · Runtime-Deps `@iobroker/adapter-core`, `mqtt` (das P12 des Konto-Brokers liest der eigene `pkcs12.ts`: nur PBE-SHA1-3DES und PBE-SHA1-RC2-40 wie govee2mqtts p12 0.6.3, RC2 nach RFC 2268 selbst, weil Nodes OpenSSL 3 es nur im Legacy-Provider hat; node-forge ist seit GHSA-86w9-cpqp-85rv nur Entwicklungsabhängigkeit) · Wiki bilingual EN/DE (über `wiki.json` Teil der Release-Kette).
 - Die APIs (LAN-Protokoll, AWS-IoT-MQTT, ptReal BLE-over-LAN, Scene-Speed, Segment-Erkennung, Snapshot-ptReal) sind größtenteils **undokumentiert**; Protokoll-Detail in `Ressourcen/govee-smart/`.
 
 ## LAN-first für Lichter
