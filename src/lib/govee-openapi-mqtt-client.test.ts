@@ -32,6 +32,9 @@ const mqttMock = vi.hoisted(() => {
     subscribe(topic: string, opts: unknown, cb: (e: Error | null) => void): void;
     end(force: boolean): void;
     removeAllListeners(): FakeClient;
+    eventNames(): string[];
+    listeners(ev: string): Array<(...args: unknown[]) => void>;
+    removeListener(ev: string, cb: (...args: unknown[]) => void): FakeClient;
   }
   const clients: FakeClient[] = [];
   let subscribeBehavior: (cb: (e: Error | null) => void) => void = cb => cb(null);
@@ -58,6 +61,14 @@ const mqttMock = vi.hoisted(() => {
         removeAllListeners() {
           for (const k of Object.keys(handlers)) {
             delete handlers[k];
+          }
+          return c;
+        },
+        eventNames: () => Object.keys(handlers).filter(k => handlers[k]),
+        listeners: ev => (handlers[ev] ? [handlers[ev]] : []),
+        removeListener(ev, cb) {
+          if (handlers[ev] === cb) {
+            delete handlers[ev];
           }
           return c;
         },

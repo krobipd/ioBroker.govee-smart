@@ -1,3 +1,5 @@
+import * as net from "node:net";
+import * as mqtt from "mqtt";
 import { CONNECT_WINDOW_MS, ReconnectingMqttClient, computeBackoffDelay } from "./reconnecting-mqtt-client";
 import { type TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
@@ -64,6 +66,9 @@ class TestClient extends ReconnectingMqttClient {
   public open(connectFn: (url: string, opts: Record<string, unknown>) => unknown): void {
     this.openBroker(connectFn as never, "mqtts://broker.example:8883", { keepalive: 60 });
   }
+  public openAt(connectFn: (url: string, opts: Record<string, unknown>) => unknown, url: string): void {
+    this.openBroker(connectFn as never, url, { keepalive: 60, connectTimeout: 30_000 });
+  }
   public get hasArmedTimer(): boolean {
     return this.reconnectTimer !== undefined;
   }
@@ -115,7 +120,13 @@ describe("ReconnectingMqttClient base scaffolding", () => {
     it("a third reconnect inside the minute waits until the first connect left the window", () => {
       const t = makeCapturingTimers();
       const c = new TestClient(mockLog, t.timers);
-      const connect = (): unknown => ({ removeAllListeners: () => {}, on: () => {}, end: () => {} });
+      const connect = (): unknown => ({
+        removeAllListeners: () => {},
+        on: () => {},
+        end: () => {},
+        eventNames: () => [],
+        listeners: () => [],
+      });
       c.open(connect);
       c.arm();
       expect(t.scheduled[0].ms).toBeLessThanOrEqual(10_000); // one connect so far — the plain backoff
@@ -126,6 +137,35 @@ describe("ReconnectingMqttClient base scaffolding", () => {
     });
   });
 
+  describe("releaseClient — a client ended while it still waits for CONNACK", () => {
+    it("leaves mqtt.js's own close handler in place, so its CONNACK timer stops with the socket", async () => {
+      // a broker that takes the connection and never answers — the client sits in its connectTimeout
+      const sockets: net.Socket[] = [];
+      const server = net.createServer(socket => sockets.push(socket));
+      await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+      const { port } = server.address() as net.AddressInfo;
+      const c = new TestClient(mockLog, makeCapturingTimers().timers);
+      let client: mqtt.MqttClient | undefined;
+      c.openAt((url, opts) => (client = mqtt.connect(url, opts)), `mqtt://127.0.0.1:${port}`);
+      const internals = (): { connackTimer?: { _destroyed?: boolean } } => client as never;
+      const until = async (done: () => boolean): Promise<void> => {
+        for (let i = 0; i < 100 && !done(); i++) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+      };
+      try {
+        await until(() => !!internals().connackTimer);
+        expect(internals().connackTimer?._destroyed).toBe(false);
+        c.disconnect();
+        await until(() => internals().connackTimer?._destroyed === true);
+        expect(internals().connackTimer?._destroyed).toBe(true);
+      } finally {
+        sockets.forEach(socket => socket.destroy());
+        await new Promise(resolve => server.close(resolve));
+      }
+    });
+  });
+
   describe("openBroker — the chosen network address (fleet master network-address.ts)", () => {
     it("connects from the chosen address, and from any address without one", () => {
       const t = makeCapturingTimers();
@@ -133,7 +173,7 @@ describe("ReconnectingMqttClient base scaffolding", () => {
       const seen: Array<Record<string, unknown>> = [];
       const connect = (_url: string, opts: Record<string, unknown>): unknown => {
         seen.push(opts);
-        return { removeAllListeners: () => {}, on: () => {}, end: () => {} };
+        return { removeAllListeners: () => {}, on: () => {}, end: () => {}, eventNames: () => [], listeners: () => [] };
       };
       c.open(connect);
       c.localAddress = "10.47.4.175";

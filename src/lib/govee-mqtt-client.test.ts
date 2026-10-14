@@ -511,6 +511,9 @@ describe("GoveeMqttClient", () => {
         },
         end: () => undefined,
         removeAllListeners: () => undefined,
+        eventNames: () => [],
+        listeners: () => [],
+        removeListener: () => undefined,
       };
       const client = new GoveeMqttClient(
         "u@example.com",
@@ -668,6 +671,9 @@ describe("GoveeMqttClient", () => {
         subscribe: (_t: string, _o: unknown, cb: (e: Error | null) => void) => cb(null),
         end: () => undefined,
         removeAllListeners: () => undefined,
+        eventNames: () => [],
+        listeners: () => [],
+        removeListener: () => undefined,
       };
       const client = new GoveeMqttClient(
         "u@example.com",
@@ -744,6 +750,9 @@ describe("GoveeMqttClient", () => {
         subscribe: () => undefined,
         end: () => undefined,
         removeAllListeners: () => undefined,
+        eventNames: () => [],
+        listeners: () => [],
+        removeListener: () => undefined,
       })) as never);
       (client as unknown as { extractCertsFromP12: () => unknown }).extractCertsFromP12 = () => ({
         key: "k",
@@ -897,6 +906,11 @@ describe("GoveeMqttClient", () => {
           for (const k of Object.keys(handlers)) {
             delete handlers[k];
           }
+        },
+        eventNames: () => Object.keys(handlers),
+        listeners: (ev: string) => handlers[ev] ?? [],
+        removeListener(ev: string, cb: (...a: unknown[]) => void) {
+          handlers[ev] = (handlers[ev] ?? []).filter(h => h !== cb);
         },
       };
       const client = new GoveeMqttClient(
@@ -1261,6 +1275,11 @@ describe("GoveeMqttClient", () => {
           for (const k of Object.keys(handlers)) {
             delete handlers[k];
           }
+        },
+        eventNames: () => Object.keys(handlers),
+        listeners: (ev: string) => handlers[ev] ?? [],
+        removeListener(ev: string, cb: (...a: unknown[]) => void) {
+          handlers[ev] = (handlers[ev] ?? []).filter(h => h !== cb);
         },
       };
       const scheduled: Array<{ cb: () => void; ms: number }> = [];

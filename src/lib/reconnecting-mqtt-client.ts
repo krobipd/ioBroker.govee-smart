@@ -79,6 +79,12 @@ export abstract class ReconnectingMqttClient {
   private readonly connectTimes: number[] = [];
   /** How many broker connects this client starts in any {@link CONNECT_WINDOW_MS} — its share of api-limits.json. */
   protected readonly maxConnectsPerWindow: number = MAX_CONNECTS_PER_WINDOW;
+  /**
+   * The listeners mqtt.js put on the current client itself, before any of ours — releaseClient leaves them: its own
+   * `close` handler clears the CONNACK timer, and without it a client ended while it still waited for CONNACK kept that
+   * timer (connectTimeout, 30 s) running past onUnload (inventory CI 2026-10-14, resource probe).
+   */
+  private ownListeners = new Map<string | symbol, Set<unknown>>();
 
   /**
    * @param log ioBroker logger
@@ -176,11 +182,13 @@ export abstract class ReconnectingMqttClient {
   protected openBroker(connectFn: MqttConnectFn, url: string, opts: Omit<IClientOptions, "reconnectPeriod">): void {
     this.releaseClient();
     this.connectTimes.push(Date.now());
-    this.client = connectFn(url, {
+    const client = connectFn(url, {
       ...opts,
       ...(this.localAddress ? { localAddress: this.localAddress } : {}),
       reconnectPeriod: 0,
     });
+    this.ownListeners = new Map(client.eventNames().map(name => [name, new Set<unknown>(client.listeners(name))]));
+    this.client = client;
   }
 
   /**
@@ -188,10 +196,19 @@ export abstract class ReconnectingMqttClient {
    * connect paths assign `this.client` anew; without this the previous socket
    * stayed open (its handlers attached) whenever a reconnect replaced a client
    * that had not closed — e.g. after a throw between creating and wiring it.
+   * Only our own handlers come off: mqtt.js's own (taken in openBroker) still
+   * clear its timers when the ended socket closes.
    */
   protected releaseClient(): void {
     if (this.client) {
-      this.client.removeAllListeners();
+      for (const name of this.client.eventNames()) {
+        const own = this.ownListeners.get(name);
+        for (const listener of this.client.listeners(name)) {
+          if (!own?.has(listener)) {
+            this.client.removeListener(name, listener);
+          }
+        }
+      }
       this.client.on("error", () => {
         /* ignore late errors */
       });
