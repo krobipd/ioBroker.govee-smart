@@ -611,6 +611,11 @@ export interface DeviceState {
    * that is not in the account list — then nothing is capped.
    */
   gatewayOnline?: boolean;
+  /**
+   * No cloud path right now: the Cloud REST is not reachable and the account broker is not connected (GV-16). Set by
+   * the connection rollup (`markCloudPaths`); a device that is not LAN-driven can then be no more than offline.
+   */
+  noCloudPath?: boolean;
   /** Power on/off */
   power?: boolean;
   /** Brightness 0-100 */

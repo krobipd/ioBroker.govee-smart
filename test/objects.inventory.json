@@ -355,47 +355,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h1310-0013.diag"
   },
-  "govee-smart.0.devices.h1310-0013.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h1310-0013.diag.lastExport"
-  },
   "govee-smart.0.devices.h1310-0013.diag.tier": {
     "type": "state",
     "common": {
@@ -1790,47 +1749,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5042-0004.diag"
   },
-  "govee-smart.0.devices.h5042-0004.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5042-0004.diag.lastExport"
-  },
   "govee-smart.0.devices.h5042-0004.diag.tier": {
     "type": "state",
     "common": {
@@ -2185,47 +2103,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5080-000d.diag"
-  },
-  "govee-smart.0.devices.h5080-000d.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5080-000d.diag.lastExport"
   },
   "govee-smart.0.devices.h5080-000d.diag.tier": {
     "type": "state",
@@ -2582,47 +2459,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.diag"
   },
-  "govee-smart.0.devices.h5080-ccddeeff0011000d.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.diag.lastExport"
-  },
   "govee-smart.0.devices.h5080-ccddeeff0011000d.diag.tier": {
     "type": "state",
     "common": {
@@ -2929,47 +2765,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5085-000e.diag"
-  },
-  "govee-smart.0.devices.h5085-000e.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5085-000e.diag.lastExport"
   },
   "govee-smart.0.devices.h5085-000e.diag.tier": {
     "type": "state",
@@ -3338,47 +3133,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5109-0005.diag"
-  },
-  "govee-smart.0.devices.h5109-0005.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5109-0005.diag.lastExport"
   },
   "govee-smart.0.devices.h5109-0005.diag.tier": {
     "type": "state",
@@ -3761,47 +3515,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5140-0016.diag"
-  },
-  "govee-smart.0.devices.h5140-0016.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5140-0016.diag.lastExport"
   },
   "govee-smart.0.devices.h5140-0016.diag.tier": {
     "type": "state",
@@ -4216,47 +3929,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5179-0003.diag"
-  },
-  "govee-smart.0.devices.h5179-0003.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h5179-0003.diag.lastExport"
   },
   "govee-smart.0.devices.h5179-0003.diag.tier": {
     "type": "state",
@@ -4944,47 +4616,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h607c-0015.diag"
-  },
-  "govee-smart.0.devices.h607c-0015.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h607c-0015.diag.lastExport"
   },
   "govee-smart.0.devices.h607c-0015.diag.tier": {
     "type": "state",
@@ -7228,47 +6859,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.diag"
   },
-  "govee-smart.0.devices.h6172-0001.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h6172-0001.diag.lastExport"
-  },
   "govee-smart.0.devices.h6172-0001.diag.tier": {
     "type": "state",
     "common": {
@@ -8952,47 +8542,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6199-0002.diag"
-  },
-  "govee-smart.0.devices.h6199-0002.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h6199-0002.diag.lastExport"
   },
   "govee-smart.0.devices.h6199-0002.diag.tier": {
     "type": "state",
@@ -11505,47 +11054,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h61a8-000f.diag"
-  },
-  "govee-smart.0.devices.h61a8-000f.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h61a8-000f.diag.lastExport"
   },
   "govee-smart.0.devices.h61a8-000f.diag.tier": {
     "type": "state",
@@ -14065,47 +13573,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h66a1-0014.diag"
   },
-  "govee-smart.0.devices.h66a1-0014.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h66a1-0014.diag.lastExport"
-  },
   "govee-smart.0.devices.h66a1-0014.diag.tier": {
     "type": "state",
     "common": {
@@ -16239,47 +15706,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7102-0008.diag"
   },
-  "govee-smart.0.devices.h7102-0008.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7102-0008.diag.lastExport"
-  },
   "govee-smart.0.devices.h7102-0008.diag.tier": {
     "type": "state",
     "common": {
@@ -16681,47 +16107,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7121-0009.diag"
-  },
-  "govee-smart.0.devices.h7121-0009.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7121-0009.diag.lastExport"
   },
   "govee-smart.0.devices.h7121-0009.diag.tier": {
     "type": "state",
@@ -17272,47 +16657,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7127-0010.diag"
-  },
-  "govee-smart.0.devices.h7127-0010.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7127-0010.diag.lastExport"
   },
   "govee-smart.0.devices.h7127-0010.diag.tier": {
     "type": "state",
@@ -17890,47 +17234,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7130-0006.diag"
-  },
-  "govee-smart.0.devices.h7130-0006.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7130-0006.diag.lastExport"
   },
   "govee-smart.0.devices.h7130-0006.diag.tier": {
     "type": "state",
@@ -18605,47 +17908,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7131-0012.diag"
   },
-  "govee-smart.0.devices.h7131-0012.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7131-0012.diag.lastExport"
-  },
   "govee-smart.0.devices.h7131-0012.diag.tier": {
     "type": "state",
     "common": {
@@ -19080,47 +18342,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7141-0007.diag"
-  },
-  "govee-smart.0.devices.h7141-0007.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7141-0007.diag.lastExport"
   },
   "govee-smart.0.devices.h7141-0007.diag.tier": {
     "type": "state",
@@ -19668,47 +18889,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7143-0011.diag"
   },
-  "govee-smart.0.devices.h7143-0011.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7143-0011.diag.lastExport"
-  },
   "govee-smart.0.devices.h7143-0011.diag.tier": {
     "type": "state",
     "common": {
@@ -20094,47 +19274,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7161-000c.diag"
-  },
-  "govee-smart.0.devices.h7161-000c.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7161-000c.diag.lastExport"
   },
   "govee-smart.0.devices.h7161-000c.diag.tier": {
     "type": "state",
@@ -20612,47 +19751,6 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7171-000a.diag"
   },
-  "govee-smart.0.devices.h7171-000a.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7171-000a.diag.lastExport"
-  },
   "govee-smart.0.devices.h7171-000a.diag.tier": {
     "type": "state",
     "common": {
@@ -21007,47 +20105,6 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7172-000b.diag"
-  },
-  "govee-smart.0.devices.h7172-000b.diag.lastExport": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Letzter Diagnose-Export",
-        "en": "Last diagnostics export",
-        "es": "Última exportación de diagnóstico",
-        "fr": "Dernier export de diagnostic",
-        "it": "Ultima esportazione diagnostica",
-        "nl": "Laatste diagnose-export",
-        "pl": "Ostatni eksport diagnostyki",
-        "pt": "Última exportação de diagnóstico",
-        "ru": "Последний экспорт диагностики",
-        "uk": "Останній експорт діагностики",
-        "zh-cn": "上次诊断导出"
-      },
-      "type": "string",
-      "role": "date",
-      "read": true,
-      "write": false,
-      "def": "",
-      "desc": {
-        "de": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
-        "en": "When the most recent diagnostics report was taken for this device.",
-        "es": "Cuándo se generó el último informe de diagnóstico de este dispositivo.",
-        "fr": "Quand le dernier rapport de diagnostic a été généré pour cet appareil.",
-        "it": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
-        "nl": "Wanneer het laatste diagnoserapport voor dit apparaat is gemaakt.",
-        "pl": "Kiedy powstał ostatni raport diagnostyczny dla tego urządzenia.",
-        "pt": "Quando foi gerado o último relatório de diagnóstico deste dispositivo.",
-        "ru": "Когда для этого устройства последний раз создавался отчёт диагностики.",
-        "uk": "Коли востаннє створено звіт діагностики для цього пристрою.",
-        "zh-cn": "上次为该设备生成诊断报告的时间。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsLastExport"
-    },
-    "_id": "govee-smart.0.devices.h7172-000b.diag.lastExport"
   },
   "govee-smart.0.devices.h7172-000b.diag.tier": {
     "type": "state",

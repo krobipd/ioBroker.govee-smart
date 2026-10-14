@@ -13,6 +13,7 @@ import {
   ensureCloudRetry,
   handleCloudFailure,
   onCloudContact,
+  onGoveeServerContact,
   setCloudConnected,
   type CloudRetryHandlerAdapter,
 } from "./cloud-retry-handler";
@@ -286,6 +287,21 @@ describe("onCloudContact — a Cloud that cannot be reached (issue #51)", () => 
     const down = debugs.filter(d => d.includes("Govee Cloud not reachable since"));
     expect(down).toHaveLength(1);
     expect(down[0]).toContain("ENOTFOUND");
+  });
+
+  it("the App API's calls count too: two that miss Govee a minute apart show the Cloud down, its answer ends it (GV-16)", () => {
+    vi.useFakeTimers();
+    const rig = reachableRig();
+    onGoveeServerContact(rig.adapter, false, "connect ECONNREFUSED");
+    vi.advanceTimersByTime(120_000);
+    onGoveeServerContact(rig.adapter, false, "connect ECONNREFUSED");
+    expect(rig.stateWrites).toEqual([{ id: "info.cloudConnected", val: false }]);
+    expect(rig.groupsOnline).toEqual([false]);
+    onGoveeServerContact(rig.adapter, true);
+    expect(rig.stateWrites.at(-1)).toEqual({ id: "info.cloudConnected", val: true });
+    expect(rig.groupsOnline.at(-1)).toBe(true);
+    // the API key's own matters stay the Cloud REST's: no key problem is resolved by an App API answer
+    expect(rig.resolves).toEqual([]);
   });
 
   it("an accepted answer in between starts the count again", () => {

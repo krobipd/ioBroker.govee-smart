@@ -43,6 +43,7 @@ interface CatalogRules {
   segmentCount: { min: number; max: number };
   statusCmdVersions: Set<unknown>;
   platformTempUnits: Set<unknown>;
+  pushDecoders: Set<unknown>;
   overrideTargets: Map<string, Set<unknown>>;
 }
 
@@ -145,6 +146,7 @@ export function rulesFromSchema(schema: unknown): CatalogRules {
     },
     statusCmdVersions: new Set(list(schema, [...quirks, "statusCmdVersion"], "enum")),
     platformTempUnits: new Set(list(schema, [...quirks, "platformTempUnit"], "enum")),
+    pushDecoders: new Set(list(schema, [...quirks, "pushDecoder"], "enum")),
     overrideTargets: new Map(
       keys(schema, overrides).map(cmd => [cmd, new Set(list(schema, [...overrides, cmd], "enum"))]),
     ),
@@ -205,6 +207,12 @@ function validateQuirks(sku: string, q: Record<string, unknown>, rules: CatalogR
     issues.push({
       sku,
       msg: `'statusCmdVersion' must be one of ${[...rules.statusCmdVersions].join("/")} (got ${JSON.stringify(q.statusCmdVersion)})`,
+    });
+  }
+  if (q.pushDecoder !== undefined && !rules.pushDecoders.has(q.pushDecoder)) {
+    issues.push({
+      sku,
+      msg: `'pushDecoder' must be one of ${[...rules.pushDecoders].join("/")} (got ${JSON.stringify(q.pushDecoder)})`,
     });
   }
   if (q.platformTempUnit !== undefined && !rules.platformTempUnits.has(q.platformTempUnit)) {

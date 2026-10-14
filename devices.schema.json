@@ -110,6 +110,10 @@
           "uniqueItems": true,
           "description": "Cloud capability instances Govee acknowledges but the device never acts on — no datapoint is offered for them (homebridge-govee constants.js / device-capabilities.js)."
         },
+        "pushDecoder": {
+          "enum": ["h7127-purifier", "h1741-battery"],
+          "description": "The decoder that reads the device's own status push (op.command BLE frames) into its datapoints — one per measured device family (appliance-frames.ts). Without it the push carries nothing for the model."
+        },
         "brokenPlatformApi": {
           "type": "boolean",
           "description": "Cloud platform-API metadata is unreliable — adapter skips Cloud-cap mapping and falls back to LAN-default states."

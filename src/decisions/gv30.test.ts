@@ -34,10 +34,50 @@ async function report(): Promise<string> {
   return JSON.stringify(await c.generate(light(), "3.2.0"));
 }
 
+/**
+ * The first value under `key` anywhere in a parsed report.
+ *
+ * @param node the report or a part of it
+ * @param key the key looked for
+ */
+function find(node: unknown, key: string): unknown {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const hit = find(item, key);
+      if (hit !== undefined) {
+        return hit;
+      }
+    }
+  } else if (node && typeof node === "object") {
+    const obj = node as Record<string, unknown>;
+    if (key in obj) {
+      return obj[key];
+    }
+    for (const child of Object.values(obj)) {
+      const hit = find(child, key);
+      if (hit !== undefined) {
+        return hit;
+      }
+    }
+  }
+  return undefined;
+}
+
+/** Where each own name stands in the report — the place its mark has to take. */
+const PLACE: Record<keyof typeof OWN, (r: unknown) => unknown> = {
+  cloudSnapshot: r => (find(r, "snapshots") as { names: unknown[] }).names[0],
+  diyScene: r => (find(r, "diyScenes") as { names: unknown[] }).names[0],
+  localSnapshot: r => (find(r, "localSnapshots") as Array<{ name: unknown }>)[0].name,
+};
+
+const MARK = /^name-\d+$/;
+
 describe("GV-30 own snapshot and DIY names stand in the report only as placeholders", () => {
-  for (const [what, name] of Object.entries(OWN)) {
-    it(`the ${what} name "${name}" is not in the report`, async () => {
-      expect((await report()).toLowerCase()).not.toContain(name.toLowerCase());
+  for (const [what, name] of Object.entries(OWN) as Array<[keyof typeof OWN, string]>) {
+    it(`the ${what} name "${name}" is not in the report — its mark stands in its place`, async () => {
+      const text = await report();
+      expect(text.toLowerCase()).not.toContain(name.toLowerCase());
+      expect(PLACE[what](JSON.parse(text))).toMatch(MARK);
     });
   }
 
@@ -50,10 +90,16 @@ describe("GV-30 own snapshot and DIY names stand in the report only as placehold
         snapshotPackets: [{ name: "Fernsehabend Huber", bleCmds: [["MwUB"]] }],
       },
     };
-    const text = JSON.stringify((await c.generateReport(light(), "3.2.0", undefined, { live })).content);
+    const content = (await c.generateReport(light(), "3.2.0", undefined, { live })).content;
+    const text = JSON.stringify(content);
     for (const name of ["Omas Sonntag", "Lenas Party", "Fernsehabend Huber"]) {
       expect(text.toLowerCase()).not.toContain(name.toLowerCase());
     }
+    // the live section is there, and each name's place holds a mark
+    const libraries = (content.live as { libraries: typeof live.libraries }).libraries;
+    expect(libraries.cloudScenes.snapshots[0].name).toMatch(MARK);
+    expect(libraries.cloudDiyScenes[0].name).toMatch(MARK);
+    expect(libraries.snapshotPackets[0].name).toMatch(MARK);
   });
 
   it("Govee's own scene name stays readable (positive control)", async () => {

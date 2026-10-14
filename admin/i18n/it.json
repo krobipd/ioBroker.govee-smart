@@ -109,8 +109,6 @@
   "infoConnectionDesc": "Vero finché l'adattatore funziona: almeno un dispositivo risponde oppure, prima che sia noto un dispositivo, il ricevitore LAN è attivo. Se un determinato dispositivo sia raggiungibile lo dice il suo info.online.",
   "infoCloudConnectedDesc": "Vero finché l'API cloud di Govee risponde. Richiede la chiave API e fornisce l'elenco dei dispositivi, le scene, i segmenti e i comandi cloud.",
   "infoMqttConnectedDesc": "Vero finché la connessione all'account in tempo reale è attiva. Richiede e-mail e password e invia le variazioni di stato da sé, invece di farle interrogare dall'adattatore.",
-  "diagnosticsLastExport": "Ultima esportazione diagnostica",
-  "diagnosticsLastExportDesc": "Quando è stato generato l'ultimo rapporto diagnostico per questo dispositivo.",
   "segmentChannel": "Segmento %s",
   "infoVerificationPending": "Codice di verifica richiesto",
   "infoVerificationPendingDesc": "Vero mentre Govee attende un codice di verifica 2FA per completare l'accesso all'account in tempo reale. Inserisci il codice nella scheda di connessione dell'adattatore.",

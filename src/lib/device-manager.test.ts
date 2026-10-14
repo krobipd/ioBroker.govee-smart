@@ -83,6 +83,21 @@ const QUIRK_TEST_REGISTRY = {
   },
 };
 
+/** The catalogue names the H7127's push decoder (GV-01: the model is adapted through the catalogue). */
+const pushRegistry = (): DeviceRegistry =>
+  new DeviceRegistry({
+    data: {
+      devices: {
+        H7127: {
+          name: "Air Purifier",
+          type: "air_purifier",
+          status: "reported",
+          quirks: { pushDecoder: "h7127-purifier" },
+        },
+      },
+    },
+  });
+
 function lightCapabilities(): CloudCapability[] {
   return [
     { type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: { dataType: "ENUM" } },
@@ -1515,7 +1530,7 @@ describe("DeviceManager", () => {
 
   describe("handleMqttStatus — an appliance's own status push (issue #47)", () => {
     it("an appliance's status push reaches the datapoint pipe decoded (H7127, issue #47 — local first)", () => {
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      const dm2 = new DeviceManager(mockLog, mockTimers, pushRegistry(), new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.97", device: "AABBCCDDEEFF0097", sku: "H7127" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.air_purifier";
@@ -1600,7 +1615,7 @@ describe("DeviceManager", () => {
       // push now would write filter_life_time into control.* (no channel known
       // yet) and warn "has no existing object". Dropping it would lose the
       // device's only live word if the start-up seed read fails.
-      const dm2 = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
+      const dm2 = new DeviceManager(mockLog, mockTimers, pushRegistry(), new DeviceIdRegistry());
       dm2.handleLanDiscovery({ ip: "192.168.1.98", device: "AABBCCDDEEFF0098", sku: "H7127" });
       const dev = dm2.getDevices()[0];
       dev.type = "devices.types.air_purifier";
@@ -3869,6 +3884,33 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     } as never);
     await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011");
     expect(device.librariesCheckedAt, "a call that never ran is not an answer").toBeUndefined();
+  });
+});
+
+describe("DeviceManager — the App API as a Govee server (GV-16)", () => {
+  it("a list call that misses Govee reports it and is no cloud path; an answer reports Govee and is one", async () => {
+    const dm = new DeviceManager(mockLog, mockTimers, emptyRegistry(), new DeviceIdRegistry());
+    (dm as any).devices.set(
+      "k",
+      createTestDevice({ lanIp: undefined, channels: { lan: false, mqtt: true, cloud: true } }),
+    );
+    const contacts: Array<[boolean, string | undefined]> = [];
+    dm.setGoveeContactHook((reached, reason) => contacts.push([reached, reason]));
+    let fail = true;
+    dm.setApiClient({
+      hasBearerToken: () => true,
+      fetchDeviceList: () =>
+        fail
+          ? Promise.reject(Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }))
+          : Promise.resolve([]),
+    } as any);
+    await dm.pollAppApi();
+    expect(contacts).toEqual([[false, "connect ECONNREFUSED"]]);
+    expect(dm.appApiAnswered()).toBe(false);
+    fail = false;
+    await dm.pollAppApi();
+    expect(contacts.at(-1)).toEqual([true, undefined]);
+    expect(dm.appApiAnswered()).toBe(true);
   });
 });
 

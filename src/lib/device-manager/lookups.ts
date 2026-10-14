@@ -295,7 +295,8 @@ export function resolveSegmentCountWithSource(
  *   it loses to a report of any direction.
  * - `noEvidence` — nobody said anything; not reachable, and not proven.
  */
-export type ReachabilityDecidedBy = "lanReply" | "gatewayDown" | "cloudReport" | "cloudLiveness" | "noEvidence";
+export type ReachabilityDecidedBy =
+  "lanReply" | "gatewayDown" | "noCloudPath" | "cloudReport" | "cloudLiveness" | "noEvidence";
 
 /** What {@link resolveDeviceReachability} answers. */
 export interface ReachabilityDecision {
@@ -366,6 +367,12 @@ export function resolveDeviceReachability(device: GoveeDevice, now: number = Dat
   // reading. An unknown gateway caps nothing.
   if (device.state.gatewayOnline === false) {
     return { online: false, proven: true, decidedBy: "gatewayDown", lastEvidenceAt: null };
+  }
+  // GV-16 (krobi 2026-10-01, 2026-10-07: "a cloud-only device without cloud is offline"): with neither the Cloud nor
+  // the account broker working, nothing reaches a device without a local interface — a CAP like the dead gateway,
+  // never evidence (a working channel says nothing about the device). Not heard, so never written back (`proven`).
+  if (device.state.noCloudPath === true) {
+    return { online: false, proven: false, decidedBy: "noCloudPath", lastEvidenceAt: null };
   }
   if (typeof device.state.cloudReportedOnline === "boolean") {
     const at = device.state.cloudReportedOnlineAt;

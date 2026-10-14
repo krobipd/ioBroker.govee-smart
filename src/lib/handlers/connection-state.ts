@@ -56,6 +56,25 @@ export interface ConnectionStateAdapter {
 }
 
 /**
+ * Whether a cloud path works right now — the Cloud REST reachable, the account broker connected, or the App API's
+ * account list answering — and the mark on every device that a device without a local interface cannot be reached
+ * while none does (GV-16). Runs before the device markers are judged, so `info.online` and `info.connection` answer
+ * from the same picture.
+ *
+ * @param adapter The adapter surface
+ * @returns Whether the Cloud and the broker are up
+ */
+export function markCloudPaths(adapter: ConnectionStateAdapter): { cloudUp: boolean; brokerUp: boolean } {
+  const cloudUp = cloudReachable(adapter);
+  const brokerUp = adapter.mqttClient?.connected ?? false;
+  const appApiUp = adapter.deviceManager?.appApiAnswered() ?? false;
+  for (const device of adapter.deviceManager?.getDevices() ?? []) {
+    device.state.noCloudPath = !cloudUp && !brokerUp && !appApiUp;
+  }
+  return { cloudUp, brokerUp };
+}
+
+/**
  * Update global `info.connection` — the ioBroker-IDC indicator.
  *
  * Semantics:
@@ -80,14 +99,13 @@ export function updateConnectionState(adapter: ConnectionStateAdapter): void {
   // reach it; whether the device itself answers is the device marker's job and
   // needs evidence. 2.29.0 collapsed the two and got both wrong.
   // A device without a local API is reached only over a cloud path: Govee's
-  // REST cloud or the account broker. With neither working right now nothing
-  // reaches it, so Govee's last "online" (fresh for up to 30 minutes) must not
-  // keep the adapter green (GV-16, issue #51). Whether the device ever pushed
-  // over the broker is history, not a connection.
-  const cloudUp = cloudReachable(adapter);
-  const brokerUp = adapter.mqttClient?.connected ?? false;
+  // REST cloud, the account broker or the App API's account list. With none
+  // working right now nothing reaches it, so Govee's last "online" (fresh for up
+  // to 30 minutes) must not keep the adapter green (GV-16, issue #51). Whether the
+  // device ever pushed over the broker is history, not a connection.
+  const { cloudUp } = markCloudPaths(adapter);
   const anyOnline = devices.some(d => {
-    if (!d.lanIp && !cloudUp && !brokerUp) {
+    if (!d.lanIp && d.state.noCloudPath === true) {
       return false;
     }
     return (

@@ -195,6 +195,27 @@ export function onCloudContact(adapter: CloudRetryHandlerAdapter, outcome: Cloud
 }
 
 /**
+ * What one call of the App API's account list says about Govee's servers (GV-16, issue #51): a call that did not reach
+ * a working Govee server counts for the outage tracker like an unreachable Cloud call — the Cloud REST itself makes no
+ * call for many minutes and would show an outage only on its next one; an answer ends a confirmed outage. The API key
+ * and the retry loop are the Cloud REST's own and stay untouched.
+ *
+ * @param adapter Handler host
+ * @param reached Whether Govee answered
+ * @param reason The error text of a call that did not reach Govee
+ */
+export function onGoveeServerContact(adapter: CloudRetryHandlerAdapter, reached: boolean, reason?: string): void {
+  if (!reached) {
+    onCloudContact(adapter, "unreachable", reason);
+    return;
+  }
+  if (adapter.cloudOutage.noteAnswer()) {
+    adapter.log.debug("Govee Cloud reachable again");
+    showCloudReachability(adapter);
+  }
+}
+
+/**
  * React to a failed Cloud load (init, manual sync, retry) — the reachability
  * falls to false, and the retry loop re-arms by the failure reason even when
  * it believed the list loaded: a failed manual sync of a running adapter

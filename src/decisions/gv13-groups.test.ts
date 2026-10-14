@@ -161,6 +161,7 @@ describe("GV-13 a group is confirmed only when every member took the command", (
       groupMusic: { 0: "---", 1: "Spectrum" },
     });
     await b.write("music.music_mode", "1");
+    expect(b.sent).toContain("M");
     expect(b.acked.get("groups.basegroup-4567.music.music_mode")).toBe("1");
   });
 
@@ -173,6 +174,14 @@ describe("GV-13 a group is confirmed only when every member took the command", (
       },
     );
     await b.write("music.music_mode", "1");
+    expect(b.sent).toEqual(["M", "N"]);
     expect(b.acked.has("groups.basegroup-4567.music.music_mode")).toBe(false);
+    // the same group whose two music members both took it is confirmed
+    const both = bench(
+      [member("M", { capabilities: [MUSIC as never] }), member("N", { capabilities: [MUSIC as never] })],
+      { groupMusic: { 0: "---", 1: "Spectrum" } },
+    );
+    await both.write("music.music_mode", "1");
+    expect(both.acked.get("groups.basegroup-4567.music.music_mode")).toBe("1");
   });
 });

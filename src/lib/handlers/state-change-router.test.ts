@@ -31,6 +31,7 @@ import { CloudControlRejected } from "../govee-cloud-client";
 import { createTestDevice, mockLog } from "../../../test/test-helpers";
 import { GOVEE_CAP_TYPE } from "../govee-constants";
 import { DeviceIdRegistry } from "../device-id";
+import { DeviceRegistry } from "../device-registry";
 import { GroupFanoutHandler } from "../group-fanout";
 
 const NS = "govee-smart.0";
@@ -80,6 +81,8 @@ function makeRig(devices: GoveeDevice[], opts: { refreshChanged?: boolean; refre
     },
     namespace: NS,
     unloading: false,
+    // No model of these fixtures has a catalog entry — every target temperature is °C as declared (GV-11).
+    deviceRegistry: new DeviceRegistry({ data: { devices: {} } }),
     deviceManager: {
       getDevices: () => devices,
       getDiagnostics: () => ({ addLog: () => undefined }),

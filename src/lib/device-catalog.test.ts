@@ -5,6 +5,7 @@ import {
   CONFIGURABLE_OVERRIDE_COMMANDS,
   DEVICE_STATUSES,
   DEVICE_TYPES,
+  PUSH_DECODERS,
   TRANSPORT_TARGETS,
   type DeviceQuirks,
 } from "./device-catalog";
@@ -20,6 +21,7 @@ const QUIRK_FIELDS: Record<keyof DeviceQuirks, true> = {
   statusCmdVersion: true,
   platformTempUnit: true,
   ignoredCloudCapabilities: true,
+  pushDecoder: true,
 };
 
 interface SchemaNode {
@@ -45,6 +47,10 @@ describe("device-catalog — the schema carries the same words as the code (audi
 
   it("quirk fields: the schema offers exactly the fields DeviceQuirks declares", () => {
     expect(Object.keys(quirks).sort()).toEqual(Object.keys(QUIRK_FIELDS).sort());
+  });
+
+  it("push decoders: the schema enum IS PUSH_DECODERS, word for word", () => {
+    expect(quirks.pushDecoder.enum).toEqual([...PUSH_DECODERS]);
   });
 
   it("transport overrides: the schema keys ARE the configurable commands, each with the transport targets", () => {

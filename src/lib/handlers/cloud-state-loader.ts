@@ -3,6 +3,8 @@ import {
   mapCloudStateValues,
   planCloudCapabilityWrites,
   platformReadingsToCelsius,
+  targetReadingsToCelsius,
+  targetTemperatureInFahrenheit,
   ignoredCloudCapabilities,
 } from "../capability-mapper";
 import type { DeviceRegistry } from "../device-registry";
@@ -115,8 +117,13 @@ export async function writeCloudStateValues(
   // datapoint (C-O3) — its reading goes nowhere.
   const ignored = ignoredCloudCapabilities(device.sku, adapter.deviceRegistry);
   const kept = caps.filter(c => !ignored.has(c.instance));
-  const readings =
-    adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F" ? platformReadingsToCelsius(kept) : kept;
+  const platformFahrenheit = adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F";
+  // The target temperature too (GV-11): in °F where Govee says so, or the model's catalog entry does.
+  const targetCap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.TEMPERATURE_SETTING);
+  const readings = targetReadingsToCelsius(
+    platformFahrenheit ? platformReadingsToCelsius(kept) : kept,
+    targetTemperatureInFahrenheit(targetCap, platformFahrenheit),
+  );
   // One capability can carry two datapoints (work_mode → mode + level),
   // so the list is flattened first and the LAN-shadow rule below applies
   // per RESULT — same shape and same nesting level as before.

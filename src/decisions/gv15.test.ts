@@ -169,6 +169,9 @@ describe("GV-15 repeat only quickly, only what Govee never got, never at the bud
     for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setImmediate(resolve));
     }
+    // both signs of life reached the device: its push is stamped, Govee's word is taken
+    expect(typeof light.state.devicePushAt).toBe("number");
+    expect(light.state.cloudReportedOnline).toBe(true);
     expect(calls).toBe(1);
   });
 

@@ -64,24 +64,50 @@ function sensor(gatewayDeviceId?: string): GoveeDevice {
   });
 }
 
-function resolved(devices: GoveeDevice[]): void {
+const GATEWAY_ID = "11:22:33:44:55:66:77:88";
+
+/**
+ * One poll of the account list — the way the adapter learns that a sensor hangs off a gateway and judges it by it.
+ *
+ * @param devices the devices the adapter knows
+ * @param gatewayNamed whether the account list names the sensor's gateway
+ */
+async function polled(devices: GoveeDevice[], gatewayNamed: boolean): Promise<void> {
   const dm = new DeviceManager(log, timers, new DeviceRegistry({ data: { devices: {} } }), new DeviceIdRegistry());
   const map = (dm as unknown as { devices: Map<string, GoveeDevice> }).devices;
-  devices.forEach((d, i) => map.set(`k${i}`, d));
-  (dm as unknown as { resolveGatewayReachability(): void }).resolveGatewayReachability();
+  devices.forEach(d => map.set(`${d.sku}_${d.deviceId.replace(/:/g, "").toLowerCase()}`, d));
+  const entries = devices.map(d => ({
+    sku: d.sku,
+    device: d.deviceId,
+    deviceName: d.name,
+    settings: d.sku === "H5109" && gatewayNamed ? { gatewayInfo: { sku: "H5042", device: GATEWAY_ID } } : {},
+  }));
+  dm.setApiClient({ hasBearerToken: () => true, fetchDeviceList: () => Promise.resolve(entries) } as never);
+  await dm.pollAppApi();
 }
 
 describe("GV-24 the gateway is the reachability device", () => {
-  it("a dead gateway makes the sensor behind it not reachable, however fresh its last reading", () => {
-    const s = sensor("11:22:33:44:55:66:77:88");
-    const gateway = device("H5042", "11:22:33:44:55:66:77:88", "devices.types.gateway", { state: { online: false } });
-    resolved([s, gateway]);
+  it("the account list links the sensor to its gateway — the adapter knows the sensor only through it", async () => {
+    const s = sensor(undefined);
+    const gateway = device("H5042", GATEWAY_ID, "devices.types.gateway", { state: { online: true } });
+    await polled([s, gateway], true);
+    expect(s.gatewayDeviceId).toBe(GATEWAY_ID);
+    expect(s.gateway).toContain("H5042");
+  });
+
+  it("a dead gateway makes the sensor behind it not reachable, however fresh its last reading", async () => {
+    const s = sensor(undefined);
+    const gateway = device("H5042", GATEWAY_ID, "devices.types.gateway", { state: { online: false } });
+    await polled([s, gateway], true);
     expect(resolveDeviceReachability(s).online).toBe(false);
   });
 
-  it("the same sensor with no gateway named is decided by its own reading (positive control)", () => {
-    const s = sensor(undefined);
-    resolved([s]);
-    expect(resolveDeviceReachability(s).online).toBe(true);
+  it("the same sensor behind a live gateway, or with no gateway named, is decided by its own reading (positive control)", async () => {
+    const live = sensor(undefined);
+    await polled([live, device("H5042", GATEWAY_ID, "devices.types.gateway", { state: { online: true } })], true);
+    expect(resolveDeviceReachability(live).online).toBe(true);
+    const alone = sensor(undefined);
+    await polled([alone], false);
+    expect(resolveDeviceReachability(alone).online).toBe(true);
   });
 });

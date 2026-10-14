@@ -203,6 +203,8 @@ vi.mock("@iobroker/adapter-core", () => {
       }
       return Promise.resolve(out);
     });
+    // one bulk read of the instance's own states (relative pattern, like the controller)
+    public getStatesAsync = vi.fn((pattern: string) => this.getForeignStatesAsync(`${this.namespace}.${pattern}`));
     public getForeignStatesAsync = vi.fn((pattern: string) => {
       const prefix = pattern.replace(/\*$/, "").replace(`${this.namespace}.`, "");
       const out: Record<string, unknown> = {};
@@ -350,6 +352,7 @@ function internalOf(adapter: GoveeAdapter): {
   unloading: boolean;
   setState: ReturnType<typeof vi.fn>;
   setStateChangedAsync: ReturnType<typeof vi.fn>;
+  getStateAsync: ReturnType<typeof vi.fn>;
   setInterval: ReturnType<typeof vi.fn>;
   clearInterval: ReturnType<typeof vi.fn>;
   setTimeout: ReturnType<typeof vi.fn>;
@@ -1686,6 +1689,35 @@ describe("GoveeAdapter — LAN discovery wiring", () => {
     f.lan.onListenReady!();
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("LAN listening"));
   });
+
+  it("every outgoing connection leaves from the chosen address — an address the host does not carry means any", async () => {
+    // fleet master network-address.ts (krobi 2026-10-03 00:27): the chosen address is the only one the adapter uses
+    const carried = Object.values(os.networkInterfaces())
+      .flat()
+      .find(a => a && !a.internal && a.family === "IPv4")?.address;
+    expect(carried, "the test host carries no IPv4 address of its own").toBeDefined();
+    const account = { apiKey: "12345678-1234-1234-1234-123456789abc", goveeEmail: "a@b.c", goveePassword: "pw" };
+    const chosen = await setupReady({ ...account, bind: carried });
+    const i = internalOf(chosen.adapter) as unknown as {
+      mqttClient: { localAddress?: string };
+      openapiMqttClient: { localAddress?: string };
+      callGate: { https: () => (o: Record<string, unknown>) => Promise<unknown> };
+      outboundHttps: () => (o: Record<string, unknown>) => Promise<unknown>;
+    };
+    expect(i.mqttClient.localAddress).toBe(carried);
+    expect(i.openapiMqttClient.localAddress).toBe(carried);
+    const sent: Array<Record<string, unknown>> = [];
+    i.callGate = { https: () => o => (sent.push(o), Promise.resolve(null)) };
+    await i.outboundHttps()({ method: "GET", url: "https://openapi.api.govee.com/x", headers: {} });
+    expect(sent[0].localAddress).toBe(carried);
+
+    const missing = await setupReady({ ...account, bind: "203.0.113.7" });
+    const j = internalOf(missing.adapter) as unknown as typeof i;
+    expect(j.mqttClient.localAddress).toBeUndefined();
+    j.callGate = { https: () => o => (sent.push(o), Promise.resolve(null)) };
+    await j.outboundHttps()({ method: "GET", url: "https://openapi.api.govee.com/x", headers: {} });
+    expect(sent[1]).not.toHaveProperty("localAddress");
+  });
 });
 
 describe("GoveeAdapter — segment echo caps", () => {
@@ -1819,7 +1851,14 @@ describe("GoveeAdapter — gateway sensors", () => {
     const dm = i.deviceManager as unknown as { onLanIpChanged: (d: GoveeDevice, ip: string) => void };
     dm.onLanIpChanged(light, "10.0.0.5");
     await settle();
-    expect(i.states.get(`${i.stateManager!.devicePrefix(light)}.info.ip`)?.val).toBe("10.0.0.5");
+    const id = `${i.stateManager!.devicePrefix(light)}.info.ip`;
+    expect(i.states.get(id)?.val).toBe("10.0.0.5");
+    // read-only, compared in memory: the device build writing the same address afterwards reaches no database
+    const stored = i.states.get(id);
+    await (i.stateManager as unknown as StateManager).writeReadOnly(id, "10.0.0.5");
+    expect(i.states.get(id)).toBe(stored);
+    await (i.stateManager as unknown as StateManager).writeReadOnly(id, "10.0.0.6");
+    expect(i.states.get(id)).not.toBe(stored);
   });
 });
 
@@ -3199,7 +3238,7 @@ describe("GoveeAdapter — cloud capability writes over the REAL host object", (
   // AdapterHost` means a method missing there is NOT a type error. Audit
   // 2026-09-12 (F6) added `setStateChanged` to that view — a rig declaring it
   // on its own fake would prove nothing about the real one.
-  it("writes an App-API reading through setStateChangedAsync, not setState", async () => {
+  it("writes an App-API reading once and a repeat not again — compared in memory, never read back (round 77)", async () => {
     const { adapter } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
     const sensor = makeDevice({ sku: "H5179", type: "devices.types.thermometer", deviceId: "AA:BB:CC:DD:EE:33" });
@@ -3210,18 +3249,24 @@ describe("GoveeAdapter — cloud capability writes over the REAL host object", (
 
     i.setStateChangedAsync.mockClear();
     i.setState.mockClear();
+    i.getStateAsync.mockClear();
     const bridge = (
       i.deviceManager as unknown as {
         onCloudCapabilities: ((d: GoveeDevice, caps: unknown[]) => void) | null;
       }
     ).onCloudCapabilities;
     expect(bridge, "main wires the cloud-capability bridge").toBeTruthy();
-    bridge!(sensor, [{ type: "devices.capabilities.property", instance: "battery", state: { value: 75 } }]);
+    const reading = [{ type: "devices.capabilities.property", instance: "battery", state: { value: 75 } }];
+    bridge!(sensor, reading);
+    await settle(4);
+    bridge!(sensor, reading);
     await settle(4);
 
+    const battery = (c: unknown[]): boolean => String(c[0]).endsWith(".sensor.battery");
     expect(i.states.get(`${prefix}.sensor.battery`)?.val).toBe(75);
-    expect(i.setStateChangedAsync.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(true);
-    expect(i.setState.mock.calls.some(c => String(c[0]).endsWith(".sensor.battery"))).toBe(false);
+    expect(i.setState.mock.calls.filter(battery)).toHaveLength(1);
+    expect(i.setStateChangedAsync.mock.calls.some(battery)).toBe(false);
+    expect(i.getStateAsync.mock.calls.some(battery)).toBe(false);
   });
 });
 
@@ -3303,7 +3348,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     const device = i.deviceManager!.getDevices()[0];
     const prefix = i.stateManager!.devicePrefix(device);
     const host = i.buildMessageRouterHost();
-    const result = await fetchReport(host, `${device.sku}:${device.deviceId}`);
+    const result = await fetchReport(host, i.stateManager!.devicePrefix(device).split(".").pop()!);
     await settle(6);
 
     // Nothing is written anywhere — the file store of 2.29.0–2.36.0 is gone.
@@ -3314,8 +3359,8 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // The fleet's file name (DB-12): adapter, the device's tree id, version, UTC time.
     expect(result.fileName).toMatch(/^govee-smart_h61be-ee11_v.*\.json$/);
     expect(JSON.parse(result.content).device.sku).toBe("H61BE");
-    // A report writes no value (DB-10).
-    expect(i.states.get(`${prefix}.diag.lastExport`)?.val ?? "").toBe("");
+    // A report writes no value (DB-10) — the device has no datapoint for one either.
+    expect([...i.states.keys()].filter(id => id.startsWith(`${prefix}.diag.`) && !id.endsWith(".tier"))).toEqual([]);
   });
 
   it("the wired report carries the start time and never a group's digit id (issue #50)", async () => {
@@ -3346,7 +3391,7 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // An instance in compact mode says so in its report.
     (adapter as unknown as { common: { compact?: boolean } }).common = { compact: true };
     const host = i.buildMessageRouterHost();
-    const result = await fetchReport(host, `${device.sku}:${device.deviceId}`);
+    const result = await fetchReport(host, i.stateManager!.devicePrefix(device).split(".").pop()!);
     await settle(6);
     expect(result.content).not.toContain("98765432");
     expect(result.content).toMatch(/member of group group-\d+/);

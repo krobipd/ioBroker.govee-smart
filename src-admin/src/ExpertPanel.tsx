@@ -10,12 +10,6 @@ import { SegmentWizard } from "./SegmentWizard";
 /** Which half of the Expert tab is showing. */
 type Tool = "wizard" | "diagnostics";
 
-/** The tab ids of `admin/jsonConfig.json` — the settings open on the first one again (fleet tab memory, GV-07). */
-const TAB_IDS = ["_main", "_expert"] as const;
-
-/** The adapter's GitHub repository — the diagnostics card links its issue form there (DB-07). */
-const REPOSITORY = "https://github.com/krobipd/ioBroker.govee-smart";
-
 /** Props for the Expert panel. */
 export interface ExpertPanelProps {
   /** Admin socket (gui-components) handed down to whichever tool is showing. */
@@ -44,8 +38,9 @@ export interface ExpertPanelProps {
 export function ExpertPanel({ socket, namespace }: ExpertPanelProps): React.JSX.Element {
   const [tool, setTool] = React.useState<Tool>("wizard");
   React.useEffect(() => {
-    forgetLastTab(namespace, TAB_IDS);
-    return () => forgetLastTab(namespace, TAB_IDS);
+    // the tab ids of admin/jsonConfig.json — the settings open on the first one again (fleet tab memory, GV-07)
+    forgetLastTab(namespace, ["_main", "_expert"]);
+    return () => forgetLastTab(namespace, ["_main", "_expert"]);
   }, [namespace]);
 
   return (
@@ -81,8 +76,8 @@ export function ExpertPanel({ socket, namespace }: ExpertPanelProps): React.JSX.
           <DiagnosticsPanel
             socket={socket}
             namespace={namespace}
-            repository={REPOSITORY}
-            tabIds={TAB_IDS}
+            repository="https://github.com/krobipd/ioBroker.govee-smart"
+            tabIds={["_main", "_expert"]}
           />
         )}
       </Stack>

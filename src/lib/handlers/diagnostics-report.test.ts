@@ -86,13 +86,23 @@ describe("the govee report source behind the fleet's report jobs", () => {
     const group = light({ sku: "BaseGroup", deviceId: "7654321", name: "Wohnzimmer" });
     const { adapter } = rig([light(), group]);
     expect(makeReportSource(adapter).devices()).toEqual([
-      { id: "H6199:AA:BB:CC:DD:EE:FF:B2:4D", label: expect.stringContaining("H6199") as string, connected: false },
+      { id: "h6199-b24d", label: expect.stringContaining("H6199") as string, connected: false },
     ]);
+  });
+
+  it("is built before the adapter has its log — and logs through the log it gets later", async () => {
+    const { adapter } = rig([light()]);
+    const host = { ...adapter, log: undefined as unknown as ioBroker.Logger };
+    const source = makeReportSource(host);
+    const infos: string[] = [];
+    host.log = { ...adapter.log, info: (m: string) => infos.push(m) };
+    await fetch(new ReportJobs(source), "h6199-b24d");
+    expect(infos.some(m => m.includes("diagnostics report ready"))).toBe(true);
   });
 
   it("an unconnected device is never read live — the report says so (DB-03)", async () => {
     const { adapter, asked, cloudReads } = rig([light()]);
-    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "H6199:AA:BB:CC:DD:EE:FF:B2:4D");
+    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "h6199-b24d");
     const content = JSON.parse(report.content) as Record<string, unknown>;
     expect(asked).toEqual([]);
     expect(cloudReads).toEqual([]);
@@ -103,7 +113,7 @@ describe("the govee report source behind the fleet's report jobs", () => {
   it("a connected device is asked over the broker and the Cloud; the answers go into their own section (E1, E2)", async () => {
     const { adapter, collector } = rig([connected()], { answers: true, cloudState: [{ instance: "powerSwitch" }] });
     collector.addLog("AA:BB:CC:DD:EE:FF:B2:4D", "info", "before the report");
-    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "H6199:AA:BB:CC:DD:EE:FF:B2:4D");
+    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "h6199-b24d");
     const content = JSON.parse(report.content) as {
       liveRead: string;
       live: { statusRequest: { answeredAfterMs: number }; cloudState: { capabilities: unknown } };
@@ -122,7 +132,7 @@ describe("the govee report source behind the fleet's report jobs", () => {
 
   it("a connected device that answers nothing gives a failed read, never `read` (DB-02)", async () => {
     const { adapter } = rig([connected()], { answers: false, cloudFails: true });
-    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "H6199:AA:BB:CC:DD:EE:FF:B2:4D");
+    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "h6199-b24d");
     const content = JSON.parse(report.content) as { liveRead: string; live: { error: string } };
     expect(content.liveRead).toBe("failed");
     expect(content.live.error).toContain("no answer");
@@ -130,7 +140,7 @@ describe("the govee report source behind the fleet's report jobs", () => {
 
   it("the file is named by the tree id through the same placeholders, and the content keeps no personal value", async () => {
     const { adapter } = rig([light()]);
-    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "H6199:AA:BB:CC:DD:EE:FF:B2:4D");
+    const report = await fetch(new ReportJobs(makeReportSource(adapter)), "h6199-b24d");
     expect(report.fileName).toMatch(/^govee-smart_h6199-b24d_v3\.2\.0_\d{4}-\d{2}-\d{2}_\d{6}\.json$/);
     expect(report.content).not.toContain("Jennys Leselampe");
     expect(report.content).not.toContain("AA:BB:CC:DD:EE:FF:B2:4D");

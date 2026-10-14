@@ -109,8 +109,6 @@
   "infoConnectionDesc": "Wahr, solange der Adapter arbeitet — mindestens ein Gerät antwortet, oder, bevor ein Gerät bekannt ist, läuft der LAN-Empfänger. Ob ein bestimmtes Gerät erreichbar ist, sagt dessen eigenes info.online.",
   "infoCloudConnectedDesc": "Wahr, solange die Govee-Cloud-API antwortet. Sie braucht den API-Schlüssel und liefert Geräteliste, Szenen, Segmente und Cloud-Befehle.",
   "infoMqttConnectedDesc": "Wahr, solange die Echtzeit-Kontoverbindung steht. Sie braucht E-Mail und Passwort und schickt Statusänderungen von sich aus, statt dass der Adapter sie abfragt.",
-  "diagnosticsLastExport": "Letzter Diagnose-Export",
-  "diagnosticsLastExportDesc": "Wann zuletzt ein Diagnosebericht für dieses Gerät erzeugt wurde.",
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Bestätigungscode erforderlich",
   "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben.",

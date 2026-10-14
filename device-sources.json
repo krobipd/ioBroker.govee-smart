@@ -1,0 +1,46 @@
+{
+  "_comment": "GV-31 (krobi 2026-10-08 09:59): the research sources gate A15 reads on every release; every model one of them knows stands in devices.json or below `excluded` with its reason. Measurement of every source: Ressourcen/govee-smart/geraete-quellen-2026-10-08.md.",
+  "catalog": "devices.json",
+  "catalogKey": "devices",
+  "pattern": "\\b[HR][0-9][0-9A-Z]{3}\\b",
+  "sources": [
+    {
+      "name": "homebridge-govee constants",
+      "url": "https://raw.githubusercontent.com/homebridge-plugins/homebridge-govee/latest/lib/utils/constants.js"
+    },
+    {
+      "name": "Govee app gateway and sensor list",
+      "url": "https://app2.govee.com/bff-app/v1/gateway-group/get-gw-and-sensor-photos"
+    },
+    {
+      "name": "govee-local-api light capabilities",
+      "url": "https://raw.githubusercontent.com/Galorhallen/govee-local-api/develop/src/govee_local_api/light_capabilities.py"
+    },
+    {
+      "name": "lasswellt govee-homeassistant",
+      "url": "https://raw.githubusercontent.com/lasswellt/govee-homeassistant/main/custom_components/govee/const.py"
+    },
+    {
+      "name": "Govee developer supported models",
+      "url": "https://developer.govee.com/docs/support-product-model"
+    },
+    {
+      "name": "openHAB Govee binding",
+      "url": "https://raw.githubusercontent.com/openhab/openhab-addons/main/bundles/org.openhab.binding.govee/README.md"
+    },
+    {
+      "name": "govee2mqtt quirks",
+      "url": "https://raw.githubusercontent.com/wez/govee2mqtt/main/src/service/quirks.rs"
+    }
+  ],
+  "excluded": {
+    "H1162": "Music Sync Box: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (Govee product page and manual: Bluetooth connection only)",
+    "H3001": "Bluetooth-only model, removed from the catalogue in 2.40.0 — Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0)",
+    "H5010": "Body fat scale: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (homebridge-govee #1235 reporter: Bluetooth; account entry without Wi-Fi fields)",
+    "H5181": "Meat thermometer: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (manual: Bluetooth range up to 70 m, paired over Bluetooth)",
+    "H5182": "Meat thermometer: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (manual: Bluetooth range up to 70 m, paired over Bluetooth)",
+    "H5183": "Meat thermometer: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (manual: paired over Bluetooth; spare probe list H5181–H5185)",
+    "H5184": "Meat thermometer: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (manual: Bluetooth range up to 70 m, paired over Bluetooth)",
+    "H5185": "Meat thermometer: Bluetooth only, no Wi-Fi and no Govee gateway path — measured 2026-09-24 (adapter 2.40.0) (homebridge-govee #804 capture: no topic, no Wi-Fi fields)"
+  }
+}

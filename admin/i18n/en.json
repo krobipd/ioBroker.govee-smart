@@ -109,8 +109,6 @@
   "infoConnectionDesc": "True while the adapter is working — at least one device answers, or, before any device is known, the LAN listener is running. Whether one particular device is reachable is what its own info.online says.",
   "infoCloudConnectedDesc": "True while the Govee Cloud API answers. It needs the API key and supplies the device list, scenes, segments and cloud commands.",
   "infoMqttConnectedDesc": "True while the real-time account connection is up. It needs email and password and pushes status changes by itself instead of the adapter polling for them.",
-  "diagnosticsLastExport": "Last diagnostics export",
-  "diagnosticsLastExportDesc": "When the most recent diagnostics report was taken for this device.",
   "segmentChannel": "Segment %s",
   "infoVerificationPending": "Verification code required",
   "infoVerificationPendingDesc": "True while Govee is waiting for a 2FA verification code before the real-time account login can finish. Enter the code in the adapter's connection card.",

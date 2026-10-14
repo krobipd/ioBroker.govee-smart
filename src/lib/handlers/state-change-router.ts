@@ -1,4 +1,11 @@
-import { declaredOptionValue, pickOption, resolveWorkModeStruct } from "../capability-mapper";
+import {
+  celsiusToFahrenheit,
+  declaredOptionValue,
+  fahrenheitToCelsius,
+  pickOption,
+  resolveWorkModeStruct,
+  targetTemperatureInFahrenheit,
+} from "../capability-mapper";
 import type { DeviceManager } from "../device-manager";
 import { GOVEE_CAP_TYPE, isAppGroup } from "../govee-constants";
 import type { GoveeLanClient } from "../govee-lan-client";
@@ -250,10 +257,17 @@ export async function sendTargetTemperatureCommand(
   }
   const fields = cap.parameters?.fields ?? [];
   const range = fields.find(f => f && f.fieldName === "temperature")?.range;
+  // The datapoint is °C (GV-11); a heater that takes °F gets the value converted, and the datapoint is confirmed
+  // with the °C of what went out.
+  const fahrenheit = targetTemperatureInFahrenheit(
+    cap,
+    adapter.deviceRegistry.getQuirks(device.sku)?.platformTempUnit === "F",
+  );
+  const asked = fahrenheit ? celsiusToFahrenheit(written) : written;
   const temperature =
     range && typeof range.min === "number" && typeof range.max === "number"
-      ? Math.min(Math.max(written, range.min), range.max)
-      : written;
+      ? Math.min(Math.max(asked, range.min), range.max)
+      : asked;
 
   const struct: Record<string, unknown> = { temperature };
   const unitField = fields.find(f => f && f.fieldName === "unit");
@@ -274,7 +288,7 @@ export async function sendTargetTemperatureCommand(
     }
   }
   await adapter.deviceManager!.sendCapabilityCommand(device, cap.type, cap.instance, struct);
-  return { ack: autoStopChanged ? newValue : temperature };
+  return { ack: autoStopChanged ? newValue : fahrenheit ? fahrenheitToCelsius(temperature) : temperature };
 }
 
 /** What the manual-segment update needs. */

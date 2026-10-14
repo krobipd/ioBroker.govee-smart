@@ -21,6 +21,7 @@
  *  4. Number-Override: API reports a wrong scalar (segmentCount, statusCmdVersion)
  *  5. Unit-Override: API reports a value in another unit (platformTempUnit)
  *  6. Capability-Ignore: API offers a capability the device never acts on (ignoredCloudCapabilities)
+ *  7. Decoder-Select: which decoder reads the device's own status push (pushDecoder)
  */
 export interface DeviceQuirks {
   /** Override color-temperature range (Govee API often claims a flat 2000-9000K, real range is narrower). */
@@ -86,7 +87,19 @@ export interface DeviceQuirks {
    * "the OpenAPI colorRgb write is accepted but does nothing on this model").
    */
   ignoredCloudCapabilities?: string[];
+  /**
+   * The decoder that reads the device's own status push (`op.command` BLE frames, `appliance-frames.ts`) into its
+   * datapoints. One decoder per measured device family; a model without the quirk gets nothing from its push (GV-01:
+   * the catalogue adapts a model, no model is written into the code).
+   */
+  pushDecoder?: PushDecoder;
 }
+
+/** The push decoders a catalogue entry may name — each measured on the device it is named after (`appliance-frames.ts`). */
+export const PUSH_DECODERS = ["h7127-purifier", "h1741-battery"] as const;
+
+/** A push decoder name. */
+export type PushDecoder = (typeof PUSH_DECODERS)[number];
 
 /**
  * The commands that may appear as a key of `transportOverrides` in devices.json.

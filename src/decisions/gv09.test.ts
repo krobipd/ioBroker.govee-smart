@@ -12,7 +12,8 @@ vi.mock("@iobroker/adapter-core", () => ({
   },
 }));
 
-import { DeviceManager } from "../lib/device-manager";
+import { brokerStatusRequester, DeviceManager } from "../lib/device-manager";
+import { resolveDeviceReachability } from "../lib/device-manager/lookups";
 import { DeviceIdRegistry } from "../lib/device-id";
 import { DeviceRegistry } from "../lib/device-registry";
 import { GoveeMqttClient } from "../lib/govee-mqtt-client";
@@ -67,29 +68,50 @@ function cloudLight(sku: string, deviceId: string): GoveeDevice {
   };
 }
 
+/** The account client with its socket replaced: every publish is recorded, the broker counts as connected. */
+function client(): { mqtt: GoveeMqttClient; published: Array<{ topic: string; msg: Record<string, unknown> }> } {
+  const mqtt = new GoveeMqttClient("user@example.com", "secret", log, timers);
+  const published: Array<{ topic: string; msg: Record<string, unknown> }> = [];
+  (mqtt as unknown as { client: unknown }).client = {
+    connected: true,
+    publish: (topic: string, payload: string) =>
+      published.push({ topic, msg: (JSON.parse(payload) as { msg: Record<string, unknown> }).msg }),
+  };
+  return { mqtt, published };
+}
+
 describe("GV-09 status request over the account broker with the quirk's version", () => {
-  it("a device without LAN is asked; the H6121 with the version of its quirk, the other model with version 2", () => {
-    const asked = new Map<string, number>();
+  it("a device without LAN is asked over the account broker — the H6121 with the version of its quirk, the other model with version 2", () => {
+    const { mqtt, published } = client();
     const dm = new DeviceManager(log, timers, registry, new DeviceIdRegistry());
-    dm.setStatusRequester((device, cmdVersion) => {
-      asked.set(device.sku, cmdVersion);
-      return true;
-    });
+    dm.setStatusRequester(brokerStatusRequester(() => mqtt));
     const devices = (dm as unknown as { devices: Map<string, GoveeDevice> }).devices;
     devices.set("H6121_A", cloudLight("H6121", "AA:BB:CC:DD:EE:FF:00:21"));
     devices.set("H6199_B", cloudLight("H6199", "AA:BB:CC:DD:EE:FF:00:99"));
     dm.requestStaleStatuses(Date.now());
-    expect(Object.fromEntries(asked)).toEqual({ H6121: 1, H6199: 2 });
+    expect(published.map(p => [p.topic, p.msg.cmd, p.msg.cmdVersion])).toEqual([
+      ["GD/AA:BB:CC:DD:EE:FF:00:21", "status", 1],
+      ["GD/AA:BB:CC:DD:EE:FF:00:99", "status", 2],
+    ]);
   });
 
-  it("the broker request carries that version in its payload", () => {
-    const client = new GoveeMqttClient("user@example.com", "secret", log, timers);
-    const published: string[] = [];
-    (client as unknown as { client: unknown }).client = {
-      connected: true,
-      publish: (_topic: string, payload: string) => published.push(payload),
-    };
-    expect(client.requestStatus("GD/AA:BB", Date.now(), 1)).toBe(true);
-    expect(JSON.parse(published[0]).msg).toMatchObject({ cmd: "status", cmdVersion: 1 });
+  it("the device's answer counts, not the account list: a fresh status push stays online against a polled 'offline' (list or state read share one cap)", () => {
+    const dm = new DeviceManager(log, timers, registry, new DeviceIdRegistry());
+    const strip = cloudLight("H6199", "AA:BB:CC:DD:EE:FF:00:99");
+    (dm as unknown as { devices: Map<string, GoveeDevice> }).devices.set("k", strip);
+    const listSaysOffline = [{ type: "devices.capabilities.online", instance: "online", state: { value: false } }];
+    // positive control: without an answer of the device, the list's word stands
+    dm.applyCloudStateOnline(strip, listSaysOffline);
+    expect(resolveDeviceReachability(strip).online).toBe(false);
+    // the status request's answer — the device's own voice, stamped now
+    dm.handleMqttStatus({
+      sku: "H6199",
+      device: strip.deviceId,
+      cmd: "status",
+      transaction: `x_${Date.now()}001`,
+      state: { onOff: 1 },
+    });
+    dm.applyCloudStateOnline(strip, listSaysOffline);
+    expect(resolveDeviceReachability(strip).online).toBe(true);
   });
 });

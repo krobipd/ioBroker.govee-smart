@@ -39,6 +39,8 @@ export interface HttpRequestOptions {
   body?: unknown;
   /** Timeout in milliseconds (default 15000; the tests shorten it to reach the timeout path) */
   timeout?: number;
+  /** The address the connection leaves from — the chosen network address (`native.bind`); absent = any address */
+  localAddress?: string;
 }
 
 /**
@@ -157,6 +159,9 @@ export function httpsRequest<T>(
     // would silently send such a request to 443 instead of failing loudly.
     if (u.port) {
       reqOptions.port = u.port;
+    }
+    if (options.localAddress) {
+      reqOptions.localAddress = options.localAddress;
     }
 
     const req = transport.request(reqOptions, res => {

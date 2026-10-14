@@ -572,6 +572,51 @@ describe("StateManager", () => {
       await sm.writeReadOnly("info.devicesTotal", 4);
       expect(dbCalls()).toEqual(["setStateChangedAsync", "setState"]);
     });
+
+    it("the build sets a read-only default from the start's bulk read, never from a single read (round 77)", async () => {
+      const { adapter, calls, states } = createMockAdapter();
+      states.set("devices.h6160-0011.sensor.air_quality", { val: 3, ack: true } as ioBroker.State);
+      adapter.getStatesAsync = () =>
+        Promise.resolve(Object.fromEntries([...states].map(([id, s]) => [`govee-smart.0.${id}`, s])));
+      const sm = new StateManager(adapter as never, registry);
+      await sm.primeReadOnly();
+      const defs = [
+        { id: "air_quality", name: "AQ", type: "number", role: "value", write: false, channel: "sensor", def: 0 },
+        { id: "filter_life", name: "Filter", type: "number", role: "value", write: false, channel: "sensor", def: 0 },
+      ] as StateDefinition[];
+      await sm.createCloudStates(createTestDevice(), defs, 0);
+      const single = calls.filter(c => c.method === "getStateAsync" && String(c.args[0]).includes(".sensor."));
+      expect(single).toEqual([]);
+      expect(states.get("devices.h6160-0011.sensor.air_quality")?.val).toBe(3); // the stored value stays
+      expect(states.get("devices.h6160-0011.sensor.filter_life")?.val).toBe(0); // a new state gets its default
+      const before = calls.length;
+      await sm.writeReadOnly("devices.h6160-0011.sensor.filter_life", 0);
+      expect(calls.slice(before)).toEqual([]); // the default is known in memory
+    });
+
+    it("a deleted read-only state is forgotten — the same value written after it reaches the database again", async () => {
+      const { adapter, calls, objects } = createMockAdapter();
+      adapter.getStatesAsync = () => Promise.resolve({});
+      const sm = new StateManager(adapter as never, registry);
+      await sm.primeReadOnly();
+      const id = "devices.h5109-001a.info.ip";
+      objects.set(id, { type: "state", common: {}, native: {} });
+      await sm.writeReadOnly(id, "10.0.0.5");
+      await sm.removeInfoStateOnce("devices.h5109-001a", "ip");
+      const before = calls.length;
+      await sm.writeReadOnly(id, "10.0.0.5");
+      expect(calls.slice(before).map(c => c.method)).toEqual(["setState"]);
+    });
+
+    it("a synthetic sensor or event datapoint is read-only before this run ensured its object", () => {
+      const { adapter } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      expect(sm.isReadOnlyState("devices.h5179-0003.sensor.temperature")).toBe(true);
+      expect(sm.isReadOnlyState("devices.h7141-0007.events.lack_water_event")).toBe(true);
+      expect(sm.isReadOnlyState("devices.h7141-0007.control.temperature")).toBe(false); // a setpoint of another channel
+      expect(sm.isReadOnlyState("devices.h6160-0011.control.power")).toBe(false);
+      expect(sm.isReadOnlyState("groups.g-1.sensor.temperature")).toBe(false);
+    });
   });
 
   describe("cleanupCloudOwnedStates", () => {
@@ -1835,21 +1880,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
-        // The two datapoints the diag channel actually has. This test used to
-        // route `export` and `result` — the button removed in 2.31.0 and the
-        // state removed in 2.29.0 — so it pinned the rule with names a reader
-        // would go looking for and never find.
-        {
-          id: "lastExport",
-          name: "Last export",
-          type: "string",
-          role: "date",
-          write: false,
-          def: "",
-          capabilityType: "local",
-          capabilityInstance: "diagnosticsLastExport",
-          channel: "diag",
-        },
+        // The datapoint the diag channel actually has.
         {
           id: "tier",
           name: "Tier",
@@ -1862,7 +1893,6 @@ describe("StateManager", () => {
           channel: "diag",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160-0011", "lastExport")).toBe("devices.h6160-0011.diag.lastExport");
       expect(sm.resolveStatePath("devices.h6160-0011", "tier")).toBe("devices.h6160-0011.diag.tier");
     });
 
@@ -1873,9 +1903,12 @@ describe("StateManager", () => {
       expect(calls.filter(c => c.method === "setState")).toEqual([]);
       const light = createTestDevice();
       await sm.updateDeviceTier(light, "verified");
-      expect(calls.filter(c => c.method === "setState").map(c => c.args)).toEqual([
+      // read-only: the first write of a run compares once with the database, later ones in memory
+      expect(calls.filter(c => c.method === "setStateChangedAsync").map(c => c.args.slice(0, 2))).toEqual([
         [`${sm.devicePrefix(light)}.diag.tier`, { val: "verified", ack: true }],
       ]);
+      await sm.updateDeviceTier(light, "verified");
+      expect(calls.filter(c => c.method === "setState" || c.method === "setStateChangedAsync")).toHaveLength(1);
     });
 
     it("should route unknown states to control channel", () => {
@@ -3194,35 +3227,16 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       expect(states.has("devices.h6160-0011.diag.export")).toBe(false);
     });
 
-    it("clears a lastExport still holding a FILE NAME — the type change alone would not", async () => {
-      // `lastExport` stopped naming the file and now stamps when the report was
-      // taken. The type stayed `string`, so nothing forces the old value out:
-      // writeStateDefsToChannels only writes the default into an EMPTY state.
-      // Without this an upgraded install shows a file name under a datapoint
-      // that reads "time of the last export".
-      const { adapter, states } = createMockAdapter();
+    it("removes diag.lastExport — a report writes no value (DB-10)", async () => {
+      const { adapter, objects, states } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
-      states.set("devices.h6160-0011.diag.lastExport", {
-        val: "govee-smart_H6160_0011_v2.30.0_2026-09-03_205830.json",
-        ack: true,
-      } as ioBroker.State);
+      objects.set("devices.h6160-0011.diag.lastExport", { common: { name: "Last diagnostics export" } });
+      states.set("devices.h6160-0011.diag.lastExport", { val: "2026-09-03T20:58:30Z", ack: true } as ioBroker.State);
 
       await sm.migrateLegacyDiagnostics(createTestDevice());
 
-      expect(states.get("devices.h6160-0011.diag.lastExport")?.val).toBe("");
-    });
-
-    it("leaves a timestamp alone — the migration must not undo itself on every start", async () => {
-      const { adapter, states } = createMockAdapter();
-      const sm = new StateManager(adapter as never, registry);
-      states.set("devices.h6160-0011.diag.lastExport", {
-        val: "2026-09-03T20:58:30Z",
-        ack: true,
-      } as ioBroker.State);
-
-      await sm.migrateLegacyDiagnostics(createTestDevice());
-
-      expect(states.get("devices.h6160-0011.diag.lastExport")?.val).toBe("2026-09-03T20:58:30Z");
+      expect(objects.has("devices.h6160-0011.diag.lastExport")).toBe(false);
+      expect(states.has("devices.h6160-0011.diag.lastExport")).toBe(false);
     });
 
     it("is a silent no-op on an install that never had it", async () => {

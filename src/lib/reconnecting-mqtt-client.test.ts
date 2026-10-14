@@ -1,4 +1,4 @@
-import { ReconnectingMqttClient, computeBackoffDelay } from "./reconnecting-mqtt-client";
+import { CONNECT_WINDOW_MS, ReconnectingMqttClient, computeBackoffDelay } from "./reconnecting-mqtt-client";
 import { type TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
 
@@ -61,6 +61,9 @@ class TestClient extends ReconnectingMqttClient {
   public subscribe(topic: string, onOk: () => void, onFail: (m: string) => void): void {
     this.subscribeOrForceClose(topic, onOk, onFail);
   }
+  public open(connectFn: (url: string, opts: Record<string, unknown>) => unknown): void {
+    this.openBroker(connectFn as never, "mqtts://broker.example:8883", { keepalive: 60 });
+  }
   public get hasArmedTimer(): boolean {
     return this.reconnectTimer !== undefined;
   }
@@ -108,6 +111,38 @@ describe("computeBackoffDelay", () => {
 });
 
 describe("ReconnectingMqttClient base scaffolding", () => {
+  describe("the connect gate — at most two broker connects a minute (api-limits.json)", () => {
+    it("a third reconnect inside the minute waits until the first connect left the window", () => {
+      const t = makeCapturingTimers();
+      const c = new TestClient(mockLog, t.timers);
+      const connect = (): unknown => ({ removeAllListeners: () => {}, on: () => {}, end: () => {} });
+      c.open(connect);
+      c.arm();
+      expect(t.scheduled[0].ms).toBeLessThanOrEqual(10_000); // one connect so far — the plain backoff
+      t.fireLast();
+      c.open(connect); // the reconnect itself
+      c.arm();
+      expect(t.scheduled[1].ms).toBeGreaterThan(CONNECT_WINDOW_MS - 1_000); // two in the window — wait for the first
+    });
+  });
+
+  describe("openBroker — the chosen network address (fleet master network-address.ts)", () => {
+    it("connects from the chosen address, and from any address without one", () => {
+      const t = makeCapturingTimers();
+      const c = new TestClient(mockLog, t.timers);
+      const seen: Array<Record<string, unknown>> = [];
+      const connect = (_url: string, opts: Record<string, unknown>): unknown => {
+        seen.push(opts);
+        return { removeAllListeners: () => {}, on: () => {}, end: () => {} };
+      };
+      c.open(connect);
+      c.localAddress = "10.47.4.175";
+      c.open(connect);
+      expect(seen[0]).not.toHaveProperty("localAddress");
+      expect(seen[1]).toMatchObject({ localAddress: "10.47.4.175", keepalive: 60, reconnectPeriod: 0 });
+    });
+  });
+
   describe("scheduleReconnect", () => {
     it("arms a backoff timer and fires reconnect() when it elapses", () => {
       const t = makeCapturingTimers();

@@ -18,6 +18,8 @@ import { DeviceIdRegistry } from "../lib/device-id";
 import { DeviceRegistry } from "../lib/device-registry";
 import { GroupFanoutHandler } from "../lib/group-fanout";
 import { buildGroupFanoutHost } from "../lib/handlers/group-fanout-handler";
+import { counterpartFor, limitOf } from "../lib/api-limits";
+import { GoveeMqttClient } from "../lib/govee-mqtt-client";
 import type { GoveeDevice } from "../lib/types";
 
 const log: ioBroker.Logger = {
@@ -64,10 +66,12 @@ function light(sku: string, extra: Partial<GoveeDevice> = {}): GoveeDevice {
  *
  * @param dev the light
  * @param lan whether the LAN client is there
+ * @param broker the account broker: connected, disconnected, or none at all (no Govee account)
  */
 async function switchOn(
   dev: GoveeDevice,
   lan = false,
+  broker: "up" | "down" | "none" = "up",
 ): Promise<{ published: string[]; cloud: string[]; lanSent: string[]; acked: Map<string, unknown> }> {
   const published: string[] = [];
   const cloud: string[] = [];
@@ -87,13 +91,15 @@ async function switchOn(
   );
   (dm as unknown as { devices: Map<string, GoveeDevice> }).devices.set("k", dev);
   // Optional call: a build without the broker route has no such method — the guard must then fail on its assertions.
-  (dm as unknown as { setBrokerClient?: (client: unknown) => void }).setBrokerClient?.({
-    connected: true,
-    publishCommand: (topic: string, cmd: string) => {
-      published.push(`${topic} ${cmd}`);
-      return true;
-    },
-  });
+  if (broker !== "none") {
+    (dm as unknown as { setBrokerClient?: (client: unknown) => void }).setBrokerClient?.({
+      connected: broker === "up",
+      publishCommand: (topic: string, cmd: string) => {
+        published.push(`${topic} ${cmd}`);
+        return true;
+      },
+    });
+  }
   dm.setCloudClient({
     controlDevice: (_sku: string, _id: string, _type: string, instance: string) => {
       cloud.push(instance);
@@ -119,7 +125,7 @@ async function switchOn(
     groupFanout: null,
     snapshotHandler: null,
     lanClient: lan ? lanClient : null,
-    mqttClient: { connected: true },
+    mqttClient: broker === "none" ? null : { connected: broker === "up" },
     getStateAsync: () => Promise.resolve(null),
     getObjectAsync: () => Promise.resolve(structuredClone({ common: { type: "boolean" }, native: {} })),
     setState: (id: string, state: { val: unknown; ack?: boolean }) => {
@@ -142,6 +148,42 @@ describe("K18 commands over the account broker", () => {
     expect(r.published).toEqual([`${TOPIC} turn`]);
     expect(r.cloud).toEqual([]);
     expect(r.acked.has("control.power")).toBe(false);
+  });
+
+  it("only with a Govee account: without one there is no broker, and the light goes over the Cloud", async () => {
+    const r = await switchOn(light("H9K01"), false, "none");
+    expect(r.published).toEqual([]);
+    expect(r.cloud).toEqual(["powerSwitch"]);
+  });
+
+  it("then the Cloud: with the broker disconnected the command goes over the Cloud", async () => {
+    const r = await switchOn(light("H9K01"), false, "down");
+    expect(r.published).toEqual([]);
+    expect(r.cloud).toEqual(["powerSwitch"]);
+  });
+
+  it("the broker has its own limit in src/lib/api-limits.json, and the account client keeps its commands within it", () => {
+    const declared = counterpartFor("tcp", "a1b2c3d4e5f6g7-ats.iot.eu-central-1.amazonaws.com", 8883);
+    expect(declared?.name).toBe("Govee account broker (AWS IoT MQTT)");
+    const perMinute = limitOf("Govee account broker (AWS IoT MQTT)", 60).max;
+    expect(perMinute).toBeGreaterThan(40);
+    const mqtt = new GoveeMqttClient("user@example.com", "secret", log, timers);
+    let published = 0;
+    (mqtt as unknown as { client: unknown }).client = {
+      connected: true,
+      publish: () => {
+        published++;
+      },
+    };
+    let accepted = 0;
+    for (let i = 0; i < perMinute; i++) {
+      if (mqtt.publishCommand(TOPIC, "turn", { value: 1 })) {
+        accepted++;
+      }
+    }
+    // the protocol's own writes (subscribe, ping) keep their share of the limit; every command beyond is refused
+    expect(accepted).toBe(perMinute - 40);
+    expect(published).toBe(accepted);
   });
 
   it("a model the catalog switches off goes over the Cloud, whose success confirms it", async () => {

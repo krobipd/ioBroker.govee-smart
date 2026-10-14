@@ -75,7 +75,8 @@ describe("GV-25 an untested model asks for the switch and a report", () => {
     expect(lines[0]).not.toMatch(CLAIMS_TO_WORK);
   });
 
-  it("a reported model asks for nothing (positive control)", () => {
+  it("a reported model asks for nothing — where a seed model of the same catalog asks (positive control)", () => {
     expect(linesFor("H9R01", false)).toEqual([]);
+    expect(linesFor("H9S01", false)).toHaveLength(1);
   });
 });

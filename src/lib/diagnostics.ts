@@ -1584,6 +1584,8 @@ export class DiagnosticsCollector {
     const decidedBy = {
       lanReply: "LAN reply freshness",
       gatewayDown: "its gateway is down — a device behind a gateway can be no more reachable than the gateway",
+      noCloudPath:
+        "neither the Cloud nor the account broker is reachable — a device without a local interface cannot be reached",
       cloudReport: "Govee reported it explicitly (an `online` capability)",
       cloudLiveness:
         "Govee delivered something for this device without reporting reachability — the payload proves it spoke",

@@ -1,5 +1,5 @@
 import { errText } from "../types";
-import { updateConnectionState, type ConnectionStateAdapter } from "./connection-state";
+import { markCloudPaths, updateConnectionState, type ConnectionStateAdapter } from "./connection-state";
 import * as groupFanoutHandler from "./group-fanout-handler";
 
 /** What the 20-second round needs: the connection contract, the group contract, and its own two flags. */
@@ -25,6 +25,8 @@ export async function runOnlineSyncRound(adapter: OnlineSyncAdapter): Promise<vo
     if (adapter.unloading || !adapter.stateManager || !adapter.deviceManager) {
       return;
     }
+    // the cloud paths first — a cloud-only device without one shows offline in this round (GV-16)
+    markCloudPaths(adapter);
     let anyLightChanged = false;
     for (const device of adapter.deviceManager.getDevices()) {
       const changed = await adapter.stateManager.syncInfoOnline(device).catch(() => false);

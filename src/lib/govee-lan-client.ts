@@ -1,3 +1,4 @@
+import { AsyncResource } from "node:async_hooks";
 import * as dgram from "node:dgram";
 import * as os from "node:os";
 import { errText, type LanDevice, type LanMessage, type LanStatus, type TimerAdapter } from "./types";
@@ -425,8 +426,9 @@ export class GoveeLanClient {
       this.onSend?.(ip, cmd, data, 0, "socket not ready");
       return;
     }
-    // The light's control limit (api-limits.json): a datagram over it waits, in order, behind the ones before it.
-    const send = (): void => this.transmit(ip, cmd, data);
+    // The light's control limit (api-limits.json): a datagram over it waits, in order, behind the ones before it. Bound to
+    // the context it was asked in — released by a timer another command armed, it still belongs to its own command.
+    const send = AsyncResource.bind((): void => this.transmit(ip, cmd, data));
     const waiting = this.paced.get(ip);
     if (waiting) {
       waiting.push(send);

@@ -89,6 +89,15 @@ const mockTimers = {
 };
 
 describe("GoveeOpenapiMqttClient", () => {
+  it("connects at most once a minute — the declared cap of 40 writes holds a full connect and its keepalive", () => {
+    const client = new GoveeOpenapiMqttClient("k", mockLog, mockTimers);
+    const gate = client as unknown as { connectTimes: number[]; connectWaitMs: (now: number) => number };
+    expect(gate.connectWaitMs(100_000)).toBe(0);
+    gate.connectTimes.push(100_000);
+    expect(gate.connectWaitMs(130_000)).toBe(30_001); // the account broker's client would connect a second time here
+    expect(gate.connectWaitMs(160_000)).toBe(0);
+  });
+
   describe("lifecycle without a broker", () => {
     it("starts disconnected, and a disconnect() that never connected is a silent no-op", () => {
       const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers);

@@ -18,7 +18,7 @@ vi.mock("../useDeviceList", async importOriginal => ({
   }),
 }));
 
-import { ExpertPanel } from "../ExpertPanel";
+import ExpertConfig from "../ExpertConfig";
 
 beforeEach(() => {
   I18n.extendTranslations(enJson, "en");
@@ -33,12 +33,18 @@ describe("GV-27 the segment wizard is the adapter's own React component", () => 
   it("the Expert tab of the settings page mounts the adapter's own component, which opens on the segment wizard", async () => {
     const config = JSON.stringify(readJson("admin", "jsonConfig.json"));
     expect(config).toContain("ConfigCustomGoveeSegmentSet/Components/ExpertConfig");
-    render(
-      <ExpertPanel
-        socket={{}}
-        namespace="govee-smart.0"
-      />,
-    );
+    const props = {
+      oContext: { adapterName: "govee-smart", instance: 0, socket: {}, themeType: "light", forceUpdate: () => {} },
+      data: {},
+      originalData: {},
+      schema: { type: "custom" },
+      attr: "_expert",
+      onChange: () => {},
+      onError: () => {},
+      themeType: "light",
+      alive: true,
+    };
+    render(<ExpertConfig {...(props as unknown as React.ComponentProps<typeof ExpertConfig>)} />);
     await waitFor(() => expect(screen.getByTestId("wiz-start")).toBeTruthy());
   });
 
@@ -47,10 +53,14 @@ describe("GV-27 the segment wizard is the adapter's own React component", () => 
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
     };
-    expect(Object.keys({ ...pkg.dependencies, ...pkg.devDependencies }).filter(n => n.includes("dm-utils"))).toEqual(
-      [],
-    );
-    const io = readJson("io-package.json") as { common?: { supportedMessages?: Record<string, unknown> | null } };
+    const packages = Object.keys({ ...pkg.dependencies, ...pkg.devDependencies });
+    expect(packages.filter(n => n.includes("dm-utils"))).toEqual([]);
+    // the same lookup sees what the adapter does depend on (positive control)
+    expect(packages).toContain("@iobroker/adapter-core");
+    const io = readJson("io-package.json") as {
+      common?: { name?: string; supportedMessages?: Record<string, unknown> | null };
+    };
+    expect(io.common?.name).toBe("govee-smart");
     expect(io.common?.supportedMessages?.deviceManager).toBeUndefined();
   });
 });

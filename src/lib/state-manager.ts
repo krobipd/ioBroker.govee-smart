@@ -29,12 +29,6 @@ const SORT_KEY_END = "香";
  */
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
 /**
- * What `diag.lastExport` holds since 2.31.0 — an ISO-8601 instant in UTC,
- * seconds precision. Used to tell a migrated value from the file name the
- * datapoint carried up to 2.30.0.
- */
-const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
-/**
  * Display names used when the channel object is (re-)created. `info` is
  * listed here even though it's not in MANAGED_CHANNELS — capability-mapper
  * emits states with `channel: "info"`, and without this entry the create
@@ -129,6 +123,10 @@ export class StateManager {
    * confirmed it — see {@link writeReadOnly}.
    */
   private readonly readOnlyValues = new Map<string, ioBroker.StateValue>();
+  /** Whether `primeReadOnly` read the stored values — from then on a state not in memory has no value yet. */
+  private readOnlyPrimed = false;
+  /** The read-only states this run created from its definitions (`common.write: false`). */
+  private readonly readOnlyIds = new Set<string>();
   /** This instance's device catalog — quirks for the LAN default states. */
   private readonly registry: DeviceRegistry;
   /**
@@ -239,6 +237,7 @@ export class StateManager {
     // Whatever gets deleted must be re-creatable later — drop it from the
     // "already ensured" cache in the same breath.
     this.ensuredStates.delete(id);
+    this.forgetReadOnly(id);
     const obj = await this.adapter.getObjectAsync(id).catch(() => null);
     if (!obj) {
       return;
@@ -312,7 +311,8 @@ export class StateManager {
       return;
     }
     const prefix = this.devicePrefix(device);
-    await this.adapter.setState(`${prefix}.diag.tier`, { val: tier, ack: true }).catch(() => undefined);
+    // read-only: compared in memory, written only on a change
+    await this.writeReadOnly(`${prefix}.diag.tier`, tier).catch(() => undefined);
   }
 
   /**
@@ -457,15 +457,16 @@ export class StateManager {
    * differs from what this run already wrote or confirmed, compared IN MEMORY
    * (fleet rule, round 62): `setStateChangedAsync` reads the state back from the
    * database on every call, and the 20-second round did that for every marker.
-   * The first write of a run compares once with the database — the value of the
-   * last run lives only there.
+   * The values of the last run come from ONE bulk read at the start
+   * (`primeReadOnly`, round 77: no single read of a read-only state); without it
+   * the first write of a run compares once with the database.
    *
    * @param id State id (namespace-less)
    * @param val The value
    */
   async writeReadOnly(id: string, val: ioBroker.StateValue): Promise<void> {
-    if (this.readOnlyValues.has(id)) {
-      if (this.readOnlyValues.get(id) === val) {
+    if (this.readOnlyValues.has(id) || this.readOnlyPrimed) {
+      if (this.readOnlyValues.has(id) && this.readOnlyValues.get(id) === val) {
         return;
       }
       this.readOnlyValues.set(id, val);
@@ -474,6 +475,72 @@ export class StateManager {
     }
     this.readOnlyValues.set(id, val);
     await this.adapter.setStateChangedAsync(id, { val, ack: true });
+  }
+
+  /**
+   * Read every stored value of this instance ONCE, at the start — `writeReadOnly` then compares in memory and never
+   * reads a single state (fleet rule, round 77).
+   */
+  async primeReadOnly(): Promise<void> {
+    const states = await this.adapter.getStatesAsync("*").catch(() => null);
+    if (!states) {
+      return;
+    }
+    const ns = `${this.adapter.namespace}.`;
+    for (const [fullId, state] of Object.entries(states)) {
+      if (state && fullId.startsWith(ns)) {
+        this.readOnlyValues.set(fullId.slice(ns.length), state.val);
+      }
+    }
+    this.readOnlyPrimed = true;
+  }
+
+  /**
+   * Forget the in-memory value of every state at or below an id — a deleted state has no value any more, and the next
+   * write of a re-created one must reach the database (js-controller sets only its `def` when it creates it).
+   *
+   * @param id State, channel or device id (namespace-less)
+   */
+  private forgetReadOnly(id: string): void {
+    for (const key of this.readOnlyValues.keys()) {
+      if (key === id || key.startsWith(`${id}.`)) {
+        this.readOnlyValues.delete(key);
+      }
+    }
+  }
+
+  /**
+   * Whether a state is one only the adapter writes — created read-only by this run from its definitions or as a
+   * synthetic sensor/event state.
+   *
+   * @param id State id (namespace-less)
+   */
+  isReadOnlyState(id: string): boolean {
+    if (this.readOnlyIds.has(id)) {
+      return true;
+    }
+    // A synthetic sensor/event datapoint is read-only by construction (ensureSyntheticStateObject) — also when a write
+    // reaches it before this run ensured its object.
+    const parts = id.split(".");
+    const stateId = parts[parts.length - 1];
+    return (
+      parts[0] === "devices" &&
+      SYNTHETIC_STATE_META[stateId.toLowerCase()] !== undefined &&
+      parts[parts.length - 2] === inferChannelFromStateId(stateId)
+    );
+  }
+
+  /**
+   * Keep the in-memory value of a read-only state in step with a write that did not go through `writeReadOnly` (a
+   * reading written with its measurement time).
+   *
+   * @param id State id (namespace-less)
+   * @param val The value written
+   */
+  noteReadOnlyWrite(id: string, val: ioBroker.StateValue): void {
+    if (this.isReadOnlyState(id)) {
+      this.readOnlyValues.set(id, val);
+    }
   }
 
   /**
@@ -530,31 +597,10 @@ export class StateManager {
     // only report itself in the log).
     await this.safeDeleteState(`${prefix}.diag.export`);
     this.stateChannelMap.delete(`${prefix}.export`);
-    // 2.31.0: `lastExport` stopped naming the file and now stamps WHEN the last
-    // report was taken. The type did not change, so nothing forces the old value
-    // out: `writeStateDefsToChannels` only writes the default into an EMPTY
-    // state. Without this an upgraded install keeps showing a file name under a
-    // datapoint that now reads "time of the last export".
-    await this.resetLastExportIfNotATimestamp(prefix);
-  }
-
-  /**
-   * Clear a `diag.lastExport` left over from ≤2.30.0, where the value was the
-   * report's file NAME. Anything that is not an ISO timestamp is a leftover;
-   * an already-migrated (or empty) state is left alone so this stays a no-op
-   * on every start after the first.
-   *
-   * @param prefix Device state prefix (e.g. `devices.h61be-1d6f`)
-   */
-  private async resetLastExportIfNotATimestamp(prefix: string): Promise<void> {
-    const id = `${prefix}.diag.lastExport`;
-    const current = await this.adapter.getStateAsync(id).catch(() => null);
-    const val = current?.val;
-    if (typeof val !== "string" || val === "" || ISO_TIMESTAMP.test(val)) {
-      return;
-    }
-    this.adapter.log.debug(`Clearing pre-2.31.0 file name from ${id}`);
-    await this.adapter.setState(id, { val: "", ack: true });
+    // 3.2.0: a report writes no value (DB-10, krobi 2026-10-06) — `lastExport`, the time of the last report, goes
+    // the same way.
+    await this.safeDeleteState(`${prefix}.diag.lastExport`);
+    this.stateChannelMap.delete(`${prefix}.lastExport`);
   }
 
   /**
@@ -661,6 +707,7 @@ export class StateManager {
         native: {},
       });
       this.ensuredStates.add(stateFullId);
+      this.readOnlyIds.add(stateFullId);
     } catch {
       /* retried on the next write */
     }
@@ -767,10 +814,7 @@ export class StateManager {
     // change should write and bump the timestamp. No consumer reads the
     // ts/lc of these states as a freshness signal (grep-verified).
     await this.ensureState(`${prefix}.info.name`, { name: tName("stateName"), type: "string", role: "info.name" });
-    await this.adapter.setStateChangedAsync(`${prefix}.info.name`, {
-      val: device.name,
-      ack: true,
-    });
+    await this.writeReadOnly(`${prefix}.info.name`, device.name);
 
     if (!isGroup) {
       await this.ensureState(`${prefix}.info.online`, {
@@ -836,33 +880,18 @@ export class StateManager {
         },
         native: {},
       });
-      await this.adapter.setStateChangedAsync(`${prefix}.info.model`, {
-        val: device.sku,
-        ack: true,
-      });
-      await this.adapter.setStateChangedAsync(`${prefix}.info.serial`, {
-        val: device.deviceId,
-        ack: true,
-      });
+      await this.writeReadOnly(`${prefix}.info.model`, device.sku);
+      await this.writeReadOnly(`${prefix}.info.serial`, device.deviceId);
       if (device.gateway) {
-        await this.adapter.setStateChangedAsync(`${prefix}.info.gateway`, {
-          val: device.gateway,
-          ack: true,
-        });
+        await this.writeReadOnly(`${prefix}.info.gateway`, device.gateway);
         // Drop a leftover info.ip from before the device was known to hang off a
         // gateway. Once-guarded — after the first pass the object tree is never
         // touched again (no per-refresh create/delete churn).
         await this.removeInfoStateOnce(prefix, "ip");
       } else {
-        await this.adapter.setStateChangedAsync(`${prefix}.info.ip`, {
-          val: device.lanIp ?? "",
-          ack: true,
-        });
+        await this.writeReadOnly(`${prefix}.info.ip`, device.lanIp ?? "");
       }
-      await this.adapter.setStateChangedAsync(`${prefix}.info.type`, {
-        val: infoTypeValue(device.type),
-        ack: true,
-      });
+      await this.writeReadOnly(`${prefix}.info.type`, infoTypeValue(device.type));
       // Initial info.online sync — see syncInfoOnline for the resolver.
       // Subsequent updates come from the periodic sync timer in main.ts
       // and from direct calls in onDeviceStateUpdate when state.online
@@ -877,10 +906,7 @@ export class StateManager {
         role: "text",
         desc: tDesc("descMembers"),
       });
-      await this.adapter.setStateChangedAsync(`${prefix}.info.members`, {
-        val: memberIds,
-        ack: true,
-      });
+      await this.writeReadOnly(`${prefix}.info.members`, memberIds);
       // The object exists from the first build on; its VALUE is written by the
       // reachability rounds (first one ≤ 20 s after start). Created lazily on
       // that first round, the object appeared up to 20 s after the rest of the
@@ -906,6 +932,7 @@ export class StateManager {
         this.onlineMarkerCache?.delete(`${prefix}.info.online`);
         this.resolvedOnline.delete(`${prefix}.info.online`);
         // Groups never had a `diag` channel — drop any leftover from migrated installs.
+        this.forgetReadOnly(`${prefix}.diag`);
         await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
       }
     }
@@ -1014,6 +1041,9 @@ export class StateManager {
           read: def.role === "button" ? false : true,
           write: def.write,
         };
+        if (!def.write) {
+          this.readOnlyIds.add(`${prefix}.${channel}.${def.id}`);
+        }
 
         if (def.unit) {
           common.unit = def.unit;
@@ -1054,21 +1084,28 @@ export class StateManager {
           await this.repairCommonStatesIfBuggy(`${prefix}.${channel}.${def.id}`, def.states);
         }
 
-        // Initialize or validate state value
+        // Initialize or validate state value — a read-only state from the start's bulk read, never one by one
+        // (fleet rule, round 77)
         if (def.def !== undefined) {
-          const current = await this.adapter.getStateAsync(`${prefix}.${channel}.${def.id}`);
+          const id = `${prefix}.${channel}.${def.id}`;
+          const current =
+            !def.write && this.readOnlyPrimed
+              ? this.readOnlyValues.has(id)
+                ? { val: this.readOnlyValues.get(id) }
+                : null
+              : await this.adapter.getStateAsync(id);
           if (!current || current.val === null || current.val === undefined) {
             // Set default value for new states
-            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
+            this.noteReadOnlyWrite(id, def.def);
+            await this.adapter.setState(id, {
               val: def.def,
               ack: true,
             });
           } else if (def.states && !(String(current.val) in def.states)) {
             // Reset dropdown to default if current value is no longer valid
-            this.adapter.log.debug(
-              `Resetting stale dropdown: ${prefix}.${channel}.${def.id} = "${String(current.val)}" → "${String(def.def)}"`,
-            );
-            await this.adapter.setState(`${prefix}.${channel}.${def.id}`, {
+            this.adapter.log.debug(`Resetting stale dropdown: ${id} = "${String(current.val)}" → "${String(def.def)}"`);
+            this.noteReadOnlyWrite(id, def.def);
+            await this.adapter.setState(id, {
               val: def.def,
               ack: true,
             });
@@ -1113,10 +1150,7 @@ export class StateManager {
       role: "value",
       desc: tDesc("descSegmentCount"),
     });
-    await this.adapter.setState(`${prefix}.segments.count`, {
-      val: reportedCount,
-      ack: true,
-    });
+    await this.writeReadOnly(`${prefix}.segments.count`, reportedCount);
 
     // Manual-mode toggle and list — user-writable for cut-strip overrides
     await this.extendIfChanged(`${prefix}.segments.manual_mode`, {
@@ -1148,17 +1182,18 @@ export class StateManager {
 
     // Sync manual_mode / manual_list states back from the runtime device
     // (restored from cache on startup, or updated by the wizard). Using
-    // ack=true keeps this out of the user-change handler path.
+    // ack=true keeps this out of the user-change handler path; written only on
+    // a change (a user's unconfirmed write differs in `ack` and is confirmed).
     const manualModeVal = device.manualMode === true;
     const manualListVal =
       device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? device.manualSegments.join(",")
         : "";
-    await this.adapter.setState(`${prefix}.segments.manual_mode`, {
+    await this.adapter.setStateChangedAsync(`${prefix}.segments.manual_mode`, {
       val: manualModeVal,
       ack: true,
     });
-    await this.adapter.setState(`${prefix}.segments.manual_list`, {
+    await this.adapter.setStateChangedAsync(`${prefix}.segments.manual_list`, {
       val: manualListVal,
       ack: true,
     });
@@ -1244,6 +1279,7 @@ export class StateManager {
       const segIdx = parseInt(segPart, 10);
       if (!isNaN(segIdx) && !valid.has(segIdx)) {
         this.adapter.log.debug(`Removing excess segment: ${localId}`);
+        this.forgetReadOnly(localId);
         // The recursive delete takes the values with it: js-controller 7.2.2
         // (`_deleteObjects`) deletes the state of every state object it
         // removes and drops its enum memberships — nothing resurrects into a
@@ -1395,10 +1431,7 @@ export class StateManager {
     // bumped ts on an unchanged (usually empty) value, spamming state
     // events and history adapters (M6; same class as the v2.9.0
     // info.online ts-rewrite fix).
-    await this.adapter.setStateChangedAsync(stateId, {
-      val: unreachable.join(", "),
-      ack: true,
-    });
+    await this.writeReadOnly(stateId, unreachable.join(", "));
   }
 
   /**
@@ -1579,6 +1612,7 @@ export class StateManager {
         const localId = row.id.replace(`${this.adapter.namespace}.`, "");
         this.adapter.log.debug(`Removing stale state: ${localId}`);
         this.ensuredStates.delete(localId);
+        this.forgetReadOnly(localId);
         // Deleting a state object deletes its value too (js-controller 7.2.2,
         // `_delForeignObject`: `delForeignState` for `type: "state"`).
         await this.adapter.delObjectAsync(localId);
@@ -1631,7 +1665,7 @@ export class StateManager {
   private forgetPrefix(prefix: string): void {
     this.onlineMarkerCache?.delete(`${prefix}.info.online`);
     this.resolvedOnline.delete(`${prefix}.info.online`);
-    this.readOnlyValues.delete(`${prefix}.info.online`);
+    this.forgetReadOnly(prefix);
     // A removed or re-prefixed device must get its device object written in
     // full again — a surviving signature would skip the write that rebuilds it.
     this.deviceObjectSignature.delete(prefix);

@@ -12,6 +12,8 @@ vi.mock("@iobroker/adapter-core", () => ({
 }));
 
 import { loadCloudStates, type CloudStateLoaderAdapter } from "../lib/handlers/cloud-state-loader";
+import { DeviceManager } from "../lib/device-manager";
+import { DeviceIdRegistry } from "../lib/device-id";
 import { DeviceRegistry } from "../lib/device-registry";
 import type { GoveeDevice } from "../lib/types";
 
@@ -70,6 +72,54 @@ describe("GV-19 no state read for app groups", () => {
       setStateChanged: () => Promise.resolve(),
     };
     await loadCloudStates(adapter);
+    expect(asked).toEqual(["H6199"]);
+  });
+
+  it("the reachability refresh of the first cycle asks the cloud light, never the app group", async () => {
+    const asked: string[] = [];
+    const timers = {
+      setInterval: () => undefined,
+      clearInterval: () => undefined,
+      clearTimeout: () => undefined,
+      setTimeout: () => undefined,
+      delay: () => Promise.resolve(),
+    } as never;
+    const dm = new DeviceManager(log, timers, new DeviceRegistry({ data: { devices: {} } }), new DeviceIdRegistry());
+    dm.setCloudClient({
+      getDeviceState: (sku: string) => {
+        asked.push(sku);
+        return Promise.resolve([]);
+      },
+    } as never);
+    const devices = (dm as unknown as { devices: Map<string, GoveeDevice> }).devices;
+    devices.set("BaseGroup_1234567", device("BaseGroup", "1234567"));
+    devices.set("H6199_19", device("H6199", "AA:BB:CC:DD:EE:FF:00:19"));
+    await dm.refreshExpiringReachability();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(asked).toEqual(["H6199"]);
+  });
+
+  it("the status request over the account broker asks the cloud light, never the app group", () => {
+    const asked: string[] = [];
+    const timers = {
+      setInterval: () => undefined,
+      clearInterval: () => undefined,
+      clearTimeout: () => undefined,
+      delay: () => Promise.resolve(),
+      setTimeout: (cb: () => void) => {
+        cb();
+        return undefined;
+      },
+    } as never;
+    const dm = new DeviceManager(log, timers, new DeviceRegistry({ data: { devices: {} } }), new DeviceIdRegistry());
+    dm.setStatusRequester(d => {
+      asked.push(d.sku);
+      return true;
+    });
+    const devices = (dm as unknown as { devices: Map<string, GoveeDevice> }).devices;
+    devices.set("BaseGroup_1234567", { ...device("BaseGroup", "1234567"), iotTopic: "GD/group" });
+    devices.set("H6199_19", { ...device("H6199", "AA:BB:CC:DD:EE:FF:00:19"), iotTopic: "GD/light" });
+    dm.requestStaleStatuses(Date.now());
     expect(asked).toEqual(["H6199"]);
   });
 });

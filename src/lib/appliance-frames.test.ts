@@ -106,28 +106,30 @@ const PUSH_2026_09_10 = [
 
 describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", () => {
   it("reads mode, level and filter life from the 2026-09-11 packet (Custom mode → level 0, as the cloud reports it)", () => {
-    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11)).toEqual([
+    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11, "h7127-purifier")).toEqual([
       { type: "devices.capabilities.work_mode", instance: "workMode", state: { value: { workMode: 2, modeValue: 0 } } },
       { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 72 } },
     ]);
   });
 
   it("reads the 2026-09-10 packet — gear mode with its level, filter 73 %", () => {
-    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_10)).toEqual([
+    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_10, "h7127-purifier")).toEqual([
       { type: "devices.capabilities.work_mode", instance: "workMode", state: { value: { workMode: 1, modeValue: 1 } } },
       { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 73 } },
     ]);
   });
 
   it("does not write air quality — byte 5 is measured once and never seen changing", () => {
-    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11).map(c => c.instance)).not.toContain("airQuality");
+    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11, "h7127-purifier").map(c => c.instance)).not.toContain(
+      "airQuality",
+    );
   });
 
   it("drops a frame whose checksum does not match, and everything it would have carried", () => {
     const corrupted = PUSH_2026_09_10.map(f =>
       f === "qhkA//8GAEkAAAAAAAAAAAAAAPw=" ? "qhkA//8GAEkAAAAAAAAAAAAAAP0=" : f,
     );
-    const out = decodeApplianceFrames(purifier(), corrupted);
+    const out = decodeApplianceFrames(purifier(), corrupted, "h7127-purifier");
     expect(out.map(c => c.instance)).toEqual(["workMode"]);
   });
 
@@ -137,7 +139,7 @@ describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", (
     const mode7 = Buffer.from("aa050007000000000000000000000000000000", "hex");
     const xor = mode7.reduce((a, b) => a ^ b, 0);
     const frames = [Buffer.concat([mode7, Buffer.from([xor])]).toString("base64")];
-    expect(decodeApplianceFrames(device, frames)).toEqual([]);
+    expect(decodeApplianceFrames(device, frames, "h7127-purifier")).toEqual([]);
   });
 
   // Audit 2026-09-12 (T2): raising the plausibility bound from 100 to 255
@@ -148,12 +150,12 @@ describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", (
     const sensors = Buffer.from("aa1900ffff0600c8000000000000000000000000", "hex").subarray(0, 19);
     const xor = sensors.reduce((a, b) => a ^ b, 0);
     const frame = Buffer.concat([sensors, Buffer.from([xor])]).toString("base64");
-    const out = decodeApplianceFrames(purifier(), [frame]);
+    const out = decodeApplianceFrames(purifier(), [frame], "h7127-purifier");
     expect(out).toEqual([]);
     // …while the same frame with a plausible value is written.
     const ok = Buffer.from("aa1900ffff0600480000000000000000000000", "hex").subarray(0, 19);
     const okFrame = Buffer.concat([ok, Buffer.from([ok.reduce((a, b) => a ^ b, 0)])]).toString("base64");
-    expect(decodeApplianceFrames(purifier(), [okFrame])).toEqual([
+    expect(decodeApplianceFrames(purifier(), [okFrame], "h7127-purifier")).toEqual([
       { type: "devices.capabilities.property", instance: "filterLifeTime", state: { value: 72 } },
     ]);
   });
@@ -173,18 +175,22 @@ describe("decodeApplianceFrames — H7127 status push (issue #47, spec §11)", (
       capabilities: H7127_CAPS,
       channels: { lan: false, mqtt: true, cloud: true },
     });
-    expect(decodeApplianceFrames(foreign, PUSH_2026_09_11)).toEqual([]);
+    expect(decodeApplianceFrames(foreign, PUSH_2026_09_11, undefined)).toEqual([]);
     // the very same packet on the measured sku does decode
-    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11)).toHaveLength(2);
+    expect(decodeApplianceFrames(purifier(), PUSH_2026_09_11, "h7127-purifier")).toHaveLength(2);
   });
 
   it("returns [] for a SKU without a decoder, for a light, and for junk", () => {
     expect(
-      decodeApplianceFrames(createTestDevice({ sku: "H7131", type: "devices.types.heater" }), PUSH_2026_09_11),
+      decodeApplianceFrames(
+        createTestDevice({ sku: "H7131", type: "devices.types.heater" }),
+        PUSH_2026_09_11,
+        undefined,
+      ),
     ).toEqual([]);
-    expect(decodeApplianceFrames(createTestDevice(), PUSH_2026_09_11)).toEqual([]);
-    expect(decodeApplianceFrames(purifier(), ["not base64!!", 42, null])).toEqual([]);
-    expect(decodeApplianceFrames(purifier(), undefined)).toEqual([]);
+    expect(decodeApplianceFrames(createTestDevice(), PUSH_2026_09_11, undefined)).toEqual([]);
+    expect(decodeApplianceFrames(purifier(), ["not base64!!", 42, null], "h7127-purifier")).toEqual([]);
+    expect(decodeApplianceFrames(purifier(), undefined, "h7127-purifier")).toEqual([]);
   });
 });
 
@@ -215,28 +221,36 @@ describe("decodeApplianceFrames — H1741 battery (issue #50)", () => {
 
   it("reads the level against the app's battery icon: two of three bars, full, one bar", () => {
     // 2026-09-23 05:13 — the app showed two of three bars.
-    expect(decodeApplianceFrames(lamp(), h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="))).toEqual(battery(48));
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="), "h1741-battery")).toEqual(
+      battery(48),
+    );
     // 2026-09-25 13:14 — right after a full charge.
-    expect(decodeApplianceFrames(lamp(), h1741Push("qkJQAAAAAAAAAAAAAAAAAAAAALg="))).toEqual(battery(80));
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkJQAAAAAAAAAAAAAAAAAAAAALg="), "h1741-battery")).toEqual(
+      battery(80),
+    );
     // 2026-09-26 11:24 — one bar, shortly before the battery saver.
-    expect(decodeApplianceFrames(lamp(), h1741Push("qkIgAAAAAAAAAAAAAAAAAAAAAMg="))).toEqual(battery(32));
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkIgAAAAAAAAAAAAAAAAAAAAAMg="), "h1741-battery")).toEqual(
+      battery(32),
+    );
   });
 
   it("masks bit 7 — seen only before the lamp was unplugged, its meaning is not measured", () => {
     // 2026-09-25 13:12 — 0xd4.
-    expect(decodeApplianceFrames(lamp(), h1741Push("qkLUAAAAAAAAAAAAAAAAAAAAADw="))).toEqual(battery(84));
+    expect(decodeApplianceFrames(lamp(), h1741Push("qkLUAAAAAAAAAAAAAAAAAAAAADw="), "h1741-battery")).toEqual(
+      battery(84),
+    );
   });
 
   it("drops a level above 100 and a frame with a wrong checksum", () => {
     // 0x65 = 101, checksum fixed up.
     const over = Buffer.from("aa4265000000000000000000000000000000008d", "hex").toString("base64");
-    expect(decodeApplianceFrames(lamp(), h1741Push(over))).toEqual([]);
+    expect(decodeApplianceFrames(lamp(), h1741Push(over), "h1741-battery")).toEqual([]);
     const broken = Buffer.from("aa423000000000000000000000000000000000d9", "hex").toString("base64");
-    expect(decodeApplianceFrames(lamp(), h1741Push(broken))).toEqual([]);
+    expect(decodeApplianceFrames(lamp(), h1741Push(broken), "h1741-battery")).toEqual([]);
   });
 
   it("reads nothing from another device's `aa 42` — mains devices send it too", () => {
     const h1310 = createTestDevice({ sku: "H1310", type: "devices.types.fan" });
-    expect(decodeApplianceFrames(h1310, h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="))).toEqual([]);
+    expect(decodeApplianceFrames(h1310, h1741Push("qkIwAAAAAAAAAAAAAAAAAAAAANg="), undefined)).toEqual([]);
   });
 });

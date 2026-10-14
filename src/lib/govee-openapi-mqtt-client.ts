@@ -47,6 +47,11 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
 
   /** Channel label used in reconnect log lines. */
   protected readonly channelLabel = "Cloud-events";
+  /**
+   * One connect a minute: a connect costs about 20 writes (TCP, TLS handshake, CONNECT, SUBSCRIBE), the declared cap of
+   * this counterpart is 40 a minute (api-limits.json) — two full connects and a keepalive would go over it.
+   */
+  protected readonly maxConnectsPerWindow = 1;
   /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
   private readonly logOnce: LogOnce;
   /**

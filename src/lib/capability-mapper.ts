@@ -1124,9 +1124,8 @@ function mapAutoStop(cap: CloudCapability): StateDefinition[] {
 }
 
 /**
- * Map temperature_setting capability — Heater target-temp slider.
- * Honours the unit reported by the API (°F or °C); falls back to °F
- * because that's the more common Govee Heater default.
+ * Map temperature_setting capability — Heater target-temp slider. The datapoint is always in °C (GV-11); a range
+ * Govee gives in °F is converted by `targetTemperatureInCelsius`, which knows the device's catalog entry.
  *
  * @param cap Cloud temperature_setting capability
  */
@@ -1143,7 +1142,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
       return f.fieldName.toLowerCase().includes("temperature");
     });
     if (tempField?.range) {
-      const unit = temperatureUnit(cap);
+      const unit = "°C";
       return [
         {
           id: "target_temperature",
@@ -1165,7 +1164,7 @@ function mapTemperatureSetting(cap: CloudCapability): StateDefinition[] {
 
   const range = cap.parameters?.range;
   if (range) {
-    const unit = temperatureUnit(cap);
+    const unit = "°C";
     return [
       {
         id: "target_temperature",
@@ -1436,6 +1435,97 @@ function temperatureUnit(cap: CloudCapability): string | undefined {
   // Nothing declared → no unit: an invented "°F" labelled the only recorded
   // heater (5–30, declared °C) wrongly — the mapper invents no unit, like no limit.
   return normalizeUnit(declared) ?? normalizeUnit(onTemperature) ?? normalizeUnit(cap.parameters?.unit);
+}
+
+/**
+ * Whether a temperature_setting's numbers are in °F: the unit Govee declares for it, else the catalog's
+ * `platformTempUnit` quirk; nothing declared and no quirk is °C (GV-11, krobi 2026-10-07: temperatures always in °C).
+ *
+ * @param cap The device's temperature_setting capability
+ * @param platformFahrenheit Whether the catalog marks the model as reporting °F
+ */
+export function targetTemperatureInFahrenheit(cap: CloudCapability | undefined, platformFahrenheit: boolean): boolean {
+  const declared = cap ? temperatureUnit(cap) : undefined;
+  return declared ? declared === "°F" : platformFahrenheit;
+}
+
+/**
+ * °F → °C, one decimal.
+ *
+ * @param f Degrees Fahrenheit
+ */
+export function fahrenheitToCelsius(f: number): number {
+  return Math.round((((f - 32) * 5) / 9) * 10) / 10;
+}
+
+/**
+ * °C → whole °F, the step a Govee heater takes.
+ *
+ * @param c Degrees Celsius
+ */
+export function celsiusToFahrenheit(c: number): number {
+  return Math.round((c * 9) / 5 + 32);
+}
+
+/**
+ * The target temperature in °C (GV-11): a range Govee gives in °F becomes °C, and the unit is stated.
+ *
+ * @param stateDefs The device's state definitions
+ * @param device The device
+ * @param registry This instance's device catalog
+ */
+function targetTemperatureInCelsius(stateDefs: StateDefinition[], device: GoveeDevice, registry: DeviceRegistry): void {
+  const def = stateDefs.find(d => d.id === "target_temperature" && d.type === "number");
+  if (!def) {
+    return;
+  }
+  const cap = device.capabilities.find(c => c.type === GOVEE_CAP_TYPE.TEMPERATURE_SETTING);
+  if (targetTemperatureInFahrenheit(cap, registry.getQuirks(device.sku)?.platformTempUnit === "F")) {
+    for (const key of ["min", "max", "def"] as const) {
+      const value = def[key];
+      if (typeof value === "number") {
+        def[key] = fahrenheitToCelsius(value);
+      }
+    }
+  }
+  def.unit = "°C";
+}
+
+/**
+ * `/device/state` target temperatures in °C (GV-11): a value the answer marks as Fahrenheit, or one without a unit
+ * of a device whose target temperature is in °F, becomes °C.
+ *
+ * @param caps One `/device/state` answer
+ * @param fahrenheit Whether the device's target temperature is in °F (`targetTemperatureInFahrenheit`)
+ */
+export function targetReadingsToCelsius(caps: CloudStateCapability[], fahrenheit: boolean): CloudStateCapability[] {
+  return caps.map(cap => {
+    if (cap?.type !== GOVEE_CAP_TYPE.TEMPERATURE_SETTING) {
+      return cap;
+    }
+    const raw = cap.state?.value;
+    const direct = coerceNum(raw);
+    if (direct !== null) {
+      return fahrenheit ? { ...cap, state: { value: fahrenheitToCelsius(direct) } } : cap;
+    }
+    if (typeof raw !== "object" || raw === null) {
+      return cap;
+    }
+    const struct = raw as Record<string, unknown>;
+    const unit = struct.unit ?? struct.temperatureUnit;
+    const inFahrenheit = typeof unit === "string" ? /^f/i.test(unit) || unit === "unit.fahrenheit" : fahrenheit;
+    if (!inFahrenheit) {
+      return cap;
+    }
+    const value: Record<string, unknown> = { ...struct };
+    for (const key of ["targetTemperature", "temperature", "temp"]) {
+      const n = coerceNum(struct[key]);
+      if (n !== null) {
+        value[key] = fahrenheitToCelsius(n);
+      }
+    }
+    return { ...cap, state: { value } };
+  });
 }
 
 /**
@@ -1765,7 +1855,7 @@ export function platformReadingsToCelsius(caps: CloudStateCapability[]): CloudSt
     if (f === null) {
       return cap;
     }
-    return { ...cap, state: { value: Math.round((((f - 32) * 5) / 9) * 10) / 10 } };
+    return { ...cap, state: { value: fahrenheitToCelsius(f) } };
   });
 }
 
@@ -2057,37 +2147,13 @@ function sharedColorTempRange(
 }
 
 /**
- * The two diagnostics states (time of the last export, trust tier) for real
- * devices. Groups get none (no group handler; Pattern 33).
+ * The diagnostics state (trust tier) for real devices. Groups get none (no group handler; Pattern 33). A report
+ * writes no value (DB-10): the time of the last export is gone, `migrateLegacyDiagnostics` removes it.
  *
  * @param tierDef Initial value for the diag.tier state
  */
 function buildDiagStateDefs(tierDef: string): StateDefinition[] {
-  const defs: StateDefinition[] = [
-    {
-      // Two predecessors, both gone:
-      //  - `result` (until 2.29.0) held the ENTIRE report as text — measured
-      //    67,917 characters on an H61BE, over GitHub's issue limit and a heavy
-      //    value to keep in the state database and in every history
-      //    subscription on the device. The report is a file now.
-      //  - the file NAME (until 2.31.0), which only repeated what the export
-      //    already handed the user.
-      // What is worth keeping is WHEN the last report was taken. Neither
-      // predecessor could leave on its own: `cleanupCloudOwnedStates` sweeps
-      // only MANAGED_CHANNELS and `diag` is not one of them, so both are
-      // removed explicitly in `migrateLegacyDiagnostics`.
-      id: "lastExport",
-      name: tName("diagnosticsLastExport"),
-      desc: tDesc("diagnosticsLastExportDesc"),
-      type: "string",
-      role: "date",
-      write: false,
-      def: "",
-      capabilityType: "local",
-      capabilityInstance: "diagnosticsLastExport",
-      channel: "diag",
-    },
-  ];
+  const defs: StateDefinition[] = [];
   defs.push({
     id: "tier",
     name: tName("deviceTier"),
@@ -2181,6 +2247,7 @@ export function buildCloudStateDefs(
   }
 
   applyQuirksToStates(device.sku, stateDefs, log, registry);
+  targetTemperatureInCelsius(stateDefs, device, registry);
 
   // Light-only synthetic state defs — scenes / snapshots / music / scene_speed
   // only make sense for lights. Sensors and appliances would otherwise see

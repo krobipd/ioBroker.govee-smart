@@ -3,10 +3,12 @@ import * as utils from "@iobroker/adapter-core";
 import * as path from "node:path";
 import { ActionableProblems } from "./lib/actionable-problems";
 import { DeviceRegistry } from "./lib/device-registry";
-import { DeviceManager } from "./lib/device-manager";
+import { brokerStatusRequester, DeviceManager } from "./lib/device-manager";
 import { effectiveSegmentCount, resolveDeviceReachability } from "./lib/device-manager/lookups";
 import { GoveeApiClient } from "./lib/govee-api-client";
 import { CallGate } from "./lib/call-gate";
+import type { HttpsRequestFn } from "./lib/http-client";
+import { carriesAddress, chosenAddress } from "./lib/network-address";
 import { GoveeCloudClient } from "./lib/govee-cloud-client";
 import { GoveeLanClient } from "./lib/govee-lan-client";
 import { GoveeMqttClient, LoginWindow } from "./lib/govee-mqtt-client";
@@ -158,6 +160,17 @@ export class GoveeAdapter extends utils.Adapter {
   /** The short windows of api-limits.json for this instance — every HTTP client waits at it (GV-08). */
   private readonly callGate = new CallGate(ms => this.delay(ms));
   /**
+   * The chosen network address every outgoing connection leaves from (`native.bind`, fleet master network-address.ts:
+   * the only address the adapter listens, sends and connects on); undefined for every address, or when no interface of
+   * this host carries it (the LAN client warns about that once). Set in prepareInstance.
+   */
+  private localAddress: string | undefined = undefined;
+  /** The call gate's request function, leaving from the chosen network address. */
+  private outboundHttps(): HttpsRequestFn {
+    const gated = this.callGate.https();
+    return options => gated(this.localAddress ? { ...options, localAddress: this.localAddress } : options);
+  }
+  /**
    * @param log Adapter logger forwarded to the LAN client
    * @param timers Adapter timer wrapper
    */
@@ -175,7 +188,7 @@ export class GoveeAdapter extends utils.Adapter {
     log: ioBroker.Logger,
     timers: GoveeAdapter,
   ) => GoveeMqttClient = (email, password, log, timers) =>
-    new GoveeMqttClient(email, password, log, timers, this.callGate.https());
+    new GoveeMqttClient(email, password, log, timers, this.outboundHttps());
   /**
    * @param apiKey Govee Cloud API key
    * @param log Adapter logger
@@ -191,10 +204,10 @@ export class GoveeAdapter extends utils.Adapter {
    * @param log Adapter logger
    */
   private makeCloudClient: (apiKey: string, log: ioBroker.Logger) => GoveeCloudClient = (apiKey, log) =>
-    new GoveeCloudClient(apiKey, log, this.callGate.https());
+    new GoveeCloudClient(apiKey, log, this.outboundHttps());
   /** @param log Adapter logger */
   private makeApiClient: (log: ioBroker.Logger) => GoveeApiClient = log =>
-    new GoveeApiClient(log, this.callGate.https());
+    new GoveeApiClient(log, this.outboundHttps());
   /**
    * @param log Adapter logger
    * @param timers Adapter timer wrapper
@@ -379,9 +392,20 @@ export class GoveeAdapter extends utils.Adapter {
     read("namespace", () => this.namespace);
     read("version", () => this.version);
     read("config", () => this.config);
-    method("setState", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) => this.setState(id, state));
+    // A read-only state (`common.write: false`) is compared in memory, never read back one by one (fleet rule, round
+    // 77): the change-only write of the handlers goes through writeReadOnly, every other write keeps its memory current.
+    const valueOf = (state: ioBroker.SettableState | ioBroker.StateValue): ioBroker.StateValue =>
+      state !== null && typeof state === "object" && "val" in state
+        ? (state.val ?? null)
+        : (state as ioBroker.StateValue);
+    method("setState", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) => {
+      this.stateManager?.noteReadOnlyWrite(id, valueOf(state));
+      return this.setState(id, state);
+    });
     method("setStateChanged", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) =>
-      this.setStateChangedAsync(id, state),
+      this.stateManager?.isReadOnlyState(id)
+        ? this.stateManager.writeReadOnly(id, valueOf(state))
+        : this.setStateChangedAsync(id, state),
     );
     method("getStateAsync", (id: string) => this.getStateAsync(id));
     method("getObjectAsync", (id: string) => this.getObjectAsync(id));
@@ -586,13 +610,15 @@ export class GoveeAdapter extends utils.Adapter {
     // only creates instanceObjects that are missing.
     await this.ensureManifestObjects();
     const config = this.config;
+    const chosen = chosenAddress(config.bind);
+    this.localAddress = chosen !== undefined && carriesAddress(chosen) ? chosen : undefined;
 
     // Fetch the live Govee-app version early (fire-and-forget) so the first
     // login / requests already use a current version — the undocumented
     // endpoints reject stale ones. GOVEE_APP_VERSION stays the fallback until
     // this resolves; a daily timer keeps it fresh.
     void appVersion
-      .refreshLiveAppVersion(this.handlerHost, this.callGate.https())
+      .refreshLiveAppVersion(this.handlerHost, this.outboundHttps())
       .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
 
     // One-shot cleanups: objects earlier versions left behind that nothing reads any more.
@@ -687,6 +713,8 @@ export class GoveeAdapter extends utils.Adapter {
     });
 
     this.stateManager = new StateManager(this, this.deviceRegistry);
+    // One bulk read of every stored value: read-only states are compared in memory from here on (fleet rule, round 77).
+    await this.stateManager.primeReadOnly();
     // The account and event flags go through the state manager's read-only
     // writer from their first write on: every later callback writes only a
     // change (a login retry used to rewrite `false` each time). The stale
@@ -792,7 +820,8 @@ export class GoveeAdapter extends utils.Adapter {
         return;
       }
       const prefix = this.stateManager!.devicePrefix(device);
-      this.setState(`${prefix}.info.ip`, { val: ip, ack: true }).catch(logRejected(this.log, "best-effort write"));
+      // read-only: compared in memory — the device build of the same discovery writes the address too
+      this.stateManager!.writeReadOnly(`${prefix}.info.ip`, ip).catch(logRejected(this.log, "best-effort write"));
     };
 
     // Mirror a segment batch command and an AA A5 push into the segment
@@ -931,16 +960,19 @@ export class GoveeAdapter extends utils.Adapter {
       return true;
     }
     this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+    this.mqttClient.localAddress = this.localAddress;
     this.mqttClient.onUnreadable = (from, raw, reason) =>
       this.deviceManager?.getDiagnostics().recordUnreadable("account-broker", from, raw, reason);
     this.mqttClient.useLoginWindow(this.loginWindowFor(accountEmail));
     // The status request over the account broker — the DeviceManager
     // decides WHOM to ask, the client only publishes.
-    this.deviceManager!.setStatusRequester((device, cmdVersion) =>
-      device.iotTopic ? (this.mqttClient?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false,
-    );
+    this.deviceManager!.setStatusRequester(brokerStatusRequester(() => this.mqttClient));
     // A 401 from the App API asks the account client for a fresh bearer.
     this.deviceManager!.setBearerRefresher(() => this.mqttClient?.requestBearerRefresh());
+    // The account list's calls reach Govee's servers too — an outage shows without waiting for a Cloud REST call (GV-16).
+    this.deviceManager!.setGoveeContactHook((reached, reason) =>
+      cloudRetryHandler.onGoveeServerContact(this.handlerHost, reached, reason),
+    );
     // Light commands of a light without LAN go over the broker before the Cloud (K18).
     this.deviceManager!.setBrokerClient(this.mqttClient);
 
@@ -1095,6 +1127,7 @@ export class GoveeAdapter extends utils.Adapter {
     // separate credentials required. Connection runs in parallel to
     // the AWS-IoT MQTT used for status push of regular devices.
     this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
+    this.openapiMqttClient.localAddress = this.localAddress;
     this.openapiMqttClient.onUnreadable = (from, raw, reason) =>
       this.deviceManager?.getDiagnostics().recordUnreadable("openapi-events", from, raw, reason);
     this.openapiMqttClient.connect(
@@ -1309,7 +1342,7 @@ export class GoveeAdapter extends utils.Adapter {
     // initial fetch is fired early in onReady, above).
     this.appVersionCheckTimer = this.setInterval(() => {
       appVersion
-        .refreshLiveAppVersion(this.handlerHost, this.callGate.https())
+        .refreshLiveAppVersion(this.handlerHost, this.outboundHttps())
         .catch(e => this.log.debug(`App version refresh error: ${errText(e)}`));
     }, APP_VERSION_CHECK_INTERVAL_MS);
 
@@ -1529,6 +1562,7 @@ export class GoveeAdapter extends utils.Adapter {
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
       createMqttProbeClient: (email: string, password: string) => {
         const probe = this.makeMqttClient(email, password, this.log, this);
+        probe.localAddress = this.localAddress;
         // One-shot probe: a failed login must not arm the reconnect backoff —
         // it could fire a second login against Govee inside the probe window.
         probe.enableProbeMode();

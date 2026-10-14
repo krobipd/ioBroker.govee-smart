@@ -9,7 +9,7 @@ import { I18n } from "@iobroker/gui-components";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import enJson from "../i18n/en.json";
-import { ConnectionPanel } from "../ConnectionPanel";
+import ConnectionConfig from "../ConnectionConfig";
 
 type Handler = (id: string, state: { val: unknown } | null | undefined) => void;
 
@@ -40,16 +40,31 @@ function fakeSocket(states: Record<string, unknown>): {
   return { socket, sent, emit: (id, val) => (subs.get(id) ?? []).forEach(cb => cb(id, { val })) };
 }
 
+/**
+ * The card as the admin mounts it: the jsonConfig custom component with the instance's settings.
+ *
+ * @param states the adapter states the card reads live
+ */
 function renderCard(states: Record<string, unknown> = {}): ReturnType<typeof fakeSocket> {
   const fake = fakeSocket(states);
-  render(
-    <ConnectionPanel
-      socket={fake.socket}
-      namespace="govee-smart.0"
-      values={{ apiKey: "", email: "user@example.com", password: "secret", code: "" }}
-      onChange={() => {}}
-    />,
-  );
+  const props = {
+    oContext: {
+      adapterName: "govee-smart",
+      instance: 0,
+      socket: fake.socket,
+      themeType: "light",
+      forceUpdate: () => {},
+    },
+    data: { apiKey: "", goveeEmail: "user@example.com", goveePassword: "secret", mqttVerificationCode: "" },
+    originalData: {},
+    schema: { type: "custom" },
+    attr: "_connection",
+    onChange: () => {},
+    onError: () => {},
+    themeType: "light",
+    alive: true,
+  };
+  render(<ConnectionConfig {...(props as unknown as React.ComponentProps<typeof ConnectionConfig>)} />);
   return fake;
 }
 
@@ -79,14 +94,29 @@ describe("B4 login and two-factor code in the connection card", () => {
   it("Connect logs in through the card, and Govee's request for a code opens the code field in the card", async () => {
     const { sent } = renderCard();
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    fireEvent.click(await screen.findByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
     await waitFor(() => expect(sent).toHaveLength(1));
     expect(sent[0]).toMatchObject({ command: "mqttAuth", data: { action: "test", email: "user@example.com" } });
     expect(await screen.findByLabelText(I18n.t("gsw_conn_code_label"))).toBeTruthy();
   });
 
+  it("the two-factor code typed into the card leaves it with the login, to the adapter's mqttAuth", async () => {
+    const { sent } = renderCard();
+    fireEvent.click(await screen.findByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    const field = await screen.findByLabelText(I18n.t("gsw_conn_code_label"));
+    fireEvent.change(field, { target: { value: "123456" } });
+    fireEvent.click(await screen.findByRole("button", { name: I18n.t("gsw_conn_connect_btn") }));
+    await waitFor(() => expect(sent).toHaveLength(2));
+    expect(sent[1]).toMatchObject({
+      command: "mqttAuth",
+      data: { action: "test", email: "user@example.com", code: "123456" },
+    });
+  });
+
   it("the card follows the adapter live: a pending verification opens the code field without a click", async () => {
     const { emit, sent } = renderCard();
+    // the mounted card is up and has read the adapter's states
+    await screen.findByRole("button", { name: I18n.t("gsw_conn_connect_btn") });
     await act(() => Promise.resolve());
     expect(screen.queryByLabelText(I18n.t("gsw_conn_code_label"))).toBeNull();
     act(() => emit("govee-smart.0.info.verificationPending", true));

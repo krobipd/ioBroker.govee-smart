@@ -6,6 +6,9 @@
 
 **Support:** [![Ko-fi](https://img.shields.io/badge/Ko--fi-Support-ff5e5b?logo=ko-fi)](https://ko-fi.com/krobipd) [![PayPal](https://img.shields.io/badge/Donate-PayPal-blue.svg)](https://paypal.me/krobipd)
 
+> [!IMPORTANT]
+> This adapter cannot be installed from github
+
 Control all [Govee](https://www.govee.com/) WiFi products from ioBroker — lights, sensors and appliances. Bluetooth-only devices are not supported.
 
 The adapter uses every available Govee channel (LAN, Cloud REST, AWS IoT MQTT, OpenAPI MQTT, App API) and picks whichever delivers the fastest answer for each device. Details in the **[Wiki](https://github.com/krobipd/ioBroker.govee-smart/wiki)**.
@@ -94,6 +97,22 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     Placeholder for the next version (at the beginning of the line):
     ### **WORK IN PROGRESS**
 -->
+
+### **WORK IN PROGRESS**
+
+- New: lights without a local connection are switched over your Govee account's live connection before the Cloud; models where that does not work stay on the Cloud
+- Changed: a command is confirmed only by the light's own report where it sends one, otherwise once it went out cleanly — a refused or lost command stays unconfirmed
+- Changed: a group command is confirmed only when every member that has to take it took it; a member that did not switch is named in one log line
+- New: the diagnostics report is made in the Expert tab, reads a connected device live and replaces your names, mail, ids and addresses by placeholders
+- Improved: the diagnostics report shows the device's log lines, its reachability changes, network replies and messages the adapter could not read
+- Changed: the datapoint `diag.lastExport` is removed from every device — a diagnostics report changes nothing in the object tree any more
+- Improved: calls to Govee, Apple and your devices stay within the limits each service sets, and one device never holds up another
+- Fixed: a device reached only over the Cloud shows offline, and no longer keeps the adapter green, while neither the Cloud nor your Govee account is connected
+- Fixed: a heater's target temperature is always shown and set in °C — a model that works in °F gets its range, its reading and your value converted
+- Fixed: the refresh button of a light is confirmed only when Govee answered; otherwise it stays unconfirmed and one log warning says so
+- Changed: an untested model asks in the log for the experimental switch and a diagnostics report again, and never claims that it works
+- New: seven models added as untested: Smart Gateway 1s (H5044, R5044), Wi-Fi Gateway (H5151), Smart Light (H610E, H610F), Outdoor String Lights 2 (H7030), Smart Fan (H7108)
+- Improved: a Govee service that does not answer is shown as a state instead of repeated log warnings; any other error is warned once until it is gone
 
 ### 3.1.1 (2026-10-01)
 

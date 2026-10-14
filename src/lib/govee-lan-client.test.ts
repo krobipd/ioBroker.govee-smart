@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { GoveeLanClient, interfaceBroadcasts } from "./govee-lan-client";
 import {
   buildDiyPackets,
@@ -486,6 +487,35 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     expect(pending).toHaveLength(1);
     pending.shift()!();
     expect(sent()).toEqual(levels);
+    client.stop();
+    vi.useRealTimers();
+  });
+
+  it("a datagram held for the limit goes out in the context of its own command — not of the one that armed the release", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const pending: Array<() => void> = [];
+    const timers = { ...lanTimers, setTimeout: (fn: () => void) => pending.push(fn) } as unknown as TimerAdapter;
+    const client = new GoveeLanClient(lanLog, timers);
+    client.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[0] as unknown as { send: (...args: unknown[]) => unknown };
+    const command = new AsyncLocalStorage<string>();
+    const contexts: Array<string | undefined> = [];
+    const send = sendSock.send.bind(sendSock);
+    sendSock.send = (...args: unknown[]) => {
+      contexts.push(command.getStore());
+      return send(...args);
+    };
+    for (let level = 1; level <= 12; level++) {
+      command.run(`command ${level}`, () => client.setBrightness("10.0.0.7", level));
+    }
+    vi.setSystemTime(Date.now() + 1001);
+    pending.shift()!();
+    expect(contexts.slice(10)).toEqual(["command 11", "command 12"]);
     client.stop();
     vi.useRealTimers();
   });

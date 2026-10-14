@@ -146,7 +146,10 @@
       "name": "Table Lamp",
       "type": "light",
       "status": "reported",
-      "since": "2.18.1"
+      "since": "2.18.1",
+      "quirks": {
+        "pushDecoder": "h1741-battery"
+      }
     },
     "H1771": {
       "name": "Table Lamp",
@@ -3212,7 +3215,10 @@
       "name": "Air Purifier",
       "type": "air_purifier",
       "status": "reported",
-      "since": "2.33.0"
+      "since": "2.33.0",
+      "quirks": {
+        "pushDecoder": "h7127-purifier"
+      }
     },
     "H7128": {
       "name": "Air Purifier",

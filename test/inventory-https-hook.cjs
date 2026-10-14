@@ -12,6 +12,7 @@
 // Every unknown host is REFUSED rather than let through: no call leaves the
 // machine, and a route someone forgot to add surfaces as an error instead of
 // silently reaching the real Govee.
+const fs = require("node:fs");
 const http = require("node:http");
 const https = require("node:https");
 const net = require("node:net");
@@ -37,21 +38,37 @@ https.request = function patchedRequest(options, callback) {
   return http.request(opts, callback);
 };
 
-// The Cloud-events client (mqtt.js over mqtts://) does not go through
-// https.request — it opens a TLS socket of its own. With the fixture's API key
-// it used to reach Govee's REAL broker on every inventory run and collect
-// "Connection refused: Not authorized" there. mqtt.js reads `connect` from the
-// tls module object at call time (`(0, tls_1.connect)(opts)`), so replacing it
-// here is seen. Anything outside this machine is refused the way an unplugged
-// network would refuse it — asynchronously, as ECONNREFUSED on the socket —
-// so the client runs its ordinary NETWORK path (force-close, backoff) and
-// never dials out.
+// The two MQTT clients (mqtt.js over mqtts://) do not go through https.request —
+// each opens a TLS socket of its own. mqtt.js reads `connect` from the tls
+// module object at call time (`(0, tls_1.connect)(opts)`), so replacing it here
+// is seen. Both brokers — Govee's Cloud-events broker and the account's AWS IoT
+// endpoint from the IoT-key answer — go to the fixture broker on loopback. The
+// broker's certificate names both hosts and is issued by the fixture's own CA,
+// which is the CA handed in here: certificate and host name are still checked,
+// only against the fixture instead of Govee's and Amazon's. Anything else outside this machine is refused
+// the way an unplugged network would refuse it — asynchronously, as
+// ECONNREFUSED on the socket — so the client runs its ordinary NETWORK path
+// (force-close, backoff) and never dials out.
+const MQTT_PORT = process.env.GOVEE_FIXTURE_MQTT_PORT;
+const BROKER_HOST = /^(mqtt\.openapi\.govee\.com|[a-z0-9]+-ats\.iot\.[a-z0-9-]+\.amazonaws\.com)$/;
 const realTlsConnect = tls.connect;
 tls.connect = function patchedTlsConnect(...args) {
   const opts = typeof args[0] === "object" && args[0] !== null ? args[0] : { port: args[0], host: args[1] };
   const host = String(opts.host || opts.hostname || opts.servername || "");
   if (host === "127.0.0.1" || host === "localhost") {
     return realTlsConnect.apply(tls, args);
+  }
+  if (MQTT_PORT && BROKER_HOST.test(host)) {
+    const callback = args.find(a => typeof a === "function");
+    const routed = {
+      ...opts,
+      host: "127.0.0.1",
+      hostname: undefined,
+      port: Number(MQTT_PORT),
+      servername: host,
+      ca: fs.readFileSync(process.env.GOVEE_FIXTURE_MQTT_CA, "utf8"),
+    };
+    return callback ? realTlsConnect.call(tls, routed, callback) : realTlsConnect.call(tls, routed);
   }
   process.stderr.write(
     `inventory fixture: refusing tls.connect to ${host}:${opts.port ?? "?"} — nothing leaves the machine\n`,

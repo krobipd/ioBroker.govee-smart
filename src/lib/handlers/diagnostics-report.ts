@@ -32,12 +32,24 @@ export interface DiagnosticsReportAdapter {
 }
 
 /**
- * The key a device is listed and reported under — the same `sku:deviceId` the card always used.
+ * The `sku:deviceId` key the adapter's log lines name a device by.
  *
  * @param device The device
  */
-function reportKey(device: GoveeDevice): string {
+function logKey(device: GoveeDevice): string {
   return `${device.sku}:${device.deviceId}`;
+}
+
+/**
+ * The id a device is listed and reported under — its device id in the tree (`h6199-b24d`), the one the report's file
+ * name carries (DB-12, krobi 2026-10-06 19:07: one file name for every adapter, its device part the id the card lists).
+ *
+ * @param adapter The adapter surface
+ * @param device The device
+ */
+function reportId(adapter: DiagnosticsReportAdapter, device: GoveeDevice): string {
+  const prefix = adapter.stateManager?.devicePrefix(device);
+  return prefix ? prefix.slice(prefix.lastIndexOf(".") + 1) : logKey(device);
 }
 
 /**
@@ -46,7 +58,7 @@ function reportKey(device: GoveeDevice): string {
  * @param device The device
  */
 function mentionsOf(device: GoveeDevice): string[] {
-  return [device.deviceId, reportKey(device), device.name, device.lanIp ?? ""].filter(m => m.length > 0);
+  return [device.deviceId, logKey(device), device.name, device.lanIp ?? ""].filter(m => m.length > 0);
 }
 
 /**
@@ -58,7 +70,7 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
   /** Buffers frozen when the live read starts, handed to the build of the same report. */
   const frozen = new Map<string, FrozenBuffers | undefined>();
   const find = (id: string): GoveeDevice | undefined =>
-    adapter.deviceManager?.getDevices().find(d => !isAppGroup(d) && reportKey(d) === id);
+    adapter.deviceManager?.getDevices().find(d => !isAppGroup(d) && reportId(adapter, d) === id);
   const mentions = (device: GoveeDevice): LogMentions => ({
     mine: mentionsOf(device),
     others: (adapter.deviceManager?.getDevices() ?? []).filter(d => d !== device).flatMap(mentionsOf),
@@ -69,13 +81,20 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
     get version(): string {
       return adapter.version ?? "unknown";
     },
-    log: adapter.log,
+    // read when a report is made: the source is built in the adapter's constructor, before js-controller hands over the log
+    get log(): ioBroker.Logger {
+      return adapter.log;
+    },
 
     devices(): ReportSourceDevice[] {
       // Every real device, reachable or not — a report is wanted when a device misbehaves. App groups have no report.
       return (adapter.deviceManager?.getDevices() ?? [])
         .filter(d => !isAppGroup(d))
-        .map(d => ({ id: reportKey(d), label: deviceLabel(d), connected: resolveDeviceReachability(d).online }));
+        .map(d => ({
+          id: reportId(adapter, d),
+          label: deviceLabel(d),
+          connected: resolveDeviceReachability(d).online,
+        }));
     },
 
     async readLive(id: string): Promise<LiveReading> {

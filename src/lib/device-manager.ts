@@ -33,7 +33,7 @@ import {
   type SourceKind,
 } from "./device-manager/reconciler";
 import type { AppDeviceEntry, GoveeApiClient } from "./govee-api-client";
-import type { GoveeCloudClient } from "./govee-cloud-client";
+import { isUnreachable, type GoveeCloudClient } from "./govee-cloud-client";
 import type { GoveeLanClient } from "./govee-lan-client";
 import { decodeApplianceFrames } from "./appliance-frames";
 import {
@@ -46,6 +46,7 @@ import {
 } from "./rate-limiter";
 import {
   CLOUD_ONLINE_EVIDENCE_TTL_MS,
+  APP_API_POLL_INTERVAL_MS,
   CLOUD_REACHABILITY_REFRESH_MS,
   LAN_STATUS_REFRESH_MS,
   MAX_RATE_LIMIT_RETRY_MS,
@@ -122,9 +123,22 @@ function cloudListFailure(err: unknown): Exclude<CloudLoadResult, { ok: true }> 
 }
 
 /**
- * Device manager — maintains unified device list and routes commands
- * through the fastest available channel: LAN → Cloud.
- * MQTT is status-push only and never used for commands.
+ * The status request over the account broker (GV-09): the device's own topic, the request version the catalog names —
+ * the DeviceManager decides WHOM to ask, the account client only publishes.
+ *
+ * @param client The account client, read at each request (null while there is none)
+ * @returns The requester to hand to {@link DeviceManager.setStatusRequester}
+ */
+export function brokerStatusRequester(
+  client: () => { requestStatus(topic: string, now: number, cmdVersion: 1 | 2): boolean } | null,
+): (device: GoveeDevice, cmdVersion: 1 | 2) => boolean {
+  return (device, cmdVersion) =>
+    device.iotTopic ? (client()?.requestStatus(device.iotTopic, Date.now(), cmdVersion) ?? false) : false;
+}
+
+/**
+ * Device manager — maintains unified device list and routes commands through the fastest available channel: LAN →
+ * account broker (K18, the four light commands of a light without LAN) → Cloud.
  */
 export class DeviceManager {
   private readonly log: ioBroker.Logger;
@@ -194,6 +208,10 @@ export class DeviceManager {
   private readonly logOnce: LogOnce;
   /** The last failure category of each call kind — for the diagnostics report, not for the log. */
   private lastAppApiErrorCategory: ErrorCategory | null = null;
+  /** When the App API's account list last answered — a working cloud path (GV-16). */
+  /** What the App API's calls say about Govee's servers — wired to the outage tracker. */
+  private goveeContact: ((reached: boolean, reason?: string) => void) | null = null;
+  private lastAppApiAnsweredAt: number | undefined;
   private lastGroupMembersErrorCategory: ErrorCategory | null = null;
 
   // === Account reconcile (auto-remove devices no longer in the Govee account) ===
@@ -445,6 +463,16 @@ export class DeviceManager {
    */
   setStatusRequester(fn: ((device: GoveeDevice, cmdVersion: 1 | 2) => boolean) | null): void {
     this.statusRequester = fn;
+  }
+
+  /**
+   * Wire what the App API's account list says about Govee's servers (GV-16, issue #51): a call that did not reach a
+   * working Govee server feeds the outage tracker like a Cloud call, an answer ends an outage.
+   *
+   * @param fn Receives whether Govee answered, and the error text of a call that did not reach it
+   */
+  setGoveeContactHook(fn: ((reached: boolean, reason?: string) => void) | null): void {
+    this.goveeContact = fn;
   }
 
   /**
@@ -1693,7 +1721,7 @@ export class DeviceManager {
       // device family and routed through the same pipe as the App-API and
       // cloud-event values. Local first: the cloud state read is only the seed
       // at start, the push keeps the datapoints live without a cloud call.
-      const pushed = decodeApplianceFrames(device, update.op.command);
+      const pushed = decodeApplianceFrames(device, update.op.command, this.registry.getQuirks(device.sku)?.pushDecoder);
       if (pushed.some(c => c.instance === "workMode")) {
         this.learnPushReports(device, ["control.work_mode", "control.mode_value"]);
       }
@@ -2203,6 +2231,10 @@ export class DeviceManager {
         err,
         `App API fetch failed: ${errText(err)}`,
       );
+      // A Govee server that does not answer is an outage the Cloud REST would only notice on its next call.
+      if (isUnreachable(err, classifyError(err))) {
+        this.goveeContact?.(false, errText(err));
+      }
       // The report has to show a failed account-list fetch too. Sensors and
       // appliances get their reachability and their readings from exactly this
       // call — when it fails, the report used to look as if it had never been
@@ -2217,6 +2249,8 @@ export class DeviceManager {
     }
     // Reset on success so the next failure is said again.
     this.lastAppApiErrorCategory = null;
+    this.lastAppApiAnsweredAt = Date.now();
+    this.goveeContact?.(true);
     this.logOnce.forget("app-api");
     // Snapshot the App-API list as the second account-membership source. This
     // endpoint (empty-body POST) returns the COMPLETE Govee-Home account list,
@@ -2533,6 +2567,21 @@ export class DeviceManager {
       }
       dev.state.gatewayOnline = gateway ? gateway.state.online === true : undefined;
     }
+  }
+
+  /**
+   * Whether the App API's account list answered within the last two polls and its last call did not fail — Govee's
+   * cloud reached over the account,
+   * a cloud path for a device without a local interface (GV-16, `markCloudPaths`).
+   *
+   * @param now Current time (ms epoch)
+   */
+  public appApiAnswered(now: number = Date.now()): boolean {
+    return (
+      this.lastAppApiErrorCategory === null &&
+      this.lastAppApiAnsweredAt !== undefined &&
+      now - this.lastAppApiAnsweredAt < 2 * APP_API_POLL_INTERVAL_MS
+    );
   }
 
   /**

@@ -52,7 +52,11 @@ function makeRig(
   const adapter = {
     log: mockLog,
     namespace: "govee-smart.0",
-    deviceManager: { getDevices: () => devices, syncSegmentCount: (d: GoveeDevice) => d.segmentCount ?? 0 } as never,
+    deviceManager: {
+      getDevices: () => devices,
+      syncSegmentCount: (d: GoveeDevice) => d.segmentCount ?? 0,
+      appApiAnswered: () => false,
+    } as never,
     stateManager: {
       devicePrefix: (d: GoveeDevice) => `devices.${d.sku.toLowerCase()}`,
       // The real one chains builds per device; here it only records that the

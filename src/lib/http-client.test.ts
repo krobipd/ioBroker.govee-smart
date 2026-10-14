@@ -195,6 +195,23 @@ describe("httpsRequest (HTTPS impl unit-tested via plain HTTP shim)", () => {
     expect(result.headers?.["api-ratelimit-remaining"]).toBe("9");
   });
 
+  it("leaves from the chosen network address, and from any address without one", async () => {
+    const sent: Array<string | undefined> = [];
+    const transport: HttpTransport = {
+      request: (opts, cb) => {
+        sent.push(opts.localAddress);
+        return http.request({ ...opts, localAddress: undefined }, cb);
+      },
+    };
+    stub.queue.push({ statusCode: 200, body: "{}" }, { statusCode: 200, body: "{}" });
+    await httpsRequest({ method: "GET", url: `http://127.0.0.1:${stub.port}/a`, headers: {} }, transport);
+    await httpsRequest(
+      { method: "GET", url: `http://127.0.0.1:${stub.port}/b`, headers: {}, localAddress: "127.0.0.1" },
+      transport,
+    );
+    expect(sent).toEqual([undefined, "127.0.0.1"]);
+  });
+
   it("parses 200 JSON response into HttpResult envelope", async () => {
     stub.queue.push({ statusCode: 200, body: JSON.stringify({ hello: "world" }) });
     const result = await httpRequestPlain<{ hello: string }>({

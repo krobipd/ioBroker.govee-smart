@@ -1,4 +1,5 @@
 import { decodeBleFrame } from "./ble-frame";
+import type { PushDecoder } from "./device-catalog";
 import { GOVEE_CAP_TYPE } from "./govee-constants";
 import type { CapabilityOption, CloudStateCapability, GoveeDevice } from "./types";
 
@@ -106,10 +107,10 @@ const lampH1741: FrameDecoder = frames => {
   return level <= 100 ? [{ type: GOVEE_CAP_TYPE.PROPERTY, instance: "battery", state: { value: level } }] : [];
 };
 
-/** One decoder per measured device family. A SKU not listed here gets nothing from its push. */
-const DECODERS: Readonly<Record<string, FrameDecoder>> = {
-  H7127: purifierH7127,
-  H1741: lampH1741,
+/** One decoder per measured device family; the catalogue's `pushDecoder` quirk names the one a model uses (GV-01). */
+const DECODERS: Readonly<Record<PushDecoder, FrameDecoder>> = {
+  "h7127-purifier": purifierH7127,
+  "h1741-battery": lampH1741,
 };
 
 /**
@@ -119,12 +120,17 @@ const DECODERS: Readonly<Record<string, FrameDecoder>> = {
  *
  * @param device    The device the packet belongs to
  * @param opCommand `op.command` of the status packet (base64 frames), unchecked
+ * @param decoder   The decoder the catalogue names for the model (`pushDecoder` quirk) — none: nothing is decoded
  */
-export function decodeApplianceFrames(device: GoveeDevice, opCommand: unknown): CloudStateCapability[] {
-  const decoder = DECODERS[device.sku];
-  if (!decoder || !Array.isArray(opCommand)) {
+export function decodeApplianceFrames(
+  device: GoveeDevice,
+  opCommand: unknown,
+  decoder: PushDecoder | undefined,
+): CloudStateCapability[] {
+  const decode = decoder ? DECODERS[decoder] : undefined;
+  if (!decode || !Array.isArray(opCommand)) {
     return [];
   }
   const frames = opCommand.map(parseFrame).filter((f): f is Frame => f !== null);
-  return frames.length > 0 ? decoder(frames, device) : [];
+  return frames.length > 0 ? decode(frames, device) : [];
 }

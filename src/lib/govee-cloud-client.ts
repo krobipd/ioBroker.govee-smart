@@ -119,7 +119,7 @@ const TLS_ERROR_CODES = new Set([
  * @param err The error of the failed call
  * @param category What `classifyError` made of it
  */
-function isUnreachable(err: unknown, category: ErrorCategory): boolean {
+export function isUnreachable(err: unknown, category: ErrorCategory): boolean {
   if (category === "NETWORK" || category === "TIMEOUT") {
     return true;
   }

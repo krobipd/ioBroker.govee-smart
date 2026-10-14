@@ -62,6 +62,8 @@ function makeRig(opts: {
     },
     deviceManager: {
       getDevices: () => devices,
+      // the App API's account list is not part of these cases (GV-16 counts it as a cloud path)
+      appApiAnswered: () => false,
       hasKnownPopulation: () => opts.populationKnown ?? true,
       accountListedPrefixes: () => opts.listedPrefixes ?? new Set<string>(),
       reloadForAccountGap: () => opts.gapReload ?? false,

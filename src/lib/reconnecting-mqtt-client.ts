@@ -11,6 +11,16 @@ export type MqttConnectFn = (url: string, opts: IClientOptions) => MqttClient;
 /** Upper bound of one broker message — real status/event messages are a few KB. */
 export const MQTT_MAX_MESSAGE_BYTES = 64 * 1024;
 
+/**
+ * At most this many broker connects in any {@link CONNECT_WINDOW_MS} (GV-08, api-limits.json): a connect costs about 20
+ * protocol writes (TCP connect, TLS handshake records, CONNECT, SUBSCRIBE — measured on the inventory's network hook,
+ * 2026-10-14), and the backoff starts again at 5 s after every successful connect, so a broker that accepts and drops
+ * again would otherwise be dialled four times a minute.
+ */
+export const MAX_CONNECTS_PER_WINDOW = 2;
+/** The window of {@link MAX_CONNECTS_PER_WINDOW}. */
+export const CONNECT_WINDOW_MS = 60_000;
+
 /** Exponential-backoff parameters (all milliseconds). */
 export interface BackoffOpts {
   /** Base delay for attempt 1, doubled each subsequent attempt. */
@@ -60,6 +70,15 @@ export abstract class ReconnectingMqttClient {
   protected lastErrorMessage: string | null = null;
   /** Set in disconnect(); reconnect paths bail on it so timers that fire after stop are no-ops. */
   protected disposed = false;
+  /**
+   * The address every broker connection leaves from — the chosen network address (`native.bind`, fleet master
+   * network-address.ts); undefined = any address.
+   */
+  localAddress: string | undefined = undefined;
+  /** When each broker connect of the last {@link CONNECT_WINDOW_MS} started. */
+  private readonly connectTimes: number[] = [];
+  /** How many broker connects this client starts in any {@link CONNECT_WINDOW_MS} — its share of api-limits.json. */
+  protected readonly maxConnectsPerWindow: number = MAX_CONNECTS_PER_WINDOW;
 
   /**
    * @param log ioBroker logger
@@ -105,7 +124,10 @@ export abstract class ReconnectingMqttClient {
     }
 
     this.reconnectAttempts++;
-    const delay = computeBackoffDelay(this.reconnectAttempts, { base: 5_000, cap: 300_000, jitterCap: 30_000 });
+    const delay = Math.max(
+      computeBackoffDelay(this.reconnectAttempts, { base: 5_000, cap: 300_000, jitterCap: 30_000 }),
+      this.connectWaitMs(),
+    );
     this.log.debug(`${this.channelLabel}: reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempts})`);
 
     this.reconnectTimer = this.timers.setTimeout(() => {
@@ -115,6 +137,19 @@ export abstract class ReconnectingMqttClient {
       }
       this.reconnect();
     }, delay);
+  }
+
+  /**
+   * How long until one more broker connect fits {@link maxConnectsPerWindow} — 0 when it fits now.
+   *
+   * @param now Current time (ms)
+   */
+  protected connectWaitMs(now: number = Date.now()): number {
+    const recent = this.connectTimes.filter(t => now - t < CONNECT_WINDOW_MS);
+    this.connectTimes.splice(0, this.connectTimes.length, ...recent);
+    return recent.length < this.maxConnectsPerWindow
+      ? 0
+      : recent[recent.length - this.maxConnectsPerWindow] + CONNECT_WINDOW_MS - now + 1;
   }
 
   /** Disconnect and clean up: stop reconnect, run subclass teardown, end the client. */
@@ -140,7 +175,12 @@ export abstract class ReconnectingMqttClient {
    */
   protected openBroker(connectFn: MqttConnectFn, url: string, opts: Omit<IClientOptions, "reconnectPeriod">): void {
     this.releaseClient();
-    this.client = connectFn(url, { ...opts, reconnectPeriod: 0 });
+    this.connectTimes.push(Date.now());
+    this.client = connectFn(url, {
+      ...opts,
+      ...(this.localAddress ? { localAddress: this.localAddress } : {}),
+      reconnectPeriod: 0,
+    });
   }
 
   /**

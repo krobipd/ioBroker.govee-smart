@@ -44,7 +44,7 @@
           "max": 40,
           "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none; the client only connects, subscribes and pings every 60 s, and reconnects back off from 5 s doubling (reconnecting-mqtt-client)"
+          "source": "own cap of the adapter — Govee documents none; the client connects at most once a minute (connect gate, reconnecting-mqtt-client — a connect costs about 20 writes: TCP, TLS handshake, CONNECT, SUBSCRIBE, measured 2026-10-14), then only pings every 60 s"
         }
       ]
     },
@@ -56,7 +56,7 @@
           "max": 60,
           "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none (K18 research 2026-10-08); the client lets at most this cap less 40 protocol writes (TLS, connect, subscribe, the 60 s keepalive under the 5 s doubling reconnect backoff) out as commands and status requests per minute, and refuses the rest (govee-mqtt-client)"
+          "source": "own cap of the adapter — Govee documents none (K18 research 2026-10-08); the client lets at most this cap less 40 protocol writes (at most two connects a minute through the connect gate of reconnecting-mqtt-client, about 16 writes each — TCP, TLS, CONNECT, SUBSCRIBE, measured 2026-10-14 — and the 60 s keepalive) out as commands and status requests per minute, and refuses the rest (govee-mqtt-client)"
         }
       ]
     },
