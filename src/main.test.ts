@@ -14,7 +14,12 @@ import * as pathReal from "node:path";
 // DeviceManager / SkuCache / LocalSnapshotStore can run against it. Only the
 // network-facing collaborators are replaced via main.ts's factory seams.
 // ---------------------------------------------------------------------------
-const tmpRoot = fsReal.mkdtempSync(pathReal.join(os.tmpdir(), "govee-main-test-"));
+// Made in beforeAll, not at import: a run whose filter selects no test here still imports the file but skips
+// every hook, so a directory made at import was never removed (one empty dir per filtered run, 2026-10-15).
+let tmpRoot = "";
+beforeAll(() => {
+  tmpRoot = fsReal.mkdtempSync(pathReal.join(os.tmpdir(), "govee-main-test-"));
+});
 /**
  * Instance data directory handed to the adapter, swapped per setup() call.
  * Every test gets a fresh one: the SKU cache and the credentials file live
