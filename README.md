@@ -98,6 +98,10 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### 3.2.1 (2026-10-15)
+
+- Fixed: the H1771 table lamp no longer offers a DreamView switch that Govee refuses for this model
+
 ### 3.2.0 (2026-10-15)
 
 - New: lights without a local connection switch through your Govee account, faster than through the Cloud
@@ -155,14 +159,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### 3.0.1 (2026-09-27)
 
 - Improved: the note the Admin shows before an update to 3.x is short now: the warning, one example old → new and a link to the details
-
-### 3.0.0 (2026-09-26)
-
-- Changed: every device gets a new object ID once — model and last four characters with a hyphen, e.g. `devices.h61be-525f`; scripts and visualizations need the new IDs
-- Changed: the move carries values, recording settings, rooms, functions and aliases along, and recorded history continues in its old series
-- Fixed: two devices of one model whose IDs end alike now get a tree each and each receives its own commands — until now they shared one
-- New: the H1741 battery table lamp reports its charge level in `sensor.battery`; Govee reports a fully charged battery as about 80 percent
-- Fixed: fans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 no longer puts a warning in the log at every refresh
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
