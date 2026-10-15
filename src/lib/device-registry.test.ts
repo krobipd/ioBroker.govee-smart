@@ -340,6 +340,13 @@ describe("devices.json — ignoredCloudCapabilities and the Bluetooth-only remov
     expect(active.getQuirks("H8120")?.ignoredCloudCapabilities).toEqual(["colorRgb"]);
   });
 
+  it("drops the H1771's DreamView switch — Govee lists it and refuses every command on it (issue #49)", () => {
+    // the user's report (3.1.1, 2026-10-04) lists `dreamViewToggle` among the lamp's 13 capabilities; switching it
+    // logged "Cloud control rejected for H1771/…/dreamViewToggle: code=400 — The device does not has DreamView"
+    const active = new DeviceRegistry({ filePath: file, experimental: false });
+    expect(active.getQuirks("H1771")?.ignoredCloudCapabilities).toEqual(["dreamViewToggle"]);
+  });
+
   it("no longer lists the Bluetooth-only H3001 — the catalog is for Wi-Fi products", () => {
     const real = JSON.parse(fs.readFileSync(file, "utf-8")) as { devices: Record<string, unknown> };
     expect(real.devices.H3001).toBeUndefined();

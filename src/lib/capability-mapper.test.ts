@@ -1,3 +1,4 @@
+import * as path from "node:path";
 import { vi } from "vitest";
 
 vi.mock("@iobroker/adapter-core", () => ({
@@ -3132,6 +3133,21 @@ describe("capabilities Govee acknowledges but the device ignores (catalog quirk 
   it("a seed entry stays dormant without the experimental switch", () => {
     const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(false)).map(d => d.id);
     expect(ids).toContain("main_light_toggle");
+  });
+  it("the H1771 from the real catalog offers no DreamView switch, its other two toggles stay (issue #49)", () => {
+    // the three toggle instances of the user's report (issue #49, 3.1.1 export of 2026-10-04)
+    const lamp = createTestDevice({
+      sku: "H1771",
+      lanIp: undefined,
+      capabilities: [toggle("dreamViewToggle"), toggle("wallWashingLightToggle"), toggle("nightlampToggle")],
+    });
+    const real = new DeviceRegistry({
+      filePath: path.resolve(__dirname, "..", "..", "devices.json"),
+      experimental: false,
+    });
+    const ids = buildCloudStateDefsRaw(lamp, mockLog, real).map(d => d.id);
+    expect(ids).not.toContain("dream_view_toggle");
+    expect(ids).toEqual(expect.arrayContaining(["wall_washing_light_toggle", "nightlamp_toggle"]));
   });
 });
 

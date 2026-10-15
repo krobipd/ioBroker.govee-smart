@@ -155,7 +155,10 @@
       "name": "Table Lamp",
       "type": "light",
       "status": "reported",
-      "since": "2.33.0"
+      "since": "2.33.0",
+      "quirks": {
+        "ignoredCloudCapabilities": ["dreamViewToggle"]
+      }
     },
     "H1811": {
       "name": "Projector Light",
