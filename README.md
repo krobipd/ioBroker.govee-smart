@@ -98,23 +98,21 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
-### **WORK IN PROGRESS**
+### 3.2.0 (2026-10-15)
 
-- New: lights without a local connection are switched over your Govee account's live connection before the Cloud; models where that does not work stay on the Cloud
-- Changed: a command is confirmed only by the light's own report where it sends one, otherwise once it went out cleanly — a refused or lost command stays unconfirmed
-- Changed: a group command is confirmed only when every member that has to take it took it; a member that did not switch is named in one log line
-- New: the diagnostics report is made in the Expert tab, reads a connected device live and replaces your names, mail, ids and addresses by placeholders
-- Improved: the diagnostics report shows the device's log lines, its reachability changes, network replies and messages the adapter could not read
-- Changed: the datapoint `diag.lastExport` is removed from every device — a diagnostics report changes nothing in the object tree any more
-- Improved: calls to Govee, Apple and your devices stay within the limits each service sets, and one device never holds up another
-- Fixed: a device reached only over the Cloud shows offline, and no longer keeps the adapter green, while neither the Cloud nor your Govee account is connected
-- Fixed: a heater's target temperature is always shown and set in °C — a model that works in °F gets its range, its reading and your value converted
-- Fixed: the refresh button of a light is confirmed only when Govee answered; otherwise it stays unconfirmed and one log warning says so
-- Changed: an untested model asks in the log for the experimental switch and a diagnostics report again, and never claims that it works
+- New: lights without a local connection switch through your Govee account, faster than through the Cloud
+- Changed: a command shows as confirmed only when it really reached the device
+- Changed: a group command shows as confirmed only when every light of the group took it
+- New: a diagnostics report for each device in the Expert tab, with your personal data replaced by placeholders
+- Changed: the datapoint diag.lastExport is removed from every device
+- Improved: a device that does not answer no longer holds up the others
+- Fixed: a device reached only through the Cloud shows offline while the Cloud is not connected
+- Fixed: a heater's target temperature is shown and set in °C, also on models that work in °F
+- Fixed: the refresh button of a light is confirmed only when Govee answered
+- Changed: an untested model asks for a diagnostics report and never claims that it works
 - New: seven models added as untested: Smart Gateway 1s (H5044, R5044), Wi-Fi Gateway (H5151), Smart Light (H610E, H610F), Outdoor String Lights 2 (H7030), Smart Fan (H7108)
-- Improved: a Govee service that does not answer is shown as a state instead of repeated log warnings; any other error is warned once until it is gone
-- Fixed: with a network address chosen in the settings, every connection to Govee now leaves from it — the Cloud, your account and the event connection included
-- Improved: a restart writes no unchanged value again and does not ask Govee once more for snapshot data it already has, which saves calls and database writes
+- Improved: an outage of a Govee service is shown as a status instead of a stream of warnings
+- Fixed: the network address chosen in the settings now applies to every connection to Govee
 
 ### 3.1.1 (2026-10-01)
 
@@ -165,11 +163,6 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: two devices of one model whose IDs end alike now get a tree each and each receives its own commands — until now they shared one
 - New: the H1741 battery table lamp reports its charge level in `sensor.battery`; Govee reports a fully charged battery as about 80 percent
 - Fixed: fans and heaters with a numeric level (H7102, H7130) store it as a number, and the H7121 no longer puts a warning in the log at every refresh
-
-### 2.41.0 (2026-09-26)
-
-- Changed: Discovery follows the selected network interface only — the additional scan addresses setting is gone, and the broadcast goes to the network of the chosen card
-- Fixed: `info.cloudConnected` turns false while the Govee Cloud stays unreachable and true again with its next answer — until now only a rejected API key cleared it
 
 [Older changelogs can be found there](CHANGELOG_OLD.md)
 
