@@ -33,6 +33,32 @@
       "fixed": 4002
     }
   ],
+  "serverTest": {
+    "_why": "Proves on the real account what fixtures cannot: the account broker (own PKCS#12 reader), the OpenAPI events broker and the cloud REST path come up, every device keeps its model and name, and one light really switches over its own channel and confirms by its device report.",
+    "_observe": "150 s covers one full App API cycle (APP_API_POLL_INTERVAL_MS, 2 min) — the longest periodic cycle that can log a warning.",
+    "_spacing": "A start reuses the persisted bearer and P12 (tryPersistedReuse in govee-mqtt-client.ts) and sends no login while the token is valid; the account lockout of 2026-04-19 (5 restarts in 1 h, CLAUDE_RELEASE.md) predates that reuse. What binds across starts are the per-process caps in src/lib/api-limits.json: the OpenAPI events broker connects at most once a minute and the App Store lookup is capped at 2 per 60 s — 60 s apart keeps both.",
+    "_command": "control.power on a LAN-driven light is confirmed only by the device's own status report (GV-13, confirmation.ts), so the commanded state is its own confirmation. Groups are left out: one toggle switches several lights and the group acknowledges itself. Govee has no wake state — a light without power falls through to asking krobi.",
+    "observeSeconds": 150,
+    "connectSeconds": 60,
+    "startSpacingSeconds": 60,
+    "reads": [
+      { "id": "info.connection", "expect": "true" },
+      { "id": "info.cloudConnected", "expect": "true" },
+      { "id": "info.mqttConnected", "expect": "true" },
+      { "id": "info.openapiMqttConnected", "expect": "true" },
+      { "id": "info.devicesTotal", "expect": "number" },
+      { "id": "devices.*.info.model", "expect": "nonEmpty" },
+      { "id": "devices.*.info.name", "expect": "nonEmpty" }
+    ],
+    "commands": [
+      {
+        "id": "devices.*.control.power",
+        "online": "devices.*.info.online",
+        "value": "toggle",
+        "timeoutSeconds": 30
+      }
+    ]
+  },
   "ciExtraJobs": {
     "_comment": "Extra CI jobs beyond the fleet's core jobs — each costs runtime in every run, so each carries its reason.",
     "validate-devices": "devices.json is the device catalog the adapter ships: its schema, statuses and quirk fields are validated on every push (npm run validate-devices), a broken entry would break every installation's quirk loading"
