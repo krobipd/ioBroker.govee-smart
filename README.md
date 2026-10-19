@@ -59,8 +59,8 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 ## Requirements
 
 - Node.js >= 22
-- ioBroker js-controller >= 7.2.2
-- ioBroker Admin >= 8.0.14
+- ioBroker js-controller >= 7.2.5
+- ioBroker Admin >= 8.2.0
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
 ---
@@ -102,6 +102,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Fixed: the diagnostics report contains the object tree again
 - Changed: the diagnostics report names where a device's reachability and segment count come from and shows each fact only once
+- Changed: needs js-controller 7.2.5 and Admin 8.2.0, the current stable versions
 
 ### 3.2.1 (2026-10-15)
 
