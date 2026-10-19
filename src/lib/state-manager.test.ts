@@ -2182,12 +2182,17 @@ describe("StateManager", () => {
       it("tells every change of the shown value with its deciding source, and nothing while it stays", async () => {
         const { adapter } = createMockAdapter();
         const sm = new StateManager(adapter as never, registry);
-        const changes: Array<{ online: boolean; was: boolean | null; decidedBy: string }> = [];
+        const changes: Array<{ online: boolean; was: boolean | null; decidedBy: string; source?: string }> = [];
         sm.onReachabilityChange = (_d, change) => changes.push(change);
         const dev = createTestDevice({
           lanIp: undefined,
           lastLanReplyAt: undefined,
-          state: { online: true, cloudReportedOnline: true, cloudReportedOnlineAt: Date.now() },
+          state: {
+            online: true,
+            cloudReportedOnline: true,
+            cloudReportedOnlineAt: Date.now(),
+            cloudReportedBy: "appList",
+          },
           channels: { lan: false, mqtt: false, cloud: true },
         });
         await createAllStatesForTest(sm, dev, []);
@@ -2195,7 +2200,10 @@ describe("StateManager", () => {
         dev.state.cloudReportedOnline = false;
         await sm.syncInfoOnline(dev);
         await sm.syncInfoOnline(dev);
-        expect(changes).toEqual([expect.objectContaining({ online: false, was: true, decidedBy: "cloudReport" })]);
+        // who delivered the evidence travels along (#56/#57: "cloudReport" alone hid the device's own push)
+        expect(changes).toEqual([
+          expect.objectContaining({ online: false, was: true, decidedBy: "cloudReport", source: "appList" }),
+        ]);
       });
     });
 

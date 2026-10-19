@@ -65,8 +65,8 @@ function find(node: unknown, key: string): unknown {
 
 /** Where each own name stands in the report — the place its mark has to take. */
 const PLACE: Record<keyof typeof OWN, (r: unknown) => unknown> = {
-  cloudSnapshot: r => (find(r, "snapshots") as { names: unknown[] }).names[0],
-  diyScene: r => (find(r, "diyScenes") as { names: unknown[] }).names[0],
+  cloudSnapshot: r => (find(r, "snapshots") as { entries: Array<{ name: unknown }> }).entries[0].name,
+  diyScene: r => (find(r, "diyScenes") as { entries: Array<{ name: unknown }> }).entries[0].name,
   localSnapshot: r => (find(r, "localSnapshots") as Array<{ name: unknown }>)[0].name,
 };
 

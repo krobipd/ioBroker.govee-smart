@@ -65,3 +65,29 @@ export function installLogPrefix(log: ioBroker.Logger, getSnap: () => ChannelSta
     };
   }
 }
+
+/** A channel prefix at the start of a line, as {@link formatChannelPrefix} writes it. */
+const CHANNEL_PREFIX_RE = /^\[LAN=\S+ Cloud=\S+ MQTT=\S+ OpenAPI=\S+\] /;
+
+/**
+ * For the diagnostics report: the channel prefix stays only on the lines where it changed. On every debug line it
+ * repeated the same four channels — about 10 KB of a report (#57, 2026-10-18) — while the state changed a few times;
+ * a line without a prefix carries the one above it.
+ *
+ * @param lines The log lines, oldest first
+ * @returns The same lines, each prefix that repeats the previous one removed
+ */
+export function keepChannelChanges<T extends { msg: string }>(lines: readonly T[]): T[] {
+  let last = "";
+  return lines.map(line => {
+    const prefix = CHANNEL_PREFIX_RE.exec(line.msg)?.[0];
+    if (prefix === undefined) {
+      return line;
+    }
+    if (prefix === last) {
+      return { ...line, msg: line.msg.slice(prefix.length) };
+    }
+    last = prefix;
+    return line;
+  });
+}

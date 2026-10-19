@@ -49,13 +49,12 @@ the adapter builds a report and your browser saves it as a file. Attach that fil
 issue — the device-support form asks for exactly this file.
 
 The device list offers every device, reachable or not — a report is wanted precisely when
-something misbehaves. Each device's `diag.lastExport` datapoint records when its last report was
-taken.
+something misbehaves. A report writes no datapoint.
 
-The report is **pseudonymised**: IP addresses, mail addresses and device names are replaced by
-stable markers, device ids are shortened, and credentials never appear at all. The same real value
-always maps to the same marker inside one file, so the report stays followable without carrying
-anything about your home. The file explains all of this in its own header.
+The report is **pseudonymised**: IP addresses, mail addresses, device names, your own snapshot and DIY
+names and hardware ids are replaced by stable markers, and credentials never appear at all. The same
+real value always maps to the same marker inside one file, so the report stays followable without
+carrying anything about your home.
 
 A report is what lets a device be added or a bug found without anyone needing your hardware. If it
 does not contain enough to do that, the report is at fault, not you — please say so in the issue.

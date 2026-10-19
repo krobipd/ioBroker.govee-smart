@@ -2003,7 +2003,9 @@ describe("DeviceManager", () => {
       expect((result.device as any).sku).toBe("H6160");
       expect((result.device as any).channels).toEqual({ lan: true, mqtt: true, cloud: true });
       expect((result.scenes as any).count).toBe(2);
-      expect((result.scenes as any).names).toEqual(["Sunset", "Rainbow"]);
+      // the names stand in the entries — a second list of them was a copy (#57)
+      expect((result.scenes as any).entries.map((e: { name: string }) => e.name)).toEqual(["Sunset", "Rainbow"]);
+      expect((result.scenes as any).names).toBeUndefined();
       expect((result.sceneLibrary as any).count).toBe(1);
       // v2.9.1 — sceneLibrary now exports full entries (incl. scenceParam +
       // speedInfo). Old shape projected `speedSupported: boolean` only.
@@ -2466,6 +2468,8 @@ describe("DeviceManager", () => {
 
       expect(grownDevice).not.toBeNull();
       expect(dm.getDevices()[0].segmentCount).toBe(20);
+      // the report names who taught the count
+      expect(dm.getDevices()[0].segmentCountOrigin).toBe("push");
     });
 
     it("shrinks segmentCount when a COMPLETE push proves Cloud over-reported (H6076 15→7)", () => {
@@ -3612,6 +3616,56 @@ describe("DeviceManager — loadFromCache merge", () => {
         { type: "devices.capabilities.online", instance: "online", state: { value: false } },
       ]);
       expect(dev.state.cloudReportedOnline).toBe(false);
+    });
+
+    it("names who delivered each piece of evidence — the report tells them apart (#56/#57, 2026-10-18)", async () => {
+      // Two 3.2.1 reports called a device's own status push "Govee reported it explicitly (an `online` capability)":
+      // the slot has five writers, and the report named the slot. Each writer now leaves its name beside its evidence.
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      const report = (): unknown => [dev.state.cloudReportedBy, resolveDeviceReachability(dev).source];
+
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+      ]);
+      expect(report()).toEqual(["stateRead", "stateRead"]);
+
+      dm2.handleOpenApiEvent({
+        sku: "H7130",
+        device: dev.deviceId,
+        capabilities: [{ type: "devices.capabilities.online", instance: "online", state: { value: true } }],
+      });
+      expect(report()).toEqual(["cloudEvent", "cloudEvent"]);
+
+      // the device's own status packet — no word on reachability in it, the H6199 shape of #57
+      dm2.handleMqttStatus({
+        sku: "H7130",
+        device: dev.deviceId,
+        cmd: "status",
+        transaction: `y_${Date.now()}081`,
+        state: { onOff: 0, brightness: 100 },
+      });
+      expect(report()).toEqual(["devicePush", "devicePush"]);
+
+      dm2.handleMqttStatus({ sku: "H7130", device: dev.deviceId, cmd: "online", state: { connected: "true" } });
+      expect(report()).toEqual(["accountOnline", "accountOnline"]);
+
+      dev.state.devicePushAt = undefined;
+      dm2.setApiClient({
+        hasBearerToken: () => true,
+        fetchDeviceList: () =>
+          Promise.resolve([{ sku: "H7130", device: dev.deviceId, deviceName: "x", lastData: { online: true } }]),
+      } as never);
+      await dm2.pollAppApi();
+      expect(report()).toEqual(["appList", "appList"]);
+    });
+
+    it("a payload without a word on reachability names its source too", () => {
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dm2.applyCloudStateOnline(dev, [
+        { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+      ]);
+      expect(dev.state.cloudLivenessBy).toBe("stateRead");
+      expect(resolveDeviceReachability(dev)).toMatchObject({ decidedBy: "cloudLiveness", source: "stateRead" });
     });
 
     it("a polled online is applied regardless — the guard only shields against a downgrade", () => {

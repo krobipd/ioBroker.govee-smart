@@ -1216,13 +1216,13 @@ describe("GoveeMqttClient", () => {
       expect(statuses).toHaveLength(0); // dropped before JSON.parse — no status update
     });
 
-    it("forwards each op.command hex string to onPacket with the raw envelope", () => {
+    it("forwards a packet once, its op.command frames beside the raw envelope — not once per frame", () => {
+      // Until 3.2.1 a packet with 13 frames reached the report 13 times, each copy with the whole envelope (#57).
       const { packets, feed } = makeClient();
       const msg = { sku: "H61BE", device: "AA:BB", op: { command: ["aa01", "bb02"] } };
       feed(msg, "GA/topic");
       expect(packets).toEqual([
-        { device: "AA:BB", topic: "GA/topic", payload: { hex: "aa01", rawJson: JSON.stringify(msg) } },
-        { device: "AA:BB", topic: "GA/topic", payload: { hex: "bb02", rawJson: JSON.stringify(msg) } },
+        { device: "AA:BB", topic: "GA/topic", payload: { hex: "aa01 bb02", rawJson: JSON.stringify(msg) } },
       ]);
     });
 
@@ -1727,7 +1727,7 @@ describe("GoveeMqttClient", () => {
       expect(h.scheduled.length).toBe(before);
     });
 
-    it("hands each BLE frame of a packet to the report — and nothing that is not a frame", async () => {
+    it("hands a packet's BLE frames to the report once — and nothing that is not a frame", async () => {
       const h = liveClient();
       const frames: Array<string | undefined> = [];
       h.client.setPacketHook((_dev, _topic, payload) => frames.push(payload.hex));
@@ -1740,7 +1740,7 @@ describe("GoveeMqttClient", () => {
         "GA/acc/topic",
         Buffer.from(JSON.stringify({ sku: "H6076", device: "AA:BB", op: { command: ["qqUB", 7, "", null, "qqUC"] } })),
       );
-      expect(frames).toEqual(["qqUB", "qqUC"]);
+      expect(frames).toEqual(["qqUB qqUC"]);
       h.client.disconnect();
     });
 

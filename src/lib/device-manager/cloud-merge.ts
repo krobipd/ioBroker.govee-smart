@@ -1,6 +1,6 @@
 import type { DeviceRegistry } from "../device-registry";
 import { GOVEE_CAP_TYPE, isPseudoGroupSku } from "../govee-constants";
-import type { CloudDevice, CloudStateCapability, DeviceState, GoveeDevice } from "../types";
+import type { CloudDevice, CloudStateCapability, DeviceState, GoveeDevice, ReachabilitySource } from "../types";
 import { cloudDeviceToGoveeDevice } from "./mapping";
 import { deviceKey, isDevicePushFresh } from "./lookups";
 
@@ -99,8 +99,14 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
  * @param adapter Device-manager surface (for the update callback)
  * @param device Target device
  * @param caps The capability list that just arrived
+ * @param source Where the list came from — the report names it (`state.cloudReportedBy` / `cloudLivenessBy`)
  */
-export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, caps: CloudStateCapability[]): void {
+export function applyOnlineCap(
+  adapter: CloudMergeAdapter,
+  device: GoveeDevice,
+  caps: CloudStateCapability[],
+  source: ReachabilitySource,
+): void {
   let online: boolean | undefined;
   for (const c of caps) {
     if (
@@ -123,6 +129,7 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
     // note above. `cloudLivenessAt` expires on the same clock, so this cannot
     // hold a device green forever either.
     device.state.cloudLivenessAt = now;
+    device.state.cloudLivenessBy = source;
     device.lastSeenOnNetwork = now;
     if (device.state.online === true) {
       return;
@@ -148,6 +155,7 @@ export function applyOnlineCap(adapter: CloudMergeAdapter, device: GoveeDevice, 
   // Remember that Govee spoke at all — `syncInfoOnline` needs to tell "Govee
   // reports offline" apart from "Govee never reports for this device kind".
   device.state.cloudReportedOnline = online;
+  device.state.cloudReportedBy = source;
   // Stamped so the proof can expire (CLOUD_ONLINE_EVIDENCE_TTL_MS). Without a
   // stamp a single "online" would read as reachable forever.
   device.state.cloudReportedOnlineAt = now;

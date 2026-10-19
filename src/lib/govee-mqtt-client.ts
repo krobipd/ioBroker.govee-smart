@@ -870,19 +870,17 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     // shows why.
     try {
       if (this.onPacket && update.device) {
-        // v2.9.1 — always forward the raw envelope so state-only pushes
-        // (state with no op.command) are visible in diag. Previously the
-        // hook only fired on op.command BLE bytes — state changes from
-        // the Govee app / physical remote went uncaptured.
-        if (Array.isArray(update.op?.command)) {
-          for (const frame of update.op.command) {
-            if (typeof frame === "string" && frame) {
-              this.onPacket(update.device, topic, { hex: frame, rawJson: rawText });
-            }
-          }
-        } else {
-          this.onPacket(update.device, topic, { rawJson: rawText });
-        }
+        // One packet, one entry: the envelope carries its BLE frames in `op.command`. Until 3.2.1 the hook fired once
+        // per frame with the whole envelope each time — a status packet with 13 frames stood 13 times in the report,
+        // and since every copy differed in its frame, the ring never counted the packet as a repeat (plan G3/R1).
+        // The frames go along so they survive an envelope over the size limit.
+        const frames = Array.isArray(update.op?.command)
+          ? update.op.command.filter((frame): frame is string => typeof frame === "string" && frame.length > 0)
+          : [];
+        this.onPacket(update.device, topic, {
+          ...(frames.length > 0 ? { hex: frames.join(" ") } : {}),
+          rawJson: rawText,
+        });
       }
       this.onStatus?.(update);
     } catch (e) {

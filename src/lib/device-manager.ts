@@ -66,6 +66,7 @@ import {
   type GoveeDevice,
   type LanDevice,
   type MqttStatusUpdate,
+  type ReachabilitySource,
   type TimerAdapter,
   deviceLabel,
   errText,
@@ -1805,6 +1806,9 @@ export class DeviceManager {
       }
       state.online = heard;
       state.cloudReportedOnline = heard;
+      // An explicit statement and a packet that only proves the device spoke both land in this slot — the report
+      // tells them apart.
+      state.cloudReportedBy = reported !== undefined ? "accountOnline" : "devicePush";
       // Stamped so the proof can expire — an unstamped one would read as
       // reachable forever (the Weihnachtslichter case). A status packet from
       // the device carries the PACKET's stamp: a retained replay dates itself
@@ -1888,6 +1892,7 @@ export class DeviceManager {
     // everything that needs the physical length has it without a rebuild.
     if (!quirkLocked && maxSeen === current && device.segmentCount !== maxSeen) {
       device.segmentCount = maxSeen;
+      device.segmentCountOrigin = "push";
       this.persistDeviceToCache(device);
     }
     // Filter by manual-segments override if active — ignore indices the user
@@ -1960,6 +1965,7 @@ export class DeviceManager {
   private adoptSegmentCount(device: GoveeDevice, count: number, verb: string, was: number): void {
     this.log.info(`${deviceLabel(device)}: ${verb} ${count} segments via MQTT (was ${was}) — rebuilding state tree`);
     device.segmentCount = count;
+    device.segmentCountOrigin = "push";
     // Persist now so a restart starts from the real value instead of
     // falling back to Cloud capabilities.
     this.persistDeviceToCache(device);
@@ -2303,7 +2309,7 @@ export class DeviceManager {
       // never reaches info.online via the capability pipeline. Pluck it out and
       // apply it directly — otherwise sensor SKUs like H5179 stay at
       // info.online=false forever even while their readings keep updating.
-      this.maybeApplyCloudOnline(device, caps);
+      this.maybeApplyCloudOnline(device, caps, "appList");
       // Govee's entry as it came, not the parsed projection: `lastDeviceData`
       // is cut down to five known fields by the parser, and a value Govee sends
       // under any other name (a battery level, say) was invisible in the report.
@@ -2459,9 +2465,10 @@ export class DeviceManager {
    *
    * @param device Target device
    * @param caps Capability list from the source pipeline
+   * @param source Where the list came from
    */
-  private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[]): void {
-    cloudMergeHelpers.applyOnlineCap(this.helperHost, device, caps);
+  private applyOnlineCap(device: GoveeDevice, caps: CloudStateCapability[], source: ReachabilitySource): void {
+    cloudMergeHelpers.applyOnlineCap(this.helperHost, device, caps, source);
   }
 
   /**
@@ -2491,7 +2498,7 @@ export class DeviceManager {
    * @param caps The capabilities Govee returned
    */
   applyCloudStateOnline(device: GoveeDevice, caps: CloudStateCapability[]): void {
-    this.maybeApplyCloudOnline(device, caps);
+    this.maybeApplyCloudOnline(device, caps, "stateRead");
   }
 
   /**
@@ -2505,10 +2512,11 @@ export class DeviceManager {
    *
    * @param device Target device
    * @param caps Capability list carrying the online flag
+   * @param source Where the list came from
    */
-  private maybeApplyCloudOnline(device: GoveeDevice, caps: CloudStateCapability[]): void {
+  private maybeApplyCloudOnline(device: GoveeDevice, caps: CloudStateCapability[], source: ReachabilitySource): void {
     if (!isLanDriven(device)) {
-      this.applyOnlineCap(device, caps);
+      this.applyOnlineCap(device, caps, source);
     }
   }
 
@@ -2652,6 +2660,6 @@ export class DeviceManager {
     // never flips to true even while events stream in.
     // Cloud-only lights need the cloud online signal too; LAN-capable lights
     // stay LAN-driven (same rule as the App-API path — see maybeApplyCloudOnline).
-    this.maybeApplyCloudOnline(device, event.capabilities);
+    this.maybeApplyCloudOnline(device, event.capabilities, "cloudEvent");
   }
 }

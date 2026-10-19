@@ -227,6 +227,23 @@ describe("cache.cachedToGoveeDevice / goveeDeviceToCached", () => {
       expect(cached.sceneSpeed).toBe(undefined);
     });
 
+    it("the segment count keeps who taught it across a restart — and drops an origin without a count", () => {
+      // The report names the origin; "cache, MQTT push or wizard" answered nothing on a segment issue.
+      for (const origin of ["push", "wizard"] as const) {
+        const original = makeFullDevice();
+        original.segmentCountOrigin = origin;
+        expect(cachedToGoveeDevice(goveeDeviceToCached(original)).segmentCountOrigin).toBe(origin);
+      }
+      const unlearned = makeFullDevice();
+      unlearned.segmentCount = 0;
+      unlearned.segmentCountOrigin = "push";
+      expect(goveeDeviceToCached(unlearned).segmentCountOrigin).toBeUndefined();
+      // an edited file: an origin that is not one of the two is no origin
+      const cached = goveeDeviceToCached(makeFullDevice());
+      (cached as { segmentCountOrigin?: unknown }).segmentCountOrigin = "cloud";
+      expect(cachedToGoveeDevice(cached).segmentCountOrigin).toBeUndefined();
+    });
+
     it("a corrupt segment count / index list in the cache file is dropped on load", () => {
       // The cache is a host-local, editable file — an absurd count must never
       // become the number of segment channels the adapter builds.

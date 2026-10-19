@@ -74,6 +74,8 @@ export interface CachedDeviceData {
    * Once set, wins over Cloud capability re-reads across restarts.
    */
   segmentCount?: number;
+  /** Who taught the count — the device's segment push or the wizard (absent on a count learned before the origin was recorded). */
+  segmentCountOrigin?: "push" | "wizard";
   /** Cut-strip mode: `manualSegments` lists the physically-present indices. */
   manualMode?: boolean;
   /** Physical indices when manualMode=true; undefined when contiguous. */

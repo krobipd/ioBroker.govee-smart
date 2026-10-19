@@ -406,6 +406,12 @@ export interface GoveeDevice {
    */
   segmentCount?: number;
   /**
+   * Who taught {@link segmentCount}: the device's own segment push or the wizard. The diagnostics report names it — a
+   * segment report is usually about exactly this, and "cache, MQTT push or wizard" answered nothing. Absent on a count
+   * learned before the origin was recorded. Persisted with the count.
+   */
+  segmentCountOrigin?: "push" | "wizard";
+  /**
    * BLE packets per cloud snapshot for ptReal activation, keyed by the
    * snapshot's NAME (`cmds`: [cmdIdx][packetBase64]). Until 2.40.0 they were
    * index-aligned with `snapshots` at fetch time — a snapshot added or moved in
@@ -547,6 +553,13 @@ export interface GoveeDevice {
   };
 }
 
+/**
+ * Where a piece of Govee's reachability evidence came from: the device's own status push and an explicit `online`
+ * packet over the account broker, the 2-minute account list of the App-API, the cloud state read (`/device/state`) and
+ * the OpenAPI event push.
+ */
+export type ReachabilitySource = "devicePush" | "accountOnline" | "appList" | "stateRead" | "cloudEvent";
+
 /** Current device state */
 export interface DeviceState {
   /** Whether device is reachable */
@@ -570,6 +583,13 @@ export interface DeviceState {
    */
   cloudReportedOnline?: boolean;
   /**
+   * Who wrote {@link cloudReportedOnline} last. The slot has more writers than its name says: besides an explicit
+   * `online` capability (`applyOnlineCap`) every packet of the account push lands here, also a status packet that says
+   * nothing about reachability (`parseMqttStateUpdate`). The diagnostics report used to name the slot, not the writer,
+   * and called a device's own status push "Govee reported it explicitly" (#56/#57, 2026-10-18). Runtime-only.
+   */
+  cloudReportedBy?: ReachabilitySource;
+  /**
    * When that report was heard. Evidence has to be able to grow old: without a
    * timestamp a device that said "online" once would read as reachable forever,
    * sitting unplugged in a drawer. Renewed by the account push, by the 2-minute
@@ -591,6 +611,8 @@ export interface DeviceState {
    * Runtime-only, like the two above.
    */
   cloudLivenessAt?: number;
+  /** Who delivered the payload behind {@link cloudLivenessAt}. Runtime-only. */
+  cloudLivenessBy?: ReachabilitySource;
   /**
    * When the device ITSELF last pushed a status packet over the account broker
    * — its own voice, as opposed to what Govee's lists say about it. Dated by

@@ -98,6 +98,11 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
     ### **WORK IN PROGRESS**
 -->
 
+### **WORK IN PROGRESS**
+
+- Fixed: the diagnostics report contains the object tree again
+- Changed: the diagnostics report names where a device's reachability and segment count come from and shows each fact only once
+
 ### 3.2.1 (2026-10-15)
 
 - Fixed: the H1771 table lamp no longer offers a DreamView switch that Govee refuses for this model

@@ -3364,6 +3364,14 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     // The fleet's file name (DB-12): adapter, the device's tree id, version, UTC time.
     expect(result.fileName).toMatch(/^govee-smart_h61be-ee11_v.*\.json$/);
     expect(JSON.parse(result.content).device.sku).toBe("H61BE");
+    // The object tree and the control paths come through the real host too (DB-03). 3.2.0 read the values with
+    // `getForeignStatesAsync`, which `buildHost()` did not carry: the read threw, the report swallowed it, and every
+    // report since stood with `objectTree: null` and `controlPaths: null`.
+    const report = JSON.parse(result.content) as { objectTree: Array<{ id: string }>; controlPaths: unknown[] };
+    expect(report.objectTree.map(e => e.id)).toContain("control.power");
+    expect(report.controlPaths).toEqual(
+      expect.arrayContaining([expect.objectContaining({ stateId: "control.power" })]),
+    );
     // A report writes no value (DB-10) — the device has no datapoint for one either.
     expect([...i.states.keys()].filter(id => id.startsWith(`${prefix}.diag.`) && !id.endsWith(".tier"))).toEqual([]);
   });

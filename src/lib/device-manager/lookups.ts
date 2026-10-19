@@ -1,6 +1,12 @@
 import { decodeBleFrame } from "../ble-frame";
 import { SEGMENT_HARD_MAX } from "../segment-list";
-import { normalizeDeviceId, type DeviceState, type GoveeDevice, type MqttStatusUpdate } from "../types";
+import {
+  normalizeDeviceId,
+  type DeviceState,
+  type GoveeDevice,
+  type MqttStatusUpdate,
+  type ReachabilitySource,
+} from "../types";
 import { mapKey } from "../device-key";
 import { GOVEE_DEVICE_TYPE } from "../govee-constants";
 import { CLOUD_ONLINE_EVIDENCE_TTL_MS, LAN_CAPABLE_MEMORY_MS, LAN_REPLY_FRESHNESS_MS } from "../timing-constants";
@@ -306,6 +312,8 @@ export interface ReachabilityDecision {
   proven: boolean;
   /** Which source decided. */
   decidedBy: ReachabilityDecidedBy;
+  /** For `cloudReport` and `cloudLiveness`: who delivered the evidence (account push, list, state read, event). */
+  source?: ReachabilitySource;
   /** When the deciding source last spoke (ms epoch), or null when none did. */
   lastEvidenceAt: number | null;
 }
@@ -384,6 +392,7 @@ export function resolveDeviceReachability(device: GoveeDevice, now: number = Dat
         online: device.state.cloudReportedOnline,
         proven: true,
         decidedBy: "cloudReport",
+        ...(device.state.cloudReportedBy ? { source: device.state.cloudReportedBy } : {}),
         lastEvidenceAt: at,
       };
     }
@@ -395,7 +404,13 @@ export function resolveDeviceReachability(device: GoveeDevice, now: number = Dat
   // BELOW the branch above, not beside it).
   const liveAt = device.state.cloudLivenessAt;
   if (typeof liveAt === "number" && now - liveAt < CLOUD_ONLINE_EVIDENCE_TTL_MS) {
-    return { online: true, proven: true, decidedBy: "cloudLiveness", lastEvidenceAt: liveAt };
+    return {
+      online: true,
+      proven: true,
+      decidedBy: "cloudLiveness",
+      ...(device.state.cloudLivenessBy ? { source: device.state.cloudLivenessBy } : {}),
+      lastEvidenceAt: liveAt,
+    };
   }
   return { online: false, proven: false, decidedBy: "noEvidence", lastEvidenceAt: null };
 }

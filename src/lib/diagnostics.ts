@@ -3,18 +3,17 @@ import { Placeholders } from "./diagnostics/placeholders";
 import type { LogLine, LogRing } from "./diagnostics/log-ring";
 import { ByteRing } from "./diagnostics/byte-ring";
 import { pseudonymiseReport } from "./report-placeholders";
+import { keepChannelChanges } from "./log-prefix";
 import type { DeviceRegistry } from "./device-registry";
 import { errText, type GoveeDevice } from "./types";
-import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
+import { isAppGroup } from "./govee-constants";
 import {
   effectiveSegmentCount,
-  isLanDriven,
   resolveDeviceReachability,
   resolveSegmentCount,
   resolveSegmentCountWithSource,
 } from "./device-manager/lookups";
-import { CLOUD_REACHABILITY_REFRESH_MS, STATUS_REQUEST_INTERVAL_MS } from "./timing-constants";
-import { applianceBudget, type RateLimiterSnapshot } from "./rate-limiter";
+import type { RateLimiterSnapshot } from "./rate-limiter";
 import type { GoveeRateLimit } from "./govee-cloud-client";
 
 /** Single log line captured for a device. */
@@ -39,7 +38,7 @@ export interface MqttPacketEntry {
   kind?: string;
   /** AWS-IoT account topic or Cloud-events topic the packet arrived on */
   topic: string;
-  /** Hex-encoded BLE bytes (lowercase, space-separated) — set for AWS-IoT op.command entries. */
+  /** The packet's BLE frames (Base64, space-separated) — only when the envelope is missing or over the limit. */
   hex?: string;
   /** Raw JSON envelope around the message — captured so state-correlation isn't lost. */
   rawJson?: string;
@@ -49,8 +48,12 @@ export interface MqttPacketEntry {
 
 /** One captured API call (success or failure) for a Cloud / App-API endpoint. */
 export interface ApiResponseEntry {
-  /** ISO timestamp */
+  /** ISO timestamp — of the newest answer when the same answer came more than once. */
   ts: string;
+  /** When the same answer came first (ISO) — set once it repeated (fleet R1). */
+  first?: string;
+  /** How often the same answer came; absent means once (fleet R1). */
+  count?: number;
   /** Endpoint identifier (e.g. "/router/api/v1/device/state") */
   endpoint: string;
   /** True = body holds the parsed response. False = body holds `{ error, status, responseBody }`. */
@@ -213,6 +216,8 @@ export interface ReachabilityChangeEntry {
   was: boolean | null;
   /** The source that decided it (`resolveDeviceReachability`). */
   decidedBy: string;
+  /** For `cloudReport`/`cloudLiveness`: who delivered the evidence (`ReachabilitySource`). */
+  source?: string;
   /** The time of the evidence it rests on (ISO), null without one. */
   lastEvidenceAt: string | null;
 }
@@ -432,14 +437,10 @@ export type LocalSnapshotsProvider = (sku: string, deviceId: string) => unknown[
  * their Node field on 2026-09-02 precisely because it belongs in here.
  */
 export interface EnvironmentSnapshot {
-  /** Node.js version the adapter runs on. */
-  node?: string;
-  /** js-controller version. */
+  /** js-controller version. (Node and platform stand in the fleet frame, `runtime`.) */
   jsController?: string;
   /** Admin adapter version. */
   admin?: string;
-  /** Host platform, e.g. "linux x64". */
-  platform?: string;
   /** Whether this instance shares a process with others (compact mode). */
   compactMode?: boolean;
   /**
@@ -834,14 +835,16 @@ export class DiagnosticsCollector {
       typeof payload === "string" ? payload : payload && typeof payload === "object" ? payload.hex : undefined;
     const rawJson = payload && typeof payload === "object" ? payload.rawJson : undefined;
     let omitted = 0;
-    if (typeof hex === "string" && hex) {
-      entry.hex = wholeOrNothing(hex, MAX_PACKET_RAW_BYTES);
-      omitted += entry.hex === undefined ? hex.length : 0;
-    }
     if (typeof rawJson === "string" && rawJson) {
       const clean = this.cleanRawJson(rawJson);
       entry.rawJson = wholeOrNothing(clean, MAX_PACKET_RAW_BYTES);
       omitted += entry.rawJson === undefined ? clean.length : 0;
+    }
+    // The frames stand in the envelope's `op.command` — kept apart only when there is no envelope, or it was over
+    // the limit; a second copy next to the envelope is what made every status packet stand once per frame.
+    if (typeof hex === "string" && hex && entry.rawJson === undefined) {
+      entry.hex = wholeOrNothing(hex, MAX_PACKET_RAW_BYTES);
+      omitted += entry.hex === undefined ? hex.length : 0;
     }
     if (omitted > 0) {
       entry.omittedBytes = omitted;
@@ -1039,10 +1042,22 @@ export class DiagnosticsCollector {
    * copies of itself and of other endpoints rather than being refused.
    *
    * @param b Device buffers
-   * @param entry New API response entry (success or failure) to append
+   * @param answer New API response entry (success or failure) to append
    */
-  private appendResponse(b: DeviceBuffers, entry: ApiResponseEntry): void {
-    const list = b.responses.get(entry.endpoint) ?? [];
+  private appendResponse(b: DeviceBuffers, answer: ApiResponseEntry): void {
+    const list = b.responses.get(answer.endpoint) ?? [];
+    // The same answer again is counted, not stacked (fleet R1): the 2-minute account list returned the same entry six
+    // times in ten minutes in one report (#57, 2026-10-18), each copy in full.
+    const body = JSON.stringify(answer.body);
+    const same = list.findIndex(
+      e => e.ok === answer.ok && e.statusCode === answer.statusCode && JSON.stringify(e.body) === body,
+    );
+    let entry = answer;
+    if (same >= 0) {
+      const [earlier] = list.splice(same, 1);
+      b.responseBytes -= earlier.bytes;
+      entry = { ...answer, first: earlier.first ?? earlier.ts, count: (earlier.count ?? 1) + 1 };
+    }
     list.push(entry);
     b.responseBytes += entry.bytes;
     while (list.length > MAX_RESPONSES_PER_ENDPOINT) {
@@ -1150,11 +1165,12 @@ export class DiagnosticsCollector {
    * @param change.online What `info.online` shows now
    * @param change.was What it showed before (null for the first value)
    * @param change.decidedBy The deciding source
+   * @param change.source Who delivered the evidence, for a cloud report or liveness
    * @param change.lastEvidenceAt The evidence time (ms), null without one
    */
   recordReachability(
     deviceId: string,
-    change: { online: boolean; was: boolean | null; decidedBy: string; lastEvidenceAt: number | null },
+    change: { online: boolean; was: boolean | null; decidedBy: string; source?: string; lastEvidenceAt: number | null },
   ): void {
     if (typeof deviceId !== "string" || !deviceId) {
       return;
@@ -1166,6 +1182,7 @@ export class DiagnosticsCollector {
         online: change.online,
         was: change.was,
         decidedBy: change.decidedBy,
+        ...(change.source ? { source: change.source } : {}),
         lastEvidenceAt: change.lastEvidenceAt === null ? null : new Date(change.lastEvidenceAt).toISOString(),
       },
       MAX_REACHABILITY_CHANGES,
@@ -1329,10 +1346,8 @@ export class DiagnosticsCollector {
         // Where the segment count came from. It is the single most asked-back
         // question on a segment report, and the number alone never answered it.
         segmentCountSource: this.segmentCountSource(device),
-        // Same idea for reachability: `state.online` alone never answered
-        // "why does it show offline" — this names the deciding source, when it
-        // last spoke, what refreshes it, and which sources stay silent for this
-        // device kind by design.
+        // Same idea for reachability: `state.online` alone never answered "why does it show offline" — this names the
+        // deciding source, who delivered its evidence, and when.
         reachabilitySource: this.reachabilitySource(device),
         channels: { ...device.channels },
         lanIp: device.lanIp ?? null,
@@ -1364,19 +1379,16 @@ export class DiagnosticsCollector {
       capabilities: device.capabilities,
       scenes: {
         count: device.scenes.length,
-        names: device.scenes.map(s => s.name),
         // Cloud-side `value` payload — needed when the dropdown index can't
         // be replayed from name alone (snapshots especially have integer IDs).
         entries: device.scenes.map(s => ({ name: s.name, value: s.value })),
       },
       diyScenes: {
         count: device.diyScenes.length,
-        names: device.diyScenes.map(s => s.name),
         entries: device.diyScenes.map(s => ({ name: s.name, value: s.value })),
       },
       snapshots: {
         count: device.snapshots.length,
-        names: device.snapshots.map(s => s.name),
         entries: device.snapshots.map(s => ({ name: s.name, value: s.value })),
         // v2.9.1 — raw BLE packets per snapshot. THE field for byte-level
         // snapshot debugging (Issue #13, H61A8 tukey42). Previously the only
@@ -1423,7 +1435,7 @@ export class DiagnosticsCollector {
       state: { ...device.state },
       recentLogs: b?.logs.slice() ?? [],
       // The adapter's own log at every level, also debug (plan G2) — the lines naming this device or no other one.
-      adapterLog: extra.frozen?.adapterLog ?? this.adapterLogAbout(extra.mentions),
+      adapterLog: keepChannelChanges(extra.frozen?.adapterLog ?? this.adapterLogAbout(extra.mentions)),
       // Every address the device answered the LAN scan from, counted (plan G1).
       lanReplies: extra.frozen?.lanReplies ?? [...(this.lanReplies.get(device.deviceId)?.values() ?? [])],
       // Every change of what info.online showed, with the deciding source and its evidence (plan G4).
@@ -1493,132 +1505,42 @@ export class DiagnosticsCollector {
   }
 
   /**
-   * Where this device's reachability comes from — and, just as important, which
-   * sources can NEVER speak for it.
+   * Which source decided this device's reachability, and who delivered that evidence — the answer of
+   * {@link resolveDeviceReachability}, as keys. **This method decides nothing**: a second, hand-written copy of the rule
+   * drifted once already (2.30.0, measured on an H618A: all four fields wrong at once).
    *
-   * The report used to show `state.online` and nothing else. On a "shows offline
-   * although it works" report that is the one number that cannot answer the
-   * question, because the interesting part is which source decided it and when
-   * that source last said anything. Measured cost of the omission (2026-09-03):
-   * tracing a single device's reachability took hours of reading the adapter's
-   * source, because the report simply did not carry it.
-   *
-   * **This method decides nothing.** It asks {@link resolveDeviceReachability}
-   * which source settled the question and only puts that into words. The first
-   * version did decide — it re-stated the rule by hand — and 2.30.0 moved the
-   * rule underneath it: measured on an H618A the same day, all four fields were
-   * wrong at once (LAN was tied to `lanIp` instead of the seven-day memory, two
-   * timestamps read fields the resolver no longer uses, and the gateway ceiling
-   * was missing entirely). A second copy of a rule is a copy that will drift.
-   *
-   * Mirrors {@link segmentCountSource} — same question, same shape.
+   * The report used to add two sentences here — every way the evidence could be renewed, and the sources that stay
+   * silent — the same text for every device of a kind, whatever the installation. It said nothing about the device
+   * and repeated `channels` (krobi 2026-10-20: "ich brauch da keinen dummy text").
    *
    * @param device The device the report is about
    */
   private reachabilitySource(device: GoveeDevice): {
     decidedBy: string;
+    source?: string;
     lastEvidenceAt: number | null;
-    refreshedBy: string;
-    silentSources: string[];
   } {
-    // An app group is no device: nothing reports on it, and its tree has no
-    // reachability datapoint of its own. Run through the device rule it read
-    // "nothing ever reported — reported as not reachable" next to five renewers
-    // that never touch a group (krobi's installation, 2.39.1).
+    // An app group has no reachability of its own (groups.info.online shows the cloud connection).
     if (isAppGroup(device)) {
-      return {
-        decidedBy:
-          "not applicable — an app group has no reachability of its own; groups.info.online shows the cloud connection, the group's info.membersUnreachable names members that cannot be reached",
-        lastEvidenceAt: null,
-        refreshedBy: "nothing — a group is never asked for its state",
-        silentSources: [],
-      };
+      return { decidedBy: "appGroup", lastEvidenceAt: null };
     }
     const decision = resolveDeviceReachability(device);
-    const isLight = device.type === GOVEE_DEVICE_TYPE.LIGHT;
-    const lanDriven = isLanDriven(device);
-
-    // What stays silent, and what can renew the evidence, both follow from HOW
-    // the device is driven — not from what happened to decide this time. Each
-    // renewer names the credentials it needs, because that is the difference
-    // between "this proof gets refreshed" and "this proof expires in 30
-    // minutes and the device goes grey": every renewer but the last one needs
-    // the Govee account, and an installation with only an API key has none.
-    const silent: string[] = [];
-    const renewers: string[] = [];
-    if (lanDriven) {
-      // maybeApplyCloudOnline bails on isLanDriven, so NO cloud source can
-      // speak for this device — in either direction.
-      silent.push("cloud state read (a LAN-driven light ignores every cloud claim)");
-      silent.push("account push (same reason)");
-      silent.push("app device list (same reason)");
-      silent.push("cloud event push (same reason)");
-      renewers.push("LAN scan, every 30 s");
-    } else {
-      silent.push(isLight ? "LAN reply (device has no local API enabled)" : "LAN reply (not a light)");
-      renewers.push(
-        "account push, event-driven (needs email + password) — the device's own status push holds against a polled offline for 30 min",
-      );
-      renewers.push("app device list, every 2 min (needs email + password)");
-      renewers.push(
-        `status request over the account broker once the device's own push is older than ${Math.round(STATUS_REQUEST_INTERVAL_MS / 60000)} min, and once right after a failed command (needs email + password)`,
-      );
-      renewers.push("cloud event push, event-driven (needs the API key)");
-      // The refresh skips every device with its own daily budget (appliances,
-      // sensors — `applianceBudget`): 72 of its 90 calls a day would go to
-      // reachability alone. Promising it here sent the reader of an H7127
-      // report waiting for a call that never comes (issue #47, 2026-09-22).
-      if (applianceBudget(device) === undefined) {
-        renewers.push(
-          `reachability refresh once the evidence is older than ${Math.round(CLOUD_REACHABILITY_REFRESH_MS / 60000)} min, and once after a failed command when no status request can reach the device — that read also corrects the values (needs the API key)`,
-        );
-      } else {
-        silent.push(
-          "reachability refresh (the device keeps its own daily budget — start read, own push, command and list only)",
-        );
-      }
-    }
-
-    const refreshedBy = renewers.join("; ");
-
-    const decidedBy = {
-      lanReply: "LAN reply freshness",
-      gatewayDown: "its gateway is down — a device behind a gateway can be no more reachable than the gateway",
-      noCloudPath:
-        "neither the Cloud nor the account broker is reachable — a device without a local interface cannot be reached",
-      cloudReport: "Govee reported it explicitly (an `online` capability)",
-      cloudLiveness:
-        "Govee delivered something for this device without reporting reachability — the payload proves it spoke",
-      noEvidence: "nothing ever reported — reported as not reachable",
-    }[decision.decidedBy];
-
     return {
-      decidedBy,
+      decidedBy: decision.decidedBy,
+      ...(decision.source ? { source: decision.source } : {}),
       lastEvidenceAt: decision.lastEvidenceAt,
-      refreshedBy,
-      silentSources: silent,
     };
   }
 
   /**
-   * Which source settled this device's segment count — the answer of
-   * `resolveSegmentCountWithSource`, put into words. A second copy of the
-   * priority here drifted (no plausibility gate: "cloud capability" next to
-   * a count of 0; a quirk of 99 reported as the source of a different count).
+   * Where the segment count came from, as a key: the quirk, the device's own segment push, the wizard, a count learned
+   * before its origin was recorded (`learned`), the smallest cloud segment capability, or none. A second copy of the
+   * priority here drifted once (no plausibility gate), so the source is `resolveSegmentCountWithSource`'s.
    *
    * @param device The device being reported on
    */
   private segmentCountSource(device: GoveeDevice): string {
-    switch (resolveSegmentCountWithSource(device, this.registry).source) {
-      case "quirk":
-        return "quirk (hard override for this SKU)";
-      case "learned":
-        return "learned at runtime (cache, MQTT push or wizard)";
-      case "cloudCapability":
-        return "smallest cloud segment capability";
-      case "none":
-      default:
-        return "unknown (no segment source)";
-    }
+    const { source } = resolveSegmentCountWithSource(device, this.registry);
+    return source === "learned" ? (device.segmentCountOrigin ?? "learned") : source;
   }
 }

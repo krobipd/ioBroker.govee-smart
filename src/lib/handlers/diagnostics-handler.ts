@@ -117,11 +117,10 @@ export function wireDiagnosticsProviders(host: DiagnosticsProvidersHost): void {
   // and the issue forms dropped their Node field because it belongs in here.
   diag.setEnvironmentProvider(() => {
     const devices = host.deviceManager?.getDevices() ?? [];
+    // Node and platform stand in the fleet frame (`runtime`) — not a second time here.
     return {
-      node: process.version,
       jsController: host.hostVersions.jsController,
       admin: host.hostVersions.admin,
-      platform: `${process.platform} ${process.arch}`,
       compactMode: host.compactMode,
       credentialTier: host.mqttClient ? "account" : host.cloudClient ? "apiKey" : "lan",
       deviceCount: devices.length,

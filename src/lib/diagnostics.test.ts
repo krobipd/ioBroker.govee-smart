@@ -8,6 +8,47 @@ import { rawAppEntry } from "./govee-api-client";
 
 /** A catalog with no entries — tests that don't care about quirks. */
 const emptyRegistry = (): DeviceRegistry => new DeviceRegistry({ data: { devices: {} } });
+
+/** A status push of the H6199 in issue #57 (3.2.1 report, 2026-10-18), as the report carried it — 13 BLE frames. */
+const REAL_H6199_STATUS = {
+  proType: 2,
+  sku: "H6199",
+  device: "mac-1",
+  softVersion: "1.10.04",
+  wifiSoftVersion: "1.00.33",
+  cmd: "status",
+  type: 0,
+  transaction: "y_1792340740999081",
+  pactType: 2,
+  pactCode: 1,
+  state: {
+    onOff: 0,
+    brightness: 100,
+    color: { r: 255, g: 0, b: 0 },
+    colorTemInKelvin: 0,
+    mode: 21,
+    wifiHardVersion: "1.03.00",
+    bleHardVersion: "3.02.01",
+    result: 1,
+  },
+  op: {
+    command: [
+      "qlUAZDIBAAAyAAAAAAAAAAAAAJo=",
+      "qgUVAQAAAAAAAAAAAAAAAAAAALs=",
+      "qqUBXP8AAFz/AABc/wAAXP8AAA4=",
+      "qqUCXP8AAFz/AABc/wAAXP8AAA0=",
+      "qqUDXP8AAFz/AABc/wAAXP8AAAw=",
+      "qqUEXP8AAFz/AABk/wAAAFxcXMw=",
+      "qhEAHg8PAAAAAAAAAAAAAAAAAKU=",
+      "qhL/ZAAAgAoAAAAAAAAAAAAAAKk=",
+      "qiP/AAAAgAAAAIAAAACAAAAAgHY=",
+      "qq4BBGRkZGQAAAAAAAAAAAAAAAE=",
+      "qqkABgEQAwEQAwAAAAAAAAAAAAU=",
+      "qqkCATIAAAAAAAAAAAAAAAAAADI=",
+      "qqkKBgABCgAsAQAAAAAAAAAAACk=",
+    ],
+  },
+};
 /** The catalog the constructed modules read — reassigned per suite where quirks matter. */
 let registry: DeviceRegistry = emptyRegistry();
 
@@ -143,9 +184,10 @@ describe("DiagnosticsCollector", () => {
         kind: string;
         hex?: string;
       }>;
+      // frames that came with an envelope stand in it (`op.command`), not a second time beside it
       expect(packets.map(p => [p.hex, p.kind])).toEqual([
         ["qqgFAQEEAAAAA=", "status"],
-        ["qqgFAQEEAAAAB=", "other"],
+        [undefined, "other"],
       ]);
     });
 
@@ -170,6 +212,45 @@ describe("DiagnosticsCollector", () => {
       expect(entry.endpoint).toBe("/api/state");
       expect(entry.ok).toBe(true);
       expect(entry.statusCode).toBe(200);
+    });
+
+    it("the same answer again is counted, not stacked (fleet R1, #57)", async () => {
+      // The H6199 report of #57: the 2-minute account list returned this entry six times in ten minutes
+      // (16:15:49–16:25:49), and the report carried it six times in full.
+      const entry = {
+        sku: "H6199",
+        device: "mac-1",
+        deviceName: "name-11",
+        deviceExt: { lastDeviceData: { online: false } },
+      };
+      let now = Date.parse("2026-10-18T16:15:49.014Z");
+      vi.useFakeTimers({ now, toFake: ["Date"] });
+      try {
+        const c = new DiagnosticsCollector(registry);
+        for (let i = 0; i < 6; i++) {
+          c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", entry);
+          now += 120_000;
+          vi.setSystemTime(now);
+        }
+        c.recordApiSuccess("dev1", "/device/rest/devices/v1/list", {
+          ...entry,
+          deviceExt: { lastDeviceData: { online: true } },
+        });
+        const list = (
+          (await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.1")).apiHistory as Record<string, unknown[]>
+        )["/device/rest/devices/v1/list"] as Array<Record<string, unknown>>;
+        expect(list).toHaveLength(2);
+        expect(list[0]).toMatchObject({
+          first: "2026-10-18T16:15:49.014Z",
+          ts: "2026-10-18T16:25:49.014Z",
+          count: 6,
+          body: entry,
+        });
+        // a different answer is its own entry, the newest last
+        expect(list[1].count).toBeUndefined();
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("redacts secretCode and topic from recorded API responses so they never reach the diag export (SEC-ISSUE1)", async () => {
@@ -327,20 +408,18 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("the report names WHY a device shows the reachability it shows", () => {
-    it("a LAN light: the LAN reply decides, and the cloud sources are named as silent", async () => {
+    it("a LAN light: the LAN reply decides — keys, no sentences", async () => {
       // Tracing one device's reachability cost hours of reading the adapter's
       // source (2026-09-03) because the report carried the value and nothing
-      // else. The deciding source, its last evidence and the sources that stay
-      // silent by design are what actually answer "why does it show offline".
+      // else. The deciding source and its last evidence answer "why does it show offline". The sentences that stood
+      // beside them (every renewer, every silent source — the same for every device of a kind) are gone
+      // (krobi 2026-10-20: "ich brauch da keinen dummy text").
       const c = new DiagnosticsCollector(registry);
       const r = (await c.generate(
         makeDevice({ lanIp: "10.0.0.5", lastLanReplyAt: 1_700_000_000_000 }),
         "2.30.0",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      const src = r.device.reachabilitySource!;
-      expect(src.decidedBy).toContain("LAN");
-      expect(src.lastEvidenceAt).toBe(1_700_000_000_000);
-      expect((src.silentSources as string[]).join(" ")).toContain("account push");
+      expect(r.device.reachabilitySource).toEqual({ decidedBy: "lanReply", lastEvidenceAt: 1_700_000_000_000 });
     });
 
     it("a light with no address but a recent LAN reply is still LAN-driven — the seven-day memory", async () => {
@@ -353,54 +432,54 @@ describe("DiagnosticsCollector", () => {
         makeDevice({ lanIp: undefined, lastLanSeenAt: Date.now() - 60_000, lastLanReplyAt: 1_700_000_000_000 }),
         "2.31.0",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      const src = r.device.reachabilitySource!;
-      expect(src.decidedBy).toContain("LAN");
-      expect(src.lastEvidenceAt).toBe(1_700_000_000_000);
-      expect(String(src.refreshedBy)).toContain("30 s");
+      expect(r.device.reachabilitySource).toEqual({ decidedBy: "lanReply", lastEvidenceAt: 1_700_000_000_000 });
     });
 
-    it("a cloud-only light: the account list refreshes it every 2 minutes", async () => {
-      // Until 2.30.0 the cloud poll for such a light really did run once at
-      // start, and the report said so. `hasDeviceNeedingAppApi` changed that —
-      // a light without a local interface joins the 2-minute account call —
-      // and the hand-written report text kept telling the old story.
-      const c = new DiagnosticsCollector(registry);
-      const r = (await c.generate(
-        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
-        "2.31.0",
-      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      const src = r.device.reachabilitySource!;
-      expect(String(src.refreshedBy)).toContain("2 min");
-      expect(String(src.refreshedBy)).not.toContain("ONCE");
-      expect((src.silentSources as string[]).join(" ")).toContain("no local API");
-    });
-
-    it("an appliance: the report does not promise the reachability refresh that skips it (issue #47, 2026-09-22)", async () => {
-      // `refreshExpiringReachability` skips every device with its own daily
-      // budget (appliances, sensors) — the reporter's H7127 export listed the
-      // refresh among its renewers anyway, and the reader waited for a call
-      // that never comes. The refresh belongs to the silent sources there.
+    it("a light's own status push is named as such — not as Govee's explicit word (#56/#57, 2026-10-18)", async () => {
+      // Both 3.2.1 reports said "Govee reported it explicitly (an `online` capability)" while `cloudReportedOnlineAt`
+      // equalled `devicePushAt`: the H605C and the H6199 had pushed their own status over the account broker, a packet
+      // that carries no reachability statement at all.
+      const at = Date.now() - 1000;
       const c = new DiagnosticsCollector(registry);
       const r = (await c.generate(
         makeDevice({
-          sku: "H7127",
-          type: "devices.types.air_purifier",
           lanIp: undefined,
           lastLanSeenAt: undefined,
-          state: { online: false },
+          state: {
+            online: true,
+            cloudReportedOnline: true,
+            cloudReportedOnlineAt: at,
+            cloudReportedBy: "devicePush",
+            devicePushAt: at,
+          },
         }),
-        "2.39.0",
+        "3.2.1",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      const src = r.device.reachabilitySource!;
-      expect(String(src.refreshedBy)).not.toContain("reachability refresh");
-      expect((src.silentSources as string[]).join(" ")).toContain("reachability refresh");
-      expect((src.silentSources as string[]).join(" ")).toContain("daily budget");
-      // A cloud-only LIGHT keeps the renewer — it has no budget of its own.
-      const light = (await c.generate(
-        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
-        "2.39.0",
+      expect(r.device.reachabilitySource).toEqual({
+        decidedBy: "cloudReport",
+        source: "devicePush",
+        lastEvidenceAt: at,
+      });
+    });
+
+    it("a payload without a word on reachability names who delivered it", async () => {
+      const at = Date.now() - 1000;
+      const c = new DiagnosticsCollector(registry);
+      const r = (await c.generate(
+        makeDevice({
+          sku: "H5179",
+          type: "devices.types.thermometer",
+          lanIp: undefined,
+          lastLanSeenAt: undefined,
+          state: { online: true, cloudLivenessAt: at, cloudLivenessBy: "appList" },
+        }),
+        "3.2.1",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      expect(String(light.device.reachabilitySource!.refreshedBy)).toContain("reachability refresh");
+      expect(r.device.reachabilitySource).toEqual({
+        decidedBy: "cloudLiveness",
+        source: "appList",
+        lastEvidenceAt: at,
+      });
     });
 
     it("names the gateway as the deciding source when the gateway is down", async () => {
@@ -418,7 +497,7 @@ describe("DiagnosticsCollector", () => {
         }),
         "2.31.0",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      expect(String(r.device.reachabilitySource!.decidedBy)).toContain("gateway");
+      expect(r.device.reachabilitySource!.decidedBy).toBe("gatewayDown");
     });
 
     it("the report never decides for itself — it renders what the resolver answered", async () => {
@@ -438,7 +517,7 @@ describe("DiagnosticsCollector", () => {
       >;
       expect(r.device.reachabilitySource!.lastEvidenceAt).toBe(decision.lastEvidenceAt);
       expect(decision.decidedBy).toBe("cloudReport");
-      expect(String(r.device.reachabilitySource!.decidedBy)).toContain("Govee reported");
+      expect(r.device.reachabilitySource!.decidedBy).toBe(decision.decidedBy);
     });
   });
 
@@ -543,7 +622,7 @@ describe("DiagnosticsCollector", () => {
       registry = emptyRegistry();
     });
 
-    it("names where the segment count came from — quirk, learned, capability, nothing", async () => {
+    it("names where the segment count came from — quirk, push, wizard, learned, capability, nothing", async () => {
       const segmentCap = {
         type: "devices.capabilities.segment_color_setting",
         instance: "segmentedColorRgb",
@@ -558,14 +637,16 @@ describe("DiagnosticsCollector", () => {
       const source = async (c: DiagnosticsCollector, d: GoveeDevice): Promise<unknown> =>
         ((await c.generate(d, "2.40.0")).device as Record<string, unknown>).segmentCountSource;
       expect(await source(new DiagnosticsCollector(quirked), makeDevice({ sku: "H6141", segmentCount: 20 }))).toBe(
-        "quirk (hard override for this SKU)",
+        "quirk",
       );
       const plain = new DiagnosticsCollector(emptyRegistry());
-      expect(await source(plain, makeDevice({ segmentCount: 20 }))).toBe(
-        "learned at runtime (cache, MQTT push or wizard)",
-      );
-      expect(await source(plain, makeDevice({ capabilities: [segmentCap] }))).toBe("smallest cloud segment capability");
-      expect(await source(plain, makeDevice())).toBe("unknown (no segment source)");
+      // "cache, MQTT push or wizard" named three candidates and answered nothing; the origin is kept with the count
+      expect(await source(plain, makeDevice({ segmentCount: 20, segmentCountOrigin: "push" }))).toBe("push");
+      expect(await source(plain, makeDevice({ segmentCount: 20, segmentCountOrigin: "wizard" }))).toBe("wizard");
+      // a count learned before the origin was recorded
+      expect(await source(plain, makeDevice({ segmentCount: 20 }))).toBe("learned");
+      expect(await source(plain, makeDevice({ capabilities: [segmentCap] }))).toBe("cloudCapability");
+      expect(await source(plain, makeDevice())).toBe("none");
     });
 
     it("contains the device sections and the ring buffers — the frame fields are the fleet's", async () => {
@@ -754,14 +835,32 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("v2.9.1 Class F1 — AWS-IoT MQTT envelope durchgereicht", () => {
-    it("addMqttPacket accepts {hex, rawJson} so state-only pushes are captured too", async () => {
+    it("a status packet stands once, its frames inside the envelope — repeated, it is counted (#57, plan G3)", async () => {
+      // The H6199 status push of issue #57 (3.2.1 report, 2026-10-18), 13 frames: it stood 13 times in that report.
+      const frames = REAL_H6199_STATUS.op.command;
+      const envelope = JSON.stringify(REAL_H6199_STATUS);
       const c = new DiagnosticsCollector(registry);
-      const envelope = JSON.stringify({ sku: "H61BE", device: "AA:BB:CC", state: { onOff: 1 } });
-      c.addMqttPacket("dev1", "GA/account", { hex: "abc123", rawJson: envelope });
-      const result = await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1");
-      const packets = result.lastMqttPackets as Array<Record<string, unknown>>;
-      expect(packets[0].hex).toBe("abc123");
-      expect(packets[0].rawJson).toBe(envelope);
+      c.addMqttPacket("dev1", "GA/account", { hex: frames.join(" "), rawJson: envelope });
+      c.addMqttPacket("dev1", "GA/account", { hex: frames.join(" "), rawJson: envelope });
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1")).lastMqttPackets as Array<
+        Record<string, unknown>
+      >;
+      expect(packets).toHaveLength(1);
+      expect(packets[0]).toMatchObject({ kind: "status", count: 2, rawJson: envelope });
+      expect(packets[0].hex).toBeUndefined();
+    });
+
+    it("an envelope over the size limit keeps the packet's frames", async () => {
+      const frames = REAL_H6199_STATUS.op.command;
+      const envelope = JSON.stringify({ ...REAL_H6199_STATUS, pad: "x".repeat(5000) });
+      const c = new DiagnosticsCollector(registry);
+      c.addMqttPacket("dev1", "GA/account", { hex: frames.join(" "), rawJson: envelope });
+      const packets = (await c.generate(makeDevice({ deviceId: "dev1" }), "2.9.1")).lastMqttPackets as Array<
+        Record<string, unknown>
+      >;
+      expect(packets[0].rawJson).toBeUndefined();
+      expect(packets[0].hex).toBe(frames.join(" "));
+      expect(packets[0].omittedBytes).toBeGreaterThan(5000);
     });
 
     it("addMqttPacket accepts rawJson-only (no op.command in MQTT message)", async () => {
@@ -995,16 +1094,13 @@ describe("DiagnosticsCollector", () => {
   });
 
   describe("an app group in the reachability section", () => {
-    it("says it has no reachability of its own instead of 'nothing ever reported — not reachable'", async () => {
+    it("says it has no reachability of its own instead of 'nothing ever reported'", async () => {
       const c = new DiagnosticsCollector(registry);
       const r = (await c.generate(
         makeDevice({ sku: "BaseGroup", deviceId: "6781280", lanIp: undefined, state: { online: false } }),
         "2.39.1",
       )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      const src = r.device.reachabilitySource!;
-      expect(String(src.decidedBy)).toMatch(/^not applicable — an app group/);
-      expect(src.silentSources).toEqual([]);
-      expect(String(src.refreshedBy)).toMatch(/never asked/);
+      expect(r.device.reachabilitySource).toEqual({ decidedBy: "appGroup", lastEvidenceAt: null });
     });
   });
 
@@ -1019,15 +1115,6 @@ describe("DiagnosticsCollector", () => {
       const text = JSON.stringify(result);
       expect(text).not.toContain("0123456789abcdef0123456789abcdef");
       expect(text).not.toContain("iotTopic");
-    });
-
-    it("names the status request among the renewers of a cloud-only device", async () => {
-      const c = new DiagnosticsCollector(registry);
-      const r = (await c.generate(
-        makeDevice({ lanIp: undefined, lastLanSeenAt: undefined, state: { online: false } }),
-        "2.39.0",
-      )) as Record<string, { reachabilitySource?: Record<string, unknown> }>;
-      expect(String(r.device.reachabilitySource!.refreshedBy)).toContain("status request over the account broker");
     });
   });
 
@@ -1215,6 +1302,13 @@ describe("the reachability history in the report (plan G4)", () => {
     const c = new DiagnosticsCollector(registry);
     c.recordReachability("dev1", { online: true, was: null, decidedBy: "lanReply", lastEvidenceAt: 1_790_000_000_000 });
     c.recordReachability("dev1", { online: false, was: true, decidedBy: "noEvidence", lastEvidenceAt: null });
+    c.recordReachability("dev1", {
+      online: true,
+      was: false,
+      decidedBy: "cloudReport",
+      source: "devicePush",
+      lastEvidenceAt: 1_790_000_100_000,
+    });
     for (let n = 0; n < 60; n++) {
       c.recordReachability("dev2", {
         online: n % 2 === 0,
@@ -1226,9 +1320,10 @@ describe("the reachability history in the report (plan G4)", () => {
     const one = (await c.generate(makeDevice({ deviceId: "dev1" }), "3.2.0")).reachabilityHistory as Array<
       Record<string, unknown>
     >;
-    expect(one.map(e => [e.was, e.online, e.decidedBy])).toEqual([
-      [null, true, "lanReply"],
-      [true, false, "noEvidence"],
+    expect(one.map(e => [e.was, e.online, e.decidedBy, e.source])).toEqual([
+      [null, true, "lanReply", undefined],
+      [true, false, "noEvidence", undefined],
+      [false, true, "cloudReport", "devicePush"],
     ]);
     expect(one[0].lastEvidenceAt).toBe(new Date(1_790_000_000_000).toISOString());
     const two = (await c.generate(makeDevice({ deviceId: "dev2" }), "3.2.0")).reachabilityHistory as unknown[];

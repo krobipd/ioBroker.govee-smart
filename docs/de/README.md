@@ -50,14 +50,12 @@ Der Adapter erstellt einen Bericht, und der Browser legt ihn als Datei ab. Diese
 GitHub-Issue anhängen — das Formular für Geräte-Unterstützung fragt genau nach dieser Datei.
 
 Die Geräteliste zeigt alle Geräte, erreichbar oder nicht — ein Bericht wird gerade dann gebraucht,
-wenn etwas klemmt. Der Datenpunkt `diag.lastExport` je Gerät hält fest, wann der letzte Bericht
-erzeugt wurde.
+wenn etwas klemmt. Ein Bericht schreibt keinen Datenpunkt.
 
-Der Bericht ist **anonymisiert**: Adressen, E-Mail-Adressen und Gerätenamen werden durch
-gleichbleibende Marken ersetzt, Gerätekennungen gekürzt, und Zugangsdaten tauchen gar nicht erst
-auf. Derselbe echte Wert bekommt innerhalb einer Datei immer dieselbe Marke — der Bericht bleibt
-also nachvollziehbar, ohne etwas über dein Zuhause preiszugeben. Die Datei erklärt das in ihrem
-eigenen Kopf.
+Der Bericht ist **anonymisiert**: Adressen, E-Mail-Adressen, Gerätenamen, deine eigenen Snapshot-
+und DIY-Namen und Hardware-Kennungen werden durch gleichbleibende Marken ersetzt, und Zugangsdaten
+tauchen gar nicht erst auf. Derselbe echte Wert bekommt innerhalb einer Datei immer dieselbe Marke —
+der Bericht bleibt also nachvollziehbar, ohne etwas über dein Zuhause preiszugeben.
 
 Ein Bericht ist das, was ein Gerät einpflegen oder einen Fehler finden lässt, ohne dass jemand
 deine Hardware braucht. Reicht er dafür nicht, liegt das am Bericht und nicht an dir — bitte sag es

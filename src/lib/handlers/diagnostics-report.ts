@@ -53,12 +53,18 @@ function reportId(adapter: DiagnosticsReportAdapter, device: GoveeDevice): strin
 }
 
 /**
- * The strings that name a device in a log line: its id, its key, its name and its address.
+ * The strings that name a device in a log line: its id, its key, its tree id, its name and its address.
  *
+ * The tree id matters most: the start logs every device by it (`createStates [Cloud H14C0] devices.h14c0-44b0: …`).
+ * Without it, 59 of 234 and 82 of 281 lines in two reports (#56/#57, 2026-10-18) belonged to other devices.
+ *
+ * @param adapter The adapter surface
  * @param device The device
  */
-function mentionsOf(device: GoveeDevice): string[] {
-  return [device.deviceId, logKey(device), device.name, device.lanIp ?? ""].filter(m => m.length > 0);
+function mentionsOf(adapter: DiagnosticsReportAdapter, device: GoveeDevice): string[] {
+  return [device.deviceId, logKey(device), reportId(adapter, device), device.name, device.lanIp ?? ""].filter(
+    m => m.length > 0,
+  );
 }
 
 /**
@@ -71,10 +77,18 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
   const frozen = new Map<string, FrozenBuffers | undefined>();
   const find = (id: string): GoveeDevice | undefined =>
     adapter.deviceManager?.getDevices().find(d => !isAppGroup(d) && reportId(adapter, d) === id);
-  const mentions = (device: GoveeDevice): LogMentions => ({
-    mine: mentionsOf(device),
-    others: (adapter.deviceManager?.getDevices() ?? []).filter(d => d !== device).flatMap(mentionsOf),
-  });
+  const mentions = (device: GoveeDevice): LogMentions => {
+    const others = (adapter.deviceManager?.getDevices() ?? []).filter(d => d !== device);
+    return {
+      mine: mentionsOf(adapter, device),
+      // A line naming only a model (`H6003: brokenPlatformApi quirk active`) is another device's when the model is not
+      // this one's; a line naming this device's own model may be about it or its twin and stays.
+      others: [
+        ...others.flatMap(d => mentionsOf(adapter, d)),
+        ...new Set(others.map(d => d.sku).filter(sku => sku !== device.sku)),
+      ],
+    };
+  };
 
   return {
     adapter: "govee-smart",
@@ -148,18 +162,12 @@ export function makeReportSource(adapter: DiagnosticsReportAdapter): ReportSourc
  * @param device The device
  */
 async function askBroker(dm: DeviceManager, device: GoveeDevice): Promise<Record<string, unknown>> {
+  // Keys, not sentences: what a reason means stands in the adapter's CLAUDE.md, not in every report.
   if (!device.iotTopic) {
-    return { sent: false, why: "the device has no topic on the account broker (no Govee account, or not in the list)" };
+    return { sent: false, reason: "noTopic" };
   }
   const result = await dm.askStatus(device, REPORT_STATUS_WAIT_MS);
-  return {
-    ...result,
-    waitedMs: REPORT_STATUS_WAIT_MS,
-    ...(result.sent && result.answeredAfterMs === undefined
-      ? { note: "no answer — not proof of a power cut: a wrong statusCmdVersion is answered with silence too" }
-      : {}),
-    ...(!result.sent ? { why: "the account broker is not connected" } : {}),
-  };
+  return { ...result, waitedMs: REPORT_STATUS_WAIT_MS, ...(!result.sent ? { reason: "brokerDown" } : {}) };
 }
 
 /**
@@ -172,7 +180,7 @@ async function askBroker(dm: DeviceManager, device: GoveeDevice): Promise<Record
 async function readCloud(adapter: DiagnosticsReportAdapter, device: GoveeDevice): Promise<Record<string, unknown>> {
   const cloud = adapter.cloudClient;
   if (!cloud || !device.channels.cloud) {
-    return { asked: false, why: "no Cloud channel for this device (no API key, or the device is not in Govee's list)" };
+    return { asked: false, reason: "noCloudChannel" };
   }
   try {
     let capabilities: unknown;
@@ -189,11 +197,7 @@ async function readCloud(adapter: DiagnosticsReportAdapter, device: GoveeDevice)
     } else {
       await read();
     }
-    return {
-      asked: true,
-      capabilities,
-      note: "for a device Govee reports offline, these are the values of its last contact",
-    };
+    return { asked: true, capabilities };
   } catch (e) {
     return { asked: true, error: errText(e) };
   }

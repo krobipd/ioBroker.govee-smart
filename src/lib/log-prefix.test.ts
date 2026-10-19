@@ -1,4 +1,4 @@
-import { installLogPrefix, type ChannelStatusSnapshot } from "./log-prefix";
+import { installLogPrefix, keepChannelChanges, type ChannelStatusSnapshot } from "./log-prefix";
 
 function makeLog(): { log: ioBroker.Logger; lines: Record<string, string[]> } {
   const lines: Record<string, string[]> = { silly: [], debug: [], info: [], warn: [], error: [] };
@@ -54,5 +54,29 @@ describe("installLogPrefix", () => {
     log.debug("once");
     expect(lines.debug[0]).toBe("[LAN=on Cloud=off MQTT=n/a OpenAPI=n/a] once");
     expect(lines.debug[0].match(/\[LAN=/g)).toHaveLength(1);
+  });
+});
+
+describe("keepChannelChanges — the report keeps the channel prefix only where it changed", () => {
+  it("drops a prefix that repeats the one above, keeps every change and leaves lines without one alone", () => {
+    // Lines as the H6199 report of #57 carried them: the same four channels on every debug line, ~10 KB of the report.
+    const lines = [
+      "[LAN=off Cloud=off MQTT=off OpenAPI=off] device-registry: 636 entries loaded",
+      "[LAN=off Cloud=off MQTT=off OpenAPI=off] Govee app version: using 7.7.02",
+      "Starting (LAN, Cloud, MQTT) — please wait",
+      "[LAN=off Cloud=off MQTT=off OpenAPI=off] MQTT: trying cached credentials",
+      "[LAN=on Cloud=off MQTT=off OpenAPI=off] LAN listening on port 4002",
+      "[LAN=on Cloud=off MQTT=off OpenAPI=off] Cache loaded",
+    ].map(msg => ({ ts: "2026-10-18T15:49:48.454Z", level: "debug", msg }));
+    expect(keepChannelChanges(lines).map(l => l.msg)).toEqual([
+      "[LAN=off Cloud=off MQTT=off OpenAPI=off] device-registry: 636 entries loaded",
+      "Govee app version: using 7.7.02",
+      "Starting (LAN, Cloud, MQTT) — please wait",
+      "MQTT: trying cached credentials",
+      "[LAN=on Cloud=off MQTT=off OpenAPI=off] LAN listening on port 4002",
+      "Cache loaded",
+    ]);
+    // the input is not changed — the report must never change the ring
+    expect(lines[1].msg).toBe("[LAN=off Cloud=off MQTT=off OpenAPI=off] Govee app version: using 7.7.02");
   });
 });

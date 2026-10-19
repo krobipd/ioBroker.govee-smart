@@ -1741,7 +1741,7 @@ export class StateManager {
    */
   onReachabilityChange?: (
     device: GoveeDevice,
-    change: { online: boolean; was: boolean | null; decidedBy: string; lastEvidenceAt: number | null },
+    change: { online: boolean; was: boolean | null; decidedBy: string; source?: string; lastEvidenceAt: number | null },
   ) => void;
 
   /**
@@ -1791,6 +1791,7 @@ export class StateManager {
         online: desiredOnline,
         was: before ?? null,
         decidedBy: decision.decidedBy,
+        ...(decision.source ? { source: decision.source } : {}),
         lastEvidenceAt: decision.lastEvidenceAt,
       });
     }

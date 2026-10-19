@@ -117,6 +117,7 @@ export async function applyWizardResult(
     return;
   }
   device.segmentCount = segmentCount;
+  device.segmentCountOrigin = "wizard";
   if (result.hasGaps) {
     const parsed = parseSegmentList(result.manualList, result.segmentCount - 1);
     await applyManualSegments(adapter, device, true, parsed.error ? undefined : parsed.indices);

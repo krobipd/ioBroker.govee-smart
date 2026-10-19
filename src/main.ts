@@ -413,6 +413,7 @@ export class GoveeAdapter extends utils.Adapter {
     method("getObjectViewAsync", (design: "system", search: "state", params: { startkey: string; endkey: string }) =>
       this.getObjectViewAsync(design, search, params),
     );
+    method("getForeignStatesAsync", (pattern: string) => this.getForeignStatesAsync(pattern));
     method("extendForeignObjectAsync", (id: string, obj: { native?: Record<string, unknown> }) =>
       this.extendForeignObjectAsync(id, obj),
     );

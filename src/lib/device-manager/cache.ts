@@ -122,6 +122,11 @@ export function cachedToGoveeDevice(cached: CachedDeviceData): GoveeDevice {
     // Host-local, editable file: a corrupt count or index list must not become
     // the device's segment map (same gate as the Cloud/MQTT/wizard sources).
     segmentCount: plausibleSegmentCount(rest.segmentCount),
+    segmentCountOrigin:
+      plausibleSegmentCount(rest.segmentCount) !== undefined &&
+      (rest.segmentCountOrigin === "push" || rest.segmentCountOrigin === "wizard")
+        ? rest.segmentCountOrigin
+        : undefined,
     manualSegments: plausibleSegmentIndices(rest.manualSegments),
     snapshotBleCmds: snapshotPacketsFromCache(rest.snapshotBleCmds),
     pushReports: Array.isArray(rest.pushReports)
@@ -211,6 +216,7 @@ export function goveeDeviceToCached(device: GoveeDevice): CachedDeviceData {
  */
 function normalize<T extends Omit<GoveeDevice, RuntimeOnlyKey>>(d: T): Omit<CachedDeviceData, "cachedAt"> {
   const segmentCount = typeof d.segmentCount === "number" && d.segmentCount > 0 ? d.segmentCount : undefined;
+  const segmentCountOrigin = segmentCount !== undefined ? d.segmentCountOrigin : undefined;
   const manualMode = d.manualMode ? true : undefined;
   const manualSegments =
     manualMode && Array.isArray(d.manualSegments) && d.manualSegments.length > 0 ? d.manualSegments.slice() : undefined;
@@ -222,6 +228,7 @@ function normalize<T extends Omit<GoveeDevice, RuntimeOnlyKey>>(d: T): Omit<Cach
   return {
     ...d,
     segmentCount,
+    segmentCountOrigin,
     manualMode,
     manualSegments,
     sceneSpeed,

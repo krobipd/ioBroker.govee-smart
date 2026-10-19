@@ -77,6 +77,7 @@ describe("applyWizardResult", () => {
     const { adapter, applied } = makeAdapter([device]);
     await applyWizardResult(adapter, device, { segmentCount: 20, manualList: "", hasGaps: false });
     expect(device.segmentCount).toBe(20);
+    expect(device.segmentCountOrigin).toBe("wizard");
     expect(applied).toEqual([{ device, mode: false, indices: undefined }]);
   });
 
