@@ -56,6 +56,7 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 - Jede Farbmeldung nennt den Modus: `colorTemInKelvin > 0` = Farbtemperatur, `0` = RGB (Push, LAN-`devStatus`, Cloud `colorRgb` + `colorTemperatureK`). `colorModeOf` (`color-mode.ts`) ist die EINE Entscheidung: Farbtemperatur → `color_temperature` = Kelvin, `color_rgb` = `null` (Govees Farbe daneben ist ein Platzhalter, schwarz oder weiß je Modell); RGB → `color_rgb` = Farbe, `color_temperature` = `null`; ein RGB exakt aus Govees Farbtemperatur-Tabelle (`KELVIN_OF_TABLE_COLOR`, 2000–9000 K, zwei Spalten, aus pygovee-h6199-ble) → beide tragen ihren Wert (so stellt die App auf RGB-Modellen die Farbtemperatur ein, #57).
 - Entschieden wird nur aus einer Meldung mit BEIDEN Feldern; ein Teilpaket (`brightness`-Echo) oder Schweigen lässt beide stehen. Die Cloud entscheidet auf Listenebene (`withCloudColorMode`), LAN zuerst bleibt.
 - `null` zählt in `learnPushReports` nie als gemeldet (GV-13 unverändert).
+- Ein gespeichertes `null` ist ein Wert: die Startwert-Schleife (`writeStateDefsToChannels`, läuft in JEDEM Aufbau) setzt `def` nur, wenn der Zustand noch keinen Wert hat.
 - Wiederherstellen (lokaler Snapshot, Segment-Assistent): Farbtemperatur nur, wenn neben dem Kelvin keine Farbe oder ein Platzhalter steht (`restoresAsColorTemperature`) — ein Kelvin neben einer echten Farbe ist der alte Wert aus dem RGB-Modus oder eine Tabellenfarbe und kommt als Farbe zurück.
 
 ## Kanal-Priorität je Operation

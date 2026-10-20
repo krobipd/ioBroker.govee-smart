@@ -1315,6 +1315,22 @@ describe("StateManager", () => {
       expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
     });
 
+    it("a rebuild keeps the null the device reported — the default is set only when the state is created", async () => {
+      // GV-32: in colour-temperature mode the LAN answer writes color_rgb null; every later build (cloud list, library
+      // load, sync) runs createLanStates again — it seeded the default #000000 back over the device's null.
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+      expect(states.get("devices.h6160-0011.control.color_rgb")).toMatchObject({ val: "#000000" });
+
+      await sm.updateDeviceState(dev, { colorRgb: null, colorTemperature: 4000 });
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+
+      expect(states.get("devices.h6160-0011.control.color_rgb")).toMatchObject({ val: null });
+      expect(states.get("devices.h6160-0011.control.color_temperature")).toMatchObject({ val: 4000 });
+    });
+
     it("should not create control channel for sensor (no lanIp, no caps)", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

@@ -1094,8 +1094,9 @@ export class StateManager {
                 ? { val: this.readOnlyValues.get(id) }
                 : null
               : await this.adapter.getStateAsync(id);
-          if (!current || current.val === null || current.val === undefined) {
-            // Set default value for new states
+          if (!current || current.val === undefined) {
+            // Set default value for new states — only there: a stored null is a value (GV-32: color_rgb in
+            // colour-temperature mode), and this loop runs again on every build
             this.noteReadOnlyWrite(id, def.def);
             await this.adapter.setState(id, {
               val: def.def,
