@@ -3,7 +3,7 @@
   "targets": [
     {
       "name": "connection",
-      "tab": "Main|Haupt",
+      "tab": "Configuration|Konfiguration",
       "mountSelectors": ["[data-testid=\"dot-lan\"]"],
       "probe": [
         {
