@@ -398,15 +398,23 @@ export class GoveeAdapter extends utils.Adapter {
       state !== null && typeof state === "object" && "val" in state
         ? (state.val ?? null)
         : (state as ioBroker.StateValue);
+    // From onUnload on, a handler writes nothing: an answer that comes in behind the unload callback would write into a
+    // database that is closing (fleet suite D4) — the stop's own last words go out from onUnload itself.
     method("setState", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) => {
+      if (this.unloading) {
+        return Promise.resolve();
+      }
       this.stateManager?.noteReadOnlyWrite(id, valueOf(state));
       return this.setState(id, state);
     });
-    method("setStateChanged", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) =>
-      this.stateManager?.isReadOnlyState(id)
+    method("setStateChanged", (id: string, state: ioBroker.SettableState | ioBroker.StateValue) => {
+      if (this.unloading) {
+        return Promise.resolve();
+      }
+      return this.stateManager?.isReadOnlyState(id)
         ? this.stateManager.writeReadOnly(id, valueOf(state))
-        : this.setStateChangedAsync(id, state),
-    );
+        : this.setStateChangedAsync(id, state);
+    });
     method("getStateAsync", (id: string) => this.getStateAsync(id));
     method("getObjectAsync", (id: string) => this.getObjectAsync(id));
     method("getForeignObjectAsync", (id: string) => this.getForeignObjectAsync(id));
@@ -707,7 +715,7 @@ export class GoveeAdapter extends utils.Adapter {
       log: this.log,
     });
 
-    this.stateManager = new StateManager(this, this.deviceRegistry);
+    this.stateManager = new StateManager(this, this.deviceRegistry, () => this.unloading);
     // One bulk read of every stored value: read-only states are compared in memory from here on (fleet rule, round 77).
     await this.stateManager.primeReadOnly();
     // info channel + states are declared as instanceObjects in io-package.json, so js-controller materialises them on

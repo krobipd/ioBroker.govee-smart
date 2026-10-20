@@ -1337,6 +1337,30 @@ describe("StateManager", () => {
       expect(calls.slice(before)).toEqual([]);
     });
 
+    it("once the adapter is unloading a late report writes nothing — only the stop's offline markers go out", async () => {
+      // fleet suite D4 (CI 39408072351): cloud answers that came in behind the unload callback still wrote control
+      // states, info.online and groups.info.online — a write after the callback never reaches the database
+      const { adapter, states, objects, calls } = createMockAdapter();
+      let unloading = false;
+      const sm = new StateManager(adapter as never, registry, () => unloading);
+      const dev = createTestDevice();
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+      objects.set("groups.info.online", { type: "state" });
+      states.set("groups.info.online", { val: true, ack: true } as ioBroker.State);
+      unloading = true;
+      const before = calls.length;
+
+      await sm.updateDeviceState(dev, { power: true, brightness: 80 });
+      await sm.updateGroupsOnline(true);
+      await sm.writeReadOnly("info.devicesOnline", 3);
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+      const late = calls.slice(before).filter(c => c.method.startsWith("setState"));
+      expect(late).toEqual([]);
+
+      await sm.markAllOffline();
+      expect(states.get("groups.info.online")).toMatchObject({ val: false });
+    });
+
     it("a rebuild keeps the null the device reported — the default is set only when the state is created", async () => {
       // GV-32: in colour-temperature mode the LAN answer writes color_rgb null; every later build (cloud list, library
       // load, sync) runs createLanStates again — it seeded the default #000000 back over the device's null.
@@ -1589,6 +1613,21 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, []);
 
       expect(states.get("devices.h6160-0011.info.ip")).toMatchObject({ val: "" });
+    });
+
+    it("keeps the stored ip of a device the LAN scan has not found again — a start on the cached list empties nothing", async () => {
+      // fleet suite D6 (CI 39408072351): with a 500 from the Cloud the start built the tree from the cache, before the
+      // LAN scan answered, and wrote info.ip = "" over the address the device had
+      const { adapter, states } = createMockAdapter();
+      states.set("devices.h6160-0011.info.ip", { val: "10.0.0.5", ack: true } as ioBroker.State);
+      adapter.getStatesAsync = () =>
+        Promise.resolve({ "govee-smart.0.devices.h6160-0011.info.ip": { val: "10.0.0.5", ack: true } });
+      const sm = new StateManager(adapter as never, registry);
+      await sm.primeReadOnly();
+
+      await createAllStatesForTest(sm, createTestDevice({ lanIp: undefined }), []);
+
+      expect(states.get("devices.h6160-0011.info.ip")).toMatchObject({ val: "10.0.0.5" });
     });
 
     it("a group's legacy cleanup asks once per run — a second build reads nothing (audit YAGNI-8)", async () => {

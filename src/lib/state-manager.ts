@@ -82,6 +82,11 @@ function inferChannelFromStateId(stateId: string): string {
 export class StateManager {
   private readonly adapter: utils.AdapterInstance;
   /**
+   * Reads main's `unloading` flag — one truth, not a second marker. From then on only the stop's own last words
+   * ({@link markAllOffline}) reach the database: a write behind the unload callback is lost (fleet suite D4).
+   */
+  private readonly isUnloading: () => boolean;
+  /**
    * Which tree belongs to which device — the one place that names a device's tree (3.0.0). Filled by
    * {@link migrateDeviceIds} at start; a device seen for the first time is given its id on the first ask.
    */
@@ -150,10 +155,12 @@ export class StateManager {
   /**
    * @param adapter The ioBroker adapter instance
    * @param registry This instance's device catalog
+   * @param isUnloading Reads main's `unloading` flag
    */
-  constructor(adapter: utils.AdapterInstance, registry: DeviceRegistry) {
+  constructor(adapter: utils.AdapterInstance, registry: DeviceRegistry, isUnloading: () => boolean = () => false) {
     this.adapter = adapter;
     this.registry = registry;
+    this.isUnloading = isUnloading;
   }
 
   /**
@@ -344,7 +351,7 @@ export class StateManager {
     for (const id of ids) {
       this.resolvedOnline.set(id, false);
     }
-    await Promise.all(ids.map(id => this.writeReadOnly(id, false).catch(() => undefined)));
+    await Promise.all(ids.map(id => this.storeReadOnly(id, false).catch(() => undefined)));
     await this.clearDeviceRollup();
     return ids;
   }
@@ -467,6 +474,32 @@ export class StateManager {
    * @param val The value
    */
   async writeReadOnly(id: string, val: ioBroker.StateValue): Promise<void> {
+    if (this.isUnloading()) {
+      return;
+    }
+    await this.storeReadOnly(id, val);
+  }
+
+  /**
+   * Whether a state carries a value already — from the start's bulk read once it ran, else one read.
+   *
+   * @param id State id (namespace-less)
+   */
+  private async hasStoredValue(id: string): Promise<boolean> {
+    if (this.readOnlyPrimed) {
+      return this.readOnlyValues.has(id);
+    }
+    const current = await this.adapter.getStateAsync(id).catch(() => null);
+    return current?.val !== undefined && current?.val !== null;
+  }
+
+  /**
+   * {@link writeReadOnly} without the unload check — for the stop's own last words.
+   *
+   * @param id State id (namespace-less)
+   * @param val The value
+   */
+  private async storeReadOnly(id: string, val: ioBroker.StateValue): Promise<void> {
     if (this.readOnlyValues.has(id) || this.readOnlyPrimed) {
       if (this.readOnlyValues.has(id) && this.readOnlyValues.get(id) === val) {
         return;
@@ -560,8 +593,8 @@ export class StateManager {
     const exists = async (id: string): Promise<boolean> =>
       this.ensuredStates.has(id) || (await this.adapter.getObjectAsync(id).catch(() => null)) != null;
     await Promise.all([
-      exists("info.devicesOnline").then(ok => (ok ? this.writeReadOnly("info.devicesOnline", 0) : undefined)),
-      exists("info.devicesAllOnline").then(ok => (ok ? this.writeReadOnly("info.devicesAllOnline", false) : undefined)),
+      exists("info.devicesOnline").then(ok => (ok ? this.storeReadOnly("info.devicesOnline", 0) : undefined)),
+      exists("info.devicesAllOnline").then(ok => (ok ? this.storeReadOnly("info.devicesAllOnline", false) : undefined)),
     ]).catch(() => undefined);
   }
 
@@ -890,8 +923,12 @@ export class StateManager {
         // gateway. Once-guarded — after the first pass the object tree is never
         // touched again (no per-refresh create/delete churn).
         await this.removeInfoStateOnce(prefix, "ip");
-      } else {
-        await this.writeReadOnly(`${prefix}.info.ip`, device.lanIp ?? "");
+      } else if (device.lanIp) {
+        await this.writeReadOnly(`${prefix}.info.ip`, device.lanIp);
+      } else if (!(await this.hasStoredValue(`${prefix}.info.ip`))) {
+        // A device the LAN scan has not found again (yet) keeps the address it last had — a start on the cached list
+        // emptied it (fleet suite D6, CI 39408072351: a 500 from the Cloud); only a new state starts empty.
+        await this.writeReadOnly(`${prefix}.info.ip`, "");
       }
       await this.writeReadOnly(`${prefix}.info.type`, infoTypeValue(device.type));
       // Initial info.online sync — see syncInfoOnline for the resolver.
@@ -1096,6 +1133,9 @@ export class StateManager {
                 ? { val: this.readOnlyValues.get(id) }
                 : null
               : await this.adapter.getStateAsync(id);
+          if (this.isUnloading()) {
+            return;
+          }
           if (!current || current.val === undefined) {
             // Set default value for new states — only there: a stored null is a value (GV-32: color_rgb in
             // colour-temperature mode), and this loop runs again on every build
@@ -1192,6 +1232,9 @@ export class StateManager {
       device.manualMode && Array.isArray(device.manualSegments) && device.manualSegments.length > 0
         ? device.manualSegments.join(",")
         : "";
+    if (this.isUnloading()) {
+      return;
+    }
     await this.adapter.setStateChangedAsync(`${prefix}.segments.manual_mode`, {
       val: manualModeVal,
       ack: true,
@@ -1331,6 +1374,9 @@ export class StateManager {
    * @param state Partial state update
    */
   async updateDeviceState(device: GoveeDevice, state: Partial<DeviceState>): Promise<void> {
+    if (this.isUnloading()) {
+      return;
+    }
     const prefix = this.devicePrefix(device);
     const writes: Promise<unknown>[] = [];
 

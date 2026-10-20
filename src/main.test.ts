@@ -1620,6 +1620,28 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(order[order.length - 1]).toBe("callback");
     expect(order).toContain("write:info.connection");
   });
+
+  it("an answer that comes in behind onUnload writes nothing — no handler reaches the database", async () => {
+    // fleet suite D4 (CI 39408072351): a Cloud answer after the stop wrote info.cloudConnected and the device states
+    // behind the unload callback — such a write never reaches the database
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    i.onUnload(() => undefined);
+    await settle();
+    const setState = vi.spyOn(adapter, "setState");
+    const setStateChanged = vi.spyOn(adapter, "setStateChangedAsync");
+    // only what comes after the stop counts — its own last words came before
+    setState.mockClear();
+    setStateChanged.mockClear();
+
+    cloudRetryHandler.setCloudConnected(i.handlerHost, true);
+    await i.handlerHost.setState("devices.h6172-ee11.snapshots.snapshot_save", { val: "", ack: true });
+    await i.handlerHost.setStateChanged("devices.h6172-ee11.control.power", { val: true, ack: true });
+    await settle();
+
+    expect(setState).not.toHaveBeenCalled();
+    expect(setStateChanged).not.toHaveBeenCalled();
+  });
 });
 
 describe("GoveeAdapter — LAN discovery wiring", () => {

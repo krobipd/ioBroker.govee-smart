@@ -1,6 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { CallGate } from "./call-gate";
 import type { Counterpart } from "./api-limits";
+import type * as httpClient from "./http-client";
+import { HttpError, httpsRequest } from "./http-client";
+
+vi.mock("./http-client", async importOriginal => ({
+  ...(await importOriginal<typeof httpClient>()),
+  httpsRequest: vi.fn(),
+}));
 
 const perAccount: Counterpart = {
   name: "test account",
@@ -69,5 +76,31 @@ describe("CallGate — the short windows of api-limits.json", () => {
     await expect(gate.https()({ method: "GET", url: "https://example.com/x", headers: {} })).rejects.toThrow(
       /declares no limit for example\.com/,
     );
+  });
+
+  it("after a 429 lets no call reach that host before its Retry-After ran out — answered 429 here", async () => {
+    // fleet suite D21 (CI 39408072351): the device list waited Govee's 60 s, but the reachability refresh and the app
+    // read called the same hosts 5 s after the 429
+    const c = clock();
+    const gate = new CallGate(() => Promise.resolve(), c.now);
+    const request = vi.mocked(httpsRequest);
+    request.mockReset();
+    request.mockRejectedValueOnce(new HttpError("HTTP 429", 429, { "retry-after": "60" }));
+    request.mockResolvedValue({ ok: true } as never);
+    const call = (host: string): Promise<unknown> =>
+      gate.https()({ method: "GET", url: `https://${host}/x`, headers: {} });
+
+    await expect(call("openapi.api.govee.com")).rejects.toMatchObject({ statusCode: 429 });
+    c.advance(5_000);
+    await expect(call("openapi.api.govee.com")).rejects.toMatchObject({
+      statusCode: 429,
+      headers: { "retry-after": "55" },
+    });
+    await expect(call("app2.govee.com")).resolves.toEqual({ ok: true });
+    expect(request).toHaveBeenCalledTimes(2);
+
+    c.advance(55_000);
+    await expect(call("openapi.api.govee.com")).resolves.toEqual({ ok: true });
+    expect(request).toHaveBeenCalledTimes(3);
   });
 });
