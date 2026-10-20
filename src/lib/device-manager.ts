@@ -85,6 +85,8 @@ interface LibraryTrack {
   skipped?: boolean;
   /** A call failed or Govee rejected it in the body. */
   failed?: boolean;
+  /** The scene list was never answered (an error, or a rate limit through every retry). */
+  scenesFailed?: boolean;
 }
 
 /**
@@ -689,6 +691,19 @@ export class DeviceManager {
           this.bearerRefresher?.();
         }
       },
+      noteScenesFailed: () => {
+        if (track) {
+          track.scenesFailed = true;
+        }
+      },
+      waitOutRateLimit: async (error: unknown): Promise<boolean> => {
+        const failure = cloudListFailure(error);
+        if (failure.reason !== "rate-limited" || this.isUnloading()) {
+          return false;
+        }
+        await this.timers.delay(failure.retryAfterMs);
+        return !this.isUnloading();
+      },
       runLimited: async (fn: () => Promise<void>, lane: CallLane): Promise<void> => {
         if (!this.rateLimiter) {
           await fn();
@@ -785,7 +800,9 @@ export class DeviceManager {
       // checked: the light is persisted anyway — its capability entry has to
       // survive a cloud hiccup — but without the flag, so the next start asks
       // again instead of trusting an answer that never came.
-      device.scenesChecked = !track.cancelled;
+      // A scene list that failed (an error, or a rate limit through every retry) is no answer either — until the
+      // upstream sighting of 2026-10-20 it was stamped as checked (homebridge-govee #1362).
+      device.scenesChecked = !track.cancelled && !track.scenesFailed;
       if (track.cancelled) {
         this.persistDeviceToCache(device);
         return;
@@ -1384,7 +1401,7 @@ export class DeviceManager {
     }
     // Per-device follow-up — only the targeted device needs a rebuild.
     this.finishLibraryRun(target, track, changed, true);
-    return { ran: listed && !track.failed && !track.cancelled, changed };
+    return { ran: listed && !track.failed && !track.cancelled && !track.scenesFailed, changed };
   }
 
   /**

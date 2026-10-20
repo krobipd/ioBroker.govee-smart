@@ -73,7 +73,25 @@ export interface LibraryLoaderHost {
    * @param error What the fetch threw
    */
   noteFailed?(error: unknown): void;
+  /**
+   * Tells the host that the scene list was never answered — an error, or a rate limit that held through every
+   * retry. The light is then not checked, and the next start asks again.
+   */
+  noteScenesFailed?(): void;
+  /**
+   * Waits out a rate limit Govee answered a read with (its Retry-After), so the read can ask again in this run.
+   * Resolves `false` for any other error, and once the adapter is unloading.
+   *
+   * @param error What the read threw
+   */
+  waitOutRateLimit?(error: unknown): Promise<boolean>;
 }
+
+/**
+ * How often a scene list that Govee answered with 429 is asked again in the same run (homebridge-govee #1362: the
+ * start's scene lists past a dozen devices draw 429, and the tail of the list kept no scenes until the next restart).
+ */
+export const SCENE_RATE_LIMIT_RETRIES = 2;
 
 /** What a (possibly shared) fetch came back with. `ran: false` = the limiter never ran it. */
 export interface SharedFetchOutcome<T> {
@@ -194,10 +212,12 @@ export async function loadDeviceScenes(
   let scenesCallSucceeded = false;
   let snapsFromScenesCall: CloudScene[] = [];
   let diyFromScenesCall: CloudScene[] = [];
+  let scenesError: unknown = undefined;
   const loadScenes = async (): Promise<void> => {
     try {
       const { lightScenes, diyScenes, snapshots } = await host.cloudClient.getScenes(cd.sku, cd.device);
       scenesCallSucceeded = true;
+      scenesError = undefined;
       snapsFromScenesCall = snapshots;
       diyFromScenesCall = diyScenes;
       if (lightScenes.length > 0) {
@@ -207,11 +227,23 @@ export async function loadDeviceScenes(
         device.diyScenes = diyScenes;
       }
     } catch (e) {
+      scenesError = e;
       host.diagnostics.recordApiFailure(cd.device, "/router/api/v1/device/scenes", e, extractHttpStatus(e));
       host.log.debug(`Could not load scenes for ${deviceLabel(device)}: ${errText(e)}`);
     }
   };
-  await host.runLimited(loadScenes, { kind: "device-read", deviceKey: limiterDeviceKey(device) });
+  // A 429 is a request to slow down, not an answer: the read waits out Govee's Retry-After outside the limiter and
+  // asks again, so the light gets its scenes in this run instead of after the next restart.
+  for (let attempt = 0; ; attempt++) {
+    await host.runLimited(loadScenes, { kind: "device-read", deviceKey: limiterDeviceKey(device) });
+    if (scenesError === undefined) {
+      break;
+    }
+    if (attempt >= SCENE_RATE_LIMIT_RETRIES || !(await host.waitOutRateLimit?.(scenesError))) {
+      host.noteScenesFailed?.();
+      break;
+    }
+  }
 
   // DIY scenes from the dedicated endpoint. Gate on whether THIS /device/scenes
   // call carried DIY scenes — NOT on an empty cache. The old `diyScenes.length

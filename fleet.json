@@ -33,7 +33,6 @@
       "fixed": 4002
     }
   ],
-  "noUpstream": "Govee's cloud, account broker and LAN protocol publish no versioned source the adapter could be checked against",
   "serverTest": {
     "_why": "Proves on the real account what fixtures cannot: the account broker (own PKCS#12 reader), the OpenAPI events broker and the cloud REST path come up, every device keeps its model and name, and one light really switches over its own channel and confirms by its device report.",
     "_observe": "150 s covers one full App API cycle (APP_API_POLL_INTERVAL_MS, 2 min) — the longest periodic cycle that can log a warning.",

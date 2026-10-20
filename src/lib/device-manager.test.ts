@@ -3972,6 +3972,19 @@ describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", (
     expect((await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011")).ran).toBe(false);
   });
 
+  it("a refresh whose scene list Govee did not answer has not run — the button stays unconfirmed (GV-13)", async () => {
+    // Until the upstream sighting of 2026-10-20 a failed scene list counted as answered: the button was confirmed.
+    const device = createTestDevice();
+    (dm as any).devices.set("H6160_aabbccddeeff0011", device);
+    dm.setCloudClient({
+      getDevices: () =>
+        Promise.resolve([{ sku: "H6160", device: "AABBCCDDEEFF0011", deviceName: "Test Light", capabilities: [] }]),
+      getScenes: () => Promise.reject(new HttpError("HTTP 503", 503, {})),
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    expect((await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011")).ran).toBe(false);
+  });
+
   it("a refresh without the Cloud or for an unknown device has not run", async () => {
     expect(await dm.refreshSceneDataForDevice("AABBCCDDEEFF0011")).toEqual({ ran: false, changed: false });
     dm.setCloudClient({ getDevices: () => Promise.resolve([]) } as any);
@@ -6118,6 +6131,100 @@ describe("a failed command leaves the value unconfirmed — the device is asked 
       expect(await dm.refreshExpiringReachability()).toBe(0);
       expect(reads).toEqual([]);
     });
+  });
+});
+
+describe("loadFromCloud — a scene list Govee answers with 429 (homebridge-govee #1362, upstream sighting 2026-10-20)", () => {
+  // homebridge-govee 11.39.1 measured it: past a dozen devices Govee answers the start's scene lists with 429, and the
+  // tail of the list kept no scene selector until the next restart. Here the call gate holds the host for Retry-After
+  // and answers every call in that time with 429 itself — one 429 used to leave every later light without scenes,
+  // stamped as checked although Govee never answered.
+  const light = (id: string): CloudDevice => ({
+    sku: "H600D",
+    device: id,
+    deviceName: `Bulb ${id}`,
+    type: "devices.types.light",
+    capabilities: lightCapabilities(),
+  });
+  const scenesAnswer = {
+    lightScenes: [{ name: "Sunrise", value: { id: 1, paramId: 11 } }],
+    diyScenes: [],
+    snapshots: [],
+  };
+  function bench(getScenes: () => Promise<unknown>): { dm: DeviceManager; delays: number[] } {
+    const delays: number[] = [];
+    const timers = {
+      setInterval: () => undefined,
+      clearInterval: () => undefined,
+      setTimeout: () => undefined,
+      clearTimeout: () => undefined,
+      delay: (ms: number): Promise<void> => {
+        delays.push(ms);
+        return Promise.resolve();
+      },
+    };
+    const dm = new DeviceManager(
+      mockLog,
+      timers,
+      new DeviceRegistry({ data: { devices: {} } }),
+      new DeviceIdRegistry(),
+    );
+    dm.setCallbacks({
+      onUpdate: () => {},
+      onLanDeviceReady: () => {},
+      onCloudDataReady: () => {},
+      onGroupMembersReady: () => {},
+    });
+    dm.setCloudClient({
+      getDevices: () => Promise.resolve([light("BULB000000000001")]),
+      getScenes,
+      getDiyScenes: () => Promise.resolve([]),
+    } as never);
+    return { dm, delays };
+  }
+
+  it("waits out Govee's Retry-After and asks again, so the light gets its scenes in this run", async () => {
+    let calls = 0;
+    const { dm, delays } = bench(() => {
+      calls++;
+      return calls === 1
+        ? Promise.reject(new HttpError("HTTP 429", 429, { "retry-after": "7" }))
+        : Promise.resolve(scenesAnswer);
+    });
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    await dm.whenSceneLoadsSettled();
+    const [bulb] = dm.getDevices();
+    expect(calls).toBe(2);
+    expect(delays).toContain(7000);
+    expect(bulb.scenes.map(s => s.name)).toEqual(["Sunrise"]);
+    expect(bulb.scenesChecked).toBe(true);
+  });
+
+  it("a scene list Govee never answered is not checked — the next start asks again", async () => {
+    let calls = 0;
+    const { dm, delays } = bench(() => {
+      calls++;
+      return Promise.reject(new HttpError("HTTP 503", 503, {}));
+    });
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    await dm.whenSceneLoadsSettled();
+    const [bulb] = dm.getDevices();
+    expect(calls).toBe(1); // only a rate limit is waited out and asked again
+    expect(delays).toEqual([]);
+    expect(bulb.scenes).toEqual([]);
+    expect(bulb.scenesChecked).toBe(false);
+  });
+
+  it("a rate limit that holds through every retry leaves the light unchecked", async () => {
+    let calls = 0;
+    const { dm } = bench(() => {
+      calls++;
+      return Promise.reject(new HttpError("HTTP 429", 429, {}));
+    });
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    await dm.whenSceneLoadsSettled();
+    expect(calls).toBe(3); // the first ask and two after a wait
+    expect(dm.getDevices()[0].scenesChecked).toBe(false);
   });
 });
 

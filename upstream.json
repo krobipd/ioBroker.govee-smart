@@ -1,0 +1,5 @@
+{
+  "source": "github:homebridge-plugins/homebridge-govee",
+  "verified": "v11.39.1",
+  "watch": ["lib/connection/", "lib/utils/", "lib/device/"]
+}
