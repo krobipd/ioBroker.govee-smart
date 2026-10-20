@@ -592,6 +592,20 @@ describe("SegmentWizard", () => {
       expect(host.calls[0].value).toBe(75);
     });
 
+    it("restores a colour temperature — not Govee's placeholder colour — when the strip was in that mode (GV-32)", async () => {
+      // colour-temperature mode: color_rgb has no value, color_temperature carries the Kelvin. Until 3.2.1 the
+      // datapoint held Govee's placeholder (#ffffff or #000000) and the wizard painted it back as RGB white or black.
+      const base = `${host.namespace}.${host.devicePrefix(device)}.control`;
+      host.states.set(`${base}.color_rgb`, null);
+      host.states.set(`${base}.color_temperature`, 4000);
+      await wizard.start(key);
+      host.calls.length = 0;
+      await wizard.abort();
+      expect(host.calls.filter(c => c.command !== "brightness")).toEqual([
+        expect.objectContaining({ command: "colorTemperature", value: 4000 }),
+      ]);
+    });
+
     // Audit 2026-09-12 (F3): start() forces brightness 100 so a dimmed strip
     // shows the flashing; restoreBaseline put the segments back but never the
     // device brightness, and Govee multiplies the two — a strip dimmed to 10 %
@@ -839,6 +853,17 @@ describe("SegmentWizard", () => {
 
     it("should be safe to call without a session", () => {
       expect(() => wizard.dispose()).not.toThrow();
+    });
+
+    it("sends the colour temperature back on stop when the strip was in that mode (GV-32)", async () => {
+      const base = `${host.namespace}.${host.devicePrefix(device)}.control`;
+      host.states.set(`${base}.color_rgb`, null);
+      host.states.set(`${base}.color_temperature`, 5000);
+      await wizard.start(key);
+      host.calls.length = 0;
+      wizard.dispose();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      expect(host.calls).toEqual([expect.objectContaining({ command: "colorTemperature", value: 5000 })]);
     });
   });
 

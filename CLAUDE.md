@@ -50,6 +50,13 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 - LAN-fähige Geräte bauen auf `getDefaultLanStates()`.
 - Die Cloud liefert nur Fähigkeiten, Szenen, Snapshots, Schalter, Segmente und Sensor-Fähigkeiten.
 
+## Farbmodus (GV-32)
+
+- Jede Farbmeldung nennt den Modus: `colorTemInKelvin > 0` = Farbtemperatur, `0` = RGB (Push, LAN-`devStatus`, Cloud `colorRgb` + `colorTemperatureK`). `colorModeOf` (`color-mode.ts`) ist die EINE Entscheidung: Farbtemperatur → `color_temperature` = Kelvin, `color_rgb` = `null` (Govees Farbe daneben ist ein Platzhalter, schwarz oder weiß je Modell); RGB → `color_rgb` = Farbe, `color_temperature` = `null`; ein RGB exakt aus Govees Farbtemperatur-Tabelle (`KELVIN_OF_TABLE_COLOR`, 2000–9000 K, zwei Spalten, aus pygovee-h6199-ble) → beide tragen ihren Wert (so stellt die App auf RGB-Modellen die Farbtemperatur ein, #57).
+- Entschieden wird nur aus einer Meldung mit BEIDEN Feldern; ein Teilpaket (`brightness`-Echo) oder Schweigen lässt beide stehen. Die Cloud entscheidet auf Listenebene (`withCloudColorMode`), LAN zuerst bleibt.
+- `null` zählt in `learnPushReports` nie als gemeldet (GV-13 unverändert).
+- Wiederherstellen (lokaler Snapshot, Segment-Assistent): Farbtemperatur nur, wenn neben dem Kelvin keine Farbe oder ein Platzhalter steht (`restoresAsColorTemperature`) — ein Kelvin neben einer echten Farbe ist der alte Wert aus dem RGB-Modus oder eine Tabellenfarbe und kommt als Farbe zurück.
+
 ## Kanal-Priorität je Operation
 
 | Bereich                                                                                | Primär                                                                   | Rückfall                                             |
@@ -278,7 +285,7 @@ Suche `239.255.255.250:4001` · Antworten an `:4002` · Befehle an Geräte-IP `:
 - **Pseudo-Gruppen** (`PSEUDO_GROUP_SKUS`: `SameModeGroup`, `DreamViewScenic`) werden bei `mergeCloudDevices` und beim Cache-Laden übersprungen; `BaseGroup` (`APP_GROUP_SKU`, `isAppGroup`) wird unterstützt; Altlasten räumt `cleanupPseudoGroupOrphansOnce`.
 - **Sensortemperatur ist °C:** App-API `lastData.tem` = Hundertstel °C, `settings.fahOpen` nur Anzeige; ein Konto-Messwert trägt seine Messzeit (`lastData.lastTime` → `ts`).
 - **Govees Erinnerung ist kein Zustand:** meldet Govee `online: false`, wendet `loadCloudStates` nur das `online` an (`cloudReportsOffline`).
-- **Govees `""` ist keine Aussage** (auch `colorTemperatureK: 0`): `mapCloudStateValue` gibt `null`.
+- **Govees `""` ist keine Aussage:** `mapCloudStateValue` gibt `null`. `colorTemperatureK: 0` neben einer Zahl in `colorRgb` heißt RGB-Modus (`withCloudColorMode`, GV-32).
 - **Szenen-Dropdowns sind nach Position kodiert;** `dynamic_scene` liefert aus der Zustandsantwort keinen Wert.
 
 ## Tests

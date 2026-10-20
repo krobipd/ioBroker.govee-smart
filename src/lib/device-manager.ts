@@ -74,6 +74,7 @@ import {
 } from "./types";
 import { classifyError, formatChannelFail, logCallFailure, type ErrorCategory } from "./error-category";
 import { rgbToHex } from "./color";
+import { colorModeOf } from "./color-mode";
 import { extractHttpStatus, HttpError } from "./http-client";
 
 /** What became of the fetches of one library run — see {@link librariesConfirmed}. */
@@ -1708,7 +1709,8 @@ export class DeviceManager {
           ["control.color_temperature", state.colorTemperature],
         ] as const
       )
-        .filter(([, value]) => value !== undefined)
+        // A field the report leaves without a value (the other colour mode) is not one the device reports (GV-13).
+        .filter(([, value]) => value !== undefined && value !== null)
         .map(([key]) => key),
     );
     // The device's own state is in the tree again — nothing left unconfirmed (issue #51).
@@ -1826,17 +1828,23 @@ export class DeviceManager {
     if (brightness !== null) {
       state.brightness = brightness;
     }
+    let rgb: { r: number; g: number; b: number } | null = null;
     if (update.state.color && typeof update.state.color === "object") {
       const r = coerceFiniteNumber((update.state.color as { r?: unknown }).r);
       const g = coerceFiniteNumber((update.state.color as { g?: unknown }).g);
       const b = coerceFiniteNumber((update.state.color as { b?: unknown }).b);
       if (r !== null && g !== null && b !== null) {
-        state.colorRgb = rgbToHex(r, g, b);
+        rgb = { r, g, b };
       }
     }
-    // 0 = "not in colortemp mode" — drop intentionally (Govee-Konvention).
     const ctk = coerceFiniteNumber(update.state.colorTemInKelvin);
-    if (ctk !== null && ctk > 0) {
+    if (rgb && ctk !== null) {
+      // The report names the colour mode (GV-32): the other datapoint has no value in it.
+      Object.assign(state, colorModeOf(rgb, ctk));
+    } else if (rgb) {
+      // A colour without the Kelvin field decides no mode.
+      state.colorRgb = rgbToHex(rgb.r, rgb.g, rgb.b);
+    } else if (ctk !== null && ctk > 0) {
       state.colorTemperature = ctk;
     }
     return state;
@@ -2046,11 +2054,10 @@ export class DeviceManager {
     device.lastLanReplyAt = Date.now();
     device.lastLanSeenAt = Date.now();
     device.lastLanStatusAt = Date.now();
-    const { r, g, b } = status.color;
+    // `devStatus` always carries colour and Kelvin — it names the colour mode (GV-32).
     const state: Partial<DeviceState> = {
       brightness: status.brightness,
-      colorRgb: rgbToHex(r, g, b),
-      colorTemperature: status.colorTemInKelvin || undefined,
+      ...colorModeOf(status.color, status.colorTemInKelvin),
     };
     // `power` is in EVERY patch, unlike `online` below: control.power has a
     // user-writable twin in the database, and the poll is what corrects it

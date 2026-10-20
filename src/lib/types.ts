@@ -642,10 +642,10 @@ export interface DeviceState {
   power?: boolean;
   /** Brightness 0-100 */
   brightness?: number;
-  /** Color as "#RRGGBB" hex string */
-  colorRgb?: string;
-  /** Color temperature in Kelvin */
-  colorTemperature?: number;
+  /** Color as "#RRGGBB" hex string; null while the light is in colour-temperature mode (GV-32) */
+  colorRgb?: string | null;
+  /** Color temperature in Kelvin; null while the light is in RGB mode (GV-32) */
+  colorTemperature?: number | null;
   /** Additional dynamic state values */
   [key: string]: unknown;
 }

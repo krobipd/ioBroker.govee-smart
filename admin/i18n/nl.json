@@ -201,5 +201,7 @@
   "deviceTypeAromaDiffuser": "Aromaverspreider",
   "deviceTypeButton": "Knop",
   "deviceTypeUnknown": "Onbekend",
-  "optHeat": "Verwarmen"
+  "optHeat": "Verwarmen",
+  "descColorRgb": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+  "descColorTemperature": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint."
 }

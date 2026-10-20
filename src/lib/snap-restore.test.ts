@@ -164,21 +164,41 @@ describe("SnapshotHandler", () => {
       expect(cmds).not.toContain("colorTemperature");
     });
 
-    it("sends colorTemperature when set instead of colorRgb", async () => {
+    it("sends colorTemperature for a snapshot taken in colour-temperature mode", async () => {
+      // the colour of that mode is no colour (saved #000000) or, saved before the colour mode, Govee's placeholder
+      for (const colorRgb of ["#000000", "#ffffff"]) {
+        const snap: LocalSnapshot = {
+          name: "Warm",
+          power: true,
+          brightness: 60,
+          colorRgb,
+          colorTemperature: 3000,
+          savedAt: 0,
+        };
+        const { host, commands } = makeHost({ initialSnapshots: [snap] });
+        await new SnapshotHandler(host).restore(makeDevice(), "1");
+        const cmds = commands.map(c => c.command);
+        expect(cmds).toContain("colorTemperature");
+        expect(cmds).not.toContain("colorRgb");
+      }
+    });
+
+    it("sends the colour of a snapshot whose Kelvin is the stale value of RGB mode (#56/#57)", async () => {
+      // Until 3.2.1 color_temperature kept its last Kelvin in RGB mode (9000 K beside #fff3ea in #56) — a snapshot
+      // saved then restored the old colour temperature instead of the colour.
       const snap: LocalSnapshot = {
-        name: "Warm",
+        name: "Red",
         power: true,
         brightness: 60,
         colorRgb: "#ff0000",
-        colorTemperature: 3000,
+        colorTemperature: 9000,
         savedAt: 0,
       };
       const { host, commands } = makeHost({ initialSnapshots: [snap] });
-      const handler = new SnapshotHandler(host);
-      await handler.restore(makeDevice(), "1");
-      const cmds = commands.map(c => c.command);
-      expect(cmds).toContain("colorTemperature");
-      expect(cmds).not.toContain("colorRgb");
+      await new SnapshotHandler(host).restore(makeDevice(), "1");
+      expect(commands.filter(c => c.command === "colorRgb" || c.command === "colorTemperature")).toEqual([
+        expect.objectContaining({ command: "colorRgb", value: "#ff0000" }),
+      ]);
     });
 
     it("groups uniform segments into a single segmentBatch (SH1 fix)", async () => {

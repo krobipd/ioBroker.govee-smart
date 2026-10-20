@@ -3,6 +3,7 @@ import { SEGMENT_HARD_MAX } from "./segment-list";
 import { WIZARD_IDLE_TIMEOUT_MS } from "./timing-constants";
 import { deviceLabel, errText, type GoveeDevice } from "./types";
 import { readDeviceBaseline, restoreSegmentsGrouped } from "./device-baseline";
+import { restoresAsColorTemperature } from "./color-mode";
 import { resolveLabel, type I18nKey } from "./i18n";
 
 /**
@@ -49,6 +50,8 @@ export interface SegmentWizardSession {
     power?: boolean;
     brightness?: number;
     colorRgb?: string;
+    /** Kelvin — set in colour-temperature mode, where `colorRgb` has no value (GV-32). */
+    colorTemperature?: number;
     segmentColors: { idx: number; color: string; brightness: number }[];
   };
 }
@@ -236,7 +239,11 @@ export class SegmentWizard {
       if (device) {
         try {
           const total = this.host.segmentCount(device);
-          if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
+          if (restoresAsColorTemperature(session.baseline.colorRgb, session.baseline.colorTemperature)) {
+            void this.host
+              .sendCommand(device, "colorTemperature", session.baseline.colorTemperature)
+              .catch(() => undefined);
+          } else if (total > 0 && session.baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(session.baseline.colorRgb)) {
             const color = parseInt(session.baseline.colorRgb.slice(1), 16);
             // The DEVICE brightness on purpose, unlike restoreBaseline (F3):
             // onUnload gets one datagram, not the two commands a full restore
@@ -592,6 +599,7 @@ export class SegmentWizard {
       power: base.power,
       brightness: base.brightness,
       colorRgb: base.colorRgb,
+      colorTemperature: base.colorTemperature,
       segmentColors: base.segments.map((s, idx) => ({ idx, color: s.color, brightness: s.brightness })),
     };
   }
@@ -648,6 +656,9 @@ export class SegmentWizard {
       // Shared grouped replay (device-baseline.ts) — same path as the
       // local-snapshot restore, one segmentBatch per distinct tuple.
       await restoreSegmentsGrouped((d, cmd, val) => this.host.sendCommand(d, cmd, val), device, segs);
+    } else if (restoresAsColorTemperature(baseline.colorRgb, baseline.colorTemperature)) {
+      // The light was in colour-temperature mode: its colour is Govee's placeholder, the Kelvin is the state (GV-32).
+      await this.host.sendCommand(device, "colorTemperature", baseline.colorTemperature);
     } else if (baseline.colorRgb && /^#[0-9a-fA-F]{6}$/.test(baseline.colorRgb) && total > 0) {
       const color = parseInt(baseline.colorRgb.slice(1), 16);
       // The SEGMENT brightness, not the device's: restoreStripAtomic ends in

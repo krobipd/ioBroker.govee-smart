@@ -502,14 +502,25 @@ describe("DeviceManager", () => {
         onOff: 0,
         brightness: 50,
         color: { r: 0, g: 255, b: 0 },
-        colorTemInKelvin: 4000,
+        colorTemInKelvin: 0,
       });
 
       expect(updatedState).not.toBeNull();
       expect(updatedState!.power).toBe(false);
       expect(updatedState!.brightness).toBe(50);
       expect(updatedState!.colorRgb).toBe("#00ff00");
+      // RGB mode: the colour temperature has no value (GV-32)
+      expect(updatedState!.colorTemperature).toBeNull();
+
+      // colour-temperature mode: Govee's colour is a placeholder, not the light's colour
+      dm.handleLanStatus("192.168.1.100", {
+        onOff: 1,
+        brightness: 50,
+        color: { r: 0, g: 0, b: 0 },
+        colorTemInKelvin: 4000,
+      });
       expect(updatedState!.colorTemperature).toBe(4000);
+      expect(updatedState!.colorRgb).toBeNull();
     });
 
     it("should ignore unknown IP addresses", () => {
@@ -1868,8 +1879,9 @@ describe("DeviceManager", () => {
         color: { r: 255, g: 0, b: 0 },
         colorTemInKelvin: 0,
       });
-      // colorTemInKelvin 0 means RGB mode, not color temp
-      expect(updatedState!.colorTemperature).toBeUndefined();
+      // colorTemInKelvin 0 means RGB mode: the colour temperature datapoint has no value (GV-32), never its old one
+      expect(updatedState!.colorTemperature).toBeNull();
+      expect(updatedState!.colorRgb).toBe("#ff0000");
     });
   });
 
@@ -3657,6 +3669,44 @@ describe("DeviceManager — loadFromCache merge", () => {
       } as never);
       await dm2.pollAppApi();
       expect(report()).toEqual(["appList", "appList"]);
+    });
+
+    it("a status push names the colour mode — the other datapoint has no value, a null is never learned (GV-32)", () => {
+      // The H6199 of #57: a light without a local interface, its account push as the report carried it.
+      const { dm: dm2, dev } = cloudDrivenDevice();
+      dev.type = "devices.types.light";
+      dev.iotTopic = "GD/abc";
+      const updates: Array<Partial<DeviceState>> = [];
+      dm2.setCallbacks({
+        onUpdate: (_d, state) => updates.push(state),
+        onLanDeviceReady: () => {},
+        onCloudDataReady: () => {},
+        onGroupMembersReady: () => {},
+      });
+      const push = (state: Record<string, unknown>): Partial<DeviceState> => {
+        dm2.handleMqttStatus({ sku: "H7130", device: dev.deviceId, cmd: "status", state });
+        return updates[updates.length - 1];
+      };
+      // RGB mode: 255/0/0 with Kelvin 0 — the colour temperature has no value, and is not learned as reported
+      expect(push({ onOff: 1, brightness: 100, color: { r: 255, g: 0, b: 0 }, colorTemInKelvin: 0 })).toMatchObject({
+        colorRgb: "#ff0000",
+        colorTemperature: null,
+      });
+      expect(dev.pushReports).toContain("control.color_rgb");
+      expect(dev.pushReports).not.toContain("control.color_temperature");
+      // colour-temperature mode: 255/255/255 with 6667 K — Govee's colour is a placeholder
+      expect(
+        push({ onOff: 1, brightness: 100, color: { r: 255, g: 255, b: 255 }, colorTemInKelvin: 6667 }),
+      ).toMatchObject({ colorRgb: null, colorTemperature: 6667 });
+      // the app's colour temperature as RGB (#57 16:26:15): both carry their value
+      expect(push({ color: { r: 255, g: 223, b: 184 }, colorTemInKelvin: 0 })).toMatchObject({
+        colorRgb: "#ffdfb8",
+        colorTemperature: 4500,
+      });
+      // a brightness echo carries no colour — it decides no mode
+      const echo = push({ brightness: 98 });
+      expect(echo).not.toHaveProperty("colorRgb");
+      expect(echo).not.toHaveProperty("colorTemperature");
     });
 
     it("a payload without a word on reachability names its source too", () => {

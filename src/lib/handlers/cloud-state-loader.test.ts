@@ -623,6 +623,81 @@ describe("writeCloudStateValues — the writer shared by the load and the correc
   });
 });
 
+describe("the colour mode of a cloud state answer (GV-32)", () => {
+  // The H6199's fresh cloud state in the #57 report (3.2.1, 2026-10-18): Govee stores the app's colour temperature as
+  // RGB 16768952 (255/223/184) with colorTemperatureK 0 — exactly the 4500-K table colour.
+  const answer = (rgb: unknown, kelvin: unknown): CloudStateCapability[] => [
+    { type: "devices.capabilities.online", instance: "online", state: { value: true } },
+    { type: "devices.capabilities.on_off", instance: "powerSwitch", state: { value: 1 } },
+    { type: "devices.capabilities.color_setting", instance: "colorRgb", state: { value: rgb } },
+    { type: "devices.capabilities.color_setting", instance: "colorTemperatureK", state: { value: kelvin } },
+  ];
+  const cloudOnly = (): GoveeDevice =>
+    createTestDevice({ deviceId: "AA:57", lanIp: undefined, channels: { lan: false, mqtt: false, cloud: true } });
+  const colour = (rig: ReturnType<typeof makeRig>): Record<string, unknown> =>
+    Object.fromEntries(
+      rig.writes
+        .filter(w => /\.control\.color_(rgb|temperature)$/.test(w.id))
+        .map(w => [w.id.slice(w.id.lastIndexOf(".") + 1), w.val]),
+    );
+
+  it("a table colour with Kelvin 0 is the colour temperature — both carry their value", async () => {
+    const rig = makeRig([]);
+    await writeCloudStateValues(rig.adapter, cloudOnly(), answer(16768952, 0), "set");
+    expect(colour(rig)).toEqual({ color_rgb: "#ffdfb8", color_temperature: 4500 });
+  });
+
+  it("another colour with Kelvin 0 is RGB, a Kelvin is colour temperature — the other datapoint gets null", async () => {
+    const red = makeRig([]);
+    await writeCloudStateValues(red.adapter, cloudOnly(), answer(0xff0000, 0), "set");
+    expect(colour(red)).toEqual({ color_rgb: "#ff0000", color_temperature: null });
+    const warm = makeRig([]);
+    await writeCloudStateValues(warm.adapter, cloudOnly(), answer(0xffffff, 3000), "set");
+    expect(colour(warm)).toEqual({ color_rgb: null, color_temperature: 3000 });
+  });
+
+  it("Govee's empty value decides nothing, and a LAN light's colour stays the LAN's", async () => {
+    const empty = makeRig([]);
+    await writeCloudStateValues(empty.adapter, cloudOnly(), answer(0xff0000, ""), "set");
+    expect(colour(empty)).toEqual({ color_rgb: "#ff0000" });
+    const lan = makeRig([]);
+    const lanLight = createTestDevice({
+      deviceId: "AA:58",
+      lanIp: "10.0.0.5",
+      channels: { lan: true, mqtt: false, cloud: true },
+    });
+    await writeCloudStateValues(lan.adapter, lanLight, answer(16768952, 0), "set");
+    expect(colour(lan)).toEqual({});
+  });
+});
+
+describe("the colour mode of an App-API or event reading (GV-32)", () => {
+  it("decides the mode over the whole reading — and never writes a LAN light's colour", async () => {
+    const reading: CloudStateCapability[] = [
+      { type: "devices.capabilities.color_setting", instance: "colorRgb", state: { value: 16768952 } },
+      { type: "devices.capabilities.color_setting", instance: "colorTemperatureK", state: { value: 0 } },
+    ];
+    const cloud = makeRig([]);
+    await applyCloudCapabilities(
+      cloud.adapter,
+      createTestDevice({ deviceId: "AA:59", lanIp: undefined, channels: { lan: false, mqtt: true, cloud: true } }),
+      reading,
+    );
+    expect(
+      Object.fromEntries(
+        cloud.writes.filter(w => /color_(rgb|temperature)$/.test(w.id)).map(w => [w.id.split(".").pop(), w.val]),
+      ),
+    ).toEqual({ color_rgb: "#ffdfb8", color_temperature: 4500 });
+    const lan = makeRig([]);
+    await applyCloudCapabilities(
+      lan.adapter,
+      createTestDevice({ deviceId: "AA:60", lanIp: "10.0.0.6", channels: { lan: true, mqtt: true, cloud: true } }),
+      reading,
+    );
+    expect(lan.writes.filter(w => /color_(rgb|temperature)$/.test(w.id))).toEqual([]);
+  });
+});
+
 describe("writeCloudStateValues without a state manager", () => {
   it("writes nothing and says so — the tree is not built yet", async () => {
     const rig = makeRig([]);

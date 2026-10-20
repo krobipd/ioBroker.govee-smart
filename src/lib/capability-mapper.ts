@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { buildUniqueLabelMap } from "./dropdown-labels";
 import { rgbToHex } from "./color";
+import { colorModeOf } from "./color-mode";
 import type { DeviceRegistry } from "./device-registry";
 import { GOVEE_CAP_TYPE, GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { resolveLabel, tDesc, tName, type I18nKey } from "./i18n";
@@ -234,6 +235,7 @@ export function getDefaultLanStates(): StateDefinition[] {
     {
       id: "color_rgb",
       name: tName("colorRgb"),
+      desc: tDesc("descColorRgb"),
       type: "string",
       role: "level.color.rgb",
       write: true,
@@ -244,6 +246,7 @@ export function getDefaultLanStates(): StateDefinition[] {
     {
       id: "color_temperature",
       name: tName("colorTemperature"),
+      desc: tDesc("descColorTemperature"),
       type: "number",
       role: "level.color.temperature",
       write: true,
@@ -408,6 +411,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
       {
         id: "color_rgb",
         name: tName("colorRgb"),
+        desc: tDesc("descColorRgb"),
         type: "string",
         role: "level.color.rgb",
         write: true,
@@ -424,6 +428,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
       {
         id: "color_temperature",
         name: tName("colorTemperature"),
+        desc: tDesc("descColorTemperature"),
         type: "number",
         role: "level.color.temperature",
         write: true,
@@ -1900,7 +1905,38 @@ export function planCloudCapabilityWrites(
       writes.push(typeof cap?.ts === "number" ? { ...mapped, ts: cap.ts } : mapped);
     }
   }
-  return writes;
+  return hasLanIp ? writes : withCloudColorMode(caps, writes);
+}
+
+/**
+ * The colour mode of a cloud state answer (GV-32): `colorRgb` and `colorTemperatureK` are two capabilities, so the mode
+ * is decided over the whole list — only when both carry a number (Govee's `""` says nothing). The per-capability
+ * values of the two datapoints are replaced by the mode's; the other datapoint gets `null`.
+ *
+ * @param caps The capabilities of one answer
+ * @param values Their mapped values
+ * @returns The values with the colour mode applied
+ */
+export function withCloudColorMode(
+  caps: readonly CloudStateCapability[],
+  values: CloudStateValue[],
+): CloudStateValue[] {
+  const raw = (pick: (instance: string) => boolean): number | null => {
+    const cap = caps.find(c => c && typeof c.instance === "string" && pick(c.instance));
+    const v = cap?.state?.value;
+    return typeof v === "number" && Number.isFinite(v) ? v : null;
+  };
+  const rgb = raw(i => i === "colorRgb");
+  const kelvin = raw(i => i.includes("colorTem"));
+  if (rgb === null || kelvin === null) {
+    return values;
+  }
+  const mode = colorModeOf({ r: (rgb >> 16) & 0xff, g: (rgb >> 8) & 0xff, b: rgb & 0xff }, kelvin);
+  return [
+    ...values.filter(v => v.stateId !== "color_rgb" && v.stateId !== "color_temperature"),
+    { stateId: "color_rgb", value: mode.colorRgb },
+    { stateId: "color_temperature", value: mode.colorTemperature },
+  ];
 }
 
 /**

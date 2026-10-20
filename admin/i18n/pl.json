@@ -201,5 +201,7 @@
   "deviceTypeAromaDiffuser": "Dyfuzor zapachowy",
   "deviceTypeButton": "Przycisk",
   "deviceTypeUnknown": "Nieznany",
-  "optHeat": "Grzanie"
+  "optHeat": "Grzanie",
+  "descColorRgb": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+  "descColorTemperature": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli."
 }

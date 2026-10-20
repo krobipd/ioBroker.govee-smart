@@ -134,7 +134,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -165,7 +178,20 @@
       "unit": "K",
       "min": 2700,
       "max": 6500,
-      "def": 2700
+      "def": 2700,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -4407,7 +4433,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -4438,7 +4477,20 @@
       "unit": "K",
       "min": 2200,
       "max": 6500,
-      "def": 2200
+      "def": 2200,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -6731,7 +6783,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "lan",
@@ -6762,7 +6827,20 @@
       "unit": "K",
       "min": 2000,
       "max": 9000,
-      "def": 2000
+      "def": 2000,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "lan",
@@ -8374,7 +8452,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -8405,7 +8496,20 @@
       "unit": "K",
       "min": 2000,
       "max": 9000,
-      "def": 2000
+      "def": 2000,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -10927,7 +11031,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -10958,7 +11075,20 @@
       "unit": "K",
       "min": 2000,
       "max": 9000,
-      "def": 2000
+      "def": 2000,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -13404,7 +13534,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -13435,7 +13578,20 @@
       "unit": "K",
       "min": 2200,
       "max": 6500,
-      "def": 2200
+      "def": 2200,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -17637,7 +17793,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "devices.capabilities.color_setting",
@@ -20545,7 +20714,20 @@
       "role": "level.color.rgb",
       "read": true,
       "write": true,
-      "def": "#000000"
+      "def": "#000000",
+      "desc": {
+        "de": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+        "en": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
+        "es": "Color de la luz como #rrggbb; vacío mientras la luz está en modo de temperatura de color.",
+        "fr": "Couleur de la lumière en #rrggbb ; vide tant que la lumière est en mode température de couleur.",
+        "it": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
+        "nl": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
+        "pl": "Kolor światła jako #rrggbb; puste, dopóki światło jest w trybie temperatury barwowej.",
+        "pt": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+        "ru": "Цвет света в формате #rrggbb; пусто, пока свет в режиме цветовой температуры.",
+        "uk": "Колір світла у форматі #rrggbb; порожньо, поки світло в режимі колірної температури.",
+        "zh-cn": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。"
+      }
     },
     "native": {
       "capabilityType": "lan",
@@ -20576,7 +20758,20 @@
       "unit": "K",
       "min": 2000,
       "max": 9000,
-      "def": 2000
+      "def": 2000,
+      "desc": {
+        "de": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+        "en": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+        "es": "Temperatura de color en Kelvin; vacío mientras la luz muestra un color en lugar de un tono de blanco.",
+        "fr": "Température de couleur en kelvins ; vide tant que la lumière affiche une couleur au lieu d'un ton de blanc.",
+        "it": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+        "nl": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+        "pl": "Temperatura barwowa w kelwinach; puste, dopóki światło pokazuje kolor zamiast odcienia bieli.",
+        "pt": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco.",
+        "ru": "Цветовая температура в кельвинах; пусто, пока свет показывает цвет вместо оттенка белого.",
+        "uk": "Колірна температура в кельвінах; порожньо, поки світло показує колір замість відтінку білого.",
+        "zh-cn": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+      }
     },
     "native": {
       "capabilityType": "lan",

@@ -201,5 +201,7 @@
   "deviceTypeAromaDiffuser": "Aromadiffusor",
   "deviceTypeButton": "Taster",
   "deviceTypeUnknown": "Unbekannt",
-  "optHeat": "Heizen"
+  "optHeat": "Heizen",
+  "descColorRgb": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
+  "descColorTemperature": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt."
 }

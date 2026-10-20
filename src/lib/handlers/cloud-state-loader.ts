@@ -2,6 +2,7 @@ import {
   LAN_STATE_IDS,
   mapCloudStateValues,
   planCloudCapabilityWrites,
+  withCloudColorMode,
   platformReadingsToCelsius,
   targetReadingsToCelsius,
   targetTemperatureInFahrenheit,
@@ -127,7 +128,12 @@ export async function writeCloudStateValues(
   // One capability can carry two datapoints (work_mode → mode + level),
   // so the list is flattened first and the LAN-shadow rule below applies
   // per RESULT — same shape and same nesting level as before.
-  for (const mapped of readings.flatMap(cap => mapCloudStateValues(cap, device.capabilities))) {
+  // The colour mode is decided over the whole answer (GV-32); a LAN light's colour stays the LAN's (below).
+  const mappedAll = withCloudColorMode(
+    readings,
+    readings.flatMap(cap => mapCloudStateValues(cap, device.capabilities)),
+  );
+  for (const mapped of mappedAll) {
     if (device.lanIp && LAN_STATE_IDS.has(mapped.stateId)) {
       continue;
     }

@@ -159,18 +159,29 @@ describe("GV-02 a LAN light takes its local values only locally", () => {
       onCloudDataReady: () => {},
       onGroupMembersReady: () => {},
     });
+    // An RGB answer delivers the colour, a colour-temperature answer the Kelvin — each answer names its colour mode, the
+    // other colour datapoint gets no value in it (GV-32). Together they deliver all four datapoints locally.
     dm.handleLanStatus("192.168.1.20", {
       onOff: 1,
       brightness: 55,
       color: { r: 255, g: 0, b: 0 },
-      colorTemInKelvin: 4000,
+      colorTemInKelvin: 0,
     });
     await new Promise(resolve => setTimeout(resolve, 0));
     expect(Object.fromEntries(LOCAL.map(id => [id, written.get(id)]))).toEqual({
       "devices.h6172-0002.control.power": true,
       "devices.h6172-0002.control.brightness": 55,
       "devices.h6172-0002.control.color_rgb": "#ff0000",
-      "devices.h6172-0002.control.color_temperature": 4000,
+      "devices.h6172-0002.control.color_temperature": null,
     });
+    dm.handleLanStatus("192.168.1.20", {
+      onOff: 1,
+      brightness: 55,
+      color: { r: 0, g: 0, b: 0 },
+      colorTemInKelvin: 4000,
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(written.get("devices.h6172-0002.control.color_temperature")).toBe(4000);
+    expect(written.get("devices.h6172-0002.control.color_rgb")).toBeNull();
   });
 });

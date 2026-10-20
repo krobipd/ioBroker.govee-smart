@@ -201,5 +201,7 @@
   "deviceTypeAromaDiffuser": "Difusor de aromas",
   "deviceTypeButton": "Botão",
   "deviceTypeUnknown": "Desconhecido",
-  "optHeat": "Aquecer"
+  "optHeat": "Aquecer",
+  "descColorRgb": "Cor da luz como #rrggbb; vazio enquanto a luz está no modo de temperatura de cor.",
+  "descColorTemperature": "Temperatura de cor em Kelvin; vazio enquanto a luz mostra uma cor em vez de um tom de branco."
 }

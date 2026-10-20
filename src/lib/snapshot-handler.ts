@@ -1,6 +1,7 @@
 import type { LocalSnapshot, LocalSnapshotStore, SnapshotSegment } from "./local-snapshots";
 import { deviceLabel, type GoveeDevice } from "./types";
 import { readDeviceBaseline, restoreSegmentsGrouped } from "./device-baseline";
+import { restoresAsColorTemperature } from "./color-mode";
 
 /**
  * Host interface — the adapter functions the SnapshotHandler needs without
@@ -91,7 +92,8 @@ export class SnapshotHandler {
     await this.host.sendCommand(device, "power", snap.power);
     if (snap.power) {
       await this.host.sendCommand(device, "brightness", snap.brightness);
-      if (snap.colorTemperature > 0) {
+      // A Kelvin beside a real colour is the stale value of RGB mode or a table colour — the colour comes back (GV-32).
+      if (restoresAsColorTemperature(snap.colorRgb, snap.colorTemperature)) {
         await this.host.sendCommand(device, "colorTemperature", snap.colorTemperature);
       } else {
         await this.host.sendCommand(device, "colorRgb", snap.colorRgb);
