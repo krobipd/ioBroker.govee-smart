@@ -162,7 +162,11 @@ describe("the tab memory", () => {
         delete data[k];
       }),
     };
-    (window as Window & { _localStorage?: unknown })._localStorage = synced;
+    // Under vitest 5 the window is jsdom's own, and jsdom keeps its storage in `_localStorage` too — the test puts
+    // jsdom's storage back afterwards instead of deleting it.
+    const w = window as Window & { _localStorage?: unknown };
+    const own = w._localStorage;
+    w._localStorage = synced;
     try {
       const { unmount } = render(
         <ExpertPanel
@@ -179,7 +183,11 @@ describe("the tab memory", () => {
       unmount();
       expect(data["App.govee-smart"]).toBeUndefined();
     } finally {
-      delete (window as Window & { _localStorage?: unknown })._localStorage;
+      if (own === undefined) {
+        delete w._localStorage;
+      } else {
+        w._localStorage = own;
+      }
     }
   });
 
