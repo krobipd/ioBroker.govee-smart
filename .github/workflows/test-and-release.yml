@@ -64,7 +64,7 @@ jobs:
           # requirement, and stable users only ever get the adapter version
           # pinned in sources-dist-stable.json anyway (tt-tom17 pattern:
           # ioBroker.public-transport 1.x on npm-latest with globalDependencies
-          # admin >=8.0.1 before Admin 8 reached stable).
+          # an admin floor of a new major before that major reached stable).
           URL="https://raw.githubusercontent.com/ioBroker/ioBroker.repositories/master/sources-dist-stable.json"
           # Round 110 (audit E-M2): an unreachable source was "skipping live check" and green —
           # a gate that cannot measure is red. Three tries with a pause ride out a short outage.
