@@ -102,8 +102,8 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 
 - Fixed: the diagnostics report contains the object tree again
 - Changed: the diagnostics report names where a device's reachability and segment count come from and shows each fact only once
-- Fixed: color_temperature no longer keeps its old value while the light shows a colour, and color_rgb no longer shows Govee's placeholder in colour-temperature mode
-- New: a colour temperature set in the Govee app as a white colour also shows in color_temperature
+- Fixed: the colour temperature no longer keeps its old value while the light shows a colour, and the colour no longer shows Govee's placeholder in colour-temperature mode
+- New: a colour temperature set in the Govee app as a white colour also shows as colour temperature
 - Fixed: local snapshots and the segment wizard restore a colour as a colour and a colour temperature as a colour temperature
 - Changed: needs js-controller 7.2.5 and Admin 8.2.0, the current stable versions
 
