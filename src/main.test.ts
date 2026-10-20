@@ -3275,6 +3275,34 @@ describe("GoveeAdapter — cloud capability writes over the REAL host object", (
   });
 });
 
+describe("GoveeAdapter — a LAN answer during the start reaches its datapoints", () => {
+  // CI run 39368511164 (2026-10-20, inventory suite "counterpart gone and back"): the light's first devStatus answer came
+  // 4 s before statesReady and was dropped; with the account broker up the next ask is a minute away, so color_rgb kept
+  // its default. Over the real host: the answer is held and lands once the tree is ready.
+  it("holds a devStatus answer that comes before statesReady and writes it at ready", async () => {
+    const { adapter, f } = setup({ goveeEmail: "a@b.c", goveePassword: "pw" });
+    const i = internalOf(adapter);
+    let release!: () => void;
+    f.mqtt.connect.mockImplementation(() => new Promise<void>(r => (release = r)));
+    const ready = i.onReady();
+    await vi.waitFor(() => expect(f.mqtt.connect).toHaveBeenCalled());
+    const onDiscovery = f.lan.startArgs[0] as (d: { ip: string; device: string; sku: string }) => void;
+    const onStatus = f.lan.startArgs[1] as (ip: string, s: unknown) => void;
+    onDiscovery({ ip: "10.0.0.5", device: "AA:BB:CC:DD:EE:11", sku: "H6172" });
+    onStatus("10.0.0.5", { onOff: 1, brightness: 80, color: { r: 255, g: 120, b: 0 }, colorTemInKelvin: 4000 });
+    expect(i.statesReady).toBe(false);
+    release();
+    await ready;
+    await settle(4);
+    expect(i.statesReady).toBe(true);
+    const light = i.deviceManager!.getDevices().find(d => d.lanIp === "10.0.0.5")!;
+    const prefix = i.stateManager!.devicePrefix(light);
+    expect(i.states.get(`${prefix}.control.color_rgb`)?.val).toBeNull();
+    expect(i.states.get(`${prefix}.control.color_temperature`)?.val).toBe(4000);
+    expect(i.states.get(`${prefix}.control.brightness`)?.val).toBe(80);
+  });
+});
+
 describe("GoveeAdapter — the LAN poll keeps control.power honest", () => {
   // Audit 2026-09-12 (F7), reworked 2026-09-14. The first cut put `power` into
   // a devStatus patch only when it differed from device.state — but

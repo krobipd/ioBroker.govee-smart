@@ -125,6 +125,8 @@ export class StateManager {
   private readonly readOnlyValues = new Map<string, ioBroker.StateValue>();
   /** Whether `primeReadOnly` read the stored values — from then on a state not in memory has no value yet. */
   private readOnlyPrimed = false;
+  /** Device reports that came before the tree was ready, merged per device ({@link holdDeviceState}). */
+  private readonly heldDeviceStates = new Map<string, { device: GoveeDevice; state: Partial<DeviceState> }>();
   /** The read-only states this run created from its definitions (`common.write: false`). */
   private readonly readOnlyIds = new Set<string>();
   /** This instance's device catalog — quirks for the LAN default states. */
@@ -1288,6 +1290,31 @@ export class StateManager {
         await this.adapter.delObjectAsync(localId, { recursive: true });
       }
     }
+  }
+
+  /**
+   * Keep a device report that came before the tree was ready (statesReady) — merged per device, a later field over an
+   * earlier one, an absent field kept: a push carries only what changed. Written by {@link releaseHeldDeviceStates}.
+   * Dropping it lost the light's first LAN answer: with the account broker the next ask is a minute away (CI run
+   * 39368511164, 2026-10-20).
+   *
+   * @param device Govee device
+   * @param state The report's values
+   */
+  holdDeviceState(device: GoveeDevice, state: Partial<DeviceState>): void {
+    const key = `${device.sku}:${device.deviceId}`;
+    const held = this.heldDeviceStates.get(key);
+    this.heldDeviceStates.set(key, { device, state: { ...held?.state, ...state } });
+  }
+
+  /**
+   * Write every report held during the start, once — called when the tree is ready, after the start's cloud state read,
+   * so a light's own LAN word lands last (GV-02).
+   */
+  async releaseHeldDeviceStates(): Promise<void> {
+    const held = [...this.heldDeviceStates.values()];
+    this.heldDeviceStates.clear();
+    await Promise.all(held.map(h => this.updateDeviceState(h.device, h.state)));
   }
 
   /**

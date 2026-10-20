@@ -69,11 +69,14 @@ export function onDeviceStateUpdate<
   // Package A: don't mirror values before the initial object-creation batch has
   // finished — a fast LAN devStatus can otherwise write control.color_rgb before
   // createLanStates declared the object ("has no existing object"). Mirrors the
-  // trackStateCreation gate. The value is dropped, not held: the next LAN status
-  // read (every scan without the account broker, at least once a minute with
-  // it — audit B5) or MQTT push re-delivers it.
+  // trackStateCreation gate. The value is held, not dropped: with the account
+  // broker the next LAN status read is a minute away, and the light's first
+  // answer was lost (CI run 39368511164, 2026-10-20) — the state manager writes
+  // it when the tree is ready (releaseHeldDeviceStates).
   if (adapter.statesReady && adapter.stateManager) {
     adapter.stateManager.updateDeviceState(device, state).catch(logRejected(adapter.log, "mirror device state"));
+  } else {
+    adapter.stateManager?.holdDeviceState(device, state);
   }
   connectionState.updateConnectionState(adapter);
 

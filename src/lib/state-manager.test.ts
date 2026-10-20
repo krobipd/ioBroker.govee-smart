@@ -1315,6 +1315,28 @@ describe("StateManager", () => {
       expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
     });
 
+    it("a device report held during the start reaches the datapoints at release — merged, the later field wins", async () => {
+      // the first LAN devStatus answer comes before statesReady; with the account broker the next ask is a minute away
+      const { adapter, states, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const dev = createTestDevice();
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+      sm.holdDeviceState(dev, { power: true, brightness: 80, colorRgb: null, colorTemperature: 4000 });
+      sm.holdDeviceState(dev, { brightness: 50 });
+      expect(states.get("devices.h6160-0011.control.color_rgb")).toMatchObject({ val: "#000000" });
+
+      await sm.releaseHeldDeviceStates();
+
+      expect(states.get("devices.h6160-0011.control.color_rgb")).toMatchObject({ val: null });
+      expect(states.get("devices.h6160-0011.control.color_temperature")).toMatchObject({ val: 4000 });
+      expect(states.get("devices.h6160-0011.control.brightness")).toMatchObject({ val: 50 });
+      expect(states.get("devices.h6160-0011.control.power")).toMatchObject({ val: true });
+      // released once: a second release asks the database for nothing
+      const before = calls.length;
+      await sm.releaseHeldDeviceStates();
+      expect(calls.slice(before)).toEqual([]);
+    });
+
     it("a rebuild keeps the null the device reported — the default is set only when the state is created", async () => {
       // GV-32: in colour-temperature mode the LAN answer writes color_rgb null; every later build (cloud list, library
       // load, sync) runs createLanStates again — it seeded the default #000000 back over the device's null.

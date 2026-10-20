@@ -189,6 +189,7 @@ Basis `https://openapi.api.govee.com`, Kopf `Govee-API-Key`.
 - Dekodiert: **H1741** `aa 42 <b>` = Akku % (Bits 0–6, Bit 7 ausmaskiert) → `sensor.battery`. **H7127** `aa 05 00 m` = Modus, `aa 05 01 n` = letzte manuelle Stufe, `aa 19 00 ff ff ?? 00 FF` = Filter % (Byte 7); Byte 5 nicht dekodiert.
 - Jeder Wert wird gegen die deklarierten Fähigkeiten geprüft (Modus ∈ Modi, Stufe ∈ Gruppe, Filter ≤ 100), sonst verworfen. Neue Familie nur aus einer Aufzeichnung mit zwei Werten und unabhängiger Referenz.
 - Ein Push für ein Gerät, dessen Baum noch entsteht, wird je Gerät festgehalten (neuester gewinnt) und von `releaseHeldPushes()` nach `statesReady` und nach dem Startwert-Abruf angewendet, nie verworfen.
+- Ebenso jede Gerätemeldung, die `onDeviceStateUpdate` vor `statesReady` erreicht (die erste LAN-Antwort eines Lichts): `StateManager.holdDeviceState` führt sie je Gerät zusammen (spätere Felder gewinnen, fehlende bleiben), `releaseHeldDeviceStates()` schreibt sie direkt nach `releaseHeldPushes()` — mit Konto-Broker fragt der Adapter das Licht erst nach einer Minute wieder.
 
 ## App-API (`app2.govee.com`, intern)
 

@@ -32,6 +32,7 @@ interface Rig {
   cloudDefs: StateDefinition[][];
   undecided: string[][];
   updates: Array<Partial<DeviceState>>;
+  held: Array<Partial<DeviceState>>;
   dropdownResets: string[];
   reapCalls: number[];
   queue: Promise<void>[];
@@ -44,6 +45,7 @@ function makeRig(
   const cloudDefs: StateDefinition[][] = [];
   const undecided: string[][] = [];
   const updates: Array<Partial<DeviceState>> = [];
+  const held: Array<Partial<DeviceState>> = [];
   const dropdownResets: string[] = [];
   const reapCalls: number[] = [];
   const queue: Promise<void>[] = [];
@@ -69,6 +71,9 @@ function makeRig(
           return new Promise<void>(resolve => opts.holdBuilds!.push(() => build().then(resolve)));
         }
         return build();
+      },
+      holdDeviceState: (_d: GoveeDevice, s: Partial<DeviceState>) => {
+        held.push(s);
       },
       updateDeviceState: (_d: GoveeDevice, s: Partial<DeviceState>) => {
         updates.push(s);
@@ -145,7 +150,7 @@ function makeRig(
     return Promise.resolve();
   };
 
-  return { adapter, calls, cloudDefs, undecided, updates, dropdownResets, reapCalls, queue };
+  return { adapter, calls, cloudDefs, undecided, updates, held, dropdownResets, reapCalls, queue };
 }
 
 describe("onDeviceStateUpdate", () => {
@@ -154,6 +159,14 @@ describe("onDeviceStateUpdate", () => {
     const rig = makeRig({ devices: [device], statesReady: true });
     onDeviceStateUpdate(rig.adapter, device, { brightness: 50 });
     expect(rig.updates).toEqual([{ brightness: 50 }]);
+  });
+
+  it("before statesReady the patch is held for the release, never written and never dropped", () => {
+    const device = createTestDevice();
+    const rig = makeRig({ devices: [device], statesReady: false });
+    onDeviceStateUpdate(rig.adapter, device, { colorRgb: null, colorTemperature: 4000 });
+    expect(rig.updates).toEqual([]);
+    expect(rig.held).toEqual([{ colorRgb: null, colorTemperature: 4000 }]);
   });
 
   it("an online flip on a Light triggers the fast syncInfoOnline path (<1s recovery, not the 20s timer)", () => {

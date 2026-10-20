@@ -1304,6 +1304,9 @@ export class GoveeAdapter extends utils.Adapter {
     // pushes held during the start (the device's own, newer word) and let
     // later ones through immediately.
     this.deviceManager?.releaseHeldPushes();
+    // The device reports that came before the tree was ready (a light's first LAN answer) — after the start's cloud
+    // state read, so the device's own word lands last.
+    await this.stateManager?.releaseHeldDeviceStates();
     // What waited for an account token (group members, libraries) runs from
     // now on with each token — and right away when one came during the start.
     this.deviceManager?.enableBearerFollowUps();
