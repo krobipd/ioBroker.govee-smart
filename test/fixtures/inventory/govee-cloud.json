@@ -11,7 +11,7 @@
     "that capture (only the device id is the fixture's). A device without `_source` is a",
     "hand-picked subset of real capability blocks — its shape per capability is Govee's,",
     "its capability SET is not (audit 2026-09-11). Replace it by the verbatim entry as soon",
-    "as Ressourcen/govee-smart/github-exports/ holds its export.",
+    "as a GitHub issue carries its export.",
     "Three verbatim entries were added on 2026-09-12 (audit): H1310 (ceiling-fan light with",
     "main/background light, fan and airflow toggles), H66A1 (movie mode) and H607C (pillar and",
     "base light) — nine capability instances that real captures show and no fixture device had,",
@@ -414,7 +414,7 @@
           }
         }
       ],
-      "_source": "Ressourcen/govee-smart/github-exports/issue-26-H6199.txt apiHistory[/router/api/v1/user/devices][0].body (issue #26, adapter 2.15.0); device id is the fixture's"
+      "_source": "GitHub issue export issue-26-H6199.txt apiHistory[/router/api/v1/user/devices][0].body (issue #26, adapter 2.15.0); device id is the fixture's"
     },
     {
       "sku": "H61A8",
@@ -688,7 +688,7 @@
           }
         }
       ],
-      "_source": "Ressourcen/govee-smart/tukey42-2026-05-13/govee-diag.json apiHistory[/router/api/v1/user/devices][0].body (2026-05-13); device id is the fixture's"
+      "_source": "user diagnostics export of 2026-05-13, govee-diag.json apiHistory[/router/api/v1/user/devices][0].body (2026-05-13); device id is the fixture's"
     },
     {
       "sku": "H5179",
@@ -754,7 +754,7 @@
       "device": "AA:BB:CC:DD:EE:FF:00:05",
       "deviceName": "Battery Sensor Cellar",
       "type": "devices.types.sensor",
-      "_source": "Ressourcen/govee-smart/github-exports/issue-31.json capabilities[] — the capability LIST only (the export's device section; no parameters recorded). Gateway, battery and readings come from the account-list entry the fixture server answers (test/inventory.js).",
+      "_source": "GitHub issue export issue-31.json capabilities[] — the capability LIST only (the export's device section; no parameters recorded). Gateway, battery and readings come from the account-list entry the fixture server answers (test/inventory.js).",
       "capabilities": [
         {
           "type": "devices.capabilities.property",
@@ -947,7 +947,7 @@
       ]
     },
     {
-      "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json",
+      "_source": "issue #47 recording list-devices-issue4-H7131-H7121.json",
       "sku": "H7131",
       "device": "AA:BB:CC:DD:EE:FF:00:12",
       "deviceName": "Space Heater Study",
@@ -1179,7 +1179,7 @@
       "device": "AA:BB:CC:DD:EE:FF:00:10",
       "deviceName": "Air Purifier Bedroom",
       "type": "devices.types.air_purifier",
-      "_source": "Ressourcen/govee-smart/github-exports/issue-47-h7127-v2.35.2-offline-2026-09-14.json capabilities[] — the capability LIST verbatim (four instances; the two properties carry no parameters, as recorded).",
+      "_source": "GitHub issue export issue-47-h7127-v2.35.2-offline-2026-09-14.json capabilities[] — the capability LIST verbatim (four instances; the two properties carry no parameters, as recorded).",
       "capabilities": [
         {
           "type": "devices.capabilities.on_off",
@@ -1292,7 +1292,7 @@
           }
         },
         {
-          "_source": "Ressourcen/govee-smart/issue47-fixtures/get_device_state.json (Govee's own H7143 state answer lists warmMistToggle); the ENUM on/off parameters are the shape every recorded toggle carries",
+          "_source": "issue #47 recording get_device_state.json (Govee's own H7143 state answer lists warmMistToggle); the ENUM on/off parameters are the shape every recorded toggle carries",
           "type": "devices.capabilities.toggle",
           "instance": "warmMistToggle",
           "parameters": {
@@ -1310,7 +1310,7 @@
           }
         },
         {
-          "_source": "Ressourcen/govee-smart/issue47-fixtures/work-mode-issue-81.json",
+          "_source": "issue #47 recording work-mode-issue-81.json",
           "type": "devices.capabilities.work_mode",
           "instance": "workMode",
           "parameters": {
@@ -1482,7 +1482,7 @@
           "instance": "airQuality"
         }
       ],
-      "_source": "Ressourcen/govee-smart/issue47-fixtures/list-devices-issue4-H7131-H7121.json"
+      "_source": "issue #47 recording list-devices-issue4-H7131-H7121.json"
     },
     {
       "sku": "H7171",
@@ -1508,7 +1508,7 @@
           }
         },
         {
-          "_source": "Ressourcen/govee-smart/issue47-fixtures/work-mode-issue-100.json",
+          "_source": "issue #47 recording work-mode-issue-100.json",
           "type": "devices.capabilities.work_mode",
           "instance": "workMode",
           "parameters": {
@@ -2063,7 +2063,7 @@
           }
         }
       ],
-      "_source": "Ressourcen/govee-smart/github-exports/issue-40-h1310-diag.json.txt apiHistory[/router/api/v1/user/devices][0].body (issue #40, adapter 2.20.0); device id and name are the fixture's"
+      "_source": "GitHub issue export issue-40-h1310-diag.json.txt apiHistory[/router/api/v1/user/devices][0].body (issue #40, adapter 2.20.0); device id and name are the fixture's"
     },
     {
       "sku": "H66A1",
@@ -2394,7 +2394,7 @@
           }
         }
       ],
-      "_source": "Ressourcen/govee-smart/github-exports/issue-25-H66a1.txt apiHistory[/router/api/v1/user/devices][0].body (issue #25, adapter 2.16.0); device id and name are the fixture's"
+      "_source": "GitHub issue export issue-25-H66a1.txt apiHistory[/router/api/v1/user/devices][0].body (issue #25, adapter 2.16.0); device id and name are the fixture's"
     },
     {
       "sku": "H607C",
@@ -2708,7 +2708,7 @@
           }
         }
       ],
-      "_source": "Ressourcen/govee-smart/github-exports/issue-15-diag.json apiHistory[/router/api/v1/user/devices][0].body (issue #15, adapter 2.13.0); device id and name are the fixture's"
+      "_source": "GitHub issue export issue-15-diag.json apiHistory[/router/api/v1/user/devices][0].body (issue #15, adapter 2.13.0); device id and name are the fixture's"
     },
     {
       "sku": "H5140",

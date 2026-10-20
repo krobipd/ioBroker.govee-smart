@@ -1,5 +1,5 @@
-// The colour mode of a Govee light, read from its own report (krobi 2026-10-20 02:16 "perfekt dann mach das" on the
-// plan Ressourcen/govee-smart/plan-farbmodus-2026-10-20.md).
+// The colour mode of a Govee light, read from its own report (krobi 2026-10-20 02:16 "perfect, then do it" on the
+// colour-mode plan).
 //
 // Every colour report carries the mode: `colorTemInKelvin > 0` is colour temperature, `0` is RGB — the convention of
 // the push, the LAN `devStatus` answer and the cloud state (`colorRgb` + `colorTemperatureK`), and the one govee2mqtt

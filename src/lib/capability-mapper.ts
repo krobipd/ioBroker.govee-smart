@@ -455,7 +455,7 @@ function mapColorSetting(cap: CloudCapability): StateDefinition[] {
 function mapMode(cap: CloudCapability): StateDefinition[] {
   // Any `mode` instance, not just presetScene. `api-referenz.md:135-136`
   // documents both `presetScene` and `nightlightScene`, and the captures in
-  // `Ressourcen/govee-smart/issue47-fixtures/` carry `nightlightScene` twice —
+  // the recorded answers of issue #47 carry `nightlightScene` twice —
   // declared with its option list on the H7131 heater, and answered with a
   // value by `/device/state`. The instance check dropped the definition AND
   // `mapCloudStateValue` dropped the value, so the data arrived and was thrown

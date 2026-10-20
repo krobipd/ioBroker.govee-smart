@@ -1,5 +1,5 @@
 {
-  "_comment": "GV-31 (krobi 2026-10-08 09:59): the research sources gate A15 reads on every release; every model one of them knows stands in devices.json or below `excluded` with its reason. Measurement of every source: Ressourcen/govee-smart/geraete-quellen-2026-10-08.md.",
+  "_comment": "GV-31 (krobi 2026-10-08 09:59): the research sources gate A15 reads on every release; every model one of them knows stands in devices.json or below `excluded` with its reason. Every source measured on 2026-10-08.",
   "catalog": "devices.json",
   "catalogKey": "devices",
   "pattern": "\\b[HR][0-9][0-9A-Z]{3}\\b",

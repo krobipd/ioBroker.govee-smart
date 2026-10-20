@@ -329,7 +329,7 @@ describe("GoveeApiClient — fetchDeviceList (sensor device list)", () => {
   });
 
   it("throws on Govee's 200-with-401 body instead of answering an empty list (audit 2026-09-11)", async () => {
-    // Documented in Ressourcen/govee-smart/ptreal-ble-research.md §4.2: with an invalid
+    // Documented in the ptReal BLE research: with an invalid
     // bearer the list endpoint answers HTTP 200 and this body. Until 2.35.0 it became
     // `[]` — sensor values froze without a log line (reference_fehlschlag_rendert_wie_leer).
     mockHttp.mockResolvedValue(httpOk({ status: 401, message: "please login" }));

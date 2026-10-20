@@ -36,8 +36,7 @@ function makeFakeHttps(respond: (call: HttpRequestOptions, idx: number) => unkno
 
 /**
  * Govee's real answer to POST /router/api/v1/device/state — the H7127 purifier
- * from issue #47's 2.34.0 export (Ressourcen/govee-smart/issue47-fixtures/
- * get_device_state_h7127_live_2026-09-11.json). The envelope is `payload`, the
+ * from issue #47's 2.34.0 export (its live state answer of 2026-09-11). The envelope is `payload`, the
  * message field is `msg`; `data` is the envelope of the device LIST only.
  */
 const H7127_STATE_ENVELOPE = {

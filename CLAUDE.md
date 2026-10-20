@@ -43,7 +43,7 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 
 - Version in `io-package.json`; Changelog in `README.md` + `io-package.json:common.news` (11 Sprachen, handgeschrieben); interne Historie `.claude/dev-history.md`.
 - GitHub https://github.com/krobipd/ioBroker.govee-smart · npm `iobroker.govee-smart` · Runtime-Deps `@iobroker/adapter-core`, `mqtt` (das P12 des Konto-Brokers liest der eigene `pkcs12.ts`: nur PBE-SHA1-3DES und PBE-SHA1-RC2-40 wie govee2mqtts p12 0.6.3, RC2 nach RFC 2268 selbst, weil Nodes OpenSSL 3 es nur im Legacy-Provider hat; node-forge ist seit GHSA-86w9-cpqp-85rv nur Entwicklungsabhängigkeit) · Wiki bilingual EN/DE (über `wiki.json` Teil der Release-Kette).
-- Die APIs (LAN-Protokoll, AWS-IoT-MQTT, ptReal BLE-over-LAN, Scene-Speed, Segment-Erkennung, Snapshot-ptReal) sind größtenteils **undokumentiert**; Protokoll-Detail in `Ressourcen/govee-smart/`.
+- Die APIs (LAN-Protokoll, AWS-IoT-MQTT, ptReal BLE-over-LAN, Scene-Speed, Segment-Erkennung, Snapshot-ptReal) sind größtenteils **undokumentiert**.
 
 ## LAN-first für Lichter
 
@@ -201,7 +201,7 @@ Basis `https://openapi.api.govee.com`, Kopf `Govee-API-Key`.
 
 ## AWS IoT MQTT (Konto-Broker)
 
-Auth-Flow und Topics: `Ressourcen/govee-smart/mqtt-aws-iot.md`. Zwei Publishes auf das Geräte-Topic (`device.iotTopic`), beide QoS 0: `requestStatus` (`cmdVersion` aus dem Quirk `statusCmdVersion`, Vorgabe 2, mit `accountTopic`) und `publishCommand` (K18).
+Zwei Publishes auf das Geräte-Topic (`device.iotTopic`), beide QoS 0: `requestStatus` (`cmdVersion` aus dem Quirk `statusCmdVersion`, Vorgabe 2, mit `accountTopic`) und `publishCommand` (K18).
 
 - **Befehle über den Broker (K18, `broker-commands.ts`):** Reihenfolge LAN → Broker → Cloud. `brokerCarries` ist die EINE Regel für Router und Bestätigung: nur `power`/`brightness`/`colorRgb`/`colorTemperature`, nur Lichter mit Topic, ohne LAN-Weg, bei verbundenem Broker, außer der Katalog-Quirk `brokenBrokerCommands` schließt das Modell aus; ein `transportOverrides`-Eintrag `cloud` geht vor. Form wie govee2mqtt `iot.rs`: `turn` 1/0, `brightness` 0–100, `colorwc` mit Farbe und 0 K oder Schwarz und Kelvin, `cmdVersion 0`, `type 1`, `v_<ms>000`. Fällt der Broker zwischen Entscheidung und Senden weg, geht der Befehl an die Cloud. Der Publish hat keine Quittung: der Router merkt sich den Weg (`transportUsed`), und ein Befehl über den Broker wird nur durch den Statusbericht des Geräts bestätigt (`viaBroker` in `confirmationFor`); `LAN_STATUS_AFTER_COMMAND_MS` nach dem letzten Broker-Befehl fragt der Router das Gerät einmal (`onBrokerReadBack` → Statusanfrage), die Antwort bestätigt oder korrigiert den Datenpunkt. Ein Gruppen-Mitglied, das über den Broker schaltete, lässt die Gruppe ohne Warnung unbestätigt (`awaitsReport`).
 

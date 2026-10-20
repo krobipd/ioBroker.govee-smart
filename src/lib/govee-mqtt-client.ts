@@ -429,7 +429,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       return false;
     }
     // homebridge-govee (lib/connection/aws.js) adds the account topic to every
-    // status request, and so does the reference in Ressourcen/mqtt-aws-iot.md;
+    // status request, and so does the AWS IoT protocol reference;
     // govee2mqtt sends it without. With it, a model that expects the field is
     // not left silent — without it, the measured H61D5 answered as well.
     const msg: Record<string, unknown> = { cmd: "status", cmdVersion, transaction: `v_${now}000`, type: 0 };

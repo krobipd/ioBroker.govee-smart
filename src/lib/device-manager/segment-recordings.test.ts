@@ -21,7 +21,7 @@ import { DeviceIdRegistry } from "../device-id";
 // app's own snapshot masks are the independent reference where they exist.
 // Transactions and frames only — no device ids, names or topics.
 
-/** AA-A5 pushes as recorded in user exports (Ressourcen/govee-smart/github-exports/), op.command verbatim. */
+/** AA-A5 pushes as recorded in user exports (diagnostics exports attached to GitHub issues), op.command verbatim. */
 const AA_A5_RECORDINGS = [
   {
     source: "issue-13-diag-v2.9.1.json",

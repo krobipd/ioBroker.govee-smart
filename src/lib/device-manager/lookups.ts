@@ -58,7 +58,7 @@ const MAX_AA_A5_PACKETS = 19;
  *
  * Format per slot: [Brightness 0-100] [R] [G] [B], four slots per 20-byte
  * frame. Rules, each measured against every AA-A5 recording in
- * `Ressourcen/govee-smart/github-exports/` (audit 2026-09-24):
+ * the diagnostics exports attached to GitHub issues (audit 2026-09-24):
  *
  * 1. Packet numbers run past 5 — the H7020 and the H6062 send 10 packets. A
  *    number is read once per push (a repeat is corrupt/malicious, SEC-GC1).

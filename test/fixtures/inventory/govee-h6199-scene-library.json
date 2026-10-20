@@ -1,5 +1,5 @@
 {
-  "_source": "Ressourcen/govee-smart/github-exports/issue-26-H6199.txt sceneLibrary.entries (the H6199's own library, 236 scenes) in Govee's /appsku/v1/light-effect-libraries wire form (layout as govee2mqtt test-data/light-effect-library-h6072.json: data.categories[].scenes[].lightEffects[]); one light effect per recorded entry.",
+  "_source": "GitHub issue export issue-26-H6199.txt sceneLibrary.entries (the H6199's own library, 236 scenes) in Govee's /appsku/v1/light-effect-libraries wire form (layout as govee2mqtt test-data/light-effect-library-h6072.json: data.categories[].scenes[].lightEffects[]); one light effect per recorded entry.",
   "message": "success",
   "status": 200,
   "data": {

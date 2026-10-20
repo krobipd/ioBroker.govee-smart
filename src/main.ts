@@ -552,10 +552,10 @@ export class GoveeAdapter extends utils.Adapter {
   }
 
   private async onReady(): Promise<void> {
-    this.startedAt = Date.now();
-    // Every line from the first one on, also debug — a report is wanted after the fact (plan G2).
-    this.logRing.hook(this.log);
     try {
+      this.startedAt = Date.now();
+      // Every line from the first one on, also debug — a report is wanted after the fact (plan G2).
+      this.logRing.hook(this.log);
       const start = await this.prepareInstance();
       if (!start) {
         return;

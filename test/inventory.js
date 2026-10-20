@@ -502,7 +502,7 @@ function startFakeCloud() {
         reply(JSON.stringify({ resultCount: 1, results: [{ version: "7.6.20" }] }));
       } else if (url.includes("/account/rest/account/v2/login") && process.env.INVENTORY_REJECT_LOGIN === "1") {
         // fleet suite D11 (`a rejected login shows no connection`): INVENTORY_REJECT_LOGIN=1 — Govee's answer to a wrong
-        // password (error-code map of four projects, Ressourcen/govee-smart/_archive/2fa_454_analyse_2026_04_27.md)
+        // password (error-code map of four projects, 2026-04-27)
         reply(JSON.stringify({ status: 400, message: "Incorrect password" }));
       } else if (url.includes("/account/rest/account/v2/login")) {
         // The account login. `client` present = success; accountId and topic are

@@ -283,7 +283,7 @@ describe("GoveeMqttClient", () => {
       //  451 — issue #36 log 2026-07-23 (verbatim)
       //  454 — issue #8 log 2026-04-27: status 454 with an EMPTY message
       //  400 "Incorrect password", 400 "The app version is too low…", 429 text —
-      //      Ressourcen/govee-smart/_archive/2fa_454_analyse_2026_04_27.md, error-code map
+      //      the error-code map of four projects (2026-04-27)
       async function connectWith(body: Record<string, unknown>): Promise<{ reason: string | null; warns: string[] }> {
         const warns: string[] = [];
         const log: ioBroker.Logger = { ...mockLog, warn: (m: string) => void warns.push(m) };
