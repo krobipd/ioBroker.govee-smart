@@ -105,10 +105,10 @@ export interface RuntimeStateSnapshot {
   appApiLastErrorCategory?: string | null;
   /** DeviceManager.lastGroupMembersErrorCategory (App-API groups path). */
   groupMembersLastErrorCategory?: string | null;
-  /** GoveeCloudClient.getFailureReason() — user-facing reason for "Cloud not connected". */
-  cloudFailureReason?: string | null;
-  /** GoveeMqttClient.getFailureReason() — user-facing reason for "MQTT not connected". */
-  mqttFailureReason?: string | null;
+  /** GoveeCloudClient.getFailureCategory() — why the Cloud is not connected, as a key. */
+  cloudFailure?: string | null;
+  /** GoveeMqttClient.getFailureKey() — why the account broker is not connected, as a key. */
+  mqttFailure?: string | null;
   /** Rate-limiter usage snapshot or null if no Cloud client. Shape mirrors RateLimiter.getUsageSnapshot(). */
   rateLimiter?: RateLimiterSnapshot | null;
   /** The newest rate-limit headers Govee sent (GoveeCloudClient.getLastRateLimit), null before the first. */

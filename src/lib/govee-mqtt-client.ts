@@ -473,6 +473,24 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   }
 
   /**
+   * Why the broker is not connected, as a key for the diagnostics report (no fixed text there): `loginsStopped` once the
+   * reject cap stopped the reconnect loop, `loginPaused` while the login window is full, else the category of the last
+   * error; null while connected or before any error. The same cases {@link getFailureReason} words for the log.
+   */
+  getFailureKey(): string | null {
+    if (this.connected) {
+      return null;
+    }
+    if (this.authFailCount >= MQTT_MAX_AUTH_FAILURES) {
+      return "loginsStopped";
+    }
+    if (this.loginPausedUntil > Date.now()) {
+      return "loginPaused";
+    }
+    return this.lastErrorCategory ?? null;
+  }
+
+  /**
    * Short user-facing reason for "MQTT not connected", or null if the
    * client has never seen an error. Used by the adapter ready-summary
    * to give a concrete message instead of "still pending".

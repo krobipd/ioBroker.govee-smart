@@ -50,6 +50,30 @@ describe("GoveeMqttClient", () => {
     });
   });
 
+  describe("getFailureKey", () => {
+    it("is null before any error and names the case as a key after one — never a sentence (diagnostics report)", async () => {
+      const fresh = new GoveeMqttClient("user@example.com", "password", mockLog, mockTimers);
+      expect(fresh.getFailureKey()).toBeNull();
+      const fake = makeFakeHttps(() => ({ status: 455, message: "verification code invalid" }));
+      const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn);
+      await client.connect(
+        () => {},
+        () => {},
+      );
+      expect(client.getFailureKey()).toBe("VERIFICATION_FAILED");
+    });
+
+    it("names a stopped and a paused login before the error's category", () => {
+      const client = new GoveeMqttClient("user@example.com", "password", mockLog, mockTimers);
+      const inner = client as unknown as { authFailCount: number; loginPausedUntil: number; lastErrorCategory: string };
+      inner.lastErrorCategory = "AUTH";
+      inner.loginPausedUntil = Date.now() + 60_000;
+      expect(client.getFailureKey()).toBe("loginPaused");
+      inner.authFailCount = 99;
+      expect(client.getFailureKey()).toBe("loginsStopped");
+    });
+  });
+
   describe("token getter", () => {
     it("should return empty string before login", () => {
       const client = new GoveeMqttClient("user@example.com", "password", mockLog, mockTimers);

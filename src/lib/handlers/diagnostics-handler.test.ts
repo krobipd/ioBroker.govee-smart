@@ -67,6 +67,27 @@ describe("diagnostics providers — what the report reads from the running adapt
     });
   });
 
+  it("the runtime state names why a channel is down as a key, never as a sentence (no fixed text, DB-14)", () => {
+    // CI run 39371630270: "cannot reach Govee servers — will retry" stood the same in every device's report
+    const { host, providers } = providersHost({
+      cloudClient: {
+        getFailureCategory: () => "NETWORK",
+        getFailureReason: () => "cannot reach Govee servers — will retry",
+        getLastRateLimit: () => null,
+      } as never,
+      mqttClient: {
+        getFailureKey: () => "loginPaused",
+        getFailureReason: () =>
+          "too many logins within an hour — paused to protect the Govee account, resumes by itself",
+      } as never,
+    });
+    wireDiagnosticsProviders(host);
+    const rt = (providers.setRuntimeStateProvider as () => Record<string, unknown>)();
+    expect(rt).toMatchObject({ cloudFailure: "NETWORK", mqttFailure: "loginPaused" });
+    expect(rt).not.toHaveProperty("cloudFailureReason");
+    expect(rt).not.toHaveProperty("mqttFailureReason");
+  });
+
   it("the cache snapshot comes from the SKU cache of the instance", () => {
     const { host, providers } = providersHost();
     wireDiagnosticsProviders(host);

@@ -99,8 +99,9 @@ export function wireDiagnosticsProviders(host: DiagnosticsProvidersHost): void {
       deviceManagerLastErrorCategory: errorCats?.deviceManager ?? null,
       appApiLastErrorCategory: errorCats?.appApi ?? null,
       groupMembersLastErrorCategory: errorCats?.groupMembers ?? null,
-      cloudFailureReason: host.cloudClient?.getFailureReason() ?? null,
-      mqttFailureReason: host.mqttClient?.getFailureReason() ?? null,
+      // keys, not the log's sentences: the same sentence stood in every device's report (no fixed text, DB-14)
+      cloudFailure: host.cloudClient?.getFailureCategory() ?? null,
+      mqttFailure: host.mqttClient?.getFailureKey() ?? null,
       rateLimiter: host.rateLimiter?.getUsageSnapshot() ?? null,
       cloudRateLimit: host.cloudClient?.getLastRateLimit() ?? null,
       wizardSession: host.segmentWizard?.getSessionSnapshot() ?? null,

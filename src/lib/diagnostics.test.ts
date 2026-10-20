@@ -1150,8 +1150,8 @@ describe("DiagnosticsCollector", () => {
       const c = new DiagnosticsCollector(registry);
       c.setRuntimeStateProvider(() => ({
         deviceManagerLastErrorCategory: "TIMEOUT",
-        cloudFailureReason: "Cloud request timeout",
-        mqttFailureReason: null,
+        cloudFailure: "TIMEOUT",
+        mqttFailure: null,
         rateLimiter: {
           usedToday: 42,
           notDeliveredToday: 0,
@@ -1175,7 +1175,7 @@ describe("DiagnosticsCollector", () => {
       const result = await c.generate(makeDevice(), "2.9.1");
       const rt = result.runtimeState as Record<string, unknown>;
       expect(rt.deviceManagerLastErrorCategory).toBe("TIMEOUT");
-      expect(rt.cloudFailureReason).toBe("Cloud request timeout");
+      expect(rt.cloudFailure).toBe("TIMEOUT");
       expect((rt.rateLimiter as Record<string, number>).usedToday).toBe(42);
       // The discovery trace lists every device seen on the network — the one
       // field that carried addresses of devices the report is not even about.

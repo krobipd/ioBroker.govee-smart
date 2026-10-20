@@ -459,6 +459,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
       enableProbeMode: vi.fn(),
       setOnCredentialsRefresh: vi.fn(),
       getFailureReason: vi.fn(() => null),
+      getFailureKey: vi.fn(() => null),
       requestStatus: vi.fn(() => true),
     },
     { connected: false },
@@ -470,6 +471,7 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     setResponseHook: vi.fn(),
     setContactHook: vi.fn(),
     getFailureReason: vi.fn(() => null),
+    getFailureCategory: vi.fn(() => null),
     getLastRateLimit: vi.fn(() => null),
   };
   const api = {
