@@ -203,5 +203,6 @@
   "deviceTypeUnknown": "Unbekannt",
   "optHeat": "Heizen",
   "descColorRgb": "Farbe des Lichts als #rrggbb; leer, solange das Licht im Farbtemperatur-Modus ist.",
-  "descColorTemperature": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt."
+  "descColorTemperature": "Farbtemperatur in Kelvin; leer, solange das Licht eine Farbe statt eines Weißtons zeigt.",
+  "connectionTestFailed": "Anmeldung am Govee-Konto fehlgeschlagen: %s"
 }

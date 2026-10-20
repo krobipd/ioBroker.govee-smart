@@ -81,16 +81,30 @@ const RESOURCE_DIR = fs.mkdtempSync(path.join(require("node:os").tmpdir(), `${AD
 const READ_ONLY = new Set();
 /**
  * The environment of every adapter start: the resource probe first, then the adapter's fixture hooks (FIXTURE_HOOKS,
- * round 113), then the fleet hooks of this start — NETWORK_HOOK always last.
+ * round 113), its pacing hooks (PACING_HOOKS, round 123) unless the installation is one the limit tests judge, then the
+ * fleet hooks of this start — NETWORK_HOOK always last. countThisInstallation (right after clearInstanceData in the three
+ * limit suites) marks such an installation: `<time>.counted` next to its `<time>.install`.
  *
  * @param {...string} hooks the fleet hooks of this start (none, or NETWORK_HOOK)
  */
+// Round 123: true while a suite runs whose installation the limit tests judge (`a restart right after the start`,
+// `one counterpart hangs`, `one counterpart hangs mid-run` — countThisInstallation, their after() ends it).
+let counting = false;
 function adapterEnv(...hooks) {
+  // round 123: a judged installation runs at the adapter's own pace (no PACING_HOOKS) and tells the fixture hooks so
+  // (INVENTORY_COUNTED, for the account LIMIT_ACCOUNT announces); every other suite keeps both
   return {
-    NODE_OPTIONS: [RESOURCE_PROBE, ...FIXTURE_HOOKS, ...hooks].map(file => `--require ${file}`).join(" "),
+    NODE_OPTIONS: [RESOURCE_PROBE, ...FIXTURE_HOOKS, ...(counting ? [] : PACING_HOOKS), ...hooks]
+      .map(file => `--require ${file}`)
+      .join(" "),
     RESOURCE_PROBE_DIR: RESOURCE_DIR,
     RESOURCE_PROBE_NS: NS,
+    ...(counting ? { INVENTORY_COUNTED: "1" } : {}),
   };
+}
+function countThisInstallation() {
+  counting = true;
+  fs.writeFileSync(path.join(RESOURCE_DIR, `${Date.now()}.counted`), "");
 }
 // govee-smart: the https hook routes every Govee host to the fake cloud on this port. The harness hands the
 // mocha process's environment to the adapter process (`env: { ...process.env, ...env }`, @iobroker/testing 6.2.2).
@@ -328,6 +342,9 @@ function stateFor(device) {
   return caps;
 }
 
+// The H6199 answer is the recording of #26 (8e37b9a) and reports `online: false` — Govee's explicit word, so the adapter shows
+// devices.h6199-0002.info.online false in every run (resolveDeviceReachability, stage "Govee reported"); intended, the
+// fixture keeps the recording as it is.
 const CAPTURED = {};
 for (const sku of ["h61a8", "h6199"]) {
   const scenes = require(`./fixtures/inventory/govee-${sku}-scenes.json`);
@@ -350,7 +367,8 @@ const SCENE_LIBRARIES = { H6199: require("./fixtures/inventory/govee-h6199-scene
  * (settings and last data as JSON strings, as every raw capture since 2.39.1
  * shows them). Values from issue #31 (the export's list entry of 2026-07-05),
  * every identifying value replaced by a canary: the fixture's device id, the
- * gateway's secret, topic, BLE name and addresses.
+ * gateway's secret, topic, BLE name and addresses. Its last data report `online: false` from 2026-07-05, so
+ * devices.h5109-0005.info.online stays false in every run — no fresh reading, no reachability; intended.
  */
 const APP_LIST = [
   {
@@ -447,7 +465,14 @@ function startFakeCloud() {
         /* the adapter only ever sends JSON; a parse failure is a fixture bug */
       }
       if (url.includes("/router/api/v1/user/devices")) {
-        reply(ok(FIXTURE.devices));
+        // fleet suite D22 (`a renamed device keeps its name`): INVENTORY_RENAME=1 — the first device renamed in the app
+        reply(
+          ok(
+            process.env.INVENTORY_RENAME === "1"
+              ? FIXTURE.devices.map((d, i) => (i === 0 ? { ...d, deviceName: `${d.deviceName} Renamed` } : d))
+              : FIXTURE.devices,
+          ),
+        );
       } else if (url.includes("/router/api/v1/device/state")) {
         const device = parsed.payload?.device;
         const captured = CAPTURED[device];
@@ -475,6 +500,10 @@ function startFakeCloud() {
         // app version. Pinned here so the inventory does not change with
         // whatever Apple happens to answer.
         reply(JSON.stringify({ resultCount: 1, results: [{ version: "7.6.20" }] }));
+      } else if (url.includes("/account/rest/account/v2/login") && process.env.INVENTORY_REJECT_LOGIN === "1") {
+        // fleet suite D11 (`a rejected login shows no connection`): INVENTORY_REJECT_LOGIN=1 — Govee's answer to a wrong
+        // password (error-code map of four projects, Ressourcen/govee-smart/_archive/2fa_454_analyse_2026_04_27.md)
+        reply(JSON.stringify({ status: 400, message: "Incorrect password" }));
       } else if (url.includes("/account/rest/account/v2/login")) {
         // The account login. `client` present = success; accountId and topic are
         // validated by the client (H11), the token is what the group read needs.
@@ -558,6 +587,12 @@ function startFakeLanDevice() {
   const sock = dgram.createSocket({ type: "udp4", reuseAddr: true });
   const scanSock = dgram.createSocket({ type: "udp4", reuseAddr: true });
   const send = payload => {
+    // fleet suite D6 (`one device gone while the channel lives`): INVENTORY_DROP_DEVICE=1 — the light is unplugged, it
+    // answers nothing; it stays in the account list (a list without it means removed from the account, and govee
+    // removes that tree on purpose)
+    if (process.env.INVENTORY_DROP_DEVICE === "1") {
+      return;
+    }
     const buf = Buffer.from(JSON.stringify(payload));
     sock.send(buf, 0, buf.length, LAN_LISTEN_PORT, "127.0.0.1");
   };
@@ -851,6 +886,23 @@ const FIXTURE_NATIVE = {
  * fixture broker.
  */
 const FIXTURE_HOOKS = [path.join(__dirname, "inventory-https-hook.cjs")];
+/**
+ * Round 123 (homeconnect 2026-10-15: the fetch hook widened the request budget in every start, so the limit suites judged
+ * a limiter that was switched off): adapter-specific — the `--require` hooks that change only the adapter's own pace (a
+ * budget widened so a thousand fixture calls take seconds, not twenty minutes), each `path.join(__dirname, "<file>")`.
+ * adapterEnv drops them from the installations the limit tests judge (countThisInstallation); the limit tests then judge
+ * only those. B02 holds a fixture hook that sets an environment variable `src/` reads: it belongs here. govee-smart: none
+ * — the https hook only routes hosts, `src/` reads no environment variable.
+ */
+const PACING_HOOKS = [];
+/**
+ * Round 123: adapter-specific — true when the adapter's fixture hooks serve a smaller account in an installation the limit
+ * tests judge (`process.env.INVENTORY_COUNTED === "1"`), because its full fixture account does not fit a declared limit
+ * at its own pace; the inventory and every other suite keep the full account. The suite `one counterpart hangs` then
+ * demands that a judged installation pressed every limit below a day — a smaller account that never reaches a limit
+ * proves nothing.
+ */
+const LIMIT_ACCOUNT = false;
 /**
  * Round 113: adapter-specific — the instance's native for one start: FIXTURE_NATIVE, or what this run computes (fixture
  * servers on ports chosen now, a device table built from them), plus what a suite asks for in `extra` (the chosen
@@ -1746,6 +1798,59 @@ function fits(call, match) {
 }
 
 /**
+ * Round 123: the counted calls of the installations the limit tests judge, each with its installation number — every
+ * installation of the run where the adapter has no PACING_HOOKS (nothing changed its pace), otherwise only those
+ * countThisInstallation marked; the others ran with a widened budget, the log says how many were left out.
+ */
+function judgedCalls() {
+  const files = fs.readdirSync(RESOURCE_DIR);
+  const installs = files.filter(f => f.endsWith(".install")).map(f => Number(f.slice(0, -".install".length)));
+  const at = t => installs.filter(i => i <= t).length;
+  const counted = new Set(
+    files.filter(f => f.endsWith(".counted")).map(f => at(Number(f.slice(0, -".counted".length)))),
+  );
+  const judged = install => PACING_HOOKS.length === 0 || counted.has(install);
+  const installOf = new Map();
+  for (const c of readCalls().filter(c => !c.kind.startsWith("hang-"))) {
+    installOf.set(c.pid, installOf.get(c.pid) ?? at(c.t));
+  }
+  const left = new Set([...installOf.values()].filter(i => !judged(i)));
+  if (left.size > 0) {
+    console.log(`      ${left.size} installation(s) ran with PACING_HOOKS — not judged against the limits`);
+  }
+  return readCalls()
+    .filter(c => !c.kind.startsWith("hang-") && judged(installOf.get(c.pid)))
+    .map(c => ({ ...c, install: installOf.get(c.pid) }));
+}
+
+/**
+ * Round 123: the limits below a day that no judged installation pressed — with LIMIT_ACCOUNT the limiter is proven only
+ * where one installation called a counterpart more often than such a limit allows in its window, so it had to spread the
+ * calls. A day is no window of a run (the template's measured boundary).
+ *
+ * @param {{ install: number }[]} calls judgedCalls()
+ * @param {{ name: string, match: object, limits: { max: number, seconds: number }[] }[]} counterparts apiLimits()
+ */
+function limitSlack(calls, counterparts) {
+  const slack = [];
+  for (const d of counterparts) {
+    const per = new Map();
+    for (const c of calls.filter(c => fits(c, d.match))) {
+      per.set(c.install, (per.get(c.install) ?? 0) + 1);
+    }
+    const most = Math.max(0, ...per.values());
+    for (const limit of d.limits.filter(l => l.seconds < 86400)) {
+      if (most <= limit.max) {
+        slack.push(
+          `${d.name}: at most ${most} calls in one installation, never more than ${limit.max} in ${limit.seconds} s`,
+        );
+      }
+    }
+  }
+  return slack;
+}
+
+/**
  * Round 101 (krobi 2026-10-07 15:54): a value the adapter can be told for a writable state — another entry of `states`,
  * the other boolean (a button: a press), a number inside min/max other than now, another colour, the current text; null
  * where none exists (the state gets no command).
@@ -2437,6 +2542,7 @@ tests.integration(ADAPTER_DIR, {
         );
         harness = getHarness();
         clearInstanceData(harness);
+        countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
@@ -2455,6 +2561,9 @@ tests.integration(ADAPTER_DIR, {
             .filter(c => c.t >= since)
             .map(c => c.pid),
         );
+      });
+      after(() => {
+        counting = false;
       });
 
       it("comes up again in the same installation", function () {
@@ -2477,6 +2586,7 @@ tests.integration(ADAPTER_DIR, {
         this.timeout(HANG_DEADLINE_MS + STOP_DEADLINE_MS + RESTART_DELAY_MS + START_DEADLINE_MS + 120000);
         harness = getHarness();
         clearInstanceData(harness);
+        countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
@@ -2484,6 +2594,9 @@ tests.integration(ADAPTER_DIR, {
         hang = startHang();
         await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         hang = await playHang(harness, hang, restarts);
+      });
+      after(() => {
+        counting = false;
       });
       // Mocha may give up on before() while playHang still waits — the next suite must not start with a hung counterpart.
       after(() => fs.rmSync(HANG_FLAG, { force: true }));
@@ -2540,23 +2653,16 @@ tests.integration(ADAPTER_DIR, {
       });
 
       it("stays within every limit it declares", function () {
-        const calls = readCalls().filter(c => !c.kind.startsWith("hang-"));
         // round 113 (govee inv4): each installation counts on its own — a suite begins one in clearInstanceData; a
-        // process belongs to the installation its first call falls in, with the restarts the host plays in it
-        const installs = fs
-          .readdirSync(RESOURCE_DIR)
-          .filter(f => f.endsWith(".install"))
-          .map(f => Number(f.slice(0, -".install".length)));
-        const installOf = new Map();
-        for (const c of calls) {
-          installOf.set(c.pid, installOf.get(c.pid) ?? installs.filter(t => t <= c.t).length);
-        }
+        // process belongs to the installation its first call falls in, with the restarts the host plays in it;
+        // round 123: only the installations judgedCalls() keeps
+        const calls = judgedCalls();
         const over = [];
         for (const d of apiLimits()) {
           for (const limit of d.limits) {
             const lanes = new Map();
             for (const c of calls.filter(c => fits(c, d.match))) {
-              const lane = `${limit.per === "host" ? c.host : "account"}, installation ${installOf.get(c.pid)}`;
+              const lane = `${limit.per === "host" ? c.host : "account"}, installation ${c.install}`;
               lanes.set(lane, [...(lanes.get(lane) ?? []), c.t]);
             }
             for (const [lane, times] of lanes) {
@@ -2576,6 +2682,20 @@ tests.integration(ADAPTER_DIR, {
         }
         assert.deepStrictEqual(over, [], `calls above a declared limit:\n${over.join("\n")}`);
       });
+
+      // Round 123 (homeconnect 2026-10-15): a smaller account for the counted starts proves the limit only when it
+      // pressed it
+      it("puts its limiter under pressure when the counted starts get a smaller account", function () {
+        if (!LIMIT_ACCOUNT) {
+          return;
+        }
+        const slack = limitSlack(judgedCalls(), apiLimits());
+        assert.deepStrictEqual(
+          slack,
+          [],
+          `the smaller account never put the limiter under pressure:\n${slack.join("\n")}`,
+        );
+      });
     });
 
     // Round 107 (W100-5): the same rule while the adapter already runs — a device that answered and then stops answering
@@ -2592,12 +2712,16 @@ tests.integration(ADAPTER_DIR, {
         );
         harness = getHarness();
         clearInstanceData(harness);
+        countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
         hang = await playHangMidRun(harness, restarts);
+      });
+      after(() => {
+        counting = false;
       });
       // Mocha may give up on before() while playHangMidRun still waits — the next suite must not start with a hung counterpart.
       after(() => fs.rmSync(HANG_FLAG, { force: true }));
@@ -2699,6 +2823,7 @@ tests.integration(ADAPTER_DIR, {
             exit: harness.adapterExit,
             paths: [...open, ...via(readAnswers(since))],
             before: via(readAnswers(0, since)),
+            errors: harness.getLogs().filter(l => l.level === "error" && l.from === `${ADAPTER}.0`),
           };
         });
         after(() => Promise.all(held.map(h => new Promise(resolve => h.close(() => resolve())))));
@@ -2710,6 +2835,10 @@ tests.integration(ADAPTER_DIR, {
               verdict.exit,
               0,
               `stopped with exit code 0 while ${ports} was taken — a port it cannot do without is a fatal error`,
+            );
+            assert.ok(
+              verdict.errors.length > 0,
+              `stopped while ${ports} was taken without an error line — the user reads the log, not the exit code`,
             );
             assert.deepStrictEqual(
               [...verdict.paths, ...verdict.before],
@@ -3121,6 +3250,122 @@ tests.integration(ADAPTER_DIR, {
           );
         });
 
+        it("carries the object tree, the environment and log lines in every report", function () {
+          // DB-03 (krobi 2026-10-06 13:03): a report holds the object tree, the environment and log lines, also for
+          // a device that is not connected; the master's ReportContent names them the same in every adapter (round 129)
+          const filled = v =>
+            Array.isArray(v) ? v.length > 0 : v !== null && typeof v === "object" && Object.keys(v).length > 0;
+          const missing = [...reports.reports, ...reports.silent, ...reports.offline].flatMap(({ device, answer }) => {
+            const report = JSON.parse(answer?.content ?? "{}");
+            return ["environment", "objectTree", "logs"]
+              .filter(part => !filled(report[part]))
+              .map(part => `${device}: ${part}`);
+          });
+          assert.deepStrictEqual(
+            missing,
+            [],
+            `reports without their object tree, environment or log lines (DB-03):\n${missing.join("\n")}`,
+          );
+        });
+
+        it("holds every block once", function () {
+          // krobi 2026-10-20 00:46 for every adapter with a report, no content twice (DB-14): a block the file holds
+          // twice stands at its second place as a pointer to the first — the master's onceEach writes it
+          const twice = [...reports.reports, ...reports.silent, ...reports.offline].flatMap(({ device, answer }) => {
+            const seen = new Map();
+            const found = [];
+            const walk = (node, pointer) => {
+              if (node === null || typeof node !== "object") {
+                return;
+              }
+              const text = JSON.stringify(node);
+              const first = seen.get(text);
+              if (first !== undefined && JSON.stringify({ sameAs: first }).length < text.length) {
+                found.push(`${device}: ${pointer} repeats ${first}`);
+                return;
+              }
+              if (first === undefined) {
+                seen.set(text, pointer);
+              }
+              Object.entries(node).forEach(([key, item]) => walk(item, `${pointer}/${key}`));
+            };
+            walk(JSON.parse(answer?.content ?? "{}"), "");
+            return found;
+          });
+          assert.deepStrictEqual(twice, [], `blocks a report holds twice (DB-14):\n${twice.join("\n")}`);
+        });
+
+        it("carries no fixed text", function () {
+          // krobi 2026-10-20 00:29 "no dummy text", 00:46 for the fleet (DB-14): a sentence of four words or more that
+          // stands the same in the report of every device and holds a text of the adapter's own source says nothing
+          // about one device. A counterpart's answer or error text is no text of the source, so an account-wide block
+          // the same for every device stays out; so do the frame, the environment, the object tree and every log line
+          // (two real govee reports of 2026-10-18: exactly the five fixed sentences, no other hit)
+          const RECORDS = [
+            "readMe",
+            "adapter",
+            "version",
+            "exportedAt",
+            "runtime",
+            "connected",
+            "liveRead",
+            "environment",
+            "objectTree",
+            "logs",
+          ];
+          const words = text => text.trim().split(/\s+/).length;
+          const own = [];
+          const read = dir => {
+            for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+              const file = path.join(dir, entry.name);
+              if (entry.isDirectory()) {
+                read(file);
+              } else if (entry.name.endsWith(".ts") && !entry.name.endsWith(".test.ts")) {
+                for (const m of fs
+                  .readFileSync(file, "utf8")
+                  .matchAll(
+                    /\x22((?:\\.|[^\x22\\\n])*)\x22|\x27((?:\\.|[^\x27\\\n])*)\x27|\x60((?:\\.|[^\x60\\])*)\x60/g,
+                  )) {
+                  own.push(
+                    ...(m[1] ?? m[2] ?? m[3])
+                      .split(/\$\x7b[^\x7d]*\x7d/)
+                      .map(part => part.replace(/\\(.)/g, "$1").trim())
+                      .filter(part => words(part) >= 4),
+                  );
+                }
+              }
+            }
+          };
+          read(path.join(ADAPTER_DIR, "src"));
+          const sentences = answer => {
+            const found = new Set();
+            const walk = node => {
+              if (typeof node === "string") {
+                if (words(node) >= 4 && own.some(text => node.includes(text))) {
+                  found.add(node);
+                }
+              } else if (node !== null && typeof node === "object" && !["ts", "level", "msg"].every(k => k in node)) {
+                Object.values(node).forEach(walk);
+              }
+            };
+            Object.entries(JSON.parse(answer?.content ?? "{}"))
+              .filter(([key]) => !RECORDS.includes(key))
+              .forEach(([, part]) => walk(part));
+            return found;
+          };
+          const fixed = [reports.reports, reports.offline]
+            .filter(group => new Set(group.map(({ device }) => device)).size > 1)
+            .flatMap(group => {
+              const each = group.map(({ answer }) => sentences(answer));
+              return [...each[0]].filter(s => each.every(set => set.has(s)));
+            });
+          assert.deepStrictEqual(
+            [...new Set(fixed)],
+            [],
+            `sentences of the adapter's own source that stand the same in the report of every device (DB-14):\n${[...new Set(fixed)].join("\n")}`,
+          );
+        });
+
         it("restarts at most once for its own instance object", function () {
           assert.deepStrictEqual(restarts.again, [], "the instance object changed again after the restart it caused");
         });
@@ -3251,7 +3496,7 @@ tests.integration(ADAPTER_DIR, {
           for (const [origin, ids] of carriers) {
             if (ids.length > 1) {
               wrong.push(`${origin} → ${ids.join(", ")}: one recording on several datapoints`);
-            } else if (ids[0] !== origin && origin in live) {
+            } else if (ids[0] !== origin && live[origin]?.type === "state") {
               wrong.push(`${origin} → ${ids[0]}: copied while ${origin} lives on`);
             } else if (ids[0] !== origin && live[ids[0]].common?.type !== previous[origin]?.common?.type) {
               wrong.push(`${origin} → ${ids[0]}: another value type — a new datapoint, not the same one moved`);

@@ -1,6 +1,7 @@
 import { HttpError } from "./http-client";
 import { Placeholders } from "./diagnostics/placeholders";
 import type { LogLine, LogRing } from "./diagnostics/log-ring";
+import type { ReportContent } from "./diagnostics/report-jobs";
 import { ByteRing } from "./diagnostics/byte-ring";
 import { pseudonymiseReport } from "./report-placeholders";
 import { keepChannelChanges } from "./log-prefix";
@@ -1286,7 +1287,7 @@ export class DiagnosticsCollector {
     adapterVersion: string,
     prefix?: string,
     extra: { frozen?: FrozenBuffers; live?: Record<string, unknown>; treeId?: string; mentions?: LogMentions } = {},
-  ): Promise<{ content: Record<string, unknown>; fileId: string }> {
+  ): Promise<{ content: ReportContent; fileId: string }> {
     const quirks = this.registry.getQuirks(device.sku);
     const b = extra.frozen
       ? { ...extra.frozen, responses: new Map(Object.entries(extra.frozen.responses)) }
@@ -1326,8 +1327,8 @@ export class DiagnosticsCollector {
     // readMe, adapter, version, time and runtime come from the fleet frame (`report-file.ts`, DB-06).
     const report: Record<string, unknown> = {
       // What the report used to be missing entirely: which ioBroker this ran on
-      // and how the installation as a whole was doing at export time.
-      environment,
+      // and how the installation as a whole was doing at export time (DB-03: every report carries it).
+      environment: environment ?? {},
       device: {
         sku: device.sku,
         deviceId: device.deviceId,
@@ -1435,7 +1436,8 @@ export class DiagnosticsCollector {
       state: { ...device.state },
       recentLogs: b?.logs.slice() ?? [],
       // The adapter's own log at every level, also debug (plan G2) — the lines naming this device or no other one.
-      adapterLog: keepChannelChanges(extra.frozen?.adapterLog ?? this.adapterLogAbout(extra.mentions)),
+      // `logs` is the master's name for it in every adapter's report (ReportContent, round 129).
+      logs: keepChannelChanges(extra.frozen?.adapterLog ?? this.adapterLogAbout(extra.mentions)),
       // Every address the device answered the LAN scan from, counted (plan G1).
       lanReplies: extra.frozen?.lanReplies ?? [...(this.lanReplies.get(device.deviceId)?.values() ?? [])],
       // Every change of what info.online showed, with the deciding source and its evidence (plan G4).
@@ -1496,7 +1498,7 @@ export class DiagnosticsCollector {
       report,
       { names: [...this.deviceNames(), ...snapshotNames], digitIds: this.digitDeviceIds() },
       places,
-    ) as Record<string, unknown>;
+    ) as ReportContent;
     // the same pre-pass and placeholders as the content, so a digit group id becomes the same `group-N`
     const fileId = String(
       pseudonymiseReport(extra.treeId ?? device.sku, { names: [], digitIds: this.digitDeviceIds() }, places),

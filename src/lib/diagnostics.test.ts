@@ -1279,7 +1279,7 @@ describe("the adapter log and the LAN replies in the report (plan G1, G2)", () =
     const { content } = await c.generateReport(makeDevice({ deviceId: "dev1" }), "3.2.0", undefined, {
       mentions: { mine: ["dev1"], others: ["dev2"] },
     });
-    expect((content.adapterLog as Array<{ level: string; msg: string }>).map(l => `${l.level} ${l.msg}`)).toEqual([
+    expect((content.logs as Array<{ level: string; msg: string }>).map(l => `${l.level} ${l.msg}`)).toEqual([
       "debug dev1: status answer",
       "info adapter ready",
     ]);
@@ -1293,7 +1293,7 @@ describe("the adapter log and the LAN replies in the report (plan G1, G2)", () =
     const frozen = c.freeze("dev1");
     ring.add("debug", "during the live read");
     const { content } = await c.generateReport(makeDevice({ deviceId: "dev1" }), "3.2.0", undefined, { frozen });
-    expect((content.adapterLog as Array<{ msg: string }>).map(l => l.msg)).toEqual(["before"]);
+    expect((content.logs as Array<{ msg: string }>).map(l => l.msg)).toEqual(["before"]);
   });
 });
 

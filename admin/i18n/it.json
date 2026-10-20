@@ -203,5 +203,6 @@
   "deviceTypeUnknown": "Sconosciuto",
   "optHeat": "Riscaldamento",
   "descColorRgb": "Colore della luce come #rrggbb; vuoto finché la luce è in modalità temperatura colore.",
-  "descColorTemperature": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco."
+  "descColorTemperature": "Temperatura colore in Kelvin; vuoto finché la luce mostra un colore invece di una tonalità di bianco.",
+  "connectionTestFailed": "Accesso all'account Govee non riuscito: %s"
 }

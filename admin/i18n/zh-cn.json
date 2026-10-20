@@ -203,5 +203,6 @@
   "deviceTypeUnknown": "未知",
   "optHeat": "加热",
   "descColorRgb": "灯光颜色，格式为 #rrggbb；灯处于色温模式时为空。",
-  "descColorTemperature": "色温（开尔文）；灯显示彩色而非白色调时为空。"
+  "descColorTemperature": "色温（开尔文）；灯显示彩色而非白色调时为空。",
+  "connectionTestFailed": "登录 Govee 账户失败：%s"
 }

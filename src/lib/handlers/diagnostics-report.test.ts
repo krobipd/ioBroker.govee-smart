@@ -171,7 +171,7 @@ describe("the govee report source behind the fleet's report jobs", () => {
     }
     collector.setLogRing(ring);
     const report = await fetch(new ReportJobs(makeReportSource(adapter)), "h6199-b24d");
-    const logs = (JSON.parse(report.content) as { adapterLog: Array<{ msg: string }> }).adapterLog.map(l => l.msg);
+    const logs = (JSON.parse(report.content) as { logs: Array<{ msg: string }> }).logs.map(l => l.msg);
     // its own line, a line naming only its own model (it or its twin) and the adapter-wide one stay; the channel
     // prefix stands only where it changed
     expect(logs).toEqual([

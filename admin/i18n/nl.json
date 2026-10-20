@@ -203,5 +203,6 @@
   "deviceTypeUnknown": "Onbekend",
   "optHeat": "Verwarmen",
   "descColorRgb": "Kleur van het licht als #rrggbb; leeg zolang het licht in kleurtemperatuurmodus staat.",
-  "descColorTemperature": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint."
+  "descColorTemperature": "Kleurtemperatuur in Kelvin; leeg zolang het licht een kleur toont in plaats van een wittint.",
+  "connectionTestFailed": "Aanmelden bij het Govee-account mislukt: %s"
 }

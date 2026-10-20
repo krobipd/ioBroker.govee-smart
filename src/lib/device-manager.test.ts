@@ -386,6 +386,21 @@ describe("DeviceManager", () => {
       dm.handleLanDiscovery({ ip: "192.168.1.50", device: "AABBCCDDEEFF0022", sku: "H607C" });
       expect(lanReadyCount).toBe(1);
     });
+
+    it("a device renamed in the Govee app counts as a change of the list — its tree gets the new name", () => {
+      // fleet suite D22: after a restart the cache builds the tree with the old name; only a changed list rebuilds it
+      const entry = (deviceName: string): Record<string, unknown> => ({
+        sku: "H607C",
+        device: "AA:BB:CC:DD:EE:FF:00:22",
+        deviceName,
+        type: "devices.types.light",
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: {} }],
+      });
+      expect((dm as any).mergeCloudDevices([entry("Floor Lamp 2")])).toBe(true);
+      expect((dm as any).mergeCloudDevices([entry("Floor Lamp 2")])).toBe(false);
+      expect((dm as any).mergeCloudDevices([entry("Reading Lamp")])).toBe(true);
+      expect(dm.getDevices().find(d => d.sku === "H607C")!.name).toBe("Reading Lamp");
+    });
   });
 
   describe("handleMqttStatus", () => {

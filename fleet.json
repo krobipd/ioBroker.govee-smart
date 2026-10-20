@@ -62,5 +62,15 @@
   "ciExtraJobs": {
     "_comment": "Extra CI jobs beyond the fleet's core jobs — each costs runtime in every run, so each carries its reason.",
     "validate-devices": "devices.json is the device catalog the adapter ships: its schema, statuses and quirk fields are validated on every push (npm run validate-devices), a broken entry would break every installation's quirk loading"
+  },
+  "suites": {
+    "_comment": "What the fleet suites (test/fleet-suites.js, round 124) need to know about govee-smart: the connection test is the account card's login probe; the fixture hooks of test/inventory.js honour INVENTORY_RENAME (first device renamed in the account list), INVENTORY_REJECT_LOGIN (Govee's answer to a wrong password) and INVENTORY_DROP_DEVICE (the LAN light answers nothing, it stays in the account list).",
+    "connectionTest": { "command": "mqttAuth", "message": { "action": "test" } },
+    "groupSwitches": {
+      "none": "no admin setting adds or removes a group of datapoints; experimentalQuirks only switches the catalogue quirks of untested models"
+    },
+    "rename": true,
+    "rejectLogin": true,
+    "dropDevice": true
   }
 }

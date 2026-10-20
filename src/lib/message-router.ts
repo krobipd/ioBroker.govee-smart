@@ -4,6 +4,7 @@ import { accountEmail, hasAccountCredentials } from "./account-credentials";
 import type { GoveeMqttClient, LoginVerdict } from "./govee-mqtt-client";
 import { MQTT_PROBE_CONNECT_MS, VERIFICATION_REQUEST_THROTTLE_MS } from "./timing-constants";
 import type { AuthCreds, AuthResponse } from "./auth-status";
+import { resolveLabel } from "./i18n";
 
 /**
  * Host interface for MessageRouter.
@@ -157,7 +158,7 @@ export class MessageRouter {
           password: payload.password,
           code: payload.code,
         });
-        this.host.sendResponse(obj, response);
+        this.host.sendResponse(obj, payload.action === "test" ? asConnectionTest(response) : response);
         return;
       }
       // Unknown command — must respond, otherwise the admin sendTo() call
@@ -273,4 +274,21 @@ export class MessageRouter {
     }
     return { status: "unknownAction" };
   }
+}
+
+/**
+ * The login probe is the adapter's connection test (fleet suites D3/D14, round 124): beside the `status` the card
+ * words, it answers `result` when the login connected and `error` in the system language when it failed. A throttled
+ * test asked nobody and answers neither.
+ *
+ * @param response The probe's answer
+ */
+function asConnectionTest(response: AuthResponse): AuthResponse & { result?: string; error?: string } {
+  if (response.status === "ok") {
+    return { ...response, result: "ok" };
+  }
+  if (response.status === "throttled") {
+    return response;
+  }
+  return { ...response, error: resolveLabel("connectionTestFailed", response.reason ?? response.status) };
 }

@@ -1,3 +1,14 @@
+import { vi } from "vitest";
+
+// the connection test words its error in the system language (fleet D14) — adapter-core's I18n exits outside a
+// js-controller, so the key and its argument stand in for the translation
+vi.mock("@iobroker/adapter-core", () => ({
+  I18n: {
+    getTranslatedObject: (key: string) => ({ en: key }),
+    translate: (key: string, ...args: (string | number)[]) => (args.length > 0 ? `${key}:${args.join(",")}` : key),
+  },
+}));
+
 import { MessageRouter, type MessageRouterHost } from "./message-router";
 import { classifyLoginResponse, type GoveeMqttClient } from "./govee-mqtt-client";
 import { mockLog } from "../../test/test-helpers";
@@ -146,6 +157,39 @@ describe("MessageRouter", () => {
   });
 
   describe("mqttAuth — test action", () => {
+    // fleet suite D3/D14 (round 124): the connection test answers `result` while the counterpart is there and `error`
+    // in the system language while it is not; the card keeps reading `status`
+    it("answers result beside the status when the login connects", async () => {
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(responses[0].data).toEqual({ status: "ok", result: "ok" });
+    });
+
+    it("answers error in the system language beside the status when the login fails", async () => {
+      const { host, responses } = makeHost({
+        probe: makeProbe({ lastError: { category: "NETWORK", message: "connect ECONNREFUSED" } }),
+      });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      const data = responses[0].data as { status: string; error?: string; result?: unknown };
+      expect(data.status).toBe("loginFailed");
+      expect(data.result).toBeUndefined();
+      expect(data.error).toBe("connectionTestFailed:connect ECONNREFUSED");
+    });
+
+    it("a throttled test answers neither result nor error — it measured nothing", async () => {
+      const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(responses[1].data).toEqual({ status: "throttled" });
+    });
+
     it("a password of spaces only is no password — the card asks for credentials, no login is tried", async () => {
       const created: string[] = [];
       const { host, responses } = makeHost({ probe: makeProbe({ connected: true }) });
@@ -167,7 +211,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       expect(responses).toHaveLength(1);
-      expect(responses[0].data).toEqual({ status: "ok" });
+      expect(responses[0].data).toMatchObject({ status: "ok" });
     });
 
     it("reports 'MQTT not up' when login succeeds but the connect edge never arrives (M2 timeout)", async () => {
@@ -178,7 +222,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 60));
       expect(responses).toHaveLength(1);
-      expect(responses[0].data).toEqual({ status: "mqttNotUp" });
+      expect(responses[0].data).toMatchObject({ status: "mqttNotUp" });
     });
 
     it("disposes the probe on the timeout path — no socket leak (M2)", async () => {
@@ -215,7 +259,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "verifyRequired" });
+      expect(responses[0].data).toMatchObject({ status: "verifyRequired" });
     });
 
     it("returns invalid-code hint on Verification code invalid", async () => {
@@ -226,7 +270,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "codeInvalid" });
+      expect(responses[0].data).toMatchObject({ status: "codeInvalid" });
     });
 
     it("returns email-not-registered on matching error", async () => {
@@ -238,7 +282,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "emailNotRegistered" });
+      expect(responses[0].data).toMatchObject({ status: "emailNotRegistered" });
     });
 
     it("returns rate-limit hint", async () => {
@@ -249,7 +293,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "rateLimited" });
+      expect(responses[0].data).toMatchObject({ status: "rateLimited" });
     });
 
     it("returns account-locked hint", async () => {
@@ -261,7 +305,7 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
       // The status names the case — the generic fallback would quote Govee's sentence instead.
-      expect(responses[0].data).toEqual({ status: "accountLocked" });
+      expect(responses[0].data).toMatchObject({ status: "accountLocked" });
     });
 
     it("an account whose login window is full answers with the adapter's own pause and the time — nothing was sent", async () => {
@@ -279,7 +323,7 @@ describe("MessageRouter", () => {
       await new Promise(r => setTimeout(r, 10));
       // Its own case with the time as a number — the card words it in the admin's language and the
       // viewer's clock (audit DRY-13; until 3.1.0 a server-locale sentence under "throttled").
-      expect(responses[0].data).toEqual({ status: "loginWindowFull", retryAt: 1_790_000_000_000 });
+      expect(responses[0].data).toMatchObject({ status: "loginWindowFull", retryAt: 1_790_000_000_000 });
     });
 
     it("a sentence that only LOOKS like a sub-case is not read as one", async () => {
@@ -306,7 +350,7 @@ describe("MessageRouter", () => {
       const t0 = Date.now();
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "passwordRejected" });
+      expect(responses[0].data).toMatchObject({ status: "passwordRejected" });
       // Classified synchronously after connect() — no 5s edge-wait burned.
       expect(Date.now() - t0).toBeLessThan(1000);
     });
@@ -320,7 +364,10 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host, 20);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 60));
-      expect(responses[0].data).toEqual({ status: "loginFailed", reason: "Govee login rejected: policy mismatch" });
+      expect(responses[0].data).toMatchObject({
+        status: "loginFailed",
+        reason: "Govee login rejected: policy mismatch",
+      });
     });
 
     it("rejects when email or password missing", async () => {
@@ -328,7 +375,7 @@ describe("MessageRouter", () => {
       const router = new MessageRouter(host);
       router.onMessage(makeMessage("mqttAuth", { action: "test" }));
       await new Promise(r => setTimeout(r, 10));
-      expect(responses[0].data).toEqual({ status: "needCredentials" });
+      expect(responses[0].data).toMatchObject({ status: "needCredentials" });
     });
 
     it("throttles a rapid second test within the 30s window (SEC-I1)", async () => {

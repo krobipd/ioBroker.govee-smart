@@ -53,9 +53,21 @@ export function mergeCloudDevices(adapter: CloudMergeAdapter, cloudDevices: Clou
     }
     const existing = adapter.devices.get(deviceKey(cd.sku, cd.device));
     if (existing) {
-      existing.name = cd.deviceName || existing.name;
-      existing.capabilities = Array.isArray(cd.capabilities) ? cd.capabilities : [];
-      existing.type = cd.type || existing.type;
+      const name = cd.deviceName || existing.name;
+      const capabilities = Array.isArray(cd.capabilities) ? cd.capabilities : [];
+      const type = cd.type || existing.type;
+      // A name, type or capability list the tree was built from changed (renamed in the app, a new capability): only a
+      // changed list rebuilds the tree — after a restart the cache built it with the old values.
+      if (
+        name !== existing.name ||
+        type !== existing.type ||
+        JSON.stringify(capabilities) !== JSON.stringify(existing.capabilities)
+      ) {
+        changed = true;
+      }
+      existing.name = name;
+      existing.capabilities = capabilities;
+      existing.type = type;
       existing.channels.cloud = true;
     } else {
       const device = cloudDeviceToGoveeDevice(cd);

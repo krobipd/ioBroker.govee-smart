@@ -203,5 +203,6 @@
   "deviceTypeUnknown": "Unknown",
   "optHeat": "Heat",
   "descColorRgb": "Colour of the light as #rrggbb; empty while the light is in colour-temperature mode.",
-  "descColorTemperature": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone."
+  "descColorTemperature": "Colour temperature in Kelvin; empty while the light shows a colour instead of a white tone.",
+  "connectionTestFailed": "Govee account login failed: %s"
 }
