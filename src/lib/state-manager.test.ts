@@ -1364,6 +1364,21 @@ describe("StateManager", () => {
       expect(states.get("groups.info.online")).toMatchObject({ val: false });
     });
 
+    it("a tree built while the adapter is unloading seeds no default and syncs no manual segments", async () => {
+      // fleet suite D4: the build of a NEW tree (no stored values yet) behind the unload callback still wrote the
+      // defaults of its states and the manual-segment pair
+      const { adapter, calls } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry, () => true);
+      const dev = createTestDevice();
+      dev.manualMode = true;
+      dev.manualSegments = [0, 1];
+
+      await createAllStatesForTest(sm, dev, basicControlDefs());
+      await sm.createSegmentStates(dev, 2);
+
+      expect(calls.filter(c => c.method.startsWith("setState"))).toEqual([]);
+    });
+
     it("a rebuild keeps the null the device reported — the default is set only when the state is created", async () => {
       // GV-32: in colour-temperature mode the LAN answer writes color_rgb null; every later build (cloud list, library
       // load, sync) runs createLanStates again — it seeded the default #000000 back over the device's null.

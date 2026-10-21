@@ -103,4 +103,24 @@ describe("CallGate — the short windows of api-limits.json", () => {
     await expect(call("openapi.api.govee.com")).resolves.toEqual({ ok: true });
     expect(request).toHaveBeenCalledTimes(3);
   });
+
+  it("holds the host for the seconds its Retry-After names, not the 60 s it falls back to", async () => {
+    const c = clock();
+    const gate = new CallGate(() => Promise.resolve(), c.now);
+    const request = vi.mocked(httpsRequest);
+    request.mockReset();
+    request.mockRejectedValueOnce(new HttpError("HTTP 429", 429, { "retry-after": "120" }));
+    request.mockResolvedValue({ ok: true } as never);
+    const call = (): Promise<unknown> =>
+      gate.https()({ method: "GET", url: "https://openapi.api.govee.com/x", headers: {} });
+
+    await expect(call()).rejects.toMatchObject({ statusCode: 429 });
+    c.advance(90_000);
+    await expect(call()).rejects.toMatchObject({ statusCode: 429, headers: { "retry-after": "30" } });
+    expect(request).toHaveBeenCalledTimes(1);
+
+    c.advance(30_000);
+    await expect(call()).resolves.toEqual({ ok: true });
+    expect(request).toHaveBeenCalledTimes(2);
+  });
 });

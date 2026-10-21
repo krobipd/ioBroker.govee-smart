@@ -401,6 +401,21 @@ describe("DeviceManager", () => {
       expect((dm as any).mergeCloudDevices([entry("Reading Lamp")])).toBe(true);
       expect(dm.getDevices().find(d => d.sku === "H607C")!.name).toBe("Reading Lamp");
     });
+
+    it("a device type the cloud changes counts as a change of the list and is taken over; a missing type keeps the old", () => {
+      const entry = (type: string | undefined): Record<string, unknown> => ({
+        sku: "H607C",
+        device: "AA:BB:CC:DD:EE:FF:00:22",
+        deviceName: "Floor Lamp 2",
+        type,
+        capabilities: [{ type: "devices.capabilities.on_off", instance: "powerSwitch", parameters: {} }],
+      });
+      expect((dm as any).mergeCloudDevices([entry("devices.types.light")])).toBe(true);
+      expect((dm as any).mergeCloudDevices([entry("devices.types.socket")])).toBe(true);
+      expect(dm.getDevices().find(d => d.sku === "H607C")!.type).toBe("devices.types.socket");
+      expect((dm as any).mergeCloudDevices([entry(undefined)])).toBe(false);
+      expect(dm.getDevices().find(d => d.sku === "H607C")!.type).toBe("devices.types.socket");
+    });
   });
 
   describe("handleMqttStatus", () => {
