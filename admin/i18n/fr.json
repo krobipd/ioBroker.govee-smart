@@ -110,6 +110,8 @@
   "infoCloudConnectedDesc": "Vrai tant que l'API cloud de Govee répond. Elle nécessite la clé API et fournit la liste des appareils, les scènes, les segments et les commandes cloud.",
   "infoMqttConnectedDesc": "Vrai tant que la connexion au compte en temps réel est établie. Elle nécessite l'e-mail et le mot de passe et transmet les changements d'état d'elle-même, sans interrogation par l'adaptateur.",
   "segmentChannel": "Segment %s",
+  "segmentColor": "Couleur du segment %s",
+  "segmentBrightness": "Luminosité du segment %s",
   "infoVerificationPending": "Code de vérification requis",
   "infoVerificationPendingDesc": "Vrai tant que Govee attend un code de vérification 2FA pour terminer la connexion au compte en temps réel. Saisissez le code dans la carte de connexion de l'adaptateur.",
   "tabExpert": "Expert",

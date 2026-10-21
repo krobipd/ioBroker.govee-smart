@@ -1254,7 +1254,7 @@ export class StateManager {
       await this.extendIfChanged(`${prefix}.segments.${i}.color`, {
         type: "state",
         common: {
-          name: tName("color"),
+          name: tNameWith("segmentColor", i),
           type: "string",
           role: "level.color.rgb",
           read: true,
@@ -1267,7 +1267,7 @@ export class StateManager {
       await this.extendIfChanged(`${prefix}.segments.${i}.brightness`, {
         type: "state",
         common: {
-          name: tName("brightness"),
+          name: tNameWith("segmentBrightness", i),
           type: "number",
           role: "level.brightness",
           read: true,

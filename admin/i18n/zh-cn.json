@@ -110,6 +110,8 @@
   "infoCloudConnectedDesc": "只要 Govee 云 API 有响应即为真。它需要 API 密钥，提供设备列表、场景、分段和云端命令。",
   "infoMqttConnectedDesc": "只要实时账号连接可用即为真。它需要邮箱和密码，会主动推送状态变化，而不是由适配器轮询。",
   "segmentChannel": "分段 %s",
+  "segmentColor": "分段 %s 颜色",
+  "segmentBrightness": "分段 %s 亮度",
   "infoVerificationPending": "需要验证码",
   "infoVerificationPendingDesc": "当 Govee 等待 2FA 验证码以完成实时账户登录时为真。请在适配器的连接卡中输入验证码。",
   "tabExpert": "专家",

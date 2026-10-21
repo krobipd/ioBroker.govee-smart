@@ -144,7 +144,61 @@ async function stampsOf(harness, ids) {
   return Object.fromEntries(ids.map((id, i) => [id, values[i]?.ts]));
 }
 
+// Round 138 (audit M11): a run that shares the workshop with other runs takes its mutex — until now only a hook that
+// recognised the command text made sure of it. Walking up from the adapter, the first `.cache/locks` that holds the
+// workshop lock decides: its holder must be an ancestor of this process (with-werkstatt-lock.py, pre-release.py). No such
+// folder (the CI, a clone elsewhere): nothing to hold. Round 139 (govee 2026-10-21, krobi): the flock decides, not the
+// holder file — a killed holder leaves its text behind, and a PID the system hands out again could name an ancestor.
+// The probe is the system's lockf(1) (the workshop is a Mac; an adapter carries no Python, mcm1957): -k keeps the
+// lock file (without it lockf deletes the file), -t 0 waits for nothing; exit 0 = free, 75 = held.
+const LOCKF_HELD = 75;
+
+function workshopMutexProblem(startDir) {
+  const { execFileSync, spawnSync } = require("node:child_process");
+  let dir = path.resolve(startDir);
+  for (;;) {
+    const locks = path.join(dir, ".cache", "locks");
+    const lockFile = path.join(locks, "werkstatt-pruefung.lock");
+    if (fs.existsSync(lockFile)) {
+      const probe = spawnSync("lockf", ["-k", "-s", "-t", "0", lockFile, "/usr/bin/true"], { encoding: "utf8" });
+      if (probe.status === 0) {
+        return `the workshop mutex (${locks}) is not held — start the run through with-werkstatt-lock.py`;
+      }
+      if (probe.status !== LOCKF_HELD) {
+        return `the workshop mutex (${locks}) cannot be probed (lockf: ${probe.error?.message ?? `exit ${probe.status}`})`;
+      }
+      let holder = null;
+      try {
+        holder = JSON.parse(fs.readFileSync(path.join(locks, "werkstatt-pruefung.holder.json"), "utf8")).pid;
+      } catch {
+        return `the workshop mutex (${locks}) is held, but names no holder — start the run through with-werkstatt-lock.py`;
+      }
+      let pid = process.pid;
+      for (let hop = 0; hop < 64 && pid > 1; hop++) {
+        if (pid === Number(holder)) {
+          return null;
+        }
+        try {
+          pid = Number(execFileSync("ps", ["-o", "ppid=", "-p", String(pid)], { encoding: "utf8" }).trim());
+        } catch {
+          break;
+        }
+      }
+      return `the workshop mutex (${locks}) is held by PID ${holder}, which did not start this run`;
+    }
+    const up = path.dirname(dir);
+    if (up === dir) {
+      return null;
+    }
+    dir = up;
+  }
+}
+
 module.exports = function fleetSuites(suite, ctx) {
+  const mutexProblem = workshopMutexProblem(ctx.ADAPTER_DIR);
+  if (mutexProblem) {
+    throw new Error(mutexProblem);
+  }
   const {
     ADAPTER_DIR,
     ADAPTER,
@@ -1014,6 +1068,7 @@ module.exports = function fleetSuites(suite, ctx) {
     });
   });
 };
+module.exports.workshopMutexProblem = workshopMutexProblem;
 module.exports.spacingOf = spacingOf;
 module.exports.newlyDown = newlyDown;
 module.exports.upBefore = upBefore;

@@ -1,4 +1,7 @@
 import { vi } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { I18n } from "@iobroker/adapter-core";
 
 vi.mock("@iobroker/adapter-core", () => ({
   I18n: {
@@ -3417,6 +3420,45 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
       const name = (objects.get("devices.h6160-0011.segments.1")?.common as { name: unknown }).name;
       expect(typeof name).not.toBe("string");
       expect(name).toMatchObject({ en: expect.any(String) });
+    });
+
+    it("a segment's colour and brightness say which segment they belong to", async () => {
+      // D19 (round 138): no device carries two datapoints with the same name in
+      // any language. Every segment's states were plain "Color" / "Brightness",
+      // and the brightness also met control.brightness — eight segments meant
+      // sixteen datapoints with two names.
+      // The real texts of all eleven languages, substituted as adapter-core
+      // does: the running number replaces `%s` when the English text carries it.
+      const dir = join(__dirname, "../../admin/i18n");
+      const words = Object.fromEntries(
+        readdirSync(dir).map(f => [f.replace(".json", ""), JSON.parse(readFileSync(join(dir, f), "utf8"))]),
+      ) as Record<string, Record<string, string>>;
+      vi.mocked(I18n.getTranslatedObject).mockImplementation(((key: string, arg?: string | number) =>
+        Object.fromEntries(
+          Object.entries(words).map(([lang, w]) => {
+            const text = w[key] ?? key;
+            return [lang, arg !== undefined && words.en[key]?.includes("%s") ? text.replace("%s", String(arg)) : text];
+          }),
+        )) as never);
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      try {
+        await sm.createSegmentStates(createTestDevice(), 2);
+      } finally {
+        vi.mocked(I18n.getTranslatedObject).mockImplementation((key: string) => ({ en: key, de: `${key}_de` }));
+      }
+      const nameOf = (id: string): Record<string, string> =>
+        (objects.get(`devices.h6160-0011.${id}`)?.common as { name: Record<string, string> }).name;
+      expect(Object.keys(nameOf("segments.0.color"))).toHaveLength(11);
+      for (const lang of Object.keys(nameOf("segments.0.color"))) {
+        const names = ["segments.0.color", "segments.1.color", "segments.0.brightness", "segments.1.brightness"].map(
+          id => nameOf(id)[lang],
+        );
+        expect(new Set(names).size, lang).toBe(names.length);
+      }
+      expect(nameOf("segments.1.color").en).toBe("Segment 1 color");
+      expect(nameOf("segments.1.brightness").en).toBe("Segment 1 brightness");
+      expect(nameOf("segments.0.brightness").de).toBe("Segment 0 Helligkeit");
     });
   });
 });

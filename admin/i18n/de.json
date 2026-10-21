@@ -110,6 +110,8 @@
   "infoCloudConnectedDesc": "Wahr, solange die Govee-Cloud-API antwortet. Sie braucht den API-Schlüssel und liefert Geräteliste, Szenen, Segmente und Cloud-Befehle.",
   "infoMqttConnectedDesc": "Wahr, solange die Echtzeit-Kontoverbindung steht. Sie braucht E-Mail und Passwort und schickt Statusänderungen von sich aus, statt dass der Adapter sie abfragt.",
   "segmentChannel": "Segment %s",
+  "segmentColor": "Segment %s Farbe",
+  "segmentBrightness": "Segment %s Helligkeit",
   "infoVerificationPending": "Bestätigungscode erforderlich",
   "infoVerificationPendingDesc": "Wahr, solange Govee auf einen 2FA-Bestätigungscode wartet, bevor der Echtzeit-Konto-Login abgeschlossen werden kann. Code in der Verbindungs-Karte des Adapters eingeben.",
   "tabExpert": "Experte",

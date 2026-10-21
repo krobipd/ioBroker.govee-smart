@@ -110,6 +110,8 @@
   "infoCloudConnectedDesc": "Waar zolang de Govee-cloud-API antwoordt. Deze heeft de API-sleutel nodig en levert de apparaatlijst, scènes, segmenten en cloudopdrachten.",
   "infoMqttConnectedDesc": "Waar zolang de realtime accountverbinding actief is. Deze heeft e-mail en wachtwoord nodig en stuurt statuswijzigingen uit zichzelf, in plaats van dat de adapter ernaar vraagt.",
   "segmentChannel": "Segment %s",
+  "segmentColor": "Kleur segment %s",
+  "segmentBrightness": "Helderheid segment %s",
   "infoVerificationPending": "Verificatiecode vereist",
   "infoVerificationPendingDesc": "Waar zolang Govee wacht op een 2FA-verificatiecode voordat de realtime-accountaanmelding kan worden voltooid. Voer de code in de verbindingskaart van de adapter in.",
   "tabExpert": "Expert",
