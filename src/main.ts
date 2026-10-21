@@ -117,11 +117,12 @@ interface StartContext {
 }
 
 /**
- * Exported so the orchestration unit tests can drive the lifecycle handlers
- * directly (fleet harness, see `reference_orchestration_test_harness`). The
- * runtime entry point below still constructs it the same way.
+ * Rides on the compact-mode factory below so the orchestration unit tests can
+ * drive the lifecycle handlers directly (fleet harness, see
+ * `reference_orchestration_test_harness`). The runtime entry point below still
+ * constructs it the same way.
  */
-export class GoveeAdapter extends utils.Adapter {
+class GoveeAdapter extends utils.Adapter {
   /**
    * Settings keys renamed by earlier releases, carried over once on the first start after
    * the update (fleet helper `native-key-migration`, listen-port standard 2026-09-15):
@@ -1631,7 +1632,11 @@ export class GoveeAdapter extends utils.Adapter {
 }
 
 if (require.main !== module) {
-  module.exports = (options: Partial<utils.AdapterOptions> | undefined) => new GoveeAdapter(options);
+  // Export the constructor in compact mode; the class rides on the factory for the tests (an `export` keyword next to
+  // `module.exports` makes esbuild warn commonjs-variable-in-esm)
+  module.exports = Object.assign((options: Partial<utils.AdapterOptions> | undefined) => new GoveeAdapter(options), {
+    GoveeAdapter,
+  });
 } else {
   (() => new GoveeAdapter())();
 }

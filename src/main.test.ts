@@ -264,7 +264,7 @@ vi.mock("@iobroker/adapter-core", () => {
   };
 });
 
-import { GoveeAdapter } from "./main";
+import * as mainModule from "./main";
 import { CLOUD_LIMITS, LAN_STATUS_REFRESH_MS, STALE_DEVICE_CLEANUP_DELAY_MS } from "./lib/timing-constants";
 import { CloudControlRejected } from "./lib/govee-cloud-client";
 import * as connectionState from "./lib/handlers/connection-state";
@@ -275,6 +275,10 @@ import * as cloudCredsModule from "./lib/handlers/cloud-creds-handler";
 import type { DeviceManager } from "./lib/device-manager";
 import type { GoveeDevice } from "./lib/types";
 import { httpsRequest } from "./lib/http-client";
+
+// main.ts exports nothing by name (compact mode needs a callable module.exports); the class rides on the factory.
+const { GoveeAdapter } = mainModule as unknown as { GoveeAdapter: new () => ioBroker.Adapter };
+type GoveeAdapter = ioBroker.Adapter;
 
 beforeEach(() => {
   // Fresh instance data dir per test — see dataDirName above. Done here (not in
