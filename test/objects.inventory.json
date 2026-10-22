@@ -215,8 +215,8 @@
         "uk": "Швидкість вентилятора",
         "zh-cn": "风速"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -688,8 +688,8 @@
         "uk": "DIY-сцена",
         "zh-cn": "DIY 场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -735,8 +735,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -1584,8 +1584,8 @@
         "uk": "Cloud-знімок",
         "zh-cn": "Cloud 快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -1670,8 +1670,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -5017,8 +5017,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -5134,8 +5134,8 @@
         "uk": "DIY-сцена",
         "zh-cn": "DIY 场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -5181,8 +5181,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -6541,8 +6541,8 @@
         "uk": "Cloud-знімок",
         "zh-cn": "Cloud 快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -6627,8 +6627,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -6753,9 +6753,9 @@
       "read": true,
       "write": true,
       "unit": "%",
-      "min": 0,
+      "min": 1,
       "max": 100,
-      "def": 0
+      "def": 1
     },
     "native": {
       "capabilityType": "lan",
@@ -7244,8 +7244,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -7378,10 +7378,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.0.brightness"
@@ -7451,10 +7451,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.1.brightness"
@@ -7524,10 +7524,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.2.brightness"
@@ -7597,10 +7597,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.3.brightness"
@@ -7670,10 +7670,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.4.brightness"
@@ -7743,10 +7743,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.5.brightness"
@@ -7816,10 +7816,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.6.brightness"
@@ -7889,10 +7889,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.7.brightness"
@@ -7962,10 +7962,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.8.brightness"
@@ -8035,10 +8035,10 @@
       "role": "level.brightness",
       "read": true,
       "write": true,
-      "min": 0,
+      "min": 1,
       "max": 100,
       "unit": "%",
-      "def": 0
+      "def": 1
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.segments.9.brightness"
@@ -8296,8 +8296,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -8995,8 +8995,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -9107,8 +9107,8 @@
         "uk": "DIY-сцена",
         "zh-cn": "DIY 场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -9151,8 +9151,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -10789,8 +10789,8 @@
         "uk": "Cloud-знімок",
         "zh-cn": "Cloud 快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -10875,8 +10875,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -11533,8 +11533,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -11652,8 +11652,8 @@
         "uk": "DIY-сцена",
         "zh-cn": "DIY 场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -11696,8 +11696,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -13291,8 +13291,8 @@
         "uk": "Cloud-знімок",
         "zh-cn": "Cloud 快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -13378,8 +13378,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -14077,8 +14077,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -14201,8 +14201,8 @@
         "uk": "DIY-сцена",
         "zh-cn": "DIY 场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -14248,8 +14248,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -15535,8 +15535,8 @@
         "uk": "Cloud-знімок",
         "zh-cn": "Cloud 快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -15621,8 +15621,8 @@
         "uk": "Локальний знімок",
         "zh-cn": "本地快照"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -15813,8 +15813,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -16213,8 +16213,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -16690,8 +16690,8 @@
         "uk": "Значення режиму",
         "zh-cn": "模式值"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -16764,8 +16764,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -17342,8 +17342,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -17714,8 +17714,8 @@
         "uk": "Автозупинка",
         "zh-cn": "自动停止"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -17830,8 +17830,8 @@
         "uk": "Значення режиму",
         "zh-cn": "模式值"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -17876,8 +17876,8 @@
         "uk": "Сцена нічника",
         "zh-cn": "夜灯场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -18027,8 +18027,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -19008,8 +19008,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -19869,8 +19869,8 @@
         "uk": "Режим роботи",
         "zh-cn": "工作模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -20633,7 +20633,7 @@
       "name": "Group Ground Floor",
       "icon": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iY3VycmVudENvbG9yIj48cGF0aCBkPSJNMTYgMTFjMS42NiAwIDIuOTktMS4zNCAyLjk5LTNTMTcuNjYgNSAxNiA1Yy0xLjY2IDAtMyAxLjM0LTMgM3MxLjM0IDMgMyAzem0tOCAwYzEuNjYgMCAyLjk5LTEuMzQgMi45OS0zUzkuNjYgNSA4IDVDNi4zNCA1IDUgNi4zNCA1IDhzMS4zNCAzIDMgM3ptMCAyYy0yLjMzIDAtNyAxLjE3LTcgMy41VjE5aDE0di0yLjVjMC0yLjMzLTQuNjctMy41LTctMy41em04IDBjLS4yOSAwLS42Mi4wMi0uOTcuMDUgMS4xNi44NCAxLjk3IDEuOTcgMS45NyAzLjQ1VjE5aDZ2LTIuNWMwLTIuMzMtNC42Ny0zLjUtNy0zLjV6Ii8+PC9zdmc+",
       "statusStates": {
-        "onlineId": "govee-smart.0.groups.info.online"
+        "onlineId": "govee-smart.0.groups.basegroup-0001.info.online"
       }
     },
     "native": {
@@ -20684,9 +20684,9 @@
       "read": true,
       "write": true,
       "unit": "%",
-      "min": 0,
+      "min": 1,
       "max": 100,
-      "def": 0
+      "def": 1
     },
     "native": {
       "capabilityType": "lan",
@@ -20925,6 +20925,44 @@
     "native": {},
     "_id": "govee-smart.0.groups.basegroup-0001.info.name"
   },
+  "govee-smart.0.groups.basegroup-0001.info.online": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Online",
+        "en": "Online",
+        "es": "Conectado",
+        "fr": "En ligne",
+        "it": "Online",
+        "nl": "Online",
+        "pl": "Online",
+        "pt": "Online",
+        "ru": "Онлайн",
+        "uk": "Онлайн",
+        "zh-cn": "在线"
+      },
+      "type": "boolean",
+      "role": "indicator.reachable",
+      "read": true,
+      "write": false,
+      "desc": {
+        "de": "Ob jedes Mitglied der Gruppe erreichbar ist — false, sobald eines davon nicht antwortet.",
+        "en": "Whether every member of the group is reachable — false as soon as one of them does not answer.",
+        "es": "Si todos los miembros del grupo están accesibles — false en cuanto uno de ellos no responde.",
+        "fr": "Indique si chaque membre du groupe est joignable — false dès que l'un d'eux ne répond pas.",
+        "it": "Se ogni membro del gruppo è raggiungibile — false non appena uno di essi non risponde.",
+        "nl": "Of elk lid van de groep bereikbaar is — false zodra een van hen niet antwoordt.",
+        "pl": "Czy każdy członek grupy jest osiągalny — false, gdy tylko którykolwiek z nich nie odpowiada.",
+        "pt": "Se todos os membros do grupo estão acessíveis — false assim que um deles não responde.",
+        "ru": "Доступны ли все участники группы — false, как только хотя бы один из них не отвечает.",
+        "uk": "Чи доступні всі учасники групи — false, щойно хоча б один із них не відповідає.",
+        "zh-cn": "组内每个成员是否都可访问——只要有一个成员没有应答即为 false。"
+      },
+      "def": false
+    },
+    "native": {},
+    "_id": "govee-smart.0.groups.basegroup-0001.info.online"
+  },
   "govee-smart.0.groups.basegroup-0001.music": {
     "type": "channel",
     "common": {
@@ -20961,8 +20999,8 @@
         "uk": "Режим музики",
         "zh-cn": "音乐模式"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {
@@ -21014,8 +21052,8 @@
         "uk": "Світлова сцена",
         "zh-cn": "灯光场景"
       },
-      "type": "mixed",
-      "role": "state",
+      "type": "string",
+      "role": "text",
       "read": true,
       "write": true,
       "states": {

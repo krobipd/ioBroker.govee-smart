@@ -171,6 +171,7 @@
   "descWarmMistToggle": "Si l'humidificateur chauffe l'eau avant de la vaporiser — brume chaude au lieu de froide.",
   "descPresetScene": "Une liste déroulante des scènes prêtes à l'emploi de ce modèle ; lesquelles existent dépend de Govee et varie selon le modèle.",
   "descMembersUnreachable": "Quels membres du groupe sont actuellement injoignables, nommés comme dans l'arborescence — vide tant que tous répondent.",
+  "descGroupOnline": "Indique si chaque membre du groupe est joignable — false dès que l'un d'eux ne répond pas.",
   "portLabel": "Port d'écoute LAN",
   "portTooltip": "Imposé par le protocole LAN Govee : les réponses des lampes arrivent sur UDP 4002. Une seconde instance sur cet hôte ne peut pas le partager — l'admin avertit si un autre adaptateur utilise le port.",
   "optLow": "Faible",

@@ -1662,7 +1662,9 @@ describe("StateManager", () => {
       expect(reads()).toBe(1);
     });
 
-    it("should not create model/serial/ip/online for BaseGroup", async () => {
+    it("gives a BaseGroup its own reachability, but no model/serial/ip", async () => {
+      // fleet rule D08 device-reachable: every device shows whether it is reachable; krobi 2026-10-22: a group is
+      // reachable while every member is
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice({ sku: "BaseGroup", deviceId: "1280" });
@@ -1670,7 +1672,14 @@ describe("StateManager", () => {
       await createAllStatesForTest(sm, dev, []);
 
       expect(objects.has("groups.basegroup-1280.info.name")).toBe(true);
-      expect(objects.has("groups.basegroup-1280.info.online")).toBe(false);
+      expect(objects.get("groups.basegroup-1280.info.online")?.common).toMatchObject({
+        type: "boolean",
+        role: "indicator.reachable",
+        write: false,
+      });
+      expect(objects.get("groups.basegroup-1280")?.common).toMatchObject({
+        statusStates: { onlineId: "govee-smart.0.groups.basegroup-1280.info.online" },
+      });
       expect(objects.has("groups.basegroup-1280.info.model")).toBe(false);
       expect(objects.has("groups.basegroup-1280.info.serial")).toBe(false);
       expect(objects.has("groups.basegroup-1280.info.ip")).toBe(false);
@@ -1827,6 +1836,32 @@ describe("StateManager", () => {
       expect(objects.has("groups.basegroup-1311.info.membersUnreachable")).toBe(true);
       const val = states.get("groups.basegroup-1311.info.membersUnreachable");
       expect(val!.val).toBe("h61be-0011");
+      // one member down — the group is not reachable (krobi 2026-10-22: reachable while every member is)
+      expect(states.get("groups.basegroup-1311.info.online")).toMatchObject({ val: false, ack: true });
+    });
+
+    it("a group is reachable while every member is, and never without a resolved member", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
+
+      await sm.updateGroupMembersUnreachable(group, [createTestDevice({ state: { online: true } })]);
+      expect(states.get("groups.basegroup-1311.info.online")).toMatchObject({ val: true, ack: true });
+
+      await sm.updateGroupMembersUnreachable(group, []);
+      expect(states.get("groups.basegroup-1311.info.online")).toMatchObject({ val: false, ack: true });
+    });
+
+    it("the stop marks a group offline like every device", async () => {
+      const { adapter, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const group = createTestDevice({ sku: "BaseGroup", deviceId: "6781311" });
+      await createAllStatesForTest(sm, group, []);
+      await sm.updateGroupMembersUnreachable(group, [createTestDevice({ state: { online: true } })]);
+      expect(states.get("groups.basegroup-1311.info.online")).toMatchObject({ val: true });
+
+      await sm.markAllOffline();
+      expect(states.get("groups.basegroup-1311.info.online")).toMatchObject({ val: false });
     });
 
     it("should write empty string when all members are reachable (no delete to avoid race-condition WARN)", async () => {
@@ -2878,6 +2913,36 @@ describe("StateManager", () => {
   });
 
   describe("createSegmentStates", () => {
+    it("a segment's brightness carries the range the device declares for one segment, else 0–100 (D16)", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const segmentedBrightness = {
+        type: "devices.capabilities.segment_color_setting",
+        instance: "segmentedBrightness",
+        parameters: {
+          dataType: "STRUCT",
+          fields: [
+            { fieldName: "segment", elementRange: { min: 0, max: 9 } },
+            { fieldName: "brightness", range: { min: 1, max: 100, precision: 1 } },
+          ],
+        },
+      };
+      await sm.createSegmentStates(createTestDevice({ capabilities: [segmentedBrightness] as never }), 2);
+      expect(objects.get("devices.h6160-0011.segments.1.brightness")?.common).toMatchObject({
+        min: 1,
+        max: 100,
+        def: 1,
+      });
+
+      const plain = createMockAdapter();
+      await new StateManager(plain.adapter as never, registry).createSegmentStates(createTestDevice(), 2);
+      expect(plain.objects.get("devices.h6160-0011.segments.1.brightness")?.common).toMatchObject({
+        min: 0,
+        max: 100,
+        def: 0,
+      });
+    });
+
     it("should create segment channel and per-segment states", async () => {
       const { adapter, objects } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);

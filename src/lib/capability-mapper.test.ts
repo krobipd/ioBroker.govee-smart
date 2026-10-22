@@ -131,7 +131,7 @@ describe("classifyModeLevels + mapWorkMode against the real option shapes", () =
     // The I18n stub hands back the key — a translated label, not Govee's wording.
     expect(modeValue!.states).toEqual({ 1: "optSleep", 2: "optLow", 3: "optHigh" });
     expect(modeValue!.def).toBe("1");
-    expect(modeValue!.type).toBe("mixed");
+    expect(modeValue!.type).toBe("string");
   });
 
   it("H7121 purifier: every mode carries only a defaultValue — no level datapoint at all", () => {
@@ -633,7 +633,7 @@ describe("CapabilityMapper", () => {
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("scene");
       // "0" sentinel — the key resetModeDropdowns writes, and a `def` the
-      // repochecker accepts for a `mixed` datapoint (E1006 wants valid JSON).
+      // the text list keeps (its def is one of its keys).
       expect(result[0].states).toEqual({ 0: "---", 1: "Sunset", 2: "Rainbow", 3: "Movie" });
       expect(result[0].def).toBe("0");
       expect(result[0].write).toBe(true);
@@ -834,9 +834,9 @@ describe("CapabilityMapper", () => {
 
       // Mode dropdown
       expect(result[0].id).toBe("music_mode");
-      expect(result[0].role).toBe("state");
-      // mixed lets users write the index ("1") or the label ("Energic")
-      expect(result[0].type).toBe("mixed");
+      expect(result[0].role).toBe("text");
+      // a text list lets users write the index ("1") or the label ("Energic")
+      expect(result[0].type).toBe("string");
       // Index-based (0 = "---" sentinel), decoupled from the device value:
       // 1→Energic(value 5), 2→Rhythm(value 3), 3→Spectrum(value 6). The send
       // path resolves the index back through getMusicModeOptions, so even these
@@ -918,7 +918,7 @@ describe("CapabilityMapper", () => {
       expect(mode?.def).toBe("0");
     });
 
-    it("should fall back to mixed work_mode state when STRUCT has no fields", () => {
+    it("should fall back to a text work_mode state when STRUCT has no fields", () => {
       const caps: CloudCapability[] = [
         {
           type: "devices.capabilities.work_mode",
@@ -929,10 +929,9 @@ describe("CapabilityMapper", () => {
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("work_mode");
-      expect(result[0].type).toBe("mixed");
-      // mixed dropdown → role "state" (a level.* role forces a numeric type and
-      // would trip the js-controller strict-type check; see design principle 21)
-      expect(result[0].role).toBe("state");
+      // fleet datapoint form: no `mixed`, no role `state` — a text with its typed collective role
+      expect(result[0].type).toBe("string");
+      expect(result[0].role).toBe("text");
     });
 
     it("should map work_mode STRUCT with workMode field options to dropdown", () => {
@@ -959,7 +958,7 @@ describe("CapabilityMapper", () => {
       const result = mapCapabilities(caps);
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("work_mode");
-      expect(result[0].type).toBe("mixed");
+      expect(result[0].type).toBe("string");
       expect(result[0].states).toEqual({ 1: "optManual", 2: "optAuto", 3: "optSleep" });
       expect(result[0].def).toBe("1");
     });
@@ -994,7 +993,7 @@ describe("CapabilityMapper", () => {
       const modeValue = result.find(s => s.id === "mode_value");
       expect(modeValue).toBeDefined();
       expect(modeValue!.states).toEqual({ 1: "optLow", 2: "optHigh" });
-      expect(modeValue!.type).toBe("mixed");
+      expect(modeValue!.type).toBe("string");
     });
 
     it("should map work_mode STRUCT with modeValue range as slider", () => {
@@ -1778,7 +1777,7 @@ describe("CapabilityMapper", () => {
       };
     }
 
-    it("light_scene must be type:mixed with disambiguated labels", () => {
+    it("light_scene must be a text list with disambiguated labels", () => {
       const device = makeDevice({
         scenes: [
           { name: "Aurora", value: { id: 1 } },
@@ -1789,7 +1788,8 @@ describe("CapabilityMapper", () => {
       const defs = buildAllStateDefsForTest(device);
       const sceneDef = defs.find(d => d.id === "light_scene");
       expect(sceneDef).toBeDefined();
-      expect(sceneDef!.type).toBe("mixed");
+      expect(sceneDef!.type).toBe("string");
+      expect(sceneDef!.role).toBe("text");
       expect(sceneDef!.states).toEqual({
         0: "---",
         1: "Aurora",
@@ -1798,32 +1798,35 @@ describe("CapabilityMapper", () => {
       });
     });
 
-    it("diy_scene must be type:mixed", () => {
+    it("diy_scene must be a text list", () => {
       const device = makeDevice({
         diyScenes: [{ name: "MyDIY", value: { id: 99 } }],
       });
       const defs = buildAllStateDefsForTest(device);
       const diyDef = defs.find(d => d.id === "diy_scene");
       expect(diyDef).toBeDefined();
-      expect(diyDef!.type).toBe("mixed");
+      expect(diyDef!.type).toBe("string");
+      expect(diyDef!.role).toBe("text");
     });
 
-    it("snapshot_cloud must be type:mixed", () => {
+    it("snapshot_cloud must be a text list", () => {
       const device = makeDevice({
         snapshots: [{ name: "My Snap", value: { id: 7 } }],
       });
       const defs = buildAllStateDefsForTest(device);
       const snapDef = defs.find(d => d.id === "snapshot_cloud");
       expect(snapDef).toBeDefined();
-      expect(snapDef!.type).toBe("mixed");
+      expect(snapDef!.type).toBe("string");
+      expect(snapDef!.role).toBe("text");
     });
 
-    it("snapshot_local must be type:mixed even with empty list", () => {
+    it("snapshot_local must be a text list even with empty list", () => {
       const device = makeDevice();
       const defs = buildAllStateDefsForTest(device, undefined);
       const localDef = defs.find(d => d.id === "snapshot_local");
       expect(localDef).toBeDefined();
-      expect(localDef!.type).toBe("mixed");
+      expect(localDef!.type).toBe("string");
+      expect(localDef!.role).toBe("text");
       expect(localDef!.states).toEqual({ 0: "---" });
     });
 
@@ -1982,6 +1985,19 @@ describe("CapabilityMapper", () => {
       expect(ct).toMatchObject({ min: 2200, max: 6500, def: 2200 });
     });
 
+    it("offers the brightness range every member takes — a member's declared 1–100 narrows the LAN 0–100 (D16)", () => {
+      const brightnessCap = {
+        type: "devices.capabilities.range",
+        instance: "brightness",
+        parameters: { dataType: "INTEGER", range: { min: 1, max: 100, precision: 1 } },
+      } as never;
+      const group = createGroup();
+      const m1 = createMember({ sku: "H6172", lanIp: "192.168.1.1", capabilities: [brightnessCap] });
+      const m2 = createMember({ sku: "H61BC", lanIp: "192.168.1.2" });
+      const b = buildAllStateDefsForTest(group, undefined, [m1, m2]).find(d => d.id === "brightness");
+      expect(b).toMatchObject({ min: 1, max: 100, def: 1 });
+    });
+
     it("offers no colour temperature when the members' ranges do not overlap", () => {
       const ctCap = (min: number, max: number): GoveeDevice["capabilities"][number] =>
         ({
@@ -2073,9 +2089,10 @@ describe("CapabilityMapper", () => {
       expect(Object.values(sceneDef!.states!)).toContain("Rainbow");
       expect(Object.values(sceneDef!.states!)).toContain("Ocean");
       expect(Object.values(sceneDef!.states!)).not.toContain("Sunset");
-      // Dropdown writability: type must be "mixed" so users can write
+      // Dropdown writability: a text list so users can write
       // either the index ("1"/1) or the scene name from Blockly.
-      expect(sceneDef!.type).toBe("mixed");
+      expect(sceneDef!.type).toBe("string");
+      expect(sceneDef!.role).toBe("text");
     });
 
     it("should compute the music intersection of the modes the members DECLARE (M5)", () => {
@@ -2987,6 +3004,22 @@ describe("LAN colour-temperature limits follow the device's declared range (audi
     expect({ min: ct?.min, max: ct?.max }).toEqual({ min: 2000, max: 9000 });
   });
 
+  it("a LAN light takes the brightness range its Cloud capability declares; without one the LAN 0–100 stays (D16)", () => {
+    const brightnessCap = {
+      type: "devices.capabilities.range",
+      instance: "brightness",
+      parameters: { dataType: "INTEGER", unit: "unit.percent", range: { min: 1, max: 100, precision: 1 } },
+    } as CloudCapability;
+    const declared = buildLanStateDefs(
+      createTestDevice({ sku: "H6172", lanIp: "192.168.1.61", capabilities: [brightnessCap] }),
+    ).find(d => d.id === "brightness");
+    expect({ min: declared?.min, max: declared?.max, def: declared?.def }).toEqual({ min: 1, max: 100, def: 1 });
+    const lanOnly = buildLanStateDefs(createTestDevice({ sku: "H6172", lanIp: "192.168.1.61", capabilities: [] })).find(
+      d => d.id === "brightness",
+    );
+    expect({ min: lanOnly?.min, max: lanOnly?.max }).toEqual({ min: 0, max: 100 });
+  });
+
   it("the catalog quirk still wins over the declared range", () => {
     const quirked = new DeviceRegistry({
       data: {
@@ -3047,8 +3080,8 @@ describe("the heater's auto stop is its own dropdown (audit C-O2)", () => {
   it("declares control.auto_stop with Govee's options, labelled in the system language, and default", () => {
     const def = mapCapabilities([h7131Temp]).find(d => d.id === "auto_stop");
     expect(def).toMatchObject({
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states: { 1: "optAutoStop", 0: "optMaintain" },
       def: "0",

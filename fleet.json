@@ -72,5 +72,536 @@
     "rename": true,
     "rejectLogin": true,
     "dropDevice": true
-  }
+  },
+  "_fixtureLimits": "Every limit the inventory fixture reports for a datapoint (D16): brightness, colour temperature, humidity, target temperature, fan level, music sensitivity and each segment's brightness.",
+  "fixtureLimits": [
+    {
+      "state": "devices.h6172-0001.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/1/parameters/range/min",
+      "max": "/devices/0/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/3/parameters/range/min",
+      "max": "/devices/0/capabilities/3/parameters/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.0.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.1.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.2.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.3.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.4.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.5.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.6.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.7.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.8.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.segments.9.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6172-0001.music.music_sensitivity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/0/capabilities/7/parameters/fields/1/range/min",
+      "max": "/devices/0/capabilities/7/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h6199-0002.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/1/capabilities/2/parameters/range/min",
+      "max": "/devices/1/capabilities/2/parameters/range/max"
+    },
+    {
+      "state": "devices.h6199-0002.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/1/capabilities/5/parameters/range/min",
+      "max": "/devices/1/capabilities/5/parameters/range/max"
+    },
+    {
+      "state": "devices.h6199-0002.music.music_sensitivity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/1/capabilities/7/parameters/fields/1/range/min",
+      "max": "/devices/1/capabilities/7/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/2/parameters/range/min",
+      "max": "/devices/2/capabilities/2/parameters/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.0.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.1.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.2.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.3.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.4.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.5.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.6.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.7.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.8.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.9.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.10.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.11.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.12.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.13.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.segments.14.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/6/parameters/range/min",
+      "max": "/devices/2/capabilities/6/parameters/range/max"
+    },
+    {
+      "state": "devices.h61a8-000f.music.music_sensitivity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/2/capabilities/8/parameters/fields/1/range/min",
+      "max": "/devices/2/capabilities/8/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h7130-0006.control.target_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/6/capabilities/1/parameters/fields/0/range/min",
+      "max": "/devices/6/capabilities/1/parameters/fields/0/range/max"
+    },
+    {
+      "state": "devices.h7130-0006.control.mode_value",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/6/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/6/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h7141-0007.control.humidity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/7/capabilities/1/parameters/range/min",
+      "max": "/devices/7/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "devices.h7102-0008.control.mode_value",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/8/capabilities/1/parameters/fields/1/range/min",
+      "max": "/devices/8/capabilities/1/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h7131-0012.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/9/capabilities/3/parameters/range/min",
+      "max": "/devices/9/capabilities/3/parameters/range/max"
+    },
+    {
+      "state": "devices.h7131-0012.control.target_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/9/capabilities/6/parameters/fields/1/range/min",
+      "max": "/devices/9/capabilities/6/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h7171-000a.control.target_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/13/capabilities/2/parameters/fields/0/range/min",
+      "max": "/devices/13/capabilities/2/parameters/fields/0/range/max"
+    },
+    {
+      "state": "devices.h7161-000c.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/15/capabilities/1/parameters/range/min",
+      "max": "/devices/15/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "groups.basegroup-0001.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/18/capabilities/1/parameters/range/min",
+      "max": "/devices/18/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/1/parameters/range/min",
+      "max": "/devices/19/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.0.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.1.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.2.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.3.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.4.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.5.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.6.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.segments.7.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/2/parameters/fields/1/range/min",
+      "max": "/devices/19/capabilities/2/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h1310-0013.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/19/capabilities/5/parameters/range/min",
+      "max": "/devices/19/capabilities/5/parameters/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/1/parameters/range/min",
+      "max": "/devices/20/capabilities/1/parameters/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/3/parameters/range/min",
+      "max": "/devices/20/capabilities/3/parameters/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.0.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.1.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.2.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.3.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.4.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.5.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.6.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.7.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.8.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.9.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.10.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.11.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.12.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.segments.13.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/5/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/5/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h66a1-0014.music.music_sensitivity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/20/capabilities/8/parameters/fields/1/range/min",
+      "max": "/devices/20/capabilities/8/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.control.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/2/parameters/range/min",
+      "max": "/devices/21/capabilities/2/parameters/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.0.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.1.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.2.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.3.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.4.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.5.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.6.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.7.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.8.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.9.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.10.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.11.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.12.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.13.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.segments.14.brightness",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/3/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/3/parameters/fields/1/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.control.color_temperature",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/6/parameters/range/min",
+      "max": "/devices/21/capabilities/6/parameters/range/max"
+    },
+    {
+      "state": "devices.h607c-0015.music.music_sensitivity",
+      "file": "test/fixtures/inventory/govee-cloud.json",
+      "min": "/devices/21/capabilities/8/parameters/fields/1/range/min",
+      "max": "/devices/21/capabilities/8/parameters/fields/1/range/max"
+    }
+  ]
 }

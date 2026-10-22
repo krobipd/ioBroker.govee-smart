@@ -1522,7 +1522,7 @@ export class DiagnosticsCollector {
     source?: string;
     lastEvidenceAt: number | null;
   } {
-    // An app group has no reachability of its own (groups.info.online shows the cloud connection).
+    // An app group has no evidence of its own: its info.online follows its members (reachable while every member is).
     if (isAppGroup(device)) {
       return { decidedBy: "appGroup", lastEvidenceAt: null };
     }

@@ -1,5 +1,11 @@
 import type * as utils from "@iobroker/adapter-core";
-import { buildLanStateDefs, LAN_STATE_IDS, SYNTHETIC_STATE_META, type StateDefinition } from "./capability-mapper";
+import {
+  buildLanStateDefs,
+  declaredSegmentBrightnessRange,
+  LAN_STATE_IDS,
+  SYNTHETIC_STATE_META,
+  type StateDefinition,
+} from "./capability-mapper";
 import { GROUP_ICON, iconForGoveeType } from "./device-icons";
 import { extendIfChanged } from "./object-write";
 import { infoTypeStates, infoTypeValue, UNKNOWN_DEVICE_TYPE } from "./value-labels";
@@ -799,11 +805,9 @@ export class StateManager {
     const prefix = this.devicePrefix(device);
     const isGroup = isAppGroup(device);
 
-    // Device object with online status indicator + type-aware icon.
-    // Groups use the general groups.info.online state instead of per-group online.
-    const onlineId = isGroup
-      ? `${this.adapter.namespace}.groups.info.online`
-      : `${this.adapter.namespace}.${prefix}.info.online`;
+    // Device object with online status indicator + type-aware icon. A group's own
+    // info.online follows its members (krobi 2026-10-22: reachable while every member is).
+    const onlineId = `${this.adapter.namespace}.${prefix}.info.online`;
     const icon = isGroup ? GROUP_ICON : iconForGoveeType(device.type);
     // The device name follows the Govee app, and it is written like every other
     // name in this file: without `preserve`. Until 2.37.1 this one call carried
@@ -836,7 +840,7 @@ export class StateManager {
       this.deviceObjectSignature.set(prefix, signature);
     }
 
-    // Info channel — groups only get name (no individual online)
+    // Info channel — a group gets its name, members and reachability, no device metadata
     await this.extendIfChanged(`${prefix}.info`, {
       type: "channel",
       common: { name: tName("deviceInformation") },
@@ -952,13 +956,13 @@ export class StateManager {
       // group — the object tree of a fresh start was not the same twice, and
       // the CI start proof measured exactly that on 2026-09-15.
       await this.ensureGroupMembersUnreachableState(prefix);
+      await this.ensureGroupOnlineState(prefix);
 
       // Legacy cleanup — groups never carry device-level info states or
       // diagnostics, but older installs had them. Drop any leftovers so the
       // tree reflects the current layout; once per run and group (YAGNI-8).
       if (this.firstThisRun(`${prefix}#legacy-group`)) {
         for (const staleId of [
-          "online",
           "model",
           "serial",
           "ip",
@@ -968,8 +972,6 @@ export class StateManager {
         ]) {
           await this.safeDeleteState(`${prefix}.info.${staleId}`);
         }
-        this.onlineMarkerCache?.delete(`${prefix}.info.online`);
-        this.resolvedOnline.delete(`${prefix}.info.online`);
         // Groups never had a `diag` channel — drop any leftover from migrated installs.
         this.forgetReadOnly(`${prefix}.diag`);
         await this.adapter.delObjectAsync(`${prefix}.diag`, { recursive: true }).catch(() => {});
@@ -1186,6 +1188,8 @@ export class StateManager {
         ? device.manualSegments.slice().sort((a, b) => a - b)
         : Array.from({ length: segmentCount }, (_, i) => i);
     const reportedCount = validIndices.length;
+    // The limits the device declares for one segment (fleet rule D16), else the protocol's 0–100
+    const segmentBrightness = declaredSegmentBrightnessRange(device) ?? { min: 0, max: 100 };
 
     await this.ensureState(`${prefix}.segments.count`, {
       name: tName("segmentCount"),
@@ -1272,10 +1276,10 @@ export class StateManager {
           role: "level.brightness",
           read: true,
           write: true,
-          min: 0,
-          max: 100,
+          min: segmentBrightness.min,
+          max: segmentBrightness.max,
           unit: "%",
-          def: 0, // avoid null in vis until the first write (LAN-only tier) — B6
+          def: segmentBrightness.min, // avoid null in vis until the first write (LAN-only tier) — B6
         },
         native: {},
       });
@@ -1473,7 +1477,25 @@ export class StateManager {
   }
 
   /**
-   * Update info.membersUnreachable for a group.
+   * The group's `info.online` object — created with the group (the reachability
+   * round writes the value) and counted among the online markers, so the start
+   * and the stop mark it offline like every device.
+   *
+   * @param prefix Group prefix (`groups.<key>`)
+   */
+  private async ensureGroupOnlineState(prefix: string): Promise<void> {
+    await this.ensureState(`${prefix}.info.online`, {
+      name: tName("online"),
+      type: "boolean",
+      role: "indicator.reachable",
+      def: false,
+      desc: tDesc("descGroupOnline"),
+    });
+    this.onlineMarkerCache?.add(`${prefix}.info.online`);
+  }
+
+  /**
+   * Update info.membersUnreachable and info.online for a group.
    *
    * Always keeps the state (existing) and writes a comma-separated list of the
    * unreachable members, or an empty string when all are online. Previously we
@@ -1500,6 +1522,9 @@ export class StateManager {
       .map(m => this.deviceIds.idFor(m.sku, m.deviceId));
 
     await this.ensureGroupMembersUnreachableState(prefix);
+    await this.ensureGroupOnlineState(prefix);
+    // Reachable while every member is (krobi 2026-10-22) — a group without a resolved member proves nothing
+    await this.writeReadOnly(`${prefix}.info.online`, memberDevices.length > 0 && unreachable.length === 0);
     // setStateChangedAsync: reachability is re-evaluated on every online
     // signal — with an unconditional setState every devStatus poll reply
     // bumped ts on an unchanged (usually empty) value, spamming state
@@ -1841,8 +1866,8 @@ export class StateManager {
    * stay in sync. Returns `true` in that case so the caller can fire
    * the group-fanout reachability refresh.
    *
-   * Skips BaseGroup devices — groups have a global `groups.info.online`
-   * managed elsewhere.
+   * Skips BaseGroup devices — a group's `info.online` follows its members
+   * (`updateGroupMembersUnreachable`).
    *
    * @param device Govee device to sync
    * @returns true if a Light's resolved online state changed (caller should

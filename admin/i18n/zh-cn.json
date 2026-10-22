@@ -171,6 +171,7 @@
   "descWarmMistToggle": "加湿器是否先加热水再喷雾——温雾而非凉雾。",
   "descPresetScene": "该型号可用的预设场景下拉列表；有哪些由 Govee 决定，各型号不同。",
   "descMembersUnreachable": "当前哪些组成员无法访问，名称与对象树中一致——全部有响应时为空。",
+  "descGroupOnline": "组内每个成员是否都可访问——只要有一个成员没有应答即为 false。",
   "portLabel": "LAN 监听端口",
   "portTooltip": "由 Govee LAN 协议固定：灯具的回复到达 UDP 4002。同一主机上的第二个实例无法共用该端口——当其他适配器占用此端口时，管理界面会发出警告。",
   "optLow": "低",

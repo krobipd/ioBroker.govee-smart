@@ -470,9 +470,9 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
   // It used to be "", which was wrong twice: `resetModeDropdowns` writes "0"
   // (`dropdown-reset-helpers.ts:119`), so after any mode switch the value was
   // not a key of this map and the "Resetting stale dropdown" pass rewrote it
-  // on the next start, every start. And the repochecker requires a `mixed`
-  // datapoint's `def` to parse as JSON (`objectStructure.js:130-139`); "" does
-  // not, so the datapoint tripped E1006 the moment a device carrying it
+  // on the next start, every start. And while the dropdowns were `mixed`, the
+  // repochecker required the `def` to parse as JSON (`objectStructure.js:130-139`);
+  // "" does not, so the datapoint tripped E1006 the moment a device carrying it
   // reached the object inventory. `onStateChange` already accepted "0", 0 and
   // "" as the reset for this command (`state-change-router.ts:522`).
   //
@@ -505,8 +505,8 @@ function mapMode(cap: CloudCapability): StateDefinition[] {
       // one. `humanize()` here would put a plain string into `common.name`,
       // which the object-inventory gate rejects fleet-wide.
       name: cap.instance === "presetScene" ? tName("scene") : capabilityName(cap.instance),
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states,
       def: "0",
@@ -541,7 +541,7 @@ export function pickOption(
 
 /**
  * The value Govee declared for a written dropdown key. A `mode` dropdown is
- * keyed by the option value as TEXT (`states: {"3": "Rhythm"}`, `type: mixed`),
+ * keyed by the option value as TEXT (`states: {"3": "Rhythm"}`, `type: string`),
  * so the write arrives as `"3"` — Govee's options and examples are integers
  * (H7131 `nightlightScene`, issue47 fixture). Until 2.40.0 the text went out
  * unchanged (audit M16). An ENUM capability hands back its option's own value;
@@ -982,8 +982,8 @@ export function resolveWorkModeStruct(
  * Map work_mode capability (STRUCT — Govee Heater/Humidifier/Fan/...).
  *
  * Two states max:
- *   - `work_mode` — main mode dropdown (mixed type so users can write
- *     either the numeric mode value or the label name)
+ *   - `work_mode` — main mode dropdown (a text list, so users can write
+ *     either the mode value or the label name)
  *   - `mode_value` — secondary parameter (e.g. fan-speed level for the
  *     "manual" mode); only created if the API actually exposes one
  *
@@ -998,8 +998,8 @@ function mapWorkMode(cap: CloudCapability, deviceType?: string): StateDefinition
         id: "work_mode",
         name: tName("workMode"),
         desc: tDesc("descWorkMode"),
-        type: "mixed",
-        role: "state",
+        type: "string",
+        role: "text",
         write: true,
         def: "",
         capabilityType: cap.type,
@@ -1021,8 +1021,8 @@ function mapWorkMode(cap: CloudCapability, deviceType?: string): StateDefinition
       id: "work_mode",
       name: tName("workMode"),
       desc: tDesc("descWorkMode"),
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states: modeStates,
       def: modeField.options[0] ? safeStringify(modeField.options[0].value) : "",
@@ -1041,8 +1041,8 @@ function mapWorkMode(cap: CloudCapability, deviceType?: string): StateDefinition
           id: "mode_value",
           name: tName("modeValue"),
           desc: tDesc("descModeValue"),
-          type: "mixed",
-          role: "state",
+          type: "string",
+          role: "text",
           write: true,
           states: level.states,
           def: firstKey,
@@ -1117,8 +1117,8 @@ function mapAutoStop(cap: CloudCapability): StateDefinition[] {
       id: "auto_stop",
       name: tName("autoStop"),
       desc: tDesc("descAutoStop"),
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states,
       def,
@@ -1325,8 +1325,8 @@ function mapMusicSetting(cap: CloudCapability): StateDefinition[] {
       id: "music_mode",
       name: tName("musicMode"),
       desc: tDesc("descMusicMode"),
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states: buildUniqueLabelMap(modeOptions),
       def: "0",
@@ -2093,7 +2093,42 @@ export function declaredColorTempRange(device: GoveeDevice): { min: number; max:
       typeof c.instance === "string" &&
       c.instance.includes("colorTem"),
   );
-  const range = cap?.parameters?.range;
+  return usableRange(cap?.parameters?.range);
+}
+
+/**
+ * The brightness range a device's Cloud capability declares, or null — Govee
+ * declares 1–100 where the LAN default says 0–100 (fleet rule D16: a limit the
+ * device reports is the datapoint's limit).
+ *
+ * @param device The device
+ */
+export function declaredBrightnessRange(device: GoveeDevice): { min: number; max: number } | null {
+  const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+  const cap = caps.find(c => c && c.type === "devices.capabilities.range" && c.instance === "brightness");
+  return usableRange(cap?.parameters?.range);
+}
+
+/**
+ * The brightness range a device's Cloud capability declares for one segment
+ * (`segmentedBrightness`, field `brightness`), or null — H6172 declares 1–100,
+ * most strips 0–100 (fleet rule D16).
+ *
+ * @param device The device
+ */
+export function declaredSegmentBrightnessRange(device: GoveeDevice): { min: number; max: number } | null {
+  const caps = Array.isArray(device.capabilities) ? device.capabilities : [];
+  const cap = caps.find(c => c && c.instance === "segmentedBrightness");
+  const fields = Array.isArray(cap?.parameters?.fields) ? cap.parameters.fields : [];
+  return usableRange(fields.find(f => f && f.fieldName === "brightness")?.range);
+}
+
+/**
+ * A declared range with a number on both ends and the minimum below the maximum, or null.
+ *
+ * @param range The capability's `parameters.range`
+ */
+function usableRange(range: { min?: unknown; max?: unknown } | undefined): { min: number; max: number } | null {
   if (!range || typeof range.min !== "number" || typeof range.max !== "number" || range.min >= range.max) {
     return null;
   }
@@ -2121,22 +2156,23 @@ export function buildLanStateDefs(
   if (!device.lanIp) {
     return [];
   }
-  return applyOwnColorTempRange(getDefaultLanStates(), device, log, registry);
+  return applyOwnRanges(getDefaultLanStates(), device, log, registry);
 }
 
 /**
- * Give the colour-temperature definition in `stateDefs` the range of THIS
- * device: the one its Cloud capability declares (H6076: 2200–6500, issue #44 —
- * the LAN default 2000–9000 is Govee's generic LAN range, not this lamp's;
- * audit M7/N19), then the catalog quirk, which still wins. The one rule for a
- * light's own datapoint and for a group's intersection.
+ * Give the colour-temperature and brightness definitions in `stateDefs` the
+ * range of THIS device: the one its Cloud capability declares (H6076:
+ * 2200–6500, issue #44 — the LAN default 2000–9000 is Govee's generic LAN
+ * range, not this lamp's; audit M7/N19; brightness 1–100 where the LAN default
+ * says 0–100, fleet rule D16), then the catalog quirk, which still wins. The
+ * one rule for a light's own datapoint and for a group's intersection.
  *
  * @param stateDefs Definitions (changed in place, returned)
  * @param device The device whose range applies
  * @param log Adapter logger — forwarded to applyQuirksToStates
  * @param registry This instance's device catalog
  */
-function applyOwnColorTempRange(
+function applyOwnRanges(
   stateDefs: StateDefinition[],
   device: GoveeDevice,
   log: ioBroker.Logger,
@@ -2151,33 +2187,42 @@ function applyOwnColorTempRange(
       ct.def = declared.min;
     }
   }
+  const brightness = declaredBrightnessRange(device);
+  if (brightness) {
+    const b = stateDefs.find(d => d.id === "brightness");
+    if (b) {
+      b.min = brightness.min;
+      b.max = brightness.max;
+      b.def = brightness.min;
+    }
+  }
   applyQuirksToStates(device.sku, stateDefs, log, registry);
   return stateDefs;
 }
 
 /**
- * The colour-temperature range every member can take — the largest minimum and
- * the smallest maximum of the members' own ranges, or null when they do not
- * overlap. A group offering more sent values outside a member's range to it
- * (Cloud members get no LAN clamp).
+ * The range of `id` (colour temperature or brightness) every member can take —
+ * the largest minimum and the smallest maximum of the members' own ranges, or
+ * null when they do not overlap. A group offering more sent values outside a
+ * member's range to it (Cloud members get no LAN clamp).
  *
  * @param members The controllable members
+ * @param id The LAN-default state whose range is shared
  * @param log Adapter logger
  * @param registry This instance's device catalog
  */
-function sharedColorTempRange(
+function sharedRange(
   members: GoveeDevice[],
+  id: string,
   log: ioBroker.Logger,
   registry: DeviceRegistry,
 ): { min: number; max: number } | null {
   let min = -Infinity;
   let max = Infinity;
   for (const member of members) {
-    const ct = applyOwnColorTempRange(getDefaultLanStates(), member, log, registry).find(
-      d => d.id === "color_temperature",
-    );
-    min = Math.max(min, ct?.min ?? -Infinity);
-    max = Math.min(max, ct?.max ?? Infinity);
+    const own = applyOwnRanges(getDefaultLanStates(), member, log, registry).find(d => d.id === id);
+    min = Math.max(min, own?.min ?? -Infinity);
+    max = Math.min(max, own?.max ?? Infinity);
   }
   return Number.isFinite(min) && Number.isFinite(max) && min <= max ? { min, max } : null;
 }
@@ -2299,11 +2344,12 @@ export function buildCloudStateDefs(
       id: r.id,
       name: tName(r.nameKey),
       desc: r.descKey ? tDesc(r.descKey) : undefined,
-      // mixed lets users write the index ("1"), the index as number (1),
-      // or the entry name ("Aurora") — the onStateChange handler resolves
-      // all three forms via the common.states map.
-      type: "mixed",
-      role: "state",
+      // A text list (fleet datapoint form: no `mixed`, no role `state`); users
+      // write the index ("1"), the index as number (1) or the entry name
+      // ("Aurora") — the onStateChange handler resolves all three forms via
+      // the common.states map.
+      type: "string",
+      role: "text",
       write: true,
       states: buildUniqueLabelMap(r.source(device)),
       def: "0",
@@ -2379,7 +2425,7 @@ export function buildCloudStateDefs(
     });
   }
 
-  // Local snapshots — three states with different shapes (mixed dropdown vs
+  // Local snapshots — three states with different shapes (text dropdown vs
   // plain string-write fields). Inline because a rules-table would need a
   // discriminator field with no payoff.
   if (isLight) {
@@ -2387,8 +2433,8 @@ export function buildCloudStateDefs(
       id: "snapshot_local",
       name: tName("localSnapshot"),
       desc: tDesc("localSnapshotDesc"),
-      type: "mixed",
-      role: "state",
+      type: "string",
+      role: "text",
       write: true,
       states: buildUniqueLabelMap(localSnapshots ?? []),
       def: "0",
@@ -2502,10 +2548,10 @@ function buildGroupStateDefs(
     if (!controllable.every(m => memberHasControlState(m, ld.id))) {
       continue;
     }
-    if (ld.id === "color_temperature") {
-      const shared = sharedColorTempRange(controllable, log, registry);
+    if (ld.id === "color_temperature" || ld.id === "brightness") {
+      const shared = sharedRange(controllable, ld.id, log, registry);
       if (!shared) {
-        continue; // no temperature every member can take
+        continue; // no value every member can take
       }
       ld.min = shared.min;
       ld.max = shared.max;
@@ -2522,8 +2568,8 @@ function buildGroupStateDefs(
       stateDefs.push({
         id: "light_scene",
         name: tName("lightScene"),
-        type: "mixed",
-        role: "state",
+        type: "string",
+        role: "text",
         write: true,
         states: buildUniqueLabelMap(commonNames.map(name => ({ name }))),
         def: "0",
@@ -2549,8 +2595,8 @@ function buildGroupStateDefs(
       stateDefs.push({
         id: "music_mode",
         name: tName("musicMode"),
-        type: "mixed",
-        role: "state",
+        type: "string",
+        role: "text",
         write: true,
         states: buildUniqueLabelMap(common.map(o => ({ name: o.name }))),
         def: "0",

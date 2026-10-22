@@ -171,6 +171,7 @@
   "descWarmMistToggle": "Of de luchtbevochtiger het water verwarmt voor het vernevelen — warme in plaats van koele nevel.",
   "descPresetScene": "Een keuzelijst met de kant-en-klare scènes van dit model; welke er zijn bepaalt Govee en verschilt per model.",
   "descMembersUnreachable": "Welke leden van de groep momenteel onbereikbaar zijn, zoals ze in de objectboom heten — leeg zolang ze allemaal antwoorden.",
+  "descGroupOnline": "Of elk lid van de groep bereikbaar is — false zodra een van hen niet antwoordt.",
   "portLabel": "LAN-luisterpoort",
   "portTooltip": "Vastgelegd door het Govee-LAN-protocol: antwoorden van de lampen komen binnen op UDP 4002. Een tweede instantie op deze host kan hem niet delen — de admin waarschuwt als een andere adapter de poort gebruikt.",
   "optLow": "Laag",

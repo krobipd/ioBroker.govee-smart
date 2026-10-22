@@ -171,6 +171,7 @@
   "descWarmMistToggle": "Se o humidificador aquece a água antes de a nebulizar — névoa quente em vez de fria.",
   "descPresetScene": "Uma lista das cenas prontas deste modelo; quais existem é definido pela Govee e varia consoante o modelo.",
   "descMembersUnreachable": "Quais membros do grupo estão atualmente inacessíveis, com os nomes da árvore de objetos — vazio enquanto todos responderem.",
+  "descGroupOnline": "Se todos os membros do grupo estão acessíveis — false assim que um deles não responde.",
   "portLabel": "Porta de escuta LAN",
   "portTooltip": "Fixada pelo protocolo LAN da Govee: as respostas das lâmpadas chegam em UDP 4002. Uma segunda instância neste host não pode partilhá-la — o admin avisa quando outro adaptador usa a porta.",
   "optLow": "Baixo",

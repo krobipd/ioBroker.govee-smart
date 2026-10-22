@@ -171,6 +171,7 @@
   "descWarmMistToggle": "Czy nawilżacz podgrzewa wodę przed rozpyleniem — ciepła mgiełka zamiast chłodnej.",
   "descPresetScene": "Lista rozwijana z gotowymi scenami tego modelu; które istnieją, określa Govee i różnią się zależnie od modelu.",
   "descMembersUnreachable": "Którzy członkowie grupy są obecnie nieosiągalni, nazwani jak w drzewie obiektów — puste, dopóki wszyscy odpowiadają.",
+  "descGroupOnline": "Czy każdy członek grupy jest osiągalny — false, gdy tylko którykolwiek z nich nie odpowiada.",
   "portLabel": "Port nasłuchu LAN",
   "portTooltip": "Ustalony przez protokół LAN Govee: odpowiedzi lamp przychodzą na UDP 4002. Druga instancja na tym hoście nie może go współdzielić — admin ostrzega, gdy inny adapter używa portu.",
   "optLow": "Niski",

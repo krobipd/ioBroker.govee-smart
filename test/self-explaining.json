@@ -4,8 +4,6 @@
   "devices.*.info.serial": "Plain identification of the hardware — the serial is the whole content.",
   "devices.*.control.power": "A basic light and appliance control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.brightness": "A basic light control whose name IS its function, behaving exactly as the role promises.",
-  "devices.*.control.color_rgb": "A basic light control whose name IS its function, behaving exactly as the role promises.",
-  "devices.*.control.color_temperature": "A basic light control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.humidity": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.target_temperature": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
   "devices.*.control.nightlight_toggle": "A basic appliance control whose name IS its function, behaving exactly as the role promises.",
@@ -26,8 +24,6 @@
   "groups.*.info.name": "Plain identification of the app group — the name is what the user typed in the Govee app.",
   "groups.*.control.power": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
   "groups.*.control.brightness": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
-  "groups.*.control.color_rgb": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
-  "groups.*.control.color_temperature": "The group counterpart of the device control, sent to every member at once; info.members carries the explanation for the whole subtree.",
   "groups.*.scenes.light_scene": "A dropdown over the scenes every member of the group knows — the option list IS the explanation, and it differs per group.",
   "devices.*.sensor.co2": "A sensor reading whose unit (ppm) and role say it all.",
   "groups.*.music.music_mode": "A dropdown over the music modes every member of the group declares — the option list IS the explanation, and it differs per group."
