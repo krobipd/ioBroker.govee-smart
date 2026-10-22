@@ -23,22 +23,32 @@ updates:
         update-types:
           - 'version-update:semver-major'
 
-  # src-admin (Module-Federation admin component): hand-pinned compatibility matrix
-  # (React / MUI / @module-federation/vite — the versions the component was built against);
-  # npm-latest breaks the MF build. This entry exists ONLY to satisfy repochecker W8905
-  # (a non-root package.json must be covered by a dependabot npm directory). Ignoring all
-  # dependencies means it generates ZERO pull requests, so the pinned matrix is never moved.
-  # (open-pull-requests-limit: 0 would trip W8907; a wildcard ignore keeps the entry warning-free.)
+  # src-admin (Module-Federation admin component): its own package.json (repochecker W8905). Its dependencies move like
+  # the root's — the release run lifts every one of them, proven by the component's build, type check and suite; only
+  # the same compatibility holds as the root stay (krobi 2026-09-05 and 2026-10-22: every dependency moves).
   - package-ecosystem: 'npm'
     directory: '/src-admin'
     schedule:
       interval: 'weekly'
       day: 'tuesday'
       timezone: 'Europe/Berlin'
+    open-pull-requests-limit: 15
+    versioning-strategy: 'increase'
     cooldown:
       default-days: 7
     ignore:
-      - dependency-name: '*'
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: '@iobroker/gui-components'
+      - dependency-name: '@iobroker/json-config'
+      - dependency-name: '@mui/icons-material'
+      - dependency-name: '@mui/material'
+      - dependency-name: 'react'
+      - dependency-name: 'react-dom'
 
   - package-ecosystem: 'github-actions'
     directory: '/'
