@@ -139,8 +139,8 @@ export class CallGate {
   private hold(host: string, retryAfter: string | string[] | undefined): void {
     const raw = Array.isArray(retryAfter) ? retryAfter[0] : retryAfter;
     const ms = typeof raw === "string" && /^\d+$/.test(raw.trim()) ? parseInt(raw, 10) * 1000 : DEFAULT_RETRY_AFTER_MS;
-    const wait = Math.min(Math.max(ms, MIN_RATE_LIMIT_RETRY_MS), MAX_RATE_LIMIT_RETRY_MS);
-    this.heldUntil.set(host, Math.max(this.heldUntil.get(host) ?? 0, this.now() + wait));
+    const holdMs = Math.min(Math.max(ms, MIN_RATE_LIMIT_RETRY_MS), MAX_RATE_LIMIT_RETRY_MS);
+    this.heldUntil.set(host, Math.max(this.heldUntil.get(host) ?? 0, this.now() + holdMs));
   }
 
   private key(c: Counterpart, index: number, limit: ApiLimit, host: string): string {
