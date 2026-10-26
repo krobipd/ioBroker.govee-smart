@@ -33,6 +33,7 @@ const assert = require("node:assert");
 const dgram = require("node:dgram");
 const http = require("node:http");
 const tls = require("node:tls");
+const crypto = require("node:crypto");
 const { tests } = require("@iobroker/testing");
 
 const ADAPTER_DIR = path.join(__dirname, "..");
@@ -1374,29 +1375,36 @@ function sceneOptions(options) {
 }
 
 /**
- * A scene library answer in the form the adapter caches it: one entry per light effect with a code, variants named
- * `<scene>-<variant>`.
+ * A scene library answer in the form 3.2.1 caches it (`fetchSceneLibrary`): one entry per light effect with a code,
+ * variants named `<scene>-<variant>`; the code is the effect's own before the scene's, only a number > 0
+ * (`libraryCode`), the parameter only a non-empty text (`libraryParam`).
  *
  * @param {object | undefined} answer the light-effect-libraries answer of the fake cloud
  */
 function cachedSceneLibrary(answer) {
+  const codeOf = (effect, scene) => {
+    const own = effect?.sceneCode;
+    const code = own !== undefined && own !== null ? own : scene.sceneCode;
+    return typeof code === "number" && Number.isFinite(code) && code > 0 ? code : 0;
+  };
   const library = [];
   for (const category of answer?.data?.categories ?? []) {
     for (const scene of category.scenes ?? []) {
       if (typeof scene?.sceneName !== "string" || !scene.sceneName) continue;
       const effects = Array.isArray(scene.lightEffects) ? scene.lightEffects : [];
       if (effects.length === 0) {
-        if ((scene.sceneCode ?? 0) > 0) library.push({ name: scene.sceneName, sceneCode: scene.sceneCode });
+        const sceneCode = codeOf(undefined, scene);
+        if (sceneCode > 0) library.push({ name: scene.sceneName, sceneCode });
         continue;
       }
       for (const effect of effects) {
-        const sceneCode = effect.sceneCode ?? scene.sceneCode ?? 0;
+        const sceneCode = codeOf(effect, scene);
         if (sceneCode <= 0) continue;
         const entry = {
           name: effects.length > 1 && effect.scenceName ? `${scene.sceneName}-${effect.scenceName}` : scene.sceneName,
           sceneCode,
         };
-        if (effect.scenceParam) entry.scenceParam = effect.scenceParam;
+        if (typeof effect.scenceParam === "string" && effect.scenceParam) entry.scenceParam = effect.scenceParam;
         if (effect.speedInfo?.supSpeed) {
           entry.speedInfo = {
             supSpeed: true,
@@ -1412,10 +1420,13 @@ function cachedSceneLibrary(answer) {
 }
 
 /**
- * The SKU-cache entry the previous release (3.0.1) kept for one fixture device after a start against the fake cloud:
- * capabilities from the device list; for a light (the app group included) scenes, DIY scenes and snapshots from the
- * scenes endpoints, the scene library and the empty SKU features; the online stamp where the state answer reports the
- * device online; the LAN stamps for the fake LAN light; the gateway the account list names.
+ * The SKU-cache entry the previous release (3.2.1) kept for one fixture device after a start against the fake cloud
+ * (`goveeDeviceToCached`: the device without `RUNTIME_ONLY_KEYS`): capabilities from the device list; for a light (the
+ * app group included) scenes, DIY scenes and snapshots from the scenes endpoints, the scene library, the empty SKU
+ * features and — the account token is there — one packet entry per snapshot without commands (the fake cloud's
+ * snapshot answer is empty, 3.2.1 remembers that too); the online stamp where the state answer reports the device
+ * online; the LAN-seen stamp for the fake LAN light (its status stamps are runtime-only since 3.1.0); the gateway the
+ * account list names. No `pushReports`: the fixture broker never pushes a device state.
  *
  * @param {object} device a FIXTURE device
  * @param {number} now the seed time
@@ -1455,6 +1466,9 @@ function previousCacheEntry(device, now) {
       entry.snapshots = sceneOptions(own?.parameters?.options);
     }
     entry.sceneLibrary = cachedSceneLibrary(SCENE_LIBRARIES[device.sku]);
+    if (entry.snapshots.length > 0) {
+      entry.snapshotBleCmds = entry.snapshots.map(s => ({ name: s.name, cmds: [] }));
+    }
     entry.skuFeatures = {};
     entry.librariesCheckedAt = now;
     entry.scenesChecked = true;
@@ -1465,7 +1479,7 @@ function previousCacheEntry(device, now) {
     entry.lastSeenOnNetwork = now;
   }
   if (device.device === LAN_DEVICE.device) {
-    Object.assign(entry, { lastLanSeenAt: now, lastLanStatusAskedAt: now, lastLanStatusAt: now });
+    entry.lastLanSeenAt = now;
   }
   const listed = APP_LIST.find(a => a.device === device.device);
   const gatewayInfo = listed && JSON.parse(listed.deviceExt.deviceSettings).gatewayInfo;
@@ -1480,22 +1494,73 @@ function previousCacheEntry(device, now) {
 /**
  * Round 75 (reported by dl-manager): adapter-specific like feedFixtures. The previous release's dump carries objects
  * only; what that release kept in the instance data folder is not in it, and clearInstanceData has just emptied the
- * folder. 3.0.1 held one SKU-cache file per fixture device there (`cache/<sku>_<id>.json`, measured on a 3.0.1 run
- * against this fixture); the MQTT credentials file it did not write, because the fixture's IoT-key answer carries no
- * certificate and the login stops before the bundle is saved. The cache is written in 3.0.1's form from the fixture,
- * stamped with the seed time so pruning and the 7-day memories judge it as fresh.
+ * folder. 3.2.1 holds two things there after a start against this fixture, built here from its code
+ * (`git show v3.2.1:src/…`; a lab run of the old tag is refused, Werkbank round 148): one SKU-cache file per fixture
+ * device (`cache/<sku>_<id>.json`, `sku-cache.ts` + `device-manager/cache.ts`) and the account session
+ * `mqtt-credentials.json` (`handlers/cloud-creds-handler.ts` `persistCreds`) — the fixture's login succeeds and its
+ * IoT-key answer carries the client certificate. Stamped with the seed time so pruning, the 7-day memories and the
+ * token lifetime judge them as fresh.
  *
  * @param {import("@iobroker/testing").IntegrationTestHarness} harness
  * @param {object} previous the previous release's dump
  */
 async function seedInstanceData(harness, previous) {
-  const cacheDir = path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`, "cache");
+  const dataDir = path.join(harness.testDir, "iobroker-data", `${ADAPTER}.0`);
+  const cacheDir = path.join(dataDir, "cache");
   fs.mkdirSync(cacheDir, { recursive: true });
   const now = Date.now();
   for (const device of FIXTURE.devices) {
     const key = `${device.sku}_${device.device.replace(/:/g, "")}`.toLowerCase();
     fs.writeFileSync(path.join(cacheDir, `${key}.json`), JSON.stringify(previousCacheEntry(device, now), null, 2));
   }
+  const config = await harness.objects.getObject("system.config");
+  const secret = config?.native?.secret;
+  if (typeof secret !== "string" || !secret) {
+    throw new Error("system.config carries no secret — the credentials file cannot be encrypted like the adapter does");
+  }
+  fs.writeFileSync(path.join(dataDir, "mqtt-credentials.json"), previousCredentials(secret, now), { mode: 0o600 });
+}
+
+/**
+ * The account session 3.2.1 kept after the fixture login (`persistCreds`): the client id derived from the address
+ * (`deriveGoveeClientId`, UUIDv5 over the NIL namespace), token, certificate and its password encrypted with the
+ * installation secret the way js-controller's `encrypt` does (`$/aes-192-cbc:<iv>:<cipher>` for a 48-hex secret), the
+ * endpoint and account fields as the login and IoT-key answers carry them, the expiry from `token_expire_cycle`.
+ *
+ * @param {string} secret the installation secret of the throwaway controller
+ * @param {number} now the seed time
+ */
+function previousCredentials(secret, now) {
+  const encrypt = value => {
+    if (!/^[0-9a-f]{48}$/.test(secret)) {
+      let out = "";
+      for (let i = 0; i < value.length; i++) {
+        out += String.fromCharCode(secret[i % secret.length].charCodeAt(0) ^ value.charCodeAt(i));
+      }
+      return out;
+    }
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv("aes-192-cbc", Buffer.from(secret, "hex"), iv);
+    return `$/aes-192-cbc:${iv.toString("hex")}:${Buffer.concat([cipher.update(value), cipher.final()]).toString("hex")}`;
+  };
+  const hash = crypto
+    .createHash("sha1")
+    .update(Buffer.alloc(16))
+    .update(FIXTURE_NATIVE.goveeEmail.trim().toLowerCase(), "utf8")
+    .digest()
+    .subarray(0, 16);
+  hash[6] = (hash[6] & 0x0f) | 0x50;
+  hash[8] = (hash[8] & 0x3f) | 0x80;
+  return JSON.stringify({
+    accountKey: hash.toString("hex"),
+    bearerToken: encrypt("fixture-bearer-token"),
+    iotEndpoint: FIXTURE_IOT_ENDPOINT,
+    p12Cert: encrypt(FIXTURE_TLS.p12),
+    p12Pass: encrypt(FIXTURE_TLS.p12Pass),
+    accountId: "1000001",
+    accountTopic: "GA/fixture-account",
+    tokenExpiresAt: now + 3600 * 1000,
+  });
 }
 
 /**
