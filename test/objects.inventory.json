@@ -361,73 +361,6 @@
     },
     "_id": "govee-smart.0.devices.h1310-0013.control.reverse_airflow_toggle"
   },
-  "govee-smart.0.devices.h1310-0013.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h1310-0013.diag"
-  },
-  "govee-smart.0.devices.h1310-0013.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h1310-0013.diag.tier"
-  },
   "govee-smart.0.devices.h1310-0013.info": {
     "type": "channel",
     "common": {
@@ -597,6 +530,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h1310-0013.info.serial"
+  },
+  "govee-smart.0.devices.h1310-0013.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h1310-0013.info.tier"
   },
   "govee-smart.0.devices.h1310-0013.info.type": {
     "type": "state",
@@ -1755,73 +1735,6 @@
     },
     "_id": "govee-smart.0.devices.h5042-0004"
   },
-  "govee-smart.0.devices.h5042-0004.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5042-0004.diag"
-  },
-  "govee-smart.0.devices.h5042-0004.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5042-0004.diag.tier"
-  },
   "govee-smart.0.devices.h5042-0004.info": {
     "type": "channel",
     "common": {
@@ -1992,6 +1905,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5042-0004.info.serial"
   },
+  "govee-smart.0.devices.h5042-0004.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5042-0004.info.tier"
+  },
   "govee-smart.0.devices.h5042-0004.info.type": {
     "type": "state",
     "common": {
@@ -2109,73 +2069,6 @@
       "capabilityInstance": "powerSwitch"
     },
     "_id": "govee-smart.0.devices.h5080-000d.control.power"
-  },
-  "govee-smart.0.devices.h5080-000d.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5080-000d.diag"
-  },
-  "govee-smart.0.devices.h5080-000d.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5080-000d.diag.tier"
   },
   "govee-smart.0.devices.h5080-000d.info": {
     "type": "channel",
@@ -2347,6 +2240,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5080-000d.info.serial"
   },
+  "govee-smart.0.devices.h5080-000d.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5080-000d.info.tier"
+  },
   "govee-smart.0.devices.h5080-000d.info.type": {
     "type": "state",
     "common": {
@@ -2464,73 +2404,6 @@
       "capabilityInstance": "powerSwitch"
     },
     "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.control.power"
-  },
-  "govee-smart.0.devices.h5080-ccddeeff0011000d.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.diag"
-  },
-  "govee-smart.0.devices.h5080-ccddeeff0011000d.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.diag.tier"
   },
   "govee-smart.0.devices.h5080-ccddeeff0011000d.info": {
     "type": "channel",
@@ -2702,6 +2575,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.info.serial"
   },
+  "govee-smart.0.devices.h5080-ccddeeff0011000d.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5080-ccddeeff0011000d.info.tier"
+  },
   "govee-smart.0.devices.h5080-ccddeeff0011000d.info.type": {
     "type": "state",
     "common": {
@@ -2771,73 +2691,6 @@
       "idScheme": 3
     },
     "_id": "govee-smart.0.devices.h5085-000e"
-  },
-  "govee-smart.0.devices.h5085-000e.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5085-000e.diag"
-  },
-  "govee-smart.0.devices.h5085-000e.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5085-000e.diag.tier"
   },
   "govee-smart.0.devices.h5085-000e.events": {
     "type": "channel",
@@ -3070,6 +2923,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5085-000e.info.serial"
   },
+  "govee-smart.0.devices.h5085-000e.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5085-000e.info.tier"
+  },
   "govee-smart.0.devices.h5085-000e.info.type": {
     "type": "state",
     "common": {
@@ -3139,73 +3039,6 @@
       "idScheme": 3
     },
     "_id": "govee-smart.0.devices.h5109-0005"
-  },
-  "govee-smart.0.devices.h5109-0005.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5109-0005.diag"
-  },
-  "govee-smart.0.devices.h5109-0005.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5109-0005.diag.tier"
   },
   "govee-smart.0.devices.h5109-0005.info": {
     "type": "channel",
@@ -3377,6 +3210,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h5109-0005.info.serial"
   },
+  "govee-smart.0.devices.h5109-0005.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5109-0005.info.tier"
+  },
   "govee-smart.0.devices.h5109-0005.info.type": {
     "type": "state",
     "common": {
@@ -3521,73 +3401,6 @@
       "idScheme": 3
     },
     "_id": "govee-smart.0.devices.h5140-0016"
-  },
-  "govee-smart.0.devices.h5140-0016.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5140-0016.diag"
-  },
-  "govee-smart.0.devices.h5140-0016.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5140-0016.diag.tier"
   },
   "govee-smart.0.devices.h5140-0016.info": {
     "type": "channel",
@@ -3758,6 +3571,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5140-0016.info.serial"
+  },
+  "govee-smart.0.devices.h5140-0016.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5140-0016.info.tier"
   },
   "govee-smart.0.devices.h5140-0016.info.type": {
     "type": "state",
@@ -3936,73 +3796,6 @@
     },
     "_id": "govee-smart.0.devices.h5179-0003"
   },
-  "govee-smart.0.devices.h5179-0003.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h5179-0003.diag"
-  },
-  "govee-smart.0.devices.h5179-0003.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h5179-0003.diag.tier"
-  },
   "govee-smart.0.devices.h5179-0003.info": {
     "type": "channel",
     "common": {
@@ -4172,6 +3965,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h5179-0003.info.serial"
+  },
+  "govee-smart.0.devices.h5179-0003.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h5179-0003.info.tier"
   },
   "govee-smart.0.devices.h5179-0003.info.type": {
     "type": "state",
@@ -4649,73 +4489,6 @@
     },
     "_id": "govee-smart.0.devices.h607c-0015.control.power"
   },
-  "govee-smart.0.devices.h607c-0015.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h607c-0015.diag"
-  },
-  "govee-smart.0.devices.h607c-0015.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h607c-0015.diag.tier"
-  },
   "govee-smart.0.devices.h607c-0015.info": {
     "type": "channel",
     "common": {
@@ -4885,6 +4658,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h607c-0015.info.serial"
+  },
+  "govee-smart.0.devices.h607c-0015.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h607c-0015.info.tier"
   },
   "govee-smart.0.devices.h607c-0015.info.type": {
     "type": "state",
@@ -6917,73 +6737,6 @@
     },
     "_id": "govee-smart.0.devices.h6172-0001.control.power"
   },
-  "govee-smart.0.devices.h6172-0001.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h6172-0001.diag"
-  },
-  "govee-smart.0.devices.h6172-0001.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h6172-0001.diag.tier"
-  },
   "govee-smart.0.devices.h6172-0001.info": {
     "type": "channel",
     "common": {
@@ -7153,6 +6906,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6172-0001.info.serial"
+  },
+  "govee-smart.0.devices.h6172-0001.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h6172-0001.info.tier"
   },
   "govee-smart.0.devices.h6172-0001.info.type": {
     "type": "state",
@@ -8627,73 +8427,6 @@
     },
     "_id": "govee-smart.0.devices.h6199-0002.control.power"
   },
-  "govee-smart.0.devices.h6199-0002.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h6199-0002.diag"
-  },
-  "govee-smart.0.devices.h6199-0002.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h6199-0002.diag.tier"
-  },
   "govee-smart.0.devices.h6199-0002.info": {
     "type": "channel",
     "common": {
@@ -8863,6 +8596,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h6199-0002.info.serial"
+  },
+  "govee-smart.0.devices.h6199-0002.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h6199-0002.info.tier"
   },
   "govee-smart.0.devices.h6199-0002.info.type": {
     "type": "state",
@@ -11165,73 +10945,6 @@
     },
     "_id": "govee-smart.0.devices.h61a8-000f.control.power"
   },
-  "govee-smart.0.devices.h61a8-000f.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h61a8-000f.diag"
-  },
-  "govee-smart.0.devices.h61a8-000f.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h61a8-000f.diag.tier"
-  },
   "govee-smart.0.devices.h61a8-000f.info": {
     "type": "channel",
     "common": {
@@ -11401,6 +11114,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h61a8-000f.info.serial"
+  },
+  "govee-smart.0.devices.h61a8-000f.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h61a8-000f.info.tier"
   },
   "govee-smart.0.devices.h61a8-000f.info.type": {
     "type": "state",
@@ -13709,73 +13469,6 @@
     },
     "_id": "govee-smart.0.devices.h66a1-0014.control.power"
   },
-  "govee-smart.0.devices.h66a1-0014.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h66a1-0014.diag"
-  },
-  "govee-smart.0.devices.h66a1-0014.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h66a1-0014.diag.tier"
-  },
   "govee-smart.0.devices.h66a1-0014.info": {
     "type": "channel",
     "common": {
@@ -13945,6 +13638,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h66a1-0014.info.serial"
+  },
+  "govee-smart.0.devices.h66a1-0014.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h66a1-0014.info.tier"
   },
   "govee-smart.0.devices.h66a1-0014.info.type": {
     "type": "state",
@@ -15842,73 +15582,6 @@
     },
     "_id": "govee-smart.0.devices.h7102-0008.control.work_mode"
   },
-  "govee-smart.0.devices.h7102-0008.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7102-0008.diag"
-  },
-  "govee-smart.0.devices.h7102-0008.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7102-0008.diag.tier"
-  },
   "govee-smart.0.devices.h7102-0008.info": {
     "type": "channel",
     "common": {
@@ -16079,6 +15752,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7102-0008.info.serial"
   },
+  "govee-smart.0.devices.h7102-0008.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7102-0008.info.tier"
+  },
   "govee-smart.0.devices.h7102-0008.info.type": {
     "type": "state",
     "common": {
@@ -16243,73 +15963,6 @@
       "capabilityInstance": "workMode"
     },
     "_id": "govee-smart.0.devices.h7121-0009.control.work_mode"
-  },
-  "govee-smart.0.devices.h7121-0009.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7121-0009.diag"
-  },
-  "govee-smart.0.devices.h7121-0009.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7121-0009.diag.tier"
   },
   "govee-smart.0.devices.h7121-0009.info": {
     "type": "channel",
@@ -16480,6 +16133,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7121-0009.info.serial"
+  },
+  "govee-smart.0.devices.h7121-0009.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7121-0009.info.tier"
   },
   "govee-smart.0.devices.h7121-0009.info.type": {
     "type": "state",
@@ -16794,73 +16494,6 @@
     },
     "_id": "govee-smart.0.devices.h7127-0010.control.work_mode"
   },
-  "govee-smart.0.devices.h7127-0010.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7127-0010.diag"
-  },
-  "govee-smart.0.devices.h7127-0010.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7127-0010.diag.tier"
-  },
   "govee-smart.0.devices.h7127-0010.info": {
     "type": "channel",
     "common": {
@@ -17030,6 +16663,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7127-0010.info.serial"
+  },
+  "govee-smart.0.devices.h7127-0010.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7127-0010.info.tier"
   },
   "govee-smart.0.devices.h7127-0010.info.type": {
     "type": "state",
@@ -17371,73 +17051,6 @@
     },
     "_id": "govee-smart.0.devices.h7130-0006.control.work_mode"
   },
-  "govee-smart.0.devices.h7130-0006.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7130-0006.diag"
-  },
-  "govee-smart.0.devices.h7130-0006.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7130-0006.diag.tier"
-  },
   "govee-smart.0.devices.h7130-0006.info": {
     "type": "channel",
     "common": {
@@ -17607,6 +17220,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7130-0006.info.serial"
+  },
+  "govee-smart.0.devices.h7130-0006.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7130-0006.info.tier"
   },
   "govee-smart.0.devices.h7130-0006.info.type": {
     "type": "state",
@@ -18057,73 +17717,6 @@
     },
     "_id": "govee-smart.0.devices.h7131-0012.control.work_mode"
   },
-  "govee-smart.0.devices.h7131-0012.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7131-0012.diag"
-  },
-  "govee-smart.0.devices.h7131-0012.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7131-0012.diag.tier"
-  },
   "govee-smart.0.devices.h7131-0012.info": {
     "type": "channel",
     "common": {
@@ -18293,6 +17886,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7131-0012.info.serial"
+  },
+  "govee-smart.0.devices.h7131-0012.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7131-0012.info.tier"
   },
   "govee-smart.0.devices.h7131-0012.info.type": {
     "type": "state",
@@ -18491,73 +18131,6 @@
       "capabilityInstance": "powerSwitch"
     },
     "_id": "govee-smart.0.devices.h7141-0007.control.power"
-  },
-  "govee-smart.0.devices.h7141-0007.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7141-0007.diag"
-  },
-  "govee-smart.0.devices.h7141-0007.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7141-0007.diag.tier"
   },
   "govee-smart.0.devices.h7141-0007.events": {
     "type": "channel",
@@ -18789,6 +18362,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7141-0007.info.serial"
+  },
+  "govee-smart.0.devices.h7141-0007.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7141-0007.info.tier"
   },
   "govee-smart.0.devices.h7141-0007.info.type": {
     "type": "state",
@@ -19038,73 +18658,6 @@
     },
     "_id": "govee-smart.0.devices.h7143-0011.control.work_mode"
   },
-  "govee-smart.0.devices.h7143-0011.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7143-0011.diag"
-  },
-  "govee-smart.0.devices.h7143-0011.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7143-0011.diag.tier"
-  },
   "govee-smart.0.devices.h7143-0011.info": {
     "type": "channel",
     "common": {
@@ -19275,6 +18828,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7143-0011.info.serial"
   },
+  "govee-smart.0.devices.h7143-0011.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7143-0011.info.tier"
+  },
   "govee-smart.0.devices.h7143-0011.info.type": {
     "type": "state",
     "common": {
@@ -19423,73 +19023,6 @@
       "capabilityInstance": "powerSwitch"
     },
     "_id": "govee-smart.0.devices.h7161-000c.control.power"
-  },
-  "govee-smart.0.devices.h7161-000c.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7161-000c.diag"
-  },
-  "govee-smart.0.devices.h7161-000c.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7161-000c.diag.tier"
   },
   "govee-smart.0.devices.h7161-000c.info": {
     "type": "channel",
@@ -19660,6 +19193,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7161-000c.info.serial"
+  },
+  "govee-smart.0.devices.h7161-000c.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7161-000c.info.tier"
   },
   "govee-smart.0.devices.h7161-000c.info.type": {
     "type": "state",
@@ -19900,73 +19480,6 @@
     },
     "_id": "govee-smart.0.devices.h7171-000a.control.work_mode"
   },
-  "govee-smart.0.devices.h7171-000a.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7171-000a.diag"
-  },
-  "govee-smart.0.devices.h7171-000a.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7171-000a.diag.tier"
-  },
   "govee-smart.0.devices.h7171-000a.info": {
     "type": "channel",
     "common": {
@@ -20137,6 +19650,53 @@
     "native": {},
     "_id": "govee-smart.0.devices.h7171-000a.info.serial"
   },
+  "govee-smart.0.devices.h7171-000a.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7171-000a.info.tier"
+  },
   "govee-smart.0.devices.h7171-000a.info.type": {
     "type": "state",
     "common": {
@@ -20254,73 +19814,6 @@
       "capabilityInstance": "powerSwitch"
     },
     "_id": "govee-smart.0.devices.h7172-000b.control.power"
-  },
-  "govee-smart.0.devices.h7172-000b.diag": {
-    "type": "channel",
-    "common": {
-      "name": {
-        "de": "Diagnose",
-        "en": "Diagnostics",
-        "es": "Diagnóstico",
-        "fr": "Diagnostic",
-        "it": "Diagnostica",
-        "nl": "Diagnose",
-        "pl": "Diagnostyka",
-        "pt": "Diagnóstico",
-        "ru": "Диагностика",
-        "uk": "Діагностика",
-        "zh-cn": "诊断"
-      }
-    },
-    "native": {},
-    "_id": "govee-smart.0.devices.h7172-000b.diag"
-  },
-  "govee-smart.0.devices.h7172-000b.diag.tier": {
-    "type": "state",
-    "common": {
-      "name": {
-        "de": "Geräte-Stufe",
-        "en": "Device Tier",
-        "es": "Nivel del dispositivo",
-        "fr": "Niveau de l'appareil",
-        "it": "Livello del dispositivo",
-        "nl": "Apparaatniveau",
-        "pl": "Poziom urządzenia",
-        "pt": "Nível do dispositivo",
-        "ru": "Уровень устройства",
-        "uk": "Рівень пристрою",
-        "zh-cn": "设备等级"
-      },
-      "type": "string",
-      "role": "text",
-      "read": true,
-      "write": false,
-      "states": {
-        "verified": "Verified — confirmed by a tester",
-        "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
-        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
-      },
-      "def": "unknown",
-      "desc": {
-        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
-        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
-        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
-        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
-        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
-        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
-        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
-        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
-        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
-        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
-        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
-      }
-    },
-    "native": {
-      "capabilityType": "local",
-      "capabilityInstance": "diagnosticsTier"
-    },
-    "_id": "govee-smart.0.devices.h7172-000b.diag.tier"
   },
   "govee-smart.0.devices.h7172-000b.events": {
     "type": "channel",
@@ -20552,6 +20045,53 @@
     },
     "native": {},
     "_id": "govee-smart.0.devices.h7172-000b.info.serial"
+  },
+  "govee-smart.0.devices.h7172-000b.info.tier": {
+    "type": "state",
+    "common": {
+      "name": {
+        "de": "Geräte-Stufe",
+        "en": "Device Tier",
+        "es": "Nivel del dispositivo",
+        "fr": "Niveau de l'appareil",
+        "it": "Livello del dispositivo",
+        "nl": "Apparaatniveau",
+        "pl": "Poziom urządzenia",
+        "pt": "Nível do dispositivo",
+        "ru": "Уровень устройства",
+        "uk": "Рівень пристрою",
+        "zh-cn": "设备等级"
+      },
+      "type": "string",
+      "role": "text",
+      "read": true,
+      "write": false,
+      "states": {
+        "verified": "Verified — confirmed by a tester",
+        "reported": "Reported — community-reported, treated as verified",
+        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
+      },
+      "def": "unknown",
+      "desc": {
+        "de": "Wie gut dieses Modell im Katalog des Adapters bekannt ist — geprüft, gemeldet, importiert oder gar nicht gelistet.",
+        "en": "How well this model is known to the adapter's catalogue — verified, reported, seed, or not listed at all.",
+        "es": "Cuánto conoce el catálogo del adaptador este modelo — verificado, reportado, importado o no listado.",
+        "fr": "À quel point ce modèle est connu du catalogue de l'adaptateur — vérifié, signalé, importé ou absent.",
+        "it": "Quanto questo modello è noto al catalogo dell'adattatore — verificato, segnalato, importato o assente.",
+        "nl": "Hoe goed dit model in de catalogus van de adapter bekend is — geverifieerd, gemeld, geïmporteerd of afwezig.",
+        "pl": "Jak dobrze ten model jest znany katalogowi adaptera — zweryfikowany, zgłoszony, zaimportowany lub nieobecny.",
+        "pt": "Quão bem este modelo é conhecido no catálogo do adaptador — verificado, reportado, importado ou ausente.",
+        "ru": "Насколько модель известна каталогу адаптера — проверена, сообщена, импортирована или отсутствует.",
+        "uk": "Наскільки модель відома каталогу адаптера — перевірена, повідомлена, імпортована чи відсутня.",
+        "zh-cn": "该型号在适配器目录中的确认程度 —— 已验证、已上报、已导入或完全未收录。"
+      }
+    },
+    "native": {
+      "capabilityType": "local",
+      "capabilityInstance": "diagnosticsTier"
+    },
+    "_id": "govee-smart.0.devices.h7172-000b.info.tier"
   },
   "govee-smart.0.devices.h7172-000b.info.type": {
     "type": "state",
