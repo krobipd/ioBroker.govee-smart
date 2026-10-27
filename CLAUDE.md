@@ -26,6 +26,7 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 - **GV-30** Names the user gives himself stand in the diagnostics report only as marks. For govee: own snapshot and DIY names. Govee's own scene names stay readable.
 - **GV-31** On every release the research sources are checked for new Govee devices, and every new Wi-Fi device goes into the catalogue.
 - **GV-32** Govee reports the colour mode with every colour report (Kelvin > 0 = colour temperature, 0 = RGB); govee-smart follows it. In colour-temperature mode `color_temperature` carries the value and `color_rgb` null, in RGB mode `color_rgb` the colour and `color_temperature` null. An RGB report that exactly matches an entry of Govee's colour-temperature table is a colour temperature, then both carry their value. Only a report carrying both fields decides, never silence.
+- **GV-33** A device's trust tier stands as `info.tier` in the device's info channel; there is no separate `diag` channel.
 - **GV-24** A device behind a Govee gateway is supported only through the gateway; the gateway is its reachability device.
 - **GV-25** An untested model (seed) asks in the log for the experimental switch and a diagnostics report. It never claims to work.
 - **GV-27** The segment assistant is a React component of its own (variant B), not through dm-utils.
