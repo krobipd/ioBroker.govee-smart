@@ -2653,7 +2653,7 @@ describe("CapabilityMapper", () => {
     // that every state-def emitted has plain-string VALUES, irrespective of
     // language.
 
-    it("diag.tier VALUES are plain-string in default (en) language", () => {
+    it("info.tier VALUES are plain-string in default (en) language", () => {
       const device: GoveeDevice = {
         sku: "H6172",
         deviceId: "AA:BB:CC:DD:EE:FF",
@@ -2673,6 +2673,7 @@ describe("CapabilityMapper", () => {
       const cloudDefs = buildCloudStateDefs(device);
       const tier = cloudDefs.find(d => d.id === "tier");
       expect(tier, "tier state-def must exist for non-group devices").toBeDefined();
+      expect(tier!.channel, "the tier lives in the info channel (3.3.0)").toBe("info");
       expect(tier!.states, "tier state-def must have common.states").toBeDefined();
       for (const [k, v] of Object.entries(tier!.states!)) {
         expect(typeof v, `tier states[${k}] must be plain-string, got ${typeof v}`).toBe("string");

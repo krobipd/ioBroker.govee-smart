@@ -2049,7 +2049,7 @@ function modeLevelKind(field: CapabilityField | undefined): "dropdown" | "number
  * Scene-dropdown rules — three states with identical shape (dropdown over a
  * device-content array, capabilityType `dynamic_scene`). Adding a new
  * scene-style dropdown means: append one entry here. The 8 other Cloud-derived
- * states (scene_speed, refresh_cloud, snapshot_local/save/delete, diag.*)
+ * states (scene_speed, refresh_cloud, snapshot_local/save/delete, info.tier)
  * have genuinely different shapes and stay inline — not the same anti-pattern.
  */
 const SCENE_DROPDOWN_RULES: ReadonlyArray<{
@@ -2228,10 +2228,11 @@ function sharedRange(
 }
 
 /**
- * The diagnostics state (trust tier) for real devices. Groups get none (no group handler; Pattern 33). A report
- * writes no value (DB-10): the time of the last export is gone, `migrateLegacyDiagnostics` removes it.
+ * The trust tier of a real device, in its `info` channel (3.3.0, krobi 2026-10-27: no folder of its own for it).
+ * Groups get none (no group handler; Pattern 33). Until 3.2.1 it was `diag.tier`; `migrateLegacyDiagnostics`
+ * moves it and removes the `diag` channel.
  *
- * @param tierDef Initial value for the diag.tier state
+ * @param tierDef Initial value for the info.tier state
  */
 function buildDiagStateDefs(tierDef: string): StateDefinition[] {
   const defs: StateDefinition[] = [];
@@ -2251,7 +2252,7 @@ function buildDiagStateDefs(tierDef: string): StateDefinition[] {
     },
     capabilityType: "local",
     capabilityInstance: "diagnosticsTier",
-    channel: "diag",
+    channel: "info",
   });
   return defs;
 }
@@ -2468,8 +2469,8 @@ export function buildCloudStateDefs(
     });
   }
 
-  // Diagnostics — time of the last export, trust tier. Default tier
-  // "unknown" for a real device (its actual tier comes from the registry).
+  // Trust tier (info.tier). Default "unknown" for a real device (its actual
+  // tier comes from the registry).
   stateDefs.push(...buildDiagStateDefs("unknown"));
 
   return stateDefs;

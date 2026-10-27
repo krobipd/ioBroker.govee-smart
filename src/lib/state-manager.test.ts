@@ -165,6 +165,21 @@ function createMockAdapter(): {
       states.delete(id);
       return Promise.resolve();
     },
+    getForeignObjectsAsync: (pattern: string) => {
+      calls.push({ method: "getForeignObjectsAsync", args: [pattern] });
+      const head = pattern.replace(/\*$/, "");
+      const found: Record<string, unknown> = {};
+      for (const [key, obj] of objects.entries()) {
+        if (key.startsWith(head)) {
+          found[key] = structuredClone(obj);
+        }
+      }
+      return Promise.resolve(found);
+    },
+    getForeignObjectAsync: (id: string) => {
+      calls.push({ method: "getForeignObjectAsync", args: [id] });
+      return Promise.resolve(structuredClone(objects.get(id.replace("govee-smart.0.", "")) ?? null));
+    },
     getObjectViewAsync: (_type: string, viewType: string, opts: { startkey: string; endkey: string }) => {
       calls.push({ method: "getObjectViewAsync", args: [_type, viewType, opts] });
       const rows: Array<{ id: string; value: unknown }> = [];
@@ -2010,7 +2025,7 @@ describe("StateManager", () => {
       const sm = new StateManager(adapter as never, registry);
       const dev = createTestDevice();
       await createAllStatesForTest(sm, dev, [
-        // The datapoint the diag channel actually has.
+        // The trust tier lives in the info channel (3.3.0; diag.tier until 3.2.1).
         {
           id: "tier",
           name: "Tier",
@@ -2020,13 +2035,13 @@ describe("StateManager", () => {
           def: "unknown",
           capabilityType: "local",
           capabilityInstance: "diagnosticsTier",
-          channel: "diag",
+          channel: "info",
         },
       ]);
-      expect(sm.resolveStatePath("devices.h6160-0011", "tier")).toBe("devices.h6160-0011.diag.tier");
+      expect(sm.resolveStatePath("devices.h6160-0011", "tier")).toBe("devices.h6160-0011.info.tier");
     });
 
-    it("diag.tier is written for a device and never for an app group — a group has no diag channel", async () => {
+    it("info.tier is written for a device and never for an app group — a group has no tier", async () => {
       const { adapter, calls } = createMockAdapter();
       const sm = new StateManager(adapter as never, registry);
       await sm.updateDeviceTier(createTestDevice({ sku: "BaseGroup", deviceId: "9900001" }), "unknown");
@@ -2035,7 +2050,7 @@ describe("StateManager", () => {
       await sm.updateDeviceTier(light, "verified");
       // read-only: the first write of a run compares once with the database, later ones in memory
       expect(calls.filter(c => c.method === "setStateChangedAsync").map(c => c.args.slice(0, 2))).toEqual([
-        [`${sm.devicePrefix(light)}.diag.tier`, { val: "verified", ack: true }],
+        [`${sm.devicePrefix(light)}.info.tier`, { val: "verified", ack: true }],
       ]);
       await sm.updateDeviceTier(light, "verified");
       expect(calls.filter(c => c.method === "setState" || c.method === "setStateChangedAsync")).toHaveLength(1);
@@ -3405,6 +3420,70 @@ describe("StateManager — invariants without a test (mutation audit)", () => {
 
       expect(objects.has("devices.h6160-0011.diag.lastExport")).toBe(false);
       expect(states.has("devices.h6160-0011.diag.lastExport")).toBe(false);
+    });
+
+    it("moves diag.tier to info.tier with the user's recording, alias and room, then drops the diag channel", async () => {
+      // 3.3.0 (krobi 2026-10-27): the tier needs no folder of its own. info.tier is the same datapoint under a new
+      // id, so what hangs on diag.tier goes along — the recording keeps its series under the old id.
+      const { adapter, objects, states } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      const old = "govee-smart.0.devices.h6160-0011.diag.tier";
+      const moved = "govee-smart.0.devices.h6160-0011.info.tier";
+      objects.set("devices.h6160-0011.diag", { type: "channel", common: { name: "Diagnostics" } });
+      objects.set("devices.h6160-0011.diag.tier", {
+        type: "state",
+        common: { name: "Tier", custom: { "influxdb.0": { enabled: true } } },
+      });
+      states.set("devices.h6160-0011.diag.tier", { val: "verified", ack: true } as ioBroker.State);
+      // The build creates info.tier before the migration runs (onCloudDataReady) and maps `tier` to it.
+      const dev = createTestDevice();
+      await createAllStatesForTest(sm, dev, [
+        {
+          id: "tier",
+          name: "Tier",
+          type: "string",
+          role: "text",
+          write: false,
+          def: "unknown",
+          capabilityType: "local",
+          capabilityInstance: "diagnosticsTier",
+          channel: "info",
+        },
+      ]);
+      objects.set("enum.rooms.living", { type: "enum", common: { members: [old, "other.0.x"] } });
+      objects.set("alias.0.tier", { type: "state", common: { alias: { id: old } } });
+
+      await sm.migrateLegacyDiagnostics(dev);
+
+      expect(objects.has("devices.h6160-0011.diag.tier")).toBe(false);
+      expect(states.has("devices.h6160-0011.diag.tier")).toBe(false);
+      expect(objects.has("devices.h6160-0011.diag")).toBe(false);
+      expect((objects.get("devices.h6160-0011.info.tier")?.common as { custom?: unknown }).custom).toEqual({
+        "influxdb.0": { enabled: true, aliasId: old },
+      });
+      expect((objects.get("enum.rooms.living")?.common as { members: string[] }).members).toEqual(["other.0.x", moved]);
+      expect((objects.get("alias.0.tier")?.common as { alias: { id: string } }).alias.id).toBe(moved);
+      expect(sm.resolveStatePath("devices.h6160-0011", "tier")).toBe("devices.h6160-0011.info.tier");
+    });
+
+    it("keeps a recording the user already set on info.tier — the old one does not overwrite it", async () => {
+      const { adapter, objects } = createMockAdapter();
+      const sm = new StateManager(adapter as never, registry);
+      objects.set("devices.h6160-0011.diag.tier", {
+        type: "state",
+        common: { custom: { "influxdb.0": { enabled: true } } },
+      });
+      objects.set("devices.h6160-0011.info.tier", {
+        type: "state",
+        common: { custom: { "history.0": { enabled: true } } },
+      });
+
+      await sm.migrateLegacyDiagnostics(createTestDevice());
+
+      expect((objects.get("devices.h6160-0011.info.tier")?.common as { custom?: unknown }).custom).toEqual({
+        "history.0": { enabled: true },
+      });
+      expect(objects.has("devices.h6160-0011.diag.tier")).toBe(false);
     });
 
     it("is a silent no-op on an install that never had it", async () => {

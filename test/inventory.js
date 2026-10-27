@@ -920,7 +920,18 @@ async function fixtureNative(extra = {}) {
  * previous full id → current full id (adapter-specific like FIXTURE_NATIVE, may be computed). The recording is the
  * user's and goes on with the moved datapoint (krobi 2026-09-02); the upgrade suite checks that it arrived there.
  */
-const MOVES = {};
+// 3.3.0 (krobi 2026-10-27): a device's trust tier moved from `diag.tier` to `info.tier` — the same datapoint, the
+// `diag` channel is gone.
+const MOVES = (() => {
+  const previousFile = process.env.INVENTORY_PREVIOUS;
+  if (!previousFile || !fs.existsSync(previousFile)) {
+    return {};
+  }
+  const ids = Object.keys(JSON.parse(fs.readFileSync(previousFile, "utf8")));
+  return Object.fromEntries(
+    ids.filter(id => id.endsWith(".diag.tier")).map(id => [id, id.replace(/\.diag\.tier$/, ".info.tier")]),
+  );
+})();
 /**
  * Round 87: adapter-specific like FIXTURE_NATIVE — the states that show an outage of EVERY counterpart, each with the
  * value it takes then (ids without the namespace, e.g. `{ "info.connection": false }` plus each device's reachability).

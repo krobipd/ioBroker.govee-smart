@@ -3428,8 +3428,9 @@ describe("GoveeAdapter — the diagnostics export over the REAL host object", ()
     expect(report.controlPaths).toEqual(
       expect.arrayContaining([expect.objectContaining({ stateId: "control.power" })]),
     );
-    // A report writes no value (DB-10) — the device has no datapoint for one either.
-    expect([...i.states.keys()].filter(id => id.startsWith(`${prefix}.diag.`) && !id.endsWith(".tier"))).toEqual([]);
+    // A report writes no value (DB-10) — the device has no datapoint for one either, and since 3.3.0 no diag
+    // channel at all: the tier lives in info.
+    expect([...i.states.keys()].filter(id => id.startsWith(`${prefix}.diag.`))).toEqual([]);
   });
 
   it("the wired report carries the start time and never a group's digit id (issue #50)", async () => {

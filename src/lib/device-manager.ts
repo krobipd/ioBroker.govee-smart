@@ -1643,7 +1643,7 @@ export class DeviceManager {
    * device reconnects don't spam the log. Behaviour by tier:
    *   - verified / reported: silent (the catalog backs the device, no
    *     action needed). The tier is still surfaced via the
-   *     `diag.tier` state for any user who wants to check.
+   *     `info.tier` state for any user who wants to check.
    *   - seed with catalog quirks, toggle off: warn — the corrections stay off
    *     until the experimental toggle is on.
    *   - seed with quirks, toggle on: info — the corrections are active.

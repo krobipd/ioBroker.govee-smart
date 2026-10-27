@@ -17,6 +17,8 @@ import { tDesc, tName, tNameWith } from "./i18n";
 import { errText, type DeviceState, type GoveeDevice } from "./types";
 import { DeviceIdRegistry, ID_SCHEME } from "./device-id";
 import { idMigrationDepsFor, migrateDeviceIds } from "./device-id-migration";
+import { keepHistoryUnder, retargetAliases } from "./device-move";
+import { moveWithEnums } from "./enum-carry";
 
 /**
  * High sort-end marker for getObjectView key ranges (`startkey: prefix,
@@ -33,6 +35,23 @@ const SORT_KEY_END = "香";
  * ensureState instead of stateDefs. Cleaning `info` by stateDef-set would
  * delete the adapter-managed ones.
  */
+/**
+ * The recording settings (`common.custom`) of a state as a copy that keeps its series under the state's old id,
+ * or undefined when it has none.
+ *
+ * @param common The state's `common`
+ * @param fullId The state's full id, namespace included
+ */
+function carriedRecording(common: unknown, fullId: string): Record<string, unknown> | undefined {
+  const custom = (common as { custom?: unknown } | null | undefined)?.custom;
+  if (!custom || typeof custom !== "object" || Object.keys(custom).length === 0) {
+    return undefined;
+  }
+  const copy = JSON.parse(JSON.stringify(custom)) as Record<string, unknown>;
+  keepHistoryUnder(copy, fullId);
+  return copy;
+}
+
 const MANAGED_CHANNELS = ["control", "scenes", "music", "snapshots", "sensor", "events"];
 /**
  * Display names used when the channel object is (re-)created. `info` is
@@ -49,7 +68,6 @@ const CHANNEL_NAME_KEYS: Record<string, I18nKey> = {
   sensor: "channelSensorData",
   events: "channelEvents",
   info: "deviceInformation",
-  diag: "channelDiagnostics",
 };
 
 /**
@@ -183,7 +201,7 @@ export class StateManager {
    * v1.27.2 (URL-dropdown) and v1.28.4 (mode-dropdown): Admin renders
    * states-VALUES as React children, so a translation object triggers React
    * Error #31 → fatal "Error in GUI" on dropdown open (write:true) or any
-   * render path (write:false like diag.tier).
+   * render path (write:false like info.tier).
    *
    * ⚠️ Until 2.37.1 the replace was `delObject` → `setObjectNotExists`, and the
    * comment here claimed the state value survives in the states DB. It does
@@ -313,7 +331,7 @@ export class StateManager {
 
   /**
    * Push the device's trust tier (verified/reported/seed/unknown) into
-   * the user-visible `diag.tier` state. Called after every device-state
+   * the user-visible `info.tier` state. Called after every device-state
    * refresh so the value tracks any registry change between adapter
    * restarts (e.g. seed → verified once a tester confirms). No-op for
    * groups (BaseGroup has no per-device tier).
@@ -327,7 +345,7 @@ export class StateManager {
     }
     const prefix = this.devicePrefix(device);
     // read-only: compared in memory, written only on a change
-    await this.writeReadOnly(`${prefix}.diag.tier`, tier).catch(() => undefined);
+    await this.writeReadOnly(`${prefix}.info.tier`, tier).catch(() => undefined);
   }
 
   /**
@@ -605,10 +623,11 @@ export class StateManager {
   }
 
   /**
-   * Migrate v2.1.0 layout (`info.diagnostics_*`) to v2.1.1 layout
-   * (`diag.*`). Deletes the three old objects + states; the new ones get
-   * created by the regular `createDeviceStates` pass. Once per run and tree —
-   * until 3.1.0 every build of the device asked again (audit YAGNI-8).
+   * Clear the diagnostics layouts of earlier versions: v2.1.0 `info.diagnostics_*`,
+   * the datapoints of the `diag` channel that later versions dropped, and since
+   * 3.3.0 the channel itself — its last datapoint `diag.tier` moves to `info.tier`.
+   * The new datapoints are created by the regular build before this runs. Once
+   * per run and tree — until 3.1.0 every build of the device asked again (audit YAGNI-8).
    *
    * @param device Govee device
    */
@@ -642,6 +661,43 @@ export class StateManager {
     // the same way.
     await this.safeDeleteState(`${prefix}.diag.lastExport`);
     this.stateChannelMap.delete(`${prefix}.lastExport`);
+    // 3.3.0: the trust tier lives in `info`, and the `diag` channel goes (krobi 2026-10-27: no folder just for
+    // it). The map entry `${prefix}.tier` stays — it names the new datapoint.
+    await this.moveTierToInfo(prefix);
+    await this.safeDeleteState(`${prefix}.diag`);
+  }
+
+  /**
+   * Move `diag.tier` to `info.tier` — the same datapoint under a new id, so what the user hung on it goes along:
+   * the recording (its series stays under the old id), the aliases that point at it, its rooms and functions.
+   * Then the old datapoint is deleted. The new one exists by then — the build that runs the migration created it.
+   * A no-op once moved.
+   *
+   * @param prefix The device prefix (`devices.<id>`)
+   */
+  private async moveTierToInfo(prefix: string): Promise<void> {
+    const oldId = `${prefix}.diag.tier`;
+    const old = await this.adapter.getObjectAsync(oldId).catch(() => null);
+    if (!old) {
+      return;
+    }
+    const newId = `${prefix}.info.tier`;
+    const oldFull = `${this.adapter.namespace}.${oldId}`;
+    const newFull = `${this.adapter.namespace}.${newId}`;
+    const custom = carriedRecording(old.common, oldFull);
+    if (custom) {
+      const target = await this.adapter.getObjectAsync(newId).catch(() => null);
+      if (target && carriedRecording(target.common, newFull) === undefined) {
+        await this.adapter.extendObject(newId, { common: { custom } }).catch(() => undefined);
+      }
+    }
+    const aliases = await this.adapter.getForeignObjectsAsync("alias.*", "state").catch(() => null);
+    await retargetAliases(
+      aliases ?? {},
+      id => (id === oldFull ? newFull : undefined),
+      (id, obj) => this.adapter.setForeignObject(id, obj),
+    ).catch(() => 0);
+    await moveWithEnums(this.adapter, oldFull, newFull, () => this.safeDeleteState(oldId), errText);
   }
 
   /**
@@ -1114,13 +1170,13 @@ export class StateManager {
           },
         });
 
-        // Existing diag.tier datapoints from v2.6.0+ may carry translation-object
+        // Existing tier datapoints from v2.6.0+ (diag.tier until 3.2.1) may carry translation-object
         // VALUES in common.states (the old buildCloudStateDefs wrote tLabel(...)
         // directly). extendObject deep-merges: stale keys absent from the fresh
         // map would survive with their object values — clearing the map before
         // rewriting it is what makes it exactly `fresh`. React Error #31 would
         // otherwise fatal-crash Admin on dropdown open (write:true states) or
-        // any view that renders the value (write:false states like diag.tier).
+        // any view that renders the value (write:false states like info.tier).
         if (def.states) {
           await this.repairCommonStatesIfBuggy(`${prefix}.${channel}.${def.id}`, def.states);
         }

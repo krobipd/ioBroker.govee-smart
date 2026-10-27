@@ -207,7 +207,7 @@ export class DeviceRegistry {
 
   /**
    * Single canonical trust tier for a SKU as exposed to users via the
-   * `diag.tier` state. Unlike {@link getStatus}, this collapses the
+   * `info.tier` state. Unlike {@link getStatus}, this collapses the
    * unknown-SKU case into the explicit string `"unknown"` so the value is
    * always one of four well-known labels.
    *
@@ -218,7 +218,7 @@ export class DeviceRegistry {
   }
 }
 
-/** The four labels `diag.tier` can carry — the three catalog statuses plus "unknown". */
+/** The four labels `info.tier` can carry — the three catalog statuses plus "unknown". */
 export type DeviceTier = DeviceStatus | "unknown";
 
 // There is deliberately NO module-level registry: every adapter instance builds
