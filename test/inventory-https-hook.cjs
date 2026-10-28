@@ -52,11 +52,16 @@ https.request = function patchedRequest(options, callback) {
 const MQTT_PORT = process.env.GOVEE_FIXTURE_MQTT_PORT;
 const BROKER_HOST = /^(mqtt\.openapi\.govee\.com|[a-z0-9]+-ats\.iot\.[a-z0-9-]+\.amazonaws\.com)$/;
 const realTlsConnect = tls.connect;
-tls.connect = function patchedTlsConnect(...args) {
-  const opts = typeof args[0] === "object" && args[0] !== null ? args[0] : { port: args[0], host: args[1] };
+/**
+ * @param {...unknown} args what the caller hands tls.connect (options, or port and host, and a listener)
+ * @returns {net.Socket} the socket the caller gets
+ */
+function patchedTlsConnect(...args) {
+  /** @type {{ host?: unknown, hostname?: unknown, servername?: unknown, port?: unknown }} */
+  const opts = typeof args[0] === "object" && args[0] !== null ? { ...args[0] } : { port: args[0], host: args[1] };
   const host = String(opts.host || opts.hostname || opts.servername || "");
   if (host === "127.0.0.1" || host === "localhost") {
-    return realTlsConnect.apply(tls, args);
+    return Reflect.apply(realTlsConnect, tls, args);
   }
   if (MQTT_PORT && BROKER_HOST.test(host)) {
     const callback = args.find(a => typeof a === "function");
@@ -66,21 +71,22 @@ tls.connect = function patchedTlsConnect(...args) {
       hostname: undefined,
       port: Number(MQTT_PORT),
       servername: host,
-      ca: fs.readFileSync(process.env.GOVEE_FIXTURE_MQTT_CA, "utf8"),
+      ca: fs.readFileSync(process.env.GOVEE_FIXTURE_MQTT_CA ?? "", "utf8"),
     };
-    return callback ? realTlsConnect.call(tls, routed, callback) : realTlsConnect.call(tls, routed);
+    return Reflect.apply(realTlsConnect, tls, callback ? [routed, callback] : [routed]);
   }
   process.stderr.write(
     `inventory fixture: refusing tls.connect to ${host}:${opts.port ?? "?"} — nothing leaves the machine\n`,
   );
   const socket = new net.Socket();
   process.nextTick(() => {
-    const err = new Error(`inventory fixture: connection to ${host} refused`);
-    err.code = "ECONNREFUSED";
-    socket.destroy(err);
+    socket.destroy(
+      Object.assign(new Error(`inventory fixture: connection to ${host} refused`), { code: "ECONNREFUSED" }),
+    );
   });
   return socket;
-};
+}
+tls.connect = /** @type {typeof tls.connect} */ (/** @type {unknown} */ (patchedTlsConnect));
 
 // The fixture server has no rate limit, and the inventory is a picture of the
 // FINISHED tree: with the production minute window (8 cloud calls per minute
@@ -93,10 +99,14 @@ tls.connect = function patchedTlsConnect(...args) {
 // the module load: the harness copies the adapter into a temp install, so a
 // require() of the source tree from here would patch a different instance.
 // krobi-Go 2026-09-22.
-const Module = require("node:module");
+// `Module._load` is node's own loader hook; @types/node does not declare it.
+const Module = /** @type {{ _load: (request: unknown, parent: unknown, isMain: boolean) => unknown }} */ (
+  /** @type {unknown} */ (require("node:module"))
+);
 const realLoad = Module._load;
 Module._load = function patchedLoad(request, parent, isMain) {
-  const exp = realLoad.call(this, request, parent, isMain);
+  /** @type {{ CLOUD_LIMITS?: Record<string, unknown> } | null | undefined} */
+  const exp = Reflect.apply(realLoad, this, [request, parent, isMain]);
   if (typeof request === "string" && /timing-constants(\.js)?$/.test(request) && exp && exp.CLOUD_LIMITS) {
     // Every minute window and burst of the per-actor budget (CLOUD_LIMITS,
     // 2.39.0) — the daily counter stays, nothing in a fixture run reaches it.
