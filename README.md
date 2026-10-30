@@ -60,7 +60,7 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 - Node.js >= 22
 - ioBroker js-controller >= 7.2.5
-- ioBroker Admin >= 8.2.0
+- ioBroker Admin >= 8.3.5
 - A Govee account and at least one Govee WiFi device. LAN control needs a light with LAN mode enabled in the Govee Home app — see Govee's [LAN-supported device list](https://app-h5.govee.com/user-manual/wlan-guide).
 
 ---
