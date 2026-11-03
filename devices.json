@@ -1462,8 +1462,7 @@
       "status": "seed",
       "since": "2.33.0",
       "quirks": {
-        "statusCmdVersion": 1,
-        "brokenBrokerCommands": true
+        "statusCmdVersion": 1
       }
     },
     "H6125": {
@@ -1683,10 +1682,7 @@
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
-      "since": "2.33.0",
-      "quirks": {
-        "brokenBrokerCommands": true
-      }
+      "since": "2.33.0"
     },
     "H6159": {
       "name": "LED Strip",

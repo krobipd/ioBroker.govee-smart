@@ -38,9 +38,9 @@ export interface DeviceQuirks {
   brokenPlatformApi?: boolean;
   /**
    * The account broker does not carry this model's light commands (K18) — power, brightness, colour and colour
-   * temperature go LAN → Cloud instead of LAN → broker → Cloud. Models per govee2mqtt `src/service/quirks.rs`
-   * (`with_iot_api_support(false)`: H6121, H6154 — issue #40, commands ignored, status arrived; read 2026-10-08). Not
-   * H6176: its issue #49 was a status report without the on/off value, not an ignored command. Applies whatever the
+   * temperature go LAN → Cloud instead of LAN → broker → Cloud. No catalog entry carries it today: govee2mqtt's
+   * exclusion of H6121/H6154/H6176 (`quirks.rs`, issues #40/#49) came from commands sent without the account topic,
+   * and homebridge-govee (11.39.1) controls all three over the account like any light (#64). Applies whatever the
    * entry's status, like every quirk (GV-25).
    */
   brokenBrokerCommands?: boolean;

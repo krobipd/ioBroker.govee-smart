@@ -1504,19 +1504,18 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
   });
 
-  it("every model the shipped catalog excludes from the broker stays on the API", () => {
+  it("the shipped catalog sends H6121, H6154 and H6176 over the account like any light (homebridge-govee does, #64)", () => {
+    // govee2mqtt excluded them (quirks.rs, issues #40/#49) after commands sent without the account topic did nothing;
+    // homebridge-govee 11.39.1 controls them over the account with it, and so does this adapter since #64.
     const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "..", "devices.json"), "utf-8")) as {
       devices: Record<string, { quirks?: { brokenBrokerCommands?: boolean } }>;
     };
-    const excluded = Object.keys(catalog.devices).filter(
-      sku => catalog.devices[sku].quirks?.brokenBrokerCommands === true,
-    );
-    expect(excluded.length).toBeGreaterThan(0);
     const { router } = cloudRouter(new DeviceRegistry());
     router.setBrokerClient(makeBroker().client);
-    for (const sku of excluded) {
+    for (const sku of ["H6121", "H6154", "H6176"]) {
+      expect(catalog.devices[sku].quirks?.brokenBrokerCommands, sku).toBeUndefined();
       const device = makeDevice({ sku, lanIp: undefined, iotTopic: TOPIC });
-      expect(router.resolveTransport(device, "power"), sku).toEqual({ kind: "cloud", reason: "light-no-lan-fallback" });
+      expect(router.resolveTransport(device, "power"), sku).toEqual({ kind: "broker", reason: "no-lan" });
     }
   });
 
