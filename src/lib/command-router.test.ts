@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { vi } from "vitest";
 
 // The router resolves dropdown keys through the capability mapper, which reads
@@ -1482,6 +1484,40 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(broker.published).toEqual([]);
     expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
     expect(router.transportUsed(device, "power")).toBe("cloud");
+  });
+
+  it("the broker exclusion holds for an untested (seed) model without the experimental switch", async () => {
+    const reg = new DeviceRegistry({
+      data: {
+        devices: {
+          H6121: { name: "Smart Light", type: "light", status: "seed", quirks: { brokenBrokerCommands: true } },
+        },
+      },
+    });
+    const { router, cloud } = cloudRouter(reg);
+    const broker = makeBroker();
+    router.setBrokerClient(broker.client);
+    const device = makeDevice({ sku: "H6121", lanIp: undefined, iotTopic: TOPIC });
+    expect(router.resolveTransport(device, "power")).toEqual({ kind: "cloud", reason: "light-no-lan-fallback" });
+    await router.sendCommand(device, "power", true);
+    expect(broker.published).toEqual([]);
+    expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
+  });
+
+  it("every model the shipped catalog excludes from the broker stays on the Cloud without the experimental switch", () => {
+    const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "..", "devices.json"), "utf-8")) as {
+      devices: Record<string, { quirks?: { brokenBrokerCommands?: boolean } }>;
+    };
+    const excluded = Object.keys(catalog.devices).filter(
+      sku => catalog.devices[sku].quirks?.brokenBrokerCommands === true,
+    );
+    expect(excluded.length).toBeGreaterThan(0);
+    const { router } = cloudRouter(new DeviceRegistry());
+    router.setBrokerClient(makeBroker().client);
+    for (const sku of excluded) {
+      const device = makeDevice({ sku, lanIp: undefined, iotTopic: TOPIC });
+      expect(router.resolveTransport(device, "power"), sku).toEqual({ kind: "cloud", reason: "light-no-lan-fallback" });
+    }
   });
 
   it("a cloud override in the catalog wins over the broker", () => {

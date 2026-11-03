@@ -341,7 +341,9 @@ export class CommandRouter {
       brokerCarries(device, command, {
         lanPath: false,
         brokerConnected: this.brokerClient?.connected === true,
-        brokerExcluded: this.registry.getQuirks(device.sku)?.brokenBrokerCommands === true,
+        // Read from the catalog entry, not the active quirks: an untested (seed) model's quirks wait for the experimental
+        // switch, and every model the catalog excludes is seed — the exclusion (K18) only keeps the Cloud path of 3.1.1.
+        brokerExcluded: this.registry.getEntry(device.sku)?.quirks?.brokenBrokerCommands === true,
       })
     ) {
       return { kind: "broker", reason: "no-lan" };
