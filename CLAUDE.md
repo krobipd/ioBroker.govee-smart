@@ -28,7 +28,7 @@ krobi's decisions for this adapter. The register with his verbatim words lives i
 - **GV-32** Govee reports the colour mode with every colour report (Kelvin > 0 = colour temperature, 0 = RGB); govee-smart follows it. In colour-temperature mode `color_temperature` carries the value and `color_rgb` null, in RGB mode `color_rgb` the colour and `color_temperature` null. An RGB report that exactly matches an entry of Govee's colour-temperature table is a colour temperature, then both carry their value. Only a report carrying both fields decides, never silence.
 - **GV-33** A device's trust tier stands as `info.tier` in the device's info channel; there is no separate `diag` channel.
 - **GV-24** A device behind a Govee gateway is supported only through the gateway; the gateway is its reachability device.
-- **GV-25** An untested model (seed) asks in the log for the experimental switch and a diagnostics report. It never claims to work.
+- **GV-25** An untested model says in the log that it is untested and asks for a diagnostics report. It never claims to work. There is no experimental switch. A catalog correction always applies to exactly the model it is written for, whatever its status.
 - **GV-27** The segment assistant is a React component of its own (variant B), not through dm-utils.
 - **B1** Every device can need quirks — whether it is connected over the cloud, locally or another way.
 - **B2** The datapoints for colour and colour temperature are called `color_rgb` and `color_temperature`.
