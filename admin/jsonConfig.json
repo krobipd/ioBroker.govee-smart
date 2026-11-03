@@ -77,30 +77,6 @@
           "lg": 6,
           "xl": 6
         },
-        "_advancedInfo": {
-          "newLine": true,
-          "type": "staticText",
-          "text": "experimentalQuirksInfo",
-          "xs": 12,
-          "sm": 12,
-          "md": 12,
-          "lg": 12,
-          "xl": 12,
-          "style": {
-            "fontSize": 14,
-            "marginBottom": 8
-          }
-        },
-        "experimentalQuirks": {
-          "type": "checkbox",
-          "label": "experimentalQuirksLabel",
-          "tooltip": "experimentalQuirksTooltip",
-          "xs": 12,
-          "sm": 12,
-          "md": 8,
-          "lg": 6,
-          "xl": 6
-        },
         "_supportHeader": {
           "newLine": true,
           "type": "header",

@@ -578,7 +578,6 @@ describe("resolveSegmentCountWithSource — the report names the source of THIS 
           H6076: { name: "x", type: "light", status: "verified", since: "2.0.0", quirks: { segmentCount } },
         },
       } as never,
-      experimental: true,
     });
   const device = (over: Partial<GoveeDevice>): GoveeDevice =>
     ({ sku: "H6076", deviceId: "AA:BB", capabilities: [], ...over }) as GoveeDevice;

@@ -512,9 +512,8 @@ function buildAllStateDefsForTest(
 }
 
 /**
- * Quirk-dependent tests need a registry where the seed-status entries
- * (H60A1, H6141, …) are also active. Real-world default has them off
- * unless the user toggles experimental support — tests force the flag on.
+ * Quirk-dependent tests use a catalog of seed-status entries (H60A1, H6141, …);
+ * their corrections apply like every quirk (GV-25).
  * Inserted via beforeEach so subsequent test files cannot leak a reset.
  */
 const TEST_REGISTRY = {
@@ -532,7 +531,7 @@ const TEST_REGISTRY = {
 
 describe("CapabilityMapper", () => {
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: TEST_REGISTRY as never });
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -1587,12 +1586,11 @@ describe("CapabilityMapper", () => {
   });
 
   describe("brokenPlatformApi quirk (v2.10.0 — Boolean-Flag pattern wired live)", () => {
-    // The catalog above marks H6141 as brokenPlatformApi:true with status:seed.
-    // We initialize the registry with experimental:true so the quirk activates,
-    // then verify buildCloudStateDefs returns an empty/minimal list for that
+    // The catalog above marks H6141 as brokenPlatformApi:true with status:seed;
+    // the quirk applies like every quirk (GV-25). Verify buildCloudStateDefs returns an empty/minimal list for that
     // SKU even when the device claims a full capability tree.
     it("returns empty cloud-cap states when brokenPlatformApi is active", () => {
-      registry = new DeviceRegistry({ data: TEST_REGISTRY as never, experimental: true });
+      registry = new DeviceRegistry({ data: TEST_REGISTRY as never });
       const device: GoveeDevice = {
         sku: "H6141",
         deviceId: "AA:BB:CC:DD:EE:FF",
@@ -3142,7 +3140,7 @@ describe("capabilities Govee acknowledges but the device ignores (catalog quirk 
       lanIp: undefined,
       capabilities: [toggle("mainLightToggle"), toggle("backgroundLightToggle"), toggle("gradientToggle")],
     });
-  const catalog = (experimental: boolean): DeviceRegistry =>
+  const catalog = (): DeviceRegistry =>
     new DeviceRegistry({
       data: {
         devices: {
@@ -3154,18 +3152,17 @@ describe("capabilities Govee acknowledges but the device ignores (catalog quirk 
           },
         },
       } as never,
-      experimental,
     });
 
   it("offers no datapoint for an ignored capability, the others stay", () => {
-    const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(true)).map(d => d.id);
+    const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog()).map(d => d.id);
     expect(ids).not.toContain("main_light_toggle");
     expect(ids).not.toContain("background_light_toggle");
     expect(ids).toContain("gradient_toggle");
   });
 
-  it("a seed entry stays dormant without the experimental switch", () => {
-    const ids = buildCloudStateDefsRaw(ceiling(), mockLog, catalog(false)).map(d => d.id);
+  it("a model without the quirk keeps every toggle", () => {
+    const ids = buildCloudStateDefsRaw({ ...ceiling(), sku: "H9999" }, mockLog, catalog()).map(d => d.id);
     expect(ids).toContain("main_light_toggle");
   });
   it("the H1771 from the real catalog offers no DreamView switch, its other two toggles stay (issue #49)", () => {
@@ -3177,7 +3174,6 @@ describe("capabilities Govee acknowledges but the device ignores (catalog quirk 
     });
     const real = new DeviceRegistry({
       filePath: path.resolve(__dirname, "..", "..", "devices.json"),
-      experimental: false,
     });
     const ids = buildCloudStateDefsRaw(lamp, mockLog, real).map(d => d.id);
     expect(ids).not.toContain("dream_view_toggle");

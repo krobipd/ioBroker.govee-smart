@@ -419,12 +419,11 @@ describe("a model whose platform API reports °F (catalog quirk platformTempUnit
       channels: { lan: false, mqtt: false, cloud: true },
       capabilities: [{ type: "devices.capabilities.property", instance: "sensorTemperature", parameters: {} }] as never,
     });
-  const catalog = (experimental: boolean): DeviceRegistry =>
+  const catalog = (): DeviceRegistry =>
     new DeviceRegistry({
       data: {
         devices: { H7131: { name: "Heater", type: "heater", status: "seed", quirks: { platformTempUnit: "F" } } },
       },
-      experimental,
     });
   const reading: CloudStateCapability = {
     type: "devices.capabilities.property",
@@ -433,7 +432,7 @@ describe("a model whose platform API reports °F (catalog quirk platformTempUnit
   };
 
   it("converts the /device/state reading to °C with one decimal — only the temperature", async () => {
-    const rig = makeRig([heater()], catalog(true));
+    const rig = makeRig([heater()], catalog());
     rig.setDeviceState(() =>
       Promise.resolve([
         reading,
@@ -446,21 +445,21 @@ describe("a model whose platform API reports °F (catalog quirk platformTempUnit
   });
 
   it("an empty reading stays empty — nothing is converted into a number", async () => {
-    const rig = makeRig([heater()], catalog(true));
+    const rig = makeRig([heater()], catalog());
     rig.setDeviceState(() => Promise.resolve([{ ...reading, state: { value: "" } }]));
     await loadCloudStates(rig.adapter);
     expect(rig.writes.find(w => w.id.endsWith(".temperature"))).toBeUndefined();
   });
 
-  it("a seed entry stays dormant without the experimental switch — the reading passes unchanged", async () => {
-    const rig = makeRig([heater()], catalog(false));
+  it("a model without the quirk passes the reading unchanged", async () => {
+    const rig = makeRig([{ ...heater(), sku: "H9999" }], catalog());
     rig.setDeviceState(() => Promise.resolve([reading]));
     await loadCloudStates(rig.adapter);
     expect(rig.writes.find(w => w.id.endsWith(".temperature"))?.val).toBe(79.52);
   });
 
   it("the account-list path is never converted — its reading is hundredths of °C whatever the app shows (#18)", async () => {
-    const rig = makeRig([heater()], catalog(true));
+    const rig = makeRig([heater()], catalog());
     await applyCloudCapabilities(rig.adapter, heater(), [{ ...reading, state: { value: 21.5 } }]);
     expect(rig.writes.find(w => w.id.endsWith(".temperature"))?.val).toBe(21.5);
   });
@@ -493,7 +492,6 @@ describe("a reading of a capability the catalog marks as ignored (quirk ignoredC
           },
         },
       },
-      experimental: true,
     });
     const rig = makeRig([iceMaker], registry);
     rig.setDeviceState(() =>

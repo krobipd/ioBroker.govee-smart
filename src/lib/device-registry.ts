@@ -8,12 +8,6 @@ interface RegistryConfig {
   filePath?: string;
   /** Pre-parsed devices data — alternative to filePath, primarily for unit tests. */
   data?: DevicesFile;
-  /**
-   * Whether seed-status entries are activated. Default: false (the adapter
-   * config option `experimentalQuirks` flips this on for users who want to
-   * try untested devices).
-   */
-  experimental?: boolean;
   /** Optional logger — used to surface load failures and active-device counts. */
   log?: {
     debug: (msg: string) => void;
@@ -23,12 +17,12 @@ interface RegistryConfig {
 }
 
 /**
- * Loads devices.json + filters by status. Replacement for the old
- * `device-quirks.ts` module that only had a hard-coded TS map.
+ * Loads devices.json. Replacement for the old `device-quirks.ts` module that
+ * only had a hard-coded TS map.
  *
- * Status filter:
- *   - verified + reported → always active (default-on)
- *   - seed                → only when experimental=true
+ * A catalog correction (quirk) always applies to exactly the model it is
+ * written for, whatever that model's status (GV-25): the status only says how
+ * well the model is confirmed and decides whether it asks for a report.
  *
  * Unknown SKUs return undefined from `getQuirks()`/`getEntry()` — the
  * adapter then runs its default code path without overrides.
@@ -36,7 +30,6 @@ interface RegistryConfig {
 export class DeviceRegistry {
   private readonly entries: Map<string, DeviceEntry>;
   private readonly activeQuirks: Map<string, DeviceQuirks>;
-  private readonly experimental: boolean;
   private readonly log: RegistryConfig["log"];
 
   /**
@@ -46,7 +39,6 @@ export class DeviceRegistry {
    * @param config Loader options
    */
   constructor(config: RegistryConfig = {}) {
-    this.experimental = config.experimental ?? false;
     this.log = config.log;
     this.entries = new Map();
     this.activeQuirks = new Map();
@@ -103,7 +95,6 @@ export class DeviceRegistry {
     }
 
     let active = 0;
-    let skipped = 0;
     for (const [sku, entry] of Object.entries(parsed.devices)) {
       if (!entry || typeof entry !== "object") {
         continue;
@@ -111,52 +102,18 @@ export class DeviceRegistry {
       const upper = sku.toUpperCase();
       this.entries.set(upper, entry);
 
-      const eligible =
-        entry.status === "verified" || entry.status === "reported" || (entry.status === "seed" && this.experimental);
-
-      if (eligible && entry.quirks) {
+      if (entry.quirks) {
         this.activeQuirks.set(upper, entry.quirks);
         active++;
-      } else if (!eligible) {
-        skipped++;
       }
     }
 
-    this.log?.debug(
-      `device-registry: ${this.entries.size} entries loaded, ${active} active quirks, ${skipped} seed entries skipped`,
-    );
-    // The boot-time seed-list dump was removed: it logged every seed SKU in
-    // the catalog regardless of whether the user owned any of them, so a
-    // typical Lights-only setup got 27 SKUs in their face for nothing.
-    // The targeted nudge — "your H7160 is here, flip the toggle" — now
-    // happens later in `noteSeedDeviceDetected()`, called by the device
-    // manager when a real device of that SKU appears.
+    this.log?.debug(`device-registry: ${this.entries.size} entries loaded, ${active} with quirks`);
   }
 
   /**
-   * Whether the given SKU exists as a `seed` entry in the catalog and
-   * the experimental toggle is OFF — i.e. the adapter recognises this
-   * device but the user has not opted in yet (catalog quirks, where the
-   * entry carries any, stay inactive as well). The device
-   * manager calls this when a real device shows up so the user gets a
-   * targeted* nudge ("you have an H7160, enable the toggle"), not a
-   * blanket dump of every seed entry in the catalog.
-   *
-   * @param sku Govee SKU (case-insensitive)
-   */
-  isSeedAndDormant(sku: string): boolean {
-    if (this.experimental) {
-      return false;
-    }
-    if (!sku || typeof sku !== "string") {
-      return false;
-    }
-    return this.entries.get(sku.toUpperCase())?.status === "seed";
-  }
-
-  /**
-   * Quirks for a SKU. Returns undefined if SKU is unknown OR if it's a
-   * seed-status entry and `experimental` is off.
+   * Quirks for a SKU, whatever its status. Returns undefined if the SKU is
+   * unknown or its entry carries no quirks.
    *
    * @param sku Govee SKU (case-insensitive)
    */
@@ -222,7 +179,5 @@ export class DeviceRegistry {
 export type DeviceTier = DeviceStatus | "unknown";
 
 // There is deliberately NO module-level registry: every adapter instance builds
-// its own from its own `experimentalQuirks` setting and hands it to the modules
-// that need it. In compact mode several instances share one process (one module
-// cache), and a shared registry let the instance that started last decide the
-// experimental toggle for all of them.
+// its own and hands it to the modules that need it, so nothing an instance holds
+// leaks into another one sharing the process in compact mode.

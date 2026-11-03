@@ -229,7 +229,7 @@ function buildAaA5Packet(packetNum: number, slots: Array<[number, number, number
 
 describe("DeviceManager", () => {
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -2819,7 +2819,7 @@ describe("DeviceManager — loadFromCache merge", () => {
   // tier-based unknown-SKU warning fires on every LAN-discovered device,
   // breaking the warn-counter assertions in the pollAppApi suite.
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -3910,7 +3910,7 @@ describe("DeviceManager — loadFromCache merge", () => {
 describe("DeviceManager — loadDeviceScenes snapshot resolution (Issue #13)", () => {
   let dm: DeviceManager;
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
     dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry());
   });
   afterEach(() => {
@@ -4095,7 +4095,7 @@ describe("DeviceManager — internal logic helpers", () => {
 
 describe("DeviceManager — invariants without a test (mutation audit)", () => {
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -4411,7 +4411,7 @@ describe("DeviceManager — invariants without a test (mutation audit)", () => {
 
 describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothing", () => {
   beforeEach(() => {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental: true });
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
   });
   afterEach(() => {
     registry = emptyRegistry();
@@ -4500,12 +4500,12 @@ describe("DeviceManager.syncSegmentCount — derives the tree size, stores nothi
   });
 });
 
-describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () => {
+describe("DeviceManager.maybeNudgeSeedSku — an untested model says so (GV-25)", () => {
   afterEach(() => {
     registry = emptyRegistry();
   });
-  function nudgeDm(experimental: boolean): { dm: DeviceManager; warns: string[]; infos: string[] } {
-    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never, experimental });
+  function nudgeDm(): { dm: DeviceManager; warns: string[]; infos: string[] } {
+    registry = new DeviceRegistry({ data: QUIRK_TEST_REGISTRY as never });
     const warns: string[] = [];
     const infos: string[] = [];
     const dm = new DeviceManager(
@@ -4517,35 +4517,32 @@ describe("DeviceManager.maybeNudgeSeedSku — the experimental-toggle hint", () 
     return { dm, warns, infos };
   }
 
-  it("a seed model with quirks and the toggle OFF asks for the toggle and a report, on warn, ONCE per model", () => {
-    const { dm, warns } = nudgeDm(false);
+  it("a seed model with quirks says it is untested and asks for a report, on info, ONCE per model", () => {
+    const { dm, warns, infos } = nudgeDm();
     dm.maybeNudgeSeedSku("H6141", "Strip");
     dm.maybeNudgeSeedSku("h6141", "Strip");
-    expect(warns).toEqual([
-      'Device Strip (H6141) is untested — please turn on "Enable experimental device support" in the adapter settings, create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
+    expect(warns).toEqual([]);
+    expect(infos).toEqual([
+      "Device Strip (H6141) is untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
     ]);
   });
 
-  it("a seed model with the toggle ON asks for the report only, on info", () => {
-    const { dm, warns, infos } = nudgeDm(true);
+  it("a seed WITHOUT quirks gets the same line, and no line names a switch", () => {
+    const { dm, warns, infos } = nudgeDm();
+    dm.maybeNudgeSeedSku("H6001", "Bulb");
     dm.maybeNudgeSeedSku("H6141", undefined);
     expect(warns).toEqual([]);
     expect(infos).toEqual([
-      "Device H6141 is untested — experimental device support is on; please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
+      "Device Bulb (H6001) is untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
+      "Device H6141 is untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.",
     ]);
-  });
-
-  it("a seed WITHOUT quirks asks for the toggle and the report on info, and never claims it works", () => {
-    const { dm, warns, infos } = nudgeDm(false);
-    dm.maybeNudgeSeedSku("H6001", "Bulb");
-    expect(warns).toEqual([]);
-    expect(infos).toEqual([
-      'Device Bulb (H6001) is untested — please turn on "Enable experimental device support" in the adapter settings, create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.',
-    ]);
+    for (const line of infos) {
+      expect(line).not.toMatch(/experimental|switch|toggle/i);
+    }
   });
 
   it("verified / reported models stay silent, an unknown model asks for a diag export", () => {
-    const { dm, warns, infos } = nudgeDm(false);
+    const { dm, warns, infos } = nudgeDm();
     dm.maybeNudgeSeedSku("H61BE", "Wall");
     dm.maybeNudgeSeedSku("H5179", "Thermo");
     expect(warns).toEqual([]);
@@ -5506,15 +5503,15 @@ describe("requestStaleStatuses — the status request over the account broker (i
     expect(asked).toEqual([]);
   });
 
-  it("hands the requester the catalog's statusCmdVersion — 1 for H6121 with the toggle on, 2 for everything else and for a dormant seed", () => {
+  it("hands the requester the catalog's statusCmdVersion — 1 for the seed H6121, 2 for everything else", () => {
     const catalog = {
       devices: {
         H6121: { name: "Smart Light", type: "light", status: "seed", quirks: { statusCmdVersion: 1 } },
         H600D: { name: "Bulb", type: "light", status: "reported" },
       },
     };
-    const run = (experimental: boolean): Array<[string, number]> => {
-      const reg = new DeviceRegistry({ data: catalog as never, experimental });
+    const run = (): Array<[string, number]> => {
+      const reg = new DeviceRegistry({ data: catalog as never });
       const timers = {
         setInterval: () => undefined,
         clearInterval: () => undefined,
@@ -5545,13 +5542,9 @@ describe("requestStaleStatuses — the status request over the account broker (i
       expect(dm.requestStaleStatuses(Date.now())).toBe(2);
       return seen;
     };
-    expect(run(true)).toEqual([
+    // A correction applies to its model whatever the model's status (GV-25).
+    expect(run()).toEqual([
       ["H6121", 1],
-      ["H600D", 2],
-    ]);
-    // A seed's quirk is dormant until the experimental toggle — like every quirk.
-    expect(run(false)).toEqual([
-      ["H6121", 2],
       ["H600D", 2],
     ]);
   });

@@ -19,12 +19,6 @@ declare global {
       /** Listen address for the LAN sockets ("0.0.0.0" = all interfaces); `networkInterface` until 2.36.0 */
       bind: string;
       /**
-       * Activate device entries with status `seed` from `devices.json`. Off by
-       * default — these devices are prepared in code but unconfirmed by any
-       * tester. The Wiki lists every device and its status.
-       */
-      experimentalQuirks: boolean;
-      /**
        * Govee 2FA verification code. Empty unless Govee has demanded 2FA on the
        * account (status 454). User pastes the code from the Govee email here,
        * adapter consumes it on the next login and clears the field automatically

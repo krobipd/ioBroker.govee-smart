@@ -1486,7 +1486,7 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(router.transportUsed(device, "power")).toBe("cloud");
   });
 
-  it("the broker exclusion holds for an untested (seed) model without the experimental switch", async () => {
+  it("the broker exclusion holds for an untested (seed) model too", async () => {
     const reg = new DeviceRegistry({
       data: {
         devices: {
@@ -1504,7 +1504,7 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
   });
 
-  it("every model the shipped catalog excludes from the broker stays on the Cloud without the experimental switch", () => {
+  it("every model the shipped catalog excludes from the broker stays on the API", () => {
     const catalog = JSON.parse(fs.readFileSync(path.resolve(__dirname, "..", "..", "devices.json"), "utf-8")) as {
       devices: Record<string, { quirks?: { brokenBrokerCommands?: boolean } }>;
     };

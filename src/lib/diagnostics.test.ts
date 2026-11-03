@@ -615,7 +615,6 @@ describe("DiagnosticsCollector", () => {
             },
           },
         } as never,
-        experimental: true,
       });
     });
     afterEach(() => {
@@ -632,7 +631,6 @@ describe("DiagnosticsCollector", () => {
         data: {
           devices: { H6141: { name: "LED Strip", type: "light", status: "seed", quirks: { segmentCount: 10 } } },
         } as never,
-        experimental: true,
       });
       const source = async (c: DiagnosticsCollector, d: GoveeDevice): Promise<unknown> =>
         ((await c.generate(d, "2.40.0")).device as Record<string, unknown>).segmentCountSource;

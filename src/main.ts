@@ -147,6 +147,8 @@ class GoveeAdapter extends utils.Adapter {
     { drop: "mqttAccountTopic" },
     { drop: "mqttTokenExpiresAt" },
     { drop: "scanTargets" },
+    // The experimental switch is gone (GV-25, krobi 2026-11-03): every catalog correction applies to its model.
+    { drop: "experimentalQuirks" },
     { commonDrop: "encryptedNative" },
     { commonDrop: "protectedNative" },
   ];
@@ -222,11 +224,9 @@ class GoveeAdapter extends utils.Adapter {
   // ──────────────────────────────────────────────────────────────────────────
 
   /**
-   * This instance's device catalog (devices.json filtered by the instance's
-   * own `experimentalQuirks` setting). Built first in onReady and handed to
-   * every module that applies quirks — never a module-level value, because in
-   * compact mode several instances share one process and the last one to
-   * start would otherwise decide the experimental toggle for all of them.
+   * This instance's device catalog (devices.json). Built first in onReady and
+   * handed to every module that applies quirks — never a module-level value,
+   * so nothing one instance holds leaks into another in compact mode.
    */
   private deviceRegistry!: DeviceRegistry;
   private deviceManager: DeviceManager | null = null;
@@ -709,12 +709,9 @@ class GoveeAdapter extends utils.Adapter {
     });
 
     // Device catalog from devices.json in the adapter package root — built
-    // before anything that applies quirks. Status filter: verified+reported
-    // active by default; seed-status entries need the experimentalQuirks toggle.
-    this.deviceRegistry = new DeviceRegistry({
-      experimental: config.experimentalQuirks === true,
-      log: this.log,
-    });
+    // before anything that applies quirks. Every correction applies to its
+    // model, whatever the model's status (GV-25).
+    this.deviceRegistry = new DeviceRegistry({ log: this.log });
 
     this.stateManager = new StateManager(this, this.deviceRegistry, () => this.unloading);
     // One bulk read of every stored value: read-only states are compared in memory from here on (fleet rule, round 77).

@@ -30,9 +30,9 @@ export interface Texts extends DeviceSectionTexts {
   /** One line under the device-list heading: the types unfold on click. */
   tablesHint: string;
   /** "Your device shows ⚪?" help section heading */
-  experimentalHeading: string;
+  untestedHeading: string;
   /** "Your device shows ⚪?" help section body */
-  experimentalBody: string;
+  untestedBody: string;
   /** Footer with timestamp */
   footer: string;
   /** Word after the entry count in the footer ("entries" / "Einträge") */
@@ -49,11 +49,10 @@ export const TEXTS_DE: Texts = {
 Mehrere verifizierte Erfahrungsberichte liegen vor.`,
   statusReported: `### 🟢 User-bestätigt
 Erfahrungsbericht eines Anwenders liegt vor. Weitere Tests erwünscht.`,
-  statusSeed: `### ⚪ Experimentell
-Ungetestet, es liegen noch keine Erfahrungsberichte vor.
-Das Gerät läuft wie jedes andere; Korrekturen, die der Katalog für das Modell
-mitbringt (falls vorhanden), bleiben aus, bis du die experimentelle
-Unterstützung in der Adapter-Konfiguration einschaltest.`,
+  statusSeed: `### ⚪ Ungetestet
+Es liegen noch keine Erfahrungsberichte vor. Korrekturen, die der Katalog für
+das Modell mitbringt (falls vorhanden), gelten trotzdem immer. Das Log nennt
+das Modell beim Start „untested“ und bittet um einen Diagnosebericht.`,
   tablesHeading: "## Geräte-Liste",
   tablesHint: "Klick auf einen Gerätetyp öffnet seine Modelle.",
   typeSummary: "<b>{title}</b> · {n} {models} (✅ {v} · 🟢 {r} · ⚪ {s})",
@@ -80,20 +79,16 @@ Unterstützung in der Adapter-Konfiguration einschaltest.`,
   colName: "Govee-Name",
   colStatus: "Status",
   colSince: "Seit",
-  experimentalHeading: "## Dein Gerät steht auf ⚪? So hilfst du uns",
-  experimentalBody: `Wir haben dein Gerät noch nicht selbst getestet. Wenn du es ausprobierst,
+  untestedHeading: "## Dein Gerät steht auf ⚪? So hilfst du uns",
+  untestedBody: `Wir haben dein Gerät noch nicht selbst getestet. Wenn du es ausprobierst,
 hast du echte Daten — und unser Adapter wird mit jedem Bericht besser.
 
 ### Ausprobieren
 
 1. Dein Gerät steht schon im Object-Browser unter
-   \`govee-smart.0.devices.<sku>-<id>\` — dafür braucht es keinen Schalter
+   \`govee-smart.0.devices.<sku>-<id>\`
 2. Probier die Funktionen durch (Power, Helligkeit, Farbe, Modes — was
    dein Gerät eben kann)
-3. Stimmt etwas nicht (ein Bereich, ein Wert): in der Adapter-Konfiguration
-   **„Experimentelle Geräte-Unterstützung aktivieren"** ankreuzen und
-   speichern — der Adapter startet neu und wendet die Korrekturen an, die der
-   Katalog für dein Modell mitbringt, falls es welche gibt
 
 ### Daten exportieren und teilen
 
@@ -113,8 +108,7 @@ willst: gerne ein Pull-Request gegen \`devices.json\`. Details in
 ### Was passiert mit deinem Bericht
 
 Sobald wir Diagnostics von deinem Gerät haben, wandert es im nächsten Release
-auf 🟢 **User-bestätigt** — seine Korrekturen gelten dann für alle, ohne den
-experimentellen Schalter.`,
+auf 🟢 **User-bestätigt**.`,
   footer: "Diese Seite ist automatisch generiert.",
   entriesWord: "Einträge",
 };
@@ -129,11 +123,10 @@ export const TEXTS_EN: Texts = {
 Multiple verified user reports on file.`,
   statusReported: `### 🟢 User-confirmed
 One user has reported success with diagnostics. More tests welcome.`,
-  statusSeed: `### ⚪ Experimental
-Untested, no user reports yet.
-The device works like any other; corrections the catalog carries for the
-model (if any) stay off until you enable experimental support in the
-adapter configuration.`,
+  statusSeed: `### ⚪ Untested
+No user reports yet. Corrections the catalog carries for the model (if any)
+apply anyway. At start the log names the model "untested" and asks for a
+diagnostics report.`,
   tablesHeading: "## Device list",
   tablesHint: "Click a device type to unfold its models.",
   typeSummary: "<b>{title}</b> · {n} {models} (✅ {v} · 🟢 {r} · ⚪ {s})",
@@ -160,20 +153,16 @@ adapter configuration.`,
   colName: "Govee name",
   colStatus: "Status",
   colSince: "Since",
-  experimentalHeading: "## Your device shows ⚪? Here's how to help",
-  experimentalBody: `We haven't tested your device ourselves yet. If you try it, you have
+  untestedHeading: "## Your device shows ⚪? Here's how to help",
+  untestedBody: `We haven't tested your device ourselves yet. If you try it, you have
 real data — and the adapter improves with every report.
 
 ### Try it
 
 1. Your device is already in the object browser under
-   \`govee-smart.0.devices.<sku>-<id>\` — no switch needed for that
+   \`govee-smart.0.devices.<sku>-<id>\`
 2. Try the functions (power, brightness, color, modes — whatever your
    device supports)
-3. If something is off (a range, a value): tick **"Enable experimental
-   device support"** in the adapter configuration and save — the adapter
-   restarts and applies the corrections the catalog carries for your model,
-   if there are any
 
 ### Export data and share
 
@@ -193,8 +182,7 @@ a pull request against \`devices.json\` is welcome — see
 ### What happens with your report
 
 Once we have diagnostics from your device, it moves to 🟢 **User-confirmed**
-in the next release — its corrections then apply for everyone, without the
-experimental toggle.`,
+in the next release.`,
   footer: "This page is auto-generated.",
   entriesWord: "entries",
 };
@@ -232,9 +220,9 @@ export function renderPage(devices: Record<string, DeviceEntry>, t: Texts): stri
   out.push(...sections.lines);
   const totalCount = sections.total;
 
-  out.push(t.experimentalHeading);
+  out.push(t.untestedHeading);
   out.push("");
-  out.push(t.experimentalBody);
+  out.push(t.untestedBody);
   out.push("");
   out.push(`---`);
   out.push("");

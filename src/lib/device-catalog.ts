@@ -39,8 +39,8 @@ export interface DeviceQuirks {
   /**
    * The account broker does not carry this model's light commands (K18) — power, brightness, colour and colour
    * temperature go LAN → Cloud instead of LAN → broker → Cloud. Models per govee2mqtt `src/service/quirks.rs`
-   * (`with_iot_api_support(false)`: H6121, H6154, H6176; issues #40, #49; read 2026-10-08). Dormant on a `seed`
-   * entry like every quirk until the experimental toggle is on.
+   * (`with_iot_api_support(false)`: H6121, H6154, H6176; issues #40, #49; read 2026-10-08). Applies whatever the
+   * entry's status, like every quirk (GV-25).
    */
   brokenBrokerCommands?: boolean;
   /**
@@ -61,8 +61,8 @@ export interface DeviceQuirks {
    * Govee's devices answer version 2 (measured 2026-09-22); homebridge-govee
    * carries one exception, H6121 ("requires cmdVersion 1 for status requests",
    * `lib/utils/device-capabilities.js`). A device sent the wrong version stays
-   * silent — grey after the TTL, never a false green. Dormant on a `seed`
-   * entry like every quirk until the experimental toggle is on.
+   * silent — grey after the TTL, never a false green. Applies whatever the
+   * entry's status, like every quirk (GV-25).
    */
   statusCmdVersion?: 1 | 2;
   /**

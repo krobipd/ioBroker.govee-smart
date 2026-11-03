@@ -108,7 +108,7 @@ describe("DeviceRegistry", () => {
     });
   });
 
-  describe("Status filter (default: experimental=false)", () => {
+  describe("Quirks apply to their model, whatever the status (GV-25)", () => {
     it("activates verified entries (no quirks set)", () => {
       const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getEntry("H5179")?.status).toBe("verified");
@@ -122,26 +122,19 @@ describe("DeviceRegistry", () => {
       });
     });
 
-    it("hides seed quirks by default", () => {
+    it("activates seed quirks — a correction applies to exactly its model", () => {
       const reg = new DeviceRegistry({ data: SAMPLE });
-      expect(reg.getQuirks("H60A1")).toBeUndefined();
-      expect(reg.getQuirks("H6022")).toBeUndefined();
-      expect(reg.getQuirks("H6141")).toBeUndefined();
-    });
-  });
-
-  describe("Status filter (experimental=true)", () => {
-    it("activates seed quirks when experimental flag is on", () => {
-      const reg = new DeviceRegistry({
-        data: SAMPLE,
-        experimental: true,
-      });
       expect(reg.getQuirks("H60A1")).toEqual({
         colorTempRange: { min: 2200, max: 6500 },
       });
       expect(reg.getQuirks("H6141")).toEqual({
         brokenPlatformApi: true,
       });
+      expect(reg.getQuirks("H6022")).toEqual({
+        colorTempRange: { min: 2700, max: 6500 },
+      });
+      // an entry without quirks gets none
+      expect(reg.getQuirks("H61BE")).toBeUndefined();
     });
   });
 
@@ -188,29 +181,28 @@ describe("DeviceRegistry", () => {
 
   describe("instance helpers — one catalog per adapter instance", () => {
     // Deliberately NO module-level registry: in compact mode several instances
-    // share one process, and a shared catalog let the instance that started
-    // last decide the experimental toggle for all of them.
-    it("applyColorTempQuirk falls through to the API range without an active quirk", () => {
+    // share one process, and nothing one instance holds may leak into another.
+    it("applyColorTempQuirk falls through to the API range without a quirk", () => {
       const reg = new DeviceRegistry({ data: SAMPLE });
-      expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
+      expect(reg.applyColorTempQuirk("H61BE", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
       expect(reg.applyColorTempQuirk("HZZZZ", 2000, 9000)).toEqual({ min: 2000, max: 9000 });
     });
 
-    it("applyColorTempQuirk uses the catalog range once the seed entry is active", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
+    it("applyColorTempQuirk uses the catalog range of a seed entry", () => {
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.applyColorTempQuirk("H60A1", 2000, 9000)).toEqual({ min: 2200, max: 6500 });
     });
 
-    it("two instances with different toggles keep their own quirks", () => {
-      const plain = new DeviceRegistry({ data: SAMPLE });
-      const experimental = new DeviceRegistry({ data: SAMPLE, experimental: true });
+    it("two instances built from different catalogs keep their own quirks", () => {
+      const plain = new DeviceRegistry({ data: { devices: {} } });
+      const other = new DeviceRegistry({ data: SAMPLE });
       expect(plain.getQuirks("H6141")).toBeUndefined();
-      expect(experimental.getQuirks("H6141")).toEqual({ brokenPlatformApi: true });
+      expect(other.getQuirks("H6141")).toEqual({ brokenPlatformApi: true });
       expect(plain.getQuirks("H6141")).toBeUndefined(); // untouched by the other instance
     });
 
     it("getTier maps the catalog status to a tier label and collapses unknown SKUs to 'unknown'", () => {
-      const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
+      const reg = new DeviceRegistry({ data: SAMPLE });
       expect(reg.getTier("H60A1")).toBe("seed");
       expect(reg.getTier("H61BE")).toBe("verified");
       expect(reg.getTier("H7160")).toBe("reported");
@@ -265,13 +257,11 @@ describe("DeviceRegistry", () => {
   describe("devices.json — statusCmdVersion (2.39.0)", () => {
     // homebridge-govee `lib/utils/device-capabilities.js`: every model answers
     // the status request with cmdVersion 2 except H6121, which needs 1.
-    it("H6121 carries statusCmdVersion 1 — active only with the experimental toggle, like every seed quirk", () => {
+    it("H6121 carries statusCmdVersion 1 — active although the model is seed, like every quirk", () => {
       const file = path.resolve(__dirname, "..", "..", "devices.json");
-      const dormant = new DeviceRegistry({ filePath: file });
-      const active = new DeviceRegistry({ filePath: file, experimental: true });
-      expect(active.getEntry("H6121")?.quirks?.statusCmdVersion).toBe(1);
+      const active = new DeviceRegistry({ filePath: file });
+      expect(active.getEntry("H6121")?.status).toBe("seed");
       expect(active.getQuirks("H6121")?.statusCmdVersion).toBe(1);
-      expect(dormant.getQuirks("H6121")).toBeUndefined();
       const realDevices = JSON.parse(fs.readFileSync(file, "utf-8")) as {
         devices: Record<string, { quirks?: { statusCmdVersion?: unknown } }>;
       };
@@ -321,13 +311,12 @@ describe("devices.json — platformTempUnit (2.40.0, audit M18)", () => {
     }
   });
 
-  it("the verified H5179 applies it by default, a seed model only with the experimental toggle", () => {
+  it("the verified H5179 and the seed H7131 both apply it", () => {
     const file = path.resolve(__dirname, "..", "..", "devices.json");
-    const dormant = new DeviceRegistry({ filePath: file });
-    const active = new DeviceRegistry({ filePath: file, experimental: true });
-    expect(dormant.getQuirks("H5179")?.platformTempUnit).toBe("F");
-    expect(dormant.getQuirks("H7131")).toBeUndefined();
-    expect(active.getQuirks("H7131")?.platformTempUnit).toBe("F");
+    const reg = new DeviceRegistry({ filePath: file });
+    expect(reg.getQuirks("H5179")?.platformTempUnit).toBe("F");
+    expect(reg.getEntry("H7131")?.status).toBe("seed");
+    expect(reg.getQuirks("H7131")?.platformTempUnit).toBe("F");
   });
 });
 
@@ -335,7 +324,7 @@ describe("devices.json — ignoredCloudCapabilities and the Bluetooth-only remov
   const file = path.resolve(__dirname, "..", "..", "devices.json");
 
   it("marks exactly the capabilities homebridge-govee documents as acknowledged but ignored", () => {
-    const active = new DeviceRegistry({ filePath: file, experimental: true });
+    const active = new DeviceRegistry({ filePath: file });
     expect(active.getQuirks("H1250")?.ignoredCloudCapabilities).toEqual(["mainLightToggle", "backgroundLightToggle"]);
     expect(active.getQuirks("H8120")?.ignoredCloudCapabilities).toEqual(["colorRgb"]);
   });
@@ -343,35 +332,12 @@ describe("devices.json — ignoredCloudCapabilities and the Bluetooth-only remov
   it("drops the H1771's DreamView switch — Govee lists it and refuses every command on it (issue #49)", () => {
     // the user's report (3.1.1, 2026-10-04) lists `dreamViewToggle` among the lamp's 13 capabilities; switching it
     // logged "Cloud control rejected for H1771/…/dreamViewToggle: code=400 — The device does not has DreamView"
-    const active = new DeviceRegistry({ filePath: file, experimental: false });
+    const active = new DeviceRegistry({ filePath: file });
     expect(active.getQuirks("H1771")?.ignoredCloudCapabilities).toEqual(["dreamViewToggle"]);
   });
 
   it("no longer lists the Bluetooth-only H3001 — the catalog is for Wi-Fi products", () => {
     const real = JSON.parse(fs.readFileSync(file, "utf-8")) as { devices: Record<string, unknown> };
     expect(real.devices.H3001).toBeUndefined();
-  });
-});
-
-describe("isSeedAndDormant — the experimental-toggle nudge", () => {
-  it("is true only for a seed entry while the experimental toggle is OFF", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE });
-    expect(reg.isSeedAndDormant("H60A1")).toBe(true); // seed, toggle off → user should be nudged
-    expect(reg.isSeedAndDormant("h60a1")).toBe(true); // case-insensitive
-    expect(reg.isSeedAndDormant("H61BE")).toBe(false); // verified — nothing dormant
-    expect(reg.isSeedAndDormant("H7160")).toBe(false); // reported — active without the toggle
-    expect(reg.isSeedAndDormant("HZZZZ")).toBe(false); // unknown — a different nudge, not this one
-  });
-
-  it("is never true once the toggle is ON — the seed corrections are already active", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE, experimental: true });
-    expect(reg.isSeedAndDormant("H60A1")).toBe(false);
-  });
-
-  it("is safe against non-string input", () => {
-    const reg = new DeviceRegistry({ data: SAMPLE });
-    expect(reg.isSeedAndDormant(undefined as never)).toBe(false);
-    expect(reg.isSeedAndDormant(42 as never)).toBe(false);
-    expect(reg.isSeedAndDormant("")).toBe(false);
   });
 });

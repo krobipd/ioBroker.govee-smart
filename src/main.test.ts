@@ -428,7 +428,7 @@ function makeDevice(o: Partial<GoveeDevice> = {}): GoveeDevice {
 function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeAdapter; f: Fakes } {
   const adapter = new GoveeAdapter();
   const i = internalOf(adapter);
-  Object.assign(i.config, { port: 4002, bind: "", experimentalQuirks: false }, configOverrides);
+  Object.assign(i.config, { port: 4002, bind: "" }, configOverrides);
 
   const calls: Fakes["calls"] = { mqtt: [], cloud: [], openapi: [], limiter: [], lan: [] };
   const lan: Fakes["lan"] = {

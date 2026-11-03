@@ -533,7 +533,7 @@ export class DeviceManager {
       // The request's protocol version comes from the catalog: 2 for every
       // measured device, 1 where a `statusCmdVersion` quirk says so (H6121 —
       // the wrong version is answered with silence, so the device would stay
-      // grey for no reason). Dormant on a seed until the experimental toggle.
+      // grey for no reason).
       const cmdVersion = this.registry.getQuirks(device.sku)?.statusCmdVersion ?? 2;
       const delayMs = scheduled * 1000;
       scheduled++;
@@ -1644,12 +1644,8 @@ export class DeviceManager {
    *   - verified / reported: silent (the catalog backs the device, no
    *     action needed). The tier is still surfaced via the
    *     `info.tier` state for any user who wants to check.
-   *   - seed with catalog quirks, toggle off: warn — the corrections stay off
-   *     until the experimental toggle is on.
-   *   - seed with quirks, toggle on: info — the corrections are active.
-   *   - seed without quirks: info, whatever the toggle — the device works
-   *     either way, so only the diagnostics report that would confirm the
-   *     model is asked for.
+   *   - seed: info — the model is untested; the line says so and asks for a
+   *     diagnostics report, never claims it runs (GV-25).
    *   - unknown: warn — asks for a diagnostics export so we can add the
    *     SKU to the catalogue.
    *
@@ -1668,25 +1664,12 @@ export class DeviceManager {
       case "verified":
       case "reported":
         return;
-      case "seed": {
-        // An untested model asks for the experimental toggle and a diagnostics
-        // report, and never claims it runs (GV-25). With the toggle already on,
-        // only the report is left to ask for. Catalog corrections that stay off
-        // without the toggle make the request a warning.
-        const report =
-          "create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed";
-        if (this.registry.isSeedAndDormant(upper)) {
-          const msg = `Device ${label} is untested — please turn on "Enable experimental device support" in the adapter settings, ${report}.`;
-          if (this.registry.getEntry(upper)?.quirks !== undefined) {
-            this.log.warn(msg);
-          } else {
-            this.log.info(msg);
-          }
-        } else {
-          this.log.info(`Device ${label} is untested — experimental device support is on; please ${report}.`);
-        }
+      case "seed":
+        // An untested model says so and asks for a diagnostics report; it never claims it runs (GV-25).
+        this.log.info(
+          `Device ${label} is untested — please create a diagnostics report in the Expert tab and attach it to a GitHub issue so the model can be confirmed.`,
+        );
         return;
-      }
       case "unknown":
         this.log.warn(
           `Device ${label} is not in the supported device list. Please open the adapter's Expert tab, create a diagnostics report for it and attach the file to a GitHub issue so the SKU can be added.`,

@@ -554,7 +554,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -1928,7 +1928,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -2263,7 +2263,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -2598,7 +2598,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -2946,7 +2946,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -3233,7 +3233,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -3595,7 +3595,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -3989,7 +3989,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -4682,7 +4682,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -6930,7 +6930,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -8620,7 +8620,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -11138,7 +11138,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -13662,7 +13662,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -15775,7 +15775,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -16157,7 +16157,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -16687,7 +16687,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -17244,7 +17244,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -17910,7 +17910,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -18386,7 +18386,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -18851,7 +18851,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -19217,7 +19217,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -19673,7 +19673,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
@@ -20069,7 +20069,7 @@
       "states": {
         "verified": "Verified — confirmed by a tester",
         "reported": "Reported — community-reported, treated as verified",
-        "seed": "Seed — beta, needs experimental toggle in adapter settings",
+        "seed": "Seed — untested, create a report under Expert → Diagnostics and post it in a GitHub issue",
         "unknown": "Unknown SKU — create a report under Expert → Diagnostics and post it in a GitHub issue"
       },
       "def": "unknown",
