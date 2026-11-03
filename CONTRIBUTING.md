@@ -50,25 +50,29 @@ Fields: `name`, `type`, `status` required; `since` (semver, no `v` prefix) and `
 
 ### Status-Schwellen / Status thresholds
 
-- `seed` — extern importiert (homebridge-govee, Govees Modellseite), kein Erfahrungsbericht. Das Gerät erscheint trotzdem; seine Quirks werden nur scharf, wenn der Adapter-Config-Schalter "Experimentelle Geräte-Unterstützung" aktiv ist.
-- `reported` — 1 verifizierter Erfahrungsbericht mit Diagnostics. Quirks aktiv.
-- `verified` — mehrere unabhängige verifizierte Erfahrungsberichte. Quirks aktiv.
+- `seed` — extern importiert (homebridge-govee, Govees Modellseite), kein Erfahrungsbericht. Das Gerät erscheint, nennt sich im Log „untested“ und bittet um einen Diagnosebericht. / Imported from an outside source, no user report yet. The device appears, says in the log that it is untested and asks for a diagnostics report.
+- `reported` — 1 verifizierter Erfahrungsbericht mit Diagnostics. / One verified user report with diagnostics.
+- `verified` — mehrere unabhängige verifizierte Erfahrungsberichte. / Several independent verified user reports.
+
+Ein Quirk gilt bei jedem Status für genau sein Modell — der Status sagt nur, wie gut das Modell bestätigt ist. / A quirk applies to exactly its model whatever the status — the status only says how well the model is confirmed.
 
 Promotion-Pfad: ⚪ → 🟢 → ✅. Linear, jede neue Bestätigung kann hochpromoten.
 
 ### Quirk-Felder / Quirk fields
 
-Das Schema ([`devices.schema.json`](./devices.schema.json)) kennt genau diese sieben Felder, und jedes wirkt im Code — `npm run validate-devices` liest seine Regeln aus dem Schema. / The schema knows exactly these seven fields, and every one acts in the code — `npm run validate-devices` reads its rules from the schema.
+Das Schema ([`devices.schema.json`](./devices.schema.json)) kennt genau diese neun Felder, und jedes wirkt im Code — `npm run validate-devices` liest seine Regeln aus dem Schema. / The schema knows exactly these nine fields, and every one acts in the code — `npm run validate-devices` reads its rules from the schema.
 
-| Feld / Field                                        | Wann verwenden / When to use                                                                                                |
-| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `colorTempRange: { min, max }`                      | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                                  |
-| `brokenPlatformApi: true`                           | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                                |
-| `transportOverrides: { <command>: "cloud"\|"lan" }` | Bestimmten Transport pro Operation erzwingen (z.B. Pixel-Matrix-SKUs deren LAN-Bridge Scene-Frames verwirft — H70B3, H70C5) |
-| `segmentCount: 1..56`                               | Die Cloud meldet mehr Segmente als der Streifen hat, und das Gerät korrigiert sich nicht selbst per Status-Push             |
-| `statusCmdVersion: 1 \| 2`                          | Die Statusanfrage über das Konto braucht eine andere Protokoll-Version (H6121: 1)                                           |
-| `platformTempUnit: "F"`                             | `/device/state` meldet die Temperatur in °F statt °C                                                                        |
-| `ignoredCloudCapabilities: ["<instance>", …]`       | Govee bestätigt einen Befehl mit „success“, das Gerät tut nichts (z.B. H1250, H8120)                                        |
+| Feld / Field                                        | Wann verwenden / When to use                                                                                                          |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `colorTempRange: { min, max }`                      | API meldet einen Range, real ist enger (z.B. H6022, H60A1)                                                                            |
+| `brokenPlatformApi: true`                           | Cloud-Capabilities sind unzuverlässig, Adapter fällt auf LAN-Defaults zurück                                                          |
+| `transportOverrides: { <command>: "cloud"\|"lan" }` | Bestimmten Transport pro Operation erzwingen (z.B. Pixel-Matrix-SKUs deren LAN-Bridge Scene-Frames verwirft — H70B3, H70C5)           |
+| `segmentCount: 1..56`                               | Die Cloud meldet mehr Segmente als der Streifen hat, und das Gerät korrigiert sich nicht selbst per Status-Push                       |
+| `statusCmdVersion: 1 \| 2`                          | Die Statusanfrage über das Konto braucht eine andere Protokoll-Version (H6121: 1)                                                     |
+| `platformTempUnit: "F"`                             | `/device/state` meldet die Temperatur in °F statt °C                                                                                  |
+| `ignoredCloudCapabilities: ["<instance>", …]`       | Govee bestätigt einen Befehl mit „success“, das Gerät tut nichts (z.B. H1250, H8120)                                                  |
+| `pushDecoder: "h7127-purifier" \| "h1741-battery"`  | Welcher Decoder den eigenen Status-Push des Geräts in Datenpunkte liest (H7127, H1741)                                                |
+| `brokenBrokerCommands: true`                        | Das Modell führt Lichtbefehle über den Govee-Account nicht aus — sie gehen über LAN, sonst über die API (heute trägt es kein Eintrag) |
 
 Wenn dein Gerät einen Quirk braucht der hier fehlt: erst Issue mit Diagnostics-JSON aufmachen — wir entscheiden gemeinsam ob es ein neues Feld im Schema rechtfertigt oder im bestehenden Vokabular abgebildet werden kann. Schema-Erweiterungen kommen mit dem Code-Pfad der sie auswertet zusammen rein.
 

@@ -1472,14 +1472,14 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     const reg = new DeviceRegistry({
       data: {
         devices: {
-          H6121: { name: "Smart Light", type: "light", status: "reported", quirks: { brokenBrokerCommands: true } },
+          H9B01: { name: "Smart Light", type: "light", status: "reported", quirks: { brokenBrokerCommands: true } },
         },
       },
     });
     const { router, cloud } = cloudRouter(reg);
     const broker = makeBroker();
     router.setBrokerClient(broker.client);
-    const device = makeDevice({ sku: "H6121", lanIp: undefined, iotTopic: TOPIC });
+    const device = makeDevice({ sku: "H9B01", lanIp: undefined, iotTopic: TOPIC });
     await router.sendCommand(device, "power", true);
     expect(broker.published).toEqual([]);
     expect(cloud.calls.map(c => c.instance)).toEqual(["powerSwitch"]);
@@ -1490,14 +1490,14 @@ describe("sendCommand — the account broker between LAN and Cloud (K18)", () =>
     const reg = new DeviceRegistry({
       data: {
         devices: {
-          H6121: { name: "Smart Light", type: "light", status: "seed", quirks: { brokenBrokerCommands: true } },
+          H9B01: { name: "Smart Light", type: "light", status: "seed", quirks: { brokenBrokerCommands: true } },
         },
       },
     });
     const { router, cloud } = cloudRouter(reg);
     const broker = makeBroker();
     router.setBrokerClient(broker.client);
-    const device = makeDevice({ sku: "H6121", lanIp: undefined, iotTopic: TOPIC });
+    const device = makeDevice({ sku: "H9B01", lanIp: undefined, iotTopic: TOPIC });
     expect(router.resolveTransport(device, "power")).toEqual({ kind: "cloud", reason: "light-no-lan-fallback" });
     await router.sendCommand(device, "power", true);
     expect(broker.published).toEqual([]);
