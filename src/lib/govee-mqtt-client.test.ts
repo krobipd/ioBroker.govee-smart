@@ -608,7 +608,7 @@ describe("GoveeMqttClient", () => {
       expect(published).toHaveLength(0);
     });
 
-    it("a light command goes out as govee2mqtt's control envelope — cmdVersion 0, type 1, QoS 0 (K18)", async () => {
+    it("a light command goes out as the Govee app sends it — cmdVersion 0, type 1, QoS 0, with the account topic (K18, #64)", async () => {
       const { client, published } = connectedClient();
       await client.connect(
         () => {},
@@ -621,7 +621,10 @@ describe("GoveeMqttClient", () => {
       expect(published).toEqual([
         {
           topic: "GD/0123456789abcdef0123456789abcdef",
-          payload: '{"msg":{"cmd":"turn","data":{"val":1},"cmdVersion":0,"transaction":"v_1790071124009000","type":1}}',
+          // The account topic is in every command the Govee app sends (govee2mqtt #105, an Android capture) and in
+          // homebridge-govee's (lib/connection/aws.js); an older device ignores a command without it (#64).
+          payload:
+            '{"msg":{"cmd":"turn","data":{"val":1},"cmdVersion":0,"transaction":"v_1790071124009000","type":1,"accountTopic":"GA/topic"}}',
           opts: { qos: 0 },
         },
       ]);

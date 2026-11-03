@@ -447,10 +447,12 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
 
   /**
    * Send a light command over the account broker (K18) — the way the Govee app
-   * and govee2mqtt (`src/service/iot.rs`) control a device: a publish on the
-   * device's own topic with `cmdVersion 0`, `type 1`, `v_<ms>000`, QoS 0. The
-   * broker gives no receipt; only the device's status packet on the account
-   * topic says it took the command (GV-13).
+   * controls a device: a publish on the device's own topic with `cmdVersion 0`,
+   * `type 1`, `v_<ms>000` and the account topic, QoS 0. The app puts the account
+   * topic into every command (govee2mqtt #105, an Android capture), so does
+   * homebridge-govee (`lib/connection/aws.js`); an older device ignores a command
+   * without it (#64). The broker gives no receipt; only the device's status
+   * packet on the account topic says it took the command (GV-13).
    *
    * @param deviceTopic The device's publish topic from the account list
    * @param cmd Govee's command word (`turn`, `brightness`, `colorwc`)
@@ -463,7 +465,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     if (!client || !this.connected || !this.publishGate.tryAdmit(BROKER_PUBLISHES, "")) {
       return false;
     }
-    const payload = JSON.stringify({ msg: { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 } });
+    const msg: Record<string, unknown> = { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 };
+    if (this.accountTopic) {
+      msg.accountTopic = this.accountTopic;
+    }
+    const payload = JSON.stringify({ msg });
     client.publish(deviceTopic, payload, { qos: 0 }, (err?: Error) => {
       if (err) {
         this.log.debug(`MQTT command ${cmd} to ${deviceTopic.slice(0, 6)}… failed: ${errText(err)}`);
