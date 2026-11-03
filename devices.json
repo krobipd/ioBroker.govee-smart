@@ -1839,10 +1839,7 @@
       "name": "Smart Light",
       "type": "light",
       "status": "seed",
-      "since": "2.33.0",
-      "quirks": {
-        "brokenBrokerCommands": true
-      }
+      "since": "2.33.0"
     },
     "H6178": {
       "name": "Smart Light",
