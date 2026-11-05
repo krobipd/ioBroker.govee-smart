@@ -24,7 +24,7 @@ A short guide ships with the adapter: [English](docs/en/README.md) · [Deutsch](
 | Topic                                                                       | English                                                                                               | Deutsch                                                                                                 |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | Landing page                                                                | [Home](https://github.com/krobipd/ioBroker.govee-smart/wiki/Home)                                     | [Startseite](https://github.com/krobipd/ioBroker.govee-smart/wiki/Startseite)                           |
-| Channels, credentials, API key, experimental devices                        | [Setup](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup)                                   | [Einrichtung](https://github.com/krobipd/ioBroker.govee-smart/wiki/Einrichtung)                         |
+| Channels, credentials, API key, untested devices                            | [Setup](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup)                                   | [Einrichtung](https://github.com/krobipd/ioBroker.govee-smart/wiki/Einrichtung)                         |
 | Supported models, status meanings, contributing yours                       | [Devices](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices)                               | [Geräte](https://github.com/krobipd/ioBroker.govee-smart/wiki/Geraete)                                  |
 | Every datapoint, where it lands, what it does                               | [State tree](https://github.com/krobipd/ioBroker.govee-smart/wiki/State-Tree)                         | [Datenpunkte](https://github.com/krobipd/ioBroker.govee-smart/wiki/Datenpunkte)                         |
 | Thermometers, heaters, kettles, etc. — state tree, updates, troubleshooting | [Sensors and Appliances](https://github.com/krobipd/ioBroker.govee-smart/wiki/Sensors-and-Appliances) | [Sensoren und Appliances](https://github.com/krobipd/ioBroker.govee-smart/wiki/Sensoren-und-Appliances) |
@@ -65,6 +65,16 @@ For details and how to disable it, see the [Sentry plugin documentation](https:/
 
 ---
 
+## Ports
+
+| Port | Protocol | Direction | Purpose |
+| --- | --- | --- | --- |
+| 4001 | UDP multicast | outgoing | finds the Govee lights on the local network |
+| 4002 | UDP | incoming | receives the answers of the Govee lights |
+| 4003 | UDP | outgoing | sends commands to a Govee light |
+
+---
+
 ## Getting started
 
 The adapter works LAN-only without any credentials. Adding an API key unlocks scenes, segments and appliance control. Adding your Govee email and password adds sensor readings (temperature/humidity via the App API), real-time status push and full group control. See the [Setup page](https://github.com/krobipd/ioBroker.govee-smart/wiki/Setup) for credential levels, how to get an API key, and network requirements.
@@ -73,7 +83,7 @@ The adapter works LAN-only without any credentials. Adding an API key unlocks sc
 
 ## Device support
 
-Each device shows its test status under `diag.tier`. The [Devices page](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) lists every supported model and what the status means.
+Each device shows its test status under `info.tier`. The [Devices page](https://github.com/krobipd/ioBroker.govee-smart/wiki/Devices) lists every supported model and what the status means.
 
 ---
 
@@ -101,7 +111,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 ### **WORK IN PROGRESS**
 
 - Fixed: the diagnostics report contains the object tree again
-- Improved: the diagnostics report names the source of a device's reachability and segment count
+- Fixed: older lights such as the H6110 switch again when controlled over the Govee account
 - Fixed: the colour temperature no longer keeps its old value while the light shows a colour, and the colour no longer shows Govee's placeholder in colour-temperature mode
 - New: a colour temperature set in the Govee app as a white colour also shows as colour temperature
 - Fixed: local snapshots and the segment wizard restore a colour as a colour and a colour temperature as a colour temperature
@@ -109,7 +119,15 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a device's IP address is no longer emptied when the adapter starts before it finds the device on the network again
 - Fixed: after a rate-limit answer from Govee, no further call goes to that server until the wait Govee asks for has passed
 - Improved: the adapter settings page loads about 8 MB less and opens faster
-- Changed: needs js-controller 7.2.5 and Admin 8.2.0
+- Fixed: a light whose scene list Govee refused with too many requests at the start gets its scenes in the same run
+- Fixed: the refresh button of a light is confirmed only when Govee sent its scene list
+- Changed: the experimental switch is gone; every catalog correction now applies to its model
+- Changed: the colour and brightness of each segment carry the segment's number in their name
+- New: each Govee app group shows in info.online whether all its members are reachable
+- Fixed: the brightness of a light and of its segments uses the range Govee reports for that light, for example 1 to 100
+- Changed: scene, snapshot, music and mode lists are now text datapoints
+- Changed: each device shows its test status in info.tier; the separate diag folder is gone
+- Changed: needs js-controller 7.2.5 and Admin 8.3.5
 
 ### 3.2.1 (2026-10-15)
 
