@@ -1516,6 +1516,8 @@ class GoveeAdapter extends utils.Adapter {
         this.clearInterval(this.appVersionCheckTimer);
         this.appVersionCheckTimer = undefined;
       }
+      // A report still being made ends after its current step, and no message starts a new one (round 165).
+      this.reportJobs.stop();
       this.cloudRetry?.dispose();
       this.segmentWizard?.dispose();
       this.lanClient?.stop();
