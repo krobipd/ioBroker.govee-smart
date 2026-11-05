@@ -808,7 +808,9 @@ async function feedFixtures(harness) {
   }
   // The LAN scan runs every 30 s; announcing until the adapter asks the light for its status makes the first answer land
   // whenever the adapter's listen socket came up. A new process asks right after it found the light (claimLanStatusRequest:
-  // no status read yet), and every feed follows a fresh start.
+  // no status read yet), and every feed follows a fresh start — the fixture native gives the adapter no reason to write its
+  // instance object, so no host restart falls into a feed. A stopped adapter ends it too ("a taken port" waits 1 s for the
+  // feed; announcing on, it would reach the next suite's adapter before that suite's feed listens).
   let asked = false;
   const ask = msg => {
     try {
@@ -818,10 +820,11 @@ async function feedFixtures(harness) {
     }
   };
   const found = () => {
-    if (!asked) {
-      lan.announce();
+    if (asked || harness.didAdapterStop()) {
+      return true;
     }
-    return asked;
+    lan.announce();
+    return false;
   };
   lan.socket.on("message", ask);
   try {

@@ -122,6 +122,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: a light whose scene list Govee refused with too many requests at the start gets its scenes in the same run
 - Fixed: the refresh button of a light is confirmed only when Govee sent its scene list
 - Changed: the experimental switch is gone; every catalog correction now applies to its model
+- New: an untested device says so in the log and asks for a diagnostics report
 - Changed: the colour and brightness of each segment carry the segment's number in their name
 - New: each Govee app group shows in info.online whether all its members are reachable
 - Fixed: the brightness of a light and of its segments uses the range Govee reports for that light, for example 1 to 100
