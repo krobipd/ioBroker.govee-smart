@@ -121,7 +121,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Improved: the adapter settings page loads about 8 MB less and opens faster
 - Fixed: a light whose scene list Govee refused with too many requests at the start gets its scenes in the same run
 - Fixed: the refresh button of a light is confirmed only when Govee sent its scene list
-- Changed: the experimental switch is gone; every catalog correction now applies to its model
+- Changed: catalog corrections now apply without the experimental switch
 - New: an untested device says so in the log and asks for a diagnostics report
 - Changed: the colour and brightness of each segment carry the segment's number in their name
 - New: each Govee app group shows in info.online whether all its members are reachable
