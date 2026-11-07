@@ -264,9 +264,16 @@ describe("verification code spent outside the settings", () => {
   });
 
   it("the mark holds the code's hash, never the code, readable by the owner only", async () => {
+    // Windows has no POSIX modes (statSync reports 0o666): the mode handed over holds everywhere, the real one where
+    // the concept exists — as for the credentials file above
+    const asyncOpen = vi.spyOn(fs.promises, "open");
     await markVerificationCodeUsed(dataDir, "123456");
+    expect(asyncOpen.mock.calls.at(-1)?.[2]).toBe(0o600);
+    asyncOpen.mockRestore();
     expect(fs.readFileSync(markFile(), "utf-8")).not.toContain("123456");
-    expect(fs.statSync(markFile()).mode & 0o777).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect(fs.statSync(markFile()).mode & 0o777).toBe(0o600);
+    }
   });
 
   it("an empty code is neither marked nor sent", async () => {
