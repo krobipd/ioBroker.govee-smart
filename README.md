@@ -128,6 +128,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Fixed: the brightness of a light and of its segments uses the range Govee reports for that light, for example 1 to 100
 - Changed: scene, snapshot, music and mode lists are now text datapoints
 - Changed: each device shows its test status in info.tier; the separate diag folder is gone
+- Changed: a verification code stays in the settings after use; the adapter no longer clears the field and restarts itself
 - Changed: needs js-controller 7.2.5 and Admin 8.3.5
 
 ### 3.2.1 (2026-10-15)

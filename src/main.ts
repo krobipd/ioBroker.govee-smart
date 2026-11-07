@@ -423,9 +423,6 @@ class GoveeAdapter extends utils.Adapter {
       this.getObjectViewAsync(design, search, params),
     );
     method("getForeignStatesAsync", (pattern: string) => this.getForeignStatesAsync(pattern));
-    method("extendForeignObjectAsync", (id: string, obj: { native?: Record<string, unknown> }) =>
-      this.extendForeignObjectAsync(id, obj),
-    );
     method("readFileAsync", (meta: string, name: string) => this.readFileAsync(meta, name));
     method("delFileAsync", (meta: string, name: string) => this.delFileAsync(meta, name));
     method("readDirAsync", (meta: string, path: string) => this.readDirAsync(meta, path));
@@ -984,7 +981,12 @@ class GoveeAdapter extends utils.Adapter {
     this.deviceManager!.setBrokerClient(this.mqttClient);
 
     // Diagnostics hooks, the verification code and the problems the user has to act on.
-    accountHandler.wireAccountClient(this.handlerHost, this.mqttClient, config.mqttVerificationCode ?? "");
+    accountHandler.wireAccountClient(
+      this.handlerHost,
+      this.mqttClient,
+      cloudCreds.usableVerificationCode(dataDir, config.mqttVerificationCode ?? ""),
+      dataDir,
+    );
 
     // Re-use cached MQTT credentials across restarts. Stored (encrypted) in
     // a FILE in the instance data directory — not a state and not a meta
@@ -1572,6 +1574,12 @@ class GoveeAdapter extends utils.Adapter {
         };
       },
       sendResponse: (obj, data) => this.sendMessageResponse(obj, data),
+      usableVerificationCode: code => cloudCreds.usableVerificationCode(utils.getAbsoluteInstanceDataDir(this), code),
+      markVerificationCodeUsed: code => {
+        cloudCreds.markVerificationCodeUsed(utils.getAbsoluteInstanceDataDir(this), code).catch(e => {
+          this.log.warn(`Could not remember the used verification code: ${errText(e)}`);
+        });
+      },
       createMqttProbeClient: (email: string, password: string) => {
         const probe = this.makeMqttClient(email, password, this.log, this);
         probe.localAddress = this.localAddress;

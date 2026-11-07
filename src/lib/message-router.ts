@@ -19,6 +19,10 @@ export interface MessageRouterHost {
   getConfig: () => { goveeEmail: string; goveePassword: string; mqttVerificationCode?: string };
   /** Sends the JSON response back to the caller (sendMessageResponse path). */
   sendResponse: (obj: ioBroker.Message, data: unknown) => void;
+  /** The code a login sends — "" once Govee consumed or rejected exactly this one (the field is never cleared). */
+  usableVerificationCode: (code: string) => string;
+  /** Remember a code Govee consumed, so no later login replays it. */
+  markVerificationCodeUsed: (code: string) => void;
   /**
    * Factory for a one-shot MqttClient (for the login test), built with the
    * given credentials — so a test uses what the user is currently editing in
@@ -187,7 +191,7 @@ export class MessageRouter {
     const config = this.host.getConfig();
     const email = accountEmail(creds.email ?? config.goveeEmail);
     const password = creds.password ?? config.goveePassword ?? "";
-    const code = (creds.code ?? config.mqttVerificationCode ?? "").trim();
+    const code = this.host.usableVerificationCode(creds.code ?? config.mqttVerificationCode ?? "");
     if (!hasAccountCredentials(email, password)) {
       return { status: "needCredentials" };
     }
@@ -199,6 +203,8 @@ export class MessageRouter {
       this.lastTestRequestMs = now;
       const probe = this.host.createMqttProbeClient(email, password);
       probe.setVerificationCode(code);
+      // A code the probe's login spends is spent for the live client too — after "save" it must not replay it.
+      probe.setOnVerificationConsumed(() => this.host.markVerificationCodeUsed(code));
       let probeTimer: ioBroker.Timeout | undefined;
       try {
         // The "connected" edge (onConnection(true)) arrives asynchronously AFTER

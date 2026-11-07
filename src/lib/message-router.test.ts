@@ -29,12 +29,20 @@ interface FakeProbeOpts {
   requestError?: Error;
   /** Called whenever probe.disconnect() runs — lets a test assert disposal. */
   onDisconnect?: () => void;
+  /** Every code the router hands the probe. */
+  sentCodes?: string[];
+  /** The login spends the code it sent (Govee accepted it). */
+  spendsCode?: boolean;
 }
 
 function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
   let lastErrorReads = 0;
+  let onConsumed: (() => void) | undefined;
   const probe = {
-    setVerificationCode: (_code: string) => {},
+    setVerificationCode: (code: string) => opts.sentCodes?.push(code),
+    setOnVerificationConsumed: (cb: () => void) => {
+      onConsumed = cb;
+    },
     enableProbeMode: () => {},
     disconnect: () => opts.onDisconnect?.(),
     getLastError: () => {
@@ -60,6 +68,9 @@ function makeProbe(opts: FakeProbeOpts): GoveeMqttClient {
       // → subscribe. Model that timing so a probe that reads `connected`
       // synchronously right after connect() sees false (the M2 bug). connect()
       // NEVER throws — failures land in getLastError() (H2).
+      if (opts.spendsCode) {
+        onConsumed?.();
+      }
       if (opts.connected) {
         setTimeout(() => onConnection(true), 0);
       }
@@ -82,6 +93,9 @@ function makeHost(opts: {
   devices?: Array<{ value: string; label: string; model: string; online: boolean; segments: number }>;
   diagnosticsAnswer?: unknown;
   diagnosticsCalls?: unknown[];
+  savedCode?: string;
+  spentCodes?: string[];
+  markedCodes?: string[];
 }): { host: MessageRouterHost; responses: RecordedResponse[] } {
   const responses: RecordedResponse[] = [];
   const host: MessageRouterHost = {
@@ -89,9 +103,11 @@ function makeHost(opts: {
     getConfig: () => ({
       goveeEmail: opts.email ?? "user@example.com",
       goveePassword: opts.password ?? "password",
-      mqttVerificationCode: "",
+      mqttVerificationCode: opts.savedCode ?? "",
     }),
     sendResponse: (obj, data) => responses.push({ obj, data }),
+    usableVerificationCode: code => (opts.spentCodes?.includes(code.trim()) ? "" : code.trim()),
+    markVerificationCodeUsed: code => opts.markedCodes?.push(code),
     createMqttProbeClient: (_email: string, _password: string) => opts.probe ?? makeProbe({ connected: false }),
     getDeviceList: () => opts.devices ?? [],
     handleDiagnostics: payload => {
@@ -421,6 +437,34 @@ describe("MessageRouter", () => {
       router.onMessage(makeMessage("mqttAuth", { action: "test", email: "live@x.com", password: "livepw" }));
       await new Promise(r => setTimeout(r, 10));
       expect(seen).toEqual([{ email: "live@x.com", password: "livepw" }]);
+    });
+
+    // The settings field keeps a code after use (round 170): the test must not replay a spent one.
+    it("a spent code from the card or the settings is not sent, a fresh one is", async () => {
+      const sentCodes: string[] = [];
+      const { host } = makeHost({ savedCode: "111111", spentCodes: ["111111", "222222"] });
+      host.createMqttProbeClient = () => makeProbe({ connected: true, sentCodes });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(sentCodes).toEqual([""]);
+      const again = new MessageRouter(host);
+      again.onMessage(makeMessage("mqttAuth", { action: "test", code: " 222222 " }));
+      await new Promise(r => setTimeout(r, 10));
+      const fresh = new MessageRouter(host);
+      fresh.onMessage(makeMessage("mqttAuth", { action: "test", code: " 333333 " }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(sentCodes).toEqual(["", "", "333333"]);
+    });
+
+    it("a code the test's login spends is remembered, so the live client does not replay it after save", async () => {
+      const markedCodes: string[] = [];
+      const { host } = makeHost({ markedCodes });
+      host.createMqttProbeClient = () => makeProbe({ connected: true, spendsCode: true });
+      const router = new MessageRouter(host);
+      router.onMessage(makeMessage("mqttAuth", { action: "test", code: "444444" }));
+      await new Promise(r => setTimeout(r, 10));
+      expect(markedCodes).toEqual(["444444"]);
     });
   });
 

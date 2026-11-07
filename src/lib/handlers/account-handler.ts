@@ -24,12 +24,14 @@ export interface AccountHandlerAdapter extends cloudCreds.CloudCredsAdapter {
  *
  * @param adapter Adapter surface
  * @param client The account client
- * @param verificationCode The code from the settings (may be empty)
+ * @param verificationCode The code from the settings, "" when empty or already spent ({@link cloudCreds.usableVerificationCode})
+ * @param dataDir Adapter instance data directory — where a spent code is remembered
  */
 export function wireAccountClient(
   adapter: AccountHandlerAdapter,
   client: GoveeMqttClient,
   verificationCode: string,
+  dataDir: string,
 ): void {
   // Forward every parsed MQTT message into the diagnostics ring buffer
   // so the report contains the recent packets per device. v2.9.1: the
@@ -47,18 +49,19 @@ export function wireAccountClient(
     adapter.deviceManager?.getDiagnostics().recordAccountCall(endpoint, ok, statusCode, message);
   });
 
-  // 2FA: forward optional code from settings into the next login attempt;
-  // clear the field automatically once Govee has accepted it.
-  client.setVerificationCode(verificationCode);
-  client.setOnVerificationConsumed(() => {
-    cloudCreds.clearVerificationCodeSetting(adapter).catch(e => {
-      adapter.log.warn(`Could not clear mqttVerificationCode: ${errText(e)}`);
+  // 2FA: forward the code from the settings into the next login attempt. Once Govee accepted it, the adapter
+  // remembers it as spent — the settings field stays as the user left it, no later login replays the code.
+  const rememberSpent = (): void => {
+    cloudCreds.markVerificationCodeUsed(dataDir, verificationCode).catch(e => {
+      adapter.log.warn(`Could not remember the used verification code: ${errText(e)}`);
     });
-  });
+  };
+  client.setVerificationCode(verificationCode);
+  client.setOnVerificationConsumed(rememberSpent);
   client.setOnVerificationFailed(reason => {
-    // On 'failed' (455 / 454+code-was-sent) blank the code so the user
-    // doesn't keep retrying with a stale value. On 'pending' (454 + no
-    // code) we leave the field as-is — the user is about to fill it.
+    // On 'failed' (455 / 454+code-was-sent) the code is remembered as spent,
+    // so no later login retries a stale value. On 'pending' (454 + no code)
+    // nothing was sent — the user is about to fill the field.
     // Surface the "code needed" state on info.verificationPending so the
     // connection card can show it live (the notification below is only a
     // nudge for when the user isn't in the settings — the actual flow
@@ -67,9 +70,7 @@ export function wireAccountClient(
       ?.writeReadOnly("info.verificationPending", true)
       .catch(logRejected(adapter.log, "best-effort write"));
     if (reason === "failed") {
-      cloudCreds
-        .clearVerificationCodeSetting(adapter)
-        .catch(logRejected(adapter.log, "clear the verification code setting"));
+      rememberSpent();
       adapter.actionableProblems.report({
         key: "mqtt-verification",
         title: "Govee rejected the verification code for real-time status",

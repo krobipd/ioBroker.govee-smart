@@ -5,12 +5,23 @@ vi.mock("./connection-state", () => ({
   updateConnectionState: vi.fn(),
 }));
 
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import * as connectionState from "./connection-state";
 import { onAccountConnection, wireAccountClient, type AccountHandlerAdapter } from "./account-handler";
+import { usableVerificationCode } from "./cloud-creds-handler";
 import type { GoveeMqttClient } from "../govee-mqtt-client";
 import { mockLog } from "../../../test/test-helpers";
 
 type Hooks = Record<string, (...args: never[]) => unknown>;
+
+const dataDirs: string[] = [];
+afterEach(() => {
+  for (const dir of dataDirs.splice(0)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 function rig(code = "123456"): {
   adapter: AccountHandlerAdapter & connectionState.ConnectionStateAdapter;
@@ -19,7 +30,7 @@ function rig(code = "123456"): {
   flags: Array<[string, unknown]>;
   reported: string[];
   resolved: string[];
-  cleared: unknown[];
+  dataDir: string;
   diag: { packets: unknown[]; calls: unknown[] };
   staleRequests: number[];
 } {
@@ -27,7 +38,8 @@ function rig(code = "123456"): {
   const flags: Array<[string, unknown]> = [];
   const reported: string[] = [];
   const resolved: string[] = [];
-  const cleared: unknown[] = [];
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-account-test-"));
+  dataDirs.push(dataDir);
   const diag = { packets: [] as unknown[], calls: [] as unknown[] };
   const staleRequests: number[] = [];
   let verificationCode: string | undefined;
@@ -46,11 +58,6 @@ function rig(code = "123456"): {
   const adapter = {
     log: mockLog,
     namespace: "govee-smart.0",
-    getForeignObjectAsync: () => Promise.resolve(structuredClone({ native: { mqttVerificationCode: code } })),
-    extendForeignObjectAsync: (_id: string, obj: unknown) => {
-      cleared.push(obj);
-      return Promise.resolve();
-    },
     deviceManager: {
       getDiagnostics: () => ({
         addMqttPacket: (...a: unknown[]) => diag.packets.push(a),
@@ -69,36 +76,33 @@ function rig(code = "123456"): {
       resolve: (key: string) => resolved.push(key),
     },
   } as unknown as AccountHandlerAdapter & connectionState.ConnectionStateAdapter;
-  wireAccountClient(adapter, client, code);
+  wireAccountClient(adapter, client, code, dataDir);
   expect(verificationCode).toBe(code);
-  return { adapter, client, hooks, flags, reported, resolved, cleared, diag, staleRequests };
+  return { adapter, client, hooks, flags, reported, resolved, dataDir, diag, staleRequests };
 }
 
-const settle = (): Promise<void> => new Promise(r => setTimeout(r, 0));
-
 describe("wireAccountClient", () => {
-  it("a rejected code shows the code state, clears the setting and asks for a fresh code", async () => {
+  it("a rejected code shows the code state, is remembered as spent and asks for a fresh code", async () => {
     const r = rig();
     (r.hooks.setOnVerificationFailed as (reason: string) => void)("failed");
-    await settle();
+    await vi.waitFor(() => expect(usableVerificationCode(r.dataDir, "123456")).toBe(""));
     expect(r.flags).toEqual([["info.verificationPending", true]]);
-    expect(r.cleared).toEqual([{ native: { mqttVerificationCode: "" } }]);
     expect(r.reported).toEqual(["mqtt-verification: Govee rejected the verification code for real-time status"]);
   });
 
-  it("a code Govee wants for the first time keeps the setting and asks for one", async () => {
+  it("a code Govee wants for the first time is not marked and asks for one", async () => {
     const r = rig();
     (r.hooks.setOnVerificationFailed as (reason: string) => void)("pending");
-    await settle();
-    expect(r.cleared).toEqual([]);
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(usableVerificationCode(r.dataDir, "123456")).toBe("123456");
     expect(r.reported[0]).toMatch(/^mqtt-verification: Govee requires a verification code/);
   });
 
-  it("a consumed code is cleared from the settings", async () => {
+  it("a consumed code is remembered as spent, so no later login sends it", async () => {
     const r = rig();
     r.hooks.setOnVerificationConsumed();
-    await settle();
-    expect(r.cleared).toEqual([{ native: { mqttVerificationCode: "" } }]);
+    await vi.waitFor(() => expect(usableVerificationCode(r.dataDir, "123456")).toBe(""));
+    expect(usableVerificationCode(r.dataDir, "654321")).toBe("654321");
   });
 
   it("rejected credentials and a blocked login each surface once for the user", () => {

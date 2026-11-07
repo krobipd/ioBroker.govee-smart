@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { errText, type PersistedMqttCredentials } from "../types";
@@ -18,10 +19,6 @@ export interface CloudCredsAdapter {
   readonly namespace: string;
   /** Read one own state. */
   getStateAsync(id: string): Promise<ioBroker.State | null | undefined>;
-  /** Read one object by its full id. */
-  getForeignObjectAsync(id: string): Promise<{ native?: unknown } | null | undefined>;
-  /** Extend one object by its full id. */
-  extendForeignObjectAsync(id: string, obj: { native?: Record<string, unknown> }): Promise<unknown>;
   /** Read a file from a meta.user object — one-shot legacy migration; rejects when the file is absent. */
   readFileAsync(meta: string, name: string): Promise<{ file: Buffer | string; mimeType?: string }>;
   /** Delete a file from a meta.user object — one-shot legacy migration cleanup. */
@@ -35,25 +32,56 @@ export interface CloudCredsAdapter {
 }
 
 /**
- * Clear the one-shot `mqttVerificationCode` field in
- * `system.adapter.X.native`. Skipped when the field is already empty —
- * a dirty write would trigger a needless adapter restart.
- *
- * @param adapter ioBroker adapter surface
+ * File in the instance data directory that remembers the last verification code Govee consumed or rejected. The
+ * settings field keeps what the user typed — `native` belongs to the settings page, which writes back on save what
+ * it loaded on opening, and every write to it restarts the instance (CLAUDE_PATTERNS.md) — so the adapter notes
+ * outside it that the code is spent.
  */
-export async function clearVerificationCodeSetting(adapter: CloudCredsAdapter): Promise<void> {
-  try {
-    const obj = await adapter.getForeignObjectAsync(`system.adapter.${adapter.namespace}`);
-    const native = (obj?.native ?? {}) as Record<string, unknown>;
-    if (typeof native.mqttVerificationCode !== "string" || native.mqttVerificationCode === "") {
-      return;
-    }
-    await adapter.extendForeignObjectAsync(`system.adapter.${adapter.namespace}`, {
-      native: { mqttVerificationCode: "" },
-    });
-  } catch (e) {
-    adapter.log.warn(`Could not clear mqttVerificationCode: ${errText(e)}`);
+const USED_CODE_FILE = "verification-code.json";
+
+/**
+ * The stored mark of a code: its hash, never the code itself.
+ *
+ * @param code The trimmed code
+ */
+function codeMark(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+/**
+ * The verification code a login sends: the one from the settings (or the card), or "" once Govee consumed or
+ * rejected exactly this code — a spent code is skipped instead of being replayed on every login.
+ *
+ * @param dataDir Adapter instance data directory
+ * @param code The code from the settings or the card
+ */
+export function usableVerificationCode(dataDir: string, code: string): string {
+  const trimmed = code.trim();
+  if (!trimmed) {
+    return "";
   }
+  try {
+    const stored = JSON.parse(fs.readFileSync(path.join(dataDir, USED_CODE_FILE), "utf-8")) as { used?: unknown };
+    return stored.used === codeMark(trimmed) ? "" : trimmed;
+  } catch {
+    // no mark yet, or an unreadable one: the code was never spent
+    return trimmed;
+  }
+}
+
+/**
+ * Remember that Govee consumed or rejected this code, so no later login sends it again.
+ *
+ * @param dataDir Adapter instance data directory
+ * @param code The code that went out
+ */
+export async function markVerificationCodeUsed(dataDir: string, code: string): Promise<void> {
+  const trimmed = code.trim();
+  if (!trimmed) {
+    return;
+  }
+  await fs.promises.mkdir(dataDir, { recursive: true });
+  await writeFileAtomic(path.join(dataDir, USED_CODE_FILE), JSON.stringify({ used: codeMark(trimmed) }), 0o600);
 }
 
 /** File name the encrypted MQTT credentials live in, inside the instance data directory. */

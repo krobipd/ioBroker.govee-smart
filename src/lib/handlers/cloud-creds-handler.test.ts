@@ -3,36 +3,15 @@ import * as os from "node:os";
 import * as path from "node:path";
 import {
   type CloudCredsAdapter,
-  clearVerificationCodeSetting,
   loadPersistedCreds,
+  markVerificationCodeUsed,
   migrateCredentialsMetaOnce,
   persistCreds,
+  usableVerificationCode,
 } from "./cloud-creds-handler";
 import type { PersistedMqttCredentials } from "../types";
 
 const noopLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger;
-
-function makeAdapter(native: Record<string, unknown> = {}): CloudCredsAdapter & { calls: string[] } {
-  const calls: string[] = [];
-  return {
-    calls,
-    log: noopLog,
-    namespace: "govee-smart.0",
-    getStateAsync: () => Promise.resolve(null),
-    getForeignObjectAsync: () => Promise.resolve({ native: structuredClone(native) }),
-    extendForeignObjectAsync: (_id, obj) => {
-      calls.push(`extend:${JSON.stringify(obj.native)}`);
-      return Promise.resolve();
-    },
-    readFileAsync: () => {
-      return Promise.reject(new Error("Not exists"));
-    },
-    delFileAsync: async () => {},
-    delObjectAsync: async () => {},
-    encrypt: v => v,
-    decrypt: v => v,
-  };
-}
 
 describe("MQTT credential persistence (instance-data-dir file)", () => {
   let dataDir: string;
@@ -60,8 +39,6 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
       log: noopLog,
       namespace: "govee-smart.0",
       getStateAsync: id => Promise.resolve(states.has(id) ? ({ val: states.get(id) } as ioBroker.State) : null),
-      getForeignObjectAsync: () => Promise.resolve({ native: {} }),
-      extendForeignObjectAsync: () => Promise.resolve(undefined),
       readFileAsync: (meta, name) => {
         const key = `${meta}/${name}`;
         if (!metaFiles.has(key)) {
@@ -262,20 +239,44 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
   });
 });
 
-describe("clearVerificationCodeSetting", () => {
-  it("clears the field via extendForeignObjectAsync when it holds a code", async () => {
-    const adapter = makeAdapter({ mqttVerificationCode: "123456" });
-    await clearVerificationCodeSetting(adapter);
-    expect(adapter.calls).toHaveLength(1);
-    expect(adapter.calls[0]).toContain('"mqttVerificationCode":""');
+// The settings field keeps the code the user typed (`native` belongs to the settings page, round 170): a code Govee
+// consumed or rejected is remembered in the instance data folder and skipped instead of being cleared.
+describe("verification code spent outside the settings", () => {
+  let dataDir: string;
+  const markFile = (): string => path.join(dataDir, "verification-code.json");
+
+  beforeEach(() => {
+    dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-code-test-"));
+  });
+  afterEach(() => {
+    fs.rmSync(dataDir, { recursive: true, force: true });
   });
 
-  it("is a no-op when the field is empty or absent (no needless restart)", async () => {
-    const a1 = makeAdapter({ mqttVerificationCode: "" });
-    await clearVerificationCodeSetting(a1);
-    const a2 = makeAdapter({});
-    await clearVerificationCodeSetting(a2);
-    expect(a1.calls).toHaveLength(0);
-    expect(a2.calls).toHaveLength(0);
+  it("a code nobody marked goes out trimmed", () => {
+    expect(usableVerificationCode(dataDir, " 123456 ")).toBe("123456");
+  });
+
+  it("a marked code is skipped, a different one goes out", async () => {
+    await markVerificationCodeUsed(dataDir, " 123456 ");
+    expect(usableVerificationCode(dataDir, "123456")).toBe("");
+    expect(usableVerificationCode(dataDir, " 123456")).toBe("");
+    expect(usableVerificationCode(dataDir, "654321")).toBe("654321");
+  });
+
+  it("the mark holds the code's hash, never the code, readable by the owner only", async () => {
+    await markVerificationCodeUsed(dataDir, "123456");
+    expect(fs.readFileSync(markFile(), "utf-8")).not.toContain("123456");
+    expect(fs.statSync(markFile()).mode & 0o777).toBe(0o600);
+  });
+
+  it("an empty code is neither marked nor sent", async () => {
+    await markVerificationCodeUsed(dataDir, "   ");
+    expect(fs.existsSync(markFile())).toBe(false);
+    expect(usableVerificationCode(dataDir, "  ")).toBe("");
+  });
+
+  it("an unreadable mark counts as no mark", () => {
+    fs.writeFileSync(markFile(), "{broken");
+    expect(usableVerificationCode(dataDir, "123456")).toBe("123456");
   });
 });

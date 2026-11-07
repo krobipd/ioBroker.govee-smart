@@ -2878,11 +2878,12 @@ describe("GoveeAdapter — cache vs cloud start", () => {
 // them.
 // ===========================================================================
 describe("GoveeAdapter — callback wiring", () => {
-  function fullSetup(): Promise<{ adapter: GoveeAdapter; f: Fakes }> {
+  function fullSetup(extra: Record<string, unknown> = {}): Promise<{ adapter: GoveeAdapter; f: Fakes }> {
     return setupReady({
       apiKey: "12345678-1234-1234-1234-123456789abc",
       goveeEmail: "a@b.c",
       goveePassword: "pw",
+      ...extra,
     });
   }
   const firstArg = <T>(fn: ReturnType<typeof vi.fn>): T => {
@@ -2904,37 +2905,49 @@ describe("GoveeAdapter — callback wiring", () => {
     expect(f.mqtt.useLoginWindow.mock.calls.at(-1)?.[0]).not.toBe(live);
   });
 
-  it("MQTT verification: 'pending' opens the code field + nudges, 'consumed' clears the saved code", async () => {
-    const { adapter, f } = await fullSetup();
+  it("MQTT verification: 'pending' opens the code field + nudges, 'consumed' remembers the code outside the settings", async () => {
+    const { adapter, f } = await fullSetup({ mqttVerificationCode: "123456" });
     const i = internalOf(adapter);
+    expect(f.mqtt.setVerificationCode).toHaveBeenCalledWith("123456");
     const onFailed = firstArg<(reason: string) => void>(f.mqtt.setOnVerificationFailed);
     onFailed("pending");
     await settle();
     expect(i.states.get("info.verificationPending")).toEqual({ val: true, ack: true });
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("requires a verification code"));
 
-    // Govee accepted the code → the setting is wiped so a stale code is never re-sent.
-    i.getForeignObjectAsync.mockResolvedValue({ native: { mqttVerificationCode: "123456" } });
-    const onConsumed = firstArg<() => void>(f.mqtt.setOnVerificationConsumed);
-    onConsumed();
-    await settle();
-    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(
-      `system.adapter.${i.namespace}`,
-      expect.objectContaining({ native: expect.objectContaining({ mqttVerificationCode: "" }) }),
-    );
+    // Govee accepted the code → it is remembered as spent in the data folder; the settings stay as the user left them
+    // (round 170: the adapter never writes its own instance `native` at runtime).
+    i.extendForeignObjectAsync.mockClear();
+    firstArg<() => void>(f.mqtt.setOnVerificationConsumed)();
+    await vi.waitFor(() => expect(cloudCredsModule.usableVerificationCode(currentDataDir(), "123456")).toBe(""));
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(`system.adapter.${i.namespace}`, expect.anything());
   });
 
-  it("MQTT 'failed' verification also wipes the code and names the rejection", async () => {
-    const { adapter, f } = await fullSetup();
+  it("MQTT 'failed' verification remembers the rejected code and names the rejection", async () => {
+    const { adapter, f } = await fullSetup({ mqttVerificationCode: "999999" });
     const i = internalOf(adapter);
-    i.getForeignObjectAsync.mockResolvedValue({ native: { mqttVerificationCode: "999999" } });
+    i.extendForeignObjectAsync.mockClear();
     firstArg<(reason: string) => void>(f.mqtt.setOnVerificationFailed)("failed");
-    await settle();
+    await vi.waitFor(() => expect(cloudCredsModule.usableVerificationCode(currentDataDir(), "999999")).toBe(""));
     expect(i.log.warn).toHaveBeenCalledWith(expect.stringContaining("rejected the verification code"));
-    expect(i.extendForeignObjectAsync).toHaveBeenCalledWith(
-      `system.adapter.${i.namespace}`,
-      expect.objectContaining({ native: expect.objectContaining({ mqttVerificationCode: "" }) }),
-    );
+    expect(i.extendForeignObjectAsync).not.toHaveBeenCalledWith(`system.adapter.${i.namespace}`, expect.anything());
+  });
+
+  it("a start does not send a code Govee already consumed or rejected", async () => {
+    await cloudCredsModule.markVerificationCodeUsed(currentDataDir(), "123456");
+    const { f } = await fullSetup({ mqttVerificationCode: "123456" });
+    expect(f.mqtt.setVerificationCode).toHaveBeenCalledWith("");
+  });
+
+  it("the login test checks and remembers a spent code in the instance data folder (the REAL host)", async () => {
+    const { adapter } = await fullSetup();
+    const host = internalOf(adapter).buildMessageRouterHost();
+    const usable = host.usableVerificationCode as (code: string) => string;
+    const mark = host.markVerificationCodeUsed as (code: string) => void;
+    expect(usable(" 777777 ")).toBe("777777");
+    mark("777777");
+    await vi.waitFor(() => expect(usable("777777")).toBe(""));
+    expect(cloudCredsModule.usableVerificationCode(currentDataDir(), "777777")).toBe("");
   });
 
   it("MQTT auth-failed and login-blocked surface as actionable warnings", async () => {
