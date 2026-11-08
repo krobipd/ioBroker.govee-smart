@@ -1156,16 +1156,16 @@ describe("DiagnosticsCollector", () => {
           dailyLimit: 9000,
           queueLength: 0,
           windows: [
-            { lane: "Govee OpenAPI device list|0|account", seconds: 60, max: 20, used: 1 },
-            { lane: "Govee App API libraries|0|account", seconds: 60, max: 8, used: 2 },
+            { lane: "openapi-device-list/60s", seconds: 60, max: 20, used: 1 },
+            { lane: "app-api-libraries/60s", seconds: 60, max: 8, used: 2 },
             {
-              lane: "Govee OpenAPI device reads|0|device H6172:AA:BB:CC:DD:EE:FF:00:11",
+              lane: "openapi-device-reads/60s/H6172:AA:BB:CC:DD:EE:FF:00:11",
               seconds: 60,
               max: 20,
               used: 1,
             },
             {
-              lane: "Govee OpenAPI device control|0|device H6172:AA:BB:CC:DD:EE:FF:00:11",
+              lane: "openapi-device-control/3s/H6172:AA:BB:CC:DD:EE:FF:00:11",
               seconds: 3,
               max: 6,
               used: 1,
@@ -1189,7 +1189,7 @@ describe("DiagnosticsCollector", () => {
       // the names go through the report's placeholders like every other id.
       const windows = (rt.rateLimiter as { windows: Array<{ lane: string }> }).windows;
       expect(windows[2].lane).not.toContain("AA:BB:CC:DD:EE:FF:00:11");
-      expect(windows[2].lane).toMatch(/^Govee OpenAPI device reads\|0\|device H6172:/);
+      expect(windows[2].lane).toMatch(/^openapi-device-reads\/60s\/H6172:/);
     });
 
     it("yields null runtimeState when no provider is wired", async () => {

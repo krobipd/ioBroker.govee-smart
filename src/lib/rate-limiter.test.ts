@@ -1,19 +1,6 @@
-import fs from "node:fs";
-import os from "node:os";
-import path from "node:path";
 import type { ApiLimit, Counterpart } from "./api-limits";
 import { currentBooking } from "./call-booking";
-import {
-  ACCOUNT_LIST_LANE,
-  LIMITER_MEMORY_FILE,
-  MAX_QUEUE_LENGTH,
-  QUEUE_MAX_WINDOW_SECONDS,
-  RateLimiter,
-  applianceBudget,
-  loadLimiterMemory,
-  saveLimiterMemory,
-  type CallLane,
-} from "./rate-limiter";
+import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, applianceBudget, type CallLane } from "./rate-limiter";
 import { CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 import type { GoveeDevice, TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
@@ -270,8 +257,8 @@ describe("RateLimiter", () => {
     await fire();
     await fire();
     const snap = rl.getUsageSnapshot();
-    expect(snap.windows.find(w => w.lane === "test list|0|account")).toEqual({
-      lane: "test list|0|account",
+    expect(snap.windows.find(w => w.lane === "test-list/60s")).toEqual({
+      lane: "test-list/60s",
       seconds: 60,
       max: 5,
       used: 2,
@@ -396,47 +383,42 @@ describe("RateLimiter — sliding windows, the way Govee counts and the fleet ju
   });
 });
 
-describe("RateLimiter — the daily window outlives a restart", () => {
-  it("a limiter that remembers counts the calls the previous process made in the last 24 hours", async () => {
-    const first = bench(limitsOf(100, 3));
+describe("RateLimiter — every window outlives a restart (the fleet's `a restart right after the start`)", () => {
+  it("a limiter that remembers counts the calls the previous process made in every window", async () => {
+    const first = bench(limitsOf(2, 3));
     await first.fire();
     await first.fire();
     const memory = first.rl.memory();
-    expect(memory.lanes["test day|0|account"]).toEqual([1_000_000, 1_000_000]);
-    const second = bench(limitsOf(100, 3));
-    second.clock.set(1_000_000 + 3_600_000); // an hour later
+    expect(memory["test day|0|account"]).toEqual({ seconds: 86_400, ends: [1_000_000, 1_000_000] });
+    expect(memory["test list|0|account"]).toEqual({ seconds: 60, ends: [1_000_000, 1_000_000] });
+    const second = bench(limitsOf(2, 3));
+    second.clock.set(1_000_000 + 30_000); // restarted half a minute later
     second.rl.remember(memory);
     expect(second.rl.getUsageSnapshot().usedToday).toBe(2);
-    await second.fire();
-    expect(await second.fire()).toBe(false);
+    expect(await second.fire()).toBe(false); // the minute window still holds the two calls before the restart
+    second.clock.set(1_000_000 + 60_000);
+    second.process();
     expect(second.ran()).toBe(1);
+    expect(await second.fire()).toBe(false); // the day is full: three in 24 hours
   });
 
   it("a limiter that made no call leaves an empty memory — no lane without a call in it", () => {
     const { rl } = bench();
-    expect(rl.memory()).toEqual({ lanes: {} });
+    expect(rl.memory()).toEqual({});
   });
 
-  it("carries only windows longer than an hour — a minute is long past when the next process asks", async () => {
-    const { rl, fire } = bench(limitsOf(5, 100));
-    await fire();
-    const lanes = Object.keys(rl.memory().lanes);
-    expect(lanes).toEqual(["test day|0|account"]);
-    expect(QUEUE_MAX_WINDOW_SECONDS).toBe(3600);
-  });
-
-  it("drops what lies outside the window, in the future or in a lane it does not keep", () => {
+  it("drops what lies outside its window or in the future when it remembers", () => {
     const { rl, clock } = bench(limitsOf(100, 10));
     const now = clock.now();
     rl.remember({
-      lanes: {
-        "test day|0|account": [now - 86_400_000, now - 1000, now + 5000],
-        "nobody|0|account": [now - 1000],
-        "test list|0|account": [now - 1000],
-      },
+      "test day|0|account": { seconds: 86_400, ends: [now - 86_400_000, now - 1000, now + 5000] },
+      "test list|0|account": { seconds: 60, ends: [now - 60_000, now - 59_999] },
     });
     expect(rl.getUsageSnapshot().usedToday).toBe(1);
-    expect(rl.memory().lanes).toEqual({ "test day|0|account": [now - 1000] });
+    expect(rl.memory()).toEqual({
+      "test day|0|account": { seconds: 86_400, ends: [now - 1000] },
+      "test list|0|account": { seconds: 60, ends: [now - 59_999] },
+    });
   });
 
   it("an appliance's allowance is carried over too", async () => {
@@ -453,27 +435,7 @@ describe("RateLimiter — the daily window outlives a restart", () => {
     const { rl, clock } = bench(limitsOf(100, 100));
     void rl.tryExecute(() => new Promise<void>(() => {}));
     clock.advance(5000);
-    expect(rl.memory().lanes["test day|0|account"]).toEqual([clock.now()]);
-  });
-
-  it("the memory file round-trips; a missing, broken or foreign file is an empty memory", async () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-limits-"));
-    try {
-      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
-      await saveLimiterMemory(path.join(dir, "sub"), { lanes: { "a|0|account": [1, 2] } });
-      expect(loadLimiterMemory(path.join(dir, "sub"))).toEqual({ lanes: { "a|0|account": [1, 2] } });
-      fs.writeFileSync(path.join(dir, LIMITER_MEMORY_FILE), "{not json");
-      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
-      fs.writeFileSync(path.join(dir, LIMITER_MEMORY_FILE), JSON.stringify({ lanes: 5 }));
-      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
-      fs.writeFileSync(
-        path.join(dir, LIMITER_MEMORY_FILE),
-        JSON.stringify({ lanes: { a: [1, "2", null, Infinity, 3], b: "x" } }),
-      );
-      expect(loadLimiterMemory(dir)).toEqual({ lanes: { a: [1, 3] } });
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    expect(rl.memory()["test day|0|account"]).toEqual({ seconds: 86_400, ends: [clock.now()] });
   });
 });
 
@@ -671,6 +633,13 @@ describe("per-device daily budget", () => {
     clock.advance(60_000);
     process();
     await expect(tracked).rejects.toThrow(/budget/i);
+  });
+
+  it("the report names an appliance's allowance as a window of its own, under its device", async () => {
+    const { rl } = bench(limitsOf(100, 10_000));
+    await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+    const lanes = rl.getUsageSnapshot().windows.map(w => [w.lane, w.used]);
+    expect(lanes).toContainEqual(["appliance-day/86400s/H7160:AA:BB", 1]);
   });
 
   it("a call without a budget is never blocked by one", async () => {
@@ -902,21 +871,21 @@ describe("RateLimiter — lanes per Govee actor, the windows api-limits.json dec
     await fire(APPAPI);
     await fire(LIST);
     const used = Object.fromEntries(rl.getUsageSnapshot().windows.map(w => [w.lane, [w.used, w.max, w.seconds]]));
-    expect(used["Govee OpenAPI device list|0|account"]).toEqual([1, 20, 60]);
-    expect(used["Govee App API libraries|0|account"]).toEqual([1, 8, 60]);
-    expect(used["Govee OpenAPI device reads|0|device H600D:BULB1"]).toEqual([1, 20, 60]);
-    expect(used["Govee OpenAPI device control|0|device H600D:BULB1"]).toEqual([1, 6, 3]);
-    expect(used["Govee OpenAPI device control|1|account"]).toEqual([1, 80, 7]);
-    expect(used["Govee OpenAPI (REST)|0|account"]).toEqual([3, 9000, 86_400]);
+    expect(used["openapi-device-list/60s"]).toEqual([1, 20, 60]);
+    expect(used["app-api-libraries/60s"]).toEqual([1, 8, 60]);
+    expect(used["openapi-device-reads/60s/H600D:BULB1"]).toEqual([1, 20, 60]);
+    expect(used["openapi-device-control/3s/H600D:BULB1"]).toEqual([1, 6, 3]);
+    expect(used["openapi-device-control/7s"]).toEqual([1, 80, 7]);
+    expect(used["openapi-rest/86400s"]).toEqual([3, 9000, 86_400]);
     // a window per device stands under its device only, never as an account window
     expect(Object.keys(used).sort()).toEqual(
       [
-        "Govee App API libraries|0|account",
-        "Govee OpenAPI (REST)|0|account",
-        "Govee OpenAPI device control|0|device H600D:BULB1",
-        "Govee OpenAPI device control|1|account",
-        "Govee OpenAPI device list|0|account",
-        "Govee OpenAPI device reads|0|device H600D:BULB1",
+        "app-api-libraries/60s",
+        "openapi-rest/86400s",
+        "openapi-device-control/3s/H600D:BULB1",
+        "openapi-device-control/7s",
+        "openapi-device-list/60s",
+        "openapi-device-reads/60s/H600D:BULB1",
       ].sort(),
     );
   });
@@ -929,8 +898,8 @@ describe("RateLimiter — lanes per Govee actor, the windows api-limits.json dec
     await fire(read(1));
     (rl as any).limits = CLOUD_LIMITS;
     const lanes = rl.getUsageSnapshot().windows.map(w => w.lane);
-    expect(lanes).not.toContain("old reads|0|device H600D:BULB1");
-    expect(lanes).toContain("Govee OpenAPI (REST)|0|account");
+    expect(lanes).not.toContain("old-reads/60s/H600D:BULB1");
+    expect(lanes).toContain("openapi-rest/86400s");
   });
 });
 
@@ -1019,7 +988,7 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
   const CONTROL: CallLane = { kind: "device-control", deviceKey: "H6097:AA" };
   const usedIn = (rl: RateLimiter, lane: string): number =>
     rl.getUsageSnapshot().windows.find(w => w.lane === lane)?.used ?? 0;
-  const readsOf = (rl: RateLimiter): number => usedIn(rl, "Govee OpenAPI device reads|0|device H6097:AA");
+  const readsOf = (rl: RateLimiter): number => usedIn(rl, "openapi-device-reads/60s/H6097:AA");
 
   it("a swallowed DNS failure gives back the lane slot and the daily count, and the report counts it", async () => {
     const { rl } = bench();
@@ -1057,8 +1026,8 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
     const { rl } = bench();
     await rl.tryExecute(neverSent, ACCOUNT_LIST_LANE);
     await rl.tryExecute(neverSent, { kind: "appapi" });
-    expect(usedIn(rl, "Govee OpenAPI device list|0|account")).toBe(0);
-    expect(usedIn(rl, "Govee App API libraries|0|account")).toBe(0);
+    expect(usedIn(rl, "openapi-device-list/60s")).toBe(0);
+    expect(usedIn(rl, "app-api-libraries/60s")).toBe(0);
   });
 
   it("control: six commands that never left free their slots — the seventh still goes at once", async () => {
@@ -1072,7 +1041,7 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
       return delivered();
     }, CONTROL);
     expect(ran).toBe(true);
-    expect(usedIn(rl, "Govee OpenAPI device control|1|account")).toBe(1);
+    expect(usedIn(rl, "openapi-device-control/7s")).toBe(1);
   });
 
   it("executeTracked: the failure still reaches the caller, the booking goes back", async () => {
@@ -1097,7 +1066,7 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
     clock.advance(60_000);
     process(); // the waiter runs and fails
     await vi.waitFor(() => expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1));
-    expect(usedIn(rl, "test reads|0|device H6097:AA")).toBe(0);
+    expect(usedIn(rl, "test-reads/60s/H6097:AA")).toBe(0);
     expect(rl.getUsageSnapshot().usedToday).toBe(1);
   });
 

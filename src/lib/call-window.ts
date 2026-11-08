@@ -9,12 +9,25 @@ export interface Slot {
   end?: number;
 }
 
+/** One lane as a restart carries it over. */
+export interface LaneRecord {
+  /** The lane's window length. */
+  seconds: number;
+  /** The settle times of its held slots (ms). */
+  ends: number[];
+}
+
+/** What a restart carries over of a limiter: every held lane by key. */
+export type LaneMemory = Record<string, LaneRecord>;
+
 /**
  * The slots of every lane. A lane is one declared window of one counterpart for the account, one host or one device —
  * its key names it, and one key always has the same window length.
  */
 export class SlotLanes {
   private readonly lanes = new Map<string, Slot[]>();
+  /** The window length of each lane, as its slots were taken. */
+  private readonly seconds = new Map<string, number>();
 
   /**
    * The slots of a lane still held at `now`: open, or settled less than `seconds · 1000` ago. Forgets the others.
@@ -31,6 +44,7 @@ export class SlotLanes {
     const kept = all.filter(s => s.end === undefined || now - s.end < seconds * 1000);
     if (kept.length === 0) {
       this.lanes.delete(key);
+      this.seconds.delete(key);
     } else if (kept.length !== all.length) {
       this.lanes.set(key, kept);
     }
@@ -63,8 +77,10 @@ export class SlotLanes {
    * Take a slot in a lane — open until the call settles.
    *
    * @param key The lane
+   * @param seconds The lane's window length
    */
-  take(key: string): Slot {
+  take(key: string, seconds: number): Slot {
+    this.seconds.set(key, seconds);
     const slot: Slot = {};
     const lane = this.lanes.get(key);
     if (lane) {
@@ -88,30 +104,43 @@ export class SlotLanes {
       lane.splice(at, 1);
       if (lane.length === 0) {
         this.lanes.delete(key);
+        this.seconds.delete(key);
       }
     }
   }
 
   /**
-   * The settle times of a lane's held slots, an open one as `now` — what a restart must carry over.
+   * Every lane still held, with its window length and the settle times of its slots — an open one as `now`: what the
+   * next process of this instance must know. A restart within a window would otherwise hand the counterpart the window
+   * a second time (the fleet's suite `a restart right after the start`).
    *
-   * @param key The lane
-   * @param seconds The lane's window length
    * @param now Current time (ms)
    */
-  ends(key: string, seconds: number, now: number): number[] {
-    return this.held(key, seconds, now).map(s => s.end ?? now);
+  dump(now: number): LaneMemory {
+    const memory: LaneMemory = {};
+    for (const [key, seconds] of [...this.seconds]) {
+      const ends = this.held(key, seconds, now).map(s => s.end ?? now);
+      if (ends.length > 0) {
+        memory[key] = { seconds, ends };
+      }
+    }
+    return memory;
   }
 
   /**
-   * Lay settled slots into a lane — the calls an earlier process of this instance made within the window.
+   * Lay in what an earlier process of this instance held: every settle time still inside its window. A time after
+   * `now` (a clock set back since) is not taken — it would hold the window longer than its length.
    *
-   * @param key The lane
-   * @param ends Their settle times (ms)
+   * @param memory What {@link dump} returned there
+   * @param now Current time (ms)
    */
-  restore(key: string, ends: readonly number[]): void {
-    for (const end of ends) {
-      this.take(key).end = end;
+  load(memory: LaneMemory, now: number): void {
+    for (const [key, { seconds, ends }] of Object.entries(memory)) {
+      for (const end of ends) {
+        if (end <= now && now - end < seconds * 1000) {
+          this.take(key, seconds).end = end;
+        }
+      }
     }
   }
 
@@ -128,4 +157,21 @@ export class SlotLanes {
  */
 export function isStamp(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
+}
+
+/**
+ * A limiter's memory as it comes back from the data folder — only lanes with a positive window length and their
+ * settle times that are stamps; anything else is left out.
+ *
+ * @param raw What the file holds for one limiter
+ */
+export function readLaneMemory(raw: unknown): LaneMemory {
+  const memory: LaneMemory = {};
+  for (const [key, lane] of Object.entries(raw ?? {})) {
+    const { seconds, ends } = (lane ?? {}) as { seconds?: unknown; ends?: unknown };
+    if (isStamp(seconds) && seconds > 0 && Array.isArray(ends)) {
+      memory[key] = { seconds, ends: ends.filter(isStamp) };
+    }
+  }
+  return memory;
 }

@@ -3,6 +3,7 @@ import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
 import { limitOf } from "./api-limits";
 import { CallGate } from "./call-gate";
+import type { LaneMemory } from "./call-window";
 import { GOVEE_APP_BASE_URL, buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
 import {
   MQTT_LOGIN_WINDOW_MS,
@@ -404,6 +405,20 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   /** Bearer token from login — available after connect, used for undocumented API */
   get token(): string {
     return this._bearerToken;
+  }
+
+  /** What the next process of this instance must know of the broker's publish limit (limit-memory.ts). */
+  limitMemory(): LaneMemory {
+    return this.publishGate.memory();
+  }
+
+  /**
+   * Lay in what the previous process published within the broker's limit.
+   *
+   * @param memory What the previous process left
+   */
+  rememberLimits(memory: LaneMemory): void {
+    this.publishGate.remember(memory);
   }
 
   /**

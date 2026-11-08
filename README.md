@@ -129,7 +129,7 @@ This adapter's MQTT authentication and BLE-over-LAN (ptReal) protocol implementa
 - Changed: scene, snapshot, music and mode lists are now text datapoints
 - Changed: each device shows its test status in info.tier; the separate diag folder is gone
 - Changed: a verification code stays in the settings after use; the adapter no longer clears the field and restarts itself
-- Changed: Govee's Cloud limits are kept as sliding windows per endpoint and device, and the daily budget counts on across a restart
+- Changed: Govee's Cloud limits are kept as sliding windows per endpoint and device, and every limit counts on across a restart
 - Changed: needs js-controller 7.2.5 and Admin 8.3.5
 
 ### 3.2.1 (2026-10-15)

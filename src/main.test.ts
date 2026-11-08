@@ -307,6 +307,8 @@ interface Fakes {
     setScanRecordHook: ReturnType<typeof vi.fn>;
     getDiagSnapshot: ReturnType<typeof vi.fn>;
     isListening: ReturnType<typeof vi.fn>;
+    limitMemory: ReturnType<typeof vi.fn>;
+    rememberLimits: ReturnType<typeof vi.fn>;
     onInterfaceError: ((m: string) => void) | null;
     onListenPortBusy: ((m: string) => void) | null;
     onListenReady: (() => void) | null;
@@ -442,6 +444,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     setScanRecordHook: vi.fn(),
     getDiagSnapshot: vi.fn(() => ({ seenDeviceIps: [], lastCommandSentMs: {} })),
     isListening: vi.fn(() => true),
+    limitMemory: vi.fn(() => ({})),
+    rememberLimits: vi.fn(),
     onInterfaceError: null,
     onListenPortBusy: null,
     onListenReady: null,
@@ -465,6 +469,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
       getFailureReason: vi.fn(() => null),
       getFailureKey: vi.fn(() => null),
       requestStatus: vi.fn(() => true),
+      limitMemory: vi.fn(() => ({})),
+      rememberLimits: vi.fn(),
     },
     { connected: false },
   );
@@ -589,16 +595,29 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Starting (LAN, Cloud)"));
   });
 
-  it("the rate limiter remembers what the previous process left in the data folder before it starts", async () => {
-    // the daily window slides over a restart (Werkbank round 171: a window longer than one installation survives it)
+  it("every limiter remembers what the previous process left in the data folder, before its first call", async () => {
+    // a restart within a window must not hand a counterpart a second window's worth (Werkbank round 171)
+    const lane = (ends: number[]): Record<string, { seconds: number; ends: number[] }> => ({
+      "x|0|account": { seconds: 60, ends },
+    });
     fsReal.mkdirSync(currentDataDir(), { recursive: true });
     fsReal.writeFileSync(
       pathReal.join(currentDataDir(), "rate-limits.json"),
-      JSON.stringify({ lanes: { "Govee OpenAPI (REST)|0|account": [123, 456] } }),
+      JSON.stringify({ limiter: lane([1]), gate: lane([2]), lan: lane([3]), broker: lane([4]) }),
     );
-    const { f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
-    expect(f.limiter.remember).toHaveBeenCalledWith({ lanes: { "Govee OpenAPI (REST)|0|account": [123, 456] } });
+    const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc", goveeEmail: "a@b.c", goveePassword: "pw" });
+    const i = internalOf(ctx.adapter);
+    const gate = (i as unknown as { callGate: { remember: (m: unknown) => void } }).callGate;
+    const gateRemember = vi.spyOn(gate, "remember");
+    await i.onReady();
+    const { f } = ctx;
+    expect(f.limiter.remember).toHaveBeenCalledWith(lane([1]));
+    expect(gateRemember).toHaveBeenCalledWith(lane([2]));
+    expect(f.lan.rememberLimits).toHaveBeenCalledWith(lane([3]));
+    expect(f.mqtt.rememberLimits).toHaveBeenCalledWith(lane([4]));
     expect(f.limiter.remember.mock.invocationCallOrder[0]).toBeLessThan(f.limiter.start.mock.invocationCallOrder[0]);
+    expect(f.lan.rememberLimits.mock.invocationCallOrder[0]).toBeLessThan(f.lan.start.mock.invocationCallOrder[0]);
+    expect(f.mqtt.rememberLimits.mock.invocationCallOrder[0]).toBeLessThan(f.mqtt.connect.mock.invocationCallOrder[0]);
   });
 
   it("account credentials are trimmed before the MQTT login (issue #39)", async () => {
@@ -1354,10 +1373,20 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(i.states.get("info.connection")).toEqual({ val: false, ack: true });
   });
 
-  it("onUnload leaves the limiter's long windows in the data folder before it calls back", async () => {
-    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+  it("onUnload leaves every limiter's windows in the data folder before it calls back", async () => {
+    const { adapter, f } = await setupReady({
+      apiKey: "12345678-1234-1234-1234-123456789abc",
+      goveeEmail: "a@b.c",
+      goveePassword: "pw",
+    });
     const i = internalOf(adapter);
-    f.limiter.memory.mockReturnValue({ lanes: { "Govee OpenAPI (REST)|0|account": [789] } });
+    const lane = (end: number): Record<string, { seconds: number; ends: number[] }> => ({
+      "x|0|account": { seconds: 60, ends: [end] },
+    });
+    f.limiter.memory.mockReturnValue(lane(1));
+    f.lan.limitMemory.mockReturnValue(lane(3));
+    f.mqtt.limitMemory.mockReturnValue(lane(4));
+    vi.spyOn((i as unknown as { callGate: { memory: () => unknown } }).callGate, "memory").mockReturnValue(lane(2));
     const file = pathReal.join(currentDataDir(), "rate-limits.json");
     let onDiskAtCallback: unknown;
     await new Promise<void>(resolve => {
@@ -1367,13 +1396,43 @@ describe("GoveeAdapter onReady — timers", () => {
       });
     });
     expect(f.limiter.memory.mock.invocationCallOrder[0]).toBeGreaterThan(f.limiter.stop.mock.invocationCallOrder[0]);
-    expect(onDiskAtCallback).toEqual({ lanes: { "Govee OpenAPI (REST)|0|account": [789] } });
+    expect(onDiskAtCallback).toEqual({ limiter: lane(1), gate: lane(2), lan: lane(3), broker: lane(4) });
+  });
+
+  it("onUnload hands on the memory of a limiter this run never built", async () => {
+    // no API key and no account: no rate limiter, no broker — what the previous process left for them stays
+    const kept = { "x|0|account": { seconds: 86_400, ends: [Date.now() - 1000] } };
+    fsReal.mkdirSync(currentDataDir(), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(currentDataDir(), "rate-limits.json"),
+      JSON.stringify({ limiter: kept, broker: kept }),
+    );
+    const { adapter } = await setupReady();
+    const i = internalOf(adapter);
+    const file = pathReal.join(currentDataDir(), "rate-limits.json");
+    let onDiskAtCallback: { limiter?: unknown; broker?: unknown } | undefined;
+    await new Promise<void>(resolve => {
+      i.onUnload(() => {
+        onDiskAtCallback = JSON.parse(fsReal.readFileSync(file, "utf8")) as typeof onDiskAtCallback;
+        resolve();
+      });
+    });
+    expect(onDiskAtCallback?.limiter).toEqual(kept);
+    expect(onDiskAtCallback?.broker).toEqual(kept);
+  });
+
+  it("an unload before the start read the memory writes no file — it would wipe what the last run left", async () => {
+    const { adapter } = setup({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    await new Promise<void>(resolve => i.onUnload(() => resolve()));
+    expect(fsReal.existsSync(pathReal.join(currentDataDir(), "rate-limits.json"))).toBe(false);
   });
 
   it("onUnload waits for the limiter's file even when a state write fails first", async () => {
     const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
     const i = internalOf(adapter);
-    f.limiter.memory.mockReturnValue({ lanes: { "Govee OpenAPI (REST)|0|account": [321] } });
+    const memory = { "x|0|account": { seconds: 60, ends: [321] } };
+    f.limiter.memory.mockReturnValue(memory);
     (i as unknown as { setState: () => Promise<never> }).setState = () =>
       Promise.reject(new Error("states DB already closed"));
     const file = pathReal.join(currentDataDir(), "rate-limits.json");
@@ -1385,7 +1444,7 @@ describe("GoveeAdapter onReady — timers", () => {
         resolve();
       });
     });
-    expect(onDiskAtCallback).toEqual({ lanes: { "Govee OpenAPI (REST)|0|account": [321] } });
+    expect((onDiskAtCallback as { limiter?: unknown } | undefined)?.limiter).toEqual(memory);
     expect(debug).toHaveBeenCalledWith(expect.stringContaining("final write rejected: states DB already closed"));
   });
 
@@ -1669,7 +1728,8 @@ describe("GoveeAdapter onReady — timers", () => {
       )) as unknown as typeof adapter.setState;
 
     i.onUnload(() => order.push("callback"));
-    await new Promise(resolve => setTimeout(resolve, 20));
+    // the callback comes after the last write — the limiters' file included, whose flush takes its own time
+    await vi.waitFor(() => expect(order).toContain("callback"));
 
     expect(order[order.length - 1]).toBe("callback");
     expect(order).toContain("write:info.connection");

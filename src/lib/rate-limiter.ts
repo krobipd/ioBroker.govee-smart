@@ -1,9 +1,6 @@
-import * as fs from "node:fs";
-import * as path from "node:path";
 import type { Counterpart } from "./api-limits";
-import { writeFileAtomic } from "./atomic-file";
 import { Booking, runBooked } from "./call-booking";
-import { SlotLanes, isStamp, type Slot } from "./call-window";
+import { SlotLanes, type LaneMemory, type Slot } from "./call-window";
 import { errText, type GoveeDevice, type TimerAdapter } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
@@ -41,9 +38,6 @@ export const QUEUE_MAX_WINDOW_SECONDS = 3600;
 
 /** The window of a device's own allowance and of the report's "today" — one sliding day. */
 const DAY_SECONDS = 86_400;
-
-/** The file in the instance data folder that carries the long windows over a restart. */
-export const LIMITER_MEMORY_FILE = "rate-limits.json";
 
 /** One window a call books: its lane key and its limit. */
 interface LaneWindow {
@@ -130,51 +124,6 @@ export function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined 
     return undefined;
   }
   return { key: `${device.sku}:${device.deviceId}`, perDay: CLOUD_APPLIANCE_DAILY_LIMIT };
-}
-
-/**
- * What a restart carries over: the settle times of every window longer than
- * {@link QUEUE_MAX_WINDOW_SECONDS}, by lane key — the daily OpenAPI window and
- * the appliances' allowances. A shorter window is long past when the next
- * process asks.
- */
-export interface RateLimiterMemory {
-  /** Settle times (ms) per lane key. */
-  lanes: Record<string, number[]>;
-}
-
-/**
- * Read what the previous process of this instance left in its data folder — an
- * empty memory when there is none or it is unreadable.
- *
- * @param dataDir The instance data folder
- */
-export function loadLimiterMemory(dataDir: string): RateLimiterMemory {
-  try {
-    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, LIMITER_MEMORY_FILE), "utf-8")) as unknown;
-    const lanes = (raw as { lanes?: unknown } | null)?.lanes;
-    const kept: Record<string, number[]> = {};
-    for (const [key, ends] of Object.entries(lanes ?? {})) {
-      if (Array.isArray(ends)) {
-        kept[key] = ends.filter(isStamp);
-      }
-    }
-    return { lanes: kept };
-  } catch {
-    // no file yet, or an unreadable one: nothing was counted
-    return { lanes: {} };
-  }
-}
-
-/**
- * Leave the long windows for the next process of this instance.
- *
- * @param dataDir The instance data folder
- * @param memory What {@link RateLimiter.memory} returned
- */
-export async function saveLimiterMemory(dataDir: string, memory: RateLimiterMemory): Promise<void> {
-  await fs.promises.mkdir(dataDir, { recursive: true });
-  await writeFileAtomic(path.join(dataDir, LIMITER_MEMORY_FILE), JSON.stringify(memory));
 }
 
 /**
@@ -443,7 +392,7 @@ export class RateLimiter {
     const taken = this.windowsOf(lane, budget).map(w => {
       // a window that takes a call has room again: when it fills up next time, it says so again
       this.warnedSpent.delete(w.key);
-      return { key: w.key, slot: this.lanes.take(w.key) };
+      return { key: w.key, slot: this.lanes.take(w.key, w.seconds) };
     });
     return { taken };
   }
@@ -468,7 +417,7 @@ export class RateLimiter {
         for (const { key, slot } of spent.taken) {
           this.lanes.give(key, slot);
         }
-        this.notDelivered.take("given back").end = now;
+        this.notDelivered.take("given back", DAY_SECONDS).end = now;
       } else {
         for (const { slot } of spent.taken) {
           slot.end = now;
@@ -536,48 +485,22 @@ export class RateLimiter {
   }
 
   /**
-   * What the next process of this instance must know: the settle times of
-   * every window longer than {@link QUEUE_MAX_WINDOW_SECONDS} — an open call
-   * as ending now.
+   * What the next process of this instance must know: every window that holds
+   * a slot, with the settle times of its slots (call-window.ts) — the device
+   * allowances included.
    */
-  memory(): RateLimiterMemory {
-    const now = this.clock();
-    const lanes: Record<string, number[]> = {};
-    for (const w of this.knownWindows()) {
-      if (w.seconds > QUEUE_MAX_WINDOW_SECONDS) {
-        const ends = this.lanes.ends(w.key, w.seconds, now);
-        if (ends.length > 0) {
-          lanes[w.key] = ends;
-        }
-      }
-    }
-    return { lanes };
+  memory(): LaneMemory {
+    return this.lanes.dump(this.clock());
   }
 
   /**
-   * Lay in what the previous process left — the calls it made within every
-   * long window still count. Only lanes this limiter keeps and only settle
-   * times within their window are taken.
+   * Lay in what the previous process held — its calls still count in every
+   * window they fall in.
    *
-   * @param memory What {@link loadLimiterMemory} read
+   * @param memory What the previous process left (limit-memory.ts)
    */
-  remember(memory: RateLimiterMemory): void {
-    const now = this.clock();
-    const longs = new Map(
-      this.knownWindows()
-        .filter(w => w.seconds > QUEUE_MAX_WINDOW_SECONDS)
-        .map(w => [w.key, w.seconds]),
-    );
-    for (const [key, ends] of Object.entries(memory.lanes)) {
-      const seconds = longs.get(key) ?? (key.startsWith("allowance|") ? DAY_SECONDS : undefined);
-      if (seconds === undefined) {
-        continue;
-      }
-      this.lanes.restore(
-        key,
-        ends.filter(end => end <= now && now - end < seconds * 1000),
-      );
-    }
+  remember(memory: LaneMemory): void {
+    this.lanes.load(memory, this.clock());
   }
 
   /**
@@ -632,7 +555,7 @@ export class RateLimiter {
   getUsageSnapshot(): RateLimiterSnapshot {
     const now = this.clock();
     const windows = this.knownWindows().map(w => ({
-      lane: w.key,
+      lane: laneId(w.key, w.seconds),
       seconds: w.seconds,
       max: w.max,
       used: this.lanes.held(w.key, w.seconds, now).length,
@@ -711,6 +634,26 @@ export class RateLimiter {
   }
 }
 
+/**
+ * The report's name of a lane — an identifier, never a sentence (DB-14: a report carries no fixed text): the counterpart
+ * in lower case without "Govee", its window, and the device of a window per device.
+ *
+ * @param key The lane key (`<counterpart>|<limit index>|<account or device>`, or `allowance|<device>`)
+ * @param seconds The lane's window length
+ */
+function laneId(key: string, seconds: number): string {
+  const [name, index, who] = key.split("|");
+  if (name === "allowance") {
+    return `appliance-day/${seconds}s/${index}`;
+  }
+  const base = name
+    .toLowerCase()
+    .replace(/^govee\s+/, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return who?.startsWith("device ") ? `${base}/${seconds}s/${who.slice("device ".length)}` : `${base}/${seconds}s`;
+}
+
 /** What `getUsageSnapshot` reports — every window that holds a slot. */
 export interface RateLimiterSnapshot {
   /** OpenAPI calls in the last 24 hours, all lanes together. */
@@ -721,6 +664,6 @@ export interface RateLimiterSnapshot {
   dailyLimit: number;
   /** Calls waiting for a free window right now. */
   queueLength: number;
-  /** Per window: its lane (`<counterpart>|<limit>|<account or device>`), length, limit and use. */
+  /** Per window: its lane (`<counterpart>/<seconds>s[/<device>]`), length, limit and use. */
   windows: Array<{ lane: string; seconds: number; max: number; used: number }>;
 }

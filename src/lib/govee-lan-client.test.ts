@@ -491,6 +491,41 @@ describe("GoveeLanClient — command send path (what really leaves the socket)",
     vi.useRealTimers();
   });
 
+  it("the control limit outlives a restart — a client that remembers holds the eleventh datagram of the second", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const pending: Array<() => void> = [];
+    const timers = { ...lanTimers, setTimeout: (fn: () => void) => pending.push(fn) } as unknown as TimerAdapter;
+    const first = new GoveeLanClient(lanLog, timers);
+    first.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    for (let level = 1; level <= 10; level++) {
+      first.setBrightness("10.0.0.7", level);
+    }
+    const memory = first.limitMemory();
+    first.stop();
+    const before = dgramMock.sockets.length;
+    const second = new GoveeLanClient(lanLog, timers);
+    second.rememberLimits(memory);
+    second.start(
+      () => {},
+      () => {},
+      30_000,
+      "0.0.0.0",
+    );
+    const sendSock = dgramMock.sockets[before];
+    second.setBrightness("10.0.0.7", 11);
+    expect(sendSock.sends.filter(d => d.address === "10.0.0.7")).toHaveLength(0);
+    vi.setSystemTime(Date.now() + 1001);
+    pending.at(-1)!();
+    expect(sendSock.sends.filter(d => d.address === "10.0.0.7")).toHaveLength(1);
+    second.stop();
+    vi.useRealTimers();
+  });
+
   it("a release that leaves datagrams waiting arms the next one, an empty queue arms none, and stop drops the wait", () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     const pending: Array<() => void> = [];

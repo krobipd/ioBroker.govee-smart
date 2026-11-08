@@ -18,6 +18,7 @@ import { LogOnce } from "./log-once";
 import { counterpartNamed } from "./api-limits";
 import { carriesAddress, chosenAddress } from "./network-address";
 import { CallGate } from "./call-gate";
+import type { LaneMemory } from "./call-window";
 
 /** The LAN counterparts of api-limits.json (GV-08). */
 const LAN_DISCOVERY = counterpartNamed("Govee LAN discovery");
@@ -347,6 +348,21 @@ export class GoveeLanClient {
       seenDeviceIps: Array.from(this.seenDeviceIps),
       lastCommandSentMs: Object.fromEntries(this.lastCommandSentMs),
     };
+  }
+
+  /** What the next process of this instance must know of the LAN limits (limit-memory.ts). */
+  limitMemory(): LaneMemory {
+    return this.gate.memory();
+  }
+
+  /**
+   * Lay in what the previous process sent within the LAN limits — a scan right after a restart counts with the one
+   * before it.
+   *
+   * @param memory What the previous process left
+   */
+  rememberLimits(memory: LaneMemory): void {
+    this.gate.remember(memory);
   }
 
   /** Stop all sockets and timers */

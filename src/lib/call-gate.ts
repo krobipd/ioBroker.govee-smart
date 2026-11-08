@@ -1,6 +1,6 @@
 // The gate that keeps the short windows of api-limits.json (GV-08) for every request — per adapter instance.
 import { counterpartsFor, deviceOf, type Counterpart, type LimitedCall } from "./api-limits";
-import { SlotLanes } from "./call-window";
+import { SlotLanes, type LaneMemory } from "./call-window";
 import { HttpError, httpsRequest, type HttpsRequestFn } from "./http-client";
 import { MAX_RATE_LIMIT_RETRY_MS, MIN_RATE_LIMIT_RETRY_MS } from "./timing-constants";
 
@@ -110,7 +110,7 @@ export class CallGate {
     if (this.waitIn(windows) !== 0) {
       return undefined;
     }
-    const slots = windows.map(w => this.lanes.take(w.key));
+    const slots = windows.map(w => this.lanes.take(w.key, w.seconds));
     return () => {
       const end = this.now();
       for (const slot of slots) {
@@ -202,6 +202,22 @@ export class CallGate {
         end();
       }
     };
+  }
+
+  /**
+   * What the next process of this instance must know: every window that holds a slot (call-window.ts).
+   */
+  memory(): LaneMemory {
+    return this.lanes.dump(this.now());
+  }
+
+  /**
+   * Lay in what the previous process held — its calls still count in every window they fall in.
+   *
+   * @param memory What the previous process left (limit-memory.ts)
+   */
+  remember(memory: LaneMemory): void {
+    this.lanes.load(memory, this.now());
   }
 
   /**

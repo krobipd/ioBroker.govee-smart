@@ -31,7 +31,8 @@ import type * as dropdownReset from "./lib/handlers/dropdown-reset-helpers";
 import * as snapshotHandlerGlue from "./lib/handlers/snapshot-handler-glue";
 import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
-import { RateLimiter, loadLimiterMemory, saveLimiterMemory } from "./lib/rate-limiter";
+import { RateLimiter } from "./lib/rate-limiter";
+import { loadLimitMemory, saveLimitMemory, type LimitMemory } from "./lib/limit-memory";
 import type { SegmentWizard } from "./lib/segment-wizard";
 import { tDesc, tName } from "./lib/i18n";
 import { SkuCache } from "./lib/sku-cache";
@@ -246,6 +247,8 @@ class GoveeAdapter extends utils.Adapter {
   private cloudClient: GoveeCloudClient | null = null;
   /** Shared Cloud budget — the cloud-state loader budgets its /device/state calls on it too. */
   private rateLimiter: RateLimiter | null = null;
+  /** What the instance's limiters carry over a restart (limit-memory.ts) — read first in prepareInstance. */
+  private limitMemory: LimitMemory | undefined = undefined;
   /** Repeating timer for the App-API poll (sensor-state pull). */
   private appApiPollTimer: ioBroker.Interval | undefined;
   /**
@@ -599,6 +602,10 @@ class GoveeAdapter extends utils.Adapter {
     // The translations first: every message answer may translate (fleet check i18n-before-messages).
     await I18n.init(path.join(this.adapterDir, "admin"), this);
     this.on("message", this.onMessage.bind(this));
+    // The windows of every limiter as the previous process left them, before any call goes out: a restart within a
+    // window must not hand a counterpart a second window's worth (limit-memory.ts).
+    this.limitMemory = loadLimitMemory(utils.getAbsoluteInstanceDataDir(this));
+    this.callGate.remember(this.limitMemory.gate ?? {});
     // Then, before anything else starts: without this the whole shutdown path stays dead on an updated
     // install, and the correction restarts us — so nothing else may start up here.
     if (await this.clearStopInstanceFlag()) {
@@ -870,6 +877,7 @@ class GoveeAdapter extends utils.Adapter {
     const { config } = start;
     // --- LAN (always active) ---
     this.lanClient = this.makeLanClient(this.log, this);
+    this.lanClient.rememberLimits(this.limitMemory?.lan ?? {});
     this.deviceManager!.setLanClient(this.lanClient);
 
     // A socket error on a PINNED interface is user-fixable config (the
@@ -964,6 +972,7 @@ class GoveeAdapter extends utils.Adapter {
       return true;
     }
     this.mqttClient = this.makeMqttClient(accountEmail, config.goveePassword, this.log, this);
+    this.mqttClient.rememberLimits(this.limitMemory?.broker ?? {});
     this.mqttClient.localAddress = this.localAddress;
     this.mqttClient.onUnreadable = (from, raw, reason) =>
       this.deviceManager?.getDiagnostics().recordUnreadable("account-broker", from, raw, reason);
@@ -1128,8 +1137,7 @@ class GoveeAdapter extends utils.Adapter {
     this.deviceManager!.setCloudClient(this.cloudClient);
 
     this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
-    // The daily window slides over a restart: the calls the previous process made in the last 24 hours still count.
-    this.rateLimiter.remember(loadLimiterMemory(utils.getAbsoluteInstanceDataDir(this)));
+    this.rateLimiter.remember(this.limitMemory?.limiter ?? {});
     this.rateLimiter.start();
     this.deviceManager!.setRateLimiter(this.rateLimiter);
 
@@ -1528,7 +1536,13 @@ class GoveeAdapter extends utils.Adapter {
       this.mqttClient?.disconnect();
       this.openapiMqttClient?.disconnect();
       this.rateLimiter?.stop();
-      const limiterMemory = this.rateLimiter?.memory();
+      // Every limiter's windows for the next process — a limiter this run never built hands on what it was given
+      const limitMemory: LimitMemory | undefined = this.limitMemory && {
+        limiter: this.rateLimiter?.memory() ?? this.limitMemory.limiter,
+        gate: this.callGate.memory(),
+        lan: this.lanClient?.limitMemory() ?? this.limitMemory.lan,
+        broker: this.mqttClient?.limitMemory() ?? this.limitMemory.broker,
+      };
       // The callback is the "we are done" signal to the host, and it comes AFTER
       // these writes: issued fire-and-forget and followed by an immediate callback,
       // not one of them reaches the database — the process is gone first (measured
@@ -1549,9 +1563,8 @@ class GoveeAdapter extends utils.Adapter {
         // Covers the per-device markers, the group marker and the rollup.
         writes.push(this.stateManager.markAllOffline());
       }
-      if (limiterMemory) {
-        // The next process of this instance counts the calls of the last 24 hours on (rate-limiter.ts).
-        writes.push(saveLimiterMemory(utils.getAbsoluteInstanceDataDir(this), limiterMemory));
+      if (limitMemory) {
+        writes.push(saveLimitMemory(utils.getAbsoluteInstanceDataDir(this), limitMemory));
       }
       // Every write ends before the callback, also when one of them fails: the limiter's file must be on disk
       // before the process goes.

@@ -5282,7 +5282,7 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     const { dm, rl } = build();
     expect(await dm.loadFromCloud()).toEqual({ ok: true });
     const used = Object.fromEntries(rl.getUsageSnapshot().windows.map(w => [w.lane, w.used]));
-    expect(used["Govee OpenAPI device list|0|account"]).toBe(1);
+    expect(used["openapi-device-list/60s"]).toBe(1);
     expect(rl.getUsageSnapshot().usedToday).toBeGreaterThanOrEqual(1);
   });
 

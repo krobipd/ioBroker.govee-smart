@@ -672,6 +672,29 @@ describe("GoveeMqttClient", () => {
       expect(published).toHaveLength(cap);
     });
 
+    it("the broker's publish limit outlives a restart — a client that remembers refuses what the minute holds", async () => {
+      const cap = limitOf("Govee account broker (AWS IoT MQTT)", 60).max - 40;
+      const first = connectedClient();
+      await first.client.connect(
+        () => {},
+        () => {},
+      );
+      (first.client as unknown as { client: { connected: boolean } }).client.connected = true;
+      for (let i = 0; i < cap; i++) {
+        expect(first.client.publishCommand("GD/x", "turn", { val: i % 2 })).toBe(true);
+      }
+      const memory = first.client.limitMemory();
+      const second = connectedClient();
+      second.client.rememberLimits(memory);
+      await second.client.connect(
+        () => {},
+        () => {},
+      );
+      (second.client as unknown as { client: { connected: boolean } }).client.connected = true;
+      expect(second.client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
+      expect(second.published).toHaveLength(0);
+    });
+
     it("a light command is not sent while the broker is not connected", async () => {
       const { client, published } = connectedClient();
       expect(client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);

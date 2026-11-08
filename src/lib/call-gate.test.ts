@@ -180,6 +180,24 @@ describe("CallGate — requests: every counterpart they belong to, held until th
     expect(waited).toEqual([60_000]);
   });
 
+  it("a restart within a window: a gate that remembers holds the calls the previous process made", async () => {
+    const before = waitingGate();
+    const request = vi.mocked(httpsRequest);
+    request.mockReset();
+    request.mockResolvedValue({ value: null, statusCode: 200 });
+    const lookup = (gate: CallGate): Promise<unknown> =>
+      gate.https()({ method: "GET", url: "https://itunes.apple.com/lookup", headers: {} });
+    await lookup(before.gate);
+    await lookup(before.gate); // the App Store lookup: 2 per 60 s
+    const memory = before.gate.memory();
+    expect(memory["Apple App Store lookup|0|account"]).toEqual({ seconds: 60, ends: [1_000_000, 1_000_000] });
+    const after = waitingGate();
+    after.c.advance(10_000); // the new process is up ten seconds later
+    after.gate.remember(memory);
+    await lookup(after.gate);
+    expect(after.waited).toEqual([50_000]);
+  });
+
   it("after a 429 lets no call reach that host before its Retry-After ran out — answered 429 here", async () => {
     // fleet suite D21 (CI 39408072351): the device list waited Govee's 60 s, but the reachability refresh and the app
     // read called the same hosts 5 s after the 429
