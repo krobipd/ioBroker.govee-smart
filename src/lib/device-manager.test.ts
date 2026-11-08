@@ -5171,19 +5171,30 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     scenesCalls: () => number;
   } {
     const dm = new DeviceManager(mockLog, mockTimers, registry, new DeviceIdRegistry(), opts.isUnloading);
-    // Every device has its own read bucket since 2.39.0, so the bench holds
-    // its own gate over all lanes: one free slot → everything after the first
-    // scenes call queues until the bench frees the next. (Until 2.40.0 the
+    // Every device has its own read window since 2.39.0, so the bench holds
+    // its own gate over the scene lanes: one free slot → everything after the
+    // first scenes call queues until the bench frees the next. The device list
+    // runs through the limiter too and passes the gate. (Until 2.40.0 the
     // bench used the day counter; a spent day now refuses instead of queuing,
     // audit A10.)
-    const rl = new RateLimiter(mockLog, mockTimers, CLOUD_LIMITS);
+    // The bench frees the queue itself (settle); the limiter's own wake-up never fires here — mockTimers would fire
+    // it at once, inside the call that armed it.
+    const rl = new RateLimiter(
+      mockLog,
+      { ...(mockTimers as object), setTimeout: () => undefined } as never,
+      CLOUD_LIMITS,
+    );
     const gate = { slots: 1 };
-    const canMakeCall = rl.canMakeCall.bind(rl);
-    (rl as any).canMakeCall = (lane: unknown): boolean => gate.slots > 0 && canMakeCall(lane as never);
-    const spend = (rl as any).spend.bind(rl) as (lane: unknown, budget: unknown) => void;
-    (rl as any).spend = (lane: unknown, budget: unknown): void => {
-      gate.slots--;
-      spend(lane, budget);
+    const listed = (lane: { kind: string }): boolean => lane.kind === "account-list";
+    const waitFor = (rl as any).waitFor.bind(rl) as (lane: { kind: string }, budget: unknown) => number | undefined;
+    (rl as any).waitFor = (lane: { kind: string }, budget: unknown): number | undefined =>
+      gate.slots > 0 || listed(lane) ? waitFor(lane, budget) : 60_000;
+    const spend = (rl as any).spend.bind(rl) as (lane: { kind: string }, budget: unknown) => unknown;
+    (rl as any).spend = (lane: { kind: string }, budget: unknown): unknown => {
+      if (!listed(lane)) {
+        gate.slots--;
+      }
+      return spend(lane, budget);
     };
     dm.setRateLimiter(rl);
     const saved: Array<{ deviceId: string; scenes: number; scenesChecked?: boolean }> = [];
@@ -5265,6 +5276,30 @@ describe("loadFromCloud — scene loads that the rate limiter queues (issue #46,
     const persisted = saved.filter(s => s.deviceId === "BULB000000000002");
     expect(persisted.at(-1)).toEqual({ deviceId: "BULB000000000002", scenes: 0, scenesChecked: false });
     expect(cloudReady.filter(id => id === "BULB000000000002").length).toBe(rebuildsBefore);
+  });
+
+  it("the first device list runs through the limiter too — it counts in the list's window and in the day's", async () => {
+    const { dm, rl } = build();
+    expect(await dm.loadFromCloud()).toEqual({ ok: true });
+    const used = Object.fromEntries(rl.getUsageSnapshot().windows.map(w => [w.lane, w.used]));
+    expect(used["Govee OpenAPI device list|0|account"]).toBe(1);
+    expect(rl.getUsageSnapshot().usedToday).toBeGreaterThanOrEqual(1);
+  });
+
+  it("a full list window holds the first device list until it has room — nothing goes past the limiter", async () => {
+    const { dm, rl } = build();
+    (rl as any).limits = {
+      ...CLOUD_LIMITS,
+      "account-list": [
+        { name: "test list", match: {}, limits: [{ max: 0, seconds: 60, per: "account", source: "test cap" }] },
+      ],
+    };
+    let settled = false;
+    void dm.loadFromCloud().then(() => (settled = true));
+    await new Promise(r => setImmediate(r));
+    expect(settled).toBe(false);
+    expect(rl.getUsageSnapshot().queueLength).toBe(1);
+    rl.stop();
   });
 
   it("three lights of one SKU share one library fetch per run and each is stamped as checked; a new run fetches again", async () => {

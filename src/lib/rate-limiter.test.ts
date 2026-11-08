@@ -1,50 +1,73 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import type { ApiLimit, Counterpart } from "./api-limits";
 import { currentBooking } from "./call-booking";
-import { ACCOUNT_LIST_LANE, MAX_QUEUE_LENGTH, RateLimiter, applianceBudget, type CallLane } from "./rate-limiter";
+import {
+  ACCOUNT_LIST_LANE,
+  LIMITER_MEMORY_FILE,
+  MAX_QUEUE_LENGTH,
+  QUEUE_MAX_WINDOW_SECONDS,
+  RateLimiter,
+  applianceBudget,
+  loadLimiterMemory,
+  saveLimiterMemory,
+  type CallLane,
+} from "./rate-limiter";
 import { CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
 import type { GoveeDevice, TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
 
 /**
- * The pre-2.39.0 constructor took (perMinute, perDay); these suites pin the
- * queue, the daily counters and the eviction rules on the account-list lane,
- * which is what a lane-less call is charged to.
+ * A counterpart of one window — the shape api-limits.json gives every limit.
  *
- * @param perMinute The account-list minute window
- * @param perDay The daily ceiling
+ * @param name Its name
+ * @param max Calls in the window
+ * @param seconds Window length
+ * @param per Account or device
  */
-function limitsOf(perMinute: number, perDay: number): CloudLimits {
-  return { ...CLOUD_LIMITS, accountListPerMinute: perMinute, perDay };
+function counterpart(name: string, max: number, seconds: number, per: ApiLimit["per"] = "account"): Counterpart {
+  return { name, match: {}, limits: [{ max, seconds, per, source: "test cap" }] };
 }
 
-/** Mock timer adapter that doesn't actually schedule */
-const mockTimers = {
-  setInterval: () => ({}) as ioBroker.Interval,
-  clearInterval: () => {},
-  setTimeout: () => ({}) as ioBroker.Timeout,
-  clearTimeout: () => {},
-  delay: () => Promise.resolve(),
-};
+/**
+ * The queue, the daily window and the eviction rules on the account-list lane, which is what a lane-less call is
+ * charged to: a minute window of `perMinute` and a day of `perDay`, shared by every OpenAPI lane like the declared one.
+ *
+ * @param perMinute The account-list minute window
+ * @param perDay The daily window
+ */
+function limitsOf(perMinute: number, perDay: number): CloudLimits {
+  const day = counterpart("test day", perDay, 86_400);
+  return {
+    "account-list": [counterpart("test list", perMinute, 60), day],
+    "device-read": [CLOUD_LIMITS["device-read"][0], day],
+    "device-control": [CLOUD_LIMITS["device-control"][0], day],
+    appapi: CLOUD_LIMITS.appapi,
+  };
+}
+
+/** A clock the test moves by hand — every window slides against it. */
+function manualClock(): { now: () => number; advance: (ms: number) => void; set: (t: number) => void } {
+  let t = 1_000_000;
+  return { now: () => t, advance: ms => (t += ms), set: v => (t = v) };
+}
 
 /** Timer adapter that captures scheduled callbacks so a test can fire them. */
 function makeCapturingTimers(): {
   timers: TimerAdapter;
-  intervals: Array<() => void>;
-  timeouts: Array<() => void>;
+  timeouts: Array<{ cb: () => void; ms: number }>;
   clears: () => number;
 } {
-  const intervals: Array<() => void> = [];
-  const timeouts: Array<() => void> = [];
+  const timeouts: Array<{ cb: () => void; ms: number }> = [];
   let clears = 0;
   const timers = {
-    setInterval: (cb: () => void) => {
-      intervals.push(cb);
-      return intervals.length;
-    },
+    setInterval: () => undefined,
     clearInterval: () => {
       clears++;
     },
-    setTimeout: (cb: () => void) => {
-      timeouts.push(cb);
+    setTimeout: (cb: () => void, ms: number) => {
+      timeouts.push({ cb, ms });
       return timeouts.length;
     },
     clearTimeout: () => {
@@ -52,118 +75,84 @@ function makeCapturingTimers(): {
     },
     delay: () => Promise.resolve(),
   } as never;
-  return { timers, intervals, timeouts, clears: () => clears };
+  return { timers, timeouts, clears: () => clears };
+}
+
+/**
+ * A limiter on a hand-moved clock with captured timers.
+ *
+ * @param limits The budget
+ * @param log Logger
+ */
+function bench(
+  limits: CloudLimits = CLOUD_LIMITS,
+  log: ioBroker.Logger = mockLog,
+): {
+  rl: RateLimiter;
+  clock: ReturnType<typeof manualClock>;
+  timeouts: ReturnType<typeof makeCapturingTimers>["timeouts"];
+  ran: () => number;
+  fire: (lane?: CallLane) => Promise<boolean>;
+  process: () => void;
+} {
+  const clock = manualClock();
+  const t = makeCapturingTimers();
+  const rl = new RateLimiter(log, t.timers, limits, clock.now);
+  rl.start();
+  let ran = 0;
+  const fire = (lane: CallLane = ACCOUNT_LIST_LANE): Promise<boolean> =>
+    rl.tryExecute(() => {
+      ran++;
+      return Promise.resolve();
+    }, lane);
+  return { rl, clock, timeouts: t.timeouts, ran: () => ran, fire, process: () => (rl as any).processQueue() };
 }
 
 describe("RateLimiter", () => {
   it("should allow calls within limits", () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(5, 100));
+    const { rl } = bench(limitsOf(5, 100));
     expect(rl.canMakeCall()).toBe(true);
   });
 
   it("should track daily usage", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(10, 100));
-    let called = 0;
-
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    });
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    });
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    });
-
-    expect(called).toBe(3);
+    const { rl, ran, fire } = bench(limitsOf(10, 100));
+    await fire();
+    await fire();
+    await fire();
+    expect(ran()).toBe(3);
     expect(rl.getUsageSnapshot().usedToday).toBe(3);
   });
 
-  it("should queue calls when minute limit exceeded", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(2, 100));
-    let called = 0;
-
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // 1 — ok
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // 2 — ok
-    const queued = await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // 3 — queued
-
-    expect(called).toBe(2);
-    expect(queued).toBe(false);
+  it("should queue calls when the minute window is full", async () => {
+    const { ran, fire } = bench(limitsOf(2, 100));
+    await fire();
+    await fire();
+    expect(await fire()).toBe(false);
+    expect(ran()).toBe(2);
   });
 
-  it("should respect daily limit", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(100, 2));
-    let called = 0;
-
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // ok
-    await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // ok
-    const queued = await rl.tryExecute(() => {
-      called++;
-      return Promise.resolve();
-    }); // queued
-
-    expect(called).toBe(2);
-    expect(queued).toBe(false);
+  it("should respect the daily window — the third call is refused, not queued", async () => {
+    const { rl, ran, fire } = bench(limitsOf(100, 2));
+    await fire();
+    await fire();
+    expect(await fire()).toBe(false);
+    expect(ran()).toBe(2);
     expect(rl.getUsageSnapshot().usedToday).toBe(2);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
   it("should enqueue with priority sorting", () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100)); // minute limit 0 = all queued
-    const order: number[] = [];
-
-    rl.enqueue(
-      () => {
-        order.push(2);
-        return Promise.resolve();
-      },
-      ACCOUNT_LIST_LANE,
-      2,
-    ); // low priority
-    rl.enqueue(
-      () => {
-        order.push(0);
-        return Promise.resolve();
-      },
-      ACCOUNT_LIST_LANE,
-      0,
-    ); // high priority
-    rl.enqueue(
-      () => {
-        order.push(1);
-        return Promise.resolve();
-      },
-      ACCOUNT_LIST_LANE,
-      1,
-    ); // medium priority
-
-    // Access internal queue to verify order
+    const { rl } = bench(limitsOf(0, 100)); // minute limit 0 = all queued
+    rl.enqueue(() => Promise.resolve(), ACCOUNT_LIST_LANE, 2);
+    rl.enqueue(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0);
+    rl.enqueue(() => Promise.resolve(), ACCOUNT_LIST_LANE, 1);
     const queue = (rl as any).queue;
     expect(queue).toHaveLength(3);
-    expect(queue[0].priority).toBe(0);
-    expect(queue[1].priority).toBe(1);
-    expect(queue[2].priority).toBe(2);
+    expect(queue.map((q: { priority: number }) => q.priority)).toEqual([0, 1, 2]);
   });
 
   it("evicts the lowest-priority queued call for a higher-priority one when full (L15)", () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100_000)); // minute limit 0 → all queue
+    const { rl } = bench(limitsOf(0, 100_000)); // minute limit 0 → all queue
     for (let i = 0; i < MAX_QUEUE_LENGTH; i++) {
       rl.enqueue(async () => {}, ACCOUNT_LIST_LANE, 2); // fill with low-priority (scene) calls
     }
@@ -184,25 +173,22 @@ describe("RateLimiter", () => {
   });
 
   it("should clear queue on stop", () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100));
-
+    const { rl } = bench(limitsOf(0, 100));
     rl.enqueue(async () => {}, ACCOUNT_LIST_LANE, 1);
     rl.enqueue(async () => {}, ACCOUNT_LIST_LANE, 2);
     expect((rl as any).queue).toHaveLength(2);
-
     rl.stop();
     expect((rl as any).queue).toHaveLength(0);
   });
 
   it("should return true when executed immediately", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(10, 100));
-    const result = await rl.tryExecute(async () => {});
-    expect(result).toBe(true);
+    const { fire } = bench(limitsOf(10, 100));
+    expect(await fire()).toBe(true);
   });
 
   describe("executeTracked (M3 — user commands couple to the ACTUAL execution)", () => {
     it("runs immediately within budget and propagates an immediate failure", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(10, 100));
+      const { rl } = bench(limitsOf(10, 100));
       let ran = 0;
       await rl.executeTracked(() => {
         ran++;
@@ -215,44 +201,44 @@ describe("RateLimiter", () => {
     });
 
     it("settles only when the QUEUED call eventually ran — success case", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 100));
-      await rl.tryExecute(async () => {}); // burn the minute budget
+      const { rl, clock, fire, process } = bench(limitsOf(1, 100));
+      await fire(); // fill the minute window
       let ran = 0;
       const tracked = rl.executeTracked(() => {
         ran++;
         return Promise.resolve();
       });
       expect(ran).toBe(0); // queued, not run
-      (rl as any).accountListUsed = 0; // minute reset
-      (rl as any).processQueue();
+      clock.advance(60_000); // the first call's slot frees
+      process();
       await tracked;
       expect(ran).toBe(1);
     });
 
     it("rejects when the QUEUED call eventually fails — before M3 this was a debug line after the ack", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 100));
-      await rl.tryExecute(async () => {}); // burn the minute budget
+      const { rl, clock, fire, process } = bench(limitsOf(1, 100));
+      await fire();
       const tracked = rl.executeTracked(async () => Promise.reject(new Error("late 429")));
-      (rl as any).accountListUsed = 0;
-      (rl as any).processQueue();
+      clock.advance(60_000);
+      process();
       await expect(tracked).rejects.toThrow("late 429");
     });
 
     it("a queued call that rejects with a plain object surfaces the object's fields, not [object Object]", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 100));
-      await rl.tryExecute(async () => {}); // burn the minute budget
+      const { rl, clock, fire, process } = bench(limitsOf(1, 100));
+      await fire();
       // The caller normalises to an Error — its message must carry what was thrown.
       // (vi.fn, not Promise.reject: the lint rule against non-Error rejections is right
       // for production code, and a plain-object rejection is exactly the case under test.)
       const execute = vi.fn<() => Promise<void>>().mockRejectedValue({ code: "ECONNRESET" });
       const tracked = rl.executeTracked(execute);
-      (rl as any).accountListUsed = 0;
-      (rl as any).processQueue();
+      clock.advance(60_000);
+      process();
       await expect(tracked).rejects.toThrow('{"code":"ECONNRESET"}');
     });
 
     it("rejects when the tracked call is evicted from a full queue", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100_000)); // all queue
+      const { rl } = bench(limitsOf(0, 100_000)); // all queue
       for (let i = 0; i < MAX_QUEUE_LENGTH - 1; i++) {
         rl.enqueue(async () => {}, ACCOUNT_LIST_LANE, 2);
       }
@@ -264,14 +250,14 @@ describe("RateLimiter", () => {
     });
 
     it("rejects pending tracked calls on stop() instead of hanging forever", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100)); // all queue
+      const { rl } = bench(limitsOf(0, 100)); // all queue
       const tracked = rl.executeTracked(async () => {}, ACCOUNT_LIST_LANE, 0);
       rl.stop();
       await expect(tracked).rejects.toThrow("stopped");
     });
 
     it("rejects immediately when a full queue drops the call", async () => {
-      const rl = new RateLimiter(mockLog, mockTimers, limitsOf(0, 100_000));
+      const { rl } = bench(limitsOf(0, 100_000));
       for (let i = 0; i < MAX_QUEUE_LENGTH; i++) {
         rl.enqueue(async () => {}, ACCOUNT_LIST_LANE, 0); // full with top-priority calls
       }
@@ -279,92 +265,215 @@ describe("RateLimiter", () => {
     });
   });
 
-  it("should track both minute and daily counters", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(5, 100));
-
-    await rl.tryExecute(async () => {});
-    await rl.tryExecute(async () => {});
-
-    expect(rl.getUsageSnapshot().lanes.accountList.used).toBe(2);
-    expect(rl.getUsageSnapshot().usedToday).toBe(2);
+  it("should track both the minute and the daily window", async () => {
+    const { rl, fire } = bench(limitsOf(5, 100));
+    await fire();
+    await fire();
+    const snap = rl.getUsageSnapshot();
+    expect(snap.windows.find(w => w.lane === "test list|0|account")).toEqual({
+      lane: "test list|0|account",
+      seconds: 60,
+      max: 5,
+      used: 2,
+    });
+    expect(snap.usedToday).toBe(2);
   });
 
-  it("should block when both limits are independently exceeded", async () => {
-    // Daily limit reached first
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(100, 1));
-    await rl.tryExecute(async () => {});
+  it("should block when the daily window alone is full", async () => {
+    const { rl, fire } = bench(limitsOf(100, 1));
+    await fire();
     expect(rl.canMakeCall()).toBe(false);
   });
 });
 
-describe("RateLimiter — timer-driven behaviour", () => {
-  it("schedules the reset + process timers on start and clears them on stop", () => {
-    const t = makeCapturingTimers();
-    const rl = new RateLimiter(mockLog, t.timers, limitsOf(5, 100));
-    rl.start();
-    expect(t.intervals).toHaveLength(2); // minute-reset (60s) + queue-process (2s)
-    expect(t.timeouts).toHaveLength(1); // day-reset kickoff (aligned to UTC midnight)
-    rl.stop();
-    expect(t.clears()).toBeGreaterThanOrEqual(3); // both intervals + the kickoff timeout
+describe("RateLimiter — sliding windows, the way Govee counts and the fleet judges (Werkbank rounds 170/171)", () => {
+  it("a slot frees exactly the window's length after its call ended — the window is half open", async () => {
+    const { clock, ran, fire, process } = bench(limitsOf(2, 100));
+    await fire();
+    await fire();
+    await fire(); // queued
+    clock.advance(59_999);
+    process();
+    expect(ran()).toBe(2);
+    clock.advance(1);
+    process();
+    expect(ran()).toBe(3);
   });
 
-  it("drains the queue when the minute counter resets", async () => {
+  it("a call holds its slot while it is open, and from its end on — never from its start", async () => {
+    const { rl, clock, ran, fire, process } = bench(limitsOf(1, 100));
+    let answer!: () => void;
+    const slow = rl.tryExecute(() => new Promise<void>(resolve => (answer = resolve)));
+    clock.advance(120_000); // two minutes in flight — its slot is still held
+    await fire();
+    expect(ran()).toBe(0);
+    answer();
+    await slow;
+    clock.advance(59_999); // the window counts from the answer
+    process();
+    expect(ran()).toBe(0);
+    clock.advance(1);
+    process();
+    expect(ran()).toBe(1);
+  });
+
+  it("no calendar reset: a full window right before a minute boundary stays full after it", async () => {
+    // A counter zeroed every 60 s let twice the maximum into one sliding minute — the 20 calls before the reset and
+    // the 20 after it fall within 2 s of each other.
+    const { clock, ran, fire, process } = bench(limitsOf(20, 1000));
+    clock.set(59_000);
+    for (let i = 0; i < 25; i++) {
+      await fire();
+    }
+    expect(ran()).toBe(20);
+    clock.set(61_000); // across the minute boundary
+    process();
+    expect(ran()).toBe(20);
+    clock.set(119_000); // 60 s after the twenty ended
+    process();
+    expect(ran()).toBe(25);
+  });
+
+  it("the queue wakes when the soonest window a waiting call needs has room again", async () => {
+    const { clock, timeouts, ran, fire } = bench(limitsOf(1, 100));
+    await fire();
+    clock.advance(10_000);
+    await fire(); // queued — the first call's slot frees 50 s from now
+    const wake = timeouts.at(-1)!;
+    expect(wake.ms).toBe(50_000);
+    clock.advance(50_000);
+    wake.cb();
+    expect(ran()).toBe(2);
+  });
+
+  it("with several calls waiting, the queue wakes for the soonest of them — not for the last one queued", async () => {
+    const { clock, timeouts, fire } = bench(limitsOf(1, 100));
+    await fire(); // fills the list window at t0
+    clock.advance(30_000);
+    for (let i = 0; i < 8; i++) {
+      await fire({ kind: "appapi" }); // fills the libraries window at t0 + 30 s
+    }
+    await fire(); // the list call waits 30 s
+    await fire({ kind: "appapi" }); // the library call waits 60 s
+    expect(timeouts.at(-1)!.ms).toBe(30_000);
+  });
+
+  it("a window full of open calls wakes the queue when one of them ends", async () => {
+    const { rl, clock, timeouts, ran, fire } = bench(limitsOf(1, 100));
+    let answer!: () => void;
+    const slow = rl.tryExecute(() => new Promise<void>(resolve => (answer = resolve)));
+    await fire(); // queued behind an open call — no moment to wake yet
+    const armed = timeouts.length;
+    expect(armed).toBe(0);
+    answer();
+    await slow;
+    expect(timeouts.length).toBe(armed + 1);
+    expect(timeouts.at(-1)!.ms).toBe(60_000);
+    clock.advance(60_000);
+    timeouts.at(-1)!.cb();
+    expect(ran()).toBe(1);
+  });
+
+  it("stop() clears the wake-up, and a stopped limiter runs no queued call", async () => {
     const t = makeCapturingTimers();
-    const rl = new RateLimiter(mockLog, t.timers, limitsOf(1, 100));
+    const clock = manualClock();
+    const rl = new RateLimiter(mockLog, t.timers, limitsOf(1, 100), clock.now);
     rl.start();
     let ran = 0;
     const inc = (): Promise<void> => {
       ran++;
       return Promise.resolve();
     };
-    await rl.tryExecute(inc); // 1 — immediate
-    await rl.tryExecute(inc); // 2 — queued (minute limit 1)
+    await rl.tryExecute(inc);
+    await rl.tryExecute(inc); // queued, wake-up armed
+    await rl.tryExecute(inc); // queued too — the wake-up is armed anew, the first one cleared
+    expect(t.clears()).toBe(1);
+    rl.stop();
+    expect(t.clears()).toBe(2);
+    clock.advance(60_000);
+    t.timeouts.forEach(w => w.cb());
     expect(ran).toBe(1);
-    t.intervals[0](); // fire minute-reset → counter 0 + processQueue drains the queue
-    await Promise.resolve();
-    expect(ran).toBe(2);
+  });
+});
+
+describe("RateLimiter — the daily window outlives a restart", () => {
+  it("a limiter that remembers counts the calls the previous process made in the last 24 hours", async () => {
+    const first = bench(limitsOf(100, 3));
+    await first.fire();
+    await first.fire();
+    const memory = first.rl.memory();
+    expect(memory.lanes["test day|0|account"]).toEqual([1_000_000, 1_000_000]);
+    const second = bench(limitsOf(100, 3));
+    second.clock.set(1_000_000 + 3_600_000); // an hour later
+    second.rl.remember(memory);
+    expect(second.rl.getUsageSnapshot().usedToday).toBe(2);
+    await second.fire();
+    expect(await second.fire()).toBe(false);
+    expect(second.ran()).toBe(1);
   });
 
-  it("daily kickoff zeroes the counter and installs the recurring 24h interval", () => {
-    const t = makeCapturingTimers();
-    const rl = new RateLimiter(mockLog, t.timers, limitsOf(100, 100));
-    rl.start();
-    (rl as any).callsToday = 42;
-    expect(t.intervals).toHaveLength(2);
-    t.timeouts[0](); // fire the day-reset kickoff
-    expect((rl as any).callsToday).toBe(0);
-    expect(t.intervals).toHaveLength(3); // + the recurring 24h reset interval
+  it("a limiter that made no call leaves an empty memory — no lane without a call in it", () => {
+    const { rl } = bench();
+    expect(rl.memory()).toEqual({ lanes: {} });
   });
 
-  it("does NOT install the 24h interval if stopped before the kickoff fires (leak guard)", () => {
-    const t = makeCapturingTimers();
-    const rl = new RateLimiter(mockLog, t.timers, limitsOf(100, 100));
-    rl.start();
-    rl.stop();
-    t.timeouts[0](); // stale kickoff fires after stop
-    expect(t.intervals).toHaveLength(2); // no 3rd recurring interval — the stopped-guard held
+  it("carries only windows longer than an hour — a minute is long past when the next process asks", async () => {
+    const { rl, fire } = bench(limitsOf(5, 100));
+    await fire();
+    const lanes = Object.keys(rl.memory().lanes);
+    expect(lanes).toEqual(["test day|0|account"]);
+    expect(QUEUE_MAX_WINDOW_SECONDS).toBe(3600);
   });
 
-  it("processQueue is a no-op after stop (and the queue is cleared)", async () => {
-    const t = makeCapturingTimers();
-    const rl = new RateLimiter(mockLog, t.timers, limitsOf(0, 100)); // limit 0 → everything queues
-    let ran = 0;
-    rl.enqueue(() => {
-      ran++;
-      return Promise.resolve();
+  it("drops what lies outside the window, in the future or in a lane it does not keep", () => {
+    const { rl, clock } = bench(limitsOf(100, 10));
+    const now = clock.now();
+    rl.remember({
+      lanes: {
+        "test day|0|account": [now - 86_400_000, now - 1000, now + 5000],
+        "nobody|0|account": [now - 1000],
+        "test list|0|account": [now - 1000],
+      },
     });
-    rl.start();
-    rl.stop();
-    t.intervals.forEach(cb => cb());
-    await Promise.resolve();
-    expect(ran).toBe(0);
+    expect(rl.getUsageSnapshot().usedToday).toBe(1);
+    expect(rl.memory().lanes).toEqual({ "test day|0|account": [now - 1000] });
   });
 
-  it("millisUntilNextUtcMidnight is within (0, 24h]", () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(5, 100));
-    const ms = (rl as any).millisUntilNextUtcMidnight();
-    expect(ms).toBeGreaterThan(0);
-    expect(ms).toBeLessThanOrEqual(86_400_000);
+  it("an appliance's allowance is carried over too", async () => {
+    const budget = { key: "H7160:AA:BB", perDay: 2 };
+    const first = bench(limitsOf(100, 100));
+    await first.rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, budget);
+    await first.rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, budget);
+    const second = bench(limitsOf(100, 100));
+    second.rl.remember(first.rl.memory());
+    expect(await second.rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, budget)).toBe(false);
+  });
+
+  it("an open call at the stop counts as ending then", () => {
+    const { rl, clock } = bench(limitsOf(100, 100));
+    void rl.tryExecute(() => new Promise<void>(() => {}));
+    clock.advance(5000);
+    expect(rl.memory().lanes["test day|0|account"]).toEqual([clock.now()]);
+  });
+
+  it("the memory file round-trips; a missing, broken or foreign file is an empty memory", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-limits-"));
+    try {
+      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
+      await saveLimiterMemory(path.join(dir, "sub"), { lanes: { "a|0|account": [1, 2] } });
+      expect(loadLimiterMemory(path.join(dir, "sub"))).toEqual({ lanes: { "a|0|account": [1, 2] } });
+      fs.writeFileSync(path.join(dir, LIMITER_MEMORY_FILE), "{not json");
+      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
+      fs.writeFileSync(path.join(dir, LIMITER_MEMORY_FILE), JSON.stringify({ lanes: 5 }));
+      expect(loadLimiterMemory(dir)).toEqual({ lanes: {} });
+      fs.writeFileSync(
+        path.join(dir, LIMITER_MEMORY_FILE),
+        JSON.stringify({ lanes: { a: [1, "2", null, Infinity, 3], b: "x" } }),
+      );
+      expect(loadLimiterMemory(dir)).toEqual({ lanes: { a: [1, 3] } });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -377,7 +486,7 @@ describe("RateLimiter — queue cap (v2.16.1)", () => {
       warn: (m: string) => warns.push(m),
       debug: (m: string) => debugs.push(m),
     } as ioBroker.Logger;
-    const rl = new RateLimiter(log, mockTimers, limitsOf(0, 100)); // limit 0 → everything queues
+    const { rl } = bench(limitsOf(0, 100), log); // limit 0 → everything queues
     for (let i = 0; i < 200; i++) {
       rl.enqueue(async () => {});
     }
@@ -389,20 +498,22 @@ describe("RateLimiter — queue cap (v2.16.1)", () => {
     expect(debugs.filter(m => m.includes("queue full"))).toHaveLength(1);
   });
 
-  it("a drained queue re-arms the overflow warning for the next episode", async () => {
+  it("a drained queue re-arms the overflow warning for the next episode", () => {
     const warns: string[] = [];
     const log = { ...mockLog, warn: (m: string) => warns.push(m) } as ioBroker.Logger;
-    const t = makeCapturingTimers();
-    const rl = new RateLimiter(log, t.timers, limitsOf(300, 1000));
-    rl.start();
+    const limits = limitsOf(300, 1000);
+    const { rl, process } = bench(limits, log);
+    // a window that is full when the calls are queued and empty when the queue runs
+    (rl as any).limits = limitsOf(0, 1000);
     for (let i = 0; i < 200; i++) {
       rl.enqueue(async () => {});
     }
     rl.enqueue(async () => {}); // overflow #1 → warn
     expect(warns).toHaveLength(1);
-    t.intervals[1](); // queue-process tick drains everything (budget 300)
-    await Promise.resolve();
+    (rl as any).limits = limits;
+    process(); // drains everything (window 300)
     expect((rl as any).queue).toHaveLength(0);
+    (rl as any).limits = limitsOf(0, 1000);
     for (let i = 0; i < 201; i++) {
       rl.enqueue(async () => {}); // overflow #2 → warns again
     }
@@ -423,14 +534,14 @@ describe("per-device daily budget", () => {
 
   // Govee's limits are not one budget: the account gets 10,000 calls a day, but
   // an APPLIANCE gets 100 for itself — and appliance control has no local path,
-  // so every write is a cloud call. The global counters cannot express that.
+  // so every write is a cloud call. The global windows cannot express that.
   const APPLIANCE = { key: "H7160:AA:BB", perDay: 3 };
 
   it("stops a device once it has spent its own allowance, while the global budget is untouched", async () => {
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(100, 10_000));
+    const { rl } = bench(limitsOf(100, 10_000));
     let ran = 0;
-    const call = (): Promise<boolean> =>
-      limiter.tryExecute(
+    for (let i = 0; i < 5; i++) {
+      await rl.tryExecute(
         (): Promise<void> => {
           ran += 1;
           return Promise.resolve();
@@ -439,58 +550,50 @@ describe("per-device daily budget", () => {
         0,
         APPLIANCE,
       );
-    for (let i = 0; i < 5; i++) {
-      await call();
     }
     expect(ran).toBe(3);
     // The global budget still has room — this is the device's own limit biting.
-    expect(limiter.getUsageSnapshot().usedToday).toBe(3);
+    expect(rl.getUsageSnapshot().usedToday).toBe(3);
   });
 
-  it("does not queue an exhausted device — the allowance resets in hours, not seconds", async () => {
-    // Queuing would hold the write until Govee's daily rollover and then apply
-    // it at a moment nobody asked for.
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(100, 10_000));
+  it("does not queue an exhausted device — the allowance frees in hours, not seconds", async () => {
+    // Queuing would hold the write for hours and then apply it at a moment nobody asked for.
+    const { rl } = bench(limitsOf(100, 10_000));
     for (let i = 0; i < 3; i++) {
-      await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+      await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
     }
-    const accepted = await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    expect(accepted).toBe(false);
-    expect(limiter.getUsageSnapshot().queueLength).toBe(0);
+    expect(await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE)).toBe(false);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
   it("a tracked call rejects rather than silently doing nothing", async () => {
     // User commands must not ack as if they had run.
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(100, 10_000));
+    const { rl } = bench(limitsOf(100, 10_000));
     for (let i = 0; i < 3; i++) {
-      await limiter.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+      await rl.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
     }
-    await expect(limiter.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE)).rejects.toThrow(
+    await expect(rl.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE)).rejects.toThrow(
       /budget/i,
     );
   });
 
   it("warns once per device, not on every rejected write", async () => {
     const warns: string[] = [];
-    const limiter = new RateLimiter(
-      { ...mockLog, warn: (m: string) => warns.push(m) },
-      mockTimers,
-      limitsOf(100, 10_000),
-    );
+    const { rl } = bench(limitsOf(100, 10_000), { ...mockLog, warn: (m: string) => warns.push(m) });
     for (let i = 0; i < 8; i++) {
-      await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+      await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
     }
     expect(warns).toHaveLength(1);
     expect(warns[0]).toContain("H7160:AA:BB");
   });
 
   it("budgets are per device — a second appliance is unaffected", async () => {
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(100, 10_000));
+    const { rl } = bench(limitsOf(100, 10_000));
     let other = 0;
     for (let i = 0; i < 5; i++) {
-      await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+      await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
     }
-    await limiter.tryExecute(
+    await rl.tryExecute(
       () => {
         other += 1;
         return Promise.resolve();
@@ -507,10 +610,11 @@ describe("per-device daily budget", () => {
     // only on the immediate path, so every call that had to wait for the
     // per-minute limit ran later without ever being counted. A burst is
     // precisely when calls queue.
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(0, 10_000)); // minute limit 0 → everything queues
+    const { rl, clock, process } = bench(limitsOf(1, 10_000));
+    await rl.tryExecute(() => Promise.resolve()); // fills the minute window, no allowance
     let ran = 0;
     for (let i = 0; i < 3; i++) {
-      await limiter.tryExecute(
+      await rl.tryExecute(
         () => {
           ran += 1;
           return Promise.resolve();
@@ -520,24 +624,23 @@ describe("per-device daily budget", () => {
         APPLIANCE,
       );
     }
-    expect(limiter.getUsageSnapshot().queueLength).toBe(3);
-    // Give the queue room and drain it.
-    (limiter as unknown as { limits: CloudLimits }).limits.accountListPerMinute = 100;
-    (limiter as unknown as { processQueue: () => void }).processQueue();
-    await Promise.resolve();
+    expect(rl.getUsageSnapshot().queueLength).toBe(3);
+    for (let i = 0; i < 3; i++) {
+      clock.advance(60_000);
+      process();
+      await new Promise(resolve => setImmediate(resolve)); // the call ends — its slot counts from then
+    }
     expect(ran).toBe(3);
-    expect(limiter.getUsageSnapshot().usedToday).toBe(3);
     // Booked — so the very next call for this device is refused.
-    const accepted = await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    expect(accepted).toBe(false);
+    clock.advance(60_000);
+    expect(await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE)).toBe(false);
   });
 
   it("a queued call is dropped when immediate calls spent the allowance while it waited", async () => {
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(1, 10_000));
+    const { rl, clock, process } = bench(limitsOf(1, 10_000));
     let queuedRan = 0;
-    // First call runs immediately (minute limit 1), the second queues.
-    await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    await limiter.tryExecute(
+    await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+    await rl.tryExecute(
       () => {
         queuedRan += 1;
         return Promise.resolve();
@@ -546,54 +649,46 @@ describe("per-device daily budget", () => {
       0,
       APPLIANCE,
     );
-    expect(limiter.getUsageSnapshot().queueLength).toBe(1);
-    // Two more immediate calls exhaust the allowance of 3 before the queue runs.
-    (limiter as unknown as { accountListUsed: number }).accountListUsed = 0;
-    await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    (limiter as unknown as { accountListUsed: number }).accountListUsed = 0;
-    await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    (limiter as unknown as { accountListUsed: number }).accountListUsed = 0;
-    (limiter as unknown as { processQueue: () => void }).processQueue();
+    expect(rl.getUsageSnapshot().queueLength).toBe(1);
+    // Two more immediate calls on another lane of the same device exhaust the allowance of 3 before the queue runs.
+    const READ: CallLane = { kind: "device-read", deviceKey: "H7160:AA:BB" };
+    await rl.tryExecute(() => Promise.resolve(), READ, 0, APPLIANCE);
+    await rl.tryExecute(() => Promise.resolve(), READ, 0, APPLIANCE);
+    clock.advance(60_000);
+    process();
     await Promise.resolve();
     expect(queuedRan, "the queued call must not overrun the device's day").toBe(0);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
   it("a queued TRACKED call rejects instead of hanging when the allowance ran out meanwhile", async () => {
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(1, 10_000));
-    await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    const tracked = limiter.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    // Spend the rest of the allowance while the tracked call sits in the queue.
-    for (let i = 0; i < 2; i++) {
-      (limiter as unknown as { accountListUsed: number }).accountListUsed = 0;
-      await limiter.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
-    }
-    (limiter as unknown as { accountListUsed: number }).accountListUsed = 0;
-    (limiter as unknown as { processQueue: () => void }).processQueue();
+    const { rl, clock, process } = bench(limitsOf(1, 10_000));
+    await rl.tryExecute(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+    const tracked = rl.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, APPLIANCE);
+    const READ: CallLane = { kind: "device-read", deviceKey: "H7160:AA:BB" };
+    await rl.tryExecute(() => Promise.resolve(), READ, 0, APPLIANCE);
+    await rl.tryExecute(() => Promise.resolve(), READ, 0, APPLIANCE);
+    clock.advance(60_000);
+    process();
     await expect(tracked).rejects.toThrow(/budget/i);
   });
 
   it("a call without a budget is never blocked by one", async () => {
     // Lights keep the global budget: their writes go over the LAN and the rare
     // cloud fallback is covered by the account limit.
-    const limiter = new RateLimiter(mockLog, mockTimers, limitsOf(100, 10_000));
-    let ran = 0;
+    const { ran, fire } = bench(limitsOf(100, 10_000));
     for (let i = 0; i < 10; i++) {
-      await limiter.tryExecute(() => {
-        ran += 1;
-        return Promise.resolve();
-      });
+      await fire();
     }
-    expect(ran).toBe(10);
+    expect(ran()).toBe(10);
   });
 
-  it("the daily reset frees the device allowance and re-arms the warning", async () => {
+  it("the allowance frees a day after the oldest call ended — no midnight — and re-arms the warning", async () => {
     const warns: string[] = [];
-    const { timers, timeouts } = makeCapturingTimers();
-    const limiter = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, timers, limitsOf(100, 10_000));
-    limiter.start();
+    const { rl, clock } = bench(limitsOf(100, 10_000), { ...mockLog, warn: (m: string) => warns.push(m) });
     let ran = 0;
     const call = (): Promise<boolean> =>
-      limiter.tryExecute(
+      rl.tryExecute(
         (): Promise<void> => {
           ran += 1;
           return Promise.resolve();
@@ -602,36 +697,35 @@ describe("per-device daily budget", () => {
         0,
         APPLIANCE,
       );
-    for (let i = 0; i < 5; i++) {
-      await call();
-    }
+    await call();
+    clock.advance(3_600_000);
+    await call();
+    await call();
+    await call(); // refused, warns
     expect(ran).toBe(3);
-    // The daily reset is armed as a one-shot aligned to UTC midnight, which
-    // then installs the recurring interval — firing that kickoff performs the
-    // first reset.
-    timeouts[0]();
+    clock.advance(86_400_000 - 3_600_000 - 1);
+    await call(); // the first call is a day old less 1 ms
+    expect(ran).toBe(3);
+    clock.advance(1);
     await call();
     expect(ran).toBe(4);
-    for (let i = 0; i < 5; i++) {
-      await call();
-    }
+    await call(); // full again → warns once more
     expect(warns).toHaveLength(2);
-    limiter.stop();
   });
 });
 
 describe("RateLimiter — calls after stop()", () => {
   it("a tracked call queued AFTER stop() rejects instead of waiting forever", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 100));
-    await rl.tryExecute(async () => {}); // burn the minute budget
+    const { rl, fire } = bench(limitsOf(1, 100));
+    await fire(); // fill the minute window
     rl.stop();
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow("stopped");
     expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
   it("a fire-and-queue call after stop() is dropped, not queued", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 100));
-    await rl.tryExecute(async () => {});
+    const { rl, fire } = bench(limitsOf(1, 100));
+    await fire();
     rl.stop();
     let ran = 0;
     expect(
@@ -645,34 +739,27 @@ describe("RateLimiter — calls after stop()", () => {
   });
 });
 
-describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #46, 2026-09-22)", () => {
+describe("RateLimiter — lanes per Govee actor, the windows api-limits.json declares (issue #46, GV-08)", () => {
   // Govee's OpenAPI limits are per ACTOR: the device list per account per
-  // minute, state/scenes per DEVICE per minute, control per device per second
-  // (burst 6) and per account per second (burst 80). The 8/min global window
-  // of 2.38.3 came from the v1 API and made eight bulbs drink from one pot:
-  // the second half of a group switch waited for the next minute reset.
-  const limits = (over: Partial<CloudLimits> = {}): CloudLimits => ({ ...CLOUD_LIMITS, ...over });
+  // minute, state/scenes per DEVICE per minute, control per device (burst 6,
+  // two a second) and per account (burst 80, twelve a second). The 8/min global
+  // window of 2.38.3 came from the v1 API and made eight bulbs drink from one
+  // pot: the second half of a group switch waited for the next minute.
   const dev = (n: number): CallLane => ({ kind: "device-control", deviceKey: `H600D:BULB${n}` });
   const read = (n: number): CallLane => ({ kind: "device-read", deviceKey: `H600D:BULB${n}` });
   const APPAPI: CallLane = { kind: "appapi" };
   const LIST: CallLane = { kind: "account-list" };
 
-  function bench(over: Partial<CloudLimits> = {}): {
-    rl: RateLimiter;
-    clock: { now: number };
-    ran: () => number;
-    fire: (lane: CallLane) => Promise<boolean>;
-  } {
-    const clock = { now: 1_000_000 };
-    const rl = new RateLimiter(mockLog, mockTimers, limits(over), () => clock.now);
-    let ran = 0;
-    const fire = (lane: CallLane): Promise<boolean> =>
-      rl.tryExecute(() => {
-        ran++;
-        return Promise.resolve();
-      }, lane);
-    return { rl, clock, ran: () => ran, fire };
-  }
+  /**
+   * The declared budget with the first counterpart of one lane replaced.
+   *
+   * @param kind The lane
+   * @param c Its counterpart
+   */
+  const withLane = (kind: CallLane["kind"], c: Counterpart): CloudLimits => ({
+    ...CLOUD_LIMITS,
+    [kind]: [c, ...CLOUD_LIMITS[kind].slice(1)],
+  });
 
   it("eight devices × two commands run at once — no device waits for another", async () => {
     const { ran, fire } = bench();
@@ -683,100 +770,91 @@ describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #4
     expect(ran()).toBe(16);
   });
 
-  it("one device: six commands burst, the rest refill at two per second, none is dropped", async () => {
-    const { rl, clock, ran, fire } = bench();
+  it("one device: six commands burst, the rest wait for the 3-s window — none is dropped", async () => {
+    const { rl, clock, ran, fire, process } = bench();
     for (let i = 0; i < 10; i++) {
       await fire(dev(1));
     }
     expect(ran()).toBe(6);
     expect(rl.getUsageSnapshot().queueLength).toBe(4);
-    clock.now += 1000; // two tokens refilled
-    (rl as any).processQueue();
-    expect(ran()).toBe(8);
-    clock.now += 1000;
-    (rl as any).processQueue();
+    clock.advance(2999);
+    process();
+    expect(ran()).toBe(6);
+    clock.advance(1);
+    process();
     expect(ran()).toBe(10);
     expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
-  it("a clock that jumps backwards takes no tokens away — the bucket only ever refills forwards", async () => {
-    // Date.now() is not monotonic (NTP correction, a suspended laptop). A
-    // refill computed over a negative span would SUBTRACT tokens and stall
-    // commands the user just sent.
-    const { rl, clock, ran, fire } = bench();
-    await fire(dev(1));
-    expect(ran()).toBe(1);
-    clock.now -= 5000; // the clock is corrected backwards
-    for (let i = 0; i < 5; i++) {
-      await fire(dev(1));
+  it("device reads: a device at its limit queues while another device runs", async () => {
+    const { ran, fire } = bench();
+    for (let i = 0; i < 21; i++) {
+      await fire(read(1));
     }
-    expect(ran(), "the remaining five of the burst must still run").toBe(6);
-    expect(rl.getUsageSnapshot().queueLength).toBe(0);
-  });
-
-  it("device reads: a device at its minute limit queues while another device runs", async () => {
-    const { ran, fire } = bench({ deviceReadPerMinute: 2 });
-    await fire(read(1));
-    await fire(read(1));
-    await fire(read(1)); // queued
-    expect(ran()).toBe(2);
+    expect(ran()).toBe(20);
     await fire(read(2));
-    expect(ran()).toBe(3);
+    expect(ran()).toBe(21);
   });
 
   it("a saturated App-API lane blocks no OpenAPI call — the libraries no longer stand in front of commands", async () => {
-    const { ran, fire } = bench({ appApiPerMinute: 1 });
-    await fire(APPAPI);
-    await fire(APPAPI); // queued
-    expect(ran()).toBe(1);
+    const { ran, fire } = bench();
+    for (let i = 0; i < 9; i++) {
+      await fire(APPAPI);
+    }
+    expect(ran()).toBe(8);
     await fire(dev(1));
     await fire(read(1));
     await fire(LIST);
-    expect(ran()).toBe(4);
+    expect(ran()).toBe(11);
   });
 
-  it("the account-wide control bucket caps a burst across devices", async () => {
-    const { ran, fire } = bench({ accountControl: { perSecond: 12, burst: 3 } });
-    await fire(dev(1));
-    await fire(dev(2));
-    await fire(dev(3));
-    await fire(dev(4)); // over the account burst → queued
-    expect(ran()).toBe(3);
+  it("the account-wide control window caps a burst across devices", async () => {
+    const { ran, fire } = bench();
+    for (let d = 1; d <= 14; d++) {
+      for (let k = 0; k < 6; k++) {
+        await fire(dev(d));
+      }
+    }
+    expect(ran()).toBe(80);
   });
 
-  it("the device list has its own account minute window", async () => {
-    const { ran, fire } = bench({ accountListPerMinute: 2 });
-    await fire(LIST);
-    await fire(LIST);
-    await fire(LIST);
-    expect(ran()).toBe(2);
+  it("the device list has its own account window", async () => {
+    const { ran, fire } = bench();
+    for (let i = 0; i < 21; i++) {
+      await fire(LIST);
+    }
+    expect(ran()).toBe(20);
   });
 
-  it("every lane books the daily counter — the 9000 protection does not narrow to the device lanes", async () => {
+  it("every OpenAPI lane books the daily window — the App API lane does not, Govee's day never pays for app2", async () => {
     const { rl, fire } = bench();
     await fire(APPAPI);
     await fire(LIST);
     await fire(read(1));
     await fire(dev(1));
-    expect(rl.getUsageSnapshot().usedToday).toBe(4);
+    expect(rl.getUsageSnapshot().usedToday).toBe(3);
   });
 
-  it("the minute reset frees the minute lanes and runs what waited", async () => {
-    const { rl, ran, fire } = bench({ deviceReadPerMinute: 1, appApiPerMinute: 1, accountListPerMinute: 1 });
-    await fire(read(1));
-    await fire(read(1));
-    await fire(APPAPI);
-    await fire(APPAPI);
+  it("each window frees on its own and runs what waited for it", async () => {
+    const { rl, clock, ran, fire, process } = bench(withLane("account-list", counterpart("test list", 1, 60)));
     await fire(LIST);
     await fire(LIST);
-    expect(ran()).toBe(3);
-    (rl as any).resetMinuteWindow();
-    expect(ran()).toBe(6);
+    for (let i = 0; i < 7; i++) {
+      await fire(dev(1));
+    }
+    expect(ran()).toBe(7);
+    clock.advance(3000); // the control window frees, the list window does not
+    process();
+    expect(ran()).toBe(8);
+    clock.advance(57_000);
+    process();
+    expect(ran()).toBe(9);
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
   it("a call whose lane is free runs ahead of a queued call whose lane is not — no head-of-line blocking", async () => {
-    const { rl, fire } = bench({ appApiPerMinute: 1 });
-    await fire(APPAPI);
+    const { rl, process } = bench(withLane("appapi", counterpart("test libraries", 1, 60)));
+    await rl.tryExecute(() => Promise.resolve(), APPAPI);
     const order: string[] = [];
     // Both queue (app-api saturated; the read is queued explicitly), then the queue is processed.
     rl.enqueue(
@@ -795,11 +873,11 @@ describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #4
       read(1),
       2,
     );
-    (rl as any).processQueue();
+    process();
     expect(order).toEqual(["read"]);
   });
 
-  it("scenario issue #46: ten devices' start-up load plus sixteen commands — every command runs in the first second", async () => {
+  it("scenario issue #46: ten devices' start-up load plus sixteen commands — every command runs at once", async () => {
     const { ran, fire } = bench();
     for (let d = 1; d <= 10; d++) {
       await fire(read(d)); // state read
@@ -817,34 +895,67 @@ describe("RateLimiter — lanes per Govee actor (v2 docs of 2026-07-06; issue #4
     expect(ran() - before).toBe(16);
   });
 
-  it("the usage snapshot reports every lane", async () => {
+  it("the usage snapshot reports every window with its use", async () => {
     const { rl, fire } = bench();
     await fire(dev(1));
     await fire(read(1));
     await fire(APPAPI);
     await fire(LIST);
-    const snap = rl.getUsageSnapshot();
-    expect(snap.lanes.accountList).toEqual({ used: 1, limit: CLOUD_LIMITS.accountListPerMinute });
-    expect(snap.lanes.appApi).toEqual({ used: 1, limit: CLOUD_LIMITS.appApiPerMinute });
-    expect(snap.lanes.deviceRead.devices).toEqual([{ deviceKey: "H600D:BULB1", used: 1 }]);
-    expect(snap.lanes.deviceControl.devices).toEqual([{ deviceKey: "H600D:BULB1", tokens: 5 }]);
-    expect(snap.lanes.deviceControl.accountTokens).toBe(CLOUD_LIMITS.accountControl.burst - 1);
+    const used = Object.fromEntries(rl.getUsageSnapshot().windows.map(w => [w.lane, [w.used, w.max, w.seconds]]));
+    expect(used["Govee OpenAPI device list|0|account"]).toEqual([1, 20, 60]);
+    expect(used["Govee App API libraries|0|account"]).toEqual([1, 8, 60]);
+    expect(used["Govee OpenAPI device reads|0|device H600D:BULB1"]).toEqual([1, 20, 60]);
+    expect(used["Govee OpenAPI device control|0|device H600D:BULB1"]).toEqual([1, 6, 3]);
+    expect(used["Govee OpenAPI device control|1|account"]).toEqual([1, 80, 7]);
+    expect(used["Govee OpenAPI (REST)|0|account"]).toEqual([3, 9000, 86_400]);
+    // a window per device stands under its device only, never as an account window
+    expect(Object.keys(used).sort()).toEqual(
+      [
+        "Govee App API libraries|0|account",
+        "Govee OpenAPI (REST)|0|account",
+        "Govee OpenAPI device control|0|device H600D:BULB1",
+        "Govee OpenAPI device control|1|account",
+        "Govee OpenAPI device list|0|account",
+        "Govee OpenAPI device reads|0|device H600D:BULB1",
+      ].sort(),
+    );
+  });
+
+  it("a lane whose window is declared no more drops out of the report instead of breaking it", async () => {
+    const { rl, fire } = bench({
+      ...CLOUD_LIMITS,
+      "device-read": [counterpart("old reads", 5, 60, "device"), CLOUD_LIMITS["device-read"][1]],
+    });
+    await fire(read(1));
+    (rl as any).limits = CLOUD_LIMITS;
+    const lanes = rl.getUsageSnapshot().windows.map(w => w.lane);
+    expect(lanes).not.toContain("old reads|0|device H600D:BULB1");
+    expect(lanes).toContain("Govee OpenAPI (REST)|0|account");
   });
 });
 
-describe("a spent daily counter refuses, it does not queue (audit A10)", () => {
-  function spentLimiter(): { rl: RateLimiter; warns: string[] } {
+describe("a spent daily window refuses, it does not queue (audit A10)", () => {
+  function spentLimiter(): { rl: RateLimiter; warns: string[]; clock: ReturnType<typeof manualClock> } {
     const warns: string[] = [];
-    const log = { ...mockLog, warn: (m: string) => warns.push(m) } as ioBroker.Logger;
-    const rl = new RateLimiter(log, mockTimers, limitsOf(100, 1));
-    return { rl, warns };
+    const { rl, clock } = bench(limitsOf(100, 1), { ...mockLog, warn: (m: string) => warns.push(m) });
+    return { rl, warns, clock };
   }
 
-  it("a tracked command after the last call of the day is refused at once — not held until the rollover", async () => {
+  it("a tracked command after the last call of the day is refused at once — not held for hours", async () => {
     const { rl } = spentLimiter();
     await rl.executeTracked(() => Promise.resolve());
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow("Daily Govee Cloud budget is used up");
     expect(rl.getUsageSnapshot().queueLength).toBe(0);
+  });
+
+  it("an appliance's call refused by the ACCOUNT's day names the daily ceiling, not the device's allowance", async () => {
+    const { rl, warns } = spentLimiter();
+    const budget = { key: "H7160:AA:BB", perDay: 50 };
+    await rl.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, budget);
+    await expect(rl.executeTracked(() => Promise.resolve(), ACCOUNT_LIST_LANE, 0, budget)).rejects.toThrow(
+      "Daily Govee Cloud budget is used up",
+    );
+    expect(warns).toEqual([expect.stringContaining("daily ceiling")]);
   });
 
   it("tryExecute and enqueue queue nothing on a spent day", async () => {
@@ -865,26 +976,25 @@ describe("a spent daily counter refuses, it does not queue (audit A10)", () => {
   });
 
   it("calls queued for a minute window are refused once the day runs out", async () => {
-    const rl = new RateLimiter(mockLog, mockTimers, limitsOf(1, 2));
+    const { rl, clock, process } = bench(limitsOf(1, 2));
     await rl.executeTracked(() => Promise.resolve()); // minute full, day 1/2
     const waiting = rl.executeTracked(() => Promise.resolve()); // queued for the minute
     const late = rl.executeTracked(() => Promise.resolve()); // queued too
-    (rl as any).resetMinuteWindow(); // first waiter runs → day 2/2
+    const refused = expect(late).rejects.toThrow("Daily Govee Cloud budget is used up");
+    clock.advance(60_000);
+    process(); // first waiter runs → day 2/2 → the second waiter is refused
     await waiting;
-    (rl as any).resetMinuteWindow(); // day spent → the second waiter is refused
-    await expect(late).rejects.toThrow("Daily Govee Cloud budget is used up");
+    await refused;
+    expect(rl.getUsageSnapshot().queueLength).toBe(0);
   });
 
-  it("warns once per day, and again after the reset", async () => {
-    const t = makeCapturingTimers();
-    const warns: string[] = [];
-    const rl = new RateLimiter({ ...mockLog, warn: (m: string) => warns.push(m) }, t.timers, limitsOf(100, 1));
-    rl.start();
+  it("warns once while the day is full, and again when it fills up next time", async () => {
+    const { rl, warns, clock } = spentLimiter();
     await rl.executeTracked(() => Promise.resolve());
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
     expect(warns.filter(w => w.includes("daily ceiling"))).toHaveLength(1);
-    t.timeouts[0](); // day reset
+    clock.advance(86_400_000); // the call is a day old
     await rl.executeTracked(() => Promise.resolve());
     await expect(rl.executeTracked(() => Promise.resolve())).rejects.toThrow();
     expect(warns.filter(w => w.includes("daily ceiling"))).toHaveLength(2);
@@ -907,13 +1017,9 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
   };
   const READ: CallLane = { kind: "device-read", deviceKey: "H6097:AA" };
   const CONTROL: CallLane = { kind: "device-control", deviceKey: "H6097:AA" };
-
-  function bench(over: Partial<CloudLimits> = {}): { rl: RateLimiter; clock: { now: number } } {
-    const clock = { now: 1_000_000 };
-    return { rl: new RateLimiter(mockLog, mockTimers, { ...CLOUD_LIMITS, ...over }, () => clock.now), clock };
-  }
-  const readsOf = (rl: RateLimiter): number =>
-    rl.getUsageSnapshot().lanes.deviceRead.devices.find(d => d.deviceKey === "H6097:AA")?.used ?? 0;
+  const usedIn = (rl: RateLimiter, lane: string): number =>
+    rl.getUsageSnapshot().windows.find(w => w.lane === lane)?.used ?? 0;
+  const readsOf = (rl: RateLimiter): number => usedIn(rl, "Govee OpenAPI device reads|0|device H6097:AA");
 
   it("a swallowed DNS failure gives back the lane slot and the daily count, and the report counts it", async () => {
     const { rl } = bench();
@@ -951,11 +1057,11 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
     const { rl } = bench();
     await rl.tryExecute(neverSent, ACCOUNT_LIST_LANE);
     await rl.tryExecute(neverSent, { kind: "appapi" });
-    expect(rl.getUsageSnapshot().lanes.accountList.used).toBe(0);
-    expect(rl.getUsageSnapshot().lanes.appApi.used).toBe(0);
+    expect(usedIn(rl, "Govee OpenAPI device list|0|account")).toBe(0);
+    expect(usedIn(rl, "Govee App API libraries|0|account")).toBe(0);
   });
 
-  it("control: six commands that never left do not empty the burst — the seventh still goes at once", async () => {
+  it("control: six commands that never left free their slots — the seventh still goes at once", async () => {
     const { rl } = bench();
     for (let i = 0; i < 6; i++) {
       await rl.executeTracked(neverSent, CONTROL);
@@ -966,18 +1072,7 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
       return delivered();
     }, CONTROL);
     expect(ran).toBe(true);
-    expect(rl.getUsageSnapshot().lanes.deviceControl.accountTokens).toBe(CLOUD_LIMITS.accountControl.burst - 1);
-  });
-
-  it("a token goes back only up to the bucket's capacity", async () => {
-    const { rl, clock } = bench();
-    await rl.executeTracked(() => {
-      clock.now += 2000; // the bucket refills to full while the call is in flight
-      currentBooking()?.attempt(false);
-      return Promise.resolve();
-    }, CONTROL);
-    const tokens = rl.getUsageSnapshot().lanes.deviceControl.devices.find(d => d.deviceKey === "H6097:AA")?.tokens;
-    expect(tokens).toBe(CLOUD_LIMITS.deviceControl.burst);
+    expect(usedIn(rl, "Govee OpenAPI device control|1|account")).toBe(1);
   });
 
   it("executeTracked: the failure still reaches the caller, the booking goes back", async () => {
@@ -992,13 +1087,17 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
   });
 
   it("a queued call that never reached Govee is given back too", async () => {
-    const { rl } = bench({ deviceReadPerMinute: 1 });
-    await rl.tryExecute(delivered, READ); // the minute window is full
+    const { rl, clock, process } = bench({
+      ...CLOUD_LIMITS,
+      "device-read": [counterpart("test reads", 1, 60, "device"), CLOUD_LIMITS["device-read"][1]],
+    });
+    await rl.tryExecute(delivered, READ); // the window is full
     await rl.tryExecute(neverSent, READ); // queued
     expect(rl.getUsageSnapshot().queueLength).toBe(1);
-    (rl as any).resetMinuteWindow(); // the waiter runs and fails
+    clock.advance(60_000);
+    process(); // the waiter runs and fails
     await vi.waitFor(() => expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1));
-    expect(readsOf(rl)).toBe(0);
+    expect(usedIn(rl, "test reads|0|device H6097:AA")).toBe(0);
     expect(rl.getUsageSnapshot().usedToday).toBe(1);
   });
 
@@ -1021,41 +1120,22 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
     await expect(rl.executeTracked(delivered, CONTROL, 0, budget)).rejects.toThrow("Daily Govee budget");
   });
 
-  it("a minute reset between booking and failure: the new window keeps its count, the day still gets it back", async () => {
-    const { rl } = bench();
+  it("a call given back frees only its own slots — a call booked while it was in flight keeps its count", async () => {
+    const { rl, clock } = bench();
     let release!: () => void;
     const slow = rl.tryExecute(async () => {
       await new Promise<void>(resolve => (release = resolve));
       currentBooking()?.attempt(false);
     }, READ);
-    (rl as any).resetMinuteWindow(); // a new minute while the call is in flight
-    await rl.tryExecute(delivered, READ); // one call booked in the NEW window
+    await rl.tryExecute(delivered, READ); // booked while the first is in flight
     release();
     await slow;
     expect(readsOf(rl)).toBe(1);
     expect(rl.getUsageSnapshot().usedToday).toBe(1);
-  });
-
-  it("a day reset between booking and failure: the new day keeps its count and reports nothing given back", async () => {
-    const { rl } = bench();
-    const budget = { key: "H7127:AA", perDay: 5 };
-    let release!: () => void;
-    const slow = rl.executeTracked(
-      async () => {
-        await new Promise<void>(resolve => (release = resolve));
-        currentBooking()?.attempt(false);
-      },
-      CONTROL,
-      0,
-      budget,
-    );
-    (rl as any).resetDaily(); // midnight while the call is in flight
-    await rl.executeTracked(delivered, CONTROL, 0, budget); // booked on the NEW day
-    release();
-    await slow;
-    expect(rl.getUsageSnapshot().usedToday).toBe(1);
-    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(0);
-    expect((rl as any).callsTodayPerDevice.get("H7127:AA")).toBe(1);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1);
+    // the slot left is the delivered call's, which counts down from its answer — not the open one given back
+    clock.advance(60_000);
+    expect(readsOf(rl)).toBe(0);
   });
 
   it("a leftover the call did not await cannot give the booking back after it settled", async () => {
@@ -1068,5 +1148,14 @@ describe("a call that never reached Govee is given back (issue #51)", () => {
     }, READ);
     late();
     expect(rl.getUsageSnapshot().usedToday).toBe(1);
+  });
+
+  it("the report's given-back count slides over a day as well", async () => {
+    const { rl, clock } = bench();
+    await rl.tryExecute(neverSent, READ);
+    clock.advance(86_399_999);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(1);
+    clock.advance(1);
+    expect(rl.getUsageSnapshot().notDeliveredToday).toBe(0);
   });
 });

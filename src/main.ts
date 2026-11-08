@@ -31,7 +31,7 @@ import type * as dropdownReset from "./lib/handlers/dropdown-reset-helpers";
 import * as snapshotHandlerGlue from "./lib/handlers/snapshot-handler-glue";
 import * as stateChangeRouter from "./lib/handlers/state-change-router";
 import * as wizardHandler from "./lib/handlers/wizard-handler";
-import { RateLimiter } from "./lib/rate-limiter";
+import { RateLimiter, loadLimiterMemory, saveLimiterMemory } from "./lib/rate-limiter";
 import type { SegmentWizard } from "./lib/segment-wizard";
 import { tDesc, tName } from "./lib/i18n";
 import { SkuCache } from "./lib/sku-cache";
@@ -1128,6 +1128,8 @@ class GoveeAdapter extends utils.Adapter {
     this.deviceManager!.setCloudClient(this.cloudClient);
 
     this.rateLimiter = this.makeRateLimiter(this.log, this, CLOUD_LIMITS);
+    // The daily window slides over a restart: the calls the previous process made in the last 24 hours still count.
+    this.rateLimiter.remember(loadLimiterMemory(utils.getAbsoluteInstanceDataDir(this)));
     this.rateLimiter.start();
     this.deviceManager!.setRateLimiter(this.rateLimiter);
 
@@ -1526,6 +1528,7 @@ class GoveeAdapter extends utils.Adapter {
       this.mqttClient?.disconnect();
       this.openapiMqttClient?.disconnect();
       this.rateLimiter?.stop();
+      const limiterMemory = this.rateLimiter?.memory();
       // The callback is the "we are done" signal to the host, and it comes AFTER
       // these writes: issued fire-and-forget and followed by an immediate callback,
       // not one of them reaches the database — the process is gone first (measured
@@ -1546,10 +1549,20 @@ class GoveeAdapter extends utils.Adapter {
         // Covers the per-device markers, the group marker and the rollup.
         writes.push(this.stateManager.markAllOffline());
       }
-      void Promise.all(writes)
-        .catch((e: unknown) => {
-          // States DB already going down — nothing left to report to.
-          this.log.debug(`onUnload: final states rejected: ${errText(e)}`);
+      if (limiterMemory) {
+        // The next process of this instance counts the calls of the last 24 hours on (rate-limiter.ts).
+        writes.push(saveLimiterMemory(utils.getAbsoluteInstanceDataDir(this), limiterMemory));
+      }
+      // Every write ends before the callback, also when one of them fails: the limiter's file must be on disk
+      // before the process goes.
+      void Promise.allSettled(writes)
+        .then(results => {
+          for (const r of results) {
+            if (r.status === "rejected") {
+              // States DB already going down — nothing left to report to.
+              this.log.debug(`onUnload: final write rejected: ${errText(r.reason)}`);
+            }
+          }
         })
         .finally(done);
       return;

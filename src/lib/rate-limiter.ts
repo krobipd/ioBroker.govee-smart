@@ -1,4 +1,9 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
+import type { Counterpart } from "./api-limits";
+import { writeFileAtomic } from "./atomic-file";
 import { Booking, runBooked } from "./call-booking";
+import { SlotLanes, isStamp, type Slot } from "./call-window";
 import { errText, type GoveeDevice, type TimerAdapter } from "./types";
 import { GOVEE_DEVICE_TYPE, isAppGroup } from "./govee-constants";
 import { CLOUD_APPLIANCE_DAILY_LIMIT, CLOUD_LIMITS, type CloudLimits } from "./timing-constants";
@@ -19,7 +24,7 @@ export const ACCOUNT_LIST_LANE: CallLane = { kind: "account-list" };
 export const APP_API_LANE: CallLane = { kind: "appapi" };
 
 /**
- * The key a device's own buckets are kept under.
+ * The key a device's own windows are kept under.
  *
  * @param device The device (sku + id suffice)
  */
@@ -28,85 +33,32 @@ export function limiterDeviceKey(device: Pick<GoveeDevice, "sku" | "deviceId">):
 }
 
 /**
- * Govee's "rpu / burst" control limit as a token bucket: `burst` tokens at
- * most, refilled `perSecond` continuously. A burst of six goes out at once,
- * the seventh waits half a second — never a 429, never a minute.
+ * A full window longer than this refuses its call instead of queueing it: the
+ * call would run hours later, at a moment nobody asked for (audit A10). Every
+ * shorter window queues the call until a slot frees.
  */
-class TokenBucket {
-  private tokens: number;
-  private updatedAt: number;
+export const QUEUE_MAX_WINDOW_SECONDS = 3600;
 
-  constructor(
-    private readonly capacity: number,
-    private readonly perSecond: number,
-    now: number,
-  ) {
-    this.tokens = capacity;
-    this.updatedAt = now;
-  }
+/** The window of a device's own allowance and of the report's "today" — one sliding day. */
+const DAY_SECONDS = 86_400;
 
-  private refill(now: number): void {
-    if (now > this.updatedAt) {
-      this.tokens = Math.min(this.capacity, this.tokens + ((now - this.updatedAt) / 1000) * this.perSecond);
-      this.updatedAt = now;
-    }
-  }
+/** The file in the instance data folder that carries the long windows over a restart. */
+export const LIMITER_MEMORY_FILE = "rate-limits.json";
 
-  /**
-   * Whether one token is available right now.
-   *
-   * @param now Current time (ms)
-   */
-  has(now: number): boolean {
-    this.refill(now);
-    return this.tokens >= 1;
-  }
-
-  /**
-   * Spend one token (the caller checked `has` first).
-   *
-   * @param now Current time (ms)
-   */
-  take(now: number): void {
-    this.refill(now);
-    this.tokens = Math.max(0, this.tokens - 1);
-  }
-
-  /**
-   * Put one token back — a booked call that never reached Govee (issue #51).
-   *
-   * @param now Current time (ms)
-   */
-  give(now: number): void {
-    this.refill(now);
-    this.tokens = Math.min(this.capacity, this.tokens + 1);
-  }
-
-  /**
-   * Whole tokens available, for the usage snapshot.
-   *
-   * @param now Current time (ms)
-   */
-  available(now: number): number {
-    this.refill(now);
-    return Math.floor(this.tokens);
-  }
+/** One window a call books: its lane key and its limit. */
+interface LaneWindow {
+  /** Counterpart, limit and lane (account or device), or the device's allowance. */
+  key: string;
+  /** Calls the window allows. */
+  max: number;
+  /** The window length. */
+  seconds: number;
 }
 
-/**
- * What one booked call took: its lane and allowance, and the minute and day
- * windows it was booked in — a booking given back after a window reset must not
- * free a slot of the NEW window.
- */
+/** What one booked call took: a slot in every window of its lane. */
 interface SpentCall {
-  /** The actor the call was charged to */
-  lane: CallLane;
-  /** The device allowance it was charged to, if any */
-  budget?: DeviceBudget;
-  /** The minute window it was booked in */
-  minuteEpoch: number;
-  /** The day it was booked on */
-  dayEpoch: number;
+  /** The slots, each with its lane key. */
+  taken: Array<{ key: string; slot: Slot }>;
 }
 
 /** A queued API call */
@@ -123,12 +75,9 @@ interface QueuedCall {
    */
   reject?: (err: Error) => void;
   /**
-   * The device allowance this call belongs to, carried through the queue.
-   *
-   * Without it the per-device budget was booked ONLY on the immediate path:
-   * every call that had to wait for the per-minute limit ran later without
-   * ever being counted. The protection therefore failed exactly under the load
-   * it exists for — a burst is precisely when calls queue.
+   * The device allowance this call belongs to, carried through the queue —
+   * booked when the call runs, so a call that waited is counted like one that
+   * ran at once.
    */
   budget?: DeviceBudget;
 }
@@ -142,20 +91,21 @@ interface QueuedCall {
  */
 export const MAX_QUEUE_LENGTH = 200;
 
-/** The refusal of a call on a spent daily counter (A10). */
-const DAY_BUDGET_SPENT = "Daily Govee Cloud budget is used up — the call is skipped until the daily reset";
+/** The refusal of a call on a spent daily window (A10). */
+const DAY_BUDGET_SPENT =
+  "Daily Govee Cloud budget is used up — the call is skipped until the oldest call of the last 24 hours is a day old";
 
 /**
  * A per-device daily allowance on top of the global budget.
  *
  * Govee's limits are not one budget: the account gets 10,000 calls a day, but
- * an APPLIANCE gets 100 for itself. The global counters cannot express that —
+ * an APPLIANCE gets 100 for itself. The global windows cannot express that —
  * one appliance may spend the whole account budget, ninety times its own share.
  */
 export interface DeviceBudget {
   /** Identifies the device, e.g. `sku:deviceId`. */
   key: string;
-  /** Calls this device may make today. */
+  /** Calls this device may make in any 24 hours. */
   perDay: number;
 }
 
@@ -183,66 +133,86 @@ export function applianceBudget(device?: GoveeDevice): DeviceBudget | undefined 
 }
 
 /**
- * Rate limiter for Govee Cloud API calls — one bucket per actor Govee names
- * ({@link CLOUD_LIMITS}), a global daily counter over all of them, and one
- * priority-sorted queue whose calls run as soon as THEIR bucket is free.
+ * What a restart carries over: the settle times of every window longer than
+ * {@link QUEUE_MAX_WINDOW_SECONDS}, by lane key — the daily OpenAPI window and
+ * the appliances' allowances. A shorter window is long past when the next
+ * process asks.
+ */
+export interface RateLimiterMemory {
+  /** Settle times (ms) per lane key. */
+  lanes: Record<string, number[]>;
+}
+
+/**
+ * Read what the previous process of this instance left in its data folder — an
+ * empty memory when there is none or it is unreadable.
+ *
+ * @param dataDir The instance data folder
+ */
+export function loadLimiterMemory(dataDir: string): RateLimiterMemory {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir, LIMITER_MEMORY_FILE), "utf-8")) as unknown;
+    const lanes = (raw as { lanes?: unknown } | null)?.lanes;
+    const kept: Record<string, number[]> = {};
+    for (const [key, ends] of Object.entries(lanes ?? {})) {
+      if (Array.isArray(ends)) {
+        kept[key] = ends.filter(isStamp);
+      }
+    }
+    return { lanes: kept };
+  } catch {
+    // no file yet, or an unreadable one: nothing was counted
+    return { lanes: {} };
+  }
+}
+
+/**
+ * Leave the long windows for the next process of this instance.
+ *
+ * @param dataDir The instance data folder
+ * @param memory What {@link RateLimiter.memory} returned
+ */
+export async function saveLimiterMemory(dataDir: string, memory: RateLimiterMemory): Promise<void> {
+  await fs.promises.mkdir(dataDir, { recursive: true });
+  await writeFileAtomic(path.join(dataDir, LIMITER_MEMORY_FILE), JSON.stringify(memory));
+}
+
+/**
+ * Rate limiter for Govee Cloud API calls — one lane per actor Govee names
+ * ({@link CLOUD_LIMITS}), each with the sliding windows api-limits.json
+ * declares, the daily window over every OpenAPI lane, and one priority-sorted
+ * queue whose calls run as soon as THEIR windows have room. A call holds its
+ * slot from the moment it runs until the window's length after it ended
+ * (call-window.ts) — the way Govee counts it and the fleet judges it.
  */
 export class RateLimiter {
   private readonly log: ioBroker.Logger;
   private readonly timers: TimerAdapter;
   private readonly queue: QueuedCall[] = [];
-  private processTimer: ioBroker.Interval | undefined = undefined;
-  /** `/user/devices` this minute. */
-  private accountListUsed = 0;
-  /** app2.govee.com calls this minute. */
-  private appApiUsed = 0;
-  /** `/device/state|scenes|diy-scenes` this minute, per device. */
-  private readonly deviceReadUsed = new Map<string, number>();
-  /** `/device/control` per device — Govee's rpu/burst as token buckets. */
-  private readonly deviceControl = new Map<string, TokenBucket>();
-  /** `/device/control` per account. */
-  private readonly accountControl: TokenBucket;
-  private callsToday = 0;
-  /** Calls given back today because none of their requests reached Govee — for the report. */
-  private notDeliveredToday = 0;
-  /** Counted up by every minute reset — see {@link SpentCall}. */
-  private minuteEpoch = 0;
-  /** Counted up by every daily reset — see {@link SpentCall}. */
-  private dayEpoch = 0;
-  private minuteResetTimer: ioBroker.Interval | undefined = undefined;
-  private dayResetTimer: ioBroker.Interval | undefined = undefined;
-  private dayResetKickoff: ioBroker.Timeout | undefined = undefined;
-  /**
-   * True after `stop()`. Guards the dayResetKickoff callback so a stop() that
-   * fires between kickoff-schedule and kickoff-execute can't leave behind a
-   * runaway dayResetTimer interval — without this, a stop+restart cycle would
-   * leak one interval per restart.
-   */
+  private readonly lanes = new SlotLanes();
+  /** Calls given back because none of their requests reached Govee — one sliding day, for the report. */
+  private readonly notDelivered = new SlotLanes();
+  /** The wake-up for the queue: when the soonest window a queued call waits for has room again. */
+  private wakeTimer: ioBroker.Timeout | undefined = undefined;
+  /** True after `stop()` — nothing is queued or run any more. */
   private stopped = false;
   /** Warn-once flag for the queue-full drop — reset when the queue drains. */
   private warnedQueueFull = false;
   /**
-   * Calls spent per device today. Cleared with the daily counter, so it follows
-   * the same reset Govee applies.
+   * The long windows already reported as spent — the message is actionable and
+   * belongs in the log once, not on every rejected write. A window that has
+   * room again says so again when it fills up next time.
    */
-  private readonly callsTodayPerDevice = new Map<string, number>();
-  /**
-   * Devices already warned about today. The message is actionable and belongs
-   * in the log once, not on every rejected write — a script hitting the limit
-   * hits it again a minute later.
-   */
-  private readonly warnedDeviceBudget = new Set<string>();
-  /** The account's daily counter was reported as spent today — warn once. */
-  private warnedDayBudget = false;
+  private readonly warnedSpent = new Set<string>();
 
   private readonly limits: CloudLimits;
-  /** Injectable clock — the token buckets refill against it. */
+  /** Injectable clock — the windows slide against it. */
   private readonly clock: () => number;
 
   /**
    * @param log ioBroker logger
    * @param timers Timer adapter
-   * @param limits The per-actor budget (default: Govee's v2 limits with margin)
+   * @param limits The per-actor budget (default: the declared windows of api-limits.json)
    * @param clock Time source in ms (tests advance it by hand)
    */
   constructor(
@@ -255,56 +225,19 @@ export class RateLimiter {
     this.timers = timers;
     this.limits = limits;
     this.clock = clock;
-    this.accountControl = new TokenBucket(limits.accountControl.burst, limits.accountControl.perSecond, clock());
   }
 
-  /** Start the rate limiter — resets counters periodically */
+  /** Start the rate limiter. */
   start(): void {
     this.stopped = false;
-    // Reset the minute windows every 60s
-    this.minuteResetTimer = this.timers.setInterval(() => this.resetMinuteWindow(), 60_000);
-
-    // Reset daily counter aligned to UTC midnight — Govee's daily quota
-    // resets on the API's clock (UTC). A plain setInterval(24h) starting
-    // at adapter launch would drift the reset to a non-midnight offset and
-    // waste quota: after 18:00 start you'd get a full budget until 18:00
-    // next day even though Govee gives you a fresh budget at 00:00.
-    const msUntilMidnight = this.millisUntilNextUtcMidnight();
-    this.dayResetKickoff = this.timers.setTimeout(() => {
-      this.dayResetKickoff = undefined;
-      // stop() may have fired between schedule and execute — bail before
-      // installing the recurring 24 h timer, which would otherwise leak.
-      if (this.stopped) {
-        return;
-      }
-      this.resetDaily();
-      this.dayResetTimer = this.timers.setInterval(() => this.resetDaily(), 86_400_000);
-    }, msUntilMidnight);
-
-    // Process queue every 2s
-    this.processTimer = this.timers.setInterval(() => {
-      this.processQueue();
-    }, 2_000);
   }
 
   /** Stop the rate limiter */
   stop(): void {
     this.stopped = true;
-    if (this.minuteResetTimer) {
-      this.timers.clearInterval(this.minuteResetTimer);
-      this.minuteResetTimer = undefined;
-    }
-    if (this.dayResetKickoff) {
-      this.timers.clearTimeout(this.dayResetKickoff);
-      this.dayResetKickoff = undefined;
-    }
-    if (this.dayResetTimer) {
-      this.timers.clearInterval(this.dayResetTimer);
-      this.dayResetTimer = undefined;
-    }
-    if (this.processTimer) {
-      this.timers.clearInterval(this.processTimer);
-      this.processTimer = undefined;
+    if (this.wakeTimer) {
+      this.timers.clearTimeout(this.wakeTimer);
+      this.wakeTimer = undefined;
     }
     // Reject pending TRACKED calls so no caller awaits a promise that can
     // never settle after stop (compact mode keeps the process alive —
@@ -315,27 +248,104 @@ export class RateLimiter {
     this.queue.length = 0;
   }
 
-  /** Zero the daily counter and log. Separate so kickoff + interval share it. */
-  private resetDaily(): void {
-    this.log.debug(
-      `Rate limiter: daily reset (used ${this.callsToday} calls today, ${this.callsTodayPerDevice.size} device(s) tracked)`,
-    );
-    this.callsToday = 0;
-    this.warnedDayBudget = false;
-    this.notDeliveredToday = 0;
-    this.dayEpoch++;
-    // The per-device allowances reset with the global one — Govee rolls both
-    // over at the same time. The warn-once set goes too, so a device that hit
-    // its limit yesterday says so again if it hits it today.
-    this.callsTodayPerDevice.clear();
-    this.warnedDeviceBudget.clear();
+  /**
+   * The windows a call on this lane books: every limit of every counterpart
+   * of the lane — per device under the lane's device, otherwise for the
+   * account — and the device's own allowance, where one applies.
+   *
+   * @param lane The actor the call is charged to
+   * @param budget The device's allowance
+   */
+  private windowsOf(lane: CallLane, budget?: DeviceBudget): LaneWindow[] {
+    const windows: LaneWindow[] = [];
+    for (const counterpart of this.limits[lane.kind]) {
+      for (const [i, limit] of counterpart.limits.entries()) {
+        const who = limit.per === "device" && "deviceKey" in lane ? `device ${lane.deviceKey}` : "account";
+        windows.push({ key: `${counterpart.name}|${i}|${who}`, max: limit.max, seconds: limit.seconds });
+      }
+    }
+    if (budget) {
+      windows.push({ key: `allowance|${budget.key}`, max: budget.perDay, seconds: DAY_SECONDS });
+    }
+    return windows;
   }
 
-  /** Milliseconds from now until the next UTC midnight tick. */
-  private millisUntilNextUtcMidnight(): number {
-    const now = new Date();
-    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1, 0, 0, 0, 0));
-    return next.getTime() - now.getTime();
+  /**
+   * The long window that refuses this call, if one is full — its slots free
+   * only in hours.
+   *
+   * @param lane The actor the call is charged to
+   * @param budget The device's allowance
+   */
+  private spentWindow(lane: CallLane, budget?: DeviceBudget): LaneWindow | undefined {
+    const now = this.clock();
+    for (const w of this.windowsOf(lane, budget)) {
+      if (w.seconds <= QUEUE_MAX_WINDOW_SECONDS) {
+        continue;
+      }
+      if (this.lanes.waitMs(w.key, w.max, w.seconds, now) !== 0) {
+        return w;
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Whether the call is refused because a long window is full — and if so,
+   * say so once. A refused call is NOT queued: its window has room again only
+   * in hours, and a queued command would run at a moment nobody asked for
+   * (audit A10).
+   *
+   * @param lane The actor the call is charged to
+   * @param budget The device's allowance
+   * @returns the refusal, or undefined when the call may run or wait
+   */
+  private refusal(lane: CallLane, budget?: DeviceBudget): Error | undefined {
+    const spent = this.spentWindow(lane, budget);
+    if (!spent) {
+      return undefined;
+    }
+    const isAllowance = budget !== undefined && spent.key === `allowance|${budget.key}`;
+    if (!this.warnedSpent.has(spent.key)) {
+      this.warnedSpent.add(spent.key);
+      if (isAllowance) {
+        this.log.warn(
+          `Device ${budget.key} has used its daily Govee budget (${budget.perDay} calls in 24 hours). Govee allows an ` +
+            `appliance 100 calls per day and appliance control has no local path, so every write counts. Further ` +
+            `commands for this device are skipped until its oldest call of the last 24 hours is a day old — reduce ` +
+            `how often a script writes to it.`,
+        );
+      } else {
+        this.log.warn(
+          `The adapter has made ${spent.max} Govee Cloud calls in the last 24 hours — the daily ceiling. Further ` +
+            `Cloud calls are skipped until the oldest of them is a day old; LAN control keeps working.`,
+        );
+      }
+    }
+    return new Error(
+      isAllowance ? `Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)` : DAY_BUDGET_SPENT,
+    );
+  }
+
+  /**
+   * How long until a call on this lane fits every short window — 0 when it
+   * fits now, undefined while a slot it needs is held by a call that has not
+   * ended yet.
+   *
+   * @param lane The actor the call is charged to
+   * @param budget The device's allowance
+   */
+  private waitFor(lane: CallLane, budget?: DeviceBudget): number | undefined {
+    const now = this.clock();
+    let longest = 0;
+    for (const w of this.windowsOf(lane, budget)) {
+      const wait = this.lanes.waitMs(w.key, w.max, w.seconds, now);
+      if (wait === undefined) {
+        return undefined;
+      }
+      longest = Math.max(longest, wait);
+    }
+    return longest;
   }
 
   /**
@@ -365,8 +375,9 @@ export class RateLimiter {
       reject?.(new Error("Rate limiter stopped — Cloud call cancelled"));
       return false;
     }
-    if (this.dayBudgetSpent()) {
-      reject?.(new Error(DAY_BUDGET_SPENT));
+    const refused = this.refusal(lane, budget);
+    if (refused) {
+      reject?.(refused);
       return false;
     }
     if (this.queue.length >= MAX_QUEUE_LENGTH) {
@@ -391,6 +402,7 @@ export class RateLimiter {
     this.queue.push({ execute, lane, priority, reject, budget });
     // Sort by priority (lower first)
     this.queue.sort((a, b) => a.priority - b.priority);
+    this.schedule();
     return true;
   }
 
@@ -409,12 +421,8 @@ export class RateLimiter {
     priority = 0,
     budget?: DeviceBudget,
   ): Promise<boolean> {
-    if (budget && this.deviceBudgetSpent(budget)) {
-      return false;
-    }
-    // A spent day needs no check of its own: canMakeCall refuses it first, and
-    // enqueue then turns the call away without queueing it.
-    if (this.canMakeCall(lane)) {
+    // A full long window refuses in enqueue — its wait is hours, so it never runs here
+    if (this.waitFor(lane, budget) === 0) {
       await this.runSpent(execute, this.spend(lane, budget));
       return true;
     }
@@ -423,90 +431,28 @@ export class RateLimiter {
   }
 
   /**
-   * Whether the account's daily counter is spent — and if so, say so once. Like
-   * an exhausted device budget it does NOT queue: the counter resets at the
-   * daily rollover, and a queued command would run hours later, at a moment
-   * nobody asked for (audit A10; until 2.40.0 such calls queued until then).
-   *
-   * @returns true when no call may be made today
-   */
-  private dayBudgetSpent(): boolean {
-    if (this.callsToday < this.limits.perDay) {
-      return false;
-    }
-    if (!this.warnedDayBudget) {
-      this.warnedDayBudget = true;
-      this.log.warn(
-        `The adapter has made ${this.limits.perDay} Govee Cloud calls today — the daily ceiling. Further Cloud ` +
-          `calls are skipped until the daily reset; LAN control keeps working.`,
-      );
-    }
-    return true;
-  }
-
-  /**
-   * Whether this device has used up its own daily allowance — and if so, say so
-   * once. An exhausted device budget does NOT queue the call: the allowance
-   * resets at Govee's daily rollover, not in a few seconds, so queuing would
-   * only hold a write that is hours from running and then apply it at a moment
-   * nobody asked for.
-   *
-   * @param budget The device's allowance
-   * @returns true when the call must not be made
-   */
-  private deviceBudgetSpent(budget: DeviceBudget): boolean {
-    const used = this.callsTodayPerDevice.get(budget.key) ?? 0;
-    if (used < budget.perDay) {
-      return false;
-    }
-    if (!this.warnedDeviceBudget.has(budget.key)) {
-      this.warnedDeviceBudget.add(budget.key);
-      this.log.warn(
-        `Device ${budget.key} has used its daily Govee budget (${budget.perDay} calls). Govee allows an appliance ` +
-          `100 calls per day and appliance control has no local path, so every write counts. Further commands for ` +
-          `this device are skipped until Govee's daily reset — reduce how often a script writes to it.`,
-      );
-    }
-    return true;
-  }
-
-  /**
-   * Book one call against its lane, the daily counter (EVERY lane — the 9,000
-   * protection covers the account, not just the device lanes) and, where one
-   * applies, the device's own allowance.
+   * Book one call: a slot in every window of its lane — the daily window
+   * included (EVERY OpenAPI lane: the 9,000 protection covers the account,
+   * not just the device lanes) — and, where one applies, in the device's own
+   * allowance.
    *
    * @param lane The actor the call is charged to
    * @param budget The device's allowance, when the call belongs to one
    */
   private spend(lane: CallLane, budget?: DeviceBudget): SpentCall {
-    const now = this.clock();
-    switch (lane.kind) {
-      case "account-list":
-        this.accountListUsed++;
-        break;
-      case "appapi":
-        this.appApiUsed++;
-        break;
-      case "device-read":
-        this.deviceReadUsed.set(lane.deviceKey, (this.deviceReadUsed.get(lane.deviceKey) ?? 0) + 1);
-        break;
-      case "device-control":
-        this.controlBucket(lane.deviceKey, now).take(now);
-        this.accountControl.take(now);
-        break;
-    }
-    this.callsToday++;
-    if (budget) {
-      this.callsTodayPerDevice.set(budget.key, (this.callsTodayPerDevice.get(budget.key) ?? 0) + 1);
-    }
-    return { lane, budget, minuteEpoch: this.minuteEpoch, dayEpoch: this.dayEpoch };
+    const taken = this.windowsOf(lane, budget).map(w => {
+      // a window that takes a call has room again: when it fills up next time, it says so again
+      this.warnedSpent.delete(w.key);
+      return { key: w.key, slot: this.lanes.take(w.key) };
+    });
+    return { taken };
   }
 
   /**
-   * Run a booked call and give the booking back when none of its requests
-   * reached Govee (issue #51): a call that failed on the name lookup or a
-   * refused connection was never counted by Govee, so it must not use up the
-   * adapter's mirror of Govee's limits either — least of all an appliance's
+   * Run a booked call. When it ends, its slots count down their windows from
+   * that moment; when none of its requests reached Govee (issue #51) — a call
+   * that failed on the name lookup or a refused connection was never counted
+   * by Govee — its slots are given back instead, least of all an appliance's
    * daily allowance, which otherwise refused real commands after an outage.
    *
    * @param execute The API call
@@ -517,65 +463,19 @@ export class RateLimiter {
     try {
       await runBooked(booking, execute);
     } finally {
-      if (booking.seal()) {
-        this.refund(spent);
-      }
-    }
-  }
-
-  /**
-   * Give one booking back — only to the windows it was taken from.
-   *
-   * @param spent The booking
-   */
-  private refund(spent: SpentCall): void {
-    const { lane, budget } = spent;
-    if (spent.minuteEpoch === this.minuteEpoch) {
-      switch (lane.kind) {
-        case "account-list":
-          this.accountListUsed = Math.max(0, this.accountListUsed - 1);
-          break;
-        case "appapi":
-          this.appApiUsed = Math.max(0, this.appApiUsed - 1);
-          break;
-        case "device-read":
-          this.deviceReadUsed.set(lane.deviceKey, Math.max(0, (this.deviceReadUsed.get(lane.deviceKey) ?? 0) - 1));
-          break;
-        case "device-control":
-          break;
-      }
-    }
-    // The control buckets refill continuously — a token goes back whatever the window.
-    if (lane.kind === "device-control") {
       const now = this.clock();
-      this.controlBucket(lane.deviceKey, now).give(now);
-      this.accountControl.give(now);
-    }
-    if (spent.dayEpoch === this.dayEpoch) {
-      this.callsToday = Math.max(0, this.callsToday - 1);
-      this.notDeliveredToday++;
-      if (budget) {
-        this.callsTodayPerDevice.set(budget.key, Math.max(0, (this.callsTodayPerDevice.get(budget.key) ?? 0) - 1));
+      if (booking.seal()) {
+        for (const { key, slot } of spent.taken) {
+          this.lanes.give(key, slot);
+        }
+        this.notDelivered.take("given back").end = now;
+      } else {
+        for (const { slot } of spent.taken) {
+          slot.end = now;
+        }
       }
+      this.schedule();
     }
-  }
-
-  private controlBucket(deviceKey: string, now: number): TokenBucket {
-    let bucket = this.deviceControl.get(deviceKey);
-    if (!bucket) {
-      bucket = new TokenBucket(this.limits.deviceControl.burst, this.limits.deviceControl.perSecond, now);
-      this.deviceControl.set(deviceKey, bucket);
-    }
-    return bucket;
-  }
-
-  /** Zero the minute windows and run what waited for them. */
-  private resetMinuteWindow(): void {
-    this.minuteEpoch++;
-    this.accountListUsed = 0;
-    this.appApiUsed = 0;
-    this.deviceReadUsed.clear();
-    this.processQueue();
   }
 
   /**
@@ -599,11 +499,8 @@ export class RateLimiter {
     priority = 0,
     budget?: DeviceBudget,
   ): Promise<void> {
-    if (budget && this.deviceBudgetSpent(budget)) {
-      throw new Error(`Daily Govee budget for ${budget.key} is used up (${budget.perDay} calls)`);
-    }
-    // A spent day: canMakeCall refuses, and enqueue rejects with DAY_BUDGET_SPENT.
-    if (this.canMakeCall(lane)) {
+    // A full long window refuses in enqueue, which rejects this promise with the reason
+    if (this.waitFor(lane, budget) === 0) {
       await this.runSpent(execute, this.spend(lane, budget));
       return;
     }
@@ -629,94 +526,179 @@ export class RateLimiter {
   }
 
   /**
-   * Whether a call on this lane can be made right now — the day counter first,
-   * then the lane's own bucket.
+   * Whether a call on this lane can be made right now — every window of the
+   * lane, the daily one included, has room.
    *
    * @param lane The actor the call would be charged to
    */
   canMakeCall(lane: CallLane = ACCOUNT_LIST_LANE): boolean {
-    if (this.callsToday >= this.limits.perDay) {
-      return false;
-    }
+    return this.waitFor(lane) === 0;
+  }
+
+  /**
+   * What the next process of this instance must know: the settle times of
+   * every window longer than {@link QUEUE_MAX_WINDOW_SECONDS} — an open call
+   * as ending now.
+   */
+  memory(): RateLimiterMemory {
     const now = this.clock();
-    switch (lane.kind) {
-      case "account-list":
-        return this.accountListUsed < this.limits.accountListPerMinute;
-      case "appapi":
-        return this.appApiUsed < this.limits.appApiPerMinute;
-      case "device-read":
-        return (this.deviceReadUsed.get(lane.deviceKey) ?? 0) < this.limits.deviceReadPerMinute;
-      case "device-control":
-        return this.accountControl.has(now) && this.controlBucket(lane.deviceKey, now).has(now);
+    const lanes: Record<string, number[]> = {};
+    for (const w of this.knownWindows()) {
+      if (w.seconds > QUEUE_MAX_WINDOW_SECONDS) {
+        const ends = this.lanes.ends(w.key, w.seconds, now);
+        if (ends.length > 0) {
+          lanes[w.key] = ends;
+        }
+      }
+    }
+    return { lanes };
+  }
+
+  /**
+   * Lay in what the previous process left — the calls it made within every
+   * long window still count. Only lanes this limiter keeps and only settle
+   * times within their window are taken.
+   *
+   * @param memory What {@link loadLimiterMemory} read
+   */
+  remember(memory: RateLimiterMemory): void {
+    const now = this.clock();
+    const longs = new Map(
+      this.knownWindows()
+        .filter(w => w.seconds > QUEUE_MAX_WINDOW_SECONDS)
+        .map(w => [w.key, w.seconds]),
+    );
+    for (const [key, ends] of Object.entries(memory.lanes)) {
+      const seconds = longs.get(key) ?? (key.startsWith("allowance|") ? DAY_SECONDS : undefined);
+      if (seconds === undefined) {
+        continue;
+      }
+      this.lanes.restore(
+        key,
+        ends.filter(end => end <= now && now - end < seconds * 1000),
+      );
     }
   }
 
   /**
-   * Snapshot of usage + limits for the diag runtime-state export, one entry
-   * per lane. Returns plain values so the DiagnosticsCollector can
-   * clone-and-cap safely. Plus `queueLength` for "Cloud calls piling up?"
-   * forensics.
+   * Every window a lane of this limiter books right now: the declared ones of
+   * every lane that holds a slot, and the device allowances.
+   */
+  private knownWindows(): LaneWindow[] {
+    const windows = new Map<string, LaneWindow>();
+    for (const kind of Object.keys(this.limits) as Array<CallLane["kind"]>) {
+      for (const counterpart of this.limits[kind]) {
+        for (const [i, limit] of counterpart.limits.entries()) {
+          if (limit.per !== "device") {
+            const key = `${counterpart.name}|${i}|account`;
+            windows.set(key, { key, max: limit.max, seconds: limit.seconds });
+          }
+        }
+      }
+    }
+    for (const key of this.lanes.keys()) {
+      if (key.startsWith("allowance|")) {
+        windows.set(key, { key, max: 0, seconds: DAY_SECONDS });
+      } else if (!windows.has(key)) {
+        const window = this.windowOfKey(key);
+        if (window) {
+          windows.set(key, window);
+        }
+      }
+    }
+    return [...windows.values()];
+  }
+
+  /**
+   * The declared window a lane key names (`<counterpart>|<limit index>|<who>`).
+   *
+   * @param key The lane key
+   */
+  private windowOfKey(key: string): LaneWindow | undefined {
+    const [name, index] = key.split("|");
+    const counterpart = Object.values(this.limits)
+      .flat()
+      .find((c: Counterpart) => c.name === name);
+    const limit = counterpart?.limits[Number(index)];
+    return limit ? { key, max: limit.max, seconds: limit.seconds } : undefined;
+  }
+
+  /**
+   * Snapshot of usage + limits for the diag runtime-state export: every window
+   * that holds a slot, with its use. Returns plain values so the
+   * DiagnosticsCollector can clone-and-cap safely. Plus `queueLength` for
+   * "Cloud calls piling up?" forensics.
    */
   getUsageSnapshot(): RateLimiterSnapshot {
     const now = this.clock();
+    const windows = this.knownWindows().map(w => ({
+      lane: w.key,
+      seconds: w.seconds,
+      max: w.max,
+      used: this.lanes.held(w.key, w.seconds, now).length,
+    }));
+    const day = this.knownWindows().find(w => w.seconds > QUEUE_MAX_WINDOW_SECONDS && !w.key.startsWith("allowance|"));
     return {
-      usedToday: this.callsToday,
-      notDeliveredToday: this.notDeliveredToday,
-      dailyLimit: this.limits.perDay,
+      usedToday: day ? this.lanes.held(day.key, day.seconds, now).length : 0,
+      notDeliveredToday: this.notDelivered.held("given back", DAY_SECONDS, now).length,
+      dailyLimit: day?.max ?? 0,
       queueLength: this.queue.length,
-      lanes: {
-        accountList: { used: this.accountListUsed, limit: this.limits.accountListPerMinute },
-        appApi: { used: this.appApiUsed, limit: this.limits.appApiPerMinute },
-        deviceRead: {
-          limit: this.limits.deviceReadPerMinute,
-          devices: [...this.deviceReadUsed].map(([deviceKey, used]) => ({ deviceKey, used })),
-        },
-        deviceControl: {
-          perSecond: this.limits.deviceControl.perSecond,
-          burst: this.limits.deviceControl.burst,
-          accountTokens: this.accountControl.available(now),
-          devices: [...this.deviceControl].map(([deviceKey, bucket]) => ({ deviceKey, tokens: bucket.available(now) })),
-        },
-      },
+      windows,
     };
   }
 
   /**
+   * Wake the queue when the soonest window a queued call waits for has room
+   * again. A window full of calls that have not ended yet has no such moment:
+   * the end of one of them schedules again.
+   */
+  private schedule(): void {
+    // a stopped limiter has an empty queue and queues nothing: no call, no wake-up
+    let soonest: number | undefined;
+    for (const call of this.queue) {
+      const wait = this.waitFor(call.lane, call.budget);
+      if (wait !== undefined && (soonest === undefined || wait < soonest)) {
+        soonest = wait;
+      }
+    }
+    if (soonest === undefined) {
+      return;
+    }
+    if (this.wakeTimer) {
+      this.timers.clearTimeout(this.wakeTimer);
+    }
+    this.wakeTimer = this.timers.setTimeout(() => {
+      this.wakeTimer = undefined;
+      this.processQueue();
+    }, soonest);
+  }
+
+  /**
    * Process queued calls: walk the priority-sorted queue and start every call
-   * whose lane is free right now. A call whose bucket is exhausted is skipped,
+   * whose windows have room right now. A call whose lane is full is skipped,
    * not waited for — a saturated App-API lane never holds a command back.
    */
   private processQueue(): void {
     if (this.stopped) {
       return;
     }
-    if (this.dayBudgetSpent()) {
-      // Calls queued for a minute window, then the day ran out: they would wait
-      // until the rollover — refuse them now instead (A10).
-      for (const call of this.queue.splice(0)) {
-        call.reject?.(new Error(DAY_BUDGET_SPENT));
-      }
-      return;
-    }
     for (let i = 0; i < this.queue.length;) {
       const call = this.queue[i];
-      if (!this.canMakeCall(call.lane)) {
+      // Checked HERE, not only when the call was queued: while it waited,
+      // immediate calls may have spent the rest of the day or of the device's
+      // allowance. Running it anyway would overrun Govee's 100/day for an
+      // appliance — the exact case the allowance exists for.
+      const refused = this.refusal(call.lane, call.budget);
+      if (refused) {
+        this.queue.splice(i, 1);
+        call.reject?.(refused);
+        continue;
+      }
+      if (this.waitFor(call.lane, call.budget) !== 0) {
         i++;
         continue;
       }
       this.queue.splice(i, 1);
-      // Re-check the device allowance HERE, not only when the call was
-      // queued: while this one waited, immediate calls for the same device
-      // may have spent the rest of its day. Running it anyway would overrun
-      // Govee's 100/day for an appliance — the exact case the allowance
-      // exists for, and the one the old code could not see because it never
-      // carried the budget into the queue.
-      if (call.budget && this.deviceBudgetSpent(call.budget)) {
-        call.reject?.(new Error(`Daily Govee budget for ${call.budget.key} is used up (${call.budget.perDay} calls)`));
-        continue;
-      }
-      // spend(), not two raw increments: this was the second booking site and
-      // the only one that did not know about device allowances.
       this.runSpent(call.execute, this.spend(call.lane, call.budget)).catch(err => {
         this.log.debug(`Queued call failed: ${errText(err)}`);
       });
@@ -725,29 +707,20 @@ export class RateLimiter {
       // Queue drained — the next overflow episode warns again.
       this.warnedQueueFull = false;
     }
+    this.schedule();
   }
 }
 
-/** What `getUsageSnapshot` reports — one entry per lane. */
+/** What `getUsageSnapshot` reports — every window that holds a slot. */
 export interface RateLimiterSnapshot {
-  /** OpenAPI + App-API calls made today, all lanes together. */
+  /** OpenAPI calls in the last 24 hours, all lanes together. */
   usedToday: number;
-  /** Calls given back today because none of their requests reached Govee (DNS, refused connection). */
+  /** Calls given back in the last 24 hours because none of their requests reached Govee (DNS, refused connection). */
   notDeliveredToday: number;
   /** The daily ceiling those calls count against. */
   dailyLimit: number;
-  /** Calls waiting for a free bucket right now. */
+  /** Calls waiting for a free window right now. */
   queueLength: number;
-  /** Per-lane usage against its own limit. */
-  lanes: {
-    accountList: { used: number; limit: number };
-    appApi: { used: number; limit: number };
-    deviceRead: { limit: number; devices: Array<{ deviceKey: string; used: number }> };
-    deviceControl: {
-      perSecond: number;
-      burst: number;
-      accountTokens: number;
-      devices: Array<{ deviceKey: string; tokens: number }>;
-    };
-  };
+  /** Per window: its lane (`<counterpart>|<limit>|<account or device>`), length, limit and use. */
+  windows: Array<{ lane: string; seconds: number; max: number; used: number }>;
 }

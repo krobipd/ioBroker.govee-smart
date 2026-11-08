@@ -1203,7 +1203,17 @@ export class DeviceManager {
     }
 
     try {
-      const rawCloudDevices = await this.cloudClient.getDevices();
+      // Through the limiter like every OpenAPI call: the device list counts in its own window and in the day's.
+      const cloud = this.cloudClient;
+      let rawCloudDevices: CloudDevice[] = [];
+      const fetchList = async (): Promise<void> => {
+        rawCloudDevices = await cloud.getDevices();
+      };
+      if (this.rateLimiter) {
+        await this.rateLimiter.executeTracked(fetchList, ACCOUNT_LIST_LANE, 1);
+      } else {
+        await fetchList();
+      }
 
       // An empty list is a valid account (only Bluetooth devices, only
       // groups) — unless something else says devices exist: a cache entry, a

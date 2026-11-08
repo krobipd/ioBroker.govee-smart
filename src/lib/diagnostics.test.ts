@@ -1155,17 +1155,22 @@ describe("DiagnosticsCollector", () => {
           notDeliveredToday: 0,
           dailyLimit: 9000,
           queueLength: 0,
-          lanes: {
-            accountList: { used: 1, limit: 20 },
-            appApi: { used: 2, limit: 8 },
-            deviceRead: { limit: 20, devices: [{ deviceKey: "H6172:AA:BB:CC:DD:EE:FF:00:11", used: 1 }] },
-            deviceControl: {
-              perSecond: 2,
-              burst: 6,
-              accountTokens: 79,
-              devices: [{ deviceKey: "H6172:AA:BB:CC:DD:EE:FF:00:11", tokens: 5 }],
+          windows: [
+            { lane: "Govee OpenAPI device list|0|account", seconds: 60, max: 20, used: 1 },
+            { lane: "Govee App API libraries|0|account", seconds: 60, max: 8, used: 2 },
+            {
+              lane: "Govee OpenAPI device reads|0|device H6172:AA:BB:CC:DD:EE:FF:00:11",
+              seconds: 60,
+              max: 20,
+              used: 1,
             },
-          },
+            {
+              lane: "Govee OpenAPI device control|0|device H6172:AA:BB:CC:DD:EE:FF:00:11",
+              seconds: 3,
+              max: 6,
+              used: 1,
+            },
+          ],
         },
         wizardSession: null,
         lanSeenDeviceIps: ["AA:BB:CC:DD:EE:FF:1D:6F:10.0.0.1"],
@@ -1180,11 +1185,11 @@ describe("DiagnosticsCollector", () => {
       expect(rt.lanSeenDeviceIps).toEqual([expect.stringMatching(/^mac-\d+:address-\d+$/)]);
       expect(JSON.stringify(result)).not.toContain("10.0.0.1");
       expect(JSON.stringify(result)).not.toContain("AA:BB:CC:DD:EE:FF");
-      // The per-device buckets of the limiter (2.39.0) are keyed by device id —
-      // the keys go through the report's placeholders like every other id.
-      const lanes = (rt.rateLimiter as { lanes: { deviceRead: { devices: Array<{ deviceKey: string }> } } }).lanes;
-      expect(lanes.deviceRead.devices[0].deviceKey).not.toContain("AA:BB:CC:DD:EE:FF:00:11");
-      expect(lanes.deviceRead.devices[0].deviceKey).toMatch(/^H6172:/);
+      // The per-device windows of the limiter are named by device id —
+      // the names go through the report's placeholders like every other id.
+      const windows = (rt.rateLimiter as { windows: Array<{ lane: string }> }).windows;
+      expect(windows[2].lane).not.toContain("AA:BB:CC:DD:EE:FF:00:11");
+      expect(windows[2].lane).toMatch(/^Govee OpenAPI device reads\|0\|device H6172:/);
     });
 
     it("yields null runtimeState when no provider is wired", async () => {

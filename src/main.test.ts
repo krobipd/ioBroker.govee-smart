@@ -494,6 +494,8 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     }),
     executeTracked: vi.fn(async (fn: () => Promise<void>) => fn()),
     getUsageSnapshot: vi.fn(() => null),
+    remember: vi.fn(),
+    memory: vi.fn(() => ({ lanes: {} })),
   };
 
   const seams = adapter as unknown as Record<string, unknown>;
@@ -585,6 +587,18 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     // The fake cloud client comes up → the channel must report "on".
     expect(i.channelStatus.cloud).toBe("on");
     expect(i.log.info).toHaveBeenCalledWith(expect.stringContaining("Starting (LAN, Cloud)"));
+  });
+
+  it("the rate limiter remembers what the previous process left in the data folder before it starts", async () => {
+    // the daily window slides over a restart (Werkbank round 171: a window longer than one installation survives it)
+    fsReal.mkdirSync(currentDataDir(), { recursive: true });
+    fsReal.writeFileSync(
+      pathReal.join(currentDataDir(), "rate-limits.json"),
+      JSON.stringify({ lanes: { "Govee OpenAPI (REST)|0|account": [123, 456] } }),
+    );
+    const { f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    expect(f.limiter.remember).toHaveBeenCalledWith({ lanes: { "Govee OpenAPI (REST)|0|account": [123, 456] } });
+    expect(f.limiter.remember.mock.invocationCallOrder[0]).toBeLessThan(f.limiter.start.mock.invocationCallOrder[0]);
   });
 
   it("account credentials are trimmed before the MQTT login (issue #39)", async () => {
@@ -1325,7 +1339,8 @@ describe("GoveeAdapter onReady — timers", () => {
     i.clearTimeout.mockClear();
     const cb = vi.fn();
     i.onUnload(cb);
-    await new Promise(resolve => setTimeout(resolve, 10));
+    // the callback comes after the last write — the limiter's file included, whose flush takes its own time
+    await vi.waitFor(() => expect(cb).toHaveBeenCalled());
 
     expect(i.unloading).toBe(true);
     // 3 intervals (app-api poll, online sync, app-version) + the one-shot timers.
@@ -1337,6 +1352,41 @@ describe("GoveeAdapter onReady — timers", () => {
     expect(f.limiter.stop).toHaveBeenCalled();
     expect(cb).toHaveBeenCalledTimes(1);
     expect(i.states.get("info.connection")).toEqual({ val: false, ack: true });
+  });
+
+  it("onUnload leaves the limiter's long windows in the data folder before it calls back", async () => {
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.limiter.memory.mockReturnValue({ lanes: { "Govee OpenAPI (REST)|0|account": [789] } });
+    const file = pathReal.join(currentDataDir(), "rate-limits.json");
+    let onDiskAtCallback: unknown;
+    await new Promise<void>(resolve => {
+      i.onUnload(() => {
+        onDiskAtCallback = JSON.parse(fsReal.readFileSync(file, "utf8"));
+        resolve();
+      });
+    });
+    expect(f.limiter.memory.mock.invocationCallOrder[0]).toBeGreaterThan(f.limiter.stop.mock.invocationCallOrder[0]);
+    expect(onDiskAtCallback).toEqual({ lanes: { "Govee OpenAPI (REST)|0|account": [789] } });
+  });
+
+  it("onUnload waits for the limiter's file even when a state write fails first", async () => {
+    const { adapter, f } = await setupReady({ apiKey: "12345678-1234-1234-1234-123456789abc" });
+    const i = internalOf(adapter);
+    f.limiter.memory.mockReturnValue({ lanes: { "Govee OpenAPI (REST)|0|account": [321] } });
+    (i as unknown as { setState: () => Promise<never> }).setState = () =>
+      Promise.reject(new Error("states DB already closed"));
+    const file = pathReal.join(currentDataDir(), "rate-limits.json");
+    const debug = vi.spyOn(i.log, "debug");
+    let onDiskAtCallback: unknown;
+    await new Promise<void>(resolve => {
+      i.onUnload(() => {
+        onDiskAtCallback = fsReal.existsSync(file) ? JSON.parse(fsReal.readFileSync(file, "utf8")) : undefined;
+        resolve();
+      });
+    });
+    expect(onDiskAtCallback).toEqual({ lanes: { "Govee OpenAPI (REST)|0|account": [321] } });
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("final write rejected: states DB already closed"));
   });
 
   it("onUnload clears every timer handle the start-up armed — none is left ticking", async () => {
@@ -3514,9 +3564,13 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
     const held: Array<() => Promise<void>> = [];
     let ran = 0;
     const limiter = f.limiter as unknown as {
-      executeTracked: (fn: () => Promise<void>, prio?: number) => Promise<void>;
+      executeTracked: (fn: () => Promise<void>, lane?: { kind: string }) => Promise<void>;
     };
-    limiter.executeTracked = (fn: () => Promise<void>) => {
+    limiter.executeTracked = (fn: () => Promise<void>, lane?: { kind: string }) => {
+      // the device list runs through the limiter too — the bench holds only the scene calls
+      if (lane?.kind === "account-list") {
+        return fn();
+      }
       if (ran < immediate) {
         ran++;
         return fn();

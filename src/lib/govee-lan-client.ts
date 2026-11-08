@@ -434,8 +434,11 @@ export class GoveeLanClient {
       waiting.push(send);
       return;
     }
-    if (this.gate.tryAdmit(LAN_CONTROL, ip)) {
+    const sent = this.gate.tryAdmit(LAN_CONTROL, ip);
+    if (sent) {
       send();
+      // the datagram counts from its send — the stamp comes right after it (call-gate.ts)
+      sent();
       return;
     }
     this.log.debug(`LAN ${cmd} to ${ip} waits for the control limit`);
@@ -455,8 +458,13 @@ export class GoveeLanClient {
         () => {
           this.pacedTimers.delete(ip);
           const waiting = this.paced.get(ip);
-          while (waiting && waiting.length > 0 && this.gate.tryAdmit(LAN_CONTROL, ip)) {
+          while (waiting && waiting.length > 0) {
+            const sent = this.gate.tryAdmit(LAN_CONTROL, ip);
+            if (!sent) {
+              break;
+            }
             waiting.shift()!();
+            sent();
           }
           if (!waiting || waiting.length === 0) {
             this.paced.delete(ip);
@@ -758,7 +766,8 @@ export class GoveeLanClient {
     const targets = new Set<string>([MULTICAST_ADDR, ...broadcasts, ...known]);
     for (const target of targets) {
       // The discovery limit per host (api-limits.json): a target scanned too often is skipped this round.
-      if (!this.gate.tryAdmit(LAN_DISCOVERY, target)) {
+      const sent = this.gate.tryAdmit(LAN_DISCOVERY, target);
+      if (!sent) {
         this.log.debug(`LAN scan to ${target} skipped — discovery limit`);
         continue;
       }
@@ -767,6 +776,7 @@ export class GoveeLanClient {
           this.log.debug(`LAN scan send error (${target}): ${err.message}`);
         }
       });
+      sent();
     }
   }
 

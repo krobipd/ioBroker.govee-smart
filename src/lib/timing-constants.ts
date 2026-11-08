@@ -1,4 +1,4 @@
-import { limitOf } from "./api-limits";
+import { counterpartNamed, type Counterpart } from "./api-limits";
 /**
  * Central timing constants for the adapter.
  *
@@ -308,30 +308,31 @@ export const FORCE_COLOR_MODE_SETTLE_MS = 150;
 
 // === Cloud rate-limiter ===
 
-/** The Govee cloud budget, one bucket per actor Govee names (see {@link CLOUD_LIMITS}). */
+/**
+ * The Govee cloud budget, one lane per actor Govee names (see {@link CLOUD_LIMITS}): for each kind of rate-limiter lane
+ * the declared counterparts whose windows it books.
+ */
 export interface CloudLimits {
-  /** `/user/devices` — per account and minute. */
-  accountListPerMinute: number;
-  /** `/device/state`, `/device/scenes`, `/device/diy-scenes` — per DEVICE and minute. */
-  deviceReadPerMinute: number;
-  /** `/device/control` — per DEVICE: a token bucket of `burst`, refilled `perSecond`. */
-  deviceControl: { perSecond: number; burst: number };
-  /** `/device/control` — per ACCOUNT: the same shape, the ceiling over all devices. */
-  accountControl: { perSecond: number; burst: number };
-  /** app2.govee.com (libraries, SKU features, snapshot packets) — undocumented, per minute, global. */
-  appApiPerMinute: number;
-  /** All OpenAPI calls together per day. */
-  perDay: number;
+  /** `/user/devices` — per account. */
+  "account-list": readonly Counterpart[];
+  /** `/device/state`, `/device/scenes`, `/device/diy-scenes` — per DEVICE. */
+  "device-read": readonly Counterpart[];
+  /** `/device/control` — per DEVICE and, over all devices, per ACCOUNT. */
+  "device-control": readonly Counterpart[];
+  /** app2.govee.com libraries, SKU features, snapshot packets — undocumented, a small lane of their own. */
+  appapi: readonly Counterpart[];
 }
 
 /**
  * Govee's OpenAPI limits, per ACTOR, with a safety margin (v2 reference page
- * `get-you-devices`, table "Friendly Reminder", page dated 2026-07-06):
+ * `get-you-devices`, table "Friendly Reminder", page dated 2026-07-06), as the
+ * windows api-limits.json declares — the one source of every number (GV-08;
+ * the adapter reads its pace only from its declaration):
  *
- *   /user/devices    account  30/min          → 20
- *   /device/state    device   30/min          → 20   (scenes and DIY scenes the same)
- *   /device/control  device    2/s, burst  6  → as documented
- *   /device/control  account  12/s, burst 80  → as documented
+ *   /user/devices    account  30/min          → 20 per 60 s
+ *   /device/state    device   30/min          → 20 per 60 s (scenes and DIY scenes the same)
+ *   /device/control  device    2/s, burst  6  →  6 per 3 s
+ *   /device/control  account  12/s, burst 80  → 80 per 7 s
  *
  * Until 2.38.3 ONE global window of 8 calls per minute covered every device and
  * every endpoint — the v1 API's "10 per minute" read as an account limit. Eight
@@ -341,23 +342,18 @@ export interface CloudLimits {
  * Govee's documented budget at all; they keep their own small window so an
  * undocumented endpoint is never stormed, and they no longer block commands.
  *
- * The daily numbers are v1 inheritance: 10,000 per account and 100 per
- * appliance stand in the v1 PDF only, the v2 page names no daily limit at all
- * — neither withdrawn nor confirmed. They stay (a wager either way is the
- * wrong move) until Govee's rate-limit response headers, recorded since
- * 2.39.0, show what v2 actually enforces. Accepted with them: the global
- * 8/min used to cap a day at ~11,500 calls by itself; now a script writing
- * one light in a loop can reach the 9,000 within minutes, and for lights that
- * counter is the only brake left (appliances keep their 90).
+ * Every OpenAPI lane also books the daily window of "Govee OpenAPI (REST)". The
+ * daily numbers are v1 inheritance: 10,000 per account and 100 per appliance
+ * stand in the v1 PDF only, the v2 page names no daily limit at all — neither
+ * withdrawn nor confirmed. They stay (a wager either way is the wrong move)
+ * until Govee's rate-limit response headers, recorded since 2.39.0, show what
+ * v2 actually enforces.
  */
 export const CLOUD_LIMITS: CloudLimits = {
-  accountListPerMinute: 20,
-  deviceReadPerMinute: 20,
-  deviceControl: { perSecond: 2, burst: 6 },
-  accountControl: { perSecond: 12, burst: 80 },
-  appApiPerMinute: 8,
-  // The one source of the daily number is api-limits.json (GV-08).
-  perDay: limitOf("Govee OpenAPI (REST)", 86_400).max,
+  "account-list": [counterpartNamed("Govee OpenAPI device list"), counterpartNamed("Govee OpenAPI (REST)")],
+  "device-read": [counterpartNamed("Govee OpenAPI device reads"), counterpartNamed("Govee OpenAPI (REST)")],
+  "device-control": [counterpartNamed("Govee OpenAPI device control"), counterpartNamed("Govee OpenAPI (REST)")],
+  appapi: [counterpartNamed("Govee App API libraries")],
 };
 
 /**

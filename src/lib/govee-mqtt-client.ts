@@ -425,7 +425,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   requestStatus(deviceTopic: string, now: number = Date.now(), cmdVersion: 1 | 2 = 2): boolean {
     const client = this.client;
-    if (!client || !this.connected || !this.publishGate.tryAdmit(BROKER_PUBLISHES, "")) {
+    const sent = client && this.connected ? this.publishGate.tryAdmit(BROKER_PUBLISHES, "") : undefined;
+    if (!client || !sent) {
       return false;
     }
     // homebridge-govee (lib/connection/aws.js) adds the account topic to every
@@ -442,6 +443,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         this.log.debug(`MQTT status request to ${deviceTopic.slice(0, 6)}… failed: ${errText(err)}`);
       }
     });
+    // the publish counts from its send — the stamp comes right after it (call-gate.ts)
+    sent();
     return true;
   }
 
@@ -462,7 +465,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    */
   publishCommand(deviceTopic: string, cmd: string, data: Record<string, unknown>, now: number = Date.now()): boolean {
     const client = this.client;
-    if (!client || !this.connected || !this.publishGate.tryAdmit(BROKER_PUBLISHES, "")) {
+    const sent = client && this.connected ? this.publishGate.tryAdmit(BROKER_PUBLISHES, "") : undefined;
+    if (!client || !sent) {
       return false;
     }
     const msg: Record<string, unknown> = { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 };
@@ -475,6 +479,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
         this.log.debug(`MQTT command ${cmd} to ${deviceTopic.slice(0, 6)}… failed: ${errText(err)}`);
       }
     });
+    // the publish counts from its send — the stamp comes right after it (call-gate.ts)
+    sent();
     return true;
   }
 
