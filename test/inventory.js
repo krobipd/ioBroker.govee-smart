@@ -96,16 +96,18 @@ const READ_ONLY = new Set();
  * The environment of every adapter start: the resource probe first, then the adapter's fixture hooks (FIXTURE_HOOKS,
  * round 113), its pacing hooks (PACING_HOOKS, round 123) unless the installation is one the limit tests judge, then the
  * fleet hooks of this start — NETWORK_HOOK always last. countThisInstallation (right after clearInstanceData in the three
- * limit suites) marks such an installation: `<time>.counted` next to its `<time>.install`.
+ * limit suites, and in the press installations of test/fleet-suites.js) marks such an installation: `<time>.counted` next
+ * to its `<time>.install`.
  *
  * @param {...string} hooks the fleet hooks of this start (none, or NETWORK_HOOK)
  */
 // Round 123: true while a suite runs whose installation the limit tests judge (`a restart right after the start`,
-// `one counterpart hangs`, `one counterpart hangs mid-run` — countThisInstallation, their after() ends it).
+// `one counterpart hangs`, `one counterpart hangs mid-run` — countThisInstallation, their after() ends it; round 171: the
+// press installations of test/fleet-suites.js, stopCounting ends them).
 let counting = false;
 function adapterEnv(...hooks) {
   // round 123: a judged installation runs at the adapter's own pace (no PACING_HOOKS) and tells the fixture hooks so
-  // (INVENTORY_COUNTED, for the account LIMIT_ACCOUNT announces); every other suite keeps both
+  // (INVENTORY_COUNTED: a fixture hook may serve a smaller account there); every other suite keeps both
   return {
     NODE_OPTIONS: [RESOURCE_PROBE, ...FIXTURE_HOOKS, ...(counting ? [] : PACING_HOOKS), ...hooks]
       .map(file => `--require ${file}`)
@@ -118,6 +120,9 @@ function adapterEnv(...hooks) {
 function countThisInstallation() {
   counting = true;
   fs.writeFileSync(path.join(RESOURCE_DIR, `${Date.now()}.counted`), "");
+}
+function stopCounting() {
+  counting = false;
 }
 // govee-smart: the https hook routes every Govee host to the fake cloud on this port. The harness hands the
 // mocha process's environment to the adapter process (`env: { ...process.env, ...env }`, @iobroker/testing 6.2.2).
@@ -954,18 +959,12 @@ const FIXTURE_HOOKS = [path.join(__dirname, "inventory-https-hook.cjs")];
  * a limiter that was switched off): adapter-specific — the `--require` hooks that change only the adapter's own pace (a
  * budget widened so a thousand fixture calls take seconds, not twenty minutes), each `path.join(__dirname, "<file>")`.
  * adapterEnv drops them from the installations the limit tests judge (countThisInstallation); the limit tests then judge
- * only those. B02 holds a fixture hook that sets an environment variable `src/` reads: it belongs here. govee-smart: none
- * — the https hook only routes hosts, `src/` reads no environment variable.
+ * only those. B02 holds a fixture hook that sets an environment variable `src/` reads: it belongs here. govee-smart: the
+ * pacing hook widens every limit of src/lib/api-limits.json as the adapter loads it — with Govee's own minute windows the
+ * scene and library answers of most fixture lights would arrive minutes after the start, and the inventory is a picture of
+ * the finished tree (krobi-Go 2026-09-22).
  */
-const PACING_HOOKS = [];
-/**
- * Round 123: adapter-specific — true when the adapter's fixture hooks serve a smaller account in an installation the limit
- * tests judge (`process.env.INVENTORY_COUNTED === "1"`), because its full fixture account does not fit a declared limit
- * at its own pace; the inventory and every other suite keep the full account. The suite `one counterpart hangs` then
- * demands that a judged installation pressed every limit below a day — a smaller account that never reaches a limit
- * proves nothing.
- */
-const LIMIT_ACCOUNT = false;
+const PACING_HOOKS = [path.join(__dirname, "inventory-pacing-hook.cjs")];
 /**
  * Round 113: adapter-specific — the instance's native for one start: FIXTURE_NATIVE, or what this run computes (fixture
  * servers on ports chosen now, a device table built from them), plus what a suite asks for in `extra` (the chosen
@@ -1647,6 +1646,20 @@ function previousCredentials(secret, now) {
 }
 
 /**
+ * Round 171 (reported by yamaha): adapter-specific like feedFixtures. Since round 170 a configured installation holds
+ * its devices as own objects, not in the instance native (CLAUDE_PATTERNS.md § native „Wohin“) — the fixture native
+ * alone starts an adapter without devices, or on the migration path of an older release. Write here the objects the
+ * fixture setup holds before its first start (the device objects in the form this release stores them, e.g. with
+ * harness.objects.setObjectAsync), so every fresh suite starts where a configured installation stands. Called right
+ * after resetInstanceNative before every fresh start — never in the upgrade suite (seedPrevious lays its state) and
+ * never on a running installation. Empty where the adapter's configuration is its native. govee-smart: empty — its
+ * configuration is the native; the device objects come from the cloud list and the LAN scan.
+ *
+ * @param {import("@iobroker/testing").IntegrationTestHarness} harness
+ */
+async function seedInstanceObjects(harness) {}
+
+/**
  * Round 67: the objects of the namespace that still carry ENCRYPTED_MARKER — read raw from the database, never through
  * dumpObjects (an adapter's dump masks again). Checked right after the restore, before the start: later the adapter may
  * have rewritten or deleted the object, and a clean result would prove nothing about the seeded one.
@@ -1933,9 +1946,11 @@ async function playHangMidRun(harness, restarts) {
 
 /**
  * Round 100 (krobi 2026-10-07 10:14): the limits the adapter defines — `counterparts[]`, each with `name`, `match`
- * (`host`, `port`, `kind`: http, tcp, tcp-write or udp — every field given must fit; `tcp-write` is every write on a raw
- * connection of the adapter, round 104) and `limits[]` (`max` calls in `seconds`, `per`
- * account or host, and the `source`: a link to the documentation, a measurement with its date, or the adapter's own cap).
+ * (`host`, `port`, `kind`: http, tcp, tcp-write or udp — every field given must fit; `tcp` a raw connection the adapter
+ * opens itself, `tcp-write` every write on it, round 104; round 171: an http client's, a fetch's or a WebSocket's request
+ * counts once, as `http`; `network: "private"`, `method`, `pathPattern`, `bodyPattern`) and
+ * `limits[]` (`max` calls in `seconds` or, round 171, `concurrent: true` for calls open at once; `per` account, host or
+ * device; and the `source`: a link to the documentation, a measurement with its date, or the adapter's own cap).
  */
 function apiLimits() {
   assert.ok(
@@ -1945,66 +1960,9 @@ function apiLimits() {
   return JSON.parse(fs.readFileSync(API_LIMITS, "utf8")).counterparts;
 }
 
-/** Round 100: whether a counted call belongs to a declared counterpart. */
-function fits(call, match) {
-  // round 107 (K18): `hostPattern`, an anchored regular expression, for a counterpart whose host differs per account
-  return Object.entries(match).every(([key, value]) =>
-    key === "hostPattern" ? new RegExp(value).test(String(call.host)) : call[key] === value,
-  );
-}
-
-/**
- * Round 123: the counted calls of the installations the limit tests judge, each with its installation number — every
- * installation of the run where the adapter has no PACING_HOOKS (nothing changed its pace), otherwise only those
- * countThisInstallation marked; the others ran with a widened budget, the log says how many were left out.
- */
-function judgedCalls() {
-  const files = fs.readdirSync(RESOURCE_DIR);
-  const installs = files.filter(f => f.endsWith(".install")).map(f => Number(f.slice(0, -".install".length)));
-  const at = t => installs.filter(i => i <= t).length;
-  const counted = new Set(
-    files.filter(f => f.endsWith(".counted")).map(f => at(Number(f.slice(0, -".counted".length)))),
-  );
-  const judged = install => PACING_HOOKS.length === 0 || counted.has(install);
-  const installOf = new Map();
-  for (const c of readCalls().filter(c => !c.kind.startsWith("hang-"))) {
-    installOf.set(c.pid, installOf.get(c.pid) ?? at(c.t));
-  }
-  const left = new Set([...installOf.values()].filter(i => !judged(i)));
-  if (left.size > 0) {
-    console.log(`      ${left.size} installation(s) ran with PACING_HOOKS — not judged against the limits`);
-  }
-  return readCalls()
-    .filter(c => !c.kind.startsWith("hang-") && judged(installOf.get(c.pid)))
-    .map(c => ({ ...c, install: installOf.get(c.pid) }));
-}
-
-/**
- * Round 123: the limits below a day that no judged installation pressed — with LIMIT_ACCOUNT the limiter is proven only
- * where one installation called a counterpart more often than such a limit allows in its window, so it had to spread the
- * calls. A day is no window of a run (the template's measured boundary).
- *
- * @param {{ install: number }[]} calls judgedCalls()
- * @param {{ name: string, match: object, limits: { max: number, seconds: number }[] }[]} counterparts apiLimits()
- */
-function limitSlack(calls, counterparts) {
-  const slack = [];
-  for (const d of counterparts) {
-    const per = new Map();
-    for (const c of calls.filter(c => fits(c, d.match))) {
-      per.set(c.install, (per.get(c.install) ?? 0) + 1);
-    }
-    const most = Math.max(0, ...per.values());
-    for (const limit of d.limits.filter(l => l.seconds < 86400)) {
-      if (most <= limit.max) {
-        slack.push(
-          `${d.name}: at most ${most} calls in one installation, never more than ${limit.max} in ${limit.seconds} s`,
-        );
-      }
-    }
-  }
-  return slack;
-}
+// Round 100: whether a counted call belongs to a declared counterpart — round 171: the one rule of test/fleet-suites.js
+// (host, hostPattern, network, port, kind, method, pathPattern, bodyPattern), which also judges every limit
+const { fits } = require("./fleet-suites.js");
 
 /**
  * Round 101 (krobi 2026-10-07 15:54): a value the adapter can be told for a writable state — another entry of `states`,
@@ -2580,6 +2538,7 @@ tests.integration(ADAPTER_DIR, {
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         seen = networkFiles();
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
@@ -2659,6 +2618,7 @@ tests.integration(ADAPTER_DIR, {
         harness = getHarness();
         clearInstanceData(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, SECOND_LANGUAGE);
         restarts = playControllerRestarts(harness, null);
         await harness.startAdapterAndWait(false, adapterEnv());
@@ -2693,6 +2653,7 @@ tests.integration(ADAPTER_DIR, {
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
@@ -2789,8 +2750,8 @@ tests.integration(ADAPTER_DIR, {
 
     // Round 113 (the limits count each installation on its own, rule 9 of the tool: what was blocked stays blocked): the
     // instance restarts right after its first start, the data folder kept as a host keeps it. An adapter that fetches
-    // everything again on every start calls its account twice within a minute — the limit test of the next suite judges
-    // this installation with both processes. Placed before `one counterpart hangs`, whose limit test reads it.
+    // everything again on every start calls its account twice within a minute — the limit judgement of
+    // test/fleet-suites.js (round 171, over the whole run) judges this installation with both processes.
     suite("a restart right after the start", getHarness => {
       let harness;
       let watch;
@@ -2805,6 +2766,7 @@ tests.integration(ADAPTER_DIR, {
         countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         const since = Date.now();
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
@@ -2832,7 +2794,8 @@ tests.integration(ADAPTER_DIR, {
 
     // Round 100 (krobi 2026-10-07 10:12/10:14): one counterpart hangs from the start — the adapter reaches every other one
     // before it gives up on the hung one, so one device never blocks another. Every call of this run and the one before
-    // goes to a counterpart the adapter declares in src/lib/api-limits.json, and stays within every limit there.
+    // goes to a counterpart the adapter declares in src/lib/api-limits.json; its limits test/fleet-suites.js judges over
+    // the whole run and presses (round 171).
     suite("one counterpart hangs", getHarness => {
       let harness;
       let watch;
@@ -2845,6 +2808,7 @@ tests.integration(ADAPTER_DIR, {
         countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         hang = startHang();
@@ -2907,54 +2871,6 @@ tests.integration(ADAPTER_DIR, {
           `calls to counterparts src/lib/api-limits.json does not declare:\n${unknown.join("\n")}`,
         );
       });
-
-      it("stays within every limit it declares", function () {
-        // round 113 (govee inv4): each installation counts on its own — a suite begins one in clearInstanceData; a
-        // process belongs to the installation its first call falls in, with the restarts the host plays in it;
-        // round 123: only the installations judgedCalls() keeps
-        const calls = judgedCalls();
-        const over = [];
-        for (const d of apiLimits()) {
-          for (const limit of d.limits) {
-            const lanes = new Map();
-            for (const c of calls.filter(c => fits(c, d.match))) {
-              const lane = `${limit.per === "host" ? c.host : "account"}, installation ${c.install}`;
-              lanes.set(lane, [...(lanes.get(lane) ?? []), c]);
-            }
-            for (const [lane, sent] of lanes) {
-              for (let j = 0; j < sent.length; j++) {
-                let held = 1;
-                for (let i = 0; i < j; i++) {
-                  if (sent[j].t - (sent[i].answered ?? sent[i].t) < limit.seconds * 1000) {
-                    held++;
-                  }
-                }
-                if (held > limit.max) {
-                  over.push(
-                    `${d.name} (${lane}): ${held} calls within ${limit.seconds} s, at most ${limit.max} (${limit.source})`,
-                  );
-                  break;
-                }
-              }
-            }
-          }
-        }
-        assert.deepStrictEqual(over, [], `calls above a declared limit:\n${over.join("\n")}`);
-      });
-
-      // Round 123 (homeconnect 2026-10-15): a smaller account for the counted starts proves the limit only when it
-      // pressed it
-      it("puts its limiter under pressure when the counted starts get a smaller account", function () {
-        if (!LIMIT_ACCOUNT) {
-          return;
-        }
-        const slack = limitSlack(judgedCalls(), apiLimits());
-        assert.deepStrictEqual(
-          slack,
-          [],
-          `the smaller account never put the limiter under pressure:\n${slack.join("\n")}`,
-        );
-      });
     });
 
     // Round 107 (W100-5): the same rule while the adapter already runs — a device that answered and then stops answering
@@ -2974,6 +2890,7 @@ tests.integration(ADAPTER_DIR, {
         countThisInstallation();
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
@@ -3054,6 +2971,7 @@ tests.integration(ADAPTER_DIR, {
           harness = getHarness();
           clearInstanceData(harness);
           await resetInstanceNative(harness, await fixtureNative());
+          await seedInstanceObjects(harness);
           const plan = listenPortPlan();
           held = await takePorts(plan.taken, plan.address);
           const seen = networkFiles();
@@ -3129,6 +3047,7 @@ tests.integration(ADAPTER_DIR, {
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
         await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
@@ -3159,10 +3078,14 @@ tests.integration(ADAPTER_DIR, {
         );
       });
 
+      // Round 171 (hueemu 2026-11-07): only a write that is a command asks for a call — the adapter's own settings and
+      // a list offering only its current entry reach no counterpart
       it("reaches a counterpart with its commands", function () {
+        const local = new Set(LOCAL_STATES.map(id => `${NS}${id}`));
+        const commands = command.writes.filter(w => !local.has(w.id) && !w.sole);
         assert.ok(
-          command.writes.length === 0 || command.calls.length > 0,
-          `none of ${command.writes.length} commands reached a counterpart in its own context — a queue that started before the command, or no device command at all: the suite judged nothing`,
+          commands.length === 0 || command.calls.length > 0,
+          `none of ${commands.length} commands reached a counterpart in its own context — a queue that started before the command, or no device command at all: the suite judged nothing`,
         );
       });
 
@@ -3211,6 +3134,7 @@ tests.integration(ADAPTER_DIR, {
         clearInstanceData(harness);
         watch = await watchObjectWrites(harness);
         await resetInstanceNative(harness, await fixtureNative());
+        await seedInstanceObjects(harness);
         await setSystemLanguage(harness, FIRST_LANGUAGE);
         restarts = playControllerRestarts(harness, watch);
         await harness.startAdapterAndWait(false, adapterEnv());
@@ -3254,6 +3178,7 @@ tests.integration(ADAPTER_DIR, {
           clearInstanceData(harness);
           const seen = networkFiles();
           await resetInstanceNative(harness, await fixtureNative({ [ADDRESS_KEY]: CHOSEN_ADDRESS }));
+          await seedInstanceObjects(harness);
           restarts = playControllerRestarts(harness, null, NETWORK_HOOK);
           await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
           await feedFixtures(harness);
@@ -3292,6 +3217,7 @@ tests.integration(ADAPTER_DIR, {
           harness = getHarness();
           clearInstanceData(harness);
           await resetInstanceNative(harness, await fixtureNative({ [ADDRESS_KEY]: MISSING_ADDRESS }));
+          await seedInstanceObjects(harness);
           restarts = playControllerRestarts(harness, null, NETWORK_HOOK);
           await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
           // The fixtures reach the adapter on every address — that it keeps working. No waitForAdapterWork: a
@@ -3338,6 +3264,7 @@ tests.integration(ADAPTER_DIR, {
           clearInstanceData(harness);
           watch = await watchObjectWrites(harness);
           await resetInstanceNative(harness, await fixtureNative());
+          await seedInstanceObjects(harness);
           await setSystemLanguage(harness, FIRST_LANGUAGE);
           restarts = playControllerRestarts(harness, watch, NETWORK_HOOK);
           await harness.startAdapterAndWait(false, adapterEnv(NETWORK_HOOK));
@@ -3447,15 +3374,16 @@ tests.integration(ADAPTER_DIR, {
         });
 
         it("writes no file for a report", function () {
+          // round 171 (homeconnect 2026-11-07): a file the adapter process writes while no report is made too is its own
+          // record — a hand-over of its request times that a kill or a crash must not lose fell into the window
+          const writes = fileWrites();
+          const outside = writes.filter(w => w.t < reports.start || w.t > reports.end).map(w => w.path);
+          const own = f => outside.some(p => p === f || p.endsWith(`${path.sep}${f}`));
           const files = [...new Set([...Object.keys(reports.files), ...Object.keys(reports.filesAfter)])];
-          const changed = files.filter(f => reports.files[f] !== reports.filesAfter[f]);
+          const changed = files.filter(f => reports.files[f] !== reports.filesAfter[f] && !own(f));
           // round 104: anywhere — the network hook notes every file the adapter process writes (os.tmpdir too)
           const anywhere = [
-            ...new Set(
-              fileWrites()
-                .filter(w => w.t >= reports.start && w.t <= reports.end)
-                .map(w => w.path),
-            ),
+            ...new Set(writes.filter(w => w.t >= reports.start && w.t <= reports.end && !own(w.path)).map(w => w.path)),
           ];
           const all = [...changed, ...anywhere.filter(f => !changed.includes(f))];
           assert.deepStrictEqual(all, [], `files the reports wrote, changed or removed:\n${all.join("\n")}`);
@@ -3841,6 +3769,7 @@ tests.integration(ADAPTER_DIR, {
       clearInstanceData,
       resetInstanceNative,
       fixtureNative,
+      seedInstanceObjects,
       setSystemLanguage,
       playControllerRestarts,
       restartAsTheHost,
@@ -3851,6 +3780,9 @@ tests.integration(ADAPTER_DIR, {
       dumpStates,
       withinDeadline,
       readCalls,
+      PACING_HOOKS,
+      countThisInstallation,
+      stopCounting,
     });
   },
 });
