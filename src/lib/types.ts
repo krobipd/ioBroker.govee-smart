@@ -790,8 +790,8 @@ export interface TimerAdapter {
   clearInterval: (timer: ioBroker.Interval) => void;
   /** Create a one-shot timeout timer */
   setTimeout: (callback: () => void, ms: number) => ioBroker.Timeout | undefined;
-  /** Clear a one-shot timeout timer */
-  clearTimeout: (timer: ioBroker.Timeout) => void;
+  /** Clear a one-shot timeout timer (ioBroker's own signature: undefined clears nothing) */
+  clearTimeout: (timer: ioBroker.Timeout | undefined) => void;
   /** Async delay that gets cancelled on adapter unload */
   delay: (ms: number) => Promise<void>;
 }

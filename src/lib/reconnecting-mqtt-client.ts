@@ -114,7 +114,7 @@ export abstract class ReconnectingMqttClient {
    */
   private readonly gate: CallGate;
   /** Writes that wait for room in the write window (a SUBSCRIBE, a ping) — dropped with their client. */
-  private readonly writeTimers = new Set<ioBroker.Timeout>();
+  private readonly writeTimers = new Set<ioBroker.Timeout | undefined>();
   /**
    * The listeners mqtt.js put on the current client itself, before any of ours — releaseClient leaves them: its own
    * `close` handler clears the CONNACK timer, and without it a client ended while it still waited for CONNACK kept that
@@ -179,16 +179,12 @@ export abstract class ReconnectingMqttClient {
       return;
     }
     const timer = this.timers.setTimeout(() => {
-      if (timer) {
-        this.writeTimers.delete(timer);
-      }
+      this.writeTimers.delete(timer);
       if (!this.disposed && this.client === client) {
         this.whenWritable(client, write);
       }
     }, wait);
-    if (timer) {
-      this.writeTimers.add(timer);
-    }
+    this.writeTimers.add(timer);
   }
 
   /** Drop every write still waiting for room. */

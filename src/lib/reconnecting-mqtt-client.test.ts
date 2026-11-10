@@ -306,6 +306,53 @@ describe("ReconnectingMqttClient base scaffolding", () => {
       expect(t.scheduled.at(-1)!.ms).toBeGreaterThan(59_000); // the backoff waits for the window, not only its own 5 s
     });
 
+    it("a write that waited for room is dropped once its client is gone — and a subscribe without a client is none", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        const t = makeCapturingTimers();
+        const c = new TestClient(mockLog, t.timers);
+        c.limits = lowered(2, 1);
+        let told: ((packet: { cmd: string }) => void) | undefined;
+        let subscribed = 0;
+        const fake = {
+          on: (event: string, listener: (packet: { cmd: string }) => void) => {
+            if (event === "packetsend") {
+              told = listener;
+            }
+            return fake;
+          },
+          end: () => {},
+          eventNames: () => [],
+          listeners: () => [],
+          subscribe: () => {
+            subscribed++;
+          },
+        };
+        expect(c.open(() => fake)).toBe(true);
+        told!({ cmd: "connect" }); // the CONNECT fills the write window
+        c.subscribe(
+          "GA/topic",
+          () => {},
+          () => {},
+        );
+        expect(subscribed).toBe(0);
+        c.setClient({ connected: true }); // another client took its place
+        vi.setSystemTime(Date.now() + 15_000);
+        t.fireLast();
+        expect(subscribed).toBe(0);
+        c.setClient(null);
+        expect(() =>
+          c.subscribe(
+            "GA/topic",
+            () => {},
+            () => {},
+          ),
+        ).not.toThrow();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("hands its windows to the next process: what the last one sent still counts after a restart", () => {
       const t = makeCapturingTimers();
       const first = new TestClient(mockLog, t.timers);

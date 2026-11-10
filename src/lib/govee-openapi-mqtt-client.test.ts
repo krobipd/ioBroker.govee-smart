@@ -241,7 +241,13 @@ describe("GoveeOpenapiMqttClient", () => {
       try {
         mqttMock.reset();
         const t = makeCapturingTimers();
-        const client = new GoveeOpenapiMqttClient("k", mockLog, t.timers);
+        const lines: string[] = [];
+        const log = {
+          ...mockLog,
+          debug: (m: string) => void lines.push(m),
+          warn: (m: string) => void lines.push(m),
+        } as ioBroker.Logger;
+        const client = new GoveeOpenapiMqttClient("k", log, t.timers);
         client.connect(
           () => {},
           () => {},
@@ -254,6 +260,7 @@ describe("GoveeOpenapiMqttClient", () => {
         );
         expect(mqttMock.clients).toHaveLength(1);
         expect(t.scheduled).toHaveLength(1);
+        expect(lines.filter(l => /connection failed/.test(l))).toEqual([]); // a full window is no failure
         // the next process remembers the connection
         const next = new GoveeOpenapiMqttClient("k", mockLog, makeCapturingTimers().timers);
         next.rememberLimits(client.limitMemory());

@@ -532,7 +532,7 @@ describe("GoveeMqttClient", () => {
     // on the device's `settings.topic` (already `GD/…`) is answered within a
     // second as an ordinary `status` packet carrying the request's `v_`
     // transaction; an unplugged device stays silent. govee2mqtt sends the same.
-    function connectedClient(): {
+    function connectedClient(timers: TimerAdapter = noopTimers): {
       client: GoveeMqttClient;
       published: Array<{ topic: string; payload: string; opts: unknown }>;
       sends: (cmd: string) => void;
@@ -559,7 +559,7 @@ describe("GoveeMqttClient", () => {
         "u@example.com",
         "pw",
         mockLog,
-        noopTimers,
+        timers,
         makeFakeHttps(() => ({})).fn,
         (() => fakeMqtt) as never,
       );
@@ -713,6 +713,24 @@ describe("GoveeMqttClient", () => {
       );
       // the window has no room for the CONNECT either — the next process waits for it before it opens the broker
       expect((second.client as unknown as { client: unknown }).client).toBeNull();
+      // … and its backoff comes back for it
+      const armed: number[] = [];
+      const third = connectedClient({
+        setInterval: () => undefined,
+        clearInterval: () => undefined,
+        setTimeout: (_cb: () => void, ms: number) => {
+          armed.push(ms);
+          return armed.length as unknown as ioBroker.Timeout;
+        },
+        clearTimeout: () => undefined,
+        delay: () => Promise.resolve(),
+      });
+      third.client.rememberLimits(memory);
+      await third.client.connect(
+        () => {},
+        () => {},
+      );
+      expect((third.client as unknown as { reconnectTimer: unknown }).reconnectTimer).toBeDefined();
       expect(second.client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
       expect(second.published).toHaveLength(0);
     });
