@@ -1,8 +1,19 @@
 import { GoveeMqttClient, LoginWindow, classifyLoginResponse } from "./govee-mqtt-client";
-import { limitOf } from "./api-limits";
+import { brokerLimitsOf } from "./reconnecting-mqtt-client";
 import { type HttpRequestOptions, type HttpResult, type HttpsRequestFn } from "./http-client";
 import { mockLog, mockTimers } from "../../test/test-helpers";
 import type { TimerAdapter } from "./types";
+
+/** An account broker host as the IoT key names one — it fits the declared AWS IoT pattern. */
+const ENDPOINT = "a1b2c3d4e5f6g7-ats.iot.eu-central-1.amazonaws.com";
+
+/**
+ * Let the clock pass the broker's connection window before the next connect — two connections a minute
+ * (api-limits.json): a test that reconnects at once would otherwise meet a full window. Needs `vi.useFakeTimers` on Date.
+ */
+function afterConnectWindow(): void {
+  vi.setSystemTime(Date.now() + 31_000);
+}
 
 /**
  * Timer mock that does NOT fire immediately — important for connect() tests,
@@ -524,10 +535,15 @@ describe("GoveeMqttClient", () => {
     function connectedClient(): {
       client: GoveeMqttClient;
       published: Array<{ topic: string; payload: string; opts: unknown }>;
+      sends: (cmd: string) => void;
     } {
       const published: Array<{ topic: string; payload: string; opts: unknown }> = [];
+      const handlers: Record<string, Array<(...args: unknown[]) => void>> = {};
       const fakeMqtt = {
-        on: () => fakeMqtt,
+        on: (ev: string, cb: (...args: unknown[]) => void) => {
+          (handlers[ev] ??= []).push(cb);
+          return fakeMqtt;
+        },
         subscribe: (_t: string, _o: unknown, cb: (e: Error | null) => void) => cb(null),
         publish: (topic: string, payload: string, opts: unknown, cb?: (e?: Error) => void) => {
           published.push({ topic, payload, opts });
@@ -554,14 +570,16 @@ describe("GoveeMqttClient", () => {
       });
       client.setPersistedCredentials({
         bearerToken: "tok",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=",
         p12Pass: "x",
         accountId: "acc",
         accountTopic: "GA/topic",
         tokenExpiresAt: Date.now() + 60 * 60 * 1000,
       });
-      return { client, published };
+      // mqtt.js tells every packet it writes — CONNECT, SUBSCRIBE, PINGREQ, PUBLISH
+      const sends = (cmd: string): void => (handlers.packetsend ?? []).forEach(cb => cb({ cmd }));
+      return { client, published, sends };
     }
 
     it("publishes govee2mqtt's payload plus the account topic homebridge-govee adds, on the device topic, QoS 0", async () => {
@@ -654,33 +672,36 @@ describe("GoveeMqttClient", () => {
       }
     });
 
-    it("commands and status requests together stay within the broker's minute cap less its protocol writes (GV-08)", async () => {
-      const { client, published } = connectedClient();
+    it("commands and status requests share the broker's write window with its CONNECT, SUBSCRIBE and pings (GV-08)", async () => {
+      const { client, published, sends } = connectedClient();
       await client.connect(
         () => {},
         () => {},
       );
       (client as unknown as { client: { connected: boolean } }).client.connected = true;
-      const cap = limitOf("Govee account broker (AWS IoT MQTT)", 60).max - 40;
-      for (let i = 0; i < cap - 1; i++) {
+      const max = brokerLimitsOf(ENDPOINT).writes.limits[0].max;
+      sends("connect");
+      sends("subscribe");
+      for (let i = 0; i < max - 3; i++) {
         expect(client.publishCommand("GD/x", "turn", { val: i % 2 })).toBe(true);
+        sends("publish"); // a publish counts where it is sent — mqtt.js telling it changes nothing
       }
       expect(client.requestStatus("GD/x")).toBe(true);
       // the next one would go over — not sent, so the router takes the Cloud and the status request is retried later
       expect(client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
       expect(client.requestStatus("GD/x")).toBe(false);
-      expect(published).toHaveLength(cap);
+      expect(published).toHaveLength(max - 2);
     });
 
-    it("the broker's publish limit outlives a restart — a client that remembers refuses what the minute holds", async () => {
-      const cap = limitOf("Govee account broker (AWS IoT MQTT)", 60).max - 40;
+    it("the broker's windows outlive a restart — a client that remembers refuses what the window holds", async () => {
+      const max = brokerLimitsOf(ENDPOINT).writes.limits[0].max;
       const first = connectedClient();
       await first.client.connect(
         () => {},
         () => {},
       );
       (first.client as unknown as { client: { connected: boolean } }).client.connected = true;
-      for (let i = 0; i < cap; i++) {
+      for (let i = 0; i < max; i++) {
         expect(first.client.publishCommand("GD/x", "turn", { val: i % 2 })).toBe(true);
       }
       const memory = first.client.limitMemory();
@@ -690,7 +711,8 @@ describe("GoveeMqttClient", () => {
         () => {},
         () => {},
       );
-      (second.client as unknown as { client: { connected: boolean } }).client.connected = true;
+      // the window has no room for the CONNECT either — the next process waits for it before it opens the broker
+      expect((second.client as unknown as { client: unknown }).client).toBeNull();
       expect(second.client.publishCommand("GD/x", "turn", { val: 1 })).toBe(false);
       expect(second.published).toHaveLength(0);
     });
@@ -720,7 +742,7 @@ describe("GoveeMqttClient", () => {
       // tryPersistedReuse fails and a fresh login must happen (httpCalls > 0).
       client.setPersistedCredentials({
         bearerToken: "stale-tok",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=", // invalid → readPkcs12 throws
         p12Pass: "x",
         accountId: "acc-stale",
@@ -766,7 +788,7 @@ describe("GoveeMqttClient", () => {
       });
       client.setPersistedCredentials({
         bearerToken: "tok",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=",
         p12Pass: "x",
         accountId: "acc",
@@ -798,7 +820,7 @@ describe("GoveeMqttClient", () => {
       });
       client.setPersistedCredentials({
         bearerToken: "expired-tok",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=",
         p12Pass: "x",
         accountId: "acc-exp",
@@ -835,7 +857,7 @@ describe("GoveeMqttClient", () => {
       });
       client.setPersistedCredentials({
         bearerToken: "tok",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=",
         p12Pass: "x",
         accountId: "acc",
@@ -961,7 +983,7 @@ describe("GoveeMqttClient", () => {
       const fake = makeFakeHttps((_opts, idx) =>
         idx === 0
           ? { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } }
-          : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
+          : { data: { endpoint: ENDPOINT, p12: "AAAA", p12Pass: "pw" } },
       );
       const handlers: Record<string, Array<(...a: unknown[]) => void>> = {};
       let ended = false;
@@ -1045,7 +1067,7 @@ describe("GoveeMqttClient", () => {
           disposeOnLogin?.(); // adapter unloaded while login was resolving
           return { client: { accountId: "acc", topic: "GA/acc/topic", token: "bearer", token_expire_cycle: 3600 } };
         }
-        return { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } };
+        return { data: { endpoint: ENDPOINT, p12: "AAAA", p12Pass: "pw" } };
       });
       const client = new GoveeMqttClient("u@example.com", "pw", mockLog, noopTimers, fake.fn, () => {
         mqttConnectCalls += 1;
@@ -1328,7 +1350,7 @@ describe("GoveeMqttClient", () => {
                   token_expire_cycle: tokenCycle,
                 },
               }
-            : { data: { endpoint: "iot.example.com", p12: "AAAA", p12Pass: "pw" } },
+            : { data: { endpoint: ENDPOINT, p12: "AAAA", p12Pass: "pw" } },
       );
       let endCount = 0;
       const handlers: Record<string, Array<(...a: unknown[]) => void>> = {};
@@ -1473,6 +1495,7 @@ describe("GoveeMqttClient", () => {
     });
 
     it("a network close before CONNACK keeps the bundle; three in a row or a certificate rejection retire it", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
       const h = liveClient();
       await h.client.connect(
         () => {},
@@ -1482,29 +1505,35 @@ describe("GoveeMqttClient", () => {
       const logins = (): number => h.fake.calls.filter(c => c.url.includes("/login")).length;
       h.emit("close");
       for (let i = 0; i < 3; i++) {
+        afterConnectWindow();
         h.scheduled.at(-1)!.cb(); // reuse attempt
         await new Promise(r => setTimeout(r, 5));
         expect(logins(), `reuse attempt ${i + 1} must not log in`).toBe(1);
         h.emit("close"); // closed before any CONNACK — a network failure
       }
+      afterConnectWindow();
       h.scheduled.at(-1)!.cb(); // bundle retired after three → fresh login
       await new Promise(r => setTimeout(r, 5));
       expect(logins()).toBe(2);
       // A certificate rejection retires it at once.
       h.emit("connect");
       h.emit("close");
+      afterConnectWindow();
       h.scheduled.at(-1)!.cb(); // reuse attempt …
       await new Promise(r => setTimeout(r, 5));
       h.emit("error", Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }));
       h.emit("close"); // … rejected by the broker
+      afterConnectWindow();
       h.scheduled.at(-1)!.cb();
       await new Promise(r => setTimeout(r, 5));
       expect(logins()).toBe(3);
       h.client.disconnect();
+      vi.useRealTimers();
     });
 
     it("caps SUCCESSFUL logins per hour — a broker that keeps refusing the certificate cannot loop the login", async () => {
       const warns: string[] = [];
+      vi.useFakeTimers({ toFake: ["Date"] });
       const h = liveClient({ ...mockLog, warn: (m: string) => void warns.push(m) });
       await h.client.connect(
         () => {},
@@ -1514,6 +1543,7 @@ describe("GoveeMqttClient", () => {
       for (let i = 0; i < 12; i++) {
         h.emit("error", Object.assign(new Error("Connection refused: Not authorized"), { code: 5 }));
         h.emit("close");
+        afterConnectWindow();
         h.scheduled.at(-1)!.cb();
         await new Promise(r => setTimeout(r, 5));
       }
@@ -1523,6 +1553,7 @@ describe("GoveeMqttClient", () => {
       // The pause is one timer to the end of the window, not a tight loop.
       expect(h.scheduled.at(-1)!.ms).toBeGreaterThan(50 * 60 * 1000);
       h.client.disconnect();
+      vi.useRealTimers();
     });
 
     it("a declined silent refresh is scheduled again instead of letting the bearer expire", async () => {
@@ -1595,7 +1626,7 @@ describe("GoveeMqttClient", () => {
       const h = liveClient();
       h.client.setPersistedCredentials({
         bearerToken: "b",
-        iotEndpoint: "iot.example.com",
+        iotEndpoint: ENDPOINT,
         p12Cert: "AAA=",
         p12Pass: "x",
         accountId: "acc",
@@ -1628,12 +1659,14 @@ describe("GoveeMqttClient", () => {
     });
 
     it("ends the previous broker client before a reconnect replaces it — on the reuse and on the login path", async () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
       const h = liveClient();
       await h.client.connect(
         () => {},
         () => {},
       );
       let endsBefore = h.ends();
+      afterConnectWindow();
       await h.client.connect(
         () => {},
         () => {},
@@ -1641,12 +1674,14 @@ describe("GoveeMqttClient", () => {
       expect(h.ends()).toBe(endsBefore + 1);
       h.client.setPersistedCredentials(null);
       endsBefore = h.ends();
+      afterConnectWindow();
       await h.client.connect(
         () => {},
         () => {},
       ); // fresh login path
       expect(h.ends()).toBe(endsBefore + 1);
       h.client.disconnect();
+      vi.useRealTimers();
     });
 
     it("reads sku/device from `state` when the envelope carries none (govee2mqtt iot.rs)", async () => {
@@ -1760,7 +1795,7 @@ describe("GoveeMqttClient", () => {
       h.client.requestBearerRefresh();
       await new Promise(r => setTimeout(r, 10));
       expect(iotCalls).toBe(1);
-      expect(bundles.at(-1)).toMatchObject({ bearerToken: "fresh", iotEndpoint: "iot.example.com" });
+      expect(bundles.at(-1)).toMatchObject({ bearerToken: "fresh", iotEndpoint: ENDPOINT });
       h.client.disconnect();
     });
 

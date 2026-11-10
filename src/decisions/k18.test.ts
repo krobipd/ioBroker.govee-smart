@@ -18,7 +18,7 @@ import { DeviceIdRegistry } from "../lib/device-id";
 import { DeviceRegistry } from "../lib/device-registry";
 import { GroupFanoutHandler } from "../lib/group-fanout";
 import { buildGroupFanoutHost } from "../lib/handlers/group-fanout-handler";
-import { counterpartFor, limitOf } from "../lib/api-limits";
+import { counterpartFor, counterpartNamed } from "../lib/api-limits";
 import { GoveeMqttClient } from "../lib/govee-mqtt-client";
 import type { GoveeDevice } from "../lib/types";
 
@@ -163,26 +163,47 @@ describe("K18 commands over the account broker", () => {
   });
 
   it("the broker has its own limit in src/lib/api-limits.json, and the account client keeps its commands within it", () => {
-    const declared = counterpartFor("tcp", "a1b2c3d4e5f6g7-ats.iot.eu-central-1.amazonaws.com", 8883);
-    expect(declared?.name).toBe("Govee account broker (AWS IoT MQTT)");
-    const perMinute = limitOf("Govee account broker (AWS IoT MQTT)", 60).max;
-    expect(perMinute).toBeGreaterThan(40);
-    const mqtt = new GoveeMqttClient("user@example.com", "secret", log, timers);
+    const host = "a1b2c3d4e5f6g7-ats.iot.eu-central-1.amazonaws.com";
+    // every write on the broker connection counts in the broker's own counterpart, every connection in a second one
+    expect(counterpartFor("tcp-write", host, 8883)?.name).toBe("Govee account broker (AWS IoT MQTT)");
+    expect(counterpartFor("tcp", host, 8883)?.name).toBe("Govee account broker connection (AWS IoT MQTT)");
+    const { max } = counterpartNamed("Govee account broker (AWS IoT MQTT)").limits[0];
+    const sent: Record<string, Array<(packet: { cmd: string }) => void>> = {};
     let published = 0;
-    (mqtt as unknown as { client: unknown }).client = {
-      connected: true,
+    const socket = {
+      connected: false,
+      on: (event: string, listener: (packet: { cmd: string }) => void) => {
+        (sent[event] ??= []).push(listener);
+        return socket;
+      },
       publish: () => {
         published++;
       },
+      end: () => undefined,
+      eventNames: () => [],
+      listeners: () => [],
+      removeListener: () => socket,
     };
+    const mqtt = new GoveeMqttClient("user@example.com", "secret", log, timers, undefined, (() => socket) as never);
+    (mqtt as unknown as { brokerEndpoint: string }).brokerEndpoint = host;
+    (
+      mqtt as unknown as {
+        openAccountBroker: (endpoint: string, account: string, certs: Record<string, string>) => void;
+      }
+    ).openAccountBroker(host, "account", { key: "k", cert: "c", ca: "a" });
+    socket.connected = true;
+    // the protocol's own writes — CONNECT, SUBSCRIBE and a ping, as mqtt.js tells them — take their share of the window
+    for (const cmd of ["connect", "subscribe", "pingreq"]) {
+      sent.packetsend?.forEach(listener => listener({ cmd }));
+    }
     let accepted = 0;
-    for (let i = 0; i < perMinute; i++) {
+    for (let i = 0; i < max; i++) {
       if (mqtt.publishCommand(TOPIC, "turn", { value: 1 })) {
         accepted++;
       }
     }
-    // the protocol's own writes (subscribe, ping) keep their share of the limit; every command beyond is refused
-    expect(accepted).toBe(perMinute - 40);
+    // every command beyond what the window holds after the protocol's writes is refused
+    expect(accepted).toBe(max - 3);
     expect(published).toBe(accepted);
   });
 

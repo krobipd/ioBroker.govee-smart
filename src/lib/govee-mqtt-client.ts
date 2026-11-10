@@ -1,9 +1,6 @@
 import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import { httpsRequest, type HttpsRequestFn } from "./http-client";
-import { limitOf } from "./api-limits";
-import { CallGate } from "./call-gate";
-import type { LaneMemory } from "./call-window";
 import { GOVEE_APP_BASE_URL, buildGoveeAppHeaders, deriveGoveeClientId } from "./govee-constants";
 import {
   MQTT_LOGIN_WINDOW_MS,
@@ -15,7 +12,14 @@ import {
   tokenTtlSeconds,
 } from "./timing-constants";
 import { readPkcs12 } from "./pkcs12";
-import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient, type MqttConnectFn } from "./reconnecting-mqtt-client";
+import {
+  BROKER_PORT,
+  brokerLimitsOf,
+  MQTT_MAX_MESSAGE_BYTES,
+  ReconnectingMqttClient,
+  type BrokerLimits,
+  type MqttConnectFn,
+} from "./reconnecting-mqtt-client";
 import {
   type GoveeIotKeyResponse,
   type GoveeLoginResponse,
@@ -27,25 +31,6 @@ import {
 } from "./types";
 import { classifyError, logCallFailure, type ErrorCategory } from "./error-category";
 import { LogOnce } from "./log-once";
-
-/**
- * Writes on the broker connection that are no publish of ours — TLS handshake, CONNECT, SUBSCRIBE and the 60 s keepalive,
- * with reconnects at least 5 s apart and doubling. They come off the broker's minute cap in api-limits.json; what is left
- * is the most commands and status requests one minute may publish (K18, GV-08).
- */
-const BROKER_PROTOCOL_WRITES_PER_MINUTE = 40;
-const BROKER_PUBLISHES = {
-  name: "account broker publishes",
-  match: {},
-  limits: [
-    {
-      max: limitOf("Govee account broker (AWS IoT MQTT)", 60).max - BROKER_PROTOCOL_WRITES_PER_MINUTE,
-      seconds: 60,
-      per: "account" as const,
-      source: "api-limits.json less the protocol writes",
-    },
-  ],
-};
 
 const LOGIN_URL = `${GOVEE_APP_BASE_URL}/account/rest/account/v2/login`;
 const IOT_KEY_URL = `${GOVEE_APP_BASE_URL}/app/v1/account/iot/key`;
@@ -207,8 +192,6 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * Told every packet the client could not read — the diagnostics report keeps them (plan G5).
    */
   onUnreadable?: (from: string, raw: string, reason: string) => void;
-  /** Commands and status requests per minute (K18, GV-08). */
-  private readonly publishGate: CallGate;
   private _bearerToken = "";
   private accountId = "";
   /**
@@ -299,6 +282,8 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   private loginPausedUntil = 0;
   /** Broker host of the current bundle — for the log line, fresh login and reuse alike. */
   private brokerEndpoint = "";
+  /** The counterparts of {@link brokerEndpoint}, looked up once per host. */
+  private limits: BrokerLimits | undefined = undefined;
   /** Last bearer handed to {@link onToken} — a reuse or refresh with the same token stays quiet. */
   private lastEmittedToken = "";
   /** Consecutive reuse attempts that closed before the broker's CONNACK. */
@@ -326,7 +311,6 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
   ) {
     super(log, timers);
     this.logOnce = new LogOnce(log);
-    this.publishGate = new CallGate(ms => timers.delay(ms));
     this.email = email;
     this.password = password;
     this.httpsRequestImpl = httpsRequestImpl;
@@ -407,20 +391,6 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     return this._bearerToken;
   }
 
-  /** What the next process of this instance must know of the broker's publish limit (limit-memory.ts). */
-  limitMemory(): LaneMemory {
-    return this.publishGate.memory();
-  }
-
-  /**
-   * Lay in what the previous process published within the broker's limit.
-   *
-   * @param memory What the previous process left
-   */
-  rememberLimits(memory: LaneMemory): void {
-    this.publishGate.remember(memory);
-  }
-
   /**
    * Ask a device for its status over the account broker — what the Govee app
    * does when it opens, and what govee2mqtt sends: a publish on the device's
@@ -436,12 +406,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param now Request time in ms — becomes the transaction stamp
    * @param cmdVersion Protocol version of the request — 2 for every measured
    *   device, 1 where the catalog's `statusCmdVersion` quirk says so (H6121)
-   * @returns false when the broker is not connected (nothing sent)
+   * @returns false when the broker is not connected or its write window is full (nothing sent)
    */
   requestStatus(deviceTopic: string, now: number = Date.now(), cmdVersion: 1 | 2 = 2): boolean {
     const client = this.client;
-    const sent = client && this.connected ? this.publishGate.tryAdmit(BROKER_PUBLISHES, "") : undefined;
-    if (!client || !sent) {
+    if (!client || !this.connected || !this.writeFits()) {
       return false;
     }
     // homebridge-govee (lib/connection/aws.js) adds the account topic to every
@@ -459,7 +428,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       }
     });
     // the publish counts from its send — the stamp comes right after it (call-gate.ts)
-    sent();
+    this.countWrite();
     return true;
   }
 
@@ -476,12 +445,11 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
    * @param cmd Govee's command word (`turn`, `brightness`, `colorwc`)
    * @param data The command's data object
    * @param now Send time in ms — becomes the transaction stamp
-   * @returns false when the broker is not connected or the minute's publishes are used up (nothing sent)
+   * @returns false when the broker is not connected or its write window is full (nothing sent)
    */
   publishCommand(deviceTopic: string, cmd: string, data: Record<string, unknown>, now: number = Date.now()): boolean {
     const client = this.client;
-    const sent = client && this.connected ? this.publishGate.tryAdmit(BROKER_PUBLISHES, "") : undefined;
-    if (!client || !sent) {
+    if (!client || !this.connected || !this.writeFits()) {
       return false;
     }
     const msg: Record<string, unknown> = { cmd, data, cmdVersion: 0, transaction: `v_${now}000`, type: 1 };
@@ -495,7 +463,7 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
       }
     });
     // the publish counts from its send — the stamp comes right after it (call-gate.ts)
-    sent();
+    this.countWrite();
     return true;
   }
 
@@ -820,14 +788,31 @@ export class GoveeMqttClient extends ReconnectingMqttClient {
     certs: { key: string; cert: string; ca: string },
   ): void {
     this.clientAuthRejected = false;
-    this.openBroker(this.mqttConnectImpl, `mqtts://${endpoint}:8883`, {
+    const opened = this.openBroker(this.mqttConnectImpl, `mqtts://${endpoint}:${BROKER_PORT}`, {
       clientId: `AP/${accountId}/${this.sessionUuid}`,
       ...certs,
       protocolVersion: 4,
       keepalive: 60,
       rejectUnauthorized: true,
     });
+    if (!opened) {
+      // the broker's windows are full (a restart right after a connect) — the backoff waits for room
+      this.persistedAttemptInFlight = false;
+      this.scheduleReconnect();
+      return;
+    }
     this.attachClientHandlers();
+  }
+
+  /** The declared counterparts of the broker host the IoT key named — undefined before the first one (K18, GV-08). */
+  protected brokerLimits(): BrokerLimits | undefined {
+    if (!this.brokerEndpoint) {
+      return undefined;
+    }
+    if (this.limits?.host !== this.brokerEndpoint) {
+      this.limits = brokerLimitsOf(this.brokerEndpoint);
+    }
+    return this.limits;
   }
 
   /** Stop reconnecting after repeated auth failures (check email/password) — or always in probe mode. */

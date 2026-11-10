@@ -1,4 +1,7 @@
 import type { IClientOptions, MqttClient } from "mqtt";
+import { counterpartFor, type Counterpart } from "./api-limits";
+import { CallGate } from "./call-gate";
+import { type LaneMemory } from "./call-window";
 import { type TimerAdapter } from "./types";
 import { type ErrorCategory } from "./error-category";
 
@@ -11,15 +14,36 @@ export type MqttConnectFn = (url: string, opts: IClientOptions) => MqttClient;
 /** Upper bound of one broker message — real status/event messages are a few KB. */
 export const MQTT_MAX_MESSAGE_BYTES = 64 * 1024;
 
+/** The port both Govee brokers listen on (MQTT over TLS). */
+export const BROKER_PORT = 8883;
+
 /**
- * At most this many broker connects in any {@link CONNECT_WINDOW_MS} (GV-08, api-limits.json): a connect costs about 20
- * protocol writes (TCP connect, TLS handshake records, CONNECT, SUBSCRIBE — measured on the inventory's network hook,
- * 2026-10-14), and the backoff starts again at 5 s after every successful connect, so a broker that accepts and drops
- * again would otherwise be dialled four times a minute.
+ * The two counterparts of a broker in api-limits.json (GV-08), as the fleet counts them: every connection opened to it
+ * (`tcp`) and every packet written on one (`tcp-write` — CONNECT, SUBSCRIBE, PINGREQ, PUBLISH).
  */
-export const MAX_CONNECTS_PER_WINDOW = 2;
-/** The window of {@link MAX_CONNECTS_PER_WINDOW}. */
-export const CONNECT_WINDOW_MS = 60_000;
+export interface BrokerLimits {
+  /** The broker's host. */
+  host: string;
+  /** Every connection opened to the broker. */
+  connection: Counterpart;
+  /** Every packet written on a connection. */
+  writes: Counterpart;
+}
+
+/**
+ * The declared counterparts of a broker host.
+ *
+ * @param host The broker's host
+ * @throws {Error} When api-limits.json declares no connection or no write limit for it
+ */
+export function brokerLimitsOf(host: string): BrokerLimits {
+  const connection = counterpartFor("tcp", host, BROKER_PORT);
+  const writes = counterpartFor("tcp-write", host, BROKER_PORT);
+  if (!connection || !writes) {
+    throw new Error(`api-limits.json declares no connection and write limit for ${host}`);
+  }
+  return { host, connection, writes };
+}
 
 /** Exponential-backoff parameters (all milliseconds). */
 export interface BackoffOpts {
@@ -35,8 +59,8 @@ export interface BackoffOpts {
  * The reconnect backoff of both broker clients: 5 s doubling to at most 120 s, plus up to 30 s jitter. The ceiling keeps
  * the longest wait (150 s) well inside the fleet's 300 s for showing a counterpart's return (inventory suite "counterpart
  * gone and back", round 87) — with 300 s a Govee outage of a few minutes left the push channel down up to 330 s after
- * Govee was back (CI 38647499985, 2026-10-14). Govee is not called more often for it: the connect gate allows at most
- * {@link MAX_CONNECTS_PER_WINDOW} connects a minute either way.
+ * Govee was back (CI 38647499985, 2026-10-14). Govee is not called more often for it: a connect waits for room in the
+ * broker's declared connection and write windows either way.
  */
 export const RECONNECT_BACKOFF: BackoffOpts = { base: 5_000, cap: 120_000, jitterCap: 30_000 };
 
@@ -84,10 +108,13 @@ export abstract class ReconnectingMqttClient {
    * network-address.ts); undefined = any address.
    */
   localAddress: string | undefined = undefined;
-  /** When each broker connect of the last {@link CONNECT_WINDOW_MS} started. */
-  private readonly connectTimes: number[] = [];
-  /** How many broker connects this client starts in any {@link CONNECT_WINDOW_MS} — its share of api-limits.json. */
-  protected readonly maxConnectsPerWindow: number = MAX_CONNECTS_PER_WINDOW;
+  /**
+   * The broker's declared windows (GV-08): every connection and every packet counts from the moment it leaves, and a
+   * connect, a SUBSCRIBE, a ping and a publish go out only while their window has room.
+   */
+  private readonly gate: CallGate;
+  /** Writes that wait for room in the write window (a SUBSCRIBE, a ping) — dropped with their client. */
+  private readonly writeTimers = new Set<ioBroker.Timeout>();
   /**
    * The listeners mqtt.js put on the current client itself, before any of ours — releaseClient leaves them: its own
    * `close` handler clears the CONNACK timer, and without it a client ended while it still waited for CONNACK kept that
@@ -102,7 +129,75 @@ export abstract class ReconnectingMqttClient {
   protected constructor(
     protected readonly log: ioBroker.Logger,
     protected readonly timers: TimerAdapter,
-  ) {}
+  ) {
+    this.gate = new CallGate(ms => timers.delay(ms));
+  }
+
+  /** The broker's declared counterparts — undefined while its host is not known yet (the account broker's IoT key). */
+  protected abstract brokerLimits(): BrokerLimits | undefined;
+
+  /** What the next process of this instance must know of the broker's windows (limit-memory.ts). */
+  limitMemory(): LaneMemory {
+    return this.gate.memory();
+  }
+
+  /**
+   * Lay in what the previous process sent within the broker's windows.
+   *
+   * @param memory What the previous process left
+   */
+  rememberLimits(memory: LaneMemory): void {
+    this.gate.remember(memory);
+  }
+
+  /** Whether one more packet fits the broker's write window now. */
+  protected writeFits(): boolean {
+    const limits = this.brokerLimits();
+    return !limits || this.gate.waitMs(limits.writes, limits.host) === 0;
+  }
+
+  /** Count a packet that has left on the broker connection (its write window). */
+  protected countWrite(): void {
+    const limits = this.brokerLimits();
+    if (limits) {
+      this.gate.count(limits.writes, limits.host);
+    }
+  }
+
+  /**
+   * Let a packet out once the write window has room — at once when it has, otherwise when its oldest write has slid
+   * out. Dropped when the client it was meant for is gone.
+   *
+   * @param client The client the packet belongs to
+   * @param write Sends the packet
+   */
+  private whenWritable(client: MqttClient, write: () => void): void {
+    const limits = this.brokerLimits();
+    const wait = limits ? this.gate.waitMs(limits.writes, limits.host) : 0;
+    if (wait === 0) {
+      write();
+      return;
+    }
+    const timer = this.timers.setTimeout(() => {
+      if (timer) {
+        this.writeTimers.delete(timer);
+      }
+      if (!this.disposed && this.client === client) {
+        this.whenWritable(client, write);
+      }
+    }, wait);
+    if (timer) {
+      this.writeTimers.add(timer);
+    }
+  }
+
+  /** Drop every write still waiting for room. */
+  private dropWaitingWrites(): void {
+    for (const timer of this.writeTimers) {
+      this.timers.clearTimeout(timer);
+    }
+    this.writeTimers.clear();
+  }
 
   /** Whether the underlying client is currently connected. */
   get connected(): boolean {
@@ -152,16 +247,15 @@ export abstract class ReconnectingMqttClient {
   }
 
   /**
-   * How long until one more broker connect fits {@link maxConnectsPerWindow} — 0 when it fits now.
-   *
-   * @param now Current time (ms)
+   * How long until one more broker connect fits — a connection in the connection window and its CONNECT in the write
+   * window; 0 when it fits now (and while the host is not known yet).
    */
-  protected connectWaitMs(now: number = Date.now()): number {
-    const recent = this.connectTimes.filter(t => now - t < CONNECT_WINDOW_MS);
-    this.connectTimes.splice(0, this.connectTimes.length, ...recent);
-    return recent.length < this.maxConnectsPerWindow
-      ? 0
-      : recent[recent.length - this.maxConnectsPerWindow] + CONNECT_WINDOW_MS - now + 1;
+  protected connectWaitMs(): number {
+    const limits = this.brokerLimits();
+    if (!limits) {
+      return 0;
+    }
+    return Math.max(this.gate.waitMs(limits.connection, limits.host), this.gate.waitMs(limits.writes, limits.host));
   }
 
   /** Disconnect and clean up: stop reconnect, run subclass teardown, end the client. */
@@ -181,20 +275,44 @@ export abstract class ReconnectingMqttClient {
    * reconnects on its own (`reconnectPeriod: 0`) — the backoff above does, and
    * two reconnect loops side by side would each log in.
    *
+   * Every packet the client writes counts in the broker's write window (`packetsend`; a publish counts where it is sent,
+   * see {@link countWrite}), and mqtt.js's keepalive ping waits for room like any other write — mqtt.js sends it on its
+   * own clock, not after the last write, so it could otherwise land right behind a publish. The wait stays within the
+   * write window (seconds), well inside the half keepalive mqtt.js gives the answer.
+   *
    * @param connectFn The mqtt.connect factory
    * @param url Broker URL
    * @param opts Connection options (without `reconnectPeriod`)
+   * @returns false when the broker's windows have no room for a connect now (nothing opened)
    */
-  protected openBroker(connectFn: MqttConnectFn, url: string, opts: Omit<IClientOptions, "reconnectPeriod">): void {
+  protected openBroker(connectFn: MqttConnectFn, url: string, opts: Omit<IClientOptions, "reconnectPeriod">): boolean {
+    const limits = this.brokerLimits();
+    if (this.connectWaitMs() > 0) {
+      return false;
+    }
     this.releaseClient();
-    this.connectTimes.push(Date.now());
+    if (limits) {
+      this.gate.count(limits.connection, limits.host);
+    }
     const client = connectFn(url, {
       ...opts,
       ...(this.localAddress ? { localAddress: this.localAddress } : {}),
       reconnectPeriod: 0,
     });
     this.ownListeners = new Map(client.eventNames().map(name => [name, new Set<unknown>(client.listeners(name))]));
+    if (limits) {
+      client.on("packetsend", packet => {
+        if (packet.cmd !== "publish") {
+          this.gate.count(limits.writes, limits.host);
+        }
+      });
+      if (typeof client.sendPing === "function") {
+        const ping = client.sendPing.bind(client);
+        client.sendPing = () => this.whenWritable(client, ping);
+      }
+    }
     this.client = client;
+    return true;
   }
 
   /**
@@ -206,6 +324,7 @@ export abstract class ReconnectingMqttClient {
    * clear its timers when the ended socket closes.
    */
   protected releaseClient(): void {
+    this.dropWaitingWrites();
     if (this.client) {
       for (const name of this.client.eventNames()) {
         const own = this.ownListeners.get(name);
@@ -224,7 +343,7 @@ export abstract class ReconnectingMqttClient {
   }
 
   /**
-   * Subscribe to `topic` (qos 0). On subscribe-failure force a close so the
+   * Subscribe to `topic` (qos 0) once the write window has room. On subscribe-failure force a close so the
    * close-handler's scheduleReconnect runs: a failed subscribe leaves the TCP
    * socket alive (keepalive pings keep answering), so `close` would never fire
    * on its own — a permanent silent death without the forced close.
@@ -238,17 +357,23 @@ export abstract class ReconnectingMqttClient {
     onSubscribed: () => void,
     onSubscribeFail: (errMsg: string) => void,
   ): void {
-    this.client?.subscribe(topic, { qos: 0 }, err => {
-      if (err) {
-        onSubscribeFail(err.message);
-        try {
-          this.client?.end(true);
-        } catch {
-          // ignore — the close-event handler will pick it up either way
+    const client = this.client;
+    if (!client) {
+      return;
+    }
+    this.whenWritable(client, () =>
+      client.subscribe(topic, { qos: 0 }, err => {
+        if (err) {
+          onSubscribeFail(err.message);
+          try {
+            this.client?.end(true);
+          } catch {
+            // ignore — the close-event handler will pick it up either way
+          }
+        } else {
+          onSubscribed();
         }
-      } else {
-        onSubscribed();
-      }
-    });
+      }),
+    );
   }
 }

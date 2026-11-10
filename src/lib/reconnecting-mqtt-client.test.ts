@@ -1,10 +1,13 @@
+import { EventEmitter } from "node:events";
 import * as net from "node:net";
 import * as mqtt from "mqtt";
+import type { Counterpart } from "./api-limits";
 import {
-  CONNECT_WINDOW_MS,
   RECONNECT_BACKOFF,
   ReconnectingMqttClient,
+  brokerLimitsOf,
   computeBackoffDelay,
+  type BrokerLimits,
 } from "./reconnecting-mqtt-client";
 import { type TimerAdapter } from "./types";
 import { mockLog } from "../../test/test-helpers";
@@ -44,10 +47,16 @@ function makeCapturingTimers(): {
 class TestClient extends ReconnectingMqttClient {
   public reconnectCalls = 0;
   public exhausted = false;
+  /** The broker's counterparts — none: the connect, the writes and the pings go out unwindowed. */
+  public limits: BrokerLimits | undefined = undefined;
   protected readonly channelLabel = "Test";
 
   constructor(log: ioBroker.Logger, timers: TimerAdapter) {
     super(log, timers);
+  }
+
+  protected brokerLimits(): BrokerLimits | undefined {
+    return this.limits;
   }
 
   protected reconnectExhausted(): boolean {
@@ -68,8 +77,20 @@ class TestClient extends ReconnectingMqttClient {
   public subscribe(topic: string, onOk: () => void, onFail: (m: string) => void): void {
     this.subscribeOrForceClose(topic, onOk, onFail);
   }
-  public open(connectFn: (url: string, opts: Record<string, unknown>) => unknown): void {
-    this.openBroker(connectFn as never, "mqtts://broker.example:8883", { keepalive: 60 });
+  public open(connectFn: (url: string, opts: Record<string, unknown>) => unknown): boolean {
+    return this.openBroker(connectFn as never, "mqtts://broker.example:8883", { keepalive: 60 });
+  }
+  /** A publish the way the account client sends one: only while the write window has room, counted where it is sent. */
+  public publish(): boolean {
+    if (!this.client || !this.connected || !this.writeFits()) {
+      return false;
+    }
+    this.client.publish("GD/topic", "{}", { qos: 0 });
+    this.countWrite();
+    return true;
+  }
+  public get waitForConnect(): number {
+    return this.connectWaitMs();
   }
   public openAt(connectFn: (url: string, opts: Record<string, unknown>) => unknown, url: string): void {
     this.openBroker(connectFn as never, url, { keepalive: 60, connectTimeout: 30_000 });
@@ -141,24 +162,169 @@ describe("computeBackoffDelay", () => {
 });
 
 describe("ReconnectingMqttClient base scaffolding", () => {
-  describe("the connect gate — at most two broker connects a minute (api-limits.json)", () => {
-    it("a third reconnect inside the minute waits until the first connect left the window", () => {
+  describe("the broker's windows — every connection and every packet counts, nothing goes over (GV-08)", () => {
+    /**
+     * A broker's counterparts with the given maxima, as the press hands them to the adapter.
+     *
+     * @param connections Connections a minute
+     * @param writes Packets in 15 s
+     */
+    function lowered(connections: number, writes: number): BrokerLimits {
+      const counterpart = (name: string, max: number, seconds: number): Counterpart => ({
+        name,
+        match: {},
+        limits: [{ max, seconds, per: "account", source: "test" }],
+      });
+      return {
+        host: "broker.example",
+        connection: counterpart("connection", connections, 60),
+        writes: counterpart("writes", writes, 15),
+      };
+    }
+
+    /** mqtt.js as far as the gate sees it: CONNECT after the socket, `packetsend` for every packet, its own ping. */
+    class FakeMqtt extends EventEmitter {
+      connected = false;
+      constructor(private readonly sent: number[]) {
+        super();
+        setTimeout(() => {
+          this.write("connect");
+          setTimeout(() => {
+            this.connected = true;
+            this.emit("connect");
+          }, 20);
+        }, 50);
+      }
+      private write(cmd: string): void {
+        this.sent.push(Date.now());
+        this.emit("packetsend", { cmd });
+      }
+      subscribe(_topic: string, _opts: unknown, cb: (e: Error | null) => void): void {
+        this.write("subscribe");
+        cb(null);
+      }
+      publish(): void {
+        this.write("publish");
+      }
+      sendPing(): void {
+        this.write("pingreq");
+      }
+      end(): void {
+        this.connected = false;
+      }
+    }
+
+    /**
+     * The most entries any half-open sliding window of `ms` holds.
+     *
+     * @param times The moments, oldest first
+     * @param ms The window
+     */
+    function peak(times: number[], ms: number): number {
+      return Math.max(0, ...times.map((t, j) => times.slice(0, j + 1).filter(o => t - o < ms).length));
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    for (const [connections, writes] of [
+      [1, 1],
+      [1, 2],
+      [2, 2],
+    ]) {
+      it(`at ${connections} connection(s) a minute and ${writes} write(s) in 15 s: connect, subscribe, pings, publishes and reconnects stay within both`, () => {
+        const timers = {
+          setTimeout: (cb: () => void, ms: number) => setTimeout(cb, ms) as unknown as ioBroker.Timeout,
+          clearTimeout: (h: ioBroker.Timeout) => clearTimeout(h as unknown as NodeJS.Timeout),
+          setInterval: () => undefined,
+          clearInterval: () => {},
+          delay: () => Promise.resolve(),
+        } as unknown as TimerAdapter;
+        const c = new TestClient(mockLog, timers);
+        c.limits = lowered(connections, writes);
+        const sent: number[] = [];
+        const opened: number[] = [];
+        let fake: FakeMqtt | undefined;
+        const connectNow = (): void => {
+          if (
+            c.open(() => {
+              opened.push(Date.now());
+              fake = new FakeMqtt(sent);
+              fake.on("connect", () =>
+                c.subscribe(
+                  "GA/topic",
+                  () => {},
+                  () => {},
+                ),
+              );
+              return fake;
+            })
+          ) {
+            return;
+          }
+          setTimeout(connectNow, c.waitForConnect);
+        };
+        connectNow();
+        let subscribed = 0;
+        for (let second = 0; second < 300; second++) {
+          vi.advanceTimersByTime(1_000);
+          // the application publishes every second, mqtt.js pings on its own clock — right behind a publish too
+          c.publish();
+          if (second % 60 === 59) {
+            fake?.sendPing();
+          }
+          // the broker drops the connection twice; the client comes back as fast as the windows let it
+          if (second === 100 || second === 200) {
+            fake?.end();
+            connectNow();
+          }
+          subscribed = sent.length;
+        }
+        expect(subscribed).toBeGreaterThan(0);
+        expect(opened.length).toBe(3);
+        expect(peak(opened, 60_000)).toBeLessThanOrEqual(connections);
+        expect(peak(sent, 15_000)).toBeLessThanOrEqual(writes);
+        // the press asks the window to be reached as well: with the application's demand it is
+        expect(peak(sent, 15_000)).toBe(writes);
+      });
+    }
+
+    it("a connect waits until the connection window and the write window have room — and says how long", () => {
       const t = makeCapturingTimers();
       const c = new TestClient(mockLog, t.timers);
-      const connect = (): unknown => ({
-        removeAllListeners: () => {},
-        on: () => {},
-        end: () => {},
-        eventNames: () => [],
-        listeners: () => [],
-      });
-      c.open(connect);
+      c.limits = lowered(2, 10);
+      const connect = (): unknown => ({ on: () => {}, end: () => {}, eventNames: () => [], listeners: () => [] });
+      expect(c.open(connect)).toBe(true);
+      expect(c.open(connect)).toBe(true);
+      expect(c.waitForConnect).toBeGreaterThan(59_000);
+      expect(c.open(connect)).toBe(false);
       c.arm();
-      expect(t.scheduled[0].ms).toBeLessThanOrEqual(10_000); // one connect so far — the plain backoff
-      t.fireLast();
-      c.open(connect); // the reconnect itself
-      c.arm();
-      expect(t.scheduled[1].ms).toBeGreaterThan(CONNECT_WINDOW_MS - 1_000); // two in the window — wait for the first
+      expect(t.scheduled.at(-1)!.ms).toBeGreaterThan(59_000); // the backoff waits for the window, not only its own 5 s
+    });
+
+    it("hands its windows to the next process: what the last one sent still counts after a restart", () => {
+      const t = makeCapturingTimers();
+      const first = new TestClient(mockLog, t.timers);
+      first.limits = lowered(1, 10);
+      const connect = (): unknown => ({ on: () => {}, end: () => {}, eventNames: () => [], listeners: () => [] });
+      expect(first.open(connect)).toBe(true);
+      const next = new TestClient(mockLog, t.timers);
+      next.limits = lowered(1, 10);
+      next.rememberLimits(first.limitMemory());
+      expect(next.open(connect)).toBe(false);
+    });
+
+    it("both Govee brokers declare a connection and a write limit in api-limits.json", () => {
+      for (const host of ["mqtt.openapi.govee.com", "a1b2c3d4e5f6g7-ats.iot.eu-central-1.amazonaws.com"]) {
+        const limits = brokerLimitsOf(host);
+        expect(limits.connection.match.kind).toBe("tcp");
+        expect(limits.writes.match.kind).toBe("tcp-write");
+      }
+      expect(() => brokerLimitsOf("broker.example")).toThrow(/declares no connection and write limit/);
     });
   });
 

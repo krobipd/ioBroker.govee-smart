@@ -113,26 +113,54 @@
       ]
     },
     {
-      "name": "Govee OpenAPI events (MQTT)",
-      "match": { "host": "mqtt.openapi.govee.com", "port": 8883 },
+      "name": "Govee OpenAPI events connection (MQTT)",
+      "match": { "host": "mqtt.openapi.govee.com", "port": 8883, "kind": "tcp" },
       "limits": [
         {
-          "max": 40,
+          "max": 1,
           "seconds": 60,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none; the client connects at most once a minute (connect gate, reconnecting-mqtt-client — a connect costs about 20 writes: TCP, TLS handshake, CONNECT, SUBSCRIBE, measured 2026-10-14), then only pings every 60 s"
+          "source": "own cap of the adapter — Govee documents none for its events broker: one connection a minute; reconnecting-mqtt-client opens one only while this window and the write window have room, and the window outlives a restart (limit-memory.ts)"
+        }
+      ]
+    },
+    {
+      "name": "Govee OpenAPI events (MQTT)",
+      "match": { "host": "mqtt.openapi.govee.com", "port": 8883, "kind": "tcp-write" },
+      "limits": [
+        {
+          "max": 4,
+          "seconds": 15,
+          "per": "account",
+          "source": "own cap of the adapter — Govee documents none: a connection writes CONNECT and SUBSCRIBE, then a ping every 60 s (keepalive); every packet counts as it leaves (mqtt.js packetsend), and a SUBSCRIBE or a ping waits for room (reconnecting-mqtt-client) — the window stays under half the keepalive, so a ping held back is still answered in time"
+        }
+      ]
+    },
+    {
+      "name": "Govee account broker connection (AWS IoT MQTT)",
+      "match": { "hostPattern": "^[a-z0-9]+-ats\\.iot\\.[a-z0-9-]+\\.amazonaws\\.com$", "port": 8883, "kind": "tcp" },
+      "limits": [
+        {
+          "max": 2,
+          "seconds": 60,
+          "per": "account",
+          "source": "own cap of the adapter below AWS IoT Core's 1 CONNECT per second and client id (https://docs.aws.amazon.com/general/latest/gr/iot-core.html, read 2026-11-10): two connections a minute; reconnecting-mqtt-client opens one only while this window and the write window have room, and the window outlives a restart (limit-memory.ts)"
         }
       ]
     },
     {
       "name": "Govee account broker (AWS IoT MQTT)",
-      "match": { "hostPattern": "^[a-z0-9]+-ats\\.iot\\.[a-z0-9-]+\\.amazonaws\\.com$", "port": 8883 },
+      "match": {
+        "hostPattern": "^[a-z0-9]+-ats\\.iot\\.[a-z0-9-]+\\.amazonaws\\.com$",
+        "port": 8883,
+        "kind": "tcp-write"
+      },
       "limits": [
         {
-          "max": 60,
-          "seconds": 60,
+          "max": 20,
+          "seconds": 15,
           "per": "account",
-          "source": "own cap of the adapter — Govee documents none (K18 research 2026-10-08); the client lets at most this cap less 40 protocol writes (at most two connects a minute through the connect gate of reconnecting-mqtt-client, about 16 writes each — TCP, TLS, CONNECT, SUBSCRIBE, measured 2026-10-14 — and the 60 s keepalive) out as commands and status requests per minute, and refuses the rest (govee-mqtt-client)"
+          "source": "own cap of the adapter far below AWS IoT Core's 100 publish requests per second and connection, beyond which publishes are discarded (https://docs.aws.amazon.com/general/latest/gr/iot-core.html, read 2026-11-10): CONNECT, SUBSCRIBE, the 60 s ping, every command and status request (K18) count as they leave (mqtt.js packetsend); a command or status request goes out only while the window has room and is refused otherwise (govee-mqtt-client), a SUBSCRIBE or a ping waits for room (reconnecting-mqtt-client)"
         }
       ]
     },

@@ -1,12 +1,19 @@
 import * as crypto from "node:crypto";
 import * as mqtt from "mqtt";
 import { OPENAPI_MQTT_MAX_AUTH_FAILURES } from "./timing-constants";
-import { MQTT_MAX_MESSAGE_BYTES, ReconnectingMqttClient } from "./reconnecting-mqtt-client";
+import {
+  BROKER_PORT,
+  brokerLimitsOf,
+  MQTT_MAX_MESSAGE_BYTES,
+  ReconnectingMqttClient,
+  type BrokerLimits,
+} from "./reconnecting-mqtt-client";
 import { type OpenApiMqttEvent, type CloudStateCapability, type TimerAdapter, errText, maskSecret } from "./types";
 import { classifyError, logCallFailure } from "./error-category";
 import { LogOnce } from "./log-once";
 
-const BROKER_URL = "mqtts://mqtt.openapi.govee.com:8883";
+const BROKER_HOST = "mqtt.openapi.govee.com";
+const BROKER_URL = `mqtts://${BROKER_HOST}:${BROKER_PORT}`;
 
 /** Callback for incoming sensor events */
 export type OpenApiEventCallback = (event: OpenApiMqttEvent) => void;
@@ -47,11 +54,8 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
 
   /** Channel label used in reconnect log lines. */
   protected readonly channelLabel = "Cloud-events";
-  /**
-   * One connect a minute: a connect costs about 20 writes (TCP, TLS handshake, CONNECT, SUBSCRIBE), the declared cap of
-   * this counterpart is 40 a minute (api-limits.json) — two full connects and a keepalive would go over it.
-   */
-  protected readonly maxConnectsPerWindow = 1;
+  /** The broker's connection and write windows in api-limits.json (GV-08). */
+  private readonly limits = brokerLimitsOf(BROKER_HOST);
   /** The fleet's log rule (`log-once.ts`): a failure is said once per kind; an unreachable broker is a state, not a line. */
   private readonly logOnce: LogOnce;
   /**
@@ -70,6 +74,11 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
     this.apiKey = apiKey;
     this.topic = `GA/${apiKey}`;
     this.topicLabel = `GA/${maskSecret(apiKey)}`;
+  }
+
+  /** The broker's declared counterparts (a fixed host). */
+  protected brokerLimits(): BrokerLimits {
+    return this.limits;
   }
 
   /** Stop reconnecting once the API key has been rejected too many times. */
@@ -98,7 +107,7 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
 
     try {
       const clientId = `iob_govee_smart_${this.sessionUuid}`;
-      this.openBroker(mqtt.connect, BROKER_URL, {
+      const opened = this.openBroker(mqtt.connect, BROKER_URL, {
         username: this.apiKey,
         password: this.apiKey,
         clientId,
@@ -106,6 +115,11 @@ export class GoveeOpenapiMqttClient extends ReconnectingMqttClient {
         keepalive: 60,
         rejectUnauthorized: true,
       });
+      if (!opened) {
+        // the broker's windows are full (a restart right after a connect) — the backoff waits for room
+        this.scheduleReconnect();
+        return;
+      }
       const client = this.client!;
       this.log.debug(`Cloud-events connecting: broker=${BROKER_URL} clientId=${clientId} authMode=apiKey`);
       client.on("connect", () => {

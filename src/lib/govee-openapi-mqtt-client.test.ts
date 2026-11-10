@@ -100,15 +100,6 @@ const mockTimers = {
 };
 
 describe("GoveeOpenapiMqttClient", () => {
-  it("connects at most once a minute — the declared cap of 40 writes holds a full connect and its keepalive", () => {
-    const client = new GoveeOpenapiMqttClient("k", mockLog, mockTimers);
-    const gate = client as unknown as { connectTimes: number[]; connectWaitMs: (now: number) => number };
-    expect(gate.connectWaitMs(100_000)).toBe(0);
-    gate.connectTimes.push(100_000);
-    expect(gate.connectWaitMs(130_000)).toBe(30_001); // the account broker's client would connect a second time here
-    expect(gate.connectWaitMs(160_000)).toBe(0);
-  });
-
   describe("lifecycle without a broker", () => {
     it("starts disconnected, and a disconnect() that never connected is a silent no-op", () => {
       const client = new GoveeOpenapiMqttClient("test-api-key", mockLog, mockTimers);
@@ -245,6 +236,42 @@ describe("GoveeOpenapiMqttClient", () => {
       client.disconnect();
     });
 
+    it("connects at most once a minute — its declared connection window (api-limits.json), also across a restart", () => {
+      vi.useFakeTimers({ toFake: ["Date"] });
+      try {
+        mqttMock.reset();
+        const t = makeCapturingTimers();
+        const client = new GoveeOpenapiMqttClient("k", mockLog, t.timers);
+        client.connect(
+          () => {},
+          () => {},
+        );
+        expect(mqttMock.clients).toHaveLength(1);
+        // a second connect inside the minute opens nothing and waits for the backoff
+        client.connect(
+          () => {},
+          () => {},
+        );
+        expect(mqttMock.clients).toHaveLength(1);
+        expect(t.scheduled).toHaveLength(1);
+        // the next process remembers the connection
+        const next = new GoveeOpenapiMqttClient("k", mockLog, makeCapturingTimers().timers);
+        next.rememberLimits(client.limitMemory());
+        next.connect(
+          () => {},
+          () => {},
+        );
+        expect(mqttMock.clients).toHaveLength(1);
+        vi.setSystemTime(Date.now() + 60_000);
+        t.scheduled[0]();
+        expect(mqttMock.clients).toHaveLength(2);
+        client.disconnect();
+        next.disconnect();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it("re-enters connect() when the backoff timer fires after a close", () => {
       const t = makeCapturingTimers();
       const client = new GoveeOpenapiMqttClient("key", mockLog, t.timers);
@@ -255,7 +282,10 @@ describe("GoveeOpenapiMqttClient", () => {
       expect(mqttMock.clients).toHaveLength(1);
       mqttMock.clients[0].emit("close"); // → scheduleReconnect → backoff timer armed
       expect(t.scheduled).toHaveLength(1);
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 60_000); // the backoff waited for the connection window
       t.scheduled[0](); // fire → base → reconnect() → connect() again
+      vi.useRealTimers();
       expect(mqttMock.clients).toHaveLength(2); // second mqtt.connect = reconnect proven
       client.disconnect();
     });
@@ -310,10 +340,13 @@ describe("GoveeOpenapiMqttClient", () => {
         () => {},
         () => {},
       );
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(Date.now() + 60_000); // past the connection window
       client.connect(
         () => {},
         () => {},
       );
+      vi.useRealTimers();
       expect(mqttMock.clients).toHaveLength(2);
       expect(mqttMock.clients[0].ended).toBe(true);
       expect(mqttMock.clients[1].opts.reconnectPeriod).toBe(0);

@@ -1147,6 +1147,7 @@ class GoveeAdapter extends utils.Adapter {
     // the AWS-IoT MQTT used for status push of regular devices.
     this.openapiMqttClient = this.makeOpenapiMqttClient(config.apiKey, this.log, this);
     this.openapiMqttClient.localAddress = this.localAddress;
+    this.openapiMqttClient.rememberLimits(this.limitMemory?.events ?? {});
     this.openapiMqttClient.onUnreadable = (from, raw, reason) =>
       this.deviceManager?.getDiagnostics().recordUnreadable("openapi-events", from, raw, reason);
     this.openapiMqttClient.connect(
@@ -1542,6 +1543,7 @@ class GoveeAdapter extends utils.Adapter {
         gate: this.callGate.memory(),
         lan: this.lanClient?.limitMemory() ?? this.limitMemory.lan,
         broker: this.mqttClient?.limitMemory() ?? this.limitMemory.broker,
+        events: this.openapiMqttClient?.limitMemory() ?? this.limitMemory.events,
       };
       // The callback is the "we are done" signal to the host, and it comes AFTER
       // these writes: issued fire-and-forget and followed by an immediate callback,

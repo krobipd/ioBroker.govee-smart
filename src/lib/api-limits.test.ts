@@ -51,9 +51,9 @@ describe("api-limits.json — every counterpart the adapter calls, once (GV-08)"
     for (const host of hosts) {
       expect(counterpartFor("http", host)?.name, host).toBeDefined();
     }
-    const events = /mqtts:\/\/([a-z0-9.-]+):(\d+)/.exec(src("govee-openapi-mqtt-client.ts"));
-    expect(counterpartFor("tcp-write", events![1], Number(events![2]))?.name).toBe("Govee OpenAPI events (MQTT)");
-    expect(counterpartFor("tcp", events![1], Number(events![2]))?.name).toBe("Govee OpenAPI events (MQTT)");
+    const events = /const BROKER_HOST = "([a-z0-9.-]+)"/.exec(src("govee-openapi-mqtt-client.ts"));
+    expect(counterpartFor("tcp-write", events![1], 8883)?.name).toBe("Govee OpenAPI events (MQTT)");
+    expect(counterpartFor("tcp", events![1], 8883)?.name).toBe("Govee OpenAPI events connection (MQTT)");
   });
 
   it("the account broker's pattern takes an account endpoint, not the events broker or another port", () => {
@@ -61,7 +61,7 @@ describe("api-limits.json — every counterpart the adapter calls, once (GV-08)"
       "Govee account broker (AWS IoT MQTT)",
     );
     expect(counterpartFor("tcp", "a1b2c3d4e5f6g7-ats.iot.us-east-1.amazonaws.com", 8883)?.name).toBe(
-      "Govee account broker (AWS IoT MQTT)",
+      "Govee account broker connection (AWS IoT MQTT)",
     );
     expect(counterpartFor("tcp-write", "a1b2c3-ats.iot.eu-central-1.amazonaws.com", 443)).toBeUndefined();
     expect(counterpartFor("tcp-write", "evil.example.com", 8883)).toBeUndefined();

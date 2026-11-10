@@ -474,7 +474,10 @@ function setup(configOverrides: Record<string, unknown> = {}): { adapter: GoveeA
     },
     { connected: false },
   );
-  const openapi = Object.assign({ connect: vi.fn(), disconnect: vi.fn() }, { connected: false });
+  const openapi = Object.assign(
+    { connect: vi.fn(), disconnect: vi.fn(), limitMemory: vi.fn(() => ({})), rememberLimits: vi.fn() },
+    { connected: false },
+  );
   const cloud = {
     getDevices: vi.fn(() => Promise.resolve([])),
     getDeviceState: vi.fn(() => Promise.resolve([])),
@@ -603,7 +606,7 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     fsReal.mkdirSync(currentDataDir(), { recursive: true });
     fsReal.writeFileSync(
       pathReal.join(currentDataDir(), "rate-limits.json"),
-      JSON.stringify({ limiter: lane([1]), gate: lane([2]), lan: lane([3]), broker: lane([4]) }),
+      JSON.stringify({ limiter: lane([1]), gate: lane([2]), lan: lane([3]), broker: lane([4]), events: lane([5]) }),
     );
     const ctx = setup({ apiKey: "12345678-1234-1234-1234-123456789abc", goveeEmail: "a@b.c", goveePassword: "pw" });
     const i = internalOf(ctx.adapter);
@@ -615,9 +618,13 @@ describe("GoveeAdapter onReady — channel wiring", () => {
     expect(gateRemember).toHaveBeenCalledWith(lane([2]));
     expect(f.lan.rememberLimits).toHaveBeenCalledWith(lane([3]));
     expect(f.mqtt.rememberLimits).toHaveBeenCalledWith(lane([4]));
+    expect(f.openapi.rememberLimits).toHaveBeenCalledWith(lane([5]));
     expect(f.limiter.remember.mock.invocationCallOrder[0]).toBeLessThan(f.limiter.start.mock.invocationCallOrder[0]);
     expect(f.lan.rememberLimits.mock.invocationCallOrder[0]).toBeLessThan(f.lan.start.mock.invocationCallOrder[0]);
     expect(f.mqtt.rememberLimits.mock.invocationCallOrder[0]).toBeLessThan(f.mqtt.connect.mock.invocationCallOrder[0]);
+    expect(f.openapi.rememberLimits.mock.invocationCallOrder[0]).toBeLessThan(
+      f.openapi.connect.mock.invocationCallOrder[0],
+    );
   });
 
   it("account credentials are trimmed before the MQTT login (issue #39)", async () => {
@@ -1386,6 +1393,7 @@ describe("GoveeAdapter onReady — timers", () => {
     f.limiter.memory.mockReturnValue(lane(1));
     f.lan.limitMemory.mockReturnValue(lane(3));
     f.mqtt.limitMemory.mockReturnValue(lane(4));
+    f.openapi.limitMemory.mockReturnValue(lane(5));
     vi.spyOn((i as unknown as { callGate: { memory: () => unknown } }).callGate, "memory").mockReturnValue(lane(2));
     const file = pathReal.join(currentDataDir(), "rate-limits.json");
     let onDiskAtCallback: unknown;
@@ -1396,7 +1404,13 @@ describe("GoveeAdapter onReady — timers", () => {
       });
     });
     expect(f.limiter.memory.mock.invocationCallOrder[0]).toBeGreaterThan(f.limiter.stop.mock.invocationCallOrder[0]);
-    expect(onDiskAtCallback).toEqual({ limiter: lane(1), gate: lane(2), lan: lane(3), broker: lane(4) });
+    expect(onDiskAtCallback).toEqual({
+      limiter: lane(1),
+      gate: lane(2),
+      lan: lane(3),
+      broker: lane(4),
+      events: lane(5),
+    });
   });
 
   it("onUnload hands on the memory of a limiter this run never built", async () => {

@@ -18,6 +18,7 @@ describe("limit-memory — every limiter's windows in the instance data folder",
       gate: { "y|0|account": { seconds: 60, ends: [3] } },
       lan: { "z|0|10.0.0.1": { seconds: 30, ends: [4] } },
       broker: {},
+      events: { "w|0|account": { seconds: 15, ends: [5] } },
     };
     await saveLimitMemory(path.join(dir, "sub"), memory);
     expect(loadLimitMemory(path.join(dir, "sub"))).toEqual(memory);
@@ -28,7 +29,7 @@ describe("limit-memory — every limiter's windows in the instance data folder",
     fs.writeFileSync(path.join(dir, LIMIT_MEMORY_FILE), "{not json");
     expect(loadLimitMemory(dir)).toEqual({});
     fs.writeFileSync(path.join(dir, LIMIT_MEMORY_FILE), "null");
-    expect(loadLimitMemory(dir)).toEqual({ limiter: {}, gate: {}, lan: {}, broker: {} });
+    expect(loadLimitMemory(dir)).toEqual({ limiter: {}, gate: {}, lan: {}, broker: {}, events: {} });
     fs.writeFileSync(
       path.join(dir, LIMIT_MEMORY_FILE),
       JSON.stringify({ limiter: { a: { seconds: 60, ends: [1, "x"] } }, gate: 5, other: { b: {} } }),
@@ -38,6 +39,7 @@ describe("limit-memory — every limiter's windows in the instance data folder",
       gate: {},
       lan: {},
       broker: {},
+      events: {},
     });
   });
 });

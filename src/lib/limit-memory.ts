@@ -18,11 +18,13 @@ export interface LimitMemory {
   gate?: LaneMemory;
   /** The gate of the LAN datagrams (govee-lan-client.ts). */
   lan?: LaneMemory;
-  /** The gate of the account broker's publishes (govee-mqtt-client.ts). */
+  /** The account broker's connection and write windows (govee-mqtt-client.ts). */
   broker?: LaneMemory;
+  /** The events broker's connection and write windows (govee-openapi-mqtt-client.ts). */
+  events?: LaneMemory;
 }
 
-const PARTS = ["limiter", "gate", "lan", "broker"] as const;
+const PARTS = ["limiter", "gate", "lan", "broker", "events"] as const;
 
 /**
  * Read what the previous process of this instance left — an empty memory when there is none or it is unreadable.

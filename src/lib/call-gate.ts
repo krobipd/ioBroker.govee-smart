@@ -48,7 +48,7 @@ export class CallGate {
    */
   constructor(
     private readonly delay: (ms: number) => Promise<void>,
-    private readonly now: () => number = Date.now,
+    private readonly now: () => number = () => Date.now(),
   ) {}
 
   /**
@@ -146,6 +146,20 @@ export class CallGate {
    */
   tryAdmit(c: Counterpart, host: string): (() => void) | undefined {
     return this.take(this.windowsOf([c], host));
+  }
+
+  /**
+   * Count a write that has left — a packet on a broker connection as the library sends it. It holds its slot from now
+   * on in every window of the counterpart; the sender lets a write out only while {@link waitMs} says it fits.
+   *
+   * @param c The counterpart
+   * @param host The host called (for `per: "host"`)
+   */
+  count(c: Counterpart, host: string): void {
+    const end = this.now();
+    for (const w of this.windowsOf([c], host)) {
+      this.lanes.take(w.key, w.seconds).end = end;
+    }
   }
 
   /**
