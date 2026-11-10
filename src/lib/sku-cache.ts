@@ -1,8 +1,8 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { deviceLabel, errText, type CloudCapability, type CloudScene, type SnapshotPackets } from "./types";
 import { cacheKey, treeKey } from "./device-key";
-import { writeFileAtomic } from "./atomic-file";
+import { listDataFiles, readDataFile, removeDataFile, writeDataFile } from "./data-file";
+import { LogOnce } from "./log-once";
 
 /** Data persisted per device in the SKU cache */
 export interface CachedDeviceData {
@@ -90,8 +90,8 @@ export interface CachedDeviceData {
 }
 
 /**
- * Persistent SKU cache — stores Cloud/API data as JSON per device.
- * After first fetch, the adapter runs without Cloud calls.
+ * Persistent SKU cache — stores Cloud/API data as JSON per device, one file per device in `<dataDir>/cache`, every
+ * access through the fleet master `data-file.ts`. After first fetch, the adapter runs without Cloud calls.
  */
 export class SkuCache {
   private readonly cacheDir: string;
@@ -103,8 +103,10 @@ export class SkuCache {
    * … most of those writes carried nothing new.
    */
   private readonly lastWritten = new Map<string, string>();
-  /** In-flight write per file — a second save of the same device queues behind the first. */
-  private readonly inFlight = new Map<string, Promise<void>>();
+  /** The fleet's log rule for failed writes: the first of a kind warns, a repeat is debug (log-once.ts). */
+  private readonly logOnce: LogOnce;
+  /** A write failed and none has succeeded since — the next success says so once. */
+  private writeFailing = false;
 
   /**
    * @param dataDir Adapter data directory (adapter.getDataDir())
@@ -113,13 +115,13 @@ export class SkuCache {
   constructor(dataDir: string, log: ioBroker.Logger) {
     this.cacheDir = path.join(dataDir, "cache");
     this.log = log;
-    // mkdir try/catch — a permission / read-only FS must not crash the
-    // constructor (that would throw in onReady → adapter restart loop). On
-    // failure dataAvailable=false is set and save/load skip silently.
+    this.logOnce = new LogOnce(log);
+    // The folder itself is created by the first save (writeDataFile). Listing it here finds a cache path that can
+    // never hold the files — a file in its way, a folder that cannot be read; a missing folder lists as empty. Caught:
+    // a throw here would throw in onReady → adapter restart loop. On failure dataAvailable=false is set and save/load
+    // skip silently.
     try {
-      if (!fs.existsSync(this.cacheDir)) {
-        fs.mkdirSync(this.cacheDir, { recursive: true });
-      }
+      listDataFiles(this.cacheDir);
       this.dataAvailable = true;
     } catch (e) {
       this.dataAvailable = false;
@@ -134,77 +136,69 @@ export class SkuCache {
    * Save device data to cache. Never rejects — a failed write is a warn line,
    * the adapter keeps running on its in-memory data.
    *
-   * Asynchronous and flushed: the previous synchronous open/write/fsync/close
-   * blocked the event loop for the whole fsync (tens of milliseconds per file on
-   * an SD card, for every device, at least twice per start). The data still
-   * hits the disk before the promise resolves — plain writeFile only reaches the
-   * page cache, and a SIGKILL inside the ~30 s writeback window would lose the
-   * save silently. Written to a temp file and renamed into place, so a crash
-   * mid-write leaves the previous file intact instead of a torn one.
+   * Written at once through the fleet master (`writeDataFile`: a temporary file
+   * renamed into place, so a crash mid-write leaves the previous file intact
+   * instead of a torn one). The write is synchronous, so two saves of one device
+   * never overlap; the promise stays for the callers.
    *
    * @param data Device data to persist
+   * @returns Resolves once the file is written, or the failed write is logged
    */
-  async save(data: CachedDeviceData): Promise<void> {
+  save(data: CachedDeviceData): Promise<void> {
     if (!this.dataAvailable) {
-      return;
+      return Promise.resolve();
     }
     const file = this.cacheFile(data.sku, data.deviceId);
     const { cachedAt: _cachedAt, ...comparable } = data;
     const fingerprint = JSON.stringify(comparable);
     if (this.lastWritten.get(file) === fingerprint) {
       this.log.debug(`Cache unchanged for ${data.sku} — not rewritten`);
-      return;
+      return Promise.resolve();
     }
     this.lastWritten.set(file, fingerprint);
-    const json = JSON.stringify(data, null, 2);
-    const write = (): Promise<void> => writeFileAtomic(file, json);
-    const previous = this.inFlight.get(file) ?? Promise.resolve();
-    const current = previous
-      .catch(() => undefined)
-      .then(write)
-      .then(
-        () => {
-          const sceneN = Array.isArray(data.sceneLibrary) ? data.sceneLibrary.length : 0;
-          const musicN = Array.isArray(data.musicLibrary) ? data.musicLibrary.length : 0;
-          const diyN = Array.isArray(data.diyLibrary) ? data.diyLibrary.length : 0;
-          const snapN = Array.isArray(data.snapshotBleCmds) ? data.snapshotBleCmds.length : 0;
-          this.log.debug(
-            `Cache saved for ${data.sku} (scenes=${sceneN}, music=${musicN}, diy=${diyN}, snapshotBleCmds=${snapN})`,
-          );
-        },
-        (e: unknown) => {
-          // Forget the fingerprint so the next save retries the write.
-          if (this.lastWritten.get(file) === fingerprint) {
-            this.lastWritten.delete(file);
-          }
-          this.log.warn(`Cache write failed for ${data.sku}: ${errText(e)}`);
-        },
-      );
-    this.inFlight.set(file, current);
-    await current;
-    if (this.inFlight.get(file) === current) {
-      this.inFlight.delete(file);
+    try {
+      writeDataFile(this.cacheDir, file, data);
+    } catch (e) {
+      // Forget the fingerprint so the next save retries the write. Said once per kind of failure: a data folder that
+      // cannot hold the cache (read-only, no `cache/` yet) fails every save of every device the same way.
+      this.lastWritten.delete(file);
+      this.writeFailing = true;
+      this.logOnce.report("cache-write", `Cache write failed for ${data.sku}: ${errText(e)}`, {
+        kind: (e as NodeJS.ErrnoException).code ?? "write",
+      });
+      return Promise.resolve();
     }
+    if (this.writeFailing) {
+      this.writeFailing = false;
+      this.logOnce.recovered("cache-write", `Cache writes work again (${this.cacheDir})`);
+    }
+    const sceneN = Array.isArray(data.sceneLibrary) ? data.sceneLibrary.length : 0;
+    const musicN = Array.isArray(data.musicLibrary) ? data.musicLibrary.length : 0;
+    const diyN = Array.isArray(data.diyLibrary) ? data.diyLibrary.length : 0;
+    const snapN = Array.isArray(data.snapshotBleCmds) ? data.snapshotBleCmds.length : 0;
+    this.log.debug(
+      `Cache saved for ${data.sku} (scenes=${sceneN}, music=${musicN}, diy=${diyN}, snapshotBleCmds=${snapN})`,
+    );
     this.removeLegacyFile(data.sku, data.deviceId);
+    return Promise.resolve();
   }
 
   /**
    * Drop the 2.x file of a device once its file of the current name is written — `loadAll` reads by
    * content and would otherwise return the device twice. The 2.x name could be shared by two devices
-   * of one SKU; the other one then loads its libraries anew, once.
+   * of one SKU; the other one then loads its libraries anew, once. Called after a successful write only.
    *
    * @param sku Product model
    * @param deviceId Device identifier
    */
   private removeLegacyFile(sku: string, deviceId: string): void {
     const legacy = this.legacyCacheFile(sku, deviceId);
-    if (legacy === this.cacheFile(sku, deviceId) || !fs.existsSync(this.cacheFile(sku, deviceId))) {
+    // A short device id gives both rules one name — that file is the one just written.
+    if (legacy === this.cacheFile(sku, deviceId)) {
       return;
     }
     try {
-      if (fs.existsSync(legacy)) {
-        fs.unlinkSync(legacy);
-      }
+      removeDataFile(this.cacheDir, legacy);
     } catch (e) {
       this.log.debug(`Cache: could not remove the old file of ${sku}: ${errText(e)}`);
     }
@@ -222,16 +216,22 @@ export class SkuCache {
     if (!this.dataAvailable) {
       return null;
     }
-    // A device whose cache was last written by 2.x still has the file under the old name.
-    const file = [this.cacheFile(sku, deviceId), this.legacyCacheFile(sku, deviceId)].find(f => fs.existsSync(f));
     try {
-      if (!file) {
-        return null;
+      // A device whose cache was last written by 2.x still has the file under the old name — read only while no file
+      // of the current name is there; an unusable one is not passed over.
+      for (const file of [this.cacheFile(sku, deviceId), this.legacyCacheFile(sku, deviceId)]) {
+        const read = readDataFile(this.cacheDir, file);
+        if (read.error !== undefined) {
+          this.log.debug(`Cache loadOne failed for ${sku}: ${read.error}`);
+          return null;
+        }
+        if ("value" in read) {
+          const data = read.value as CachedDeviceData;
+          // The 2.x name could be shared by two devices of one SKU — only this device's data counts.
+          return cacheKey(data.sku, data.deviceId) === cacheKey(sku, deviceId) ? data : null;
+        }
       }
-      const raw = fs.readFileSync(file, "utf-8");
-      const data = JSON.parse(raw) as CachedDeviceData;
-      // The 2.x name could be shared by two devices of one SKU — only this device's data counts.
-      return cacheKey(data.sku, data.deviceId) === cacheKey(sku, deviceId) ? data : null;
+      return null;
     } catch (e) {
       this.log.debug(`Cache loadOne failed for ${sku}: ${errText(e)}`);
       return null;
@@ -247,28 +247,21 @@ export class SkuCache {
     }
     let corruptCount = 0;
     let skippedFiles = 0;
-    try {
-      if (!fs.existsSync(this.cacheDir)) {
-        this.log.debug(`Cache load: miss — directory does not exist yet (${this.cacheDir})`);
-        return results;
+    // Sorted (listDataFiles): the order devices come back in is the order a cache start assigns their object ids in
+    // (DeviceIdRegistry) — with two devices of one SKU ending alike, which one keeps the short id must not depend on
+    // the file system's listing order.
+    for (const file of this.cacheFiles()) {
+      if (!file.endsWith(".json")) {
+        skippedFiles++;
+        continue;
       }
-      // Sorted: the order devices come back in is the order a cache start assigns their object ids in
-      // (DeviceIdRegistry) — with two devices of one SKU ending alike, which one keeps the short id must
-      // not depend on the file system's listing order.
-      for (const file of fs.readdirSync(this.cacheDir).sort()) {
-        if (!file.endsWith(".json")) {
-          skippedFiles++;
-          continue;
-        }
-        try {
-          const raw = fs.readFileSync(path.join(this.cacheDir, file), "utf-8");
-          results.push(JSON.parse(raw) as CachedDeviceData);
-        } catch {
-          corruptCount++;
-        }
+      const read = readDataFile(this.cacheDir, file);
+      if ("value" in read) {
+        results.push(read.value as CachedDeviceData);
+      } else {
+        // Unusable, or gone since the listing.
+        corruptCount++;
       }
-    } catch {
-      // race: dir disappeared between existsSync and readdir — fall through
     }
     if (results.length === 0) {
       this.log.debug(`Cache load: miss — no cached devices found in ${this.cacheDir}`);
@@ -303,25 +296,28 @@ export class SkuCache {
     const nowMs = Date.now();
     let pruned = 0;
     const prunedDetails: string[] = [];
-    this.forEachCacheFile(full => {
-      try {
-        const raw = fs.readFileSync(full, "utf-8");
-        const data = JSON.parse(raw) as CachedDeviceData;
-        // Legacy entries without timestamp: keep, set timestamp on next save
-        if (typeof data.lastSeenOnNetwork !== "number") {
-          return;
-        }
-        if (data.lastSeenOnNetwork < cutoff) {
-          const ageDays = Math.round((nowMs - data.lastSeenOnNetwork) / 86400000);
-          fs.unlinkSync(full);
-          this.lastWritten.delete(full);
-          pruned++;
-          prunedDetails.push(`${deviceLabel(data)} ${data.deviceId} (${ageDays}d)`);
-        }
-      } catch {
-        // skip corrupt files
+    for (const file of this.cacheFiles()) {
+      if (!file.endsWith(".json")) {
+        continue;
       }
-    });
+      const data = readDataFile(this.cacheDir, file).value as CachedDeviceData | null | undefined;
+      // Legacy entries without timestamp: keep, set timestamp on next save. An unusable file (no value) is kept too.
+      if (typeof data?.lastSeenOnNetwork !== "number") {
+        continue;
+      }
+      if (data.lastSeenOnNetwork < cutoff) {
+        const ageDays = Math.round((nowMs - data.lastSeenOnNetwork) / 86400000);
+        try {
+          removeDataFile(this.cacheDir, file);
+        } catch {
+          // a file that cannot be removed stays, uncounted
+          continue;
+        }
+        this.lastWritten.delete(file);
+        pruned++;
+        prunedDetails.push(`${deviceLabel(data)} ${data.deviceId} (${ageDays}d)`);
+      }
+    }
     if (pruned > 0) {
       this.log.info(
         `Cache: pruned ${pruned} stale entries (not seen for ${maxAgeDays}+ days): ${prunedDetails.join(", ")}`,
@@ -348,12 +344,11 @@ export class SkuCache {
     const file = this.cacheFile(sku, deviceId);
     this.lastWritten.delete(file);
     try {
-      const legacy = this.legacyCacheFile(sku, deviceId);
-      if (legacy !== file && fs.existsSync(legacy)) {
-        fs.unlinkSync(legacy);
-      }
-      if (fs.existsSync(file)) {
-        fs.unlinkSync(file);
+      const present = this.cacheFiles().includes(file);
+      // With a short device id both names are one — the second removal then finds nothing, which is no error.
+      removeDataFile(this.cacheDir, this.legacyCacheFile(sku, deviceId));
+      removeDataFile(this.cacheDir, file);
+      if (present) {
         this.log.debug(`Cache: evicted ${label ?? sku} ${deviceId} (removed from Govee account)`);
       }
     } catch (e) {
@@ -362,37 +357,27 @@ export class SkuCache {
   }
 
   /**
-   * Iterate the `*.json` files in the cache dir, calling `cb` with each file's
-   * absolute path. A missing or vanished dir is swallowed (cb not called).
-   * Centralises the existsSync + readdir + json-filter shared by prune/clear.
+   * The file names in the cache dir, sorted. A missing, vanished or replaced
+   * dir lists as empty — load, prune and evict never throw on it.
    *
-   * @param cb Callback invoked with each cache file's absolute path
+   * @returns The file names (sub-folders not)
    */
-  private forEachCacheFile(cb: (fullPath: string) => void): void {
-    let files: string[];
+  private cacheFiles(): string[] {
     try {
-      if (!fs.existsSync(this.cacheDir)) {
-        return;
-      }
-      files = fs.readdirSync(this.cacheDir);
+      return listDataFiles(this.cacheDir);
     } catch {
-      return;
-    }
-    for (const file of files) {
-      if (file.endsWith(".json")) {
-        cb(path.join(this.cacheDir, file));
-      }
+      return [];
     }
   }
 
   /**
-   * Build cache file path for a device.
+   * Cache file name of a device.
    *
    * @param sku Product model
    * @param deviceId Device identifier
    */
   private cacheFile(sku: string, deviceId: string): string {
-    return path.join(this.cacheDir, `${cacheKey(sku, deviceId)}.json`);
+    return `${cacheKey(sku, deviceId)}.json`;
   }
 
   /**
@@ -402,6 +387,6 @@ export class SkuCache {
    * @param deviceId Device identifier
    */
   private legacyCacheFile(sku: string, deviceId: string): string {
-    return path.join(this.cacheDir, `${treeKey(sku, deviceId)}.json`);
+    return `${treeKey(sku, deviceId)}.json`;
   }
 }

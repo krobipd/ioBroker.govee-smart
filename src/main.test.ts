@@ -3200,12 +3200,10 @@ describe("GoveeAdapter — callback wiring", () => {
       accountTopic: "GA/acc",
       tokenExpiresAt: Date.now() + 3_600_000,
     });
-    // The write is asynchronous (temp file + rename) — wait for the file to be complete.
-    // The old budget was 50 x 10 ms: locally the file is readable on the FIRST pass
-    // (measured 11 ms, five runs), so 500 ms looked like ample headroom — and it still
-    // ran out on a loaded CI worker, turning main red (run #34156073616, ubuntu 24.x).
-    // A fixed deadline against an asynchronous write is a coin toss under load; a
-    // generous one costs nothing, because a passing test leaves on the first pass.
+    // The callback persists on the handler's own promise chain — wait until the file is there.
+    // The old budget was 50 x 10 ms and ran out on a loaded CI worker, turning main red
+    // (run #34156073616, ubuntu 24.x); a generous one costs nothing, because a passing test
+    // leaves on the first pass.
     const file = pathReal.join(currentDataDir(), "mqtt-credentials.json");
     let stored: { bearerToken?: string } | null = null;
     for (let attempt = 0; attempt < 500 && !stored; attempt++) {
@@ -3711,9 +3709,6 @@ describe("start-up with more lights than the minute window holds (issue #46, 202
 
     expect(dropdown("ee01")).toEqual({ 0: "---", 1: "Sunrise" });
     expect(dropdown("ee02")).toEqual({ 0: "---", 1: "Sunrise" });
-    // save() is asynchronous (temp file + flush + rename) — wait for the disk.
-    const inFlight = (i.skuCache as { inFlight: Map<string, Promise<void>> }).inFlight;
-    await Promise.allSettled([...inFlight.values()]);
     const cached = JSON.parse(
       fsReal.readFileSync(pathReal.join(dataDir, "cache", "h600d_aabbccddee02.json"), "utf8"),
     ) as {

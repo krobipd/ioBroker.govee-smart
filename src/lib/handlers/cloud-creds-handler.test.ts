@@ -9,9 +9,21 @@ import {
   persistCreds,
   usableVerificationCode,
 } from "./cloud-creds-handler";
+import { deriveGoveeClientId } from "../govee-constants";
 import type { PersistedMqttCredentials } from "../types";
 
 const noopLog = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} } as unknown as ioBroker.Logger;
+
+/**
+ * Whether a file holds what the fleet master `writeDataFile` writes — pretty JSON with a trailing newline. Every write
+ * into the data folder goes through it (round 173), and this form shows it on every platform, Windows included.
+ *
+ * @param file The file to read
+ */
+function writtenByMaster(file: string): boolean {
+  const text = fs.readFileSync(file, "utf-8");
+  return text === `${JSON.stringify(JSON.parse(text), null, 2)}\n`;
+}
 
 describe("MQTT credential persistence (instance-data-dir file)", () => {
   let dataDir: string;
@@ -118,40 +130,50 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     expect(await loadPersistedCreds(adapter, dataDir, "anyone@example.com")).toEqual(creds);
   });
 
-  it("the credentials file is owner-only — on both write paths", async () => {
+  it("a bound bundle in the compact form 3.2.1 wrote still loads, and still only for its account", async () => {
+    // 3.2.1 wrote one line of JSON without a trailing newline; the fleet master writes pretty JSON — the reader takes both
+    const { adapter } = makeCredAdapter();
+    const bound = { accountKey: deriveGoveeClientId("first@example.com"), ...(JSON.parse(encBlob) as object) };
+    fs.writeFileSync(credsFile(), JSON.stringify(bound), { mode: 0o600 });
+    expect(await loadPersistedCreds(adapter, dataDir, "first@example.com")).toEqual(creds);
+    expect(await loadPersistedCreds(adapter, dataDir, "second@example.com")).toBeNull();
+  });
+
+  it("the credentials file is owner-only and written by the fleet master — on every write path", async () => {
     // Encryption and file mode are two independent guards, and only the content one
     // was ever asserted: a mutation run on 2026-09-07 flipped 0o600 to 0o644 on BOTH
     // writers and the whole suite stayed green. The bearer token and the certificate
     // password sit in this file; the adapter secret that decrypts them is on the same
     // machine, so a world-readable blob is not a rest state we want.
-    // Windows has no POSIX modes: statSync reports 0o666 there, which turned CI run
-    // #705 red on windows-latest (2026-09-07). The hot path is therefore asserted on
-    // what the code HANDS OVER — that holds on every platform — and the real mode is
-    // checked wherever the concept exists.
-    const { adapter, metaFiles } = makeCredAdapter();
-    // `fs.writeFileSync` is a plain ESM export and cannot be spied on, so the sync path
-    // is only provable where the mode exists.
-    // The hot path writes atomically (temp file + rename): the mode is handed
-    // over when the temp file is created.
-    const asyncOpen = vi.spyOn(fs.promises, "open");
+    // Since round 173 every writer goes through the fleet master (data-file.ts), which
+    // creates the temporary file with mode 0o600 and renames it into place. Windows has
+    // no POSIX modes: statSync reports 0o666 there, which turned CI run #705 red on
+    // windows-latest (2026-09-07). So the master's form is asserted on every platform
+    // and the real mode wherever the concept exists.
+    const { adapter, states, metaFiles } = makeCredAdapter();
     const posix = process.platform !== "win32";
+    const expectOwnerOnlyFromMaster = (): void => {
+      expect(writtenByMaster(credsFile())).toBe(true);
+      if (posix) {
+        expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
+      }
+    };
 
-    // async writer — the hot path, runs on every login and token refresh
+    // the hot path, runs on every login and token refresh
     await persistCreds(adapter, dataDir, creds);
-    expect(asyncOpen.mock.calls.at(-1)?.[2]).toBe(0o600);
-    if (posix) {
-      expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
-    }
+    expectOwnerOnlyFromMaster();
 
-    // sync writer — the one-shot startup migration from the v2.18.x meta object
+    // the one-shot startup migration from the v2.18.x meta object
     fs.rmSync(credsFile());
     metaFiles.set("govee-smart.0.credentials/mqtt.json", encBlob);
     await migrateCredentialsMetaOnce(adapter, dataDir);
-    if (posix) {
-      expect(fs.statSync(credsFile()).mode & 0o777).toBe(0o600);
-    }
+    expectOwnerOnlyFromMaster();
 
-    asyncOpen.mockRestore();
+    // the one-shot migration from the info.mqttCredentials state (v2.1.3–v2.17.x)
+    fs.rmSync(credsFile());
+    states.set("info.mqttCredentials", encBlob);
+    await loadPersistedCreds(adapter, dataDir);
+    expectOwnerOnlyFromMaster();
   });
 
   it("persist creates the data directory when it does not exist yet", async () => {
@@ -161,8 +183,25 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
     expect(fs.existsSync(path.join(nested, "mqtt-credentials.json"))).toBe(true);
   });
 
+  it("a failed persist rejects instead of throwing — every caller handles it with .catch", async () => {
+    // a folder where the master's temporary file belongs makes the write fail on every platform
+    const { adapter } = makeCredAdapter();
+    fs.mkdirSync(path.join(dataDir, "mqtt-credentials.json.tmp"));
+    await expect(persistCreds(adapter, dataDir, creds)).rejects.toThrow();
+    expect(fs.existsSync(credsFile())).toBe(false);
+  });
+
   it("load returns null when nothing is stored (no file, no legacy state)", async () => {
     expect(await loadPersistedCreds(makeCredAdapter().adapter, dataDir)).toBeNull();
+  });
+
+  it("a file holding JSON null is unusable and falls through to the legacy state", async () => {
+    const { adapter, states } = makeCredAdapter();
+    fs.writeFileSync(credsFile(), "null");
+    expect(await loadPersistedCreds(adapter, dataDir)).toBeNull();
+    states.set("info.mqttCredentials", encBlob);
+    expect(await loadPersistedCreds(adapter, dataDir)).toEqual(creds);
+    expect(JSON.parse(fs.readFileSync(credsFile(), "utf-8"))).toEqual(JSON.parse(encBlob));
   });
 
   it("load returns null when a required field is missing", async () => {
@@ -189,9 +228,29 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
 
     const loaded = await loadPersistedCreds(adapter, dataDir);
     expect(loaded).toEqual(creds); // decrypted from the migrated blob
-    expect(fs.readFileSync(credsFile(), "utf-8")).toBe(encBlob); // copied verbatim (still encrypted)
+    expect(JSON.parse(fs.readFileSync(credsFile(), "utf-8"))).toEqual(JSON.parse(encBlob)); // the blob's object, still encrypted
     expect(deletedObjects).toContain("info.mqttCredentials"); // old state removed
     expect(states.has("info.mqttCredentials")).toBe(false);
+  });
+
+  it("one-shot migration: a state blob that is no JSON is dropped without a file", async () => {
+    // Up to 3.2.1 such a blob was copied as it was, and the next start found an unusable file; the fleet master writes
+    // JSON only. Keeping the state would retry the same useless carry-over on every start.
+    const { adapter, states, deletedObjects } = makeCredAdapter();
+    states.set("info.mqttCredentials", "{ not json");
+    expect(await loadPersistedCreds(adapter, dataDir)).toBeNull();
+    expect(fs.existsSync(credsFile())).toBe(false);
+    expect(deletedObjects).toContain("info.mqttCredentials");
+  });
+
+  it("one-shot migration: a failed file write keeps the legacy state and still uses its credentials", async () => {
+    const { adapter, states, deletedObjects } = makeCredAdapter();
+    states.set("info.mqttCredentials", encBlob);
+    fs.mkdirSync(path.join(dataDir, "mqtt-credentials.json.tmp")); // the master's temporary file cannot be created
+    expect(await loadPersistedCreds(adapter, dataDir)).toEqual(creds);
+    expect(fs.existsSync(credsFile())).toBe(false);
+    expect(deletedObjects).not.toContain("info.mqttCredentials");
+    expect(states.has("info.mqttCredentials")).toBe(true);
   });
 
   it("prefers the file over the legacy state (no migration when the file already has creds)", async () => {
@@ -211,7 +270,7 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
       metaFiles.set(META_KEY, encBlob);
 
       await migrateCredentialsMetaOnce(adapter, dataDir);
-      expect(fs.readFileSync(credsFile(), "utf-8")).toBe(encBlob); // migrated verbatim
+      expect(JSON.parse(fs.readFileSync(credsFile(), "utf-8"))).toEqual(JSON.parse(encBlob)); // the blob's object
       expect(deletedMetaFiles).toContain(META_KEY); // meta file removed
       expect(deletedObjects).toContain("credentials"); // meta object removed
       // and the migrated blob loads
@@ -227,6 +286,49 @@ describe("MQTT credential persistence (instance-data-dir file)", () => {
       expect(await loadPersistedCreds(adapter, dataDir)).toEqual(creds); // untouched
       expect(deletedObjects).toContain("credentials");
       expect(metaFiles.has(META_KEY)).toBe(false);
+    });
+
+    it("an existing file that cannot be used holds nothing — the meta blob replaces it", async () => {
+      const { adapter, metaFiles, deletedObjects } = makeCredAdapter();
+      fs.writeFileSync(credsFile(), "{ broken");
+      metaFiles.set(META_KEY, encBlob);
+
+      await migrateCredentialsMetaOnce(adapter, dataDir);
+      expect(JSON.parse(fs.readFileSync(credsFile(), "utf-8"))).toEqual(JSON.parse(encBlob));
+      expect(deletedObjects).toContain("credentials");
+      expect(metaFiles.has(META_KEY)).toBe(false);
+    });
+
+    it("a data folder that cannot be read keeps the meta file and object — the write fails too", async () => {
+      const { adapter, metaFiles, deletedObjects } = makeCredAdapter();
+      metaFiles.set(META_KEY, encBlob);
+      const blocked = path.join(dataDir, "not-a-folder");
+      fs.writeFileSync(blocked, "x"); // a file where the data folder should be
+
+      await migrateCredentialsMetaOnce(adapter, blocked);
+      expect(metaFiles.has(META_KEY)).toBe(true);
+      expect(deletedObjects).not.toContain("credentials");
+    });
+
+    it("a meta blob that is no JSON is dropped without a file", async () => {
+      const { adapter, metaFiles, deletedObjects } = makeCredAdapter();
+      metaFiles.set(META_KEY, "{ not json");
+
+      await migrateCredentialsMetaOnce(adapter, dataDir);
+      expect(fs.existsSync(credsFile())).toBe(false);
+      expect(deletedObjects).toContain("credentials");
+      expect(metaFiles.has(META_KEY)).toBe(false);
+    });
+
+    it("a failed carry-over keeps the meta file and object as the source for the next start", async () => {
+      const { adapter, metaFiles, deletedObjects } = makeCredAdapter();
+      metaFiles.set(META_KEY, encBlob);
+      fs.mkdirSync(path.join(dataDir, "mqtt-credentials.json.tmp")); // the master's temporary file cannot be created
+
+      await migrateCredentialsMetaOnce(adapter, dataDir);
+      expect(fs.existsSync(credsFile())).toBe(false);
+      expect(metaFiles.has(META_KEY)).toBe(true);
+      expect(deletedObjects).not.toContain("credentials");
     });
 
     it("with nothing stored it only drops the meta object (idempotent, no file created)", async () => {
@@ -263,17 +365,34 @@ describe("verification code spent outside the settings", () => {
     expect(usableVerificationCode(dataDir, "654321")).toBe("654321");
   });
 
-  it("the mark holds the code's hash, never the code, readable by the owner only", async () => {
-    // Windows has no POSIX modes (statSync reports 0o666): the mode handed over holds everywhere, the real one where
-    // the concept exists — as for the credentials file above
-    const asyncOpen = vi.spyOn(fs.promises, "open");
+  it("the mark holds the code's hash, never the code, written by the fleet master, readable by the owner only", async () => {
+    // Windows has no POSIX modes (statSync reports 0o666): the master's form holds everywhere, the real mode where the
+    // concept exists — as for the credentials file above
     await markVerificationCodeUsed(dataDir, "123456");
-    expect(asyncOpen.mock.calls.at(-1)?.[2]).toBe(0o600);
-    asyncOpen.mockRestore();
     expect(fs.readFileSync(markFile(), "utf-8")).not.toContain("123456");
+    expect(writtenByMaster(markFile())).toBe(true);
     if (process.platform !== "win32") {
       expect(fs.statSync(markFile()).mode & 0o777).toBe(0o600);
     }
+  });
+
+  it("a failed mark rejects instead of throwing — every caller handles it with .catch", async () => {
+    // a folder where the master's temporary file belongs makes the write fail on every platform
+    fs.mkdirSync(path.join(dataDir, "verification-code.json.tmp"));
+    await expect(markVerificationCodeUsed(dataDir, "123456")).rejects.toThrow();
+    expect(usableVerificationCode(dataDir, "123456")).toBe("123456");
+  });
+
+  it("a mark in one compact line, as the file's first writer wrote it before the fleet master, is still read", () => {
+    // the sha256 of "123456", in the form the code before data-file.ts wrote it (never released)
+    const mark = "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92";
+    fs.writeFileSync(markFile(), JSON.stringify({ used: mark }), { mode: 0o600 });
+    expect(usableVerificationCode(dataDir, "123456")).toBe("");
+  });
+
+  it("a mark file holding JSON null counts as no mark", () => {
+    fs.writeFileSync(markFile(), "null");
+    expect(usableVerificationCode(dataDir, "123456")).toBe("123456");
   });
 
   it("an empty code is neither marked nor sent", async () => {

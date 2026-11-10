@@ -1,5 +1,5 @@
-import * as fs from "node:fs";
 import * as path from "node:path";
+import { listDataFiles, readDataFile, removeDataFile } from "./data-file";
 import { errText } from "./types";
 import type { DeviceIdRegistry } from "./device-id";
 import { treeKey } from "./device-key";
@@ -88,7 +88,8 @@ const LEGACY_ROOT_STORE = "snapshots";
  * object at the root of the instance (and until 2.10 in the instance data
  * directory) — a folder next to the devices that belongs to no device.
  * `init()` carries whatever it finds there into the device objects once and
- * removes the folder.
+ * removes the files (the meta object as well; an emptied folder in the data
+ * directory stays — see `carryOverDataDir`).
  *
  * `getSnapshots()` reads from an in-memory cache populated at `init()` — sync
  * access for consumers like the diagnostics provider that can't be made async.
@@ -311,19 +312,19 @@ export class LocalSnapshotStore {
 
   /**
    * Before 2.11.0 the files sat in `<dataDir>/snapshots/` — outside every
-   * backup. Same carry-over as the root store; the directory goes when it is
-   * empty. A file that cannot be moved stays for the next start.
+   * backup. Same carry-over as the root store, every access through the
+   * fleet's data-file module. A file that cannot be moved stays for the next
+   * start. The emptied folder stays as well: the data-file module removes
+   * files, never folders, and an empty folder lists as nothing on every later
+   * start.
    *
    * @param dataDir Instance data directory
    */
   private async carryOverDataDir(dataDir: string): Promise<void> {
     const oldDir = path.join(dataDir, "snapshots");
-    if (!fs.existsSync(oldDir)) {
-      return;
-    }
     let files: string[];
     try {
-      files = fs.readdirSync(oldDir).filter(f => f.endsWith(".json"));
+      files = listDataFiles(oldDir).filter(f => f.endsWith(".json"));
     } catch (e) {
       this.log.warn(`Snapshot carry-over: cannot read ${oldDir}: ${errText(e)}`);
       return;
@@ -331,25 +332,20 @@ export class LocalSnapshotStore {
     let moved = 0;
     for (const file of files) {
       const key = file.slice(0, -".json".length);
-      let snapshots: LocalSnapshot[] | null = null;
-      try {
-        snapshots = parseSnapshots(fs.readFileSync(path.join(oldDir, file), "utf-8"));
-      } catch (e) {
-        this.log.debug(`Snapshot read failed for ${file}: ${errText(e)}`);
+      const read = readDataFile(oldDir, file);
+      if (read.error !== undefined) {
+        this.log.debug(`Snapshot read failed for ${file}: ${read.error}`);
       }
+      // Nothing there (gone since the listing) and unusable both answer null — dropped as unreadable.
+      const snapshots = snapshotsOf(read.value);
       try {
         if (await this.carryOver(key, snapshots, file)) {
           moved++;
         }
-        fs.unlinkSync(path.join(oldDir, file));
+        removeDataFile(oldDir, file);
       } catch (e) {
         this.log.warn(`Snapshot carry-over of ${file} failed: ${errText(e)}`);
       }
-    }
-    try {
-      fs.rmdirSync(oldDir);
-    } catch {
-      /* dir still has files we failed to move — leave for retry on next start */
     }
     if (files.length > 0) {
       this.log.info(`Local snapshots moved from ${oldDir} into their device objects: ${moved}/${files.length} file(s)`);
@@ -433,9 +429,20 @@ function parseSnapshots(raw: unknown): LocalSnapshot[] | null {
     return null;
   }
   try {
-    const data = JSON.parse(raw) as Partial<SnapshotFile> | null;
-    return Array.isArray(data?.snapshots) ? data.snapshots : null;
+    return snapshotsOf(JSON.parse(raw));
   } catch {
     return null;
   }
+}
+
+/**
+ * The list of a parsed payload: anything but `{ snapshots: [...] }` answers
+ * null — also `null`, a bare string or nothing at all (a file of the old data
+ * directory holding `null` was unreadable, unlike an empty field).
+ *
+ * @param data The parsed JSON value, or undefined when there is none
+ */
+function snapshotsOf(data: unknown): LocalSnapshot[] | null {
+  const list = (data as Partial<SnapshotFile> | null | undefined)?.snapshots;
+  return Array.isArray(list) ? list : null;
 }

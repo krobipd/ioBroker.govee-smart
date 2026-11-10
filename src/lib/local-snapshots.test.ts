@@ -1,3 +1,6 @@
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import { LocalSnapshotStore, type LocalSnapshot, type LocalSnapshotStoreAdapter } from "./local-snapshots";
 import { mockLog } from "../../test/test-helpers";
 import { DeviceIdRegistry } from "./device-id";
@@ -555,24 +558,186 @@ describe("LocalSnapshotStore — carry-over from the stores of earlier versions"
     await s.init();
     expect(listed).toBe(0);
   });
+});
 
-  it("moves the pre-2.11 files out of the instance data directory as well", async () => {
-    const fs = await import("node:fs");
-    const os = await import("node:os");
-    const path = await import("node:path");
-    const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-snap-"));
-    try {
-      fs.mkdirSync(path.join(dataDir, "snapshots"));
-      fs.writeFileSync(path.join(dataDir, "snapshots", "h6160_0011.json"), JSON.stringify({ snapshots: [snapA] }));
-      const mock = createMockAdapter();
-      seedDevices(mock.objects);
-      const s = new LocalSnapshotStore(mock.adapter, mockLog, new DeviceIdRegistry());
-      await s.init(dataDir);
-      expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
-      expect(fs.existsSync(path.join(dataDir, "snapshots"))).toBe(false);
-    } finally {
-      fs.rmSync(dataDir, { recursive: true, force: true });
-    }
+describe("LocalSnapshotStore — carry-over from the instance data directory of 2.10 and earlier", () => {
+  const snapA = { name: "A", power: true, brightness: 10, colorRgb: "#111111", colorTemperature: 0, savedAt: 1 };
+  const snapB = { name: "B", power: false, brightness: 20, colorRgb: "#222222", colorTemperature: 2700, savedAt: 2 };
+  let dataDir: string;
+  let snapDir: string;
+
+  beforeEach(() => {
+    dataDir = fs.mkdtempSync(path.join(os.tmpdir(), "govee-snap-"));
+    snapDir = path.join(dataDir, "snapshots");
+  });
+
+  afterEach(() => {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  });
+
+  /**
+   * One file as 2.10.1 wrote it (`JSON.stringify(data, null, 2)`, no trailing newline).
+   *
+   * @param name File name in the old snapshots folder
+   * @param content The text of the file
+   */
+  function seedFile(name: string, content: string): void {
+    fs.mkdirSync(snapDir, { recursive: true });
+    fs.writeFileSync(path.join(snapDir, name), content);
+  }
+
+  /**
+   * A store over the two seeded devices whose log lines land in `lines`.
+   *
+   * @param lines Collects every info, warn and debug line by level
+   * @param lines.info info lines
+   * @param lines.warn warn lines
+   * @param lines.debug debug lines
+   */
+  function storeWithLog(lines: { info: string[]; warn: string[]; debug: string[] }): {
+    store: LocalSnapshotStore;
+    mock: ReturnType<typeof createMockAdapter>;
+  } {
+    const mock = createMockAdapter();
+    seedDevices(mock.objects);
+    const store = new LocalSnapshotStore(
+      mock.adapter,
+      {
+        ...mockLog,
+        info: (m: string) => lines.info.push(m),
+        warn: (m: string) => lines.warn.push(m),
+        debug: (m: string) => lines.debug.push(m),
+      },
+      new DeviceIdRegistry(),
+    );
+    return { store, mock };
+  }
+
+  it("moves the files into the device objects, removes them and leaves the emptied folder", async () => {
+    seedFile("h6160_0011.json", JSON.stringify({ snapshots: [snapA] }, null, 2));
+    seedFile("h6160_2222.json", JSON.stringify({ snapshots: [snapB] }, null, 2));
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(storedList(mock.objects, "devices.h6160-0011")).toEqual([snapA]);
+    expect(storedList(mock.objects, "devices.h6160-2222")).toEqual([snapB]);
+    expect(store.getSnapshots("H6160", "AABBCCDDEEFF2222")).toEqual([snapB]);
+    // The data-file module removes files, never folders — the empty folder stays.
+    expect(fs.readdirSync(snapDir)).toEqual([]);
+    expect(lines.info.some(m => m.includes(`moved from ${snapDir}`) && m.includes("2/2 file(s)"))).toBe(true);
+    expect(lines.warn).toEqual([]);
+    expect(lines.debug.some(m => m.includes("Snapshot read failed"))).toBe(false);
+  });
+
+  it("an unreadable file is dropped with a warning and its reason on debug, the readable one still moves", async () => {
+    seedFile("h6160_0011.json", "NOT JSON!");
+    seedFile("h6160_2222.json", JSON.stringify({ snapshots: [snapB] }, null, 2));
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(store.getSnapshots("H6160", "AABBCCDDEEFF0011")).toEqual([]);
+    expect(store.getSnapshots("H6160", "AABBCCDDEEFF2222")).toEqual([snapB]);
+    expect(lines.warn.some(m => m.includes("h6160_0011.json") && m.includes("unreadable and was dropped"))).toBe(true);
+    expect(lines.debug.some(m => m.includes("Snapshot read failed for h6160_0011.json: no JSON"))).toBe(true);
+    // Only the broken file says why it failed — a readable one has nothing to report.
+    expect(lines.debug.some(m => m.includes("Snapshot read failed for h6160_2222.json"))).toBe(false);
+    expect(fs.readdirSync(snapDir)).toEqual([]);
+    expect(lines.info.some(m => m.includes("1/2 file(s)"))).toBe(true);
+  });
+
+  it("a file whose snapshots are no list, or that holds null, is dropped as unreadable — never as an empty list", async () => {
+    // An empty `native.localSnapshots` field is the empty list; a file holding
+    // `null` never was — it was unreadable before the data-file module as well.
+    seedFile("h6160_0011.json", JSON.stringify({ snapshots: "hello" }));
+    seedFile("h6160_2222.json", "null");
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(storedList(mock.objects, "devices.h6160-0011")).toBeUndefined();
+    expect(lines.warn.some(m => m.includes("h6160_0011.json") && m.includes("unreadable"))).toBe(true);
+    expect(lines.warn.some(m => m.includes("h6160_2222.json") && m.includes("unreadable"))).toBe(true);
+    expect(fs.readdirSync(snapDir)).toEqual([]);
+  });
+
+  it("a file with an empty list moves nothing and is removed without a warning", async () => {
+    seedFile("h6160_0011.json", JSON.stringify({ snapshots: [] }, null, 2));
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(mock.extendCalls).toHaveLength(0);
+    expect(lines.warn).toEqual([]);
+    expect(fs.readdirSync(snapDir)).toEqual([]);
+    expect(lines.info.some(m => m.includes("0/1 file(s)"))).toBe(true);
+  });
+
+  it("an empty file (a crash between truncate and write in 2.10) is dropped as unreadable", async () => {
+    // Behaviour since the data-file module: the old text path read "" as the
+    // empty list and dropped the file silently; the file is still removed and
+    // nothing moves, only the warning is new.
+    seedFile("h6160_0011.json", "");
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(mock.extendCalls).toHaveLength(0);
+    expect(lines.warn.some(m => m.includes("h6160_0011.json") && m.includes("unreadable"))).toBe(true);
+    expect(fs.readdirSync(snapDir)).toEqual([]);
+  });
+
+  it("a file whose device write fails stays for the next start", async () => {
+    seedFile("h6160_0011.json", JSON.stringify({ snapshots: [snapA] }, null, 2));
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    mock.adapter.extendObject = () => Promise.reject(new Error("db down"));
+    await store.init(dataDir);
+    expect(lines.warn.some(m => m.includes("carry-over of h6160_0011.json failed") && m.includes("db down"))).toBe(
+      true,
+    );
+    expect(fs.readdirSync(snapDir)).toEqual(["h6160_0011.json"]);
+    expect(lines.info.some(m => m.includes("0/1 file(s)"))).toBe(true);
+  });
+
+  it("only .json files are carried — other files and sub-folders stay untouched", async () => {
+    seedFile("notes.txt", "keep me");
+    fs.mkdirSync(path.join(snapDir, "h6160_2222.json"));
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(mock.extendCalls).toHaveLength(0);
+    expect(lines.warn).toEqual([]);
+    expect(lines.info.some(m => m.includes(`moved from ${snapDir}`))).toBe(false);
+    expect(fs.readdirSync(snapDir).sort()).toEqual(["h6160_2222.json", "notes.txt"]);
+  });
+
+  it("a later start over the emptied folder carries nothing and says nothing", async () => {
+    seedFile("h6160_0011.json", JSON.stringify({ snapshots: [snapA] }, null, 2));
+    const first = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    await storeWithLog(first).store.init(dataDir);
+    expect(first.info.some(m => m.includes("1/1 file(s)"))).toBe(true);
+    const later = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(later);
+    await store.init(dataDir);
+    expect(mock.extendCalls).toHaveLength(0);
+    expect(later.info).toEqual([]);
+    expect(later.warn).toEqual([]);
+  });
+
+  it("without the old folder nothing is read, logged or created", async () => {
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store, mock } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(mock.extendCalls).toHaveLength(0);
+    expect(lines.info).toEqual([]);
+    expect(lines.warn).toEqual([]);
+    expect(fs.existsSync(snapDir)).toBe(false);
+  });
+
+  it("a snapshots entry that is no folder is reported and left alone", async () => {
+    fs.writeFileSync(snapDir, "not a folder");
+    const lines = { info: [] as string[], warn: [] as string[], debug: [] as string[] };
+    const { store } = storeWithLog(lines);
+    await store.init(dataDir);
+    expect(lines.warn.some(m => m.includes(`cannot read ${snapDir}`))).toBe(true);
+    expect(fs.readFileSync(snapDir, "utf8")).toBe("not a folder");
   });
 });
 

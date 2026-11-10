@@ -1,33 +1,24 @@
 import { vi } from "vitest";
-import type * as FsModule from "node:fs";
+import type * as DataFileModule from "./data-file";
 
 /**
- * node:fs is passed through unchanged except for a flush counter on the file
- * handles fs.promises.open hands out — the durability test below needs to see
- * that the save really flushed, and vitest cannot spy on ESM exports.
+ * The fleet master data-file.ts runs unchanged except for one fault switch: while
+ * `failRemove` holds an error, removeDataFile throws it (removal-failure tests).
+ * A file that cannot be removed has no portable real form — chmod is ignored on
+ * Windows and as root — and vitest cannot spy on ESM exports.
  */
-const fsCounters = vi.hoisted(() => ({ fsync: 0, failNextOpen: null as Error | null }));
-vi.mock("node:fs", async importOriginal => {
-  const actual = await importOriginal<typeof FsModule>();
-  // save() flushes through FileHandle.sync() on a handle from fs.promises.open —
-  // wrap the handle so the durability test can see the flush happen. A queued
-  // `failNextOpen` error makes exactly one open() fail (write-failure tests).
-  const open: typeof actual.promises.open = async (...args) => {
-    if (fsCounters.failNextOpen) {
-      const err = fsCounters.failNextOpen;
-      fsCounters.failNextOpen = null;
-      throw err;
-    }
-    const handle = await actual.promises.open(...args);
-    const origSync = handle.sync.bind(handle);
-    handle.sync = async (): Promise<void> => {
-      fsCounters.fsync++;
-      await origSync();
-    };
-    return handle;
+const faults = vi.hoisted(() => ({ failRemove: null as Error | null }));
+vi.mock("./data-file", async importOriginal => {
+  const actual = await importOriginal<typeof DataFileModule>();
+  return {
+    ...actual,
+    removeDataFile: (dir: string, file: string): void => {
+      if (faults.failRemove) {
+        throw faults.failRemove;
+      }
+      actual.removeDataFile(dir, file);
+    },
   };
-  const promises = { ...actual.promises, open };
-  return { ...actual, default: { ...actual, promises }, promises };
 });
 
 import * as fs from "node:fs";
@@ -66,6 +57,20 @@ function tmpDir(): string {
 
 function cleanup(dir: string): void {
   fs.rmSync(dir, { recursive: true, force: true });
+  faults.failRemove = null;
+}
+
+/**
+ * The cache folder of a data dir, created — for tests that put files there by
+ * hand before any save (the first save creates it otherwise).
+ *
+ * @param dir The data dir
+ * @returns The cache folder
+ */
+function cacheDirOf(dir: string): string {
+  const cacheDir = path.join(dir, "cache");
+  fs.mkdirSync(cacheDir, { recursive: true });
+  return cacheDir;
 }
 
 describe("SkuCache", () => {
@@ -79,19 +84,33 @@ describe("SkuCache", () => {
     cleanup(dir);
   });
 
-  it("should create cache directory on construction", () => {
-    new SkuCache(dir, mockLog);
-    expect(fs.existsSync(path.join(dir, "cache"))).toBe(true);
+  it("creates the cache directory with the first save — construction writes nothing", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    expect(fs.existsSync(path.join(dir, "cache"))).toBe(false);
+    await cache.save(createTestData());
+    expect(fs.readdirSync(path.join(dir, "cache"))).toEqual(["h61be_aabbccdd11223344.json"]);
   });
 
-  it("a cache directory that cannot be created leaves loads empty; one removed later reads as a miss", () => {
-    // A file where the data directory should be — mkdir fails, as on a read-only FS.
+  it("a cache directory that cannot be created leaves loads empty; one removed later reads as a miss", async () => {
+    // A file where the data directory should be — the cache folder can never be listed or created.
     const blocked = path.join(dir, "blocked");
     fs.writeFileSync(blocked, "");
     expect(new SkuCache(blocked, mockLog).loadAll()).toEqual([]);
     const cache = new SkuCache(dir, mockLog);
+    await cache.save(createTestData());
     fs.rmSync(path.join(dir, "cache"), { recursive: true, force: true });
     expect(cache.loadAll()).toEqual([]);
+  });
+
+  it("a cache folder replaced by a file after the start reads as empty — load, prune and evict never throw", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    await cache.save(createTestData());
+    fs.rmSync(path.join(dir, "cache"), { recursive: true, force: true });
+    fs.writeFileSync(path.join(dir, "cache"), "x");
+    expect(cache.loadAll()).toEqual([]);
+    expect(cache.pruneStale(14)).toBe(0);
+    expect(cache.loadOne("H61BE", "AA:BB:CC:DD:11:22:33:44")).toBeNull();
+    expect(() => cache.evictDevice("H61BE", "AA:BB:CC:DD:11:22:33:44")).not.toThrow();
   });
 
   it("should return empty for non-existent cache", () => {
@@ -156,9 +175,31 @@ describe("SkuCache", () => {
 
   it("should handle corrupt JSON gracefully", () => {
     const cache = new SkuCache(dir, mockLog);
-    const cacheDir = path.join(dir, "cache");
+    const cacheDir = cacheDirOf(dir);
     fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
     expect(cache.loadAll()).toEqual([]);
+  });
+
+  it("loadAll returns the good entries beside an unusable file and counts what it skipped", async () => {
+    const debug = vi.fn();
+    const cache = new SkuCache(dir, { ...mockLog, debug });
+    await cache.save(createTestData("H6100", "LA:00:00:00:00:00:00:01"));
+    fs.writeFileSync(path.join(dir, "cache", "corrupt_1234.json"), "not json");
+    fs.writeFileSync(path.join(dir, "cache", "notes.txt"), "not a cache file");
+    expect(cache.loadAll().map(e => e.sku)).toEqual(["H6100"]);
+    expect(debug).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "1 device(s) (no age data, legacy entries), 1 corrupt file(s) skipped, 1 non-json file(s) skipped",
+      ),
+    );
+  });
+
+  it("reads a file as version 3.2.1 wrote it (pretty JSON without a trailing newline)", () => {
+    const cache = new SkuCache(dir, mockLog);
+    const data = { ...createTestData("H6100", "OLD:00:00:00:00:00:00:21"), lastSeenOnNetwork: 1_700_000_000_000 };
+    fs.writeFileSync(path.join(cacheDirOf(dir), "h6100_old00000000000021.json"), JSON.stringify(data, null, 2));
+    expect(cache.loadAll()).toEqual([data]);
+    expect(cache.loadOne("H6100", "OLD:00:00:00:00:00:00:21")).toEqual(data);
   });
 
   it("keeps two devices of one SKU whose ids end alike in two files (3.0.0)", async () => {
@@ -175,7 +216,7 @@ describe("SkuCache", () => {
 
   it("reads a 2.x file under its old name and replaces it at the next save", async () => {
     const cache = new SkuCache(dir, mockLog);
-    const legacy = path.join(dir, "cache", "h61be_525f.json");
+    const legacy = path.join(cacheDirOf(dir), "h61be_525f.json");
     fs.writeFileSync(legacy, JSON.stringify({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "Old" }));
     expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")?.name).toBe("Old");
     await cache.save({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "New" });
@@ -183,10 +224,55 @@ describe("SkuCache", () => {
     expect(cache.loadAll().map(e => e.name)).toEqual(["New"]);
   });
 
+  it("keeps the 2.x file while the file of the current name could not be written", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    const legacy = path.join(cacheDirOf(dir), "h61be_525f.json");
+    fs.writeFileSync(legacy, JSON.stringify({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "Old" }));
+    // A folder where the master's temporary file goes — the write fails on every platform.
+    fs.mkdirSync(path.join(dir, "cache", "h61be_abcdef123456525f.json.tmp"));
+    await cache.save({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "New" });
+    expect(fs.existsSync(legacy)).toBe(true);
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")?.name).toBe("Old");
+  });
+
+  it("a 2.x file that cannot be removed stays — a debug line, the save itself succeeds", async () => {
+    const debug = vi.fn();
+    const cache = new SkuCache(dir, { ...mockLog, debug });
+    const legacy = path.join(cacheDirOf(dir), "h61be_525f.json");
+    fs.writeFileSync(legacy, JSON.stringify({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "Old" }));
+    faults.failRemove = new Error("EBUSY: resource busy");
+    await expect(
+      cache.save({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "New" }),
+    ).resolves.toBeUndefined();
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("Cache: could not remove the old file of H61BE: EBUSY"));
+    expect(fs.existsSync(legacy)).toBe(true);
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")?.name).toBe("New");
+  });
+
+  it("a device id of four characters keeps its one file — both name rules give the same name", async () => {
+    const cache = new SkuCache(dir, mockLog);
+    await cache.save(createTestData("H6100", "AB:CD"));
+    expect(fs.readdirSync(path.join(dir, "cache"))).toEqual(["h6100_abcd.json"]);
+    expect(cache.loadOne("H6100", "AB:CD")?.sku).toBe("H6100");
+  });
+
+  it("does not pass over an unusable file of the current name to the 2.x file", () => {
+    const debug = vi.fn();
+    const cache = new SkuCache(dir, { ...mockLog, debug });
+    const cacheDir = cacheDirOf(dir);
+    fs.writeFileSync(path.join(cacheDir, "h61be_abcdef123456525f.json"), "{ not json");
+    fs.writeFileSync(
+      path.join(cacheDir, "h61be_525f.json"),
+      JSON.stringify({ ...createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F"), name: "Old" }),
+    );
+    expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")).toBeNull();
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("Cache loadOne failed for H61BE: no JSON"));
+  });
+
   it("does not hand one device the 2.x file of another that shared its old name", () => {
     const cache = new SkuCache(dir, mockLog);
     fs.writeFileSync(
-      path.join(dir, "cache", "h61be_525f.json"),
+      path.join(cacheDirOf(dir), "h61be_525f.json"),
       JSON.stringify({ ...createTestData("H61BE", "11:22:33:44:55:66:52:5F"), name: "Other" }),
     );
     expect(cache.loadOne("H61BE", "AB:CD:EF:12:34:56:52:5F")).toBeNull();
@@ -195,10 +281,27 @@ describe("SkuCache", () => {
 
   it("evicts a device's 2.x file together with its current one", () => {
     const cache = new SkuCache(dir, mockLog);
-    const legacy = path.join(dir, "cache", "h61be_525f.json");
+    const legacy = path.join(cacheDirOf(dir), "h61be_525f.json");
     fs.writeFileSync(legacy, JSON.stringify(createTestData("H61BE", "AB:CD:EF:12:34:56:52:5F")));
     cache.evictDevice("H61BE", "AB:CD:EF:12:34:56:52:5F");
     expect(fs.existsSync(legacy)).toBe(false);
+  });
+
+  it("evictDevice logs the eviction only for a file that was there; a removal that fails is a debug line", async () => {
+    const debug = vi.fn();
+    const cache = new SkuCache(dir, { ...mockLog, debug });
+    const data = createTestData("H6100", "EV:00:00:00:00:00:00:01");
+    await cache.save(data);
+    cache.evictDevice("H6100", "EV:00:00:00:00:00:00:01", "Lamp (H6100)");
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("Cache: evicted Lamp (H6100) EV:00:00:00:00:00:00:01"));
+    debug.mockClear();
+    cache.evictDevice("H6100", "EV:00:00:00:00:00:00:01", "Lamp (H6100)");
+    expect(debug).not.toHaveBeenCalledWith(expect.stringContaining("Cache: evicted"));
+    await cache.save(data);
+    faults.failRemove = new Error("EBUSY: resource busy");
+    expect(() => cache.evictDevice("H6100", "EV:00:00:00:00:00:00:01", "Lamp (H6100)")).not.toThrow();
+    expect(debug).toHaveBeenCalledWith(expect.stringContaining("Cache evictDevice failed for Lamp (H6100)"));
+    expect(cache.loadOne("H6100", "EV:00:00:00:00:00:00:01")?.sku).toBe("H6100");
   });
 
   it("normalises the device id for the file name — colon and colon-less spellings hit the same file", async () => {
@@ -250,17 +353,6 @@ describe("SkuCache", () => {
     const data = createTestData();
     (data as unknown as { sku: unknown }).sku = null;
     await expect(cache.save(data)).resolves.toBeUndefined();
-  });
-
-  describe("save — durability", () => {
-    it("flushes the cache file to disk instead of leaving it in the page cache", async () => {
-      const before = fsCounters.fsync;
-      const cache = new SkuCache(dir, mockLog);
-      await cache.save(createTestData("H6100", "FSY:00:00:00:00:00:00:01"));
-      // Without the fsync a SIGKILL inside the ~30 s writeback window loses
-      // the save silently and the next start reads stale device data.
-      expect(fsCounters.fsync).toBeGreaterThan(before);
-    });
   });
 
   describe("pruneStale", () => {
@@ -331,9 +423,25 @@ describe("SkuCache", () => {
 
     it("skips corrupt cache files silently", () => {
       const cache = new SkuCache(dir, mockLog);
-      const cacheDir = path.join(dir, "cache");
+      const cacheDir = cacheDirOf(dir);
       fs.writeFileSync(path.join(cacheDir, "corrupt_1234.json"), "not json");
+      fs.writeFileSync(path.join(cacheDir, "null_1234.json"), "null");
       expect(() => cache.pruneStale(14)).not.toThrow();
+      expect(cache.pruneStale(14)).toBe(0);
+      expect(fs.readdirSync(cacheDir).sort()).toEqual(["corrupt_1234.json", "null_1234.json"]);
+    });
+
+    it("keeps a stale entry it cannot remove and does not count it", async () => {
+      const cache = new SkuCache(dir, mockLog);
+      const old = createTestData("H6001", "OLD:00:00:00:00:00:00:06");
+      old.lastSeenOnNetwork = Date.now() - 30 * DAY_MS;
+      await cache.save(old);
+      faults.failRemove = new Error("EBUSY: resource busy");
+      expect(cache.pruneStale(14)).toBe(0);
+      expect(cache.loadAll()).toHaveLength(1);
+      faults.failRemove = null;
+      expect(cache.pruneStale(14)).toBe(1);
+      expect(cache.loadAll()).toHaveLength(0);
     });
   });
 
@@ -398,14 +506,14 @@ describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)"
     const cache = new SkuCache(dir, mockLog);
     const data = createTestData("H6100", "DC:00:00:00:00:00:00:01");
     await cache.save(data);
-    const flushed = fsCounters.fsync;
+    // A marker on disk shows whether a later save touched the file.
+    fs.writeFileSync(path.join(cacheDir(), "h6100_dc00000000000001.json"), JSON.stringify({ ...data, name: "Marker" }));
     await cache.save({ ...data });
     await cache.save({ ...data, cachedAt: data.cachedAt + 60_000 });
     // saveDevicesToCache runs for every device twice per start — most of those
     // carry nothing new and must not touch the disk (SD-card wear, event loop).
-    expect(fsCounters.fsync).toBe(flushed);
+    expect(cache.loadAll()[0].name).toBe("Marker");
     await cache.save({ ...data, name: "Renamed" });
-    expect(fsCounters.fsync).toBe(flushed + 1);
     expect(cache.loadAll()[0].name).toBe("Renamed");
   });
 
@@ -436,28 +544,61 @@ describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)"
     expect(() => cache.evictDevice("H9999", "NO:PE")).not.toThrow();
   });
 
-  it("two overlapping saves of one device leave the LAST payload on disk and no temp file behind", async () => {
-    const cache = new SkuCache(dir, mockLog);
-    const first = createTestData("H6100", "OV:00:00:00:00:00:00:01");
-    const second = { ...first, name: "Second write" };
-    await Promise.all([cache.save(first), cache.save(second)]);
-    const files = fs.readdirSync(cacheDir());
-    expect(files.filter(f => f.endsWith(".tmp"))).toEqual([]);
-    expect(files).toHaveLength(1);
-    expect(cache.loadAll()[0].name).toBe("Second write");
-  });
-
-  it("a failed write warns, never rejects, and the next save of the same data retries", async () => {
-    const { log, warns } = warnLog();
+  it("a failed write warns once per kind with its reason, never rejects, and the next save of the same data retries", async () => {
+    const lines: Array<[string, string]> = [];
+    const log = {
+      ...mockLog,
+      debug: (m: string) => void lines.push(["debug", m]),
+      info: (m: string) => void lines.push(["info", m]),
+      warn: (m: string) => void lines.push(["warn", m]),
+    } as ioBroker.Logger;
     const cache = new SkuCache(dir, log);
     const data = createTestData("H6100", "FA:00:00:00:00:00:00:01");
-    fsCounters.failNextOpen = new Error("EACCES: permission denied");
+    const other = createTestData("H6100", "FA:00:00:00:00:00:00:02");
+    // Folders where the master's temporary files go — the writes fail on every platform, the same way.
+    const blockers = ["h6100_fa00000000000001.json.tmp", "h6100_fa00000000000002.json.tmp"].map(f =>
+      path.join(cacheDir(), f),
+    );
+    blockers.forEach(b => fs.mkdirSync(b, { recursive: true }));
     await expect(cache.save(data)).resolves.toBeUndefined();
-    expect(warns.some(m => m.includes("Cache write failed for H6100") && m.includes("EACCES"))).toBe(true);
+    await cache.save(other);
+    const failed = lines.filter(([, m]) => m.includes("Cache write failed for H6100"));
+    expect(failed.map(([level]) => level)).toEqual(["warn", "debug"]);
+    expect(failed[0][1]).toMatch(/EISDIR|EPERM|EEXIST/);
     expect(cache.loadAll()).toHaveLength(0);
-    // The fingerprint was NOT kept for the failed write — the retry is a real write.
+    blockers.forEach(b => fs.rmSync(b, { recursive: true }));
+    // The fingerprint was NOT kept for the failed write — the retry is a real write, and says once that writes work.
     await cache.save(data);
-    expect(cache.loadAll()).toHaveLength(1);
+    await cache.save(other);
+    expect(cache.loadAll()).toHaveLength(2);
+    expect(lines.filter(([level, m]) => level === "info" && m.includes("Cache writes work again"))).toHaveLength(1);
+  });
+
+  it("a saved entry names how many scenes, music modes, DIY scenes and snapshot packets it holds", async () => {
+    const debug = vi.fn();
+    const cache = new SkuCache(dir, { ...mockLog, debug });
+    const base = createTestData("H6100", "CT:00:00:00:00:00:00:01");
+    await cache.save({
+      ...base,
+      musicLibrary: [...base.musicLibrary, ...base.musicLibrary],
+      diyLibrary: [...base.diyLibrary, ...base.diyLibrary, ...base.diyLibrary],
+      snapshotBleCmds: [
+        { name: "a", cmds: [] },
+        { name: "b", cmds: [] },
+        { name: "c", cmds: [] },
+        { name: "d", cmds: [] },
+      ],
+    });
+    expect(debug).toHaveBeenCalledWith("Cache saved for H6100 (scenes=1, music=2, diy=3, snapshotBleCmds=4)");
+  });
+
+  it("pruneStale leaves a file that is no cache entry alone — a temporary file is never pruned or counted", () => {
+    const cache = new SkuCache(dir, mockLog);
+    fs.mkdirSync(cacheDir(), { recursive: true });
+    const old = { ...createTestData("H6100", "PT:00:00:00:00:00:00:01"), lastSeenOnNetwork: 1 };
+    fs.writeFileSync(path.join(cacheDir(), "h6100_pt00000000000001.json.tmp"), JSON.stringify(old));
+    expect(cache.pruneStale(14)).toBe(0);
+    expect(fs.readdirSync(cacheDir())).toEqual(["h6100_pt00000000000001.json.tmp"]);
   });
 
   it("loadOne returns the stored entry, null for an unknown device and null for a corrupt file", async () => {
@@ -475,12 +616,13 @@ describe("SkuCache — dirty check, write serialisation, failure paths (2.28.0)"
   });
 
   it("an unusable data directory disables the cache with one warning — save/load/evict become no-ops, nothing throws", async () => {
-    // The parent of the data dir is a regular file, so the cache directory can
-    // never be created (read-only or broken instance storage).
-    const blocker = path.join(dir, "not-a-dir");
-    fs.writeFileSync(blocker, "x");
+    // A regular file where the cache directory should be, so it can never be
+    // listed or created (broken instance storage). The file is the cache path
+    // itself: listing it fails on every platform, while a file higher up reads
+    // as "not there" on Windows.
+    fs.writeFileSync(path.join(dir, "cache"), "x");
     const { log, warns } = warnLog();
-    const cache = new SkuCache(path.join(blocker, "data"), log);
+    const cache = new SkuCache(dir, log);
     expect(warns).toHaveLength(1);
     expect(warns[0]).toContain("Cache directory not writable");
     await expect(cache.save(createTestData())).resolves.toBeUndefined();

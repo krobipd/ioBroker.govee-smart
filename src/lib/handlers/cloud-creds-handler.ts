@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto";
-import * as fs from "node:fs";
-import * as path from "node:path";
 import { errText, type PersistedMqttCredentials } from "../types";
-import { writeFileAtomic } from "../atomic-file";
+import { readDataFile, writeDataFile } from "../data-file";
 import { deriveGoveeClientId } from "../govee-constants";
 
 /**
@@ -49,6 +47,16 @@ function codeMark(code: string): string {
 }
 
 /**
+ * The fields of a parsed data file. A file that holds `null` (or nothing was read) has none; a number or a text has
+ * none of the names read here either, so only null and undefined need the empty stand-in.
+ *
+ * @param value The parsed content
+ */
+function fieldsOf(value: unknown): Record<string, unknown> {
+  return (value ?? {}) as Record<string, unknown>;
+}
+
+/**
  * The verification code a login sends: the one from the settings (or the card), or "" once Govee consumed or
  * rejected exactly this code — a spent code is skipped instead of being replayed on every login.
  *
@@ -60,28 +68,26 @@ export function usableVerificationCode(dataDir: string, code: string): string {
   if (!trimmed) {
     return "";
   }
-  try {
-    const stored = JSON.parse(fs.readFileSync(path.join(dataDir, USED_CODE_FILE), "utf-8")) as { used?: unknown };
-    return stored.used === codeMark(trimmed) ? "" : trimmed;
-  } catch {
-    // no mark yet, or an unreadable one: the code was never spent
-    return trimmed;
-  }
+  // no mark yet, or an unusable one, carries no hash: the code was never spent
+  return fieldsOf(readDataFile(dataDir, USED_CODE_FILE).value).used === codeMark(trimmed) ? "" : trimmed;
 }
 
 /**
- * Remember that Govee consumed or rejected this code, so no later login sends it again.
+ * Remember that Govee consumed or rejected this code, so no later login sends it again. The write itself is
+ * synchronous; the promise only carries a failed write to the callers' `.catch` instead of throwing into the MQTT
+ * callback that reports the code.
  *
  * @param dataDir Adapter instance data directory
  * @param code The code that went out
  */
-export async function markVerificationCodeUsed(dataDir: string, code: string): Promise<void> {
-  const trimmed = code.trim();
-  if (!trimmed) {
-    return;
-  }
-  await fs.promises.mkdir(dataDir, { recursive: true });
-  await writeFileAtomic(path.join(dataDir, USED_CODE_FILE), JSON.stringify({ used: codeMark(trimmed) }), 0o600);
+export function markVerificationCodeUsed(dataDir: string, code: string): Promise<void> {
+  return new Promise<void>(resolve => {
+    const trimmed = code.trim();
+    if (trimmed) {
+      writeDataFile(dataDir, USED_CODE_FILE, { used: codeMark(trimmed) });
+    }
+    resolve();
+  });
 }
 
 /** File name the encrypted MQTT credentials live in, inside the instance data directory. */
@@ -97,48 +103,43 @@ function legacyCredentialsMeta(adapter: CloudCredsAdapter): string {
 }
 
 /**
- * Absolute path of the encrypted credentials file inside the adapter's
- * instance data directory (`iobroker-data/<namespace>/`) — invisible in the
- * object tree, host-local like the SKU cache.
+ * Whether a usable credentials file is there — then a legacy blob has nothing to add. A file that cannot be used holds
+ * nothing either, so the blob replaces it; a data folder that cannot be read fails the write as well and keeps the
+ * legacy source for the next start.
  *
  * @param dataDir Adapter instance data directory
  */
-function credentialsFilePath(dataDir: string): string {
-  return path.join(dataDir, CREDENTIALS_FILE);
+function usableCredentialsFile(dataDir: string): boolean {
+  return readDataFile(dataDir, CREDENTIALS_FILE).value !== undefined;
 }
 
 /**
- * Write the encrypted credentials blob to disk (owner-read/write only — the
- * sensitive fields inside are additionally encrypted with the system secret).
+ * The parsed content of a legacy credentials blob (the JSON text the `info.mqttCredentials` state of v2.1.3–v2.17.x
+ * and the meta file of v2.18.x held), or undefined when the text is no JSON — such a blob holds nothing to carry over.
+ * JSON never parses to undefined, so the two cannot be mixed up.
  *
- * @param dataDir Adapter instance data directory
- * @param blob    JSON blob as produced by {@link persistCreds}
+ * @param raw The stored text
  */
-function writeCredentialsFile(dataDir: string, blob: string): void {
-  fs.mkdirSync(dataDir, { recursive: true });
-  fs.writeFileSync(credentialsFilePath(dataDir), blob, { encoding: "utf-8", mode: 0o600 });
+function legacyBlobValue(raw: string): unknown {
+  try {
+    return JSON.parse(raw) as unknown;
+  } catch {
+    return undefined;
+  }
 }
 
 /**
- * Parse + decrypt a stored credentials blob (the shape written by
+ * Decrypt a stored credentials blob (the shape written by
  * {@link persistCreds}). The sensitive fields (bearer + cert + pass) were
  * encrypted with the system secret on save. Returns null when the blob is
- * unparseable or incomplete.
+ * missing, no object or incomplete.
  *
  * @param adapter ioBroker adapter surface (for decrypt)
- * @param raw The stored JSON blob
+ * @param value The parsed blob, undefined when there is none
  */
-function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedMqttCredentials | null {
+function parsePersistedBlob(adapter: CloudCredsAdapter, value: unknown): PersistedMqttCredentials | null {
   try {
-    const obj = JSON.parse(raw) as {
-      bearerToken?: unknown;
-      iotEndpoint?: unknown;
-      p12Cert?: unknown;
-      p12Pass?: unknown;
-      accountId?: unknown;
-      accountTopic?: unknown;
-      tokenExpiresAt?: unknown;
-    };
+    const obj = fieldsOf(value);
     // typeof guards — decrypt() throws on non-string input. Defensive: if the
     // blob was tampered and holds wrong types, coerce them to empty strings.
     const safeStr = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -160,14 +161,13 @@ function parsePersistedBlob(adapter: CloudCredsAdapter, raw: string): PersistedM
 
 /**
  * The account key a stored blob was bound to, or "" for a blob written before
- * the binding existed. Only called on a blob `parsePersistedBlob` has already
- * parsed, so it cannot throw.
+ * the binding existed.
  *
- * @param raw The stored JSON blob
+ * @param value The parsed blob
  */
-function readAccountKey(raw: string): string {
-  const obj = JSON.parse(raw) as { accountKey?: unknown };
-  return typeof obj.accountKey === "string" ? obj.accountKey : "";
+function readAccountKey(value: unknown): string {
+  const { accountKey } = fieldsOf(value);
+  return typeof accountKey === "string" ? accountKey : "";
 }
 
 /**
@@ -193,27 +193,25 @@ export async function loadPersistedCreds(
   dataDir: string,
   accountEmail?: string,
 ): Promise<PersistedMqttCredentials | null> {
-  // 1. Preferred: the encrypted file in the instance data directory.
-  try {
-    const raw = fs.readFileSync(credentialsFilePath(dataDir), "utf-8");
-    const creds = raw ? parsePersistedBlob(adapter, raw) : null;
-    if (creds) {
-      // The session belongs to the account it was issued for. After the user
-      // switched to another Govee account the stored bundle would subscribe the
-      // OLD account's topic and read the OLD account's lists until its token
-      // expires — and the new account's sensors, missing from that list, would
-      // be reaped after two polls. A blob written before 2.40.0 carries no
-      // account key: it is accepted once and bound on the next save (refusing
-      // it would send every upgraded installation a verification mail).
-      const storedKey = readAccountKey(raw);
-      if (storedKey && accountEmail !== undefined && storedKey !== deriveGoveeClientId(accountEmail)) {
-        adapter.log.debug("Stored MQTT session belongs to another Govee account — fresh login");
-        return null;
-      }
-      return creds;
+  // 1. Preferred: the encrypted file in the instance data directory. No file,
+  // an unusable one (unreadable, no JSON, empty) and an incomplete one all
+  // fall through to the one-shot state migration.
+  const stored = readDataFile(dataDir, CREDENTIALS_FILE).value;
+  const fileCreds = parsePersistedBlob(adapter, stored);
+  if (fileCreds) {
+    // The session belongs to the account it was issued for. After the user
+    // switched to another Govee account the stored bundle would subscribe the
+    // OLD account's topic and read the OLD account's lists until its token
+    // expires — and the new account's sensors, missing from that list, would
+    // be reaped after two polls. A blob written before 2.40.0 carries no
+    // account key: it is accepted once and bound on the next save (refusing
+    // it would send every upgraded installation a verification mail).
+    const storedKey = readAccountKey(stored);
+    if (storedKey && accountEmail !== undefined && storedKey !== deriveGoveeClientId(accountEmail)) {
+      adapter.log.debug("Stored MQTT session belongs to another Govee account — fresh login");
+      return null;
     }
-  } catch {
-    // file absent → fall through to the one-shot state migration
+    return fileCreds;
   }
   // 2. One-shot migration from the legacy info.mqttCredentials state.
   try {
@@ -227,14 +225,19 @@ export async function loadPersistedCreds(
     // order threw them away on a write error → fresh login + potential 2FA
     // mail on every start — the exact storm this persistence exists to
     // prevent.
-    const creds = parsePersistedBlob(adapter, raw);
+    const blob = legacyBlobValue(raw);
+    const creds = parsePersistedBlob(adapter, blob);
     try {
-      // The state blob is already encrypted — copy it verbatim into the file,
-      // then drop the old state object so the credentials stop being a
-      // datapoint. Only remove the legacy state once the file carry-over
-      // actually succeeded; otherwise keep it as the migration source for
-      // the next start.
-      writeCredentialsFile(dataDir, raw);
+      // The state blob is already encrypted — its parsed object goes into the
+      // file as it is, then the old state object is dropped so the credentials
+      // stop being a datapoint. Only remove the legacy state once the file
+      // carry-over actually succeeded; otherwise keep it as the migration
+      // source for the next start. A blob that is no JSON holds nothing to
+      // carry over (up to 3.2.1 it was copied as it was and the next start
+      // found an unusable file): it is dropped without a file.
+      if (blob !== undefined) {
+        writeDataFile(dataDir, CREDENTIALS_FILE, blob);
+      }
       await adapter.delObjectAsync("info.mqttCredentials").catch(() => undefined);
       adapter.log.debug("Migrated persisted MQTT credentials from state to the credentials store");
     } catch (e) {
@@ -253,35 +256,38 @@ export async function loadPersistedCreds(
  * the blob is useless without the system secret. Writing a file does NOT
  * trigger an adapter restart (unlike a native write).
  *
+ * The fleet master writes synchronously through a temporary file renamed over
+ * the old one, readable for the owner only: a torn file would cost a fresh
+ * login (and possibly a verification mail) on the next start, and a login and
+ * a token refresh can no longer interleave inside one write. The promise only
+ * carries a failed write (or encryption) to the caller's `.catch`.
+ *
  * @param adapter ioBroker adapter surface
  * @param dataDir Adapter instance data directory
  * @param creds   The freshly-issued MQTT bundle from a successful login
  * @param accountEmail The account email the credentials belong to
  */
-export async function persistCreds(
+export function persistCreds(
   adapter: CloudCredsAdapter,
   dataDir: string,
   creds: PersistedMqttCredentials,
   accountEmail?: string,
 ): Promise<void> {
-  const blob = JSON.stringify({
-    // Binds the session to its account (see loadPersistedCreds) — the derived
-    // client id, not the address itself.
-    ...(accountEmail !== undefined ? { accountKey: deriveGoveeClientId(accountEmail) } : {}),
-    bearerToken: adapter.encrypt(creds.bearerToken),
-    iotEndpoint: creds.iotEndpoint,
-    p12Cert: adapter.encrypt(creds.p12Cert),
-    p12Pass: adapter.encrypt(creds.p12Pass),
-    accountId: creds.accountId,
-    accountTopic: creds.accountTopic,
-    tokenExpiresAt: creds.tokenExpiresAt,
+  return new Promise<void>(resolve => {
+    writeDataFile(dataDir, CREDENTIALS_FILE, {
+      // Binds the session to its account (see loadPersistedCreds) — the derived
+      // client id, not the address itself.
+      ...(accountEmail !== undefined ? { accountKey: deriveGoveeClientId(accountEmail) } : {}),
+      bearerToken: adapter.encrypt(creds.bearerToken),
+      iotEndpoint: creds.iotEndpoint,
+      p12Cert: adapter.encrypt(creds.p12Cert),
+      p12Pass: adapter.encrypt(creds.p12Pass),
+      accountId: creds.accountId,
+      accountTopic: creds.accountTopic,
+      tokenExpiresAt: creds.tokenExpiresAt,
+    });
+    resolve();
   });
-  // async fs on the hot path (runs on every login/token refresh), written
-  // atomically: a login and a token refresh can overlap, and a torn file costs
-  // a fresh login (and possibly a verification mail) on the next start. The
-  // sync writeCredentialsFile stays for the two one-shot startup migrations.
-  await fs.promises.mkdir(dataDir, { recursive: true });
-  await writeFileAtomic(credentialsFilePath(dataDir), blob, 0o600);
 }
 
 /**
@@ -290,8 +296,10 @@ export async function persistCreds(
  * file in the instance data directory: it is re-derivable from the configured
  * account (which IS part of every backup), so it does not need the meta
  * object's backup inclusion — and the visible `credentials` node disappears
- * from the object tree. Copies a stored blob into the new file (unless one
- * already exists), then drops the meta file and the meta object. Idempotent,
+ * from the object tree. Copies a stored blob — its parsed object, still
+ * encrypted — into the new file (unless a usable one already exists),
+ * then drops the meta file and the meta object; a blob that is no JSON holds
+ * nothing to carry over and is dropped without a file. Idempotent,
  * best-effort — runs on every start and no-ops once everything is gone.
  *
  * @param adapter ioBroker adapter surface
@@ -301,10 +309,10 @@ export async function migrateCredentialsMetaOnce(adapter: CloudCredsAdapter, dat
   let carryOverOk = true;
   try {
     const { file } = await adapter.readFileAsync(legacyCredentialsMeta(adapter), "mqtt.json");
-    const raw = typeof file === "string" ? file : file.toString("utf-8");
-    if (raw && !fs.existsSync(credentialsFilePath(dataDir))) {
+    const blob = legacyBlobValue(typeof file === "string" ? file : file.toString("utf-8"));
+    if (blob !== undefined && !usableCredentialsFile(dataDir)) {
       try {
-        writeCredentialsFile(dataDir, raw);
+        writeDataFile(dataDir, CREDENTIALS_FILE, blob);
         adapter.log.debug("Migrated persisted MQTT credentials into the instance data directory");
       } catch (e) {
         // Write failure (read-only FS, full disk) is NOT "no blob": keep the
